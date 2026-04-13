@@ -4,5 +4,6 @@ supabase==2.4.0
 openai==1.30.0
 numpy==1.24.4
 pandas==2.0.3
-pdfplumber
-Pillow
+pdfplumber==0.11.4
+Pillow==10.3.0
+python-dotenv==1.0.1
