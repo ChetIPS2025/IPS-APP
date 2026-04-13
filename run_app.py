@@ -25,15 +25,10 @@ def main() -> None:
     from streamlit.web import cli as stcli
 
     sys.argv = [
-        "streamlit",
-        "run",
-        str(main_py),
-        "--global.developmentMode=false",
-        "--server.address=0.0.0.0",
-        f"--server.port={os.environ.get('PORT', '8501')}",
-    ]
-    stcli.main()
-
-
-if __name__ == "__main__":
-    main()
+    "streamlit",
+    "run",
+    str(main_py),
+    "--global.developmentMode=false",
+    "--server.address=0.0.0.0",
+    f"--server.port={os.environ.get('PORT', '8501')}",
+]
