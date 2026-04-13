@@ -17,6 +17,7 @@ def main() -> None:
 
     main_py = root / "app" / "main.py"
     if not main_py.is_file():
+print(f"Starting Streamlit on port: {port}")
         print(f"Missing entry script: {main_py}", file=sys.stderr)
         sys.exit(1)
 
@@ -24,11 +25,13 @@ def main() -> None:
 
     from streamlit.web import cli as stcli
 
-    sys.argv = [
+   port = os.environ.get("PORT", "10000")
+
+sys.argv = [
     "streamlit",
     "run",
     str(main_py),
     "--global.developmentMode=false",
     "--server.address=0.0.0.0",
-    f"--server.port={os.environ.get('PORT', '8501')}",
+    f"--server.port={port}",
 ]
