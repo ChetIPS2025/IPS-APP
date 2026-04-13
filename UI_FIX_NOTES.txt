@@ -1,0 +1,4 @@
+UI fixes applied:
+- Added .streamlit/config.toml with showSidebarNavigation = false
+- Replaced raw HTML sidebar logo block with st.sidebar.image + text
+- Keeps the custom sidebar radio navigation only

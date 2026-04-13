@@ -1,0 +1,238 @@
+"""Fetch and index weekly grid time entries (public.time_entries)."""
+
+from __future__ import annotations
+
+from datetime import date, timedelta
+from typing import Any
+
+try:
+    from db import get_client
+except ImportError:
+    from app.db import get_client  # type: ignore
+
+
+def monday_of_week(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def week_dates(week_start: date) -> list[date]:
+    return [week_start + timedelta(days=i) for i in range(7)]
+
+
+def fetch_time_entries_for_date(work_date: date) -> list[dict[str, Any]]:
+    wd = work_date.isoformat()[:10]
+    r = (
+        get_client()
+        .table("time_entries")
+        .select("*")
+        .eq("work_date", wd)
+        .limit(20000)
+        .execute()
+    )
+    return r.data or []
+
+
+def fetch_time_entries_between(work_start: date, work_end: date) -> list[dict[str, Any]]:
+    r = (
+        get_client()
+        .table("time_entries")
+        .select("*")
+        .gte("work_date", work_start.isoformat())
+        .lte("work_date", work_end.isoformat())
+        .limit(20000)
+        .execute()
+    )
+    return r.data or []
+
+
+def index_by_employee_date(entries: list[dict]) -> dict[tuple[str, str], list[dict]]:
+    """(employee_id str, work_date iso str) -> list of rows."""
+    out: dict[tuple[str, str], list[dict]] = {}
+    for e in entries:
+        eid = str(e.get("employee_id") or "")
+        wd = str(e.get("work_date") or "")[:10]
+        if not eid or not wd:
+            continue
+        out.setdefault((eid, wd), []).append(e)
+    for k in out:
+        out[k].sort(key=lambda x: str(x.get("id")))
+    return out
+
+
+def sum_employee_week_hours(entries: list[dict], employee_id: str, week_dates_: list[date]) -> float:
+    total = 0.0
+    wd_set = {d.isoformat() for d in week_dates_}
+    for e in entries:
+        if str(e.get("employee_id")) != str(employee_id):
+            continue
+        wds = str(e.get("work_date") or "")[:10]
+        if wds in wd_set:
+            total += float(e.get("hours", 0) or 0)
+    return total
+
+
+def grid_labor_cost_dollars(hours: float, employee: dict | None) -> float:
+    """All grid hours billed at employee straight-time rate."""
+    if not employee:
+        return 0.0
+    hr = float(employee.get("hourly_rate") or 0)
+    return float(hours or 0) * hr
+
+
+def fetch_entries_employee_between(employee_id: str, work_start: date, work_end: date) -> list[dict[str, Any]]:
+    r = (
+        get_client()
+        .table("time_entries")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .gte("work_date", work_start.isoformat())
+        .lte("work_date", work_end.isoformat())
+        .limit(10000)
+        .execute()
+    )
+    return r.data or []
+
+
+def delete_time_entries_by_ids(entry_ids: list[str]) -> None:
+    for eid in entry_ids:
+        if eid:
+            get_client().table("time_entries").delete().eq("id", eid).execute()
+
+
+def delete_employee_work_date(employee_id: str, work_date: date) -> int:
+    rows = fetch_entries_employee_between(employee_id, work_date, work_date)
+    ids = [str(r.get("id")) for r in rows if r.get("id")]
+    delete_time_entries_by_ids(ids)
+    return len(ids)
+
+
+def delete_employee_week(employee_id: str, week_start: date, week_end: date) -> int:
+    rows = fetch_entries_employee_between(employee_id, week_start, week_end)
+    ids = [str(r.get("id")) for r in rows if r.get("id")]
+    delete_time_entries_by_ids(ids)
+    return len(ids)
+
+
+def upsert_time_entry(
+    *,
+    employee_id: str,
+    job_id: str,
+    work_date: date,
+    hours: float,
+    notes: str,
+    created_by,
+    updated_at_iso: str,
+) -> None:
+    """Insert or update one (employee, job, day) row."""
+    try:
+        from db import fetch_by_match, insert_row, update_rows
+    except ImportError:
+        from app.db import fetch_by_match, insert_row, update_rows  # type: ignore
+
+    wd = work_date.isoformat()[:10]
+    existing = fetch_by_match(
+        "time_entries",
+        {"employee_id": employee_id, "job_id": job_id, "work_date": wd},
+        limit=1,
+    )
+    payload_update = {
+        "hours": float(hours or 0),
+        "notes": (notes or "").strip(),
+        "updated_at": updated_at_iso,
+    }
+    if existing:
+        update_rows("time_entries", payload_update, {"id": existing[0]["id"]})
+    else:
+        insert_row(
+            "time_entries",
+            {
+                "employee_id": employee_id,
+                "job_id": job_id,
+                "work_date": wd,
+                "hours": float(hours or 0),
+                "notes": (notes or "").strip(),
+                "created_by": created_by,
+                "updated_at": updated_at_iso,
+            },
+        )
+
+
+def copy_employee_day_to_day(
+    *,
+    employee_id: str,
+    from_date: date,
+    to_date: date,
+    created_by,
+    updated_at_iso: str,
+) -> None:
+    """Replace destination day with a copy of source day (same jobs, hours, notes)."""
+    src = fetch_entries_employee_between(employee_id, from_date, from_date)
+    delete_employee_work_date(employee_id, to_date)
+    for row in src:
+        upsert_time_entry(
+            employee_id=employee_id,
+            job_id=str(row.get("job_id")),
+            work_date=to_date,
+            hours=float(row.get("hours", 0) or 0),
+            notes=str(row.get("notes") or ""),
+            created_by=created_by,
+            updated_at_iso=updated_at_iso,
+        )
+
+
+def copy_employee_previous_week_to_current(
+    *,
+    employee_id: str,
+    dest_week_start: date,
+    created_by,
+    updated_at_iso: str,
+) -> None:
+    """Replace the current week with a copy of the prior Mon–Sun week for this employee."""
+    dest_end = dest_week_start + timedelta(days=6)
+    delete_employee_week(employee_id, dest_week_start, dest_end)
+    src_start = dest_week_start - timedelta(days=7)
+    src_end = src_start + timedelta(days=6)
+    src_rows = fetch_entries_employee_between(employee_id, src_start, src_end)
+    for row in src_rows:
+        wd = row.get("work_date")
+        if not wd:
+            continue
+        s = str(wd)[:10]
+        try:
+            sd = date.fromisoformat(s)
+        except ValueError:
+            continue
+        dest_date = sd + timedelta(days=7)
+        if dest_date < dest_week_start or dest_date > dest_end:
+            continue
+        upsert_time_entry(
+            employee_id=employee_id,
+            job_id=str(row.get("job_id")),
+            work_date=dest_date,
+            hours=float(row.get("hours", 0) or 0),
+            notes=str(row.get("notes") or ""),
+            created_by=created_by,
+            updated_at_iso=updated_at_iso,
+        )
+
+
+def fill_employee_job_across_week(
+    *,
+    employee_id: str,
+    job_id: str,
+    week_dates: list[date],
+    hours_per_day: float,
+    notes: str,
+    created_by,
+    updated_at_iso: str,
+) -> None:
+    for d in week_dates:
+        upsert_time_entry(
+            employee_id=employee_id,
+            job_id=job_id,
+            work_date=d,
+            hours=hours_per_day,
+            notes=notes,
+            created_by=created_by,
+            updated_at_iso=updated_at_iso,
+        )

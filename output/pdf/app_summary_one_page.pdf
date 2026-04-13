@@ -1,0 +1,259 @@
+%PDF-1.4
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R /F2 3 0 R /F3 4 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+>>
+endobj
+4 0 obj
+<<
+/BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding /Name /F3 /Subtype /Type1 /Type /Font
+>>
+endobj
+5 0 obj
+<<
+/Contents 9 0 R /MediaBox [ 0 0 612 792 ] /Parent 8 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+6 0 obj
+<<
+/PageMode /UseNone /Pages 8 0 R /Type /Catalog
+>>
+endobj
+7 0 obj
+<<
+/Author (OpenAI Codex) /CreationDate (D:20260409231225-05'00') /Creator (anonymous) /Keywords () /ModDate (D:20260409231225-05'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (App Summary) /Trapped /False
+>>
+endobj
+8 0 obj
+<<
+/Count 1 /Kids [ 5 0 R ] /Type /Pages
+>>
+endobj
+9 0 obj
+<<
+/Length 5568
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+.917647 .94902 .984314 rg
+n 0 727.2 612 64.8 re f*
+.85098 .901961 .960784 rg
+n 0 0 612 20.16 re f*
+q
+1 0 0 1 25.2 732.4 cm
+q
+.094118 .192157 .32549 rg
+BT 1 0 0 1 0 2 Tm /F2 18 Tf 20 TL (App Summary) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 716.4 cm
+q
+.309804 .364706 .458824 rg
+BT 1 0 0 1 0 1.5 Tm /F1 8.5 Tf 10 TL (Industrial Plant Solutions - Streamlit estimating and operations app) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 696.4 cm
+q
+.121569 .305882 .47451 rg
+BT 1 0 0 1 0 1.8 Tm /F2 10.2 Tf 12 TL (What it is) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 657.4 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 24 Tm /F1 9 Tf 11 TL (A Streamlit web app for Industrial Plant Solutions that manages) Tj T* (estimating, jobs, time, expenses, users, and assets against a) Tj T* (Supabase backend.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 629.4 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 13 Tm /F1 9 Tf 11 TL (The repo also includes proposal export plus AI-assisted material) Tj T* (quote import and asset photo autofill features.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 615.4 cm
+q
+.121569 .305882 .47451 rg
+BT 1 0 0 1 0 1.8 Tm /F2 10.2 Tf 12 TL (Who it's for) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 587.4 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 13 Tm /F1 9 Tf 11 TL (Primary persona: internal IPS estimators and admins; viewer users) Tj T* (are also supported in auth/session role handling.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 573.4 cm
+q
+.121569 .305882 .47451 rg
+BT 1 0 0 1 0 1.8 Tm /F2 10.2 Tf 12 TL (What it does) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 545.8 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Builds estimates with materials, labor, equipment, travel, markup,) Tj T* 7 0 Td (overhead, profit, and tax controls.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 518.2 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Saves revisions, submits estimates for approval, locks final) Tj T* 7 0 Td (statuses, and marks awarded work.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 490.6 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Generates proposal exports as DOCX and PDF, and stores) Tj T* 7 0 Td (exports and attachments in Supabase Storage.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 463 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Maintains customer and job records, including linked estimates,) Tj T* 7 0 Td (status, PM/supervisor fields, and awarded amounts.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 435.4 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Tracks employee time entries with approval status and) Tj T* 7 0 Td (job/customer context.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 407.8 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Tracks PO and expense records by category, vendor, job, and) Tj T* 7 0 Td (status.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 380.2 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Manages assets, assignments, maintenance, inspections,) Tj T* 7 0 Td (documents, and AI-assisted photo/quote intake.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 366.2 cm
+q
+.121569 .305882 .47451 rg
+BT 1 0 0 1 0 1.8 Tm /F2 10.2 Tf 12 TL (How it works) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 338.6 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 UI layer: `app/main.py` registers Streamlit pages and `app/ui.py`) Tj T* 7 0 Td (renders custom sidebar navigation.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 311 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Auth/session: `app/auth.py` signs users in through Supabase) Tj T* 7 0 Td (Auth, loads `profiles`, and gates admin-only pages by role.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 272.6 cm
+q
+BT 1 0 0 1 10 23.4 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Data access: `app/db.py` wraps Supabase table CRUD, admin) Tj T* 7 0 Td (writes, signed URLs, storage upload, and quote number) Tj T* (generation.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 234.2 cm
+q
+BT 1 0 0 1 10 23.4 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Feature pages: estimating, jobs, time, expenses, materials, labor,) Tj T* 7 0 Td (equipment, users, and asset pages read/write Supabase tables) Tj T* (directly.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 195.8 cm
+q
+BT 1 0 0 1 10 23.4 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Services: `app/services/material_quote_import.py` and) Tj T* 7 0 Td (`app/services/asset_photo_autofill.py` call OpenAI for structured) Tj T* (extraction from uploaded files/photos.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 168.2 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Schema evidence: `sql/001_asset_module_tables.sql` defines) Tj T* 7 0 Td (asset tables; other non-asset table DDL was not found in repo.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 154.2 cm
+q
+.121569 .305882 .47451 rg
+BT 1 0 0 1 0 1.8 Tm /F2 10.2 Tf 12 TL (How to run) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 115.8 cm
+q
+BT 1 0 0 1 10 23.4 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 From the project root, create `.env` values for `SUPABASE_URL`) Tj T* 7 0 Td (plus either publishable/anon and secret/service-role keys;) Tj T* (`OPENAI_API_KEY` is also needed for AI features.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 88.2 cm
+q
+BT 1 0 0 1 10 12.6 Tm -7 0 Td -0.069 Tw 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Install Python dependencies: Not found in repo \(`requirements.txt`) Tj T* 0 Tw 7 0 Td (/ top-level `pyproject.toml` not found\).) Tj T* ET
+Q
+Q
+q
+1 0 0 1 25.2 71.4 cm
+q
+BT 1 0 0 1 10 1.8 Tm -7 0 Td 10.8 TL /F1 9 Tf 0 0 0 rg (\177 Start the app with `streamlit run app/main.py`.) Tj T* 7 0 Td ET
+Q
+Q
+q
+1 0 0 1 25.2 48.4 cm
+q
+.419608 .447059 .501961 rg
+BT 1 0 0 1 0 9.8 Tm /F3 7.2 Tf 8.5 TL (Source basis: repo files only. Visual PNG rendering was not available in this) Tj T* (environment because `pdftoppm` was not installed.) Tj T* ET
+Q
+Q
+ 
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000061 00000 n 
+0000000112 00000 n 
+0000000219 00000 n 
+0000000331 00000 n 
+0000000446 00000 n 
+0000000639 00000 n 
+0000000707 00000 n 
+0000000974 00000 n 
+0000001033 00000 n 
+trailer
+<<
+/ID 
+[<cf5f418a1fc8622e7a4a2d57ec930581><cf5f418a1fc8622e7a4a2d57ec930581>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 7 0 R
+/Root 6 0 R
+/Size 10
+>>
+startxref
+6652
+%%EOF

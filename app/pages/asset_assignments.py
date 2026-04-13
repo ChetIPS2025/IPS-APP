@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+import pandas as pd
+import streamlit as st
+
+try:
+    from app.auth import current_profile, current_role
+    from app.branding import render_header
+    from app.db import fetch_table, insert_row_admin, update_rows_admin
+    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+except ImportError:
+    from auth import current_profile, current_role  # type: ignore
+    from branding import render_header  # type: ignore
+    from db import fetch_table, insert_row_admin, update_rows_admin  # type: ignore
+    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+
+
+def render() -> None:
+    render_header("Asset Assignments")
+
+    if current_role() not in {"admin", "estimator"}:
+        st.info("Only admin or estimator users can manage assignments.")
+        return
+
+    assets = fetch_table("assets", limit=5000, order_by="asset_name")
+    jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
+    assignments = fetch_table("asset_assignments", limit=5000, order_by="created_at")
+
+    asset_options = {f"{a.get('asset_id')} - {a.get('asset_name')}": a for a in assets}
+    job_options: dict[str, str | None] = {"": None}
+    for job in jobs:
+        label = job_row_select_label(job)
+        if label and label != "—":
+            job_options[label] = job.get("id")
+
+    tab1, tab2 = st.tabs(["Assign Asset", "History"])
+
+    with tab1:
+        selected_label = st.selectbox("Asset", list(asset_options.keys()))
+        selected_asset = asset_options[selected_label]
+        employee = st.text_input("Assign To")
+        job_name = st.selectbox("Job", list(job_options.keys()))
+        location = st.text_input("Assignment Location", value=str(selected_asset.get("location", "")))
+        notes = st.text_area("Notes")
+
+        c1, c2 = st.columns(2)
+        if c1.button("Check Out", use_container_width=True):
+            insert_row_admin(
+                "asset_assignments",
+                {
+                    "asset_id": selected_asset["id"],
+                    "assigned_to": employee.strip(),
+                    "assigned_job_id": job_options.get(job_name),
+                    "assigned_location": location.strip(),
+                    "check_out_at": datetime.utcnow().isoformat(),
+                    "notes": notes.strip(),
+                    "created_by": current_profile().get("id"),
+                },
+            )
+            update_rows_admin(
+                "assets",
+                {
+                    "status": "Assigned",
+                    "assigned_employee": employee.strip(),
+                    "assigned_job_id": job_options.get(job_name),
+                    "location": location.strip(),
+                },
+                {"id": selected_asset["id"]},
+            )
+            st.success("Asset checked out.")
+            st.rerun()
+
+        if c2.button("Check In", use_container_width=True):
+            insert_row_admin(
+                "asset_assignments",
+                {
+                    "asset_id": selected_asset["id"],
+                    "assigned_to": selected_asset.get("assigned_employee", ""),
+                    "assigned_job_id": selected_asset.get("assigned_job_id"),
+                    "assigned_location": location.strip(),
+                    "check_in_at": datetime.utcnow().isoformat(),
+                    "notes": notes.strip(),
+                    "created_by": current_profile().get("id"),
+                },
+            )
+            update_rows_admin(
+                "assets",
+                {
+                    "status": "Available",
+                    "assigned_employee": "",
+                    "assigned_job_id": None,
+                },
+                {"id": selected_asset["id"]},
+            )
+            st.success("Asset checked in.")
+            st.rerun()
+
+    with tab2:
+        if assignments:
+            st.dataframe(pd.DataFrame(assignments), use_container_width=True, hide_index=True)
+        else:
+            st.info("No assignment history found.")

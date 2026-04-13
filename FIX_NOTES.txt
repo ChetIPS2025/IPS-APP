@@ -1,0 +1,9 @@
+Clean fix applied:
+- pages/__init__.py emptied to stop circular imports
+- po_exspenses.py copied to po_expenses.py to match imports
+- main.py rebuilt with direct page imports and a stable page map
+
+Run from project root:
+.venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app/main.py

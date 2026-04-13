@@ -1,0 +1,2 @@
+# Windows EXE packaging (install separately from runtime deps)
+pyinstaller>=6.0

@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import streamlit as st
+
+from auth import init_session, sign_in, require_login, current_role
+from config import settings
+from errors import show_auth_error, show_page_error
+from logging_config import configure_logging
+from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
+from branding import apply_branding, render_header
+try:
+    from app.pwa import inject_pwa_support
+except ImportError:
+    from pwa import inject_pwa_support  # type: ignore
+
+from pages import dashboard
+from pages import estimates
+from pages import customers_jobs
+from pages import job_database
+from pages import job_costing
+from pages import asset_database
+from pages import asset_detail
+from pages import assets as assets_page
+from pages import asset_scanner
+from pages import materials
+from pages import labor
+from pages import equipment
+from pages import inventory
+from pages import time_tracking
+from pages import pm_matrix_entry
+from pages import weekly_timesheet
+from pages import employees
+from pages import employee_toolbox
+from pages import po_expenses
+from pages import admin
+from pages import users
+
+
+PAGES = {
+    "Dashboard": dashboard.render,
+    # Estimates UI: app/pages/estimates.py → estimates.render
+    "Estimates": estimates.render,
+    "Job Database": job_database.render,
+    "Customers": customers_jobs.render_customers,
+    "Job Costing": job_costing.render,
+    "Materials": materials.render,
+    "Labor": labor.render,
+    "Equipment": equipment.render,
+    "Inventory": inventory.render,
+    "Time Tracking": time_tracking.render,
+    "PM Matrix Time Entry": pm_matrix_entry.render,
+    "Weekly Timesheet": weekly_timesheet.render,
+    "Employees": employees.render,
+    "Employee Toolbox": employee_toolbox.render,
+    "PO / Expenses": po_expenses.render,
+    "Asset Database": asset_database.render,
+    "Asset Scanner": asset_scanner.render,
+    "Admin": admin.render,
+    "Users": users.render,
+    "Asset Detail": asset_detail.render,
+    "Asset Manager": assets_page.render,
+}
+
+_ADMIN_ONLY_PAGES = frozenset(
+    {"Materials", "Labor", "Equipment", "Inventory", "Employees", "Admin", "Users"}
+)
+
+
+def main() -> None:
+    configure_logging(settings.log_level)
+
+    st.set_page_config(
+        page_title=settings.app_name,
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+
+    init_session()
+    apply_branding()
+    inject_pwa_support()
+
+    if not require_login():
+        render_header("Login")
+        st.caption("Supabase-backed multi-user estimator for Industrial Plant Solutions, LLC")
+
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Sign in", use_container_width=True):
+            try:
+                sign_in(email, password)
+                st.rerun()
+            except Exception as exc:
+                show_auth_error(exc)
+
+        st.stop()
+
+    apply_pending_navigation()
+    sidebar_page = render_sidebar()
+    if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
+        prev = st.session_state.get("_ips_last_nav_page")
+        if prev is not None and sidebar_page != prev:
+            st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+    st.session_state["_ips_last_nav_page"] = sidebar_page
+    page = st.session_state.get(IPS_ACTIVE_PAGE_KEY) or sidebar_page
+
+    if page in _ADMIN_ONLY_PAGES and current_role() != "admin":
+        st.error("Admin access required.")
+        return
+
+    render_fn = PAGES.get(page)
+    if render_fn is None:
+        st.error(f"Unknown page: {page}")
+        return
+
+    try:
+        render_fn()
+    except Exception as exc:
+        show_page_error(exc, context=f"page:{page}")
+
+
+if __name__ == "__main__":
+    main()

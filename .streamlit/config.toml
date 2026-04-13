@@ -1,0 +1,11 @@
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"
+
+[server]
+# Megabytes; raise for large quote PDFs / attachments
+maxUploadSize = 200
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
