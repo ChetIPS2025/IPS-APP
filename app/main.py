@@ -3,8 +3,6 @@ from __future__ import annotations
 import streamlit as st
 from app.config import settings
 
-st.write("URL:", settings.supabase_url)
-st.write("Publishable key:", settings.supabase_publishable_key[:30])
 from auth import init_session, sign_in, require_login, current_role
 from config import settings
 from errors import show_auth_error, show_page_error

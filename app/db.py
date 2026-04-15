@@ -13,10 +13,7 @@ except ImportError:
     class StorageApiError(Exception):
         """Fallback when storage3 is not installed."""
 
-try:
-    from config import ROOT_DIR, settings
-except ImportError:
-    from app.config import ROOT_DIR, settings  # type: ignore
+from app.config import ROOT_DIR, settings
 
 _LOG = logging.getLogger(__name__)
 

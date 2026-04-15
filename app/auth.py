@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import streamlit as st
-from db import get_client, fetch_table
+from app.db import get_client, fetch_table
 
 
 def init_session() -> None:
