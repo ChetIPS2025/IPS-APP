@@ -13,3 +13,4 @@ python-docx==1.1.2
 lxml==4.9.4
 reportlab
 PyPDF2
+PyMuPDF==1.24.1
