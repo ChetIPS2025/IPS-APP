@@ -835,7 +835,7 @@ def _render_one_asset_file_tile(
         except Exception:
             st.caption(file_name)
             if is_http:
-                st.link_button("Open file", url=ref)
+                st.link_button("Open file", url=ref, use_container_width=True)
             else:
                 p = Path(ref)
                 if p.is_file():
@@ -852,7 +852,7 @@ def _render_one_asset_file_tile(
     if kind == "pdf":
         st.markdown("##### 📄")
         if is_http:
-            st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref)
+            st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref, use_container_width=True)
         else:
             p = Path(ref)
             if p.is_file():
@@ -870,7 +870,7 @@ def _render_one_asset_file_tile(
 
     st.markdown("##### 📎")
     if is_http:
-        st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref)
+        st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref, use_container_width=True)
     else:
         p = Path(ref)
         if p.is_file():
