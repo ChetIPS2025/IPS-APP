@@ -1,9 +1,6 @@
+setuptools>=68.0.0
 streamlit==1.33.0
 supabase==2.3.4
-postgrest==0.16.10
-gotrue==2.4.2
-storage3==0.7.7
-
 openai==1.30.0
 numpy==1.24.4
 pandas==2.0.3
@@ -14,4 +11,3 @@ python-docx==1.1.2
 lxml==4.9.4
 reportlab
 PyPDF2
-setuptools>=68.0.0
