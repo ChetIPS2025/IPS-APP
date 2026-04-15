@@ -11,6 +11,7 @@ IPS-APP is a Streamlit-based business management application for Industrial Plan
 ```bash
 source /workspace/.venv/bin/activate
 export PYTHONPATH="/workspace:/workspace/app"
+export SUPABASE_PUBLISHABLE_KEY="$SUPABASE_ANON_KEY"
 streamlit run app/main.py --server.address=0.0.0.0 --server.port=10000
 ```
 
@@ -23,10 +24,10 @@ The app requires these environment variables (set as Cursor secrets):
 | Variable | Purpose |
 |----------|---------|
 | `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | Public/anon key for client Supabase access |
-| `SUPABASE_SECRET_KEY` | Service role key for admin operations |
+| `SUPABASE_ANON_KEY` | Supabase anon/public JWT (208-char JWT, **not** the short 46-char publishable key) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role JWT for admin operations |
 
-Legacy aliases `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are also supported.
+The config module also reads `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` as newer aliases. **Caveat:** `get_client()` prefers `SUPABASE_PUBLISHABLE_KEY` over `SUPABASE_ANON_KEY`. If `SUPABASE_PUBLISHABLE_KEY` is set to anything other than a valid Supabase JWT, authentication will fail with "Invalid API key". When starting Streamlit, override it: `export SUPABASE_PUBLISHABLE_KEY="$SUPABASE_ANON_KEY"`.
 
 `OPENAI_API_KEY` is optional (only needed for PDF import / AI features).
 
