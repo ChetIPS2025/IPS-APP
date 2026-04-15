@@ -118,8 +118,7 @@ def allocate_next_shared_sequence_int() -> int:
         resp = get_admin_client().rpc("ips_next_job_quote_seq", {}).execute()
     except Exception as exc:
         raise RuntimeError(
-            "Could not allocate next sequence number. Apply sql/012_ips_shared_sequence.sql in "
-            "Supabase and grant EXECUTE on public.ips_next_job_quote_seq() to service_role."
+            f"Could not allocate next sequence number. Supabase error: {exc!r}"
         ) from exc
     return _coerce_sequence_rpc_result(resp.data)
 
@@ -315,7 +314,6 @@ def delete_rows_admin(
 # STORAGE HELPERS
 # -----------------------
 
-
 def _storage_is_local() -> bool:
     return getattr(settings, "storage_backend", "supabase") == "local"
 
@@ -353,7 +351,7 @@ def _upload_bytes_local(
     data: bytes,
     content_type: str = "application/octet-stream",
 ) -> str:
-    _ = content_type  # reserved for metadata sidecars if needed later
+    _ = content_type
     dest = _local_file_path(storage_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
@@ -362,7 +360,6 @@ def _upload_bytes_local(
 
 
 def _storage_upload_options(content_type: str) -> dict[str, str]:
-    # storage3 mutates file_options; set both upsert and x-upsert for compatibility across API versions
     return {
         "content-type": content_type,
         "upsert": "true",
@@ -401,10 +398,6 @@ def upload_bytes_admin(
 
 
 def delete_storage_object_admin(storage_path: str) -> None:
-    """
-    Remove an object from Supabase Storage or the local storage root.
-    Uses the same logical key as ``upload_bytes_admin`` / ``create_signed_url``.
-    """
     key = str(storage_path or "").strip()
     if not key:
         return
@@ -429,7 +422,6 @@ def delete_storage_object_admin(storage_path: str) -> None:
         raise
 
 
-# Backward-compatible wrapper for older pages that still import upload_bytes
 def upload_bytes(
     storage_path: str,
     data: bytes,
@@ -460,10 +452,6 @@ def create_signed_url(
     storage_path: str,
     expires_in: int = 3600,
 ) -> str:
-    """
-    Supabase: HTTPS signed URL for the object.
-    Local storage: absolute filesystem path (for server-side Streamlit `st.image` / readers); expires_in ignored.
-    """
     if _storage_is_local():
         _ = expires_in
         try:
@@ -474,15 +462,10 @@ def create_signed_url(
             return str(p)
         return ""
 
-    # Service role avoids storage RLS gaps when generating download links from the Streamlit server
     client = get_admin_client()
     resp = client.storage.from_(settings.storage_bucket).create_signed_url(storage_path, expires_in)
     return _signed_url_from_response(resp)
 
-
-# -----------------------
-# APP HELPERS
-# -----------------------
 
 try:
     from app.services.shared_sequence import next_quote_number_string
