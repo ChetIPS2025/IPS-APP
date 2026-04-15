@@ -20,14 +20,11 @@ _LOG = logging.getLogger(__name__)
 _client: Client | None = None
 _admin_client: Client | None = None
 
-# ``public.jobs`` has no ``description`` column (use ``notes``). Stale callers may still
-# pass ``description`` in ``columns=`` or ``order_by=``; normalize to avoid PostgREST errors.
 _JOBS_STALE_COLUMN_DESCRIPTION = "description"
 _JOBS_ORDER_BY_FOR_STALE_DESCRIPTION = "job_name"
 
 
 def _normalize_jobs_query(*, columns: str, order_by: str | None) -> tuple[str, str | None]:
-    """Map invalid ``jobs.description`` usage to real columns (``notes`` / ``job_name``)."""
     col = (columns or "*").strip() or "*"
     if col != "*":
         parts: list[str] = []
@@ -65,7 +62,10 @@ def _normalize_jobs_query(*, columns: str, order_by: str | None) -> tuple[str, s
 def get_client() -> Client:
     global _client
     if _client is None:
-        public_key = getattr(settings, "supabase_publishable_key", "") or getattr(settings, "supabase_anon_key", "")
+        public_key = (
+            getattr(settings, "supabase_publishable_key", "")
+            or getattr(settings, "supabase_anon_key", "")
+        )
         if not settings.supabase_url or not public_key:
             raise RuntimeError("Supabase URL or public key is missing from .env")
         _client = create_client(settings.supabase_url, public_key)
@@ -75,7 +75,12 @@ def get_client() -> Client:
 def get_admin_client() -> Client:
     global _admin_client
     if _admin_client is None:
-        secret_key = getattr(settings, "supabase_secret_key", "") or getattr(settings, "supabase_service_role_key", "")
+        # Prefer legacy service-role JWT first, because your current RPC/admin path is rejecting
+        # the newer secret key with "Invalid API key".
+        secret_key = (
+            getattr(settings, "supabase_service_role_key", "")
+            or getattr(settings, "supabase_secret_key", "")
+        )
         if not settings.supabase_url or not secret_key:
             raise RuntimeError("Supabase URL or admin key is missing from .env")
         _admin_client = create_client(settings.supabase_url, secret_key)
@@ -83,7 +88,6 @@ def get_admin_client() -> Client:
 
 
 def _coerce_sequence_rpc_result(data: Any) -> int:
-    """Normalize PostgREST / supabase-py RPC return value to ``int``."""
     if data is None:
         raise RuntimeError("ips_next_job_quote_seq returned no data")
     if isinstance(data, bool):
@@ -108,12 +112,6 @@ def _coerce_sequence_rpc_result(data: Any) -> int:
 
 
 def allocate_next_shared_sequence_int() -> int:
-    """
-    Atomically increment the shared job/quote counter (row lock on ``ips_shared_sequence``).
-
-    Requires migration ``sql/012_ips_shared_sequence.sql`` and ``EXECUTE`` for the service role
-    on ``public.ips_next_job_quote_seq()``.
-    """
     try:
         resp = get_admin_client().rpc("ips_next_job_quote_seq", {}).execute()
     except Exception as exc:
@@ -123,17 +121,12 @@ def allocate_next_shared_sequence_int() -> int:
     return _coerce_sequence_rpc_result(resp.data)
 
 
-# -----------------------
-# USER / RLS READ HELPERS
-# -----------------------
-
 def fetch_table_admin(
     table_name: str,
     columns: str = "*",
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Same as :func:`fetch_table` but uses the service-role client (bypasses RLS)."""
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
     query = get_admin_client().table(table_name).select(columns).limit(limit)
@@ -149,14 +142,6 @@ def fetch_table(
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Read rows via PostgREST. ``columns`` must list only columns that exist on the table.
-    ``order_by`` must be a real column name; invalid names cause API errors (callers should
-    use :func:`fetch_table_with_order_fallback` when the schema may vary).
-
-    For ``jobs``, ``description`` is normalized: it is not a real column — ``columns`` tokens
-    map to ``notes``, and ``order_by='description'`` maps to ``job_name``.
-    """
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
     query = get_client().table(table_name).select(columns).limit(limit)
@@ -172,10 +157,6 @@ def fetch_table_with_order_fallback(
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Like :func:`fetch_table`, but if ordering fails (unknown column, etc.), retry without
-    ``order_by``. Caller may sort in Python afterward.
-    """
     if not order_by:
         return fetch_table(table_name, columns=columns, limit=limit, order_by=None)
     try:
@@ -211,7 +192,6 @@ def fetch_by_match_admin(
     columns: str = "*",
     limit: int = 1000,
 ) -> list[dict[str, Any]]:
-    """Same as :func:`fetch_by_match` but uses the service-role client (bypasses RLS)."""
     if table_name == "jobs":
         columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
     query = get_admin_client().table(table_name).select(columns).limit(limit)
@@ -229,10 +209,6 @@ def fetch_one(
     rows = fetch_by_match(table_name, match, columns=columns, limit=1)
     return rows[0] if rows else None
 
-
-# -----------------------
-# USER / RLS WRITE HELPERS
-# -----------------------
 
 def insert_row(
     table_name: str,
@@ -270,10 +246,6 @@ def delete_rows(
     return resp.data or []
 
 
-# -----------------------
-# ADMIN WRITE HELPERS
-# -----------------------
-
 def insert_row_admin(
     table_name: str,
     payload: dict[str, Any],
@@ -310,16 +282,11 @@ def delete_rows_admin(
     return resp.data or []
 
 
-# -----------------------
-# STORAGE HELPERS
-# -----------------------
-
 def _storage_is_local() -> bool:
     return getattr(settings, "storage_backend", "supabase") == "local"
 
 
 def storage_is_local() -> bool:
-    """True when ``STORAGE_BACKEND=local`` (files under ``LOCAL_STORAGE_ROOT`` / ``data/ips_storage``)."""
     return _storage_is_local()
 
 
@@ -474,12 +441,10 @@ except ImportError:
 
 
 def next_quote_number() -> str:
-    """Next quote id: ``Q`` + five digits, shared sequence with :func:`next_job_number` in job_service."""
     return next_quote_number_string()
 
 
 def quote_number_in_use(quote_number: str, exclude_estimate_id: str | None = None) -> bool:
-    """True if another estimate row already uses this quote_number (admin read, ignores RLS)."""
     qn = str(quote_number or "").strip()
     if not qn:
         return False
