@@ -39,6 +39,23 @@ try:
 except ImportError:
     from app.services.job_service import job_number_display  # type: ignore
 
+try:
+    from services.estimate_import_customer_match import (
+        PLACEHOLDER,
+        build_sorted_customer_names,
+        classify_import_customer_matches,
+        name_to_customer_id_map,
+        resolve_picked_customer_id,
+    )
+except ImportError:
+    from app.services.estimate_import_customer_match import (  # type: ignore
+        PLACEHOLDER,
+        build_sorted_customer_names,
+        classify_import_customer_matches,
+        name_to_customer_id_map,
+        resolve_picked_customer_id,
+    )
+
 from pages.estimate_editor import (
     blank_estimate,
     coalesce_imported_estimate,
@@ -70,6 +87,23 @@ def _fetch_estimates_list_rows() -> list[dict[str, Any]]:
     return fetch_table("estimates", limit=1000, order_by="updated_at")
 
 
+def _fetch_customers_for_import() -> list[dict[str, Any]]:
+    """Directory rows for matching imported quotes to real customers."""
+    if _estimates_page_admin_read():
+        return fetch_table_admin(
+            "customers",
+            columns="id,customer_name",
+            limit=3000,
+            order_by="customer_name",
+        )
+    return fetch_table(
+        "customers",
+        columns="id,customer_name",
+        limit=3000,
+        order_by="customer_name",
+    )
+
+
 def _fetch_jobs_for_estimate_links() -> list[dict[str, Any]]:
     if _estimates_page_admin_read():
         return fetch_table_admin(
@@ -93,6 +127,7 @@ _EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
     # Customer/job match helpers
     "est_customer_",
     "est_job_",
+    "est_import_cust_",
     # Equipment picker/filter widgets
     "est_eq_",
 )
@@ -341,11 +376,29 @@ def _render_estimate_list() -> None:
         st.rerun()
 
 
+def _import_customer_status_short(cls: dict[str, Any] | None) -> str:
+    if not cls:
+        return "—"
+    res = cls.get("resolution")
+    if res == "valid_existing":
+        return "ID in file (ok)"
+    if res == "auto_single":
+        return "Auto-matched"
+    if res == "choose_ambiguous":
+        return "Pick customer (multi)"
+    if res == "choose_open":
+        return "Pick customer"
+    if res == "choose_required":
+        return "Pick customer"
+    return "—"
+
+
 def _render_json_ips_estimate_import() -> None:
     st.markdown("### JSON estimate import")
     st.caption(
         "Upload **JSON** exports (same shape as Review / Save: `estimate_json`). "
-        "Use **Import JSON file(s) to database** after preview. "
+        "Each file is matched to your **customer directory** using names in the JSON (or vendor metadata). "
+        "Confirm the customer below, then use **Import JSON file(s) to database**. "
         "Vendor **PDF** quotes use the section above. Duplicate quote numbers are reassigned on import."
     )
 
@@ -362,7 +415,11 @@ def _render_json_ips_estimate_import() -> None:
 
     sig = tuple((i, f.name, len(f.getvalue())) for i, f in enumerate(uploaded))
     if st.session_state.get("estimates_import_sig") != sig:
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("est_import_cust_"):
+                st.session_state.pop(k, None)
         st.session_state["estimates_import_sig"] = sig
+        cust_rows = _fetch_customers_for_import()
         cached: list[dict] = []
         for f in uploaded:
             raw = f.getvalue()
@@ -370,7 +427,9 @@ def _render_json_ips_estimate_import() -> None:
                 parsed = parse_estimate_json_bytes(raw)
                 merged = coalesce_imported_estimate(parsed)
                 qn = str(merged.get("quote_number", "") or "").strip()
+                cls = classify_import_customer_matches(merged, cust_rows)
                 cid = merged.get("customer_id")
+                row_has_id = bool(cid) and cls.get("resolution") == "valid_existing"
                 cached.append(
                     {
                         "file": f.name,
@@ -378,7 +437,9 @@ def _render_json_ips_estimate_import() -> None:
                         "merged": merged,
                         "error": None,
                         "quote_number": qn or "(will assign)",
-                        "has_customer_id": "yes" if cid else "MISSING",
+                        "has_customer_id": "yes" if row_has_id else "needs confirmation",
+                        "customer_classify": cls,
+                        "customer_status": _import_customer_status_short(cls),
                     }
                 )
             except Exception as exc:
@@ -390,11 +451,17 @@ def _render_json_ips_estimate_import() -> None:
                         "error": str(exc),
                         "quote_number": "—",
                         "has_customer_id": f"Error: {exc}",
+                        "customer_classify": None,
+                        "customer_status": "—",
                     }
                 )
         st.session_state["estimates_import_cache"] = cached
 
     rows: list[dict] = st.session_state["estimates_import_cache"]
+    cust_rows = _fetch_customers_for_import()
+    name_map = name_to_customer_id_map(cust_rows)
+    all_names = build_sorted_customer_names(cust_rows)
+    select_options = [PLACEHOLDER] + all_names
 
     preview_df = pd.DataFrame(
         [
@@ -402,7 +469,7 @@ def _render_json_ips_estimate_import() -> None:
                 "file": r["file"],
                 "kind": r["kind"],
                 "quote_number": r["quote_number"],
-                "has_customer_id": r["has_customer_id"],
+                "customer": r.get("customer_status", "—"),
             }
             for r in rows
         ]
@@ -416,6 +483,31 @@ def _render_json_ips_estimate_import() -> None:
     ]
 
     if json_ready:
+        st.markdown("##### Customer for each JSON file")
+        st.caption(
+            "Imports must be saved against a **real customer record**. "
+            "If we found a single strong name match, the customer is pre-selected — change it if needed. "
+            f"You cannot import while **{PLACEHOLDER}** is selected."
+        )
+        for i, r in json_ready:
+            cls = r.get("customer_classify") or classify_import_customer_matches(r["merged"], cust_rows)
+            st.markdown(f"**{r['file']}**")
+            if cls.get("message"):
+                st.info(str(cls["message"]))
+            key = f"est_import_cust_{i}"
+            if key not in st.session_state:
+                default_name: str | None = None
+                if cls.get("resolution") in ("valid_existing", "auto_single") and cls.get("customer_id"):
+                    cid0 = str(cls["customer_id"])
+                    default_name = next((n for n, cid in name_map.items() if cid == cid0), None)
+                st.session_state[key] = default_name if default_name else PLACEHOLDER
+            st.selectbox(
+                "Customer directory",
+                select_options,
+                key=key,
+                help="Pick the customer this estimate belongs to. This must match a row in Customers.",
+            )
+
         st.markdown("##### JSON Import (direct)")
         if st.button(
             "Import JSON file(s) to database",
@@ -426,15 +518,29 @@ def _render_json_ips_estimate_import() -> None:
             errors: list[str] = []
             ok = 0
             notes: list[str] = []
+            cust_lookup = _fetch_customers_for_import()
+            nm = name_to_customer_id_map(cust_lookup)
             for i, r in json_ready:
                 f = uploaded[i]
                 merged = r.get("merged")
                 if merged is None:
                     errors.append(f"{f.name}: nothing to import")
                     continue
+                chosen = st.session_state.get(f"est_import_cust_{i}")
+                cid = resolve_picked_customer_id(chosen_label=chosen, name_to_id=nm)
+                if not cid:
+                    errors.append(
+                        f"{f.name}: choose a customer from the directory before importing "
+                        f"(cannot save on {PLACEHOLDER!r})."
+                    )
+                    continue
                 try:
                     raw = f.getvalue()
-                    _, suffix = insert_imported_estimate(merged, f.name, raw, source_content_type="application/json")
+                    merged_save = dict(merged)
+                    merged_save["customer_id"] = cid
+                    _, suffix = insert_imported_estimate(
+                        merged_save, f.name, raw, source_content_type="application/json"
+                    )
                     ok += 1
                     if suffix:
                         notes.append(f"{f.name}:{suffix}")

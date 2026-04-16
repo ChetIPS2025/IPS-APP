@@ -78,6 +78,15 @@ except ImportError:
     from services.job_service import job_row_select_label  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
 
+# Centered primary hero image (not full container width; ``width=`` for Streamlit 1.33+).
+_PRIMARY_IMAGE_WIDTH_DESKTOP = 380
+_PRIMARY_IMAGE_WIDTH_MOBILE = 240
+# Gallery thumbnail / preview sizing
+_GALLERY_THUMB_WIDTH_DESKTOP = 140
+_GALLERY_THUMB_WIDTH_MOBILE = 180
+_GALLERY_PREVIEW_IMAGE_WIDTH_DESKTOP = 480
+_GALLERY_PREVIEW_IMAGE_WIDTH_MOBILE = 260
+
 _PROFILE_CARD_CSS = """
 <style>
 .ips-k {
@@ -92,7 +101,7 @@ _PROFILE_CARD_CSS = """
     font-size: 16px;
     font-weight: 700;
     color: #f8fafc;
-    margin: 0 0 14px 0;
+    margin: 0 0 10px 0;
     line-height: 1.25;
 }
 .ips-hero-title {
@@ -234,44 +243,44 @@ _ASSET_DETAIL_SECTIONS_CSS = """
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) {
     background: rgba(15, 23, 42, 0.62) !important;
     border-color: rgba(71, 85, 105, 0.55) !important;
-    border-radius: 12px !important;
-    padding: 12px 12px 14px 12px !important;
-    margin-bottom: 14px !important;
+    border-radius: 10px !important;
+    padding: 10px 12px 10px 12px !important;
+    margin-bottom: 8px !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) h5 {
     color: #e2e8f0 !important;
     border-bottom: 1px solid rgba(100, 116, 139, 0.35) !important;
-    padding-bottom: 8px !important;
-    margin-bottom: 10px !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 6px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-photos) {
     background: rgba(15, 23, 42, 0.58) !important;
     border-color: rgba(71, 85, 105, 0.55) !important;
     border-radius: 10px !important;
-    padding: 10px 12px 12px 12px !important;
-    margin-bottom: 10px !important;
+    padding: 8px 10px 10px 10px !important;
+    margin-bottom: 8px !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-photos) h5 {
     color: #e2e8f0 !important;
     border-bottom: 1px solid rgba(100, 116, 139, 0.35) !important;
-    padding-bottom: 6px !important;
-    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 4px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-docs) {
     background: rgba(15, 23, 42, 0.52) !important;
     border-color: rgba(71, 85, 105, 0.48) !important;
     border-radius: 10px !important;
-    padding: 10px 12px 12px 12px !important;
-    margin-bottom: 12px !important;
+    padding: 8px 10px 10px 10px !important;
+    margin-bottom: 8px !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-docs) h5 {
     color: #e2e8f0 !important;
     border-bottom: 1px solid rgba(100, 116, 139, 0.35) !important;
-    padding-bottom: 6px !important;
-    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 4px !important;
 }
 /* Compact QR tool card (col1) */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-qr-tool) {
@@ -286,7 +295,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-qr-tool) {
 </style>
 """
 
-_IPS_AD_SECTIONS_CSS_KEY = "ips_ad_detail_sections_css_injected_v3"
+_IPS_AD_SECTIONS_CSS_KEY = "ips_ad_detail_sections_css_injected_v4"
 
 
 def _inject_asset_detail_sections_css() -> None:
@@ -411,13 +420,34 @@ def _render_asset_detail_meta_and_rental(
                 st.rerun()
 
     if quick_edit:
-        st.text_input("Category", value=str(asset.get("category") or ""), key=f"ad_qe_cat_{aid}")
-        st.checkbox(
-            "Rent to Customer",
-            value=bool(asset.get("is_rental")),
-            key=f"ad_qe_rent_{aid}",
-        )
-        if st.button("Save quick changes", type="primary", key=f"ad_qe_save_{aid}", use_container_width=True):
+        if is_narrow:
+            st.text_input("Category", value=str(asset.get("category") or ""), key=f"ad_qe_cat_{aid}")
+            st.checkbox(
+                "Rent to Customer",
+                value=bool(asset.get("is_rental")),
+                key=f"ad_qe_rent_{aid}",
+            )
+        else:
+            _qe_c1, _qe_c2 = st.columns(2)
+            with _qe_c1:
+                st.text_input("Category", value=str(asset.get("category") or ""), key=f"ad_qe_cat_{aid}")
+            with _qe_c2:
+                st.checkbox(
+                    "Rent to Customer",
+                    value=bool(asset.get("is_rental")),
+                    key=f"ad_qe_rent_{aid}",
+                )
+        if not is_narrow:
+            _qe_sl, _qe_sr = st.columns([2, 1])
+            with _qe_sr:
+                qe_save_clicked = st.button(
+                    "Save quick changes", type="primary", key=f"ad_qe_save_{aid}", use_container_width=True
+                )
+        else:
+            qe_save_clicked = st.button(
+                "Save quick changes", type="primary", key=f"ad_qe_save_{aid}", use_container_width=True
+            )
+        if qe_save_clicked:
             qn = str(st.session_state.get(f"ad_qe_name_{aid}", "")).strip()
             if not qn:
                 st.error("Asset name is required.")
@@ -955,9 +985,11 @@ def _render_asset_image_preview_panel(aid: str, rows: list[dict], *, mobile: boo
                     st.session_state[pk] = next_idx
                     st.rerun()
 
+    prev_w = _GALLERY_PREVIEW_IMAGE_WIDTH_MOBILE if mobile else _GALLERY_PREVIEW_IMAGE_WIDTH_DESKTOP
     try:
-        # Streamlit 1.33: use ``use_column_width`` (not use_container_width on st.image).
-        st.image(ref, use_column_width=True)
+        _, _prev_mid, _ = st.columns([1, 2, 1])
+        with _prev_mid:
+            st.image(ref, width=prev_w)
     except Exception as exc:
         st.warning(f"Could not load image: {exc}")
     st.caption(fn)
@@ -980,7 +1012,7 @@ def _render_asset_uploaded_files_gallery(
     )
     st.markdown('<div class="ips-ad-gallery-wrap">', unsafe_allow_html=True)
     per_row = 2 if mobile else 4
-    thumb_w = 220 if mobile else 160
+    thumb_w = _GALLERY_THUMB_WIDTH_MOBILE if mobile else _GALLERY_THUMB_WIDTH_DESKTOP
     for i in range(0, len(rows), per_row):
         chunk = rows[i : i + per_row]
         cols = st.columns(len(chunk))
@@ -1032,9 +1064,10 @@ def render() -> None:
     quick_edit = can_edit and bool(st.session_state.get(qe_key, False))
 
     if can_edit:
-        (edit_col,) = st.columns(1)
-        with edit_col:
+        _ed_l, _ed_r = st.columns([3, 1])
+        with _ed_l:
             st.markdown('<span class="ips-ad-detail-top-actions"></span>', unsafe_allow_html=True)
+        with _ed_r:
             if st.button("Edit Asset", key="edit_asset_btn", type="primary", use_container_width=True):
                 st.session_state["assets_view"] = "edit"
                 st.session_state["asset_edit_id"] = str(asset["id"])
@@ -1071,12 +1104,15 @@ def render() -> None:
     if photo_path:
         signed = create_signed_url(photo_path, expires_in=3600)
 
+    _hero_w = _PRIMARY_IMAGE_WIDTH_MOBILE if is_narrow else _PRIMARY_IMAGE_WIDTH_DESKTOP
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-primary"></span>', unsafe_allow_html=True)
         st.markdown("##### Primary image")
         if signed:
             try:
-                st.image(signed, use_column_width=True)
+                _, _hero_mid, _ = st.columns([1, 2, 1])
+                with _hero_mid:
+                    st.image(signed, width=_hero_w)
             except Exception as exc:
                 st.warning(f"Could not load primary image: {exc}")
         else:
@@ -1118,7 +1154,7 @@ def render() -> None:
         )
         _render_asset_detail_qr_block(asset, str(aid), compact=True)
     else:
-        col1, col2 = st.columns([1.5, 2.5], gap="large")
+        col1, col2 = st.columns([1.5, 2.5], gap="medium")
         with col1:
             _render_asset_detail_qr_block(asset, str(aid), compact=False)
         with col2:
@@ -1137,7 +1173,7 @@ def render() -> None:
     else:
         if not quick_edit:
             st.markdown("##### Rent to Customer")
-            st.caption("Mark whether this asset may be rented to customers and optional rates.")
+            st.caption("Flag for customer rental and optional daily / weekly / monthly rates.")
             rc1 = st.checkbox(
                 "Rent to Customer",
                 value=bool(asset.get("is_rental")),
@@ -1174,10 +1210,13 @@ def render() -> None:
                 rnotes = st.text_area(
                     "Rental notes",
                     value=rnotes,
-                    height=88,
+                    height=68,
                     key=f"ad_rr_notes_{aid}",
                 )
-            (rent_save_col,) = st.columns(1)
+            if is_narrow:
+                (rent_save_col,) = st.columns(1)
+            else:
+                _, rent_save_col = st.columns([2, 1])
             with rent_save_col:
                 if st.button("Save rental settings", key=f"ad_save_rental_{aid}", use_container_width=True):
                     pay = {
@@ -1195,21 +1234,42 @@ def render() -> None:
                     st.rerun()
 
         st.markdown("##### Asset updates")
-        st.caption("Photos & AI autofill")
-        detail_photos = st.file_uploader(
-            "Equipment photos & files (images appear under **Photos**; PDFs and other files under **Documents**)",
-            type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
-            accept_multiple_files=True,
-            key=f"ad_photos_{aid}",
-            help="Supported: PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
+        st.caption("Upload images or PDFs, then **Upload photos** or **Run AI autofill**.")
+        _up_lbl = (
+            "Photos & files"
+            if is_narrow
+            else "Equipment photos & files (images → **Photos**; PDFs → **Documents**)"
         )
-        st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
-        pa1, pa2 = st.columns(2)
-        with pa1:
-            upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
-        with pa2:
-            run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        if is_narrow:
+            detail_photos = st.file_uploader(
+                _up_lbl,
+                type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
+                accept_multiple_files=True,
+                key=f"ad_photos_{aid}",
+                help="PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI.",
+            )
+            st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
+            pa1, pa2 = st.columns(2)
+            with pa1:
+                upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
+            with pa2:
+                run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            _au_u, _au_b = st.columns([2.5, 1])
+            with _au_u:
+                detail_photos = st.file_uploader(
+                    _up_lbl,
+                    type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
+                    accept_multiple_files=True,
+                    key=f"ad_photos_{aid}",
+                    help="Supported: PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
+                )
+            with _au_b:
+                st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
+                upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
+                run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
         if upload_photos:
             if not detail_photos:
@@ -1277,7 +1337,10 @@ def render() -> None:
 
         act = st.session_state.get("asset_detail_action")
         if act:
-            (close_act_col,) = st.columns(1)
+            if is_narrow:
+                (close_act_col,) = st.columns(1)
+            else:
+                _, close_act_col = st.columns([2, 1])
             with close_act_col:
                 if st.button("Close action panel", key=f"ad_close_{aid}", use_container_width=True):
                     st.session_state.pop("asset_detail_action", None)
@@ -1285,11 +1348,20 @@ def render() -> None:
 
         if act == "checkout":
             st.markdown("**Check out**")
-            co_emp = st.text_input("Assign to", key=f"co_emp_{aid}")
-            co_job = st.selectbox("Job", list(job_options.keys()), key=f"co_job_{aid}")
+            _co_x, _co_y = st.columns(2)
+            with _co_x:
+                co_emp = st.text_input("Assign to", key=f"co_emp_{aid}")
+            with _co_y:
+                co_job = st.selectbox("Job", list(job_options.keys()), key=f"co_job_{aid}")
             co_loc = st.text_input("Assignment location", value=str(asset.get("location", "")), key=f"co_loc_{aid}")
-            co_notes = st.text_area("Notes", key=f"co_notes_{aid}")
-            if st.button("Confirm check out", key=f"co_go_{aid}", use_container_width=True):
+            co_notes = st.text_area("Notes", key=f"co_notes_{aid}", height=96)
+            if is_narrow:
+                (co_btn_col,) = st.columns(1)
+            else:
+                _, co_btn_col = st.columns([2, 1])
+            with co_btn_col:
+                co_do = st.button("Confirm check out", key=f"co_go_{aid}", use_container_width=True)
+            if co_do:
                 insert_row_admin(
                     "asset_assignments",
                     {
@@ -1318,8 +1390,14 @@ def render() -> None:
         elif act == "checkin":
             st.markdown("**Check in**")
             ci_loc = st.text_input("Location", value=str(asset.get("location", "")), key=f"ci_loc_{aid}")
-            ci_notes = st.text_area("Notes", key=f"ci_notes_{aid}")
-            if st.button("Confirm check in", key=f"ci_go_{aid}", use_container_width=True):
+            ci_notes = st.text_area("Notes", key=f"ci_notes_{aid}", height=96)
+            if is_narrow:
+                (ci_btn_col,) = st.columns(1)
+            else:
+                _, ci_btn_col = st.columns([2, 1])
+            with ci_btn_col:
+                ci_do = st.button("Confirm check in", key=f"ci_go_{aid}", use_container_width=True)
+            if ci_do:
                 insert_row_admin(
                     "asset_assignments",
                     {
@@ -1346,8 +1424,16 @@ def render() -> None:
 
         elif act == "broken":
             st.markdown("**Report broken**")
-            rb_notes = st.text_area("Describe the issue (optional)", key=f"rb_notes_{aid}")
-            if st.button("Set status to Out for Repair", key=f"rb_go_{aid}", use_container_width=True):
+            rb_notes = st.text_area("Describe the issue (optional)", key=f"rb_notes_{aid}", height=88)
+            if is_narrow:
+                rb_clicked = st.button("Set status to Out for Repair", key=f"rb_go_{aid}", use_container_width=True)
+            else:
+                _, _rb_col = st.columns([2, 1])
+                with _rb_col:
+                    rb_clicked = st.button(
+                        "Set status to Out for Repair", key=f"rb_go_{aid}", use_container_width=True
+                    )
+            if rb_clicked:
                 payload = {"status": "Out for Repair"}
                 if rb_notes.strip():
                     prev = str(asset.get("notes") or "").strip()
@@ -1369,8 +1455,14 @@ def render() -> None:
             m7, m8 = st.columns(2)
             po = m7.text_input("PO number", key=f"m_po_{aid}")
             perf = m8.text_input("Performed by", key=f"m_perf_{aid}")
-            m_notes = st.text_area("Notes", key=f"m_notes_{aid}")
-            if st.button("Save maintenance", key=f"m_go_{aid}", use_container_width=True):
+            m_notes = st.text_area("Notes", key=f"m_notes_{aid}", height=90)
+            if is_narrow:
+                (m_btn_col,) = st.columns(1)
+            else:
+                _, m_btn_col = st.columns([2, 1])
+            with m_btn_col:
+                m_go = st.button("Save maintenance", key=f"m_go_{aid}", use_container_width=True)
+            if m_go:
                 save_maintenance_record(
                     {
                         "asset_id": asset["id"],
@@ -1400,9 +1492,18 @@ def render() -> None:
             idate = i2.date_input("Inspection date", key=f"i_date_{aid}")
             inspector = i3.text_input("Inspector", key=f"i_insp_{aid}")
             istatus = st.selectbox("Status", ["Pass", "Needs Attention", "Fail"], key=f"i_stat_{aid}")
-            issues = st.text_area("Issues found", key=f"i_issues_{aid}")
-            corrective = st.text_area("Corrective action", key=f"i_corr_{aid}")
-            if st.button("Save inspection", key=f"i_go_{aid}", use_container_width=True):
+            _i_iss, _i_cor = st.columns(2)
+            with _i_iss:
+                issues = st.text_area("Issues found", key=f"i_issues_{aid}", height=90)
+            with _i_cor:
+                corrective = st.text_area("Corrective action", key=f"i_corr_{aid}", height=90)
+            if is_narrow:
+                (i_btn_col,) = st.columns(1)
+            else:
+                _, i_btn_col = st.columns([2, 1])
+            with i_btn_col:
+                i_go = st.button("Save inspection", key=f"i_go_{aid}", use_container_width=True)
+            if i_go:
                 insert_row_admin(
                     "asset_inspections",
                     {
@@ -1448,16 +1549,37 @@ def render() -> None:
 
         elif act == "doc":
             st.markdown("**Upload document**")
-            dtype = st.selectbox("Document type", DOCUMENT_TYPES, key=f"d_type_{aid}")
-            exp = st.date_input("Expiration date", value=None, key=f"d_exp_{aid}")
-            d_notes = st.text_area("Notes", key=f"d_notes_{aid}")
-            up = st.file_uploader(
-                "File",
-                accept_multiple_files=False,
-                key=f"d_up_{aid}",
-                type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg"],
-            )
-            if st.button("Upload", key=f"d_go_{aid}", use_container_width=True):
+            if is_narrow:
+                dtype = st.selectbox("Document type", DOCUMENT_TYPES, key=f"d_type_{aid}")
+                exp = st.date_input("Expiration date", value=None, key=f"d_exp_{aid}")
+                d_notes = st.text_area("Notes", key=f"d_notes_{aid}", height=72)
+                up = st.file_uploader(
+                    "File",
+                    accept_multiple_files=False,
+                    key=f"d_up_{aid}",
+                    type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg"],
+                )
+                d_upload_clicked = st.button("Upload", key=f"d_go_{aid}", use_container_width=True)
+            else:
+                _d_t1, _d_t2 = st.columns(2)
+                with _d_t1:
+                    dtype = st.selectbox("Document type", DOCUMENT_TYPES, key=f"d_type_{aid}")
+                with _d_t2:
+                    exp = st.date_input("Expiration date", value=None, key=f"d_exp_{aid}")
+                _d_m1, _d_m2 = st.columns(2)
+                with _d_m1:
+                    d_notes = st.text_area("Notes", key=f"d_notes_{aid}", height=80)
+                with _d_m2:
+                    up = st.file_uploader(
+                        "File",
+                        accept_multiple_files=False,
+                        key=f"d_up_{aid}",
+                        type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg"],
+                    )
+                _, _d_go_col = st.columns([2, 1])
+                with _d_go_col:
+                    d_upload_clicked = st.button("Upload", key=f"d_go_{aid}", use_container_width=True)
+            if d_upload_clicked:
                 if not up:
                     st.error("Choose a file first.")
                 else:
@@ -1484,7 +1606,7 @@ def render() -> None:
 
     with tab_doc:
         st.markdown("##### Documents library")
-        st.caption("Same files as the **Documents** panel above. Signed links expire after about one hour.")
+        st.caption("Same as **Documents** above · signed links expire in about one hour.")
         _render_asset_documents_list(
             merged_documents,
             key_prefix="ad_tab_doc",
@@ -1524,12 +1646,16 @@ def render() -> None:
 
     with tab_notes:
         if can_edit:
-            new_notes = st.text_area("Notes", value=str(asset.get("notes") or ""), height=220, key=f"notes_ed_{aid}")
-            (notes_save_col,) = st.columns(1)
+            new_notes = st.text_area("Notes", value=str(asset.get("notes") or ""), height=160, key=f"notes_ed_{aid}")
+            if is_narrow:
+                (notes_save_col,) = st.columns(1)
+            else:
+                _, notes_save_col = st.columns([3, 1])
             with notes_save_col:
-                if st.button("Save notes", key=f"notes_save_{aid}", use_container_width=True):
-                    update_rows_admin("assets", {"notes": new_notes.strip()}, {"id": asset["id"]})
-                    st.success("Notes saved.")
+                notes_saved = st.button("Save notes", key=f"notes_save_{aid}", use_container_width=True)
+            if notes_saved:
+                update_rows_admin("assets", {"notes": new_notes.strip()}, {"id": asset["id"]})
+                st.success("Notes saved.")
         else:
             st.markdown("**Notes**")
             st.write(str(asset.get("notes") or "").strip() or "—")

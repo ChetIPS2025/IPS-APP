@@ -15,6 +15,7 @@ from auth import current_profile, current_role
 from db import (
     create_signed_url,
     fetch_by_match,
+    fetch_by_match_admin,
     fetch_one,
     fetch_table,
     insert_row_admin,
@@ -873,6 +874,31 @@ def coalesce_imported_estimate(data: dict) -> dict:
     return base
 
 
+def _sanitize_estimate_json_for_storage(est: dict) -> dict:
+    """Drop extraction / UI helper keys that must not be persisted on ``estimate_json``."""
+    out = dict(est)
+    for k in list(out.keys()):
+        if isinstance(k, str) and (k.startswith("_extracted_") or k.startswith("_import_")):
+            out.pop(k, None)
+    return out
+
+
+def validate_import_customer_id(customer_id) -> str:
+    """Require a real customer row before persisting an imported estimate."""
+    cid = str(customer_id or "").strip()
+    if not cid:
+        raise ValueError(
+            "Choose a customer from your directory before saving this import. "
+            "Estimates must be linked to a real customer record, not free text."
+        )
+    rows = fetch_by_match_admin("customers", {"id": cid}, limit=1)
+    if not rows:
+        raise ValueError(
+            "The selected customer is not valid or could not be found. Pick a customer from the list and try again."
+        )
+    return cid
+
+
 def parse_estimate_json_bytes(raw: bytes) -> dict:
     """Parse IPS estimate JSON (raw export or wrapped)."""
     text = raw.decode("utf-8-sig")
@@ -898,6 +924,7 @@ def insert_imported_estimate(
     Insert a new estimate row from imported JSON (or PDF processed elsewhere), revision 1, source attachment.
     Returns (estimate_id, note_suffix) where note_suffix describes quote# reassignment if any.
     """
+    est = dict(est)
     materials_catalog = fetch_table("materials_catalog", limit=3000, order_by="item_key")
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
@@ -926,12 +953,13 @@ def insert_imported_estimate(
         est["quote_number"] = qn
         note_suffix = f" Quote number was {old!r} (in use); assigned {qn!r}."
 
-    if not est.get("customer_id"):
-        raise ValueError("Imported estimate must include customer_id")
+    cid = validate_import_customer_id(est.get("customer_id"))
+    est["customer_id"] = cid
+    est_for_storage = _sanitize_estimate_json_for_storage(est)
 
     payload = {
         "quote_number": qn.strip(),
-        "customer_id": est.get("customer_id"),
+        "customer_id": cid,
         "customer_contact_id": est.get("customer_contact_id"),
         "job_id": est.get("job_id"),
         "estimator_user_id": current_profile().get("id"),
@@ -954,13 +982,13 @@ def insert_imported_estimate(
         "po_number": est.get("po_number", ""),
         "po_date": est.get("po_date") or None,
         "po_amount": float(est.get("po_amount", 0) or 0),
-        "estimate_json": est,
+        "estimate_json": est_for_storage,
         "revision_number": 1,
         "updated_at": datetime.utcnow().isoformat(),
     }
     inserted = insert_row_admin("estimates", payload)
     estimate_id = str(inserted.get("id", ""))
-    save_revision(estimate_id, 1, est, f"Imported from {source_file_name}.{note_suffix}")
+    save_revision(estimate_id, 1, est_for_storage, f"Imported from {source_file_name}.{note_suffix}")
 
     safe_name = Path(source_file_name).name
     storage_path = f"quotes/{estimate_id}/imports/{safe_name}"
@@ -977,6 +1005,18 @@ def insert_imported_estimate(
         },
     )
     return estimate_id, note_suffix
+
+
+def _imported_estimate_missing_customer(est: dict, *, pending_pdf_import: bool) -> bool:
+    """True when editor state is an import that still needs a real ``customer_id``."""
+    if est.get("customer_id"):
+        return False
+    if pending_pdf_import:
+        return True
+    meta = est.get("import_meta") if isinstance(est.get("import_meta"), dict) else {}
+    if meta.get("vendor_quote"):
+        return True
+    return False
 
 
 def render_estimate_editor(*, embedded: bool = False) -> None:
@@ -1190,6 +1230,15 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     if prev_cust is not None and cur_cust != prev_cust:
         est["customer_contact_id"] = None
     st.session_state["_est_prev_customer_id"] = cur_cust
+
+    if _imported_estimate_missing_customer(
+        est,
+        pending_pdf_import=bool(st.session_state.get("estimate_pending_import_pdf")),
+    ):
+        st.warning(
+            "This imported estimate is not linked to a customer yet. "
+            "Select an existing customer or create one, then save."
+        )
 
     c1, c2, c3 = st.columns(3)
     quote_locked_after_save = bool(

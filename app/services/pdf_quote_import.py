@@ -673,22 +673,59 @@ def render_vendor_pdf_quote_section() -> None:
     import streamlit as st
 
     try:
-        from db import fetch_table
+        from auth import current_role
     except ImportError:
-        from app.db import fetch_table  # type: ignore
+        from app.auth import current_role  # type: ignore
+
+    try:
+        from db import fetch_table, fetch_table_admin
+    except ImportError:
+        from app.db import fetch_table, fetch_table_admin  # type: ignore
 
     try:
         from pages.estimate_editor import insert_imported_estimate
     except ImportError:
         from app.pages.estimate_editor import insert_imported_estimate  # type: ignore
 
-    st.write("PDF MODULE FILE:", __file__)
-    st.write("🔥 PDF SECTION FUNCTION ACTIVE")
+    try:
+        from services.estimate_import_customer_match import (
+            PLACEHOLDER,
+            build_sorted_customer_names,
+            classify_import_customer_matches,
+            name_to_customer_id_map,
+            resolve_picked_customer_id,
+        )
+    except ImportError:
+        from app.services.estimate_import_customer_match import (  # type: ignore
+            PLACEHOLDER,
+            build_sorted_customer_names,
+            classify_import_customer_matches,
+            name_to_customer_id_map,
+            resolve_picked_customer_id,
+        )
+
+    def _customers_for_vendor_import() -> list[dict[str, Any]]:
+        if current_role() in {"admin", "estimator"}:
+            return fetch_table_admin(
+                "customers",
+                columns="id,customer_name",
+                limit=3000,
+                order_by="customer_name",
+            )
+        return fetch_table(
+            "customers",
+            columns="id,customer_name",
+            limit=3000,
+            order_by="customer_name",
+        )
 
     with st.container(border=True):
         st.markdown("### 📄 Upload PDF Quote (Vendor)")
 
-        st.caption("Upload a vendor quote PDF to extract estimate data")
+        st.caption(
+            "Upload a vendor quote PDF to extract estimate data. "
+            "The customer directory is used so each saved estimate is tied to a real customer record."
+        )
 
         uploaded_file = st.file_uploader(
             "Select PDF file",
@@ -699,6 +736,7 @@ def render_vendor_pdf_quote_section() -> None:
         if not uploaded_file:
             st.session_state.pop("vendor_pdf_import_sig", None)
             st.session_state.pop("vendor_pdf_import_cache", None)
+            st.session_state.pop("vendor_pdf_customer_sel", None)
         else:
             raw_bytes = uploaded_file.getvalue()
             sig = (uploaded_file.name, len(raw_bytes))
@@ -713,9 +751,11 @@ def render_vendor_pdf_quote_section() -> None:
                         "raw_bytes": raw_bytes,
                         "file_name": uploaded_file.name,
                     }
+                    st.session_state.pop("vendor_pdf_customer_sel", None)
                 except Exception as e:
                     st.session_state.pop("vendor_pdf_import_sig", None)
                     st.session_state.pop("vendor_pdf_import_cache", None)
+                    st.session_state.pop("vendor_pdf_customer_sel", None)
                     st.error(f"PDF processing failed: {e}")
 
             cache = st.session_state.get("vendor_pdf_import_cache")
@@ -735,27 +775,46 @@ def render_vendor_pdf_quote_section() -> None:
                 st.markdown("### 🧾 Estimate Preview")
                 st.json(est)
 
-                customers = fetch_table(
-                    "customers", columns="id,customer_name", limit=1000, order_by="customer_name"
-                )
-                selected_customer_id = None
-                if customers:
-                    name_to_id = {c["customer_name"]: c["id"] for c in customers}
-                    names_sorted = sorted(name_to_id.keys())
-                    chosen = st.selectbox(
-                        "Customer for this estimate",
-                        names_sorted,
-                        key="vendor_pdf_save_customer",
-                    )
-                    selected_customer_id = name_to_id[chosen]
-                else:
-                    st.warning("Add a customer before saving an imported estimate.")
+                cust_rows = _customers_for_vendor_import()
+                cls = classify_import_customer_matches(est, cust_rows)
+                nm = name_to_customer_id_map(cust_rows)
+                all_names = build_sorted_customer_names(cust_rows)
+                opts = [PLACEHOLDER] + all_names
 
-                if st.button("Save as Estimate", key="save_pdf_estimate"):
+                if cls.get("message"):
+                    st.info(str(cls["message"]))
+
+                sel_key = "vendor_pdf_customer_sel"
+                if sel_key not in st.session_state:
+                    default_name: str | None = None
+                    if cls.get("resolution") in ("valid_existing", "auto_single") and cls.get("customer_id"):
+                        cid0 = str(cls["customer_id"])
+                        default_name = next((n for n, cid in nm.items() if cid == cid0), None)
+                    st.session_state[sel_key] = default_name if default_name else PLACEHOLDER
+
+                if not cust_rows:
+                    st.warning("Add at least one customer before saving an imported estimate.")
+                else:
+                    st.selectbox(
+                        "Customer for this estimate",
+                        opts,
+                        key=sel_key,
+                        help=f"Required: pick who this quote is for. You cannot save while **{PLACEHOLDER}** is selected.",
+                    )
+
+                save_disabled = not cust_rows
+                if st.button("Save as Estimate", key="save_pdf_estimate", disabled=save_disabled):
                     try:
-                        if not selected_customer_id:
-                            raise ValueError("Select a customer before saving.")
-                        est_save = {**est, "customer_id": selected_customer_id}
+                        cust_rows2 = _customers_for_vendor_import()
+                        nm2 = name_to_customer_id_map(cust_rows2)
+                        chosen = st.session_state.get(sel_key)
+                        cid = resolve_picked_customer_id(chosen_label=chosen, name_to_id=nm2)
+                        if not cid:
+                            raise ValueError(
+                                f"Choose a customer from the directory before saving "
+                                f"(cannot save while **{PLACEHOLDER}** is selected)."
+                            )
+                        est_save = {**est, "customer_id": cid}
                         estimate_id, note_suffix = insert_imported_estimate(
                             est_save,
                             file_name,
