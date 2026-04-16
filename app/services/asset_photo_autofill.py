@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Asset photo extraction via `OpenAI().responses.create` (needs a current `openai` wheel with Responses support)."""
+
 import base64
 import json
 import os
@@ -33,17 +35,10 @@ _IMAGE_ROLES = ("overview", "serial_tag", "meter", "mixed", "unknown")
 
 
 def _client() -> OpenAI:
-    """Sync OpenAI client. Uses env `OPENAI_API_KEY` (same as `OpenAI()` default)."""
+    """Return `OpenAI()`; API key comes from `OPENAI_API_KEY` (see OpenAI SDK defaults)."""
     if not os.getenv("OPENAI_API_KEY", "").strip():
         raise RuntimeError("OPENAI_API_KEY is missing from .env")
-    # openai<2 has no `responses` (Responses API); photo autofill requires openai>=2.
-    client = OpenAI()
-    if not hasattr(client, "responses"):
-        raise RuntimeError(
-            "Asset photo autofill requires the Responses API (openai>=2.0.0). "
-            "Upgrade with: pip install 'openai>=2.0.0'"
-        )
-    return client
+    return OpenAI()
 
 
 def _model_name() -> str:
