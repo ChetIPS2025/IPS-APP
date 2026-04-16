@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-"""Asset photo extraction via `OpenAI().responses.create` (needs a current `openai` wheel with Responses support)."""
+"""
+Asset photo / PDF-page extraction via the OpenAI Responses API only.
+
+Uses ``from openai import OpenAI`` and ``client = OpenAI()`` (SDK reads ``OPENAI_API_KEY``
+from the environment). Set ``OPENAI_MODEL`` in the environment for a non-default model
+(default ``gpt-5``). Requires ``openai>=1.30.0`` with ``client.responses``.
+"""
 
 import base64
 import json
@@ -33,16 +39,11 @@ _FIELD_KEYS = [
 
 _IMAGE_ROLES = ("overview", "serial_tag", "meter", "mixed", "unknown")
 
-
-def _client() -> OpenAI:
-    """Return `OpenAI()`; API key comes from `OPENAI_API_KEY` (see OpenAI SDK defaults)."""
-    if not os.getenv("OPENAI_API_KEY", "").strip():
-        raise RuntimeError("OPENAI_API_KEY is missing from .env")
-    return OpenAI()
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 
 
 def _model_name() -> str:
-    return os.getenv("OPENAI_MODEL", "gpt-5").strip()
+    return os.getenv("OPENAI_MODEL", "gpt-5").strip() or "gpt-5"
 
 
 def _guess_mime_type(file_name: str) -> str:
@@ -322,6 +323,105 @@ def _normalize_parsed(parsed: dict[str, Any], num_images: int) -> dict[str, Any]
     return parsed
 
 
+def _default_condition() -> str:
+    return "Good" if "Good" in ASSET_CONDITIONS else ASSET_CONDITIONS[0]
+
+
+def _fallback_parsed(num_images: int, *, reason: str) -> dict[str, Any]:
+    """Minimal valid structure when the model output cannot be parsed as JSON."""
+    return {
+        "asset_name": "",
+        "asset_type": "Other",
+        "manufacturer": "",
+        "model": "",
+        "serial_number": "",
+        "location": "",
+        "condition": _default_condition(),
+        "notes": reason,
+        "hour_meter": 0.0,
+        "mileage": 0.0,
+        "confidence": 0.0,
+        "review_flags": [reason],
+        "field_confidence": {k: 0.0 for k in _FIELD_KEYS},
+        "field_review_flags": {k: [] for k in _FIELD_KEYS},
+        "per_image_role": ["unknown"] * num_images,
+    }
+
+
+def _parse_json_object(raw_text: str) -> dict[str, Any]:
+    """
+    Parse a single JSON object from model output.
+    Handles optional whitespace, markdown fences, or extra prose.
+    """
+    text = (raw_text or "").strip()
+    if not text:
+        raise ValueError("Empty model output.")
+
+    try:
+        val = json.loads(text)
+        if isinstance(val, dict):
+            return val
+        raise ValueError("JSON root is not an object.")
+    except json.JSONDecodeError:
+        pass
+
+    m = _JSON_FENCE_RE.search(text)
+    if m:
+        inner = m.group(1).strip()
+        try:
+            val = json.loads(inner)
+            if isinstance(val, dict):
+                return val
+        except json.JSONDecodeError:
+            pass
+
+    # Last resort: first balanced {...} slice
+    start = text.find("{")
+    if start < 0:
+        raise ValueError("No JSON object found in model output.")
+    depth = 0
+    for i in range(start, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                chunk = text[start : i + 1]
+                val = json.loads(chunk)
+                if isinstance(val, dict):
+                    return val
+                raise ValueError("Extracted JSON is not an object.")
+    raise ValueError("Unbalanced braces in model output.")
+
+
+def _call_responses_api(client: OpenAI, *, num_images: int, content: list[dict[str, Any]]) -> str:
+    """Run ``client.responses.create`` and return assistant text output."""
+    try:
+        response = client.responses.create(
+            model=_model_name(),
+            input=[
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": content,
+                }
+            ],
+            text={"format": _response_text_format(num_images)},
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"OpenAI Responses API request failed ({exc.__class__.__name__}): {exc}"
+        ) from exc
+
+    raw = getattr(response, "output_text", None)
+    if raw is None or not str(raw).strip():
+        raise RuntimeError(
+            "OpenAI returned no text output (output_text empty). Check OPENAI_MODEL and API access."
+        )
+    return str(raw)
+
+
 def extract_asset_from_photos(photos: list[tuple[bytes, str]]) -> dict[str, Any]:
     """
     One or more equipment photos → structured fields for review.
@@ -340,7 +440,15 @@ def extract_asset_from_photos(photos: list[tuple[bytes, str]]) -> dict[str, Any]
     photos = prepare_asset_autofill_inputs(photos)
 
     n = len(photos)
-    client = _client()
+
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set in the environment. "
+            "Add it via .env (local) or Render → Environment (production)."
+        )
+
+    client = OpenAI()
+
     instructions = _instructions(n)
     pdf_hint = pdf_extracted_text_hints(originals)
     if pdf_hint:
@@ -362,21 +470,28 @@ def extract_asset_from_photos(photos: list[tuple[bytes, str]]) -> dict[str, Any]
         )
         content.append({"type": "input_image", "image_url": data_url, "detail": "high"})
 
-    response = client.responses.create(
-        model=_model_name(),
-        input=[
-            {
-                "type": "message",
-                "role": "user",
-                "content": content,
-            }
-        ],
-        text={"format": _response_text_format(n)},
+    raw = _call_responses_api(client, num_images=n, content=content)
+
+    fallback_note = (
+        "Automatic extraction could not parse the model response as JSON; "
+        "defaults were applied. Re-run or check OPENAI_MODEL / API logs."
     )
 
-    raw = response.output_text
-    parsed = json.loads(raw)
-    return _normalize_parsed(parsed, n)
+    try:
+        parsed = _parse_json_object(raw)
+    except (ValueError, json.JSONDecodeError) as exc:
+        fb = _fallback_parsed(n, reason=f"{fallback_note} ({exc})")
+        return _normalize_parsed(fb, n)
+
+    if not isinstance(parsed, dict):
+        fb = _fallback_parsed(n, reason=fallback_note + " (root was not an object).")
+        return _normalize_parsed(fb, n)
+
+    try:
+        return _normalize_parsed(parsed, n)
+    except Exception as exc:
+        fb = _fallback_parsed(n, reason=f"{fallback_note} (normalize: {exc})")
+        return _normalize_parsed(fb, n)
 
 
 def extract_asset_from_photo(file_bytes: bytes, file_name: str) -> dict[str, Any]:
