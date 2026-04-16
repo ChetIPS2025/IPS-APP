@@ -14,6 +14,7 @@ import os
 import re
 from typing import Any
 
+import openai
 from openai import OpenAI
 
 try:
@@ -22,6 +23,23 @@ try:
 except ImportError:
     from services.asset_autofill_media import pdf_extracted_text_hints, prepare_asset_autofill_inputs  # type: ignore
     from services.asset_constants import ASSET_CONDITIONS, ASSET_TYPES  # type: ignore
+
+# Single, module-level client (required pattern)
+try:
+    client = OpenAI()
+except Exception as exc:
+    # OpenAI SDK raises if OPENAI_API_KEY is missing; give an actionable message.
+    raise RuntimeError(
+        "OPENAI_API_KEY is not set in the environment. "
+        "Add it via .env (local) or Render → Environment (production)."
+    ) from exc
+
+# Hard runtime validation (diagnose Render mismatch / shadowed import)
+if not hasattr(client, "responses"):
+    raise RuntimeError(
+        f"OpenAI SDK mismatch: version={openai.__version__}, client_type={type(client)}, "
+        f"has_responses={hasattr(client, 'responses')}. Render is likely running an older SDK or a shadowed import."
+    )
 
 # Fields that get per-field confidence + review flags (aligned with extraction output)
 _FIELD_KEYS = [
@@ -440,14 +458,6 @@ def extract_asset_from_photos(photos: list[tuple[bytes, str]]) -> dict[str, Any]
     photos = prepare_asset_autofill_inputs(photos)
 
     n = len(photos)
-
-    if not os.getenv("OPENAI_API_KEY", "").strip():
-        raise RuntimeError(
-            "OPENAI_API_KEY is not set in the environment. "
-            "Add it via .env (local) or Render → Environment (production)."
-        )
-
-    client = OpenAI()
 
     instructions = _instructions(n)
     pdf_hint = pdf_extracted_text_hints(originals)
