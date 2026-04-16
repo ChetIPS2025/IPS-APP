@@ -13,9 +13,9 @@ from datetime import datetime
 from typing import Any, FrozenSet
 
 try:
-    from db import fetch_by_match_admin, fetch_one, insert_row, update_rows_admin
+    from db import fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin
 except ImportError:
-    from app.db import fetch_by_match_admin, fetch_one, insert_row, update_rows_admin  # type: ignore
+    from app.db import fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin  # type: ignore
 
 try:
     from services.job_schema import fetch_jobs_for_job_database
@@ -42,6 +42,29 @@ def estimate_status_allows_job_creation(status: str | None) -> bool:
 
 def _as_json_dict(val: Any) -> dict[str, Any]:
     return val if isinstance(val, dict) else {}
+
+
+def _truthy_job_received(row: dict[str, Any]) -> bool:
+    v = row.get("job_received")
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        try:
+            return float(v) != 0.0
+        except (TypeError, ValueError):
+            return False
+    s = str(v).strip().lower()
+    return s in ("true", "1", "yes", "t")
+
+
+def _jobs_has_customer_contact_column() -> bool:
+    try:
+        fetch_table("jobs", columns="id,customer_contact_id", limit=1)
+        return True
+    except Exception:
+        return False
 
 
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
@@ -119,13 +142,20 @@ class CreateJobFromEstimateResult:
     error_code: str | None = None
 
 
-def create_job_from_estimate(estimate_id: str) -> CreateJobFromEstimateResult:
+def create_job_from_estimate(
+    estimate_id: str,
+    *,
+    mark_job_received: bool = False,
+) -> CreateJobFromEstimateResult:
     """
     Insert a ``jobs`` row linked to the estimate, then set ``estimates.job_id`` and mirror
     ``job_id`` inside ``estimate_json``.
 
     Does not create a second job if the estimate already references a job or a job row already
-    points at this estimate (duplicate).
+    points at this estimate (duplicate), or if the estimate is already marked ``job_received``.
+
+    When ``mark_job_received`` is True, also sets ``estimates.job_received`` to True (Estimates
+    list **Job Received** action).
     """
     eid = str(estimate_id or "").strip()
     if not eid:
@@ -134,6 +164,13 @@ def create_job_from_estimate(estimate_id: str) -> CreateJobFromEstimateResult:
     row = fetch_one("estimates", {"id": eid})
     if not row:
         return CreateJobFromEstimateResult(ok=False, message="Estimate not found.", error_code="not_found")
+
+    if _truthy_job_received(row):
+        return CreateJobFromEstimateResult(
+            ok=False,
+            message="This estimate is already marked as job received.",
+            error_code="job_received",
+        )
 
     status_raw = row.get("status")
     if not estimate_status_allows_job_creation(str(status_raw)):
@@ -196,6 +233,10 @@ def create_job_from_estimate(estimate_id: str) -> CreateJobFromEstimateResult:
         "awarded_amount": awarded_f,
         "notes": _build_job_notes(row, ej),
     }
+    if _jobs_has_customer_contact_column():
+        cc = row.get("customer_contact_id") or ej.get("customer_contact_id")
+        if cc:
+            payload["customer_contact_id"] = str(cc)
     if has_job_number_column:
         payload["job_number"] = next_job_number()
 
@@ -220,6 +261,8 @@ def create_job_from_estimate(estimate_id: str) -> CreateJobFromEstimateResult:
         "estimate_json": ej2,
         "updated_at": datetime.utcnow().isoformat(),
     }
+    if mark_job_received:
+        est_update["job_received"] = True
     try:
         update_rows_admin("estimates", est_update, {"id": eid})
     except Exception as exc:
@@ -232,4 +275,6 @@ def create_job_from_estimate(estimate_id: str) -> CreateJobFromEstimateResult:
 
     jn = job_number_display(inserted.get("job_number") if has_job_number_column else None)
     msg = f"Created job {jn or new_id} and linked it to this estimate." if jn else f"Created job and linked it to this estimate ({new_id})."
+    if mark_job_received:
+        msg += " Estimate marked as job received."
     return CreateJobFromEstimateResult(ok=True, message=msg, job=inserted)

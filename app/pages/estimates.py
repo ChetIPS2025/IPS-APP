@@ -202,6 +202,23 @@ def _render_estimate_list() -> None:
     rows = _fetch_estimates_list_rows()
     df = pd.DataFrame(rows)
 
+    def _norm_customer_id(v: Any) -> str:
+        if v is None:
+            return ""
+        try:
+            if pd.isna(v):
+                return ""
+        except Exception:
+            pass
+        s = str(v).strip()
+        return s if s and s.lower() != "nan" else ""
+
+    eid_to_customer: dict[str, str] = {}
+    for r in rows:
+        rid = str(r.get("id") or "").strip()
+        if rid:
+            eid_to_customer[rid] = _norm_customer_id(r.get("customer_id"))
+
     job_rows = _fetch_jobs_for_estimate_links()
     job_by_id = {str(r["id"]): r for r in job_rows if r.get("id")}
     job_by_estimate_id = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
@@ -229,6 +246,25 @@ def _render_estimate_list() -> None:
             if se in job_by_estimate_id:
                 return str(job_by_estimate_id[se].get("id"))
         return None
+
+    def _series_truthy_job_received(row: pd.Series) -> bool:
+        v = row.get("job_received")
+        if v is None:
+            return False
+        try:
+            if pd.isna(v):
+                return False
+        except Exception:
+            pass
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            try:
+                return float(v) != 0.0
+            except (TypeError, ValueError):
+                return False
+        s = str(v).strip().lower()
+        return s in ("true", "1", "yes", "t")
 
     if not df.empty:
         keep = [
@@ -300,15 +336,109 @@ def _render_estimate_list() -> None:
         id_column="id",
         export_filename="estimates_export.csv",
     )
+
+    try:
+        from services.job_from_estimate import (
+            create_job_from_estimate,
+            estimate_status_allows_job_creation,
+        )
+    except ImportError:
+        from app.services.job_from_estimate import (  # type: ignore
+            create_job_from_estimate,
+            estimate_status_allows_job_creation,
+        )
+
+    def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
+        """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
+        if not can_edit:
+            return "Only admin or estimator can run this action."
+        if _series_truthy_job_received(est_row):
+            return "This estimate is already marked as job received."
+        if not cust_id:
+            return "Choose a customer on the estimate before creating a job."
+        st_raw = str(est_row.get("status") or "")
+        if not estimate_status_allows_job_creation(st_raw):
+            return (
+                f"Estimate status {st_raw!r} does not allow creating a job from this page. "
+                "Change status or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
+            )
+        return ""
+
+    try:
+        from ui import IPS_NAV_PENDING_KEY
+    except ImportError:
+        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
+
+    st.markdown("##### Job Received")
+    st.caption(
+        "One click per row when the estimate is ready (customer set, status allowed). "
+        "Shows **Job Created** when a job is already linked. "
+        "The estimate row is updated with **job_id** and **job_received** in the database."
+    )
+    jr_nav, jr_cap = st.columns([1, 3])
+    with jr_nav:
+        st.checkbox(
+            "Open new job in Job Database",
+            value=True,
+            key="est_job_recv_open_job_db",
+            help="After success, go to Job Database with that job open for editing.",
+        )
+    with jr_cap:
+        st.caption("Uncheck to stay on this list (filters and search are unchanged).")
+
+    for _, est_row in df.iterrows():
+        eid = str(est_row.get("id") or "").strip()
+        if not eid:
+            continue
+        linked_id = _linked_job_id_for_row(est_row)
+        cust_id = eid_to_customer.get(eid, "")
+        qn = str(est_row.get("quote_number") or "").strip() or "(no quote #)"
+        stc = str(est_row.get("status") or "").strip()
+        r1, r2 = st.columns([4, 1])
+        with r1:
+            st.caption(f"**{qn}** · {stc}")
+        with r2:
+            if linked_id:
+                st.button(
+                    "Job Created",
+                    key=f"est_job_created_{eid}",
+                    disabled=True,
+                    use_container_width=True,
+                    help="A job is already linked to this estimate.",
+                )
+            else:
+                reason = _job_received_disabled_reason(est_row, cust_id=cust_id)
+                ready = not reason
+                clicked = st.button(
+                    "Job Received",
+                    key=f"est_job_received_{eid}",
+                    disabled=not ready,
+                    use_container_width=True,
+                    help=(
+                        "Create a job from this estimate, link it, and mark job received."
+                        if ready
+                        else reason
+                    ),
+                )
+                if clicked and ready:
+                    res = create_job_from_estimate(eid, mark_job_received=True)
+                    if res.ok and res.job:
+                        jid = str(res.job.get("id") or "")
+                        if jid and st.session_state.get("est_job_recv_open_job_db", True):
+                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                            st.session_state["job_mode"] = "edit"
+                            st.session_state["job_edit_id"] = jid
+                        st.success(res.message)
+                        st.rerun()
+                    elif res.message:
+                        if res.error_code == "duplicate":
+                            st.warning(res.message)
+                        elif res.error_code == "job_received":
+                            st.info(res.message)
+                        else:
+                            st.error(res.message)
+
     if can_edit and sel and len(sel) == 1:
-        try:
-            from services.job_from_estimate import create_job_from_estimate
-        except ImportError:
-            from app.services.job_from_estimate import create_job_from_estimate  # type: ignore
-        try:
-            from ui import IPS_NAV_PENDING_KEY
-        except ImportError:
-            from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
         row_one = df[df["id"].astype(str) == str(sel[0])]
         open_jid: str | None = None
         linked_jn = ""

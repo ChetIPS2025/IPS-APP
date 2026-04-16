@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import html
+from typing import Any
+
 import pandas as pd
 import streamlit as st
 
 from auth import current_role
 from branding import render_header
-from db import delete_rows_admin, fetch_table, insert_row, update_rows
+from db import (
+    delete_rows_admin,
+    fetch_by_match,
+    fetch_by_match_admin,
+    fetch_table,
+    fetch_table_admin,
+    insert_row,
+    update_rows,
+)
 
 try:
     from table_actions import (
@@ -30,7 +41,6 @@ try:
     from services.customer_contacts import (
         contact_none_option_label,
         contact_option_label,
-        fetch_contacts_for_customer,
         inject_contact_picker_styles,
         render_contact_detail_preview,
         render_contact_quick_add_when_empty,
@@ -39,7 +49,6 @@ except ImportError:
     from app.services.customer_contacts import (  # type: ignore
         contact_none_option_label,
         contact_option_label,
-        fetch_contacts_for_customer,
         inject_contact_picker_styles,
         render_contact_detail_preview,
         render_contact_quick_add_when_empty,
@@ -83,6 +92,139 @@ JOB_STATUSES = [
 ]
 
 
+def _job_db_admin_read() -> bool:
+    """Admin/estimator use service-role reads so linked estimate/customer rows stay visible under RLS."""
+    return current_role() in {"admin", "estimator"}
+
+
+def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
+    if _job_db_admin_read():
+        try:
+            return fetch_table_admin("customers", limit=5000, order_by="customer_name")
+        except Exception:
+            return fetch_table("customers", limit=5000, order_by="customer_name")
+    return fetch_table("customers", limit=5000, order_by="customer_name")
+
+
+def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
+    """Columns for labels + optional scope; fall back if a column is missing."""
+    if _job_db_admin_read():
+        for cols in (
+            "id,quote_number,customer_id,proposal_total,status,job_id,scope_of_work",
+            "id,quote_number,customer_id,proposal_total,status,job_id",
+        ):
+            try:
+                return fetch_table_admin(
+                    "estimates",
+                    columns=cols,
+                    limit=5000,
+                    order_by="quote_number",
+                )
+            except Exception:
+                continue
+        try:
+            return fetch_table_admin("estimates", limit=5000, order_by="quote_number")
+        except Exception:
+            return fetch_table("estimates", limit=5000, order_by="quote_number")
+    for cols in (
+        "id,quote_number,customer_id,proposal_total,status,job_id,scope_of_work",
+        "id,quote_number,customer_id,proposal_total,status,job_id",
+    ):
+        try:
+            return fetch_table(
+                "estimates",
+                columns=cols,
+                limit=5000,
+                order_by="quote_number",
+            )
+        except Exception:
+            continue
+    return fetch_table("estimates", limit=5000, order_by="quote_number")
+
+
+def _fetch_contacts_for_job_database(customer_id: str) -> list[dict[str, Any]]:
+    """Same pattern as Estimates editor: admin read for internal roles (RLS)."""
+    admin_read = current_role() in {"admin", "estimator"}
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    try:
+        if admin_read:
+            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
+        else:
+            rows = fetch_by_match("customer_contacts", {"customer_id": cid}, limit=500)
+    except Exception:
+        return []
+    rows = list(rows or [])
+    rows = [r for r in rows if bool(r.get("is_active", True))]
+
+    def _sort_key(r: dict) -> tuple:
+        prim = 0 if r.get("is_primary") else 1
+        name = str(r.get("contact_name") or "").strip().lower()
+        return (prim, name)
+
+    rows.sort(key=_sort_key)
+    return rows
+
+
+def _fetch_estimate_row_by_id(estimate_id: str) -> dict[str, Any] | None:
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return None
+    if _job_db_admin_read():
+        try:
+            rows = fetch_by_match_admin("estimates", {"id": eid}, limit=1)
+            return rows[0] if rows else None
+        except Exception:
+            pass
+    try:
+        rows = fetch_by_match("estimates", {"id": eid}, limit=1)
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def _contact_row_by_id(contact_id: str) -> dict[str, Any] | None:
+    cid = str(contact_id or "").strip()
+    if not cid:
+        return None
+    if _job_db_admin_read():
+        try:
+            rows = fetch_by_match_admin("customer_contacts", {"id": cid}, limit=1)
+            return rows[0] if rows else None
+        except Exception:
+            pass
+    try:
+        rows = fetch_by_match("customer_contacts", {"id": cid}, limit=1)
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def _customer_display_name_for_id(
+    customer_id: str | None,
+    customers: list[dict[str, Any]],
+    name_by_id: dict[str, str],
+) -> str:
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return ""
+    n = name_by_id.get(cid)
+    if n:
+        return str(n).strip()
+    for c in customers:
+        if str(c.get("id") or "").strip() == cid:
+            return str(c.get("customer_name") or "").strip()
+    return ""
+
+
+def _text_snippet(text: str, *, max_len: int = 600) -> str:
+    t = (text or "").strip()
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + "…"
+
+
 def _safe_date_value(value):
     if value is None or str(value).strip() == "":
         return None
@@ -103,9 +245,10 @@ def _render_job_form_panel(
     has_job_number_column: bool,
     customers: list[dict],
     estimates: list[dict],
-    customer_name_by_id: dict,
-    estimate_label_map: dict,
-    estimate_quote_by_id: dict,
+    customer_name_by_id: dict[str, str],
+    estimate_label_map: dict[str, str],
+    estimate_quote_by_id: dict[str, str],
+    estimate_detail: dict[str, Any] | None = None,
 ) -> None:
     """Right-side bordered panel: add/edit job form."""
     with st.container(border=True):
@@ -113,22 +256,65 @@ def _render_job_form_panel(
         st.markdown(f"### {title}")
 
         if mode == "edit" and selected_job and selected_job.get("estimate_id"):
-            _eq = str(estimate_quote_by_id.get(str(selected_job.get("estimate_id")), "") or "").strip()
-            if _eq:
-                with st.container(border=True):
-                    st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-                    st.markdown(f"**Linked estimate** · Quote **{_eq}**", unsafe_allow_html=True)
+            _eid = str(selected_job.get("estimate_id"))
+            _eq = str(
+                estimate_quote_by_id.get(_eid)
+                or (estimate_detail or {}).get("quote_number")
+                or ""
+            ).strip()
+            _est = estimate_detail or {}
+            _st = str(_est.get("status") or "").strip()
+            _scope = _text_snippet(str(_est.get("scope_of_work") or ""))
+            with st.container(border=True):
+                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+                line_parts: list[str] = []
+                if _eq:
+                    line_parts.append(f"Quote **{_eq}**")
+                else:
+                    line_parts.append(f"Estimate id `{_eid[:8]}…`")
+                if _st:
+                    line_parts.append(f"estimate status **{_st}**")
+                st.markdown("**Linked estimate** · " + " · ".join(line_parts), unsafe_allow_html=True)
+                st.caption("Job is tied to this estimate (`estimate_id` on the job row).")
+                if _scope:
+                    st.caption("Scope (from estimate)")
+                    st.markdown(
+                        f"<div style='white-space:pre-wrap;font-size:0.88rem'>{html.escape(_scope)}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-        customer_options = {
-            c.get("customer_name", ""): c.get("id")
-            for c in customers
-            if str(c.get("customer_name", "")).strip()
-        }
-        estimate_options = {"": None}
+        customer_options: dict[str, str] = {}
+        for c in customers:
+            nm = str(c.get("customer_name") or "").strip()
+            cid = str(c.get("id") or "").strip()
+            if nm and cid:
+                customer_options[nm] = cid
+
+        estimate_options: dict[str, Any] = {"": None}
         for e in estimates:
-            estimate_options[estimate_label_map.get(e.get("id"), "")] = e.get("id")
-        estimate_options.pop("", None)
-        estimate_options = {"": None, **estimate_options}
+            eid = str(e.get("id") or "").strip()
+            if not eid:
+                continue
+            lab = estimate_label_map.get(eid)
+            if lab:
+                estimate_options[lab] = eid
+        if mode == "edit" and selected_job and selected_job.get("estimate_id"):
+            _leid = str(selected_job.get("estimate_id"))
+            existing_ids = {str(v) for v in estimate_options.values() if v is not None}
+            if _leid not in existing_ids:
+                lab = estimate_label_map.get(_leid)
+                if not lab and estimate_detail:
+                    qn = str(estimate_detail.get("quote_number") or "").strip()
+                    cn = _customer_display_name_for_id(
+                        estimate_detail.get("customer_id"),
+                        customers,
+                        customer_name_by_id,
+                    )
+                    st = str(estimate_detail.get("status") or "").strip()
+                    lab = f"{qn} | {cn} | {st}" if qn or cn or st else f"Estimate ({_leid[:8]}…)"
+                elif not lab:
+                    lab = f"Estimate ({_leid[:8]}…)"
+                estimate_options[lab] = _leid
 
         def current_value(field_name, default=""):
             if selected_job:
@@ -140,9 +326,18 @@ def _render_job_form_panel(
 
         c1, c2 = st.columns(2)
         cust_keys = [""] + sorted(customer_options.keys())
-        selected_cust_name = (
-            customer_name_by_id.get(selected_job.get("customer_id")) if selected_job else ""
-        )
+        selected_cust_name = ""
+        if selected_job:
+            scid = str(selected_job.get("customer_id") or "").strip()
+            if scid:
+                selected_cust_name = _customer_display_name_for_id(
+                    scid,
+                    customers,
+                    customer_name_by_id,
+                )
+                if selected_cust_name and selected_cust_name not in customer_options:
+                    customer_options[selected_cust_name] = scid
+                    cust_keys = [""] + sorted(customer_options.keys())
         cust_index = cust_keys.index(selected_cust_name) if selected_cust_name in cust_keys else 0
         customer_name = c1.selectbox("Customer", cust_keys, index=cust_index, disabled=_ro, key="job_form_customer")
         job_name = c2.text_input("Job Name", value=current_value("job_name"), disabled=_ro, key="job_form_job_name")
@@ -151,7 +346,14 @@ def _render_job_form_panel(
         cust_uuid = customer_options.get(customer_name) if customer_name else None
         if cust_uuid:
             inject_contact_picker_styles()
-            contacts = fetch_contacts_for_customer(str(cust_uuid), include_inactive=False)
+            contacts = _fetch_contacts_for_job_database(str(cust_uuid))
+            cur_ct = str(current_value("customer_contact_id") or "").strip()
+            if cur_ct:
+                cids = {str(c.get("id") or "") for c in contacts}
+                if cur_ct not in cids:
+                    orphan = _contact_row_by_id(cur_ct)
+                    if orphan:
+                        contacts = [orphan] + contacts
             if not contacts:
                 st.caption("No contacts found for this customer.")
                 render_contact_quick_add_when_empty(
@@ -178,7 +380,7 @@ def _render_job_form_panel(
                 except ValueError:
                     ct_idx = 0
                     chosen_id = None
-                ct_idx = min(max(ct_idx, 0), max(len(labels) - 1, 0))
+                ct_idx = min(max(ct_idx, 0), len(labels) - 1)
                 ct_sel = st.selectbox(
                     "Contact",
                     options=list(range(len(labels))),
@@ -207,22 +409,29 @@ def _render_job_form_panel(
         location = st.text_input("Location", value=current_value("location"), disabled=_ro, key="job_form_location")
 
         c5, c6 = st.columns(2)
-        status_options = JOB_STATUSES
-        current_status = current_value("status", "Draft") or "Draft"
+        status_options = list(JOB_STATUSES)
+        current_status = str(current_value("status", "Draft") or "Draft").strip() or "Draft"
         if current_status not in status_options:
-            current_status = "Draft"
+            status_options = status_options + [current_status]
+        status_idx = status_options.index(current_status)
         status = c5.selectbox(
             "Status",
             status_options,
-            index=status_options.index(current_status),
+            index=status_idx,
             disabled=_ro,
             key="job_form_status",
         )
 
         estimate_labels = [""] + [k for k in estimate_options.keys() if k]
         current_estimate_label = ""
-        if selected_job and selected_job.get("estimate_id") in estimate_label_map:
-            current_estimate_label = estimate_label_map[selected_job.get("estimate_id")]
+        if selected_job and selected_job.get("estimate_id"):
+            _seid = str(selected_job.get("estimate_id"))
+            current_estimate_label = estimate_label_map.get(_seid, "")
+            if not current_estimate_label:
+                for lab, eid in estimate_options.items():
+                    if lab and str(eid) == _seid:
+                        current_estimate_label = lab
+                        break
         linked_estimate = c6.selectbox(
             "Linked Estimate",
             estimate_labels,
@@ -336,13 +545,8 @@ def render() -> None:
 
     can_edit = current_role() in {"admin", "estimator"}
 
-    customers = fetch_table("customers", limit=5000, order_by="customer_name")
-    estimates = fetch_table(
-        "estimates",
-        columns="id,quote_number,customer_id,proposal_total,status,job_id",
-        limit=5000,
-        order_by="quote_number",
-    )
+    customers = _fetch_customers_for_job_db()
+    estimates = _fetch_estimates_for_job_db()
     # Real columns only (see app/services/job_schema.py); jobs has no ``description`` — use ``notes``.
     jobs, has_job_number_column = fetch_jobs_for_job_database(limit=5000)
     if has_job_number_column:
@@ -350,18 +554,45 @@ def render() -> None:
     else:
         jobs = sort_jobs_by_name(jobs)
 
-    customer_name_by_id = {c.get("id"): c.get("customer_name", "") for c in customers}
-    estimate_label_map = {
-        e.get("id"): f"{e.get('quote_number', '')} | {customer_name_by_id.get(e.get('customer_id'), '')} | {e.get('status', '')}"
-        for e in estimates
-    }
+    customer_name_by_id: dict[str, str] = {}
+    for c in customers:
+        cid = str(c.get("id") or "").strip()
+        if cid:
+            customer_name_by_id[cid] = str(c.get("customer_name") or "").strip()
+
+    estimate_label_map: dict[str, str] = {}
+    for e in estimates:
+        eid = str(e.get("id") or "").strip()
+        if not eid:
+            continue
+        ecust = str(e.get("customer_id") or "").strip()
+        cn = customer_name_by_id.get(ecust, "")
+        estimate_label_map[eid] = f"{e.get('quote_number', '')} | {cn} | {e.get('status', '')}"
+
     estimate_quote_by_id = {
         str(e.get("id")): str(e.get("quote_number") or "").strip()
         for e in estimates
         if e.get("id") is not None
     }
 
+    contact_label_by_id: dict[str, str] = {}
+    try:
+        if _job_db_admin_read():
+            ct_rows = fetch_table_admin("customer_contacts", limit=10000, order_by=None)
+        else:
+            ct_rows = fetch_table("customer_contacts", limit=10000, order_by=None)
+        for cr in ct_rows or []:
+            rid = str(cr.get("id") or "").strip()
+            if rid:
+                contact_label_by_id[rid] = contact_option_label(cr)
+    except Exception:
+        pass
+
     st.subheader("Jobs Overview")
+    st.caption(
+        "**Estimate-linked** jobs are labeled in **Source**; **Quote (estimate)**, **customer_name**, and **Contact** "
+        "summarize the link when data exists."
+    )
 
     jobs_df = pd.DataFrame(jobs)
 
@@ -387,11 +618,33 @@ def render() -> None:
 
         inject_table_action_styles()
         if "customer_id" in jobs_df.columns:
-            jobs_df["customer_name"] = jobs_df["customer_id"].map(customer_name_by_id)
+
+            def _cust_name_cell(v) -> str:
+                if v is None:
+                    return ""
+                try:
+                    if pd.isna(v):
+                        return ""
+                except Exception:
+                    pass
+                return customer_name_by_id.get(str(v).strip(), "")
+
+            jobs_df["customer_name"] = jobs_df["customer_id"].map(_cust_name_cell)
         else:
             jobs_df["customer_name"] = ""
         if "estimate_id" in jobs_df.columns:
-            jobs_df["estimate_label"] = jobs_df["estimate_id"].map(estimate_label_map)
+
+            def _est_label_cell(v) -> str:
+                if v is None:
+                    return ""
+                try:
+                    if pd.isna(v):
+                        return ""
+                except Exception:
+                    pass
+                return estimate_label_map.get(str(v).strip(), "")
+
+            jobs_df["estimate_label"] = jobs_df["estimate_id"].map(_est_label_cell)
 
             def _quote_for_estimate_cell(v) -> str:
                 if v is None or str(v).strip() == "":
@@ -399,9 +652,38 @@ def render() -> None:
                 return estimate_quote_by_id.get(str(v), "")
 
             jobs_df["Quote (estimate)"] = jobs_df["estimate_id"].map(_quote_for_estimate_cell)
+
+            def _source_cell(v) -> str:
+                if v is None:
+                    return "—"
+                try:
+                    if pd.isna(v):
+                        return "—"
+                except Exception:
+                    pass
+                return "Estimate" if str(v).strip() else "—"
+
+            jobs_df["Source"] = jobs_df["estimate_id"].map(_source_cell)
         else:
             jobs_df["estimate_label"] = ""
             jobs_df["Quote (estimate)"] = ""
+            jobs_df["Source"] = "—"
+
+        if "customer_contact_id" in jobs_df.columns:
+
+            def _contact_cell(v) -> str:
+                if v is None:
+                    return ""
+                try:
+                    if pd.isna(v):
+                        return ""
+                except Exception:
+                    pass
+                return contact_label_by_id.get(str(v).strip(), "")
+
+            jobs_df["Contact"] = jobs_df["customer_contact_id"].map(_contact_cell)
+        else:
+            jobs_df["Contact"] = ""
 
         sel_ids = get_selected_ids(TABLE_KEY_JOBS)
         n_sel = len(sel_ids)
@@ -477,7 +759,7 @@ def render() -> None:
                         pend.pop(TABLE_KEY_JOBS, None)
                         st.rerun()
 
-        f1, f2, f3 = st.columns([1, 1, 2])
+        f1, f2, f3, f4 = st.columns([1, 1, 2, 1])
 
         customer_names = sorted(
             [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
@@ -496,13 +778,20 @@ def render() -> None:
 
         _search_hint = "Search across visible fields"
         if has_job_number_column:
-            _search_hint = "job_number, job_name, customer, status, PM, supervisor, location, notes, …"
+            _search_hint = "Source, quote, contact, job_number, job_name, customer, status, …"
         else:
-            _search_hint = "job_name, customer, status, PM, supervisor, location, notes, …"
+            _search_hint = "Source, quote, contact, job_name, customer, status, …"
 
         search = f3.text_input(
             "Search Jobs",
             placeholder=_search_hint,
+        )
+
+        selected_source = f4.selectbox(
+            "Source",
+            ["All", "Estimate", "Other"],
+            disabled="Source" not in jobs_df.columns,
+            help="Estimate = created or linked to an estimate (estimate_id set).",
         )
 
         filtered = jobs_df.copy()
@@ -513,6 +802,11 @@ def render() -> None:
         if selected_status != "All" and "status" in filtered.columns:
             filtered = filtered[filtered["status"].astype(str) == selected_status]
 
+        if selected_source == "Estimate" and "Source" in filtered.columns:
+            filtered = filtered[filtered["Source"].astype(str) == "Estimate"]
+        elif selected_source == "Other" and "Source" in filtered.columns:
+            filtered = filtered[filtered["Source"].astype(str) != "Estimate"]
+
         if search.strip():
             s = search.strip().lower()
             mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
@@ -521,8 +815,11 @@ def render() -> None:
         show_cols: list[str] = []
         if has_job_number_column and "job_number" in filtered.columns:
             show_cols.append("job_number")
+        for c in ("Source", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
+            if c in filtered.columns and c not in show_cols:
+                show_cols.append(c)
         show_cols.extend(
-            [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns]
+            [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
         )
 
         if "id" not in filtered.columns:
@@ -540,6 +837,7 @@ def render() -> None:
     if panel_open and side_col is not None:
         with side_col:
             selected_job = None
+            estimate_detail: dict[str, Any] | None = None
             if mode == "edit":
                 edit_id = st.session_state.get("job_edit_id")
                 if edit_id:
@@ -548,6 +846,14 @@ def render() -> None:
                     st.error("Selected job could not be loaded. It may have been deleted.")
                     _clear_job_mode()
                     st.rerun()
+                if selected_job and selected_job.get("estimate_id"):
+                    eid_est = str(selected_job.get("estimate_id"))
+                    estimate_detail = next(
+                        (e for e in estimates if str(e.get("id")) == eid_est),
+                        None,
+                    )
+                    if not estimate_detail:
+                        estimate_detail = _fetch_estimate_row_by_id(eid_est)
             _render_job_form_panel(
                 mode=str(mode),
                 can_edit=can_edit,
@@ -559,4 +865,5 @@ def render() -> None:
                 customer_name_by_id=customer_name_by_id,
                 estimate_label_map=estimate_label_map,
                 estimate_quote_by_id=estimate_quote_by_id,
+                estimate_detail=estimate_detail,
             )

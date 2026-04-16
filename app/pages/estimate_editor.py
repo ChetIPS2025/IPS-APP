@@ -18,6 +18,8 @@ from db import (
     fetch_by_match_admin,
     fetch_one,
     fetch_table,
+    fetch_table_admin,
+    fetch_table_with_order_fallback,
     insert_row_admin,
     next_quote_number,
     quote_number_in_use,
@@ -276,6 +278,85 @@ def _norm_name_key(name: str) -> str:
     return " ".join(str(name or "").strip().split()).casefold()
 
 
+def _fetch_customers_for_editor() -> list[dict]:
+    """Same customer list source as the Customers tab (RLS-aware)."""
+    admin_read = current_role() in {"admin", "estimator"}
+    if admin_read:
+        try:
+            return fetch_table_admin(
+                "customers",
+                columns="id,customer_name",
+                limit=5000,
+                order_by="customer_name",
+            )
+        except Exception:
+            return fetch_table_admin("customers", columns="id,customer_name", limit=5000, order_by=None)
+    return fetch_table_with_order_fallback(
+        "customers",
+        columns="id,customer_name",
+        limit=5000,
+        order_by="customer_name",
+    )
+
+
+def _fetch_customer_row_by_id_for_editor(cid: str) -> dict | None:
+    """Fetch a single customer row for dropdowns (admin read when the editor uses admin reads)."""
+    admin_read = current_role() in {"admin", "estimator"}
+    try:
+        if admin_read:
+            rows = fetch_by_match_admin("customers", {"id": cid}, columns="id,customer_name", limit=1)
+        else:
+            rows = fetch_by_match("customers", {"id": cid}, columns="id,customer_name", limit=1)
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def _fetch_contacts_for_estimate_editor(customer_id: str) -> list[dict]:
+    """Contacts for the selected customer only; same read pattern as the Customers tab (RLS-aware)."""
+    admin_read = current_role() in {"admin", "estimator"}
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    try:
+        if admin_read:
+            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
+        else:
+            rows = fetch_by_match("customer_contacts", {"customer_id": cid}, limit=500)
+    except Exception:
+        return []
+    rows = list(rows or [])
+    rows = [r for r in rows if bool(r.get("is_active", True))]
+
+    def _sort_key(r: dict) -> tuple:
+        prim = 0 if r.get("is_primary") else 1
+        name = str(r.get("contact_name") or "").strip().lower()
+        return (prim, name)
+
+    rows.sort(key=_sort_key)
+    return rows
+
+
+def _customer_dropdown_labels(rows: list[dict]) -> tuple[list[str], dict[str, str]]:
+    """Return sorted customer ids and display labels (disambiguate duplicate names)."""
+    valid = [r for r in rows if r.get("id")]
+    by_name_lower: dict[str, list[str]] = {}
+    for r in valid:
+        nm = str(r.get("customer_name") or "").strip() or "(no name)"
+        cid = str(r["id"])
+        by_name_lower.setdefault(nm.lower(), []).append(cid)
+    sorted_rows = sorted(valid, key=lambda r: str(r.get("customer_name") or "").strip().lower())
+    id_to_label: dict[str, str] = {}
+    for r in sorted_rows:
+        cid = str(r["id"])
+        nm = str(r.get("customer_name") or "").strip() or "(no name)"
+        dups = by_name_lower.get(nm.lower(), [])
+        label = nm if len(dups) <= 1 else f"{nm} ({cid[:8]}…)"
+        id_to_label[cid] = label
+    ordered_ids = [str(r["id"]) for r in sorted_rows]
+    return ordered_ids, id_to_label
+
+
 def _top_matches(query: str, options: list[str], *, limit: int = 8) -> list[str]:
     q = " ".join(str(query or "").strip().split())
     if not q:
@@ -310,34 +391,6 @@ def _top_matches(query: str, options: list[str], *, limit: int = 8) -> list[str]
         seen.add(key)
         out.append(o)
     return out
-
-
-def create_or_get_customer_by_name(name: str) -> tuple[str | None, bool]:
-    """
-    Resolve a customer_id by name (case-insensitive, trimmed).
-    Creates a new row when no match exists.
-    Returns (customer_id, created).
-    """
-    nm = " ".join(str(name or "").strip().split())
-    if not nm:
-        return None, False
-    key = _norm_name_key(nm)
-    try:
-        rows = fetch_table("customers", columns="id,customer_name", limit=5000, order_by="customer_name")
-        for r in rows:
-            if _norm_name_key(r.get("customer_name") or "") == key:
-                return str(r.get("id") or ""), False
-        inserted = insert_row_admin(
-            "customers",
-            {
-                "customer_name": nm,
-                "is_active": True,
-            },
-        )
-        return str(inserted.get("id") or ""), True
-    except Exception as exc:
-        st.error(f"Could not create customer {nm!r}: {exc}")
-        return None, False
 
 
 def create_or_get_job_by_name(name: str, *, customer_id: str | None) -> tuple[str | None, bool]:
@@ -446,6 +499,9 @@ def ensure_state():
     st.session_state.setdefault("est_pending_po_attachment", None)
     st.session_state.setdefault("est_revision_note", "")
     est0 = st.session_state["estimate_editor_state"]
+    # Legacy widget keys from the old free-text customer field (avoid stale session state).
+    st.session_state.pop("est_customer_query", None)
+    st.session_state.pop("est_customer_match_pick", None)
     # Defensive defaults: some imported legacy payloads may omit keys or set them to null.
     est0.setdefault("materials", [])
     est0.setdefault("labor", [])
@@ -1023,15 +1079,25 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     ensure_state()
     est = st.session_state["estimate_editor_state"]
 
-    customers = fetch_table("customers", columns="id,customer_name", limit=1000, order_by="customer_name")
+    customers = _fetch_customers_for_editor()
+    cur_cust_id = str(est.get("customer_id") or "").strip()
+    ids_have = {str(c["id"]) for c in customers if c.get("id")}
+    if cur_cust_id and cur_cust_id not in ids_have:
+        extra = _fetch_customer_row_by_id_for_editor(cur_cust_id)
+        if extra and extra.get("id"):
+            customers = [extra] + list(customers)
+        elif cur_cust_id:
+            customers = [
+                {"id": cur_cust_id, "customer_name": "[Customer not found — check Customers tab]"},
+            ] + list(customers)
+
     jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=1000, order_by="job_number")
     materials_catalog = fetch_table("materials_catalog", limit=3000, order_by="item_key")
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
     existing_estimates = fetch_table("estimates", columns="id,quote_number,status,updated_at,revision_number", limit=1000, order_by="updated_at")
 
-    customer_map = {c["customer_name"]: c["id"] for c in customers}
-    customer_name_by_id = {c["id"]: c["customer_name"] for c in customers}
+    customer_name_by_id = {str(c["id"]): str(c.get("customer_name") or "").strip() for c in customers if c.get("id")}
     jobs_by_customer = {}
     for j in jobs:
         jobs_by_customer.setdefault(j.get("customer_id"), []).append(j)
@@ -1193,7 +1259,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     m5.metric("Proposal", money(totals["proposal_total"]))
 
     if embedded:
-        _cust = customer_name_by_id.get(est.get("customer_id"), "")
+        _cust = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
         _job = next((j["job_name"] for j in jobs if j["id"] == est.get("job_id")), "")
         pdf_toolbar = build_proposal_pdf(est, totals, customer_name=_cust, job_name=_job)
         ep1, ep2, ep3 = st.columns([1, 1, 4])
@@ -1225,19 +1291,13 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.session_state["est_embed_pdf_preview"] = False
                 st.rerun()
 
-    prev_cust = st.session_state.get("_est_prev_customer_id")
-    cur_cust = est.get("customer_id")
-    if prev_cust is not None and cur_cust != prev_cust:
-        est["customer_contact_id"] = None
-    st.session_state["_est_prev_customer_id"] = cur_cust
-
     if _imported_estimate_missing_customer(
         est,
         pending_pdf_import=bool(st.session_state.get("estimate_pending_import_pdf")),
     ):
         st.warning(
             "This imported estimate is not linked to a customer yet. "
-            "Select an existing customer or create one, then save."
+            "Select a saved customer from the list below (add one in the **Customers** tab if needed), then save."
         )
 
     # Row 1: Quote | Status | Customer — single compact row (no full-width fields).
@@ -1246,10 +1306,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         str(st.session_state.get("loaded_estimate_id") or "").strip()
         and str(est.get("quote_number", "") or "").strip()
     )
-    selected_customer_name = customer_name_by_id.get(est.get("customer_id"), "")
-    customer_names = list(customer_map.keys())
-    cust_id_by_norm = {_norm_name_key(nm): str(customer_map.get(nm) or "") for nm in customer_names}
-
     with q_col:
         est["quote_number"] = st.text_input(
             "Quote Number",
@@ -1269,37 +1325,46 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         )
 
     with cust_col:
-        cust_initial = selected_customer_name or str(st.session_state.get("est_customer_query") or "")
-        cust_query = st.text_input(
-            "Customer",
-            value=cust_initial,
-            disabled=is_locked,
-            key="est_customer_query",
-            placeholder="Search or type a new customer…",
-            help="Type to search. If no exact match exists, a new customer will be created when you Save / Submit / Approve / Award.",
-        )
-        cust_norm = _norm_name_key(cust_query)
-        cust_exact_id = cust_id_by_norm.get(cust_norm) if cust_norm else None
-        if cust_exact_id:
-            est["customer_id"] = cust_exact_id
-            st.caption("Matched existing customer.")
-        elif cust_norm:
-            est["customer_id"] = None
-            st.caption("New customer will be created on save.")
-
-        cust_matches = _top_matches(cust_query, customer_names, limit=7)
-        if cust_matches and not cust_exact_id:
-            cust_pick = st.selectbox(
-                "Close matches",
-                [""] + cust_matches,
-                index=0,
-                disabled=is_locked,
-                key="est_customer_match_pick",
-                help="Pick an existing customer to avoid creating a duplicate.",
+        _EMPTY_CUSTOMER = "__est_no_customer__"
+        rows_for_ui = [r for r in customers if r.get("id")]
+        if not rows_for_ui:
+            st.warning(
+                "No customers in the database. Add a customer from the **Customers** tab, then return here and select it."
             )
-            if cust_pick:
-                st.session_state["est_customer_query"] = cust_pick
-                st.rerun()
+            if not is_locked:
+                est["customer_id"] = None
+        else:
+            ordered_ids, id_to_label = _customer_dropdown_labels(rows_for_ui)
+            options = [_EMPTY_CUSTOMER] + ordered_ids
+
+            def _fmt_customer(cid: str) -> str:
+                if cid == _EMPTY_CUSTOMER:
+                    return "— Select customer —"
+                return id_to_label.get(cid, cid)
+
+            cur_sel = str(est.get("customer_id") or "").strip()
+            default_idx = options.index(cur_sel) if cur_sel in options else 0
+            sel = st.selectbox(
+                "Customer",
+                options=options,
+                index=default_idx,
+                format_func=_fmt_customer,
+                disabled=is_locked,
+                key="est_customer_select_id",
+                help="Only saved customers from the Customers tab. Add new companies there first.",
+            )
+            if sel == _EMPTY_CUSTOMER:
+                if not is_locked:
+                    est["customer_id"] = None
+            else:
+                est["customer_id"] = sel
+
+    # After customer is chosen: clear contact when customer changes (same run as the selectbox).
+    prev_cust = st.session_state.get("_est_prev_customer_id")
+    cur_cust = est.get("customer_id")
+    if prev_cust is not None and cur_cust != prev_cust:
+        est["customer_contact_id"] = None
+    st.session_state["_est_prev_customer_id"] = cur_cust
 
     matching_jobs = jobs_by_customer.get(est.get("customer_id"), []) if est.get("customer_id") else jobs
     job_names = [str(j.get("job_name") or "").strip() for j in matching_jobs if str(j.get("job_name") or "").strip()]
@@ -1319,7 +1384,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 from services.customer_contacts import (
                     contact_none_option_label,
                     contact_option_label,
-                    fetch_contacts_for_customer,
                     inject_contact_picker_styles,
                     render_contact_detail_preview,
                     render_contact_quick_add_when_empty,
@@ -1328,22 +1392,31 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 from app.services.customer_contacts import (  # type: ignore
                     contact_none_option_label,
                     contact_option_label,
-                    fetch_contacts_for_customer,
                     inject_contact_picker_styles,
                     render_contact_detail_preview,
                     render_contact_quick_add_when_empty,
                 )
 
             inject_contact_picker_styles()
-            contacts = fetch_contacts_for_customer(str(est.get("customer_id")), include_inactive=False)
+            cid_key = str(est.get("customer_id") or "").strip()
+            contacts = _fetch_contacts_for_estimate_editor(cid_key)
             if not contacts:
                 st.caption("No contacts found for this customer.")
+                st.selectbox(
+                    "Contact",
+                    options=[0],
+                    index=0,
+                    format_func=lambda _: contact_none_option_label(),
+                    disabled=is_locked,
+                    key=f"est_contact_sel_empty_{cid_key}",
+                    help="Optional: add contacts for this customer on the Customers tab.",
+                )
+                est["customer_contact_id"] = None
                 render_contact_quick_add_when_empty(
-                    customer_id=str(est.get("customer_id")),
+                    customer_id=cid_key,
                     key_prefix="est",
                     disabled=is_locked,
                 )
-                est["customer_contact_id"] = None
             else:
                 cur = str(est.get("customer_contact_id") or "").strip()
                 by_id = {str(c.get("id") or ""): c for c in contacts}
@@ -1358,24 +1431,24 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 labels = [contact_none_option_label()] + [contact_option_label(c) for c in contacts]
                 ids: list[str | None] = [None] + [str(c["id"]) for c in contacts]
                 try:
-                    idx = ids.index(str(chosen_id)) if chosen_id else 0
+                    idx = ids.index(chosen_id) if chosen_id is not None else 0
                 except ValueError:
                     idx = 0
-                    chosen_id = None
-                idx = min(max(idx, 0), max(len(labels) - 1, 0))
+                idx = min(max(idx, 0), len(labels) - 1)
                 ci = st.selectbox(
                     "Contact",
                     options=list(range(len(labels))),
                     index=idx,
                     format_func=lambda i: labels[i],
                     disabled=is_locked,
-                    key=f"est_contact_sel_{est.get('customer_id')}",
-                    help="Optional: contact person for this quote.",
+                    key=f"est_contact_sel_{cid_key}",
+                    help="Only contacts linked to the selected customer. Optional for this quote.",
                 )
                 est["customer_contact_id"] = ids[int(ci)]
 
                 render_contact_detail_preview(by_id.get(str(est.get("customer_contact_id") or "")))
         else:
+            st.caption("Select a customer to choose a contact.")
             est["customer_contact_id"] = None
 
     with row2_job:
@@ -2444,7 +2517,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.rerun()
 
     with tabs[6]:
-        customer_name = customer_name_by_id.get(est.get("customer_id"), "")
+        customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
         job_name = next((j["job_name"] for j in jobs if j["id"] == est.get("job_id")), "")
         docx_bytes = build_proposal_docx(est, totals, customer_name=customer_name, job_name=job_name)
         pdf_bytes = build_proposal_pdf(est, totals, customer_name=customer_name, job_name=job_name)
@@ -2512,7 +2585,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.session_state["est_revision_note"] = str(revision_note or "")
                     st.rerun()
 
-        customer_name = customer_name_by_id.get(est.get("customer_id"), "")
+        customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
         loaded_id = st.session_state.get("loaded_estimate_id")
         qn_now = str(est.get("quote_number", "") or "").strip()
         if not qn_now:
@@ -2520,12 +2593,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.warning("This estimate is missing a Quote Number.")
             else:
                 st.info("Quote Number will be assigned on first save if left blank.")
-        elif not (customer_name or str(st.session_state.get("est_customer_query") or "").strip()):
+        elif not customer_name:
             st.warning("Select a customer before saving.")
 
         save_cols = st.columns(4)
         can_save = bool(
-            (est.get("customer_id") or str(st.session_state.get("est_customer_query") or "").strip())
+            bool(est.get("customer_id"))
             and (qn_now or not loaded_id)
         )
 
@@ -2572,7 +2645,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 create_job_disabled_reason = "Save the estimate first so it has an id in the database."
             elif not can_create_job_ui:
                 create_job_disabled_reason = "Only admin or estimator can create jobs."
-            elif not (est.get("customer_id") or str(st.session_state.get("est_customer_query") or "").strip()):
+            elif not est.get("customer_id"):
                 create_job_disabled_reason = "Select a customer on this estimate before creating a job."
             elif not estimate_status_allows_job_creation(str(est.get("status") or "")):
                 create_job_disabled_reason = (
@@ -2619,19 +2692,11 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
         def _resolve_customer_job_on_commit() -> list[str]:
             msgs: list[str] = []
-            # Customer
-            cust_typed = " ".join(str(st.session_state.get("est_customer_query") or "").strip().split())
-            if cust_typed:
-                cid, created = create_or_get_customer_by_name(cust_typed)
-                if cid:
-                    est["customer_id"] = cid
-                    if created:
-                        msgs.append(f"Created new customer: {cust_typed}")
             # Job (requires customer_id when creating)
             job_typed = " ".join(str(st.session_state.get("est_job_query") or "").strip().split())
             if job_typed:
                 if not est.get("customer_id"):
-                    st.error("Select or type a customer before creating a new job.")
+                    st.error("Select a customer before creating a new job.")
                     st.stop()
                 jid, created = create_or_get_job_by_name(job_typed, customer_id=str(est.get("customer_id")))
                 if jid:
@@ -3019,7 +3084,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         st.caption(
             f"Quote: {est.get('quote_number') or '—'} · Status: {est.get('status') or 'draft'}"
         )
-        customer_name = customer_name_by_id.get(est.get("customer_id"), "") if "customer_name_by_id" in locals() else ""
+        customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "") if "customer_name_by_id" in locals() else ""
         if customer_name:
             st.caption(f"Customer: {customer_name}")
 
@@ -3117,28 +3182,50 @@ def render() -> None:
             help="Job short name or code.",
         )
 
-    # Second row: Customer (wider but not 100%)
-    customer_options = ss.get("customers_options") or []
-    customer_id = estimate.get("customer_id", "")
-    cust_val = ""
+    # Second row: Customer (wider but not 100%) — saved customers only (same source as Customers tab).
     cust_col, = st.columns([2.75])
     with cust_col:
-        if customer_options and isinstance(customer_options, list):
-            cust_val = st.selectbox(
-                "Customer",
-                options=[c["name"] for c in customer_options],
-                index=next((i for i, c in enumerate(customer_options) if c.get("id") == customer_id), 0),
-                key="est_customer",
-                help="Select a customer for this estimate."
+        _EMPTY_CUSTOMER_COMPACT = "__est_no_customer__"
+        customers_compact = _fetch_customers_for_editor()
+        cur_cid = str(estimate.get("customer_id") or "").strip()
+        ids_h = {str(c["id"]) for c in customers_compact if c.get("id")}
+        if cur_cid and cur_cid not in ids_h:
+            extra = _fetch_customer_row_by_id_for_editor(cur_cid)
+            if extra and extra.get("id"):
+                customers_compact = [extra] + list(customers_compact)
+            elif cur_cid:
+                customers_compact = [
+                    {"id": cur_cid, "customer_name": "[Customer not found — check Customers tab]"},
+                ] + list(customers_compact)
+        rows_c = [r for r in customers_compact if r.get("id")]
+        if not rows_c:
+            st.warning(
+                "No customers in the database. Add a customer from the **Customers** tab, then return here and select it."
             )
-            selected_customer = next((c for c in customer_options if c["name"] == cust_val), None)
+            estimate["customer_id"] = None
         else:
-            cust_val = st.text_input(
+            ordered_ids_c, id_to_label_c = _customer_dropdown_labels(rows_c)
+            options_c = [_EMPTY_CUSTOMER_COMPACT] + ordered_ids_c
+
+            def _fmt_customer_compact(cid: str) -> str:
+                if cid == _EMPTY_CUSTOMER_COMPACT:
+                    return "— Select customer —"
+                return id_to_label_c.get(cid, cid)
+
+            cur_s = str(estimate.get("customer_id") or "").strip()
+            default_idx_c = options_c.index(cur_s) if cur_s in options_c else 0
+            sel_c = st.selectbox(
                 "Customer",
-                value=estimate.get("customer_name", ""),
-                key="est_customer_fallback",
+                options=options_c,
+                index=default_idx_c,
+                format_func=_fmt_customer_compact,
+                key="est_customer_compact_select_id",
+                help="Only saved customers from the Customers tab.",
             )
-            selected_customer = None
+            if sel_c == _EMPTY_CUSTOMER_COMPACT:
+                estimate["customer_id"] = None
+            else:
+                estimate["customer_id"] = sel_c
 
     # --- Tabs for Materials, Labor, Equipment, Travel ---
 
@@ -3340,12 +3427,40 @@ def render() -> None:
                         key="status",
                     )
                 with col_cust:
-                    customer = st.text_input(
-                        "Customer",
-                        value=estimate.get("customer", ""),
-                        key="customer",
-                        max_chars=50,
-                    )
+                    _EMPTY_R = "__est_no_customer__"
+                    rows_r = _fetch_customers_for_editor()
+                    cur_r = str(estimate.get("customer_id") or "").strip()
+                    ids_r = {str(c["id"]) for c in rows_r if c.get("id")}
+                    if cur_r and cur_r not in ids_r:
+                        ex = _fetch_customer_row_by_id_for_editor(cur_r)
+                        if ex and ex.get("id"):
+                            rows_r = [ex] + list(rows_r)
+                        elif cur_r:
+                            rows_r = [
+                                {"id": cur_r, "customer_name": "[Customer not found — check Customers tab]"},
+                            ] + list(rows_r)
+                    rows_rf = [r for r in rows_r if r.get("id")]
+                    if not rows_rf:
+                        st.warning("No customers in the database. Add one from the **Customers** tab.")
+                    else:
+                        oid, lbl = _customer_dropdown_labels(rows_rf)
+                        opt = [_EMPTY_R] + oid
+
+                        def _fmt_r(cid: str) -> str:
+                            if cid == _EMPTY_R:
+                                return "— Select customer —"
+                            return lbl.get(cid, cid)
+
+                        idx_r = opt.index(cur_r) if cur_r in opt else 0
+                        sel_r = st.selectbox(
+                            "Customer",
+                            options=opt,
+                            index=idx_r,
+                            format_func=_fmt_r,
+                            key="est_customer_review_header",
+                            help="Only saved customers from the Customers tab.",
+                        )
+                        estimate["customer_id"] = None if sel_r == _EMPTY_R else sel_r
 
                 # Row 2: Contact | Job
                 col_contact, col_job = st.columns([2.5, 2.5])
