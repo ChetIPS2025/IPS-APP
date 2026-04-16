@@ -186,6 +186,91 @@ def ensure_numeric_defaults(est: dict) -> dict:
     return est
 
 
+def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str]) -> list[dict]:
+    """
+    Build rows with only ``item`` + ``qty`` for ``st.data_editor``.
+
+    Imports and legacy JSON often add ``quantity``, ``unit_price``, ``description``, etc.
+    Those extra keys became extra dataframe columns, so users had to fill Qty twice
+    (or fight duplicate-looking columns).
+    """
+    out: list[dict] = []
+    for raw in rows or []:
+        if not isinstance(raw, dict):
+            continue
+        item = raw.get("item") if raw.get("item") is not None else raw.get("item_key")
+        item_s = str(item or "").strip()
+        q = raw.get("qty")
+        if _is_missing_number(q) and not _is_missing_number(raw.get("quantity")):
+            try:
+                q = float(raw.get("quantity") or 0)
+            except (TypeError, ValueError):
+                q = 0.0
+        try:
+            qf = float(q or 0)
+        except (TypeError, ValueError):
+            qf = 0.0
+        out.append({"item": item_s, "qty": qf})
+    if not out and materials_options:
+        return [{"item": materials_options[0], "qty": 0.0}]
+    if not out:
+        return [{"item": "", "qty": 0.0}]
+    return out
+
+
+def _labor_rows_for_editor(rows: list | None, *, labor_options: list[str]) -> list[dict]:
+    """
+    Build rows with only the five labor editor columns.
+
+    Legacy rows may include a single ``hours`` field or other keys that created
+    extra columns next to ST/OT hrs per day.
+    """
+    keys_num = ("headcount", "st_hours_per_day", "ot_hours_per_day", "days")
+    out: list[dict] = []
+    for raw in rows or []:
+        if not isinstance(raw, dict):
+            continue
+        d = {k: _num0(raw.get(k)) for k in keys_num}
+        d["classification"] = str(raw.get("classification") or "").strip()
+        if (
+            d["headcount"] == 0.0
+            and d["st_hours_per_day"] == 0.0
+            and d["ot_hours_per_day"] == 0.0
+            and d["days"] == 0.0
+            and not _is_missing_number(raw.get("hours"))
+        ):
+            try:
+                h = float(raw.get("hours") or 0)
+            except (TypeError, ValueError):
+                h = 0.0
+            if h > 0.0:
+                d["headcount"] = 1.0
+                d["st_hours_per_day"] = h
+                d["days"] = 1.0
+        out.append(d)
+    if not out and labor_options:
+        return [
+            {
+                "classification": labor_options[0],
+                "headcount": 0.0,
+                "st_hours_per_day": 0.0,
+                "ot_hours_per_day": 0.0,
+                "days": 0.0,
+            }
+        ]
+    if not out:
+        return [
+            {
+                "classification": "",
+                "headcount": 0.0,
+                "st_hours_per_day": 0.0,
+                "ot_hours_per_day": 0.0,
+                "days": 0.0,
+            }
+        ]
+    return out
+
+
 def _norm_name_key(name: str) -> str:
     return " ".join(str(name or "").strip().split()).casefold()
 
@@ -331,7 +416,23 @@ def ensure_state():
     st.session_state.setdefault("loaded_estimate_id", None)
     st.session_state.setdefault("estimate_editor_quote_ready", False)
     st.session_state.setdefault("est_eq_rental_only", True)
+    # Editing indices for line-item row-card forms (avoid re-entry / widget resets)
+    st.session_state.setdefault("est_material_edit_idx", None)
+    st.session_state.setdefault("est_labor_edit_idx", None)
+    # Quick-add defaults (remember last used)
+    st.session_state.setdefault("est_material_last_category", "All")
+    st.session_state.setdefault("est_material_last_item", "")
+    st.session_state.setdefault("est_material_last_qty", 1.0)
+    st.session_state.setdefault("est_labor_last_classification", "")
+    st.session_state.setdefault("est_labor_last_headcount", 1.0)
+    st.session_state.setdefault("est_labor_last_st_hours", 8.0)
+    st.session_state.setdefault("est_labor_last_ot_hours", 0.0)
+    st.session_state.setdefault("est_labor_last_days", 1.0)
     est0 = st.session_state["estimate_editor_state"]
+    # Defensive defaults: some imported legacy payloads may omit keys or set them to null.
+    est0.setdefault("materials", [])
+    est0.setdefault("labor", [])
+    est0.setdefault("controls", {})
     ensure_numeric_defaults(est0)
     if not st.session_state.get("loaded_estimate_id"):
         qn = str(est0.get("quote_number", "") or "").strip()
@@ -1240,48 +1341,360 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     tabs = st.tabs(["Materials", "Labor", "Equipment", "Travel", "Job Scope", "Attachments / P.O.", "Proposal", "Review / Save"])
 
     with tabs[0]:
-        rows = est.get("materials", []) or ([{"item": materials_options[0], "qty": 0.0}] if materials_options else [])
-        df = pd.DataFrame(rows if rows else [{"item": "", "qty": 0.0}])
-        edited = st.data_editor(
-            df, num_rows="dynamic", use_container_width=True, hide_index=True, key="materials_editor_db",
-            disabled=is_locked,
-            column_config={
-                "item": st.column_config.SelectboxColumn("Item", options=materials_options, required=True),
-                "qty": st.column_config.NumberColumn("Qty", min_value=0.0, step=1.0, format="%.2f"),
-            },
+        # Materials row cards + form-based add/edit to avoid "enter twice" UX.
+        est.setdefault("materials", [])
+        controls = est.get("controls", {}) or {}
+        material_markup = float(controls.get("material_markup_pct", 0) or 0)
+        material_map = {m.get("item_key"): m for m in materials_catalog if isinstance(m, dict) and m.get("item_key")}
+
+        # Optional category filter (resilient to schema differences).
+        categories = sorted(
+            {
+                str(m.get("category") or "").strip()
+                for m in materials_catalog
+                if isinstance(m, dict) and str(m.get("category") or "").strip()
+            }
         )
-        if "qty" in edited.columns:
-            edited["qty"] = edited["qty"].fillna(0.0)
-        if "item" in edited.columns:
-            edited["item"] = edited["item"].fillna("")
-        est["materials"] = edited.to_dict("records")
+        cat_options = ["All"] + categories if categories else ["All"]
+
+        st.caption("Quick add: choose (optional) category, select item, set qty, submit once.")
+
+        with st.form(key="est_material_add_form", clear_on_submit=True):
+            # Remember last-used category when available.
+            last_cat = str(st.session_state.get("est_material_last_category") or "All")
+            cat_index = cat_options.index(last_cat) if last_cat in cat_options else 0
+            selected_cat = st.selectbox(
+                "Category",
+                options=cat_options,
+                index=cat_index,
+                disabled=is_locked,
+                key="est_material_add_category",
+                help="Optional filter. If your materials table has no category column, this stays as All.",
+            )
+
+            if selected_cat != "All":
+                filtered_items = [
+                    str(m.get("item_key") or "").strip()
+                    for m in materials_catalog
+                    if isinstance(m, dict)
+                    and str(m.get("item_key") or "").strip()
+                    and str(m.get("category") or "").strip() == selected_cat
+                ]
+            else:
+                filtered_items = materials_options
+            filtered_items = [x for x in filtered_items if x]
+            if not filtered_items:
+                filtered_items = [""]
+
+            last_item = str(st.session_state.get("est_material_last_item") or "").strip()
+            item_index = filtered_items.index(last_item) if last_item in filtered_items else 0
+            mat_add_item = st.selectbox(
+                "Material",
+                options=filtered_items,
+                index=item_index,
+                disabled=is_locked,
+                key="est_material_add_item",
+            )
+            mat_add_qty = st.number_input(
+                "Qty",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_material_last_qty") or 1.0),
+                key="est_material_add_qty",
+            )
+            mat_add_submit = st.form_submit_button("Add Material", disabled=is_locked)
+
+            if mat_add_submit:
+                if not str(mat_add_item or "").strip():
+                    st.error("Select a Material.")
+                    st.stop()
+                st.session_state["est_material_last_category"] = str(selected_cat)
+                st.session_state["est_material_last_item"] = str(mat_add_item).strip()
+                st.session_state["est_material_last_qty"] = float(mat_add_qty or 0.0) or 1.0
+                est["materials"] = (est.get("materials") or []) + [{"item": str(mat_add_item).strip(), "qty": float(mat_add_qty or 0.0)}]
+                st.session_state["est_material_edit_idx"] = None
+                st.rerun()
+
+        # Edit form (only one row at a time)
+        mat_edit_idx = st.session_state.get("est_material_edit_idx")
+        if mat_edit_idx is not None:
+            try:
+                mat_edit_idx = int(mat_edit_idx)
+            except Exception:
+                mat_edit_idx = None
+            if mat_edit_idx is None or mat_edit_idx < 0 or mat_edit_idx >= len(est.get("materials") or []):
+                st.session_state["est_material_edit_idx"] = None
+            else:
+                cur = (est.get("materials") or [])[mat_edit_idx] or {}
+                cur_item = str(cur.get("item") or "").strip()
+                cur_qty = float(cur.get("qty", 0) or 0)
+                with st.form(key=f"est_material_edit_form_{mat_edit_idx}", clear_on_submit=True):
+                    st.caption(f"Editing material line #{mat_edit_idx + 1}")
+                    mat_edit_item = st.selectbox(
+                        "Material",
+                        options=materials_options if materials_options else [""],
+                        index=(materials_options.index(cur_item) if cur_item in materials_options else 0),
+                        disabled=is_locked,
+                        key=f"est_material_edit_item_{mat_edit_idx}",
+                    )
+                    mat_edit_qty = st.number_input(
+                        "Qty",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_qty,
+                        key=f"est_material_edit_qty_{mat_edit_idx}",
+                    )
+                    mat_edit_submit = st.form_submit_button(
+                        "Save Changes", disabled=is_locked, key=f"est_material_edit_save_{mat_edit_idx}"
+                    )
+                    mat_edit_cancel = st.form_submit_button(
+                        "Cancel", disabled=is_locked, key=f"est_material_edit_cancel_{mat_edit_idx}"
+                    )
+                    if mat_edit_cancel:
+                        st.session_state["est_material_edit_idx"] = None
+                        st.rerun()
+                    if mat_edit_submit:
+                        if not str(mat_edit_item or "").strip():
+                            st.error("Select a Material.")
+                            st.stop()
+                        est["materials"][mat_edit_idx] = {"item": str(mat_edit_item).strip(), "qty": float(mat_edit_qty or 0.0)}
+                        st.session_state["est_material_edit_idx"] = None
+                        st.rerun()
+
+        # Render existing lines
+        mat_lines = est.get("materials") or []
+        if not mat_lines:
+            st.info("No materials added yet.")
+        else:
+            for idx, line in enumerate(mat_lines):
+                if not isinstance(line, dict):
+                    continue
+                item_key = str(line.get("item") or "").strip()
+                qty = float(line.get("qty", 0) or 0.0)
+                m = material_map.get(item_key)
+                purchase = float((m or {}).get("purchase_price", 0) or 0)
+                sell = float((m or {}).get("sell_price", 0) or 0)
+                base_sell = sell if sell > 0 else purchase * (1 + material_markup)
+                subtotal = qty * base_sell
+
+                with st.container(border=True):
+                    left, right = st.columns([2, 1])
+                    with left:
+                        st.markdown(f"**{item_key or 'Unknown material'}**")
+                        st.caption(f"Qty: {qty:.2f}")
+                    with right:
+                        st.metric(label="Line subtotal", value=money(subtotal))
+                    c_edit, c_rem = st.columns([1, 1], gap="small")
+                    with c_edit:
+                        if st.button("Edit", disabled=is_locked, key=f"est_material_edit_btn_{idx}"):
+                            st.session_state["est_material_edit_idx"] = idx
+                            st.rerun()
+                    with c_rem:
+                        if st.button("Remove", disabled=is_locked, key=f"est_material_remove_btn_{idx}"):
+                            est["materials"] = [x for j, x in enumerate(mat_lines) if j != idx]
+                            if st.session_state.get("est_material_edit_idx") == idx:
+                                st.session_state["est_material_edit_idx"] = None
+                            st.rerun()
 
     with tabs[1]:
-        rows = est.get("labor", []) or (
-            [{"classification": labor_options[0], "headcount": 0.0, "st_hours_per_day": 0.0, "ot_hours_per_day": 0.0, "days": 0.0}]
-            if labor_options
-            else []
-        )
-        df = pd.DataFrame(
-            rows if rows else [{"classification": "", "headcount": 0.0, "st_hours_per_day": 0.0, "ot_hours_per_day": 0.0, "days": 0.0}]
-        )
-        edited = st.data_editor(
-            df, num_rows="dynamic", use_container_width=True, hide_index=True, key="labor_editor_db",
-            disabled=is_locked,
-            column_config={
-                "classification": st.column_config.SelectboxColumn("Classification", options=labor_options, required=True),
-                "headcount": st.column_config.NumberColumn("Headcount", min_value=0.0, step=1.0, format="%.2f"),
-                "st_hours_per_day": st.column_config.NumberColumn("ST Hrs/Day", min_value=0.0, step=1.0, format="%.2f"),
-                "ot_hours_per_day": st.column_config.NumberColumn("OT Hrs/Day", min_value=0.0, step=1.0, format="%.2f"),
-                "days": st.column_config.NumberColumn("Days", min_value=0.0, step=1.0, format="%.2f"),
-            },
-        )
-        for col in ("headcount", "st_hours_per_day", "ot_hours_per_day", "days"):
-            if col in edited.columns:
-                edited[col] = edited[col].fillna(0.0)
-        if "classification" in edited.columns:
-            edited["classification"] = edited["classification"].fillna("")
-        est["labor"] = edited.to_dict("records")
+        # Labor row cards + form-based add/edit to avoid "enter twice" UX.
+        est.setdefault("labor", [])
+        labor_map = {r.get("classification"): r for r in labor_rates if isinstance(r, dict) and r.get("classification")}
+
+        st.caption("Quick add: pick classification, confirm defaults, submit once. Last-used values are remembered.")
+
+        with st.form(key="est_labor_add_form", clear_on_submit=True):
+            last_class = str(st.session_state.get("est_labor_last_classification") or "").strip()
+            class_opts = labor_options if labor_options else [""]
+            class_index = class_opts.index(last_class) if last_class in class_opts else 0
+            labor_add_class = st.selectbox(
+                "Classification",
+                options=class_opts,
+                index=class_index,
+                disabled=is_locked,
+                key="est_labor_add_class",
+            )
+            labor_add_headcount = st.number_input(
+                "Headcount",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_labor_last_headcount") or 1.0),
+                key="est_labor_add_headcount",
+            )
+            labor_add_st_hrs = st.number_input(
+                "ST Hrs/Day",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_labor_last_st_hours") or 8.0),
+                key="est_labor_add_st_hours",
+            )
+            labor_add_ot_hrs = st.number_input(
+                "OT Hrs/Day",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_labor_last_ot_hours") or 0.0),
+                key="est_labor_add_ot_hours",
+            )
+            labor_add_days = st.number_input(
+                "Days",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_labor_last_days") or 1.0),
+                key="est_labor_add_days",
+            )
+            labor_add_submit = st.form_submit_button("Add Labor", disabled=is_locked)
+
+            if labor_add_submit:
+                if not str(labor_add_class or "").strip():
+                    st.error("Select a Labor Classification.")
+                    st.stop()
+                st.session_state["est_labor_last_classification"] = str(labor_add_class).strip()
+                st.session_state["est_labor_last_headcount"] = float(labor_add_headcount or 0.0) or 1.0
+                st.session_state["est_labor_last_st_hours"] = float(labor_add_st_hrs or 0.0) or 8.0
+                st.session_state["est_labor_last_ot_hours"] = float(labor_add_ot_hrs or 0.0)
+                st.session_state["est_labor_last_days"] = float(labor_add_days or 0.0) or 1.0
+                est["labor"] = (est.get("labor") or []) + [
+                    {
+                        "classification": str(labor_add_class).strip(),
+                        "headcount": float(labor_add_headcount or 0.0),
+                        "st_hours_per_day": float(labor_add_st_hrs or 0.0),
+                        "ot_hours_per_day": float(labor_add_ot_hrs or 0.0),
+                        "days": float(labor_add_days or 0.0),
+                    }
+                ]
+                st.session_state["est_labor_edit_idx"] = None
+                st.rerun()
+
+        labor_edit_idx = st.session_state.get("est_labor_edit_idx")
+        if labor_edit_idx is not None:
+            try:
+                labor_edit_idx = int(labor_edit_idx)
+            except Exception:
+                labor_edit_idx = None
+            if labor_edit_idx is None or labor_edit_idx < 0 or labor_edit_idx >= len(est.get("labor") or []):
+                st.session_state["est_labor_edit_idx"] = None
+            else:
+                cur = (est.get("labor") or [])[labor_edit_idx] or {}
+                cur_class = str(cur.get("classification") or "").strip()
+                cur_headcount = float(cur.get("headcount", 0) or 0)
+                cur_st = float(cur.get("st_hours_per_day", 0) or 0)
+                cur_ot = float(cur.get("ot_hours_per_day", 0) or 0)
+                cur_days = float(cur.get("days", 0) or 0)
+                with st.form(key=f"est_labor_edit_form_{labor_edit_idx}", clear_on_submit=True):
+                    st.caption(f"Editing labor line #{labor_edit_idx + 1}")
+                    labor_edit_class = st.selectbox(
+                        "Classification",
+                        options=labor_options if labor_options else [""],
+                        index=(labor_options.index(cur_class) if cur_class in labor_options else 0),
+                        disabled=is_locked,
+                        key=f"est_labor_edit_class_{labor_edit_idx}",
+                    )
+                    labor_edit_headcount = st.number_input(
+                        "Headcount",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_headcount,
+                        key=f"est_labor_edit_headcount_{labor_edit_idx}",
+                    )
+                    labor_edit_st = st.number_input(
+                        "ST Hrs/Day",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_st,
+                        key=f"est_labor_edit_st_hours_{labor_edit_idx}",
+                    )
+                    labor_edit_ot = st.number_input(
+                        "OT Hrs/Day",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_ot,
+                        key=f"est_labor_edit_ot_hours_{labor_edit_idx}",
+                    )
+                    labor_edit_days = st.number_input(
+                        "Days",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_days,
+                        key=f"est_labor_edit_days_{labor_edit_idx}",
+                    )
+                    labor_edit_submit = st.form_submit_button(
+                        "Save Changes", disabled=is_locked, key=f"est_labor_edit_save_{labor_edit_idx}"
+                    )
+                    labor_edit_cancel = st.form_submit_button(
+                        "Cancel", disabled=is_locked, key=f"est_labor_edit_cancel_{labor_edit_idx}"
+                    )
+                    if labor_edit_cancel:
+                        st.session_state["est_labor_edit_idx"] = None
+                        st.rerun()
+                    if labor_edit_submit:
+                        if not str(labor_edit_class or "").strip():
+                            st.error("Select a Labor Classification.")
+                            st.stop()
+                        est["labor"][labor_edit_idx] = {
+                            "classification": str(labor_edit_class).strip(),
+                            "headcount": float(labor_edit_headcount or 0.0),
+                            "st_hours_per_day": float(labor_edit_st or 0.0),
+                            "ot_hours_per_day": float(labor_edit_ot or 0.0),
+                            "days": float(labor_edit_days or 0.0),
+                        }
+                        st.session_state["est_labor_edit_idx"] = None
+                        st.rerun()
+
+        labor_lines = est.get("labor") or []
+        if not labor_lines:
+            st.info("No labor lines added yet.")
+        else:
+            for idx, line in enumerate(labor_lines):
+                if not isinstance(line, dict):
+                    continue
+                classification = str(line.get("classification") or "").strip()
+                headcount = float(line.get("headcount", 0) or 0.0)
+                st_hrs = float(line.get("st_hours_per_day", 0) or 0.0)
+                ot_hrs = float(line.get("ot_hours_per_day", 0) or 0.0)
+                days = float(line.get("days", 0) or 0.0)
+                lr = labor_map.get(classification)
+                st_rate = float((lr or {}).get("st_rate", 0) or 0.0)
+                ot_rate = float((lr or {}).get("ot_rate", 0) or 0.0)
+                subtotal = headcount * days * ((st_hrs * st_rate) + (ot_hrs * ot_rate))
+
+                with st.container(border=True):
+                    left, right = st.columns([2, 1])
+                    with left:
+                        st.markdown(f"**{classification or 'Unknown labor'}**")
+                        st.caption(f"Headcount: {headcount:.2f} · Days: {days:.2f} · ST {st_hrs:.2f}h/Day · OT {ot_hrs:.2f}h/Day")
+                    with right:
+                        st.metric(label="Line subtotal", value=money(subtotal))
+                    c_edit, c_rem = st.columns([1, 1], gap="small")
+                    with c_edit:
+                        if st.button("Edit", disabled=is_locked, key=f"est_labor_edit_btn_{idx}"):
+                            st.session_state["est_labor_edit_idx"] = idx
+                            st.rerun()
+                    with c_rem:
+                        if st.button("Remove", disabled=is_locked, key=f"est_labor_remove_btn_{idx}"):
+                            est["labor"] = [x for j, x in enumerate(labor_lines) if j != idx]
+                            if st.session_state.get("est_labor_edit_idx") == idx:
+                                st.session_state["est_labor_edit_idx"] = None
+                            st.rerun()
 
     with tabs[2]:
         st.caption(
@@ -1801,6 +2214,49 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     signed = create_signed_url(att["storage_path"])
                     if signed:
                         st.markdown(f'- **{att["category"]}**: [{att["file_name"]}]({signed})')
+
+    # Persistent estimate summary/totals panel (stays visible while editing).
+    # This is intentionally rendered outside the tab bodies so it runs regardless of
+    # which editor tab is active.
+    try:
+        totals_preview = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+    except Exception as exc:
+        totals_preview = None
+        st.sidebar.error(
+            "Could not compute totals for the current draft. "
+            "Check your line items and try again."
+        )
+        st.sidebar.caption(str(exc))
+
+    with st.sidebar:
+        st.markdown("### Estimate Summary")
+        st.caption(
+            f"Quote: {est.get('quote_number') or '—'} · Status: {est.get('status') or 'draft'}"
+        )
+        customer_name = customer_name_by_id.get(est.get("customer_id"), "") if "customer_name_by_id" in locals() else ""
+        if customer_name:
+            st.caption(f"Customer: {customer_name}")
+
+        if totals_preview:
+            st.metric("Final Bid", money(totals_preview.get("final_bid", 0.0)))
+            st.metric("Proposal Total", money(totals_preview.get("proposal_total", 0.0)))
+            st.metric("Overhead", money(totals_preview.get("overhead_total", 0.0)))
+            st.metric("Profit", money(totals_preview.get("profit_total", 0.0)))
+            st.metric("Sales Tax", money(totals_preview.get("sales_tax_total", 0.0)))
+
+            st.caption(
+                "Breakdown: "
+                f"Materials ${totals_preview.get('material_sell_basis', 0.0):,.2f} · "
+                f"Labor ${totals_preview.get('labor_total', 0.0):,.2f} · "
+                f"Equipment ${totals_preview.get('equipment_total', 0.0):,.2f} · "
+                f"Travel ${totals_preview.get('travel_total', 0.0):,.2f}"
+            )
+
+        # Line-item counts for quick context (no inputs).
+        mats_n = len(est.get("materials", []) or [])
+        labor_n = len(est.get("labor", []) or [])
+        eq_n = len(est.get("equipment", []) or [])
+        st.caption(f"Lines: Materials {mats_n} · Labor {labor_n} · Equipment {eq_n}")
 
 
 def render() -> None:

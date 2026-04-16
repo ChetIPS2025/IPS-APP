@@ -821,13 +821,20 @@ def _render_one_asset_file_tile(
     is_http = ref.startswith("http://") or ref.startswith("https://")
 
     if kind == "image":
+        cap_short = file_name[:48] + ("…" if len(file_name) > 48 else "")
         try:
-            st.image(
-                ref,
-                caption=file_name[:48] + ("…" if len(file_name) > 48 else ""),
-                width=thumb_width,
-                link=f"?{_GALLERY_PREVIEW_QP}={idx}",
+            # Streamlit 1.33: st.image has no ``link=``; use same-page query param for gallery preview.
+            safe_ref = html.escape(str(ref), quote=True)
+            st.markdown(
+                f'<a href="?{_GALLERY_PREVIEW_QP}={idx}" class="ips-ad-gallery-thumb-link" '
+                'style="display:block;text-decoration:none;">'
+                f'<img src="{safe_ref}" alt="" '
+                f'style="max-width:100%;width:{int(thumb_width)}px;height:auto;border-radius:8px;'
+                f'cursor:pointer;object-fit:cover;" />'
+                f"</a>",
+                unsafe_allow_html=True,
             )
+            st.caption(cap_short)
             st.markdown(
                 '<p class="ips-ad-gallery-thumb-hint">Click image to enlarge</p>',
                 unsafe_allow_html=True,
@@ -1006,7 +1013,8 @@ def _render_asset_image_preview_panel(aid: str, rows: list[dict], *, mobile: boo
                     st.rerun()
 
     try:
-        st.image(ref, use_container_width=True)
+        # Streamlit 1.33: use ``use_column_width`` (not use_container_width on st.image).
+        st.image(ref, use_column_width=True)
     except Exception as exc:
         st.warning(f"Could not load image: {exc}")
     st.caption(fn)
@@ -1131,7 +1139,7 @@ def render() -> None:
         st.markdown("##### Primary image")
         if signed:
             try:
-                st.image(signed, use_container_width=True)
+                st.image(signed, use_column_width=True)
             except Exception as exc:
                 st.warning(f"Could not load primary image: {exc}")
         else:

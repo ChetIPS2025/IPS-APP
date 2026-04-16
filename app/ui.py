@@ -61,6 +61,9 @@ _NAV_ASSETS: tuple[str, ...] = ("Asset Database",)
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
 _NAV_RESOURCES: tuple[str, ...] = ("Materials", "Labor", "Equipment", "Inventory")
 
+# Who can open Resources & Inventory in the sidebar (read-only; each page gates writes).
+_NAV_RESOURCES_ROLES: frozenset[str] = frozenset({"admin", "estimator", "viewer"})
+
 IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSETS + _NAV_RESOURCES + _NAV_SECONDARY
 
 
@@ -240,7 +243,7 @@ def _ensure_valid_nav_page() -> None:
     _migrate_legacy_nav_session_keys()
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
-    visible_resources = set(_NAV_RESOURCES) if role == "admin" else set()
+    visible_resources = set(_NAV_RESOURCES) if role in _NAV_RESOURCES_ROLES else set()
     visible: set[str] = set(_NAV_PRIMARY) | set(_NAV_JOBS) | set(_NAV_ASSETS) | visible_resources | visible_secondary
 
     cur = st.session_state.get(IPS_NAV_PAGE_KEY)
@@ -312,11 +315,11 @@ def render_sidebar() -> str:
         '<div class="ips-nav-section-title ips-nav-group-spaced">Resources &amp; Inventory</div>',
         unsafe_allow_html=True,
     )
-    if role == "admin":
+    if role in _NAV_RESOURCES_ROLES:
         for p in _NAV_RESOURCES:
             _render_nav_button(p, current=current, indent=True)
     else:
-        st.sidebar.caption("Admin only.")
+        st.sidebar.caption("Sign in with a valid role to open catalogs.")
 
     # --- SECONDARY: TOOLS ---
     st.sidebar.markdown(

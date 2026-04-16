@@ -541,11 +541,15 @@ def render() -> None:
         render_material_quote_import_form(return_to_materials=True)
         return
 
+    fetch_error: str | None = None
     try:
         rows = fetch_table("materials_catalog", limit=5000, order_by="item_key")
-    except Exception:
+    except Exception as exc:
+        fetch_error = str(exc)
         rows = []
     df = pd.DataFrame(rows)
+    if fetch_error:
+        st.warning(f"Could not load materials catalog: {fetch_error}")
 
     _mat_del_open = destructive_confirm_open_key(_MAT_DELETE_CONFIRM_PREFIX)
     if st.session_state.get(_mat_del_open) and not can_import:

@@ -11,10 +11,29 @@ def init_session() -> None:
 
 def sign_in(email: str, password: str) -> None:
     client = get_client()
-    resp = client.auth.sign_in_with_password({"email": email, "password": password})
+    try:
+        resp = client.auth.sign_in_with_password({"email": email, "password": password})
+    except Exception as exc:
+        low = str(exc).lower()
+        if any(
+            x in low
+            for x in (
+                "invalid login",
+                "invalid credentials",
+                "invalid email",
+                "wrong password",
+                "email not confirmed",
+            )
+        ):
+            raise RuntimeError("Invalid email or password.") from exc
+        raise RuntimeError(
+            f"Could not sign in ({exc.__class__.__name__}). "
+            "Confirm SUPABASE_URL and the publishable/anon key are set in the environment "
+            "(e.g. Render Dashboard → Environment), then try again."
+        ) from exc
     user = getattr(resp, "user", None)
     if not user:
-        raise RuntimeError("Login failed.")
+        raise RuntimeError("Login failed: no user returned from Supabase.")
     st.session_state["auth_user"] = user
 
     profiles = fetch_table("profiles", columns="id,email,full_name,role,is_active", limit=1000)

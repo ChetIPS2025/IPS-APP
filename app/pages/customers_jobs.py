@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import html
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 from auth import current_role
 from branding import render_header
-from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows
+from db import delete_rows_admin, fetch_one, fetch_table_with_order_fallback, insert_row, update_rows
 
 try:
     from services.customer_contacts import (
@@ -73,6 +74,146 @@ except ImportError:
 
 _CUST_DELETE_CONFIRM_PREFIX = "customers_delete"
 _CONTACT_DELETE_PREFIX = "customer_contact_delete"
+
+# --- customers table: logical fields → possible physical column names (first match in DB wins) ---
+_CUSTOMER_NAME_KEYS: tuple[str, ...] = ("customer_name", "name", "company_name")
+_ADDRESS_KEYS: tuple[str, ...] = ("address", "street_address", "address_line1", "line1")
+_CITY_KEYS: tuple[str, ...] = ("city",)
+_STATE_KEYS: tuple[str, ...] = ("state", "region", "province")
+_ZIP_KEYS: tuple[str, ...] = ("zip", "zip_code", "postal_code", "postcode")
+_IS_ACTIVE_KEYS: tuple[str, ...] = ("is_active",)
+
+_LOGICAL_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("customer_name", _CUSTOMER_NAME_KEYS),
+    ("address", _ADDRESS_KEYS),
+    ("city", _CITY_KEYS),
+    ("state", _STATE_KEYS),
+    ("zip", _ZIP_KEYS),
+    ("is_active", _IS_ACTIVE_KEYS),
+)
+
+_MAX_CUSTOMER_NAME_LEN = 500
+# Reasonable upper bound for single-line address fragments (DB is typically text).
+_MAX_ADDRESS_FIELD_LEN = 2000
+
+
+def _default_available_columns() -> set[str]:
+    """When no rows exist yet, assume canonical IPS column names."""
+    return {
+        "id",
+        _CUSTOMER_NAME_KEYS[0],
+        _ADDRESS_KEYS[0],
+        _CITY_KEYS[0],
+        _STATE_KEYS[0],
+        _ZIP_KEYS[0],
+        _IS_ACTIVE_KEYS[0],
+    }
+
+
+def _infer_available_columns(df: pd.DataFrame, rows: list[dict[str, Any]]) -> set[str]:
+    if not df.empty and len(df.columns):
+        return set(df.columns.astype(str).tolist())
+    if rows:
+        return set(rows[0].keys())
+    return _default_available_columns()
+
+
+def _pick_physical(candidates: tuple[str, ...], available: set[str]) -> str:
+    for c in candidates:
+        if c in available:
+            return c
+    return candidates[0]
+
+
+def _resolve_customer_columns(available: set[str]) -> dict[str, str]:
+    """Map logical UI field names to actual table column names for this environment."""
+    return {logical: _pick_physical(cands, available) for logical, cands in _LOGICAL_KEYS}
+
+
+def _get_customer_field(row: dict[str, Any], logical: str, resolved: dict[str, str]) -> str:
+    """Read a value from a row, tolerating legacy/alternate column names."""
+    primary = resolved.get(logical)
+    if primary and primary in row and row[primary] is not None:
+        return str(row[primary]).strip()
+    candidates = next((c for log, c in _LOGICAL_KEYS if log == logical), ())
+    for c in candidates:
+        if c in row and row[c] is not None:
+            return str(row[c]).strip()
+    return ""
+
+
+def _build_customer_write_payload(
+    *,
+    customer_name: str,
+    address: str,
+    city: str,
+    state: str,
+    zip_value: str,
+    is_active: bool | None,
+    resolved: dict[str, str],
+    available: set[str],
+) -> dict[str, Any]:
+    """Build insert/update payload using only columns that exist in the current schema."""
+    payload: dict[str, Any] = {}
+    name_col = resolved["customer_name"]
+    if name_col not in available:
+        raise ValueError("customers table has no recognized name column (expected customer_name or equivalent).")
+    payload[name_col] = customer_name.strip()
+
+    for logical, raw in (
+        ("address", address),
+        ("city", city),
+        ("state", state),
+        ("zip", zip_value),
+    ):
+        col = resolved[logical]
+        if col in available:
+            payload[col] = str(raw).strip()
+
+    if is_active is not None and resolved["is_active"] in available:
+        payload[resolved["is_active"]] = bool(is_active)
+
+    return payload
+
+
+def _validate_customer_name_text(name: str) -> str | None:
+    t = str(name or "").strip()
+    if not t:
+        return "Customer name is required."
+    if len(t) > _MAX_CUSTOMER_NAME_LEN:
+        return f"Customer name is too long (max {_MAX_CUSTOMER_NAME_LEN} characters)."
+    return None
+
+
+def _validate_address_field(label: str, value: str) -> str | None:
+    s = str(value or "")
+    if len(s) > _MAX_ADDRESS_FIELD_LEN:
+        return f"{label} is too long (max {_MAX_ADDRESS_FIELD_LEN} characters)."
+    return None
+
+
+def _friendly_customer_db_message(exc: BaseException) -> str:
+    chain: list[str] = []
+    cur: BaseException | None = exc
+    depth = 0
+    while cur is not None and depth < 10:
+        chain.append(str(cur).lower())
+        cur = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+        depth += 1
+    blob = " ".join(chain)
+
+    if "permission" in blob or "rls" in blob or "policy" in blob or "42501" in blob:
+        return "Saving was blocked by database permissions or RLS. Sign in as a user allowed to change customers."
+    if "unique" in blob or "duplicate" in blob:
+        return "This change conflicts with an existing row (duplicate value or unique constraint)."
+    if "null value" in blob or "not null" in blob:
+        return "A required database column was empty. Check customer name and address fields."
+    if "column" in blob and ("does not exist" in blob or "unknown" in blob):
+        return (
+            "A column name in the request does not match this database. "
+            "Compare your `customers` table with the app (address / ZIP column names)."
+        )
+    return "Could not save the customer. See **Technical details** below."
 
 
 def _clear_customer_mode() -> None:
@@ -149,7 +290,12 @@ def _render_action_buttons(*, sel: list[str], can_add: bool) -> None:
                 st.rerun()
 
 
-def _render_add_form(*, existing_customer_names: set[str]) -> None:
+def _render_add_form(
+    *,
+    existing_customer_names: set[str],
+    resolved: dict[str, str],
+    available: set[str],
+) -> None:
     c1 = st.columns(1)[0]
     customer_name = c1.text_input("Customer Name", key="cust_add_name")
 
@@ -160,25 +306,50 @@ def _render_add_form(*, existing_customer_names: set[str]) -> None:
     zip_code = c8.text_input("ZIP", key="cust_add_zip")
 
     is_active_customer = st.checkbox("Active Customer", value=True, key="cust_add_active")
+    if resolved["is_active"] not in available:
+        st.caption("Note: this database has no `is_active` column; new customers use the table default.")
 
     s1, s2 = st.columns(2)
     with s1:
         if st.button("Save Customer", type="primary", use_container_width=True, key="cust_add_save"):
-            if not str(customer_name).strip():
-                st.error("Customer Name required.")
+            err = _validate_customer_name_text(customer_name)
+            if err:
+                st.error(err)
                 st.stop()
-            if str(customer_name).strip().upper() in existing_customer_names:
+            name_upper = str(customer_name).strip().upper()
+            if name_upper in existing_customer_names:
                 st.error("A customer with this name already exists.")
                 st.stop()
-            payload = {
-                "customer_name": str(customer_name).strip(),
-                "address": str(address).strip(),
-                "city": str(city).strip(),
-                "state": str(state).strip(),
-                "zip": str(zip_code).strip(),
-                "is_active": bool(is_active_customer),
-            }
-            insert_row("customers", payload)
+            for label, val in (
+                ("Address", address),
+                ("City", city),
+                ("State", state),
+                ("ZIP", zip_code),
+            ):
+                ve = _validate_address_field(label, str(val))
+                if ve:
+                    st.error(ve)
+                    st.stop()
+
+            active_val: bool | None = bool(is_active_customer) if resolved["is_active"] in available else None
+            try:
+                payload = _build_customer_write_payload(
+                    customer_name=str(customer_name).strip(),
+                    address=str(address).strip(),
+                    city=str(city).strip(),
+                    state=str(state).strip(),
+                    zip_value=str(zip_code).strip(),
+                    is_active=active_val,
+                    resolved=resolved,
+                    available=available,
+                )
+                insert_row("customers", payload)
+            except Exception as exc:
+                st.error(_friendly_customer_db_message(exc))
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+
             _clear_customer_mode()
             st.success("Customer added. Open **Edit** to add contacts.")
             st.rerun()
@@ -282,7 +453,13 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
                     "is_primary": False,
                     "is_active": bool(act),
                 }
-                inserted = insert_contact_row(payload)
+                try:
+                    inserted = insert_contact_row(payload)
+                except Exception as exc:
+                    st.error("Could not save the contact.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
+                    st.stop()
                 new_id = str((inserted or {}).get("id") or "")
                 if pr and new_id:
                     set_primary_contact(customer_id=cid, contact_id=new_id)
@@ -325,7 +502,13 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
                     "is_primary": bool(pr),
                     "is_active": bool(act),
                 }
-                update_rows("customer_contacts", payload, {"id": er["id"]})
+                try:
+                    update_rows("customer_contacts", payload, {"id": er["id"]})
+                except Exception as exc:
+                    st.error("Could not update the contact.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
+                    st.stop()
                 if pr:
                     set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
                 _clear_contact_subpanel()
@@ -337,41 +520,95 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
                 st.rerun()
 
 
-def _render_edit_form(row: dict, *, can_edit: bool) -> None:
+def _render_edit_form(
+    row: dict,
+    *,
+    can_edit: bool,
+    resolved: dict[str, str],
+    available: set[str],
+) -> None:
     cid = str(row.get("id") or "")
     st.caption(f"ID `{cid[:8]}…`")
     pk = f"cust_ed_{cid}"
 
     st.markdown("##### Company")
     c1 = st.columns(1)[0]
-    en = c1.text_input("Customer Name", value=str(row.get("customer_name") or ""), key=f"{pk}_name")
+    en = c1.text_input(
+        "Customer Name",
+        value=_get_customer_field(row, "customer_name", resolved),
+        key=f"{pk}_name",
+    )
 
     c5, c6, c7, c8 = st.columns(4)
-    eaddr = c5.text_input("Address", value=str(row.get("address") or ""), key=f"{pk}_addr")
-    ecity = c6.text_input("City", value=str(row.get("city") or ""), key=f"{pk}_city")
-    est = c7.text_input("State", value=str(row.get("state") or ""), key=f"{pk}_state")
-    ezip = c8.text_input("ZIP", value=str(row.get("zip") or ""), key=f"{pk}_zip")
+    eaddr = c5.text_input(
+        "Address",
+        value=_get_customer_field(row, "address", resolved),
+        key=f"{pk}_addr",
+    )
+    ecity = c6.text_input(
+        "City",
+        value=_get_customer_field(row, "city", resolved),
+        key=f"{pk}_city",
+    )
+    est = c7.text_input(
+        "State",
+        value=_get_customer_field(row, "state", resolved),
+        key=f"{pk}_state",
+    )
+    ezip = c8.text_input(
+        "ZIP",
+        value=_get_customer_field(row, "zip", resolved),
+        key=f"{pk}_zip",
+    )
 
-    ea = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
+    if resolved["is_active"] in row:
+        default_active = bool(row.get(resolved["is_active"], True))
+    elif "is_active" in row:
+        default_active = bool(row.get("is_active", True))
+    else:
+        default_active = True
+
+    ea = st.checkbox("Active", value=default_active, key=f"{pk}_active")
+    if resolved["is_active"] not in available:
+        st.caption("Note: this database has no `is_active` column; the Active toggle is shown for reference only.")
 
     u1, u2 = st.columns(2)
     with u1:
         if st.button("Update Customer", type="primary", use_container_width=True, key=f"{pk}_save"):
-            if not str(en).strip():
-                st.error("Customer Name required.")
+            err = _validate_customer_name_text(en)
+            if err:
+                st.error(err)
                 st.stop()
-            update_rows(
-                "customers",
-                {
-                    "customer_name": str(en).strip(),
-                    "address": str(eaddr).strip(),
-                    "city": str(ecity).strip(),
-                    "state": str(est).strip(),
-                    "zip": str(ezip).strip(),
-                    "is_active": bool(ea),
-                },
-                {"id": row["id"]},
-            )
+            for label, val in (
+                ("Address", eaddr),
+                ("City", ecity),
+                ("State", est),
+                ("ZIP", ezip),
+            ):
+                ve = _validate_address_field(label, str(val))
+                if ve:
+                    st.error(ve)
+                    st.stop()
+
+            active_val: bool | None = bool(ea) if resolved["is_active"] in available else None
+            try:
+                payload = _build_customer_write_payload(
+                    customer_name=str(en).strip(),
+                    address=str(eaddr).strip(),
+                    city=str(ecity).strip(),
+                    state=str(est).strip(),
+                    zip_value=str(ezip).strip(),
+                    is_active=active_val,
+                    resolved=resolved,
+                    available=available,
+                )
+                update_rows("customers", payload, {"id": row["id"]})
+            except Exception as exc:
+                st.error(_friendly_customer_db_message(exc))
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+
             _clear_customer_mode()
             st.success("Customer updated.")
             st.rerun()
@@ -384,13 +621,23 @@ def _render_edit_form(row: dict, *, can_edit: bool) -> None:
     _render_contacts_section(customer_row=row, can_edit=can_edit)
 
 
-def _render_customer_side_panel(*, mode: str, existing_customer_names: set[str]) -> None:
+def _render_customer_side_panel(
+    *,
+    mode: str,
+    existing_customer_names: set[str],
+    resolved: dict[str, str],
+    available: set[str],
+) -> None:
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
         if mode == "add":
             st.markdown("### Add customer")
-            _render_add_form(existing_customer_names=existing_customer_names)
+            _render_add_form(
+                existing_customer_names=existing_customer_names,
+                resolved=resolved,
+                available=available,
+            )
         elif mode == "edit":
             st.markdown("### Customer detail")
             eid = st.session_state.get("customer_edit_id")
@@ -400,10 +647,25 @@ def _render_customer_side_panel(*, mode: str, existing_customer_names: set[str])
                 _clear_customer_mode()
             else:
                 can_edit = current_role() in {"admin", "estimator"}
-                _render_edit_form(er, can_edit=can_edit)
+                _render_edit_form(er, can_edit=can_edit, resolved=resolved, available=available)
 
 
-def _render_customers_main(*, df: pd.DataFrame, can_add: bool) -> None:
+def _visible_customer_columns(filtered: pd.DataFrame, resolved: dict[str, str]) -> list[str]:
+    order = ["customer_name", "address", "city", "state", "zip", "is_active"]
+    out: list[str] = []
+    for logical in order:
+        phys = resolved.get(logical)
+        if phys and phys in filtered.columns:
+            out.append(phys)
+    return out
+
+
+def _render_customers_main(
+    *,
+    df: pd.DataFrame,
+    can_add: bool,
+    resolved: dict[str, str],
+) -> None:
     if df.empty:
         st.info("No customers found.")
         if can_add:
@@ -428,29 +690,21 @@ def _render_customers_main(*, df: pd.DataFrame, can_add: bool) -> None:
     selected_active = f2.selectbox("Status", active_options)
 
     filtered = df.copy()
-    if "is_active" in filtered.columns:
+    is_active_col = resolved.get("is_active")
+    if is_active_col and is_active_col in filtered.columns:
         if selected_active == "Active only":
-            filtered = filtered[filtered["is_active"] == True]  # noqa: E712
+            filtered = filtered[filtered[is_active_col] == True]  # noqa: E712
         elif selected_active == "Inactive only":
-            filtered = filtered[filtered["is_active"] == False]  # noqa: E712
+            filtered = filtered[filtered[is_active_col] == False]  # noqa: E712
 
     if search.strip():
         s = search.strip().lower()
-        mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
+        mask = filtered.astype(str).apply(
+            lambda col: col.str.lower().str.contains(s, na=False, regex=False)
+        )
         filtered = filtered[mask.any(axis=1)]
 
-    show_cols = [
-        c
-        for c in [
-            "customer_name",
-            "address",
-            "city",
-            "state",
-            "zip",
-            "is_active",
-        ]
-        if c in filtered.columns
-    ]
+    show_cols = _visible_customer_columns(filtered, resolved)
 
     st.caption(
         "Checkbox column on the **left**; selection is stored as **selected_customers_ids**."
@@ -487,11 +741,21 @@ def render_customers() -> None:
     can_add = current_role() in {"admin", "estimator"}
     mode = st.session_state.get("customer_mode")
 
+    load_error: BaseException | None = None
     try:
-        rows = fetch_table("customers", limit=5000, order_by="customer_name")
-    except Exception:
+        rows = fetch_table_with_order_fallback("customers", limit=5000, order_by="customer_name")
+    except Exception as exc:
+        load_error = exc
         rows = []
+
+    if load_error is not None:
+        st.error("Could not load customers from the database. The list below may be empty.")
+        with st.expander("Technical details"):
+            st.code(repr(load_error), language="text")
+
     df = pd.DataFrame(rows)
+    available = _infer_available_columns(df, rows)
+    resolved = _resolve_customer_columns(available)
 
     _cust_del_open = destructive_confirm_open_key(_CUST_DELETE_CONFIRM_PREFIX)
     if st.session_state.get(_cust_del_open) and not can_add:
@@ -504,10 +768,11 @@ def render_customers() -> None:
             st.session_state.pop("customers_pending_delete_ids", None)
             st.rerun()
         id_to_name: dict[str, str] = {}
-        if not df.empty and "id" in df.columns:
+        name_col = resolved["customer_name"]
+        if not df.empty and "id" in df.columns and name_col in df.columns:
             for _, r in df.iterrows():
                 rid = str(r["id"])
-                id_to_name[rid] = str(r.get("customer_name") or "").strip() or rid
+                id_to_name[rid] = str(r.get(name_col) or "").strip() or rid
         name_lines: list[str] = []
         for pid in pending:
             nm = id_to_name.get(pid)
@@ -528,7 +793,9 @@ def render_customers() -> None:
                 try:
                     delete_rows_admin("customers", {"id": cid})
                 except Exception as exc:
-                    st.error(f"Could not delete {cid}: {exc}")
+                    st.error(f"Could not delete this customer ({cid[:8]}…). {_friendly_customer_db_message(exc)}")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
             st.session_state.pop("customers_pending_delete_ids", None)
             clear_selected_ids(TABLE_KEY_CUSTOMERS)
             edit_id = st.session_state.get("customer_edit_id")
@@ -586,34 +853,51 @@ def render_customers() -> None:
         )
 
     if st.session_state.pop("_cust_do_deactivate", False) and can_add:
-        sel_ids = get_selected_ids(TABLE_KEY_CUSTOMERS)
-        if sel_ids:
-            for cid in sel_ids:
-                try:
-                    update_rows("customers", {"is_active": False}, {"id": cid})
-                except Exception as exc:
-                    st.error(f"Could not deactivate {cid}: {exc}")
-            clear_selected_ids(TABLE_KEY_CUSTOMERS)
-            st.success("Selected customers deactivated.")
-            st.rerun()
+        if resolved["is_active"] not in available:
+            st.warning("Deactivation is not available: the database has no `is_active` column on customers.")
+        else:
+            sel_ids = get_selected_ids(TABLE_KEY_CUSTOMERS)
+            if sel_ids:
+                failures: list[BaseException] = []
+                for cid in sel_ids:
+                    try:
+                        update_rows("customers", {resolved["is_active"]: False}, {"id": cid})
+                    except Exception as exc:
+                        failures.append(exc)
+                        st.error(
+                            f"Could not deactivate customer `{str(cid)[:8]}…`. "
+                            f"{_friendly_customer_db_message(exc)}"
+                        )
+                        with st.expander("Technical details"):
+                            st.code(repr(exc), language="text")
+                clear_selected_ids(TABLE_KEY_CUSTOMERS)
+                if not failures:
+                    st.success("Selected customers deactivated.")
+                    st.rerun()
 
     panel_open = bool(can_add and mode in ("add", "edit"))
 
     existing_names: set[str] = set()
-    if not df.empty and "customer_name" in df.columns:
+    name_col = resolved["customer_name"]
+    if not df.empty and name_col in df.columns:
         for _, c in df.iterrows():
-            nm = str(c.get("customer_name", "")).strip().upper()
+            nm = str(c.get(name_col, "")).strip().upper()
             if nm:
                 existing_names.add(nm)
 
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
         with main_col:
-            _render_customers_main(df=df, can_add=can_add)
+            _render_customers_main(df=df, can_add=can_add, resolved=resolved)
         with side_col:
-            _render_customer_side_panel(mode=str(mode), existing_customer_names=existing_names)
+            _render_customer_side_panel(
+                mode=str(mode),
+                existing_customer_names=existing_names,
+                resolved=resolved,
+                available=available,
+            )
     else:
-        _render_customers_main(df=df, can_add=can_add)
+        _render_customers_main(df=df, can_add=can_add, resolved=resolved)
 
     if not can_add:
         st.info("Only admin or estimator users can manage customers.")

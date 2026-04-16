@@ -40,8 +40,50 @@ from pages.estimate_editor import (
     render_estimate_editor,
 )
 
+_EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
+    # New form-based Materials/Labor widgets (avoid stale inputs across estimates)
+    "est_material_",
+    "est_labor_",
+    # Customer/job match helpers
+    "est_customer_",
+    "est_job_",
+    # Equipment picker/filter widgets
+    "est_eq_",
+)
+
+
+def _reset_estimate_editor_transients(*, clear_import_hints: bool = True) -> None:
+    """
+    Clear editor-only transient session keys so switching between estimates (or starting a new one)
+    doesn't carry over stale widget state that can feel like "double entry" on rerun.
+    """
+    # Known singleton keys (safe even if absent)
+    for k in (
+        "est_material_edit_idx",
+        "est_labor_edit_idx",
+        "materials_editor_db",
+        "labor_editor_db",
+        "equipment_editor_db",
+        "estimates_import_sig",
+        "estimates_import_cache",
+    ):
+        st.session_state.pop(k, None)
+
+    # Prefix-based cleanup for dynamically-indexed edit-form keys.
+    to_drop: list[str] = []
+    for k in list(st.session_state.keys()):
+        if any(str(k).startswith(p) for p in _EDITOR_TRANSIENT_PREFIXES):
+            to_drop.append(str(k))
+    for k in to_drop:
+        st.session_state.pop(k, None)
+
+    if clear_import_hints:
+        st.session_state.pop("estimate_pending_import_pdf", None)
+        st.session_state.pop("estimate_pdf_suggestions", None)
+
 
 def _load_estimate_into_session(selected_id: str) -> None:
+    _reset_estimate_editor_transients(clear_import_hints=True)
     row = fetch_one("estimates", {"id": selected_id})
     if not row:
         return
@@ -70,6 +112,8 @@ def _load_estimate_into_session(selected_id: str) -> None:
     st.session_state["estimate_editor_state"] = loaded
     st.session_state["loaded_estimate_id"] = selected_id
     st.session_state["estimate_editor_quote_ready"] = True
+    # Ensure editor defaults exist (does not overwrite loaded values).
+    ensure_state()
 
 
 def _render_estimate_list() -> None:
@@ -403,8 +447,7 @@ def render() -> None:
             a1, a2, a3 = st.columns([1, 1, 2])
             with a1:
                 if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):
-                    st.session_state.pop("estimate_pending_import_pdf", None)
-                    st.session_state.pop("estimate_pdf_suggestions", None)
+                    _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimate_editor_state"] = blank_estimate()
                     st.session_state["loaded_estimate_id"] = None
                     st.session_state["estimate_editor_quote_ready"] = False
@@ -418,8 +461,7 @@ def render() -> None:
                     use_container_width=True,
                     key="est_list_imp",
                 ):
-                    st.session_state.pop("estimate_pending_import_pdf", None)
-                    st.session_state.pop("estimate_pdf_suggestions", None)
+                    _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimates_view"] = "import"
                     st.rerun()
         _render_estimate_list()
@@ -449,8 +491,7 @@ def render() -> None:
             c1, c2, c3 = st.columns([1, 1, 4])
             with c1:
                 if st.button("← Back to list", type="secondary", use_container_width=True, key="est_ed_back"):
-                    st.session_state.pop("estimate_pending_import_pdf", None)
-                    st.session_state.pop("estimate_pdf_suggestions", None)
+                    _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimates_view"] = "list"
                     st.rerun()
             with c2:
@@ -460,8 +501,7 @@ def render() -> None:
                     use_container_width=True,
                     key="est_ed_imp",
                 ):
-                    st.session_state.pop("estimate_pending_import_pdf", None)
-                    st.session_state.pop("estimate_pdf_suggestions", None)
+                    _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimates_view"] = "import"
                     st.rerun()
             with c3:

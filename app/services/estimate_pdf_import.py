@@ -78,7 +78,9 @@ Rules:
 def _client() -> OpenAI:
     api_key = settings.openai_api_key.strip()
     if not api_key or api_key == "your_openai_api_key":
-        raise RuntimeError("OPENAI_API_KEY is missing from .env")
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Add it to the environment (local .env or Render → Environment)."
+        )
     return OpenAI(api_key=api_key)
 
 

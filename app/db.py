@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,66 +58,78 @@ def _normalize_jobs_query(*, columns: str, order_by: str | None) -> tuple[str, s
     return col, ob
 
 
+def _public_api_key() -> str:
+    """Anon / publishable key only (browser-safe)."""
+    return (
+        (getattr(settings, "supabase_publishable_key", "") or "").strip()
+        or (getattr(settings, "supabase_anon_key", "") or "").strip()
+    )
+
+
+def _admin_api_key_and_source() -> tuple[str, str]:
+    """
+    Service-role JWT for admin RPC/storage/auth.admin.
+
+    Prefer ``SUPABASE_SERVICE_ROLE_KEY``; only if unset, use ``SUPABASE_SECRET_KEY``
+    (some projects store the service role under the newer name).
+
+    Returns ``(key, source_label)`` where ``source_label`` is safe to log (no secret material).
+    """
+    sr = (getattr(settings, "supabase_service_role_key", "") or "").strip()
+    if sr:
+        return sr, "SUPABASE_SERVICE_ROLE_KEY"
+    sk = (getattr(settings, "supabase_secret_key", "") or "").strip()
+    if sk:
+        return sk, "SUPABASE_SECRET_KEY"
+    return "", ""
+
+
 def get_client() -> Client:
+    """Supabase client with the **publishable / anon** key only (RLS applies)."""
     global _client
     if _client is None:
-        public_key = (
-            getattr(settings, "supabase_publishable_key", "")
-            or getattr(settings, "supabase_anon_key", "")
-        )
-        if not settings.supabase_url or not public_key:
-            raise RuntimeError("Supabase URL or public key is missing from .env")
-        _client = create_client(settings.supabase_url, public_key)
+        public_key = _public_api_key()
+        if not (settings.supabase_url or "").strip() or not public_key:
+            raise RuntimeError(
+                "Supabase URL or public API key is missing. Set SUPABASE_URL and "
+                "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY."
+            )
+        try:
+            _client = create_client(settings.supabase_url.strip(), public_key)
+        except Exception as exc:
+            raise RuntimeError(f"create_client (anon) failed: {exc!r}") from exc
     return _client
 
 
 def get_admin_client() -> Client:
+    """
+    Supabase client with a **service-role** key (bypasses RLS for admin operations).
+
+    Key resolution: ``SUPABASE_SERVICE_ROLE_KEY`` first, then ``SUPABASE_SECRET_KEY``.
+    """
     global _admin_client
     if _admin_client is None:
-        # Prefer legacy service-role JWT first, because your current RPC/admin path is rejecting
-        # the newer secret key with "Invalid API key".
-        secret_key = (
-            getattr(settings, "supabase_service_role_key", "")
-            or getattr(settings, "supabase_secret_key", "")
-        )
-        if not settings.supabase_url or not secret_key:
-            raise RuntimeError("Supabase URL or admin key is missing from .env")
-        _admin_client = create_client(settings.supabase_url, secret_key)
+        key, source = _admin_api_key_and_source()
+        if not (settings.supabase_url or "").strip() or not key:
+            raise RuntimeError(
+                "Supabase URL or admin API key is missing. Set SUPABASE_URL and either "
+                "SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_SECRET_KEY for server-side admin access."
+            )
+        _LOG.debug("Creating Supabase admin client using credentials from %s", source)
+        try:
+            _admin_client = create_client(settings.supabase_url.strip(), key)
+        except Exception as exc:
+            raise RuntimeError(f"create_client (admin) failed: {exc!r}") from exc
     return _admin_client
 
 
-def _coerce_sequence_rpc_result(data: Any) -> int:
-    if data is None:
-        raise RuntimeError("ips_next_job_quote_seq returned no data")
-    if isinstance(data, bool):
-        raise RuntimeError("unexpected bool from ips_next_job_quote_seq")
-    if isinstance(data, int):
-        return data
-    if isinstance(data, float) and data == int(data):
-        return int(data)
-    s = str(data).strip()
-    if s.lstrip("-").isdigit():
-        return int(s)
-    if isinstance(data, list):
-        if len(data) == 1:
-            return _coerce_sequence_rpc_result(data[0])
-        raise RuntimeError(f"unexpected list from ips_next_job_quote_seq: {data!r}")
-    if isinstance(data, dict):
-        for k in ("ips_next_job_quote_seq", "value"):
-            if k in data:
-                return _coerce_sequence_rpc_result(data[k])
-        raise RuntimeError(f"unexpected dict from ips_next_job_quote_seq: {data!r}")
-    raise RuntimeError(f"unexpected ips_next_job_quote_seq payload: {type(data)!r} {data!r}")
-
-
 def allocate_next_shared_sequence_int() -> int:
+    """Call DB RPC ``ips_next_job_quote_seq`` (implementation in ``services.shared_sequence``)."""
     try:
-        resp = get_admin_client().rpc("ips_next_job_quote_seq", {}).execute()
-    except Exception as exc:
-        raise RuntimeError(
-            f"Could not allocate next sequence number. Supabase error: {exc!r}"
-        ) from exc
-    return _coerce_sequence_rpc_result(resp.data)
+        from app.services.shared_sequence import get_next_sequence_number
+    except ImportError:
+        from services.shared_sequence import get_next_sequence_number  # type: ignore
+    return get_next_sequence_number()
 
 
 def fetch_table_admin(
@@ -132,7 +143,10 @@ def fetch_table_admin(
     query = get_admin_client().table(table_name).select(columns).limit(limit)
     if order_by:
         query = query.order(order_by)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"fetch_table_admin({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -147,7 +161,10 @@ def fetch_table(
     query = get_client().table(table_name).select(columns).limit(limit)
     if order_by:
         query = query.order(order_by)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"fetch_table({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -161,12 +178,12 @@ def fetch_table_with_order_fallback(
         return fetch_table(table_name, columns=columns, limit=limit, order_by=None)
     try:
         return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
-    except Exception as exc:
+    except Exception:
         _LOG.warning(
-            "fetch_table %r order_by=%r failed (%s); retrying without order.",
+            "fetch_table %r order_by=%r failed; retrying without order (see traceback).",
             table_name,
             order_by,
-            exc,
+            exc_info=True,
         )
         return fetch_table(table_name, columns=columns, limit=limit, order_by=None)
 
@@ -182,7 +199,10 @@ def fetch_by_match(
     query = get_client().table(table_name).select(columns).limit(limit)
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"fetch_by_match({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -197,7 +217,10 @@ def fetch_by_match_admin(
     query = get_admin_client().table(table_name).select(columns).limit(limit)
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"fetch_by_match_admin({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -214,11 +237,14 @@ def insert_row(
     table_name: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    resp = get_client().table(table_name).insert(payload).execute()
+    try:
+        resp = get_client().table(table_name).insert(payload).execute()
+    except Exception as exc:
+        raise RuntimeError(f"insert into {table_name!r} failed: {exc!r}") from exc
     rows = resp.data or []
     if not rows:
         raise RuntimeError(
-            f"Insert into {table_name!r} returned no rows; check RLS and table permissions."
+            f"Insert into {table_name!r} returned no rows; check RLS and table permissions. response={resp!r}"
         )
     return rows[0]
 
@@ -231,7 +257,10 @@ def update_rows(
     query = get_client().table(table_name).update(payload)
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"update_rows({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -242,7 +271,10 @@ def delete_rows(
     query = get_client().table(table_name).delete()
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"delete_rows({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -250,11 +282,15 @@ def insert_row_admin(
     table_name: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    resp = get_admin_client().table(table_name).insert(payload).execute()
+    try:
+        resp = get_admin_client().table(table_name).insert(payload).execute()
+    except Exception as exc:
+        raise RuntimeError(f"insert_row_admin into {table_name!r} failed: {exc!r}") from exc
     rows = resp.data or []
     if not rows:
         raise RuntimeError(
-            f"Insert into {table_name!r} returned no rows; check schema and service-role permissions."
+            f"Insert into {table_name!r} returned no rows; check schema and service-role permissions. "
+            f"response={resp!r}"
         )
     return rows[0]
 
@@ -267,7 +303,10 @@ def update_rows_admin(
     query = get_admin_client().table(table_name).update(payload)
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"update_rows_admin({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -278,7 +317,10 @@ def delete_rows_admin(
     query = get_admin_client().table(table_name).delete()
     for key, value in match.items():
         query = query.eq(key, value)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"delete_rows_admin({table_name!r}) failed: {exc!r}") from exc
     return resp.data or []
 
 
@@ -358,7 +400,12 @@ def upload_bytes_admin(
             status = 0
         if status == 409 or "duplicate" in msg or "already exists" in msg:
             _LOG.info("Storage upload conflict for %s; retrying with update()", storage_path)
-            bucket.update(path=storage_path, file=data, file_options=dict(opts))
+            try:
+                bucket.update(path=storage_path, file=data, file_options=dict(opts))
+            except Exception as upd_exc:
+                raise RuntimeError(
+                    f"Storage update after 409 failed for {storage_path!r}: {upd_exc!r}"
+                ) from upd_exc
         else:
             raise
     return storage_path
@@ -372,7 +419,7 @@ def delete_storage_object_admin(storage_path: str) -> None:
         try:
             p = _local_file_path(key)
         except ValueError:
-            _LOG.warning("Invalid storage path for delete: %s", storage_path)
+            _LOG.warning("Invalid storage path for delete: %s", storage_path, exc_info=True)
             return
         if p.is_file():
             p.unlink()
@@ -384,8 +431,8 @@ def delete_storage_object_admin(storage_path: str) -> None:
     bucket = client.storage.from_(settings.storage_bucket)
     try:
         bucket.remove([norm])
-    except StorageApiError as exc:
-        _LOG.warning("Storage remove failed for %s: %s", norm, exc)
+    except StorageApiError:
+        _LOG.warning("Storage remove failed for %s", norm, exc_info=True)
         raise
 
 
@@ -430,7 +477,10 @@ def create_signed_url(
         return ""
 
     client = get_admin_client()
-    resp = client.storage.from_(settings.storage_bucket).create_signed_url(storage_path, expires_in)
+    try:
+        resp = client.storage.from_(settings.storage_bucket).create_signed_url(storage_path, expires_in)
+    except Exception as exc:
+        raise RuntimeError(f"create_signed_url failed for {storage_path!r}: {exc!r}") from exc
     return _signed_url_from_response(resp)
 
 
@@ -449,7 +499,10 @@ def quote_number_in_use(quote_number: str, exclude_estimate_id: str | None = Non
     if not qn:
         return False
     query = get_admin_client().table("estimates").select("id").eq("quote_number", qn).limit(20)
-    resp = query.execute()
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"quote_number_in_use query failed: {exc!r}") from exc
     rows = resp.data or []
     for row in rows:
         if exclude_estimate_id and row.get("id") == exclude_estimate_id:
@@ -465,20 +518,23 @@ def create_auth_user(
     full_name: str = "",
 ) -> dict[str, Any]:
     admin = get_admin_client()
-    result = admin.auth.admin.create_user(
-        {
-            "email": email,
-            "password": password,
-            "email_confirm": True,
-            "user_metadata": {"full_name": full_name, "role": role},
-        }
-    )
+    try:
+        result = admin.auth.admin.create_user(
+            {
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {"full_name": full_name, "role": role},
+            }
+        )
+    except Exception as exc:
+        raise RuntimeError(f"auth.admin.create_user failed for {email!r}: {exc!r}") from exc
 
     user = getattr(result, "user", None)
     if user is None and isinstance(result, dict):
         user = result.get("user")
     if user is None:
-        raise RuntimeError("Supabase did not return a created user.")
+        raise RuntimeError(f"Supabase did not return a created user. raw_result={result!r}")
 
     user_id = getattr(user, "id", None) or user.get("id")
     user_email = getattr(user, "email", None) or user.get("email") or email
@@ -492,10 +548,15 @@ def create_auth_user(
     }
 
     existing = fetch_one("profiles", {"id": user_id})
-    if existing:
-        update_rows_admin("profiles", profile_payload, {"id": user_id})
-    else:
-        get_admin_client().table("profiles").insert(profile_payload).execute()
+    try:
+        if existing:
+            update_rows_admin("profiles", profile_payload, {"id": user_id})
+        else:
+            get_admin_client().table("profiles").insert(profile_payload).execute()
+    except Exception as exc:
+        raise RuntimeError(
+            f"profiles upsert failed after auth user creation (user_id={user_id!r}): {exc!r}"
+        ) from exc
 
     return {
         "id": user_id,

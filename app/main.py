@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import streamlit as st
-from app.config import settings
+
+try:
+    from app.config import settings
+except ImportError:
+    from config import settings  # type: ignore
 
 from auth import init_session, sign_in, require_login, current_role
-from config import settings
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
 from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
@@ -62,9 +65,9 @@ PAGES = {
     "Asset Manager": assets_page.render,
 }
 
-_ADMIN_ONLY_PAGES = frozenset(
-    {"Materials", "Labor", "Equipment", "Inventory", "Employees", "Admin", "Users"}
-)
+# Catalog pages (Materials, Labor, Equipment, Inventory) gate writes inside each page;
+# non-admins may browse lists read-only.
+_ADMIN_ONLY_PAGES = frozenset({"Employees", "Admin", "Users"})
 
 
 def main() -> None:
