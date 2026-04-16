@@ -612,6 +612,9 @@ def _render_asset_documents_list(
         elif src == "asset_documents":
             src_note = "Registered document"
         ref = create_signed_url(fp, expires_in=3600) if fp else ""
+        is_pdf = ".pdf" in fn.lower()
+        is_manual = is_pdf or ("manual" in dt.lower())
+        open_label = "Manual" if is_manual else "Open"
         meta_bits = [x for x in (dt, created) if x]
         if src_note:
             meta_bits.append(src_note)
@@ -632,7 +635,7 @@ def _render_asset_documents_list(
                 is_http = ref.startswith("http://") or ref.startswith("https://")
                 if is_http:
                     st.link_button(
-                        "Open document",
+                        open_label,
                         url=ref,
                         use_container_width=True,
                     )
@@ -669,7 +672,7 @@ def _render_asset_documents_list(
                 is_http = ref.startswith("http://") or ref.startswith("https://")
                 if is_http:
                     st.link_button(
-                        "Open",
+                        open_label,
                         url=ref,
                         use_container_width=True,
                     )
@@ -726,6 +729,25 @@ def _clear_asset_gallery_preview(aid: str) -> None:
     """Clear expanded preview: session index and any lingering ``ips_gpv`` query param."""
     st.session_state.pop(_gallery_preview_session_key(aid), None)
     st.query_params.pop(_GALLERY_PREVIEW_QP, None)
+
+
+def _back_to_asset_list(*, aid: str | None) -> None:
+    """Clear asset-detail state and navigate back to Asset Database list."""
+    if aid:
+        _clear_asset_gallery_preview(str(aid))
+        st.session_state.pop(_pending_delete_session_key(str(aid)), None)
+        st.session_state.pop(f"del_confirm_{aid}", None)
+        st.session_state.pop(f"ad_quick_edit_{aid}", None)
+
+    st.session_state.pop("asset_detail_id", None)
+    st.session_state.pop("asset_edit_id", None)
+    st.session_state.pop("asset_return_to", None)
+    st.session_state.pop("asset_detail_action", None)
+
+    # Ensure we don't rely on a second click for rerun/nav.
+    st.session_state.pop("_asset_detail_do_nav_rerun", None)
+    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+    st.rerun()
 
 
 def _pending_delete_session_key(aid: str) -> str:
@@ -1053,12 +1075,6 @@ def render() -> None:
     render_header("Asset Detail")
     inject_asset_workflow_mobile_css()
     ensure_narrow_viewport_detected()
-    st.markdown('<div class="ips-ad-back-wrap">', unsafe_allow_html=True)
-    if st.button("← Back to Asset List", key="asset_detail_back_list", use_container_width=True):
-        st.session_state.pop("asset_detail_id", None)
-        st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
-        st.session_state["_asset_detail_do_nav_rerun"] = True
-    st.markdown("</div>", unsafe_allow_html=True)
     flash = st.session_state.pop("asset_detail_flash", None)
     if flash:
         st.success(flash)
@@ -1596,6 +1612,11 @@ def render() -> None:
         else:
             st.markdown("**Notes**")
             st.write(str(asset.get("notes") or "").strip() or "—")
+
+    st.markdown('<div class="ips-ad-back-wrap">', unsafe_allow_html=True)
+    if st.button("← Back to Asset List", use_container_width=True):
+        _back_to_asset_list(aid=str(aid))
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.pop("_asset_detail_do_nav_rerun", None):
         st.rerun()

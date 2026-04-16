@@ -8,7 +8,14 @@ import streamlit as st
 
 from auth import current_role
 from branding import render_header
-from db import delete_rows_admin, fetch_one, fetch_table_with_order_fallback, insert_row, update_rows
+from db import (
+    delete_rows_admin,
+    fetch_one,
+    fetch_table_with_order_fallback,
+    insert_row_admin,
+    update_rows,
+    update_rows_admin,
+)
 
 try:
     from services.customer_contacts import (
@@ -343,7 +350,7 @@ def _render_add_form(
                     resolved=resolved,
                     available=available,
                 )
-                insert_row("customers", payload)
+                insert_row_admin("customers", payload)
             except Exception as exc:
                 st.error(_friendly_customer_db_message(exc))
                 with st.expander("Technical details"):
@@ -602,7 +609,7 @@ def _render_edit_form(
                     resolved=resolved,
                     available=available,
                 )
-                update_rows("customers", payload, {"id": row["id"]})
+                update_rows_admin("customers", payload, {"id": row["id"]})
             except Exception as exc:
                 st.error(_friendly_customer_db_message(exc))
                 with st.expander("Technical details"):
@@ -861,7 +868,7 @@ def render_customers() -> None:
                 failures: list[BaseException] = []
                 for cid in sel_ids:
                     try:
-                        update_rows("customers", {resolved["is_active"]: False}, {"id": cid})
+                        update_rows_admin("customers", {resolved["is_active"]: False}, {"id": cid})
                     except Exception as exc:
                         failures.append(exc)
                         st.error(

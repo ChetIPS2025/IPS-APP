@@ -419,6 +419,8 @@ def ensure_state():
     # Editing indices for line-item row-card forms (avoid re-entry / widget resets)
     st.session_state.setdefault("est_material_edit_idx", None)
     st.session_state.setdefault("est_labor_edit_idx", None)
+    st.session_state.setdefault("est_equipment_edit_idx", None)
+    st.session_state.setdefault("est_travel_edit_kind", None)
     # Quick-add defaults (remember last used)
     st.session_state.setdefault("est_material_last_category", "All")
     st.session_state.setdefault("est_material_last_item", "")
@@ -428,19 +430,32 @@ def ensure_state():
     st.session_state.setdefault("est_labor_last_st_hours", 8.0)
     st.session_state.setdefault("est_labor_last_ot_hours", 0.0)
     st.session_state.setdefault("est_labor_last_days", 1.0)
+    st.session_state.setdefault("est_equipment_last_item", "")
+    st.session_state.setdefault("est_equipment_last_qty", 1.0)
+    st.session_state.setdefault("est_equipment_last_basis", "Day")
+    st.session_state.setdefault("est_equipment_last_duration", 1.0)
+    st.session_state.setdefault("est_travel_last_kind", "Mileage")
+    st.session_state.setdefault("est_travel_last_amount", 0.0)
+    st.session_state.setdefault("est_travel_last_miles", 0.0)
+    st.session_state.setdefault("est_travel_last_mileage_rate", 0.0)
+    st.session_state.setdefault("est_travel_last_hotel_nights", 0.0)
+    st.session_state.setdefault("est_travel_last_hotel_rate", 0.0)
+    # Pending uploads (kept stable across reruns; uploaded on Save)
+    st.session_state.setdefault("est_pending_quote_attachments", [])
+    st.session_state.setdefault("est_pending_po_attachment", None)
+    st.session_state.setdefault("est_revision_note", "")
     est0 = st.session_state["estimate_editor_state"]
     # Defensive defaults: some imported legacy payloads may omit keys or set them to null.
     est0.setdefault("materials", [])
     est0.setdefault("labor", [])
+    est0.setdefault("equipment", [])
+    est0.setdefault("travel", {})
     est0.setdefault("controls", {})
     ensure_numeric_defaults(est0)
-    if not st.session_state.get("loaded_estimate_id"):
-        qn = str(est0.get("quote_number", "") or "").strip()
-        if qn:
-            st.session_state["estimate_editor_quote_ready"] = True
-        elif not st.session_state["estimate_editor_quote_ready"]:
-            est0["quote_number"] = next_quote_number()
-            st.session_state["estimate_editor_quote_ready"] = True
+    # Quote numbers must never change on rerun. We only allocate a new number at commit time
+    # (Save / Submit / Approve / Award) for brand-new estimates when quote_number is blank.
+    qn = str(est0.get("quote_number", "") or "").strip()
+    st.session_state["estimate_editor_quote_ready"] = bool(qn)
 
 
 def _duplicate_quote_message(quote: str, loaded_estimate_id: str | None) -> str | None:
@@ -1037,7 +1052,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.session_state["estimate_editor_quote_ready"] = False
                 st.rerun()
         with gen_col:
-            if st.button("Generate Quote Number", use_container_width=True):
+            can_generate_qn = not st.session_state.get("loaded_estimate_id") and not str(
+                est.get("quote_number", "") or ""
+            ).strip()
+            if st.button("Generate Quote Number", use_container_width=True, disabled=not can_generate_qn):
                 est["quote_number"] = next_quote_number()
                 st.rerun()
     else:
@@ -1114,7 +1132,15 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.caption(sug.get("job_note") or "No job match.")
         g1, g2 = st.columns([4, 1])
         with g2:
-            if st.button("Generate Quote Number", use_container_width=True, key="est_embed_gen_qn"):
+            can_generate_qn = not st.session_state.get("loaded_estimate_id") and not str(
+                est.get("quote_number", "") or ""
+            ).strip()
+            if st.button(
+                "Generate Quote Number",
+                use_container_width=True,
+                key="est_embed_gen_qn",
+                disabled=not can_generate_qn,
+            ):
                 est["quote_number"] = next_quote_number()
                 st.rerun()
 
@@ -1166,7 +1192,17 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     st.session_state["_est_prev_customer_id"] = cur_cust
 
     c1, c2, c3 = st.columns(3)
-    est["quote_number"] = c1.text_input("Quote Number", value=est.get("quote_number", ""), disabled=is_locked)
+    quote_locked_after_save = bool(
+        str(st.session_state.get("loaded_estimate_id") or "").strip()
+        and str(est.get("quote_number", "") or "").strip()
+    )
+    est["quote_number"] = c1.text_input(
+        "Quote Number",
+        value=est.get("quote_number", ""),
+        disabled=(is_locked or quote_locked_after_save),
+    )
+    if quote_locked_after_save and not is_locked:
+        c1.caption("Locked after first save.")
     selected_customer_name = customer_name_by_id.get(est.get("customer_id"), "")
     customer_names = list(customer_map.keys())
     cust_id_by_norm = {_norm_name_key(nm): str(customer_map.get(nm) or "") for nm in customer_names}
@@ -1698,8 +1734,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[2]:
         st.caption(
-            "Only **Category = Equipment** assets are listed. Each row shows name, **[RENTAL]** when rent-to-customer, "
-            "and D/W/M rate preview. Search matches name, manufacturer, model, or serial number."
+            "Quick add: search equipment, pick item, set qty/basis/duration, submit once. "
+            "Then edit/remove from cards below."
         )
         eq_search = st.text_input(
             "Search equipment",
@@ -1715,52 +1751,201 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             "Uncheck to list all Equipment assets (rates may be zero).",
         )
         rental_only = st.session_state.get("est_eq_rental_only", True)
-        rows_raw = est.get("equipment", []) or []
-        option_labels, label_to_name, name_to_label, asset_id_to_label = build_equipment_picker_maps(
+
+        option_labels, label_to_name, _name_to_label, _asset_id_to_label = build_equipment_picker_maps(
             equipment_pricing,
             rental_only=rental_only,
             search_query=eq_search,
             estimate_equipment_rows=est.get("equipment", []),
         )
+        eq_opts = option_labels if option_labels else [""]
+        equipment_map = {e["equipment_item"]: e for e in equipment_pricing}
+
         if not option_labels:
             st.warning(
                 "No equipment assets match this filter. Add **Equipment** assets in the Asset Database, "
                 "adjust search, or turn off “rent-to-customer only”."
             )
-        rows_core = _equipment_rows_core_for_editor(rows_raw)
-        rows_core = _equipment_core_with_picker_labels(
-            rows_raw,
-            rows_core,
-            label_to_name=label_to_name,
-            name_to_label=name_to_label,
-            asset_id_to_label=asset_id_to_label,
-        )
-        if not rows_core and option_labels:
-            rows_core = [{"equipment_item": option_labels[0], "qty": 0.0, "basis": "Day", "duration": 0.0}]
-        elif not rows_core:
-            rows_core = [{"equipment_item": "", "qty": 0.0, "basis": "Day", "duration": 0.0}]
-        df = pd.DataFrame(rows_core if rows_core else [{"equipment_item": "", "qty": 0.0, "basis": "Day", "duration": 0.0}])
-        eq_opts = option_labels if option_labels else [""]
-        edited = st.data_editor(
-            df, num_rows="dynamic", use_container_width=True, hide_index=True, key="equipment_editor_db",
-            disabled=is_locked,
-            column_config={
-                "equipment_item": st.column_config.SelectboxColumn("Equipment (asset + rates)", options=eq_opts, required=True),
-                "qty": st.column_config.NumberColumn("Qty", min_value=0.0, step=1.0, format="%.2f"),
-                "basis": st.column_config.SelectboxColumn("Basis", options=["Day", "Week", "Month"], required=True),
-                "duration": st.column_config.NumberColumn("Duration", min_value=0.0, step=1.0, format="%.2f"),
-            },
-        )
-        for col in ("qty", "duration"):
-            if col in edited.columns:
-                edited[col] = edited[col].fillna(0.0)
-        for col in ("equipment_item", "basis"):
-            if col in edited.columns:
-                edited[col] = edited[col].fillna("")
-        raw_eq = edited.to_dict("records")
-        est["equipment"] = enrich_equipment_rows_from_assets(
-            raw_eq, equipment_pricing, picker_label_to_name=label_to_name
-        )
+
+        est.setdefault("equipment", [])
+
+        with st.form(key="est_equipment_add_form", clear_on_submit=True):
+            last_item = str(st.session_state.get("est_equipment_last_item") or "").strip()
+            item_index = eq_opts.index(last_item) if last_item in eq_opts else 0
+            eq_add_item = st.selectbox(
+                "Equipment",
+                options=eq_opts,
+                index=item_index,
+                disabled=is_locked,
+                key="est_equipment_add_item",
+                help="Items include rate preview. Choose an asset-based equipment item when possible.",
+            )
+            c1, c2, c3 = st.columns(3)
+            eq_add_qty = c1.number_input(
+                "Qty",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_equipment_last_qty") or 1.0),
+                key="est_equipment_add_qty",
+            )
+            basis_opts = ["Day", "Week", "Month"]
+            last_basis = str(st.session_state.get("est_equipment_last_basis") or "Day")
+            basis_index = basis_opts.index(last_basis) if last_basis in basis_opts else 0
+            eq_add_basis = c2.selectbox(
+                "Basis",
+                options=basis_opts,
+                index=basis_index,
+                disabled=is_locked,
+                key="est_equipment_add_basis",
+            )
+            eq_add_duration = c3.number_input(
+                "Duration",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                disabled=is_locked,
+                value=float(st.session_state.get("est_equipment_last_duration") or 1.0),
+                key="est_equipment_add_duration",
+            )
+            eq_add_submit = st.form_submit_button("Add Equipment", disabled=is_locked)
+            if eq_add_submit:
+                if not str(eq_add_item or "").strip():
+                    st.error("Select an equipment item.")
+                    st.stop()
+                st.session_state["est_equipment_last_item"] = str(eq_add_item).strip()
+                st.session_state["est_equipment_last_qty"] = float(eq_add_qty or 0.0) or 1.0
+                st.session_state["est_equipment_last_basis"] = str(eq_add_basis)
+                st.session_state["est_equipment_last_duration"] = float(eq_add_duration or 0.0) or 1.0
+
+                new_row = {
+                    "equipment_item": str(eq_add_item).strip(),
+                    "qty": float(eq_add_qty or 0.0),
+                    "basis": str(eq_add_basis),
+                    "duration": float(eq_add_duration or 0.0),
+                }
+                # Normalize picker label → canonical asset name and attach metadata.
+                enriched = enrich_equipment_rows_from_assets([new_row], equipment_pricing, picker_label_to_name=label_to_name)
+                est["equipment"] = (est.get("equipment") or []) + enriched
+                st.session_state["est_equipment_edit_idx"] = None
+                st.rerun()
+
+        eq_edit_idx = st.session_state.get("est_equipment_edit_idx")
+        if eq_edit_idx is not None:
+            try:
+                eq_edit_idx = int(eq_edit_idx)
+            except Exception:
+                eq_edit_idx = None
+            if eq_edit_idx is None or eq_edit_idx < 0 or eq_edit_idx >= len(est.get("equipment") or []):
+                st.session_state["est_equipment_edit_idx"] = None
+            else:
+                cur = (est.get("equipment") or [])[eq_edit_idx] or {}
+                cur_name = str(cur.get("equipment_item") or "").strip()
+                cur_qty = float(cur.get("qty", 0) or 0.0)
+                cur_basis = str(cur.get("basis") or "Day")
+                cur_duration = float(cur.get("duration", 0) or 0.0)
+
+                # Try to map canonical name → a current picker option label.
+                cur_pick = next((lab for lab, nm in label_to_name.items() if nm == cur_name), cur_name)
+                if cur_pick not in eq_opts and eq_opts:
+                    cur_pick = eq_opts[0]
+                with st.form(key=f"est_equipment_edit_form_{eq_edit_idx}", clear_on_submit=True):
+                    st.caption(f"Editing equipment line #{eq_edit_idx + 1}")
+                    eq_edit_item = st.selectbox(
+                        "Equipment",
+                        options=eq_opts,
+                        index=(eq_opts.index(cur_pick) if cur_pick in eq_opts else 0),
+                        disabled=is_locked,
+                        key=f"est_equipment_edit_item_{eq_edit_idx}",
+                    )
+                    e1, e2, e3 = st.columns(3)
+                    eq_edit_qty = e1.number_input(
+                        "Qty",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_qty,
+                        key=f"est_equipment_edit_qty_{eq_edit_idx}",
+                    )
+                    eq_edit_basis = e2.selectbox(
+                        "Basis",
+                        options=basis_opts,
+                        index=(basis_opts.index(cur_basis) if cur_basis in basis_opts else 0),
+                        disabled=is_locked,
+                        key=f"est_equipment_edit_basis_{eq_edit_idx}",
+                    )
+                    eq_edit_duration = e3.number_input(
+                        "Duration",
+                        min_value=0.0,
+                        step=1.0,
+                        format="%.2f",
+                        disabled=is_locked,
+                        value=cur_duration,
+                        key=f"est_equipment_edit_duration_{eq_edit_idx}",
+                    )
+                    eq_edit_submit = st.form_submit_button(
+                        "Save Changes", disabled=is_locked, key=f"est_equipment_edit_save_{eq_edit_idx}"
+                    )
+                    eq_edit_cancel = st.form_submit_button(
+                        "Cancel", disabled=is_locked, key=f"est_equipment_edit_cancel_{eq_edit_idx}"
+                    )
+                    if eq_edit_cancel:
+                        st.session_state["est_equipment_edit_idx"] = None
+                        st.rerun()
+                    if eq_edit_submit:
+                        if not str(eq_edit_item or "").strip():
+                            st.error("Select an equipment item.")
+                            st.stop()
+                        new_row = {
+                            "equipment_item": str(eq_edit_item).strip(),
+                            "qty": float(eq_edit_qty or 0.0),
+                            "basis": str(eq_edit_basis),
+                            "duration": float(eq_edit_duration or 0.0),
+                        }
+                        enriched = enrich_equipment_rows_from_assets([new_row], equipment_pricing, picker_label_to_name=label_to_name)[0]
+                        # Preserve any stored notes/asset_id if still valid (enricher will drop if no match).
+                        est["equipment"][eq_edit_idx] = {**cur, **enriched}
+                        st.session_state["est_equipment_edit_idx"] = None
+                        st.rerun()
+
+        eq_lines = est.get("equipment") or []
+        if not eq_lines:
+            st.info("No equipment lines added yet.")
+        else:
+            for idx, line in enumerate(eq_lines):
+                if not isinstance(line, dict):
+                    continue
+                name = str(line.get("equipment_item") or "").strip()
+                qty = float(line.get("qty", 0) or 0.0)
+                basis = str(line.get("basis") or "Day")
+                duration = float(line.get("duration", 0) or 0.0)
+                meta = equipment_map.get(name) or {}
+                rate = {
+                    "Day": float(meta.get("daily_rate", 0) or 0.0),
+                    "Week": float(meta.get("weekly_rate", 0) or 0.0),
+                    "Month": float(meta.get("monthly_rate", 0) or 0.0),
+                }.get(basis, 0.0)
+                subtotal = qty * duration * rate
+                with st.container(border=True):
+                    left, right = st.columns([2, 1])
+                    with left:
+                        st.markdown(f"**{name or 'Unknown equipment'}**")
+                        st.caption(f"Qty: {qty:.2f} · Basis: {basis} · Duration: {duration:.2f} · Rate: {money(rate)}")
+                    with right:
+                        st.metric(label="Line subtotal", value=money(subtotal))
+                    c_edit, c_rem = st.columns([1, 1], gap="small")
+                    with c_edit:
+                        if st.button("Edit", disabled=is_locked, key=f"est_equipment_edit_btn_{idx}"):
+                            st.session_state["est_equipment_edit_idx"] = idx
+                            st.rerun()
+                    with c_rem:
+                        if st.button("Remove", disabled=is_locked, key=f"est_equipment_remove_btn_{idx}"):
+                            est["equipment"] = [x for j, x in enumerate(eq_lines) if j != idx]
+                            if st.session_state.get("est_equipment_edit_idx") == idx:
+                                st.session_state["est_equipment_edit_idx"] = None
+                            st.rerun()
 
         with st.expander("Rental rates (reference for lines above)", expanded=False):
             ref_rows = []
@@ -1785,50 +1970,366 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.caption("Select equipment with a name that matches an Asset Database **Equipment** row to see rates.")
 
     with tabs[3]:
-        travel = est.get("travel", {})
-        tc1, tc2, tc3, tc4 = st.columns(4)
-        travel["round_trip_miles"] = tc1.number_input("Round Trip Miles", min_value=0.0, value=_num0(travel.get("round_trip_miles")), step=10.0, disabled=is_locked)
-        travel["mileage_rate"] = tc2.number_input("Mileage Rate", min_value=0.0, value=_num0(travel.get("mileage_rate")), step=0.1, format="%.2f", disabled=is_locked)
-        travel["per_diem_per_person_per_day"] = tc3.number_input("Per Diem", min_value=0.0, value=_num0(travel.get("per_diem_per_person_per_day")), step=10.0, format="%.2f", disabled=is_locked)
-        travel["hotel_nights"] = tc4.number_input("Hotel Nights", min_value=0.0, value=_num0(travel.get("hotel_nights")), step=1.0, disabled=is_locked)
-        travel["hotel_rate_per_room_per_night"] = st.number_input(
-            "Hotel Rate / Night",
-            min_value=0.0,
-            value=_num0(travel.get("hotel_rate_per_room_per_night")),
-            step=10.0,
-            format="%.2f",
-            disabled=is_locked,
-        )
-        tc5, tc6, tc7, tc8 = st.columns(4)
-        travel["airfare"] = tc5.number_input("Airfare", min_value=0.0, value=_num0(travel.get("airfare")), step=50.0, format="%.2f", disabled=is_locked)
-        travel["rental_car"] = tc6.number_input("Rental Car", min_value=0.0, value=_num0(travel.get("rental_car")), step=50.0, format="%.2f", disabled=is_locked)
-        travel["fuel"] = tc7.number_input("Fuel", min_value=0.0, value=_num0(travel.get("fuel")), step=25.0, format="%.2f", disabled=is_locked)
-        travel["line_total"] = tc8.number_input("Travel Line Total (override)", min_value=0.0, value=_num0(travel.get("line_total")), step=50.0, format="%.2f", disabled=is_locked)
+        st.caption("Quick add travel charges, then edit/remove from cards below.")
+        travel = est.get("travel", {}) or {}
         est["travel"] = travel
 
-        controls = est.get("controls", {})
-        pc1, pc2, pc3, pc4, pc5 = st.columns(5)
-        controls["material_markup_pct"] = pc1.number_input("Material Markup %", min_value=0.0, value=_num0(controls.get("material_markup_pct")), step=0.01, format="%.2f", disabled=is_locked)
-        controls["overhead_pct"] = pc2.number_input("Overhead %", min_value=0.0, value=_num0(controls.get("overhead_pct")), step=0.01, format="%.2f", disabled=is_locked)
-        controls["profit_pct"] = pc3.number_input("Profit %", min_value=0.0, value=_num0(controls.get("profit_pct")), step=0.01, format="%.2f", disabled=is_locked)
-        controls["contingency_pct"] = pc4.number_input("Contingency %", min_value=0.0, value=_num0(controls.get("contingency_pct")), step=0.01, format="%.2f", disabled=is_locked)
-        controls["sales_tax_pct"] = pc5.number_input("Sales Tax %", min_value=0.0, value=_num0(controls.get("sales_tax_pct")), step=0.01, format="%.2f", disabled=is_locked)
-        est["controls"] = controls
+        TRAVEL_KINDS = ["Mileage", "Per diem", "Hotel", "Airfare", "Rental car", "Fuel", "Override"]
+
+        with st.form(key="est_travel_add_form", clear_on_submit=True):
+            last_kind = str(st.session_state.get("est_travel_last_kind") or "Mileage")
+            kind_index = TRAVEL_KINDS.index(last_kind) if last_kind in TRAVEL_KINDS else 0
+            kind = st.selectbox(
+                "Type",
+                options=TRAVEL_KINDS,
+                index=kind_index,
+                disabled=is_locked,
+                key="est_travel_add_kind",
+            )
+
+            if kind == "Mileage":
+                c1, c2 = st.columns(2)
+                miles = c1.number_input(
+                    "Round Trip Miles",
+                    min_value=0.0,
+                    step=10.0,
+                    disabled=is_locked,
+                    value=float(st.session_state.get("est_travel_last_miles") or _num0(travel.get("round_trip_miles"))),
+                    key="est_travel_add_miles",
+                )
+                rate = c2.number_input(
+                    "Mileage Rate",
+                    min_value=0.0,
+                    step=0.1,
+                    format="%.2f",
+                    disabled=is_locked,
+                    value=float(
+                        st.session_state.get("est_travel_last_mileage_rate") or _num0(travel.get("mileage_rate"))
+                    ),
+                    key="est_travel_add_mileage_rate",
+                )
+            elif kind == "Hotel":
+                c1, c2 = st.columns(2)
+                nights = c1.number_input(
+                    "Hotel Nights",
+                    min_value=0.0,
+                    step=1.0,
+                    disabled=is_locked,
+                    value=float(
+                        st.session_state.get("est_travel_last_hotel_nights") or _num0(travel.get("hotel_nights"))
+                    ),
+                    key="est_travel_add_hotel_nights",
+                )
+                nightly = c2.number_input(
+                    "Hotel Rate / Night",
+                    min_value=0.0,
+                    step=10.0,
+                    format="%.2f",
+                    disabled=is_locked,
+                    value=float(
+                        st.session_state.get("est_travel_last_hotel_rate")
+                        or _num0(travel.get("hotel_rate_per_room_per_night"))
+                    ),
+                    key="est_travel_add_hotel_rate",
+                )
+            else:
+                amt = st.number_input(
+                    "Amount",
+                    min_value=0.0,
+                    step=25.0,
+                    format="%.2f",
+                    disabled=is_locked,
+                    value=float(st.session_state.get("est_travel_last_amount") or 0.0),
+                    key="est_travel_add_amount",
+                )
+
+            submit = st.form_submit_button("Add / Update", disabled=is_locked)
+            if submit:
+                st.session_state["est_travel_last_kind"] = str(kind)
+                if kind == "Mileage":
+                    travel["round_trip_miles"] = float(miles or 0.0)
+                    travel["mileage_rate"] = float(rate or 0.0)
+                    st.session_state["est_travel_last_miles"] = float(miles or 0.0)
+                    st.session_state["est_travel_last_mileage_rate"] = float(rate or 0.0)
+                elif kind == "Per diem":
+                    travel["per_diem_per_person_per_day"] = float(amt or 0.0)
+                    st.session_state["est_travel_last_amount"] = float(amt or 0.0)
+                elif kind == "Hotel":
+                    travel["hotel_nights"] = float(nights or 0.0)
+                    travel["hotel_rate_per_room_per_night"] = float(nightly or 0.0)
+                    st.session_state["est_travel_last_hotel_nights"] = float(nights or 0.0)
+                    st.session_state["est_travel_last_hotel_rate"] = float(nightly or 0.0)
+                elif kind == "Airfare":
+                    travel["airfare"] = float(amt or 0.0)
+                    st.session_state["est_travel_last_amount"] = float(amt or 0.0)
+                elif kind == "Rental car":
+                    travel["rental_car"] = float(amt or 0.0)
+                    st.session_state["est_travel_last_amount"] = float(amt or 0.0)
+                elif kind == "Fuel":
+                    travel["fuel"] = float(amt or 0.0)
+                    st.session_state["est_travel_last_amount"] = float(amt or 0.0)
+                elif kind == "Override":
+                    travel["line_total"] = float(amt or 0.0)
+                    st.session_state["est_travel_last_amount"] = float(amt or 0.0)
+                est["travel"] = travel
+                st.rerun()
+
+        # Draft cards (edit/remove)
+        def _travel_cards() -> list[tuple[str, str, float]]:
+            miles_total = _num0(travel.get("round_trip_miles")) * _num0(travel.get("mileage_rate"))
+            hotel_total = _num0(travel.get("hotel_nights")) * _num0(travel.get("hotel_rate_per_room_per_night"))
+            items: list[tuple[str, str, float]] = [
+                ("Mileage", f'{_num0(travel.get("round_trip_miles")):.2f} mi × {money(_num0(travel.get("mileage_rate")))}', miles_total),
+                ("Per diem", "", _num0(travel.get("per_diem_per_person_per_day"))),
+                ("Hotel", f'{_num0(travel.get("hotel_nights")):.2f} nights × {money(_num0(travel.get("hotel_rate_per_room_per_night")))}', hotel_total),
+                ("Airfare", "", _num0(travel.get("airfare"))),
+                ("Rental car", "", _num0(travel.get("rental_car"))),
+                ("Fuel", "", _num0(travel.get("fuel"))),
+                ("Override", "If set (>0) and computed travel is 0, totals use this.", _num0(travel.get("line_total"))),
+            ]
+            # Show only non-zero-ish items (but always show mileage/hotel if either field is set).
+            out: list[tuple[str, str, float]] = []
+            for k, d, v in items:
+                if k in ("Mileage", "Hotel"):
+                    if _num0(travel.get("round_trip_miles")) > 0 or _num0(travel.get("mileage_rate")) > 0 or k == "Hotel" and (_num0(travel.get("hotel_nights")) > 0 or _num0(travel.get("hotel_rate_per_room_per_night")) > 0):
+                        out.append((k, d, v))
+                else:
+                    if float(v or 0) != 0.0:
+                        out.append((k, d, float(v or 0.0)))
+            return out
+
+        cards = _travel_cards()
+        if not cards:
+            st.info("No travel charges set yet.")
+        else:
+            for k, detail, val in cards:
+                with st.container(border=True):
+                    left, right = st.columns([2, 1])
+                    with left:
+                        st.markdown(f"**{k}**")
+                        if detail:
+                            st.caption(detail)
+                    with right:
+                        st.metric(label="Amount", value=money(val))
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("Edit", disabled=is_locked, key=f"est_travel_edit_{k}"):
+                            st.session_state["est_travel_last_kind"] = k
+                            st.rerun()
+                    with c2:
+                        if st.button("Remove", disabled=is_locked, key=f"est_travel_remove_{k}"):
+                            if k == "Mileage":
+                                travel["round_trip_miles"] = 0.0
+                                travel["mileage_rate"] = 0.0
+                            elif k == "Per diem":
+                                travel["per_diem_per_person_per_day"] = 0.0
+                            elif k == "Hotel":
+                                travel["hotel_nights"] = 0.0
+                                travel["hotel_rate_per_room_per_night"] = 0.0
+                            elif k == "Airfare":
+                                travel["airfare"] = 0.0
+                            elif k == "Rental car":
+                                travel["rental_car"] = 0.0
+                            elif k == "Fuel":
+                                travel["fuel"] = 0.0
+                            elif k == "Override":
+                                travel["line_total"] = 0.0
+                            est["travel"] = travel
+                            st.rerun()
+
+        st.markdown("---")
+        st.caption("Estimate controls (markup, overhead, profit, contingency, tax) — submit once.")
+        controls = est.get("controls", {}) or {}
+        with st.form(key="est_controls_form", clear_on_submit=False):
+            pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+            material_markup_pct = pc1.number_input(
+                "Material Markup %",
+                min_value=0.0,
+                value=_num0(controls.get("material_markup_pct")),
+                step=0.01,
+                format="%.2f",
+                disabled=is_locked,
+                key="est_ctrl_material_markup_pct",
+            )
+            overhead_pct = pc2.number_input(
+                "Overhead %",
+                min_value=0.0,
+                value=_num0(controls.get("overhead_pct")),
+                step=0.01,
+                format="%.2f",
+                disabled=is_locked,
+                key="est_ctrl_overhead_pct",
+            )
+            profit_pct = pc3.number_input(
+                "Profit %",
+                min_value=0.0,
+                value=_num0(controls.get("profit_pct")),
+                step=0.01,
+                format="%.2f",
+                disabled=is_locked,
+                key="est_ctrl_profit_pct",
+            )
+            contingency_pct = pc4.number_input(
+                "Contingency %",
+                min_value=0.0,
+                value=_num0(controls.get("contingency_pct")),
+                step=0.01,
+                format="%.2f",
+                disabled=is_locked,
+                key="est_ctrl_contingency_pct",
+            )
+            sales_tax_pct = pc5.number_input(
+                "Sales Tax %",
+                min_value=0.0,
+                value=_num0(controls.get("sales_tax_pct")),
+                step=0.01,
+                format="%.2f",
+                disabled=is_locked,
+                key="est_ctrl_sales_tax_pct",
+            )
+            if st.form_submit_button("Save controls", disabled=is_locked):
+                est["controls"] = {
+                    **controls,
+                    "material_markup_pct": float(material_markup_pct or 0.0),
+                    "overhead_pct": float(overhead_pct or 0.0),
+                    "profit_pct": float(profit_pct or 0.0),
+                    "contingency_pct": float(contingency_pct or 0.0),
+                    "sales_tax_pct": float(sales_tax_pct or 0.0),
+                }
+                st.rerun()
 
     with tabs[4]:
-        est["scope_of_work"] = st.text_area("Scope of Work", value=est.get("scope_of_work", ""), height=140, disabled=is_locked)
-        est["exclusions"] = st.text_area("Exclusions", value=est.get("exclusions", ""), height=110, disabled=is_locked)
-        est["additional_charges"] = st.text_area("Additional Charges", value=est.get("additional_charges", ""), height=110, disabled=is_locked)
-        est["customer_responsibilities"] = st.text_area("Customer Responsibilities", value=est.get("customer_responsibilities", ""), height=110, disabled=is_locked)
+        st.caption("Edit scope sections in one submit to avoid rerun/reset issues.")
+        with st.form(key="est_scope_form", clear_on_submit=False):
+            scope_of_work = st.text_area(
+                "Scope of Work",
+                value=str(est.get("scope_of_work") or ""),
+                height=140,
+                disabled=is_locked,
+                key="est_scope_scope_of_work",
+            )
+            exclusions = st.text_area(
+                "Exclusions",
+                value=str(est.get("exclusions") or ""),
+                height=110,
+                disabled=is_locked,
+                key="est_scope_exclusions",
+            )
+            additional_charges = st.text_area(
+                "Additional Charges",
+                value=str(est.get("additional_charges") or ""),
+                height=110,
+                disabled=is_locked,
+                key="est_scope_additional_charges",
+            )
+            customer_responsibilities = st.text_area(
+                "Customer Responsibilities",
+                value=str(est.get("customer_responsibilities") or ""),
+                height=110,
+                disabled=is_locked,
+                key="est_scope_customer_responsibilities",
+            )
+            if st.form_submit_button("Save scope sections", disabled=is_locked):
+                est["scope_of_work"] = str(scope_of_work or "")
+                est["exclusions"] = str(exclusions or "")
+                est["additional_charges"] = str(additional_charges or "")
+                est["customer_responsibilities"] = str(customer_responsibilities or "")
+                st.rerun()
 
     with tabs[5]:
-        quote_files = st.file_uploader("Quote Attachments", type=["pdf", "jpg", "jpeg", "png"], accept_multiple_files=True, disabled=is_locked)
-        est["job_received"] = st.checkbox("Job Received / Awarded", value=bool(est.get("job_received", False)), disabled=is_locked)
-        pc1, pc2, pc3 = st.columns(3)
-        est["po_number"] = pc1.text_input("PO Number", value=est.get("po_number", ""), disabled=is_locked)
-        est["po_date"] = pc2.text_input("PO Date", value=est.get("po_date", ""), disabled=is_locked)
-        est["po_amount"] = pc3.number_input("PO Amount", min_value=0.0, value=float(est.get("po_amount", 0) or 0), step=100.0, disabled=is_locked)
-        po_file = st.file_uploader("PO Attachment", type=["pdf", "jpg", "jpeg", "png"], key="po_file_db", disabled=is_locked)
+        st.caption("Add attachments to the draft (they upload when you Save/Submit/Approve/Award).")
+
+        # Quote attachments (pending)
+        pending_quotes: list[dict] = list(st.session_state.get("est_pending_quote_attachments") or [])
+        with st.form(key="est_quote_attach_add_form", clear_on_submit=True):
+            up_files = st.file_uploader(
+                "Quote Attachments",
+                type=["pdf", "jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                disabled=is_locked,
+                key="est_quote_attach_uploader",
+                help="Files are staged in the draft until you Save.",
+            )
+            if st.form_submit_button("Add attachment(s) to draft", disabled=is_locked):
+                if not up_files:
+                    st.warning("Choose one or more files first.")
+                    st.stop()
+                for f in up_files:
+                    pending_quotes.append(
+                        {
+                            "file_name": f.name,
+                            "bytes": f.getvalue(),
+                            "content_type": f.type or "application/octet-stream",
+                        }
+                    )
+                st.session_state["est_pending_quote_attachments"] = pending_quotes
+                st.rerun()
+
+        if pending_quotes:
+            st.markdown("**Pending quote attachments**")
+            for i, f in enumerate(pending_quotes):
+                nm = str(f.get("file_name") or "file")
+                with st.container(border=True):
+                    st.markdown(f"**{nm}**")
+                    if st.button("Remove", disabled=is_locked, key=f"est_quote_attach_remove_{i}"):
+                        st.session_state["est_pending_quote_attachments"] = [
+                            x for j, x in enumerate(pending_quotes) if j != i
+                        ]
+                        st.rerun()
+        else:
+            st.caption("No pending quote attachments.")
+
+        st.markdown("---")
+        with st.form(key="est_po_form", clear_on_submit=False):
+            job_received = st.checkbox(
+                "Job Received / Awarded",
+                value=bool(est.get("job_received", False)),
+                disabled=is_locked,
+                key="est_po_job_received",
+            )
+            pc1, pc2, pc3 = st.columns(3)
+            po_number = pc1.text_input(
+                "PO Number", value=str(est.get("po_number") or ""), disabled=is_locked, key="est_po_number"
+            )
+            po_date = pc2.text_input(
+                "PO Date", value=str(est.get("po_date") or ""), disabled=is_locked, key="est_po_date"
+            )
+            po_amount = pc3.number_input(
+                "PO Amount",
+                min_value=0.0,
+                value=float(est.get("po_amount", 0) or 0),
+                step=100.0,
+                disabled=is_locked,
+                key="est_po_amount",
+            )
+            po_file = st.file_uploader(
+                "PO Attachment",
+                type=["pdf", "jpg", "jpeg", "png"],
+                key="est_po_file_uploader",
+                disabled=is_locked,
+                help="Staged in the draft until you Save.",
+            )
+            if st.form_submit_button("Save P.O. fields to draft", disabled=is_locked):
+                est["job_received"] = bool(job_received)
+                est["po_number"] = str(po_number or "")
+                est["po_date"] = str(po_date or "")
+                est["po_amount"] = float(po_amount or 0.0)
+                if po_file is not None:
+                    st.session_state["est_pending_po_attachment"] = {
+                        "file_name": po_file.name,
+                        "bytes": po_file.getvalue(),
+                        "content_type": po_file.type or "application/octet-stream",
+                    }
+                st.rerun()
+
+        if st.session_state.get("est_pending_po_attachment"):
+            po = st.session_state["est_pending_po_attachment"] or {}
+            st.markdown("**Pending PO attachment**")
+            with st.container(border=True):
+                st.markdown(f"**{po.get('file_name') or 'po'}**")
+                if st.button("Remove PO attachment", disabled=is_locked, key="est_po_remove_pending"):
+                    st.session_state["est_pending_po_attachment"] = None
+                    st.rerun()
 
     with tabs[6]:
         customer_name = customer_name_by_id.get(est.get("customer_id"), "")
@@ -1836,67 +2337,85 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         docx_bytes = build_proposal_docx(est, totals, customer_name=customer_name, job_name=job_name)
         pdf_bytes = build_proposal_pdf(est, totals, customer_name=customer_name, job_name=job_name)
 
-        st.download_button(
-            "Download Word Proposal",
-            data=docx_bytes,
-            file_name=f"{est.get('quote_number') or 'proposal'}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True,
-        )
-        st.download_button(
-            "Download PDF Proposal",
-            data=pdf_bytes,
-            file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
+        # Top action card: downloads + (optional) save-to-storage.
+        with st.container(border=True):
+            st.caption("Exports are generated from the current draft. Download anytime; save-to-storage requires a saved estimate.")
+            d1, d2 = st.columns(2)
+            with d1:
+                st.download_button(
+                    "Download Word Proposal",
+                    data=docx_bytes,
+                    file_name=f"{est.get('quote_number') or 'proposal'}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                )
+            with d2:
+                st.download_button(
+                    "Download PDF Proposal",
+                    data=pdf_bytes,
+                    file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
-        if st.session_state.get("loaded_estimate_id"):
-            save_export_cols = st.columns(2)
-            if save_export_cols[0].button("Save Word Proposal to Supabase", use_container_width=True):
-                upload_generated_export(
-                    st.session_state["loaded_estimate_id"],
-                    f"{est.get('quote_number') or 'proposal'}.docx",
-                    docx_bytes,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "generated_docx",
-                )
-                st.success("Word proposal saved to Supabase Storage.")
-            if save_export_cols[1].button("Save PDF Proposal to Supabase", use_container_width=True):
-                upload_generated_export(
-                    st.session_state["loaded_estimate_id"],
-                    f"{est.get('quote_number') or 'proposal'}.pdf",
-                    pdf_bytes,
-                    "application/pdf",
-                    "generated_pdf",
-                )
-                st.success("PDF proposal saved to Supabase Storage.")
-        else:
-            st.info("Save the estimate first, then you can save proposal exports to Supabase Storage.")
+            if st.session_state.get("loaded_estimate_id"):
+                save_export_cols = st.columns(2)
+                if save_export_cols[0].button("Save Word Proposal to Supabase", use_container_width=True):
+                    upload_generated_export(
+                        st.session_state["loaded_estimate_id"],
+                        f"{est.get('quote_number') or 'proposal'}.docx",
+                        docx_bytes,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "generated_docx",
+                    )
+                    st.success("Word proposal saved to Supabase Storage.")
+                if save_export_cols[1].button("Save PDF Proposal to Supabase", use_container_width=True):
+                    upload_generated_export(
+                        st.session_state["loaded_estimate_id"],
+                        f"{est.get('quote_number') or 'proposal'}.pdf",
+                        pdf_bytes,
+                        "application/pdf",
+                        "generated_pdf",
+                    )
+                    st.success("PDF proposal saved to Supabase Storage.")
+            else:
+                st.info("Save the estimate first, then you can save proposal exports to Supabase Storage.")
 
     with tabs[7]:
         totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-        rc1, rc2, rc3, rc4 = st.columns(4)
-        rc1.metric("Final Bid", money(totals["final_bid"]))
-        rc2.metric("Overhead", money(totals["overhead_total"]))
-        rc3.metric("Profit", money(totals["profit_total"]))
-        rc4.metric("Sales Tax", money(totals["sales_tax_total"]))
-        revision_note = st.text_input("Revision Note", value="")
-        st.code(json.dumps(est, indent=2), language="json")
+        with st.container(border=True):
+            rc1, rc2, rc3, rc4 = st.columns(4)
+            rc1.metric("Final Bid", money(totals["final_bid"]))
+            rc2.metric("Overhead", money(totals["overhead_total"]))
+            rc3.metric("Profit", money(totals["profit_total"]))
+            rc4.metric("Sales Tax", money(totals["sales_tax_total"]))
+
+            with st.form(key="est_revision_note_form", clear_on_submit=False):
+                revision_note = st.text_input(
+                    "Revision Note",
+                    value=str(st.session_state.get("est_revision_note") or ""),
+                    key="est_revision_note_input",
+                )
+                if st.form_submit_button("Update revision note"):
+                    st.session_state["est_revision_note"] = str(revision_note or "")
+                    st.rerun()
 
         customer_name = customer_name_by_id.get(est.get("customer_id"), "")
-        if not est.get("quote_number", "").strip():
-            st.warning("Generate or enter a Quote Number before saving.")
+        loaded_id = st.session_state.get("loaded_estimate_id")
+        qn_now = str(est.get("quote_number", "") or "").strip()
+        if not qn_now:
+            if loaded_id:
+                st.warning("This estimate is missing a Quote Number.")
+            else:
+                st.info("Quote Number will be assigned on first save if left blank.")
         elif not (customer_name or str(st.session_state.get("est_customer_query") or "").strip()):
             st.warning("Select a customer before saving.")
 
         save_cols = st.columns(4)
         can_save = bool(
-            est.get("quote_number", "").strip()
-            and (est.get("customer_id") or str(st.session_state.get("est_customer_query") or "").strip())
+            (est.get("customer_id") or str(st.session_state.get("est_customer_query") or "").strip())
+            and (qn_now or not loaded_id)
         )
-        loaded_id = st.session_state.get("loaded_estimate_id")
-        dup_msg = _duplicate_quote_message(est.get("quote_number", "").strip(), loaded_id)
 
         try:
             from ui import IPS_NAV_PENDING_KEY
@@ -2010,13 +2529,19 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             return msgs
 
         if save_cols[0].button("Save Estimate", use_container_width=True, disabled=(is_locked or not can_save)):
+            # Allocate quote number only for brand-new estimates when blank.
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
             if dup_msg:
                 st.error(dup_msg)
             else:
                 created_msgs = _resolve_customer_job_on_commit()
                 totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
                 payload = {
-                    "quote_number": est.get("quote_number", "").strip(),
+                    "quote_number": str(est.get("quote_number", "") or "").strip(),
                     "customer_id": est.get("customer_id"),
                     "customer_contact_id": est.get("customer_contact_id"),
                     "job_id": est.get("job_id"),
@@ -2043,30 +2568,47 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "estimate_json": est,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
-                estimate_id = persist_estimate(payload, est, revision_note)
+                estimate_id = persist_estimate(payload, est, str(st.session_state.get("est_revision_note") or ""))
                 attach_pending_pdf_import_source(estimate_id)
-                for f in quote_files or []:
-                    storage_path = f"quotes/{estimate_id}/attachments/{Path(f.name).name}"
-                    upload_bytes(storage_path, f.getvalue(), f.type or "application/octet-stream")
-                    insert_row_admin("attachments", {
-                        "estimate_id": estimate_id,
-                        "category": "quote_attachment",
-                        "file_name": f.name,
-                        "storage_path": storage_path,
-                        "file_type": f.type or "",
-                        "uploaded_by": current_profile().get("id"),
-                    })
-                if po_file is not None:
-                    storage_path = f"quotes/{estimate_id}/po/{Path(po_file.name).name}"
-                    upload_bytes(storage_path, po_file.getvalue(), po_file.type or "application/octet-stream")
-                    insert_row_admin("attachments", {
-                        "estimate_id": estimate_id,
-                        "category": "po_attachment",
-                        "file_name": po_file.name,
-                        "storage_path": storage_path,
-                        "file_type": po_file.type or "",
-                        "uploaded_by": current_profile().get("id"),
-                    })
+                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+                for f in pending_quotes:
+                    fn = str(f.get("file_name") or "file")
+                    storage_path = f"quotes/{estimate_id}/attachments/{Path(fn).name}"
+                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": estimate_id,
+                            "category": "quote_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(f.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                pending_po = st.session_state.get("est_pending_po_attachment")
+                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                    fn = str(pending_po.get("file_name") or "po")
+                    storage_path = f"quotes/{estimate_id}/po/{Path(fn).name}"
+                    upload_bytes(
+                        storage_path,
+                        pending_po.get("bytes") or b"",
+                        pending_po.get("content_type") or "application/octet-stream",
+                    )
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": estimate_id,
+                            "category": "po_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(pending_po.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                # Clear pending uploads after commit so reruns don't re-upload.
+                st.session_state["est_pending_quote_attachments"] = []
+                st.session_state["est_pending_po_attachment"] = None
                 if created_msgs:
                     for m in created_msgs:
                         st.info(m)
@@ -2074,13 +2616,18 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.session_state.pop("estimate_pdf_suggestions", None)
 
         if save_cols[1].button("Submit for Approval", use_container_width=True, disabled=(is_locked or not can_save)):
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
             if dup_msg:
                 st.error(dup_msg)
             else:
                 created_msgs = _resolve_customer_job_on_commit()
                 totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
                 payload = {
-                    "quote_number": est.get("quote_number", "").strip(),
+                    "quote_number": str(est.get("quote_number", "") or "").strip(),
                     "customer_id": est.get("customer_id"),
                     "customer_contact_id": est.get("customer_contact_id"),
                     "job_id": est.get("job_id"),
@@ -2110,6 +2657,44 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 est["status"] = "submitted"
                 eid = persist_estimate(payload, est, "Submitted for approval")
                 attach_pending_pdf_import_source(eid)
+                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+                for f in pending_quotes:
+                    fn = str(f.get("file_name") or "file")
+                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "quote_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(f.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                pending_po = st.session_state.get("est_pending_po_attachment")
+                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                    fn = str(pending_po.get("file_name") or "po")
+                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                    upload_bytes(
+                        storage_path,
+                        pending_po.get("bytes") or b"",
+                        pending_po.get("content_type") or "application/octet-stream",
+                    )
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "po_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(pending_po.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                st.session_state["est_pending_quote_attachments"] = []
+                st.session_state["est_pending_po_attachment"] = None
                 if created_msgs:
                     for m in created_msgs:
                         st.info(m)
@@ -2118,13 +2703,18 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
 
         if save_cols[2].button("Approve", use_container_width=True, disabled=(current_role() != "admin" or not can_save)):
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
             if dup_msg:
                 st.error(dup_msg)
             else:
                 created_msgs = _resolve_customer_job_on_commit()
                 totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
                 payload = {
-                    "quote_number": est.get("quote_number", "").strip(),
+                    "quote_number": str(est.get("quote_number", "") or "").strip(),
                     "customer_id": est.get("customer_id"),
                     "customer_contact_id": est.get("customer_contact_id"),
                     "job_id": est.get("job_id"),
@@ -2154,6 +2744,44 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 est["status"] = "approved"
                 eid = persist_estimate(payload, est, "Approved")
                 attach_pending_pdf_import_source(eid)
+                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+                for f in pending_quotes:
+                    fn = str(f.get("file_name") or "file")
+                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "quote_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(f.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                pending_po = st.session_state.get("est_pending_po_attachment")
+                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                    fn = str(pending_po.get("file_name") or "po")
+                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                    upload_bytes(
+                        storage_path,
+                        pending_po.get("bytes") or b"",
+                        pending_po.get("content_type") or "application/octet-stream",
+                    )
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "po_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(pending_po.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                st.session_state["est_pending_quote_attachments"] = []
+                st.session_state["est_pending_po_attachment"] = None
                 if created_msgs:
                     for m in created_msgs:
                         st.info(m)
@@ -2162,13 +2790,18 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
 
         if save_cols[3].button("Mark Awarded", use_container_width=True, disabled=(current_role() != "admin" or not can_save)):
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
             if dup_msg:
                 st.error(dup_msg)
             else:
                 created_msgs = _resolve_customer_job_on_commit()
                 totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
                 payload = {
-                    "quote_number": est.get("quote_number", "").strip(),
+                    "quote_number": str(est.get("quote_number", "") or "").strip(),
                     "customer_id": est.get("customer_id"),
                     "customer_contact_id": est.get("customer_contact_id"),
                     "job_id": est.get("job_id"),
@@ -2199,6 +2832,44 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 est["job_received"] = True
                 eid = persist_estimate(payload, est, "Marked awarded")
                 attach_pending_pdf_import_source(eid)
+                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+                for f in pending_quotes:
+                    fn = str(f.get("file_name") or "file")
+                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "quote_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(f.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                pending_po = st.session_state.get("est_pending_po_attachment")
+                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                    fn = str(pending_po.get("file_name") or "po")
+                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                    upload_bytes(
+                        storage_path,
+                        pending_po.get("bytes") or b"",
+                        pending_po.get("content_type") or "application/octet-stream",
+                    )
+                    insert_row_admin(
+                        "attachments",
+                        {
+                            "estimate_id": eid,
+                            "category": "po_attachment",
+                            "file_name": fn,
+                            "storage_path": storage_path,
+                            "file_type": str(pending_po.get("content_type") or ""),
+                            "uploaded_by": current_profile().get("id"),
+                        },
+                    )
+                st.session_state["est_pending_quote_attachments"] = []
+                st.session_state["est_pending_po_attachment"] = None
                 if created_msgs:
                     for m in created_msgs:
                         st.info(m)
@@ -2214,6 +2885,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     signed = create_signed_url(att["storage_path"])
                     if signed:
                         st.markdown(f'- **{att["category"]}**: [{att["file_name"]}]({signed})')
+
+        with st.expander("Draft snapshot (debug)", expanded=False):
+            st.code(json.dumps(est, indent=2), language="json")
 
     # Persistent estimate summary/totals panel (stays visible while editing).
     # This is intentionally rendered outside the tab bodies so it runs regardless of

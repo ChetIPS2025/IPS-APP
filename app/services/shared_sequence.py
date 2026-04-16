@@ -1,30 +1,45 @@
 """
-Shared integer sequence for Quote (Q#####) and Job (J#####) numbers.
+Yearly resetting integer sequence for Quote (QYYNNN) and Job (JYYNNN) numbers.
 
 **Allocation** is database-backed: :func:`get_next_sequence_number` calls the Supabase RPC
-``public.ips_next_job_quote_seq()`` via the admin client (atomic ``UPDATE`` on
-``public.ips_shared_sequence``, safe for concurrent users).
+``public.ips_next_yearly_seq()`` via the admin client (atomic increment per year, safe for concurrent
+users).
 
-Apply ``sql/012_ips_shared_sequence.sql`` in Supabase before relying on new numbers.
+Apply the Supabase SQL that defines ``public.ips_next_yearly_seq()`` before relying on new numbers.
 
 **Parsing** (for display / imports only) supports stored forms:
-  - ``Q#####``, ``J#####``
+  - ``QYYNNN`` (current), ``JYYNNN`` (current)
+  - legacy formats from earlier versions (no year / different digit counts)
   - ``JOB-{digits}`` (legacy job numbers)
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 import math
 import re
 from decimal import Decimal
 from typing import Any
 
-# New unified: Q/J + exactly 5 digits
-_RE_Q5 = re.compile(r"^Q(\d{5})$", re.IGNORECASE)
-_RE_J5 = re.compile(r"^J(\d{5})$", re.IGNORECASE)
+# Quote/job format (current):
+# - Q + YY + seq padded to 3 digits
+# - J + YY + seq padded to 3 digits
+_RE_QYYN = re.compile(r"^Q(\d{2})(\d{3})$", re.IGNORECASE)
+_RE_JYYN = re.compile(r"^J(\d{2})(\d{3})$", re.IGNORECASE)
+
+# Legacy quote formats:
+# - Q + YY + 5-digit sequence
+# - Q + 5-digit sequence (no year)
+_RE_QYY5_LEGACY = re.compile(r"^Q(\d{2})(\d{5})$", re.IGNORECASE)
+_RE_Q5_LEGACY = re.compile(r"^Q(\d{5})$", re.IGNORECASE)
+
+# Legacy job formats:
+# - J + 5-digit sequence (no year)
+_RE_J5_LEGACY = re.compile(r"^J(\d{5})$", re.IGNORECASE)
 _RE_JOB_LEGACY = re.compile(r"^JOB-(\d+)$", re.IGNORECASE)
 
-_RPC_NAME = "ips_next_job_quote_seq"
+# New unified yearly RPC
+_RPC_NAME = "ips_next_yearly_seq"
 
 # PostgREST / wrappers may return the scalar under these keys (checked in order).
 _DICT_KEYS: tuple[str, ...] = (
@@ -43,10 +58,23 @@ def parse_stored_sequence_value(value: str | None) -> int | None:
     s = (value or "").strip()
     if not s:
         return None
-    m = _RE_J5.match(s)
+
+    # Current formats (already encoded as 3-digit sequences).
+    m = _RE_QYYN.match(s)
+    if m:
+        return int(m.group(2))
+    m = _RE_JYYN.match(s)
+    if m:
+        return int(m.group(2))
+
+    # Legacy formats: best-effort, recover a trailing integer if possible.
+    m = _RE_QYY5_LEGACY.match(s)
+    if m:
+        return int(m.group(2))
+    m = _RE_Q5_LEGACY.match(s)
     if m:
         return int(m.group(1))
-    m = _RE_Q5.match(s)
+    m = _RE_J5_LEGACY.match(s)
     if m:
         return int(m.group(1))
     m = _RE_JOB_LEGACY.match(s)
@@ -125,7 +153,7 @@ def _coerce_sequence_rpc_payload(data: Any) -> int:
 
 
 def get_next_sequence_number() -> int:
-    """Next integer in the shared sequence (atomic increment in Postgres)."""
+    """Next integer in the yearly sequence (atomic increment in Postgres)."""
     try:
         from app.db import get_admin_client
     except ImportError:
@@ -137,7 +165,7 @@ def get_next_sequence_number() -> int:
         raise RuntimeError(
             "Could not allocate the next quote/job sequence number from the database. "
             "Confirm SUPABASE_URL and the service-role key are set, that "
-            f"sql/012_ips_shared_sequence.sql has been applied, and that RPC {_RPC_NAME!r} exists. "
+            f"the SQL that defines RPC {_RPC_NAME!r} has been applied, and that the RPC exists. "
             f"Request error: {exc!r}"
         ) from exc
 
@@ -150,18 +178,26 @@ def get_next_sequence_number() -> int:
 
 
 def format_quote_number(n: int) -> str:
-    return f"Q{n:05d}"
+    yy = datetime.utcnow().strftime("%y")
+    seq = int(n)
+    if not (0 <= seq <= 999):
+        raise ValueError(f"Quote sequence out of range (expected 0..999): {seq}")
+    return f"Q{yy}{seq:03d}"
 
 
 def format_job_number(n: int) -> str:
-    return f"J{n:05d}"
+    yy = datetime.utcnow().strftime("%y")
+    seq = int(n)
+    if not (0 <= seq <= 999):
+        raise ValueError(f"Job sequence out of range (expected 0..999): {seq}")
+    return f"J{yy}{seq:03d}"
 
 
 def next_quote_number_string() -> str:
-    """Allocate the next quote number string (``Q`` + five digits)."""
+    """Allocate the next quote number string (``Q`` + UTC year + 3-digit sequence)."""
     return format_quote_number(get_next_sequence_number())
 
 
 def next_job_number_string() -> str:
-    """Allocate the next job number string (``J`` + five digits)."""
+    """Allocate the next job number string (``J`` + UTC year + 3-digit sequence)."""
     return format_job_number(get_next_sequence_number())

@@ -12,7 +12,7 @@ _PWA_INJECTED_KEY = "ips_pwa_support_injected"
 # Streamlit serves project files from `.streamlit/static/` at `/.streamlit/static/...`
 _MANIFEST_HREF = "/.streamlit/static/manifest.json"
 _SW_HREF = "/.streamlit/static/sw.js"
-_THEME_COLOR = "#0e1117"
+_THEME_COLOR = "#0b1f3a"
 
 
 def inject_pwa_support() -> None:
@@ -30,8 +30,10 @@ def inject_pwa_support() -> None:
     st.markdown(
         f"""
 <link rel="manifest" href="{_MANIFEST_HREF}">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="{_THEME_COLOR}">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IPS Estimating">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 """,
         unsafe_allow_html=True,
@@ -78,6 +80,10 @@ def inject_pwa_support() -> None:
 
   upsertLink('manifest', cfg.manifest, {{}});
   upsertMeta('theme-color', cfg.themeColor);
+  upsertMeta('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  upsertMeta('apple-mobile-web-app-capable', 'yes');
+  upsertMeta('apple-mobile-web-app-title', 'IPS Estimating');
+  upsertMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
   upsertLink('icon', cfg.icons.favicon32, {{'sizes':'32x32', 'type':'image/png'}});
   upsertLink('apple-touch-icon', cfg.icons.apple180, {{'sizes':'180x180'}});
 
