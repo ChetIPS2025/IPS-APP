@@ -35,9 +35,9 @@ from typing import Any
 _LOG = logging.getLogger(__name__)
 
 try:
-    from db import fetch_table
+    from db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin
 except ImportError:
-    from app.db import fetch_table  # type: ignore
+    from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin  # type: ignore
 
 # All columns this page SELECTs, INSERTs, or UPDATEs (real app usage only).
 JOBS_JOB_DATABASE_COLUMNS: tuple[str, ...] = (
@@ -98,16 +98,18 @@ def _fetch_jobs_rows(
     *,
     columns_sql: str,
     limit: int,
+    use_admin: bool,
 ) -> list[dict[str, Any]]:
     """
     Load ``jobs`` rows using only real columns — never ``description`` (use ``notes``).
 
     Sorting: ``job_name`` first, then ``status``, then unordered if the API rejects ordering.
     """
+    fn = fetch_table_admin if use_admin else fetch_table
     last_err: Exception | None = None
     for order_by in ("job_name", "status", None):
         try:
-            return fetch_table(
+            return fn(
                 "jobs",
                 columns=columns_sql,
                 limit=limit,
@@ -125,7 +127,11 @@ def _fetch_jobs_rows(
     return []
 
 
-def fetch_jobs_for_job_database(limit: int = 5000) -> tuple[list[dict[str, Any]], bool]:
+def fetch_jobs_for_job_database(
+    limit: int = 5000,
+    *,
+    admin_read: bool = False,
+) -> tuple[list[dict[str, Any]], bool]:
     """
     Load jobs for the Job Database UI.
 
@@ -134,7 +140,11 @@ def fetch_jobs_for_job_database(limit: int = 5000) -> tuple[list[dict[str, Any]]
     :data:`JOBS_JOB_DATABASE_COLUMNS_NO_JOB_NUMBER`. Does **not** select ``is_active``;
     use ``status`` in the app for job lifecycle when that column exists.
 
-    Ordering uses :func:`_fetch_jobs_rows` (``job_name``, then ``status``, then no ``order_by``).
+    ``admin_read=True`` uses the service-role client first (recommended for admin/estimator
+    when RLS would hide rows from the anon client).
+
+    If all typed column lists fail, falls back to :func:`db.fetch_jobs_with_order_fallback`
+    (``select('*')``) so the grid can still populate.
     """
     variants: list[tuple[str, ...]] = [
         JOBS_JOB_DATABASE_COLUMNS,
@@ -145,12 +155,23 @@ def fetch_jobs_for_job_database(limit: int = 5000) -> tuple[list[dict[str, Any]]
     last_err: Exception | None = None
     for cols in variants:
         try:
-            rows = _fetch_jobs_rows(columns_sql=_columns_sql(cols), limit=limit)
+            rows = _fetch_jobs_rows(
+                columns_sql=_columns_sql(cols),
+                limit=limit,
+                use_admin=admin_read,
+            )
             has_jn = "job_number" in cols
             return list(rows), has_jn
         except Exception as exc:
             last_err = exc
             _LOG.warning("jobs query failed for columns %s: %s", cols, exc)
+    try:
+        relaxed = fetch_jobs_with_order_fallback(limit=limit, use_admin=admin_read)
+        has_jn = bool(relaxed) and any("job_number" in (r or {}) for r in relaxed)
+        return list(relaxed), has_jn
+    except Exception as exc:
+        last_err = exc
+        _LOG.warning("jobs relaxed select('*') fetch failed: %s", exc)
     if last_err is not None:
         raise last_err
     return [], False

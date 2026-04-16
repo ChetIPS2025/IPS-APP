@@ -79,8 +79,8 @@ except ImportError:
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
 
 # Centered primary hero image (not full container width; ``width=`` for Streamlit 1.33+).
-_PRIMARY_IMAGE_WIDTH_DESKTOP = 380
-_PRIMARY_IMAGE_WIDTH_MOBILE = 240
+_PRIMARY_IMAGE_WIDTH_DESKTOP = 480
+_PRIMARY_IMAGE_WIDTH_MOBILE = 260
 # Gallery thumbnail / preview sizing
 _GALLERY_THUMB_WIDTH_DESKTOP = 140
 _GALLERY_THUMB_WIDTH_MOBILE = 180
@@ -98,18 +98,24 @@ _PROFILE_CARD_CSS = """
     margin: 0 0 2px 0;
 }
 .ips-v {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 600;
     color: #f8fafc;
-    margin: 0 0 10px 0;
-    line-height: 1.25;
+    margin: 0 0 6px 0;
+    line-height: 1.3;
 }
+.ips-ad-facts-panel .ips-k { margin-bottom: 1px !important; }
+.ips-ad-facts-panel .ips-v { margin-bottom: 8px !important; font-size: 14px !important; }
 .ips-hero-title {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
     color: #f8fafc;
-    margin: 0 0 16px 0;
+    margin: 0 0 10px 0;
     line-height: 1.2;
+}
+.ips-ad-hero-centerblock {
+    max-width: 560px;
+    margin: 0 auto 4px auto;
 }
 @media (max-width: 900px) {
     .ips-hero-title { font-size: 1.35rem !important; margin-bottom: 12px !important; }
@@ -235,18 +241,123 @@ _PROFILE_CARD_CSS = """
     color: #94a3b8;
     margin-bottom: 4px;
 }
+/* Equipment portal: light top bar + hero */
+.ips-ad-portal-top {
+    padding: 4px 4px 8px 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.35);
+}
+.ips-ad-portal-top .ips-ad-portal-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin: 0 0 2px 0;
+}
+.ips-ad-portal-top .ips-ad-portal-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 0;
+    line-height: 1.35;
+}
+.ips-ad-facts-panel {
+    background: rgba(15, 23, 42, 0.48);
+    border: 1px solid rgba(71, 85, 105, 0.4);
+    border-radius: 10px;
+    padding: 10px 12px 10px 12px;
+    margin-top: 0;
+}
+.ips-ad-facts-panel .ips-facts-head {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7dd3fc;
+    margin: 0 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+}
+.ips-ad-actions-hero {
+    margin: 2px 0 8px 0;
+}
+/* Single dashboard row: equal-height buttons */
+.ips-ad-dash-actions [data-testid="column"] button {
+    min-height: 2.35rem !important;
+    font-size: 0.82rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+}
+.ips-ad-doc-table {
+    border: 1px solid rgba(51, 65, 85, 0.45);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+.ips-ad-doc-table-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin: 0;
+    padding: 6px 10px 8px 10px;
+    background: rgba(15, 23, 42, 0.65);
+    border-bottom: 1px solid rgba(100, 116, 139, 0.35);
+}
+.ips-ad-doc-table-head span:nth-child(1) { flex: 1; min-width: 0; }
+.ips-ad-doc-table-head span:nth-child(2) { width: 22%; text-align: center; }
+.ips-ad-doc-table-head span:nth-child(3) { width: 18%; text-align: right; }
+.ips-ad-doc-table .ips-ad-docs-row {
+    margin-bottom: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.35);
+}
+.ips-ad-doc-table .ips-ad-docs-row:last-child {
+    border-bottom: none;
+}
+.ips-ad-docs-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.45);
+    border: 1px solid rgba(51, 65, 85, 0.42);
+}
+.ips-ad-docs-row .ips-ad-docs-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #f1f5f9;
+    word-break: break-word;
+}
+.ips-ad-docs-row .ips-ad-docs-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
+}
 </style>
 """
 
 _ASSET_DETAIL_SECTIONS_CSS = """
 <style>
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) {
-    background: rgba(15, 23, 42, 0.62) !important;
-    border-color: rgba(71, 85, 105, 0.55) !important;
+    background: rgba(15, 23, 42, 0.58) !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
     border-radius: 10px !important;
-    padding: 10px 12px 10px 12px !important;
-    margin-bottom: 8px !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 8px 10px 10px 10px !important;
+    margin-bottom: 6px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) h5 {
     color: #e2e8f0 !important;
@@ -255,12 +366,12 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) h5 
     margin-bottom: 6px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-photos) {
-    background: rgba(15, 23, 42, 0.58) !important;
-    border-color: rgba(71, 85, 105, 0.55) !important;
+    background: rgba(15, 23, 42, 0.55) !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
     border-radius: 10px !important;
-    padding: 8px 10px 10px 10px !important;
-    margin-bottom: 8px !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    padding: 6px 8px 8px 8px !important;
+    margin-bottom: 6px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-photos) h5 {
     color: #e2e8f0 !important;
@@ -269,11 +380,11 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-photos) h5 {
     margin-bottom: 4px !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-docs) {
-    background: rgba(15, 23, 42, 0.52) !important;
-    border-color: rgba(71, 85, 105, 0.48) !important;
+    background: rgba(15, 23, 42, 0.5) !important;
+    border-color: rgba(71, 85, 105, 0.45) !important;
     border-radius: 10px !important;
-    padding: 8px 10px 10px 10px !important;
-    margin-bottom: 8px !important;
+    padding: 6px 8px 8px 8px !important;
+    margin-bottom: 6px !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-docs) h5 {
@@ -382,42 +493,80 @@ def _render_asset_detail_qr_block(asset: dict, aid: str, *, compact: bool) -> No
             st.caption("2x1 sticker PDF could not be generated.")
 
 
-def _render_asset_detail_meta_and_rental(
+def _render_asset_title_quick_edit(
     asset: dict,
-    jobs: list[dict],
     aid: str,
     *,
     quick_edit: bool,
     qe_key: str,
     can_edit: bool,
     is_narrow: bool,
+    centered: bool = True,
 ) -> None:
-    """Hero title, optional quick edit, field grid (desktop) or stacked summary + expander (mobile), rental rates."""
-    st.markdown('<div class="ips-ad-meta-col ips-ad-hero-stack">', unsafe_allow_html=True)
-    title_left, title_right = st.columns([6.5, 1])
-    with title_left:
-        if quick_edit:
-            st.text_input(
-                "Asset name",
-                value=str(asset.get("asset_name") or ""),
-                key=f"ad_qe_name_{aid}",
-                label_visibility="collapsed",
-                placeholder="Asset name",
-            )
-        else:
-            st.markdown(
-                f'<p class="ips-hero-title">{html.escape(_disp(asset.get("asset_name")))}</p>',
-                unsafe_allow_html=True,
-            )
-    with title_right:
-        if can_edit:
-            if st.button(
-                "✏️",
-                key=f"ad_qe_toggle_{aid}",
-                help="Quick edit: name, category, rent to customer",
-            ):
-                st.session_state[qe_key] = not bool(st.session_state.get(qe_key, False))
-                st.rerun()
+    """Asset name under hero image + optional quick-edit fields (name, category, rental flag)."""
+    _hero_wrap = "ips-ad-meta-col ips-ad-hero-stack"
+    if centered:
+        _hero_wrap += " ips-ad-hero-centerblock"
+    st.markdown(f'<div class="{_hero_wrap}">', unsafe_allow_html=True)
+    if centered and not quick_edit:
+        st.markdown(
+            f'<p class="ips-hero-title" style="text-align:center;margin:0 0 6px 0;">'
+            f"{html.escape(_disp(asset.get('asset_name')))}</p>",
+            unsafe_allow_html=True,
+        )
+        _pe1, _pe2, _pe3 = st.columns([1, 1, 1])
+        with _pe2:
+            if can_edit:
+                if st.button(
+                    "✏️",
+                    key=f"ad_qe_toggle_{aid}",
+                    help="Quick edit: name, category, rent to customer",
+                ):
+                    st.session_state[qe_key] = not bool(st.session_state.get(qe_key, False))
+                    st.rerun()
+    elif centered and quick_edit:
+        st.text_input(
+            "Asset name",
+            value=str(asset.get("asset_name") or ""),
+            key=f"ad_qe_name_{aid}",
+            label_visibility="collapsed",
+            placeholder="Asset name",
+        )
+        _qe1, _qe2, _qe3 = st.columns([1, 1, 1])
+        with _qe2:
+            if can_edit:
+                if st.button(
+                    "✏️",
+                    key=f"ad_qe_toggle_{aid}",
+                    help="Quick edit: name, category, rent to customer",
+                ):
+                    st.session_state[qe_key] = not bool(st.session_state.get(qe_key, False))
+                    st.rerun()
+    else:
+        title_left, title_right = st.columns([6.5, 1])
+        with title_left:
+            if quick_edit:
+                st.text_input(
+                    "Asset name",
+                    value=str(asset.get("asset_name") or ""),
+                    key=f"ad_qe_name_{aid}",
+                    label_visibility="collapsed",
+                    placeholder="Asset name",
+                )
+            else:
+                st.markdown(
+                    f'<p class="ips-hero-title">{html.escape(_disp(asset.get("asset_name")))}</p>',
+                    unsafe_allow_html=True,
+                )
+        with title_right:
+            if can_edit:
+                if st.button(
+                    "✏️",
+                    key=f"ad_qe_toggle_{aid}",
+                    help="Quick edit: name, category, rent to customer",
+                ):
+                    st.session_state[qe_key] = not bool(st.session_state.get(qe_key, False))
+                    st.rerun()
 
     if quick_edit:
         if is_narrow:
@@ -466,55 +615,46 @@ def _render_asset_detail_meta_and_rental(
                 st.session_state[qe_key] = False
                 st.rerun()
         st.caption("Exit Quick Edit (✏️) to use the full **rental rates** form below.")
-
-    if is_narrow:
-        _kv("Asset ID", _disp(asset.get("asset_id")))
-        if not quick_edit and str(asset.get("category") or "").strip():
-            _kv("Category", _disp(asset.get("category")))
-        _kv("Status", _disp(asset.get("status")))
-        if not quick_edit:
-            if bool(asset.get("is_rental")):
-                st.markdown(
-                    '<span class="ips-badge-rental">Rental · rent to customer</span>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                _kv("Rent to Customer", "No")
-        _kv("Serial number", _disp(asset.get("serial_number")))
-        _kv("Model", _disp(asset.get("model")))
-        _kv("Brand", _disp(asset.get("manufacturer")))
-        with st.expander("More details", expanded=False):
-            _kv("Location", _disp(asset.get("location")))
-            _kv("Assigned job", _job_name(jobs, asset.get("assigned_job_id")))
-            _kv("Assigned employee", _disp(asset.get("assigned_employee")))
-            _kv("Condition", _disp(asset.get("condition")))
-            _kv("Mileage", _disp(asset.get("mileage")))
-            _kv("Hour meter", _disp(asset.get("hour_meter")))
-            if str(asset.get("year") or "").strip():
-                _kv("Year", _disp(asset.get("year")))
-    else:
-        c1, c2 = st.columns(2)
-        with c1:
-            _kv("Brand", _disp(asset.get("manufacturer")))
-            _kv("Serial number", _disp(asset.get("serial_number")))
-            _kv("Status", _disp(asset.get("status")))
-            _kv("Assigned employee", _disp(asset.get("assigned_employee")))
-            _kv("Condition", _disp(asset.get("condition")))
-            _kv("Mileage", _disp(asset.get("mileage")))
-        with c2:
-            _kv("Model", _disp(asset.get("model")))
-            _kv("Asset ID", _disp(asset.get("asset_id")))
-            _kv("Location", _disp(asset.get("location")))
-            _kv("Assigned job", _job_name(jobs, asset.get("assigned_job_id")))
-            _kv("Hour meter", _disp(asset.get("hour_meter")))
-            if str(asset.get("year") or "").strip():
-                _kv("Year", _disp(asset.get("year")))
-            if not quick_edit:
-                if str(asset.get("category") or "").strip():
-                    _kv("Category", _disp(asset.get("category")))
-                rent_yes = bool(asset.get("is_rental"))
-                _kv("Rent to Customer", "Yes" if rent_yes else "No")
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_asset_facts_panel(
+    asset: dict,
+    jobs: list[dict],
+    *,
+    quick_edit: bool,
+) -> None:
+    """Compact key facts (portal right column / stacked): brand, model, serial, ID, status + more + rental summary."""
+    st.markdown('<div class="ips-ad-facts-panel">', unsafe_allow_html=True)
+    st.markdown('<p class="ips-facts-head">Equipment details</p>', unsafe_allow_html=True)
+
+    # Requested order: brand, model, serial, asset/tool id, status
+    _kv("Brand / manufacturer", _disp(asset.get("manufacturer")))
+    _kv("Model", _disp(asset.get("model")))
+    _kv("Serial number", _disp(asset.get("serial_number")))
+    _kv("Asset / tool ID", _disp(asset.get("asset_id")))
+    _kv("Status", _disp(asset.get("status")))
+
+    if not quick_edit and str(asset.get("category") or "").strip():
+        _kv("Category", _disp(asset.get("category")))
+    if not quick_edit:
+        if bool(asset.get("is_rental")):
+            st.markdown(
+                '<span class="ips-badge-rental">Rental · rent to customer</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            _kv("Rent to Customer", "No")
+
+    with st.expander("More details", expanded=False):
+        _kv("Location", _disp(asset.get("location")))
+        _kv("Assigned job", _job_name(jobs, asset.get("assigned_job_id")))
+        _kv("Assigned employee", _disp(asset.get("assigned_employee")))
+        _kv("Condition", _disp(asset.get("condition")))
+        _kv("Mileage", _disp(asset.get("mileage")))
+        _kv("Hour meter", _disp(asset.get("hour_meter")))
+        if str(asset.get("year") or "").strip():
+            _kv("Year", _disp(asset.get("year")))
 
     if bool(asset.get("is_rental")):
         d = _rate_disp(asset.get("rental_daily_rate"))
@@ -538,6 +678,8 @@ def _render_asset_detail_meta_and_rental(
             + "</div>",
             unsafe_allow_html=True,
         )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 _IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".heic"})
@@ -609,20 +751,21 @@ def _render_asset_documents_list(
     show_hint: bool = True,
     mobile_layout: bool = False,
 ) -> None:
-    """One action per row: open cloud signed URL or local file URI in a new tab (same storage resolution as before)."""
-    _ = key_prefix
-    _ = mobile_layout
+    """Table-style rows: name, type, Manual/Open (signed URL or local file URI — same behavior as before)."""
     if not documents:
         st.caption("No documents uploaded yet.")
         return
     if show_hint:
-        st.caption("Signed links expire after about one hour — use the button again if needed.")
-    for doc in documents:
+        st.caption("Signed links expire after about one hour — use **Open** / **Manual** again if needed.")
+
+    for i, doc in enumerate(documents):
         fp = str(doc.get("file_path") or "").strip()
         fn = str(doc.get("file_name") or "").strip() or Path(fp).name or "document"
         ref = create_signed_url(fp, expires_in=3600) if fp else ""
         is_pdf = ".pdf" in fn.lower()
         label = "Manual" if is_pdf else "Open"
+
+        dtype = str(doc.get("document_type") or doc.get("photo_type") or "").strip() or "—"
 
         open_url: str | None = None
         if ref:
@@ -633,15 +776,53 @@ def _render_asset_documents_list(
                 if p.is_file():
                     open_url = str(p.resolve().as_uri())
 
-        _, mid, _ = st.columns([1, 10, 1])
-        with mid:
-            if open_url:
-                st.link_button(label, url=open_url, use_container_width=True)
-            elif ref:
-                st.caption("Missing file")
-            else:
-                st.caption("Unavailable")
-        st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+        if mobile_layout:
+            st.markdown(
+                f'<div class="ips-ad-docs-row">'
+                f'<div class="ips-ad-docs-name">{html.escape(fn[:120] + ("…" if len(fn) > 120 else ""))}</div>'
+                f'<div class="ips-ad-docs-meta">{html.escape(dtype[:32])}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                if open_url:
+                    st.link_button(label, url=open_url, use_container_width=True, key=f"{key_prefix}_{i}_open")
+                elif ref:
+                    st.caption("Missing file")
+                else:
+                    st.caption("Unavailable")
+        else:
+            if i == 0:
+                st.markdown(
+                    '<div class="ips-ad-doc-table">'
+                    '<div class="ips-ad-doc-table-head">'
+                    "<span>Document</span><span>Type</span><span>Action</span>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+            c1, c2, c3 = st.columns([3.4, 1.15, 1.0])
+            with c1:
+                st.markdown(
+                    f'<p style="margin:0;font-size:0.9rem;color:#f1f5f9;font-weight:500;">'
+                    f"{html.escape(fn[:140] + ('…' if len(fn) > 140 else ''))}</p>",
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(
+                    f'<p style="margin:0;text-align:center;font-size:0.8rem;color:#94a3b8;">'
+                    f"{html.escape(dtype[:36] + ('…' if len(dtype) > 36 else ''))}</p>",
+                    unsafe_allow_html=True,
+                )
+            with c3:
+                if open_url:
+                    st.link_button(label, url=open_url, use_container_width=True, key=f"{key_prefix}_{i}_open")
+                elif ref:
+                    st.caption("Missing")
+                else:
+                    st.caption("—")
+    if documents and not mobile_layout:
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _gallery_image_row_indices(rows: list[dict]) -> list[int]:
@@ -1031,7 +1212,7 @@ def render() -> None:
     flash = st.session_state.pop("asset_detail_flash", None)
     if flash:
         st.success(flash)
-    st.caption("Equipment profile — key facts, actions, and history")
+    st.caption("Equipment portal — photo, details, and history")
 
     st.markdown(_PROFILE_CARD_CSS, unsafe_allow_html=True)
     _inject_asset_detail_sections_css()
@@ -1063,18 +1244,6 @@ def render() -> None:
     qe_key = f"ad_quick_edit_{aid}"
     quick_edit = can_edit and bool(st.session_state.get(qe_key, False))
 
-    if can_edit:
-        _ed_l, _ed_r = st.columns([3, 1])
-        with _ed_l:
-            st.markdown('<span class="ips-ad-detail-top-actions"></span>', unsafe_allow_html=True)
-        with _ed_r:
-            if st.button("Edit Asset", key="edit_asset_btn", type="primary", use_container_width=True):
-                st.session_state["assets_view"] = "edit"
-                st.session_state["asset_edit_id"] = str(asset["id"])
-                st.session_state["asset_return_to"] = "asset_detail"
-                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
-                st.rerun()
-
     _sync_asset_gallery_preview_query(str(aid))
 
     jobs = fetch_table("jobs", limit=5000, order_by="job_number")
@@ -1105,34 +1274,133 @@ def render() -> None:
         signed = create_signed_url(photo_path, expires_in=3600)
 
     _hero_w = _PRIMARY_IMAGE_WIDTH_MOBILE if is_narrow else _PRIMARY_IMAGE_WIDTH_DESKTOP
+
+    # --- Portal top bar (light header + navigation) ---
+    st.markdown('<span class="ips-ad-detail-top-actions"></span>', unsafe_allow_html=True)
+    _pt1, _pt2, _pt3 = st.columns([1.05, 2.4, 1.1])
+    with _pt1:
+        if st.button("← Back", key="ad_portal_back_top"):
+            _back_to_asset_list(aid=str(aid))
+    with _pt2:
+        st.markdown(
+            '<div class="ips-ad-portal-top">'
+            '<p class="ips-ad-portal-kicker">Equipment</p>'
+            f'<p class="ips-ad-portal-title">{html.escape(_disp(asset.get("asset_name")))} · '
+            f'<span style="color:#94a3b8;font-weight:500;">{html.escape(_disp(asset.get("asset_id")))}</span></p>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with _pt3:
+        if can_edit:
+            if st.button("Edit Asset", key="edit_asset_btn", type="primary", use_container_width=True):
+                st.session_state["assets_view"] = "edit"
+                st.session_state["asset_edit_id"] = str(asset["id"])
+                st.session_state["asset_return_to"] = "asset_detail"
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
+                st.rerun()
+
+    # --- Hero: large image + title + compact facts / QR ---
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-primary"></span>', unsafe_allow_html=True)
-        st.markdown("##### Primary image")
-        if signed:
-            try:
-                _, _hero_mid, _ = st.columns([1, 2, 1])
-                with _hero_mid:
-                    st.image(signed, width=_hero_w)
-            except Exception as exc:
-                st.warning(f"Could not load primary image: {exc}")
-        else:
-            st.caption(
-                "No primary image on file. Upload photos below or choose **Set as Primary Image** on a gallery thumbnail."
+        st.markdown('<span class="ips-ad-portal-hero"></span>', unsafe_allow_html=True)
+        if is_narrow:
+            if signed:
+                try:
+                    _, _hm, _ = st.columns([1, 2, 1])
+                    with _hm:
+                        st.image(signed, width=_hero_w)
+                except Exception as exc:
+                    st.warning(f"Could not load primary image: {exc}")
+            else:
+                st.caption(
+                    "No primary image. Upload below or set **Primary Image** on a gallery photo."
+                )
+            _render_asset_title_quick_edit(
+                asset,
+                str(aid),
+                quick_edit=quick_edit,
+                qe_key=qe_key,
+                can_edit=can_edit,
+                is_narrow=True,
+                centered=True,
             )
+            _render_asset_facts_panel(asset, jobs, quick_edit=quick_edit)
+            _render_asset_detail_qr_block(asset, str(aid), compact=True)
+        else:
+            _h_left, _h_right = st.columns([1.25, 1.0], gap="medium")
+            with _h_left:
+                if signed:
+                    try:
+                        _, _hm, _ = st.columns([1, 1.15, 1])
+                        with _hm:
+                            st.image(signed, width=_hero_w)
+                    except Exception as exc:
+                        st.warning(f"Could not load primary image: {exc}")
+                else:
+                    st.caption(
+                        "No primary image. Upload below or set **Primary Image** on a gallery photo."
+                    )
+                _render_asset_title_quick_edit(
+                    asset,
+                    str(aid),
+                    quick_edit=quick_edit,
+                    qe_key=qe_key,
+                    can_edit=can_edit,
+                    is_narrow=False,
+                    centered=True,
+                )
+            with _h_right:
+                _render_asset_facts_panel(asset, jobs, quick_edit=quick_edit)
+                _render_asset_detail_qr_block(asset, str(aid), compact=False)
 
+    # --- Dashboard actions: one aligned row (equal-width buttons; mobile stacks via asset_responsive) ---
+    if can_edit:
+        st.markdown('<div class="ips-ad-actions-hero"></div>', unsafe_allow_html=True)
+        st.markdown("##### Actions")
+        st.markdown(
+            '<div class="ips-ad-actions-primary ips-ad-actions-service ips-ad-dash-actions">',
+            unsafe_allow_html=True,
+        )
+        _n_action = 7 if current_role() == "admin" else 6
+        _ac = st.columns(_n_action)
+        with _ac[0]:
+            if st.button("Check out", key=f"ad_co_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "checkout"
+        with _ac[1]:
+            if st.button("Check in", key=f"ad_ci_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "checkin"
+        with _ac[2]:
+            if st.button("Report broken", key=f"ad_rb_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "broken"
+        with _ac[3]:
+            if st.button("Add maintenance", key=f"ad_maint_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "maint"
+        with _ac[4]:
+            if st.button("Add inspection", key=f"ad_insp_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "insp"
+        with _ac[5]:
+            if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
+                st.session_state["asset_detail_action"] = "doc"
+        if _n_action == 7:
+            with _ac[6]:
+                if st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True):
+                    st.session_state["asset_detail_action"] = "delete"
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Gallery + documents ---
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-photos"></span>', unsafe_allow_html=True)
-        st.markdown("##### Photos")
-        st.caption("Visual images only — PDFs and manuals appear under **Documents** below.")
+        st.markdown("##### Photo gallery")
+        st.caption("Thumbnails — tap to enlarge. PDFs and manuals are listed under **Documents**.")
         if photo_rows:
             _render_asset_uploaded_files_gallery(str(aid), photo_rows, asset, can_edit, mobile=is_narrow)
         else:
-            st.caption("No photos in the gallery yet. Use **Upload photos** in the actions below.")
+            st.caption("No photos yet. Use **Upload photos** in **Asset updates** below.")
 
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-docs"></span>', unsafe_allow_html=True)
         st.markdown("##### Documents")
-        st.caption("Manuals, PDFs, and office files — open or download.")
+        st.caption("Manuals, PDFs, and office files.")
         _render_asset_documents_list(
             merged_documents,
             key_prefix="ad_main_doc",
@@ -1141,32 +1409,6 @@ def render() -> None:
         )
 
     st.markdown("---")
-
-    if is_narrow:
-        _render_asset_detail_meta_and_rental(
-            asset,
-            jobs,
-            str(aid),
-            quick_edit=quick_edit,
-            qe_key=qe_key,
-            can_edit=can_edit,
-            is_narrow=True,
-        )
-        _render_asset_detail_qr_block(asset, str(aid), compact=True)
-    else:
-        col1, col2 = st.columns([1.5, 2.5], gap="medium")
-        with col1:
-            _render_asset_detail_qr_block(asset, str(aid), compact=False)
-        with col2:
-            _render_asset_detail_meta_and_rental(
-                asset,
-                jobs,
-                str(aid),
-                quick_edit=quick_edit,
-                qe_key=qe_key,
-                can_edit=can_edit,
-                is_narrow=False,
-            )
 
     if not can_edit:
         st.info("You can view this profile. Admin or estimator role is required for check-out and other actions.")
@@ -1293,47 +1535,6 @@ def render() -> None:
                     st.error(str(exc))
                 except Exception as exc:
                     st.error(f"AI autofill failed: {exc}")
-
-        st.markdown("##### Primary actions")
-        st.markdown('<div class="ips-ad-actions-primary">', unsafe_allow_html=True)
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("Check out", key=f"ad_co_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "checkout"
-        with b2:
-            if st.button("Check in", key=f"ad_ci_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "checkin"
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("##### Service & documents")
-        st.markdown('<div class="ips-ad-actions-service">', unsafe_allow_html=True)
-        s1, s2, s3, s4 = st.columns(4)
-        with s1:
-            if st.button("Report broken", key=f"ad_rb_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "broken"
-        with s2:
-            if st.button("Add maintenance", key=f"ad_maint_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "maint"
-        with s3:
-            if st.button("Add inspection", key=f"ad_insp_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "insp"
-        with s4:
-            if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "doc"
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if current_role() == "admin":
-            st.markdown("##### Danger zone")
-            st.markdown('<div class="ips-ad-actions-danger">', unsafe_allow_html=True)
-            (del_col,) = st.columns(1)
-            with del_col:
-                delete_clicked = st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            delete_clicked = False
-
-        if delete_clicked:
-            st.session_state["asset_detail_action"] = "delete"
 
         act = st.session_state.get("asset_detail_action")
         if act:
@@ -1599,9 +1800,9 @@ def render() -> None:
                         st.session_state["asset_detail_flash"] = "Manual uploaded successfully."
                         st.rerun()
 
-    st.markdown("##### History & notes")
+    st.markdown("### History & records")
     tab_doc, tab_maint, tab_asg, tab_insp, tab_notes = st.tabs(
-        ["Documents", "Maintenance history", "Assignment history", "Inspections", "Notes"]
+        ["Documents", "Maintenance", "Assignments", "Inspections", "Notes"]
     )
 
     with tab_doc:

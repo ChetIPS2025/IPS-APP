@@ -251,7 +251,7 @@ def create_job_from_estimate(
 
     job_name = _derive_job_name(row, ej, customer_name).strip() or "Awarded job"
 
-    _, has_job_number_column = fetch_jobs_for_job_database(limit=1)
+    _, has_job_number_column = fetch_jobs_for_job_database(limit=1, admin_read=True)
 
     awarded = row.get("proposal_total")
     if awarded is None:

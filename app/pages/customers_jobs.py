@@ -935,6 +935,26 @@ def _render_customers_main(
         with bar_ph.container():
             _render_action_buttons(sel=sel, can_add=can_add)
 
+        if len(sel) == 1:
+            one_cid = str(sel[0]).strip()
+            name_col = resolved.get("customer_name") or "customer_name"
+            row_match = filtered.loc[filtered["id"].astype(str) == one_cid] if "id" in filtered.columns else None
+            cust_title = one_cid
+            if row_match is not None and not row_match.empty and name_col in row_match.columns:
+                cust_title = str(row_match.iloc[0].get(name_col) or "").strip() or one_cid
+            st.markdown(f"##### Contacts — **{cust_title}**")
+            admin_read = can_add
+            contacts = _fetch_contacts_for_customer_row(one_cid, admin_read=admin_read, include_inactive=False)
+            if not contacts:
+                st.caption("No active contacts for this customer.")
+            else:
+                cdf = pd.DataFrame(contacts)
+                pref = ["contact_name", "title", "role", "phone", "mobile", "email", "notes"]
+                disp = [c for c in pref if c in cdf.columns]
+                if not disp:
+                    disp = list(cdf.columns)
+                st.dataframe(cdf[disp], use_container_width=True, hide_index=True)
+
 
 def render_customers() -> None:
     render_header("Customers")

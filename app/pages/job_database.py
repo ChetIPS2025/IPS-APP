@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import html
+import logging
 from typing import Any
+
+_LOG = logging.getLogger(__name__)
 
 import pandas as pd
 import streamlit as st
@@ -12,6 +15,7 @@ from db import (
     delete_rows_admin,
     fetch_by_match,
     fetch_by_match_admin,
+    fetch_jobs_with_order_fallback,
     fetch_table,
     fetch_table_admin,
     insert_row,
@@ -55,6 +59,7 @@ except ImportError:
     )
 
 try:
+    from services.job_from_estimate import create_job_from_estimate
     from services.job_schema import (
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
@@ -66,6 +71,7 @@ try:
         sort_jobs_by_number_then_name,
     )
 except ImportError:
+    from app.services.job_from_estimate import create_job_from_estimate  # type: ignore
     from app.services.job_schema import (  # type: ignore
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
@@ -544,11 +550,40 @@ def render() -> None:
     render_header("Job Database")
 
     can_edit = current_role() in {"admin", "estimator"}
+    st.session_state.setdefault("job_db_bypass_filters", True)
 
-    customers = _fetch_customers_for_job_db()
-    estimates = _fetch_estimates_for_job_db()
-    # Real columns only (see app/services/job_schema.py); jobs has no ``description`` — use ``notes``.
-    jobs, has_job_number_column = fetch_jobs_for_job_database(limit=5000)
+    customers: list[dict[str, Any]] = []
+    estimates: list[dict[str, Any]] = []
+    try:
+        customers = list(_fetch_customers_for_job_db() or [])
+    except Exception as exc:
+        _LOG.exception("Job Database: could not load customers")
+        st.error(f"Database error (customers): {exc}")
+    try:
+        estimates = list(_fetch_estimates_for_job_db() or [])
+    except Exception as exc:
+        _LOG.exception("Job Database: could not load estimates")
+        st.error(f"Database error (estimates): {exc}")
+
+    admin_read = _job_db_admin_read()
+    jobs: list[dict[str, Any]] = []
+    has_job_number_column = False
+    try:
+        jobs, has_job_number_column = fetch_jobs_for_job_database(limit=5000, admin_read=admin_read)
+    except Exception as exc:
+        _LOG.exception("Job Database: fetch_jobs_for_job_database failed")
+        st.error(f"Database error (jobs): {exc}")
+        try:
+            jobs = list(fetch_jobs_with_order_fallback(limit=5000, use_admin=admin_read) or [])
+            has_job_number_column = bool(jobs) and any("job_number" in (r or {}) for r in jobs)
+            if jobs:
+                st.info("Loaded jobs using a relaxed query (typed column list failed).")
+        except Exception as exc2:
+            _LOG.exception("Job Database: fetch_jobs_with_order_fallback failed")
+            st.error(f"Database error (jobs fallback): {exc2}")
+            jobs = []
+            has_job_number_column = False
+
     if has_job_number_column:
         jobs = sort_jobs_by_number_then_name(jobs)
     else:
@@ -577,7 +612,7 @@ def render() -> None:
 
     contact_label_by_id: dict[str, str] = {}
     try:
-        if _job_db_admin_read():
+        if admin_read:
             ct_rows = fetch_table_admin("customer_contacts", limit=10000, order_by=None)
         else:
             ct_rows = fetch_table("customer_contacts", limit=10000, order_by=None)
@@ -587,6 +622,78 @@ def render() -> None:
                 contact_label_by_id[rid] = contact_option_label(cr)
     except Exception:
         pass
+
+    qa1, qa2, qa3 = st.columns(3)
+    with qa1:
+        if st.button(
+            "Add job",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_edit,
+            key="job_qa_add",
+        ):
+            st.session_state["job_mode"] = "add"
+            st.session_state.pop("job_edit_id", None)
+            st.rerun()
+    with qa2:
+        if st.button("Refresh jobs", use_container_width=True, key="job_qa_refresh"):
+            st.rerun()
+    with qa3:
+        st.markdown(
+            '<p style="font-size:1.05rem;margin:0.35rem 0 0 0;">View jobs: use the list below.</p>',
+            unsafe_allow_html=True,
+        )
+
+    with st.expander("Database debug & checklist", expanded=False):
+        st.write("DEBUG - Job Count:", len(jobs))
+        preview = jobs[:12] if jobs else []
+        st.write("DEBUG - Jobs Raw (first rows):", preview)
+        st.checkbox(
+            "Bypass customer / status / source filters (search still applies)",
+            key="job_db_bypass_filters",
+        )
+        try:
+            from app.config import settings
+
+            url = (getattr(settings, "supabase_url", "") or "").strip()
+            pk = (
+                (getattr(settings, "supabase_publishable_key", "") or "").strip()
+                or (getattr(settings, "supabase_anon_key", "") or "").strip()
+            )
+            st.caption(
+                f"Supabase URL set: {bool(url)} · Public key set: {bool(pk)} · "
+                f"Admin/service reads for this page: {admin_read} · Table: public.jobs"
+            )
+        except Exception:
+            st.caption("Could not read local settings for debug summary.")
+
+        st.caption(
+            "If the count is zero but Supabase shows rows: check RLS policies for `authenticated`, "
+            "or ensure `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` is set for admin/estimator reads."
+        )
+
+    if can_edit:
+        with st.expander("Convert estimate → job", expanded=False):
+            ecandidates = [e for e in estimates if e.get("id") is not None and not str(e.get("job_id") or "").strip()]
+            if not ecandidates:
+                st.caption("No estimates without a linked job.")
+            else:
+                labels = [estimate_label_map.get(str(e.get("id")), str(e.get("id"))) for e in ecandidates]
+                idx_opts = list(range(len(ecandidates)))
+                pick = st.selectbox(
+                    "Estimate",
+                    idx_opts,
+                    format_func=lambda i: labels[int(i)],
+                    key="job_conv_est",
+                )
+                if st.button("Create job from estimate", type="primary", use_container_width=True, key="job_conv_go"):
+                    eid = str(ecandidates[int(pick)].get("id") or "")
+                    res = create_job_from_estimate(eid)
+                    if res.ok:
+                        st.success(res.message)
+                        st.rerun()
+                    else:
+                        st.error(res.message)
 
     st.subheader("Jobs Overview")
     st.caption(
@@ -606,233 +713,239 @@ def render() -> None:
 
     with main_col:
         if jobs_df.empty:
-            st.info("No jobs found.")
-            if can_edit:
+            st.warning("No jobs found in database.")
+            if can_edit and not panel_open:
                 with st.container(border=True):
                     st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
                     if st.button("Create New Job", key="job_add_btn_empty", type="primary", use_container_width=True):
                         st.session_state["job_mode"] = "add"
                         st.session_state.pop("job_edit_id", None)
                         st.rerun()
-            return
+                return
+            if not panel_open:
+                return
 
-        inject_table_action_styles()
-        if "customer_id" in jobs_df.columns:
-
-            def _cust_name_cell(v) -> str:
-                if v is None:
-                    return ""
-                try:
-                    if pd.isna(v):
-                        return ""
-                except Exception:
-                    pass
-                return customer_name_by_id.get(str(v).strip(), "")
-
-            jobs_df["customer_name"] = jobs_df["customer_id"].map(_cust_name_cell)
+        if jobs_df.empty:
+            st.caption("Add a job from **Add job** above, or convert an estimate.")
         else:
-            jobs_df["customer_name"] = ""
-        if "estimate_id" in jobs_df.columns:
-
-            def _est_label_cell(v) -> str:
-                if v is None:
-                    return ""
-                try:
-                    if pd.isna(v):
+            inject_table_action_styles()
+            if "customer_id" in jobs_df.columns:
+    
+                def _cust_name_cell(v) -> str:
+                    if v is None:
                         return ""
-                except Exception:
-                    pass
-                return estimate_label_map.get(str(v).strip(), "")
-
-            jobs_df["estimate_label"] = jobs_df["estimate_id"].map(_est_label_cell)
-
-            def _quote_for_estimate_cell(v) -> str:
-                if v is None or str(v).strip() == "":
-                    return ""
-                return estimate_quote_by_id.get(str(v), "")
-
-            jobs_df["Quote (estimate)"] = jobs_df["estimate_id"].map(_quote_for_estimate_cell)
-
-            def _source_cell(v) -> str:
-                if v is None:
-                    return "—"
-                try:
-                    if pd.isna(v):
+                    try:
+                        if pd.isna(v):
+                            return ""
+                    except Exception:
+                        pass
+                    return customer_name_by_id.get(str(v).strip(), "")
+    
+                jobs_df["customer_name"] = jobs_df["customer_id"].map(_cust_name_cell)
+            else:
+                jobs_df["customer_name"] = ""
+            if "estimate_id" in jobs_df.columns:
+    
+                def _est_label_cell(v) -> str:
+                    if v is None:
+                        return ""
+                    try:
+                        if pd.isna(v):
+                            return ""
+                    except Exception:
+                        pass
+                    return estimate_label_map.get(str(v).strip(), "")
+    
+                jobs_df["estimate_label"] = jobs_df["estimate_id"].map(_est_label_cell)
+    
+                def _quote_for_estimate_cell(v) -> str:
+                    if v is None or str(v).strip() == "":
+                        return ""
+                    return estimate_quote_by_id.get(str(v), "")
+    
+                jobs_df["Quote (estimate)"] = jobs_df["estimate_id"].map(_quote_for_estimate_cell)
+    
+                def _source_cell(v) -> str:
+                    if v is None:
                         return "—"
-                except Exception:
-                    pass
-                return "Estimate" if str(v).strip() else "—"
-
-            jobs_df["Source"] = jobs_df["estimate_id"].map(_source_cell)
-        else:
-            jobs_df["estimate_label"] = ""
-            jobs_df["Quote (estimate)"] = ""
-            jobs_df["Source"] = "—"
-
-        if "customer_contact_id" in jobs_df.columns:
-
-            def _contact_cell(v) -> str:
-                if v is None:
-                    return ""
-                try:
-                    if pd.isna(v):
+                    try:
+                        if pd.isna(v):
+                            return "—"
+                    except Exception:
+                        pass
+                    return "Estimate" if str(v).strip() else "—"
+    
+                jobs_df["Source"] = jobs_df["estimate_id"].map(_source_cell)
+            else:
+                jobs_df["estimate_label"] = ""
+                jobs_df["Quote (estimate)"] = ""
+                jobs_df["Source"] = "—"
+    
+            if "customer_contact_id" in jobs_df.columns:
+    
+                def _contact_cell(v) -> str:
+                    if v is None:
                         return ""
-                except Exception:
-                    pass
-                return contact_label_by_id.get(str(v).strip(), "")
-
-            jobs_df["Contact"] = jobs_df["customer_contact_id"].map(_contact_cell)
-        else:
-            jobs_df["Contact"] = ""
-
-        sel_ids = get_selected_ids(TABLE_KEY_JOBS)
-        n_sel = len(sel_ids)
-        one = n_sel == 1
-        none = n_sel == 0
-
-        # Top action bar (button-driven workflow)
-        with st.container(border=True):
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            left, b1, b2, b3 = st.columns([1.25, 1, 1, 1], gap="small")
-            with left:
-                st.markdown(
-                    f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
-                    unsafe_allow_html=True,
-                )
-            with b1:
-                if st.button(
-                    "Create New Job",
-                    key="job_add_btn",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=not can_edit,
-                ):
-                    st.session_state["job_mode"] = "add"
-                    st.session_state.pop("job_edit_id", None)
-                    st.rerun()
-            with b2:
-                if st.button(
-                    "Edit",
-                    key="job_edit_btn",
-                    type="secondary",
-                    use_container_width=True,
-                    disabled=(not can_edit or not one),
-                ):
-                    st.session_state["job_mode"] = "edit"
-                    st.session_state["job_edit_id"] = str(sel_ids[0])
-                    st.rerun()
-            with b3:
-                if st.button(
-                    "Delete",
-                    key="job_delete_btn",
-                    type="secondary",
-                    use_container_width=True,
-                    disabled=(not can_edit or none),
-                ):
-                    pending = st.session_state.get(IPS_PENDING_DELETE)
-                    if not isinstance(pending, dict):
-                        pending = {}
-                        st.session_state[IPS_PENDING_DELETE] = pending
-                    pending[TABLE_KEY_JOBS] = list(sel_ids)
-                    st.rerun()
-
-        pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-        if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):
-            pend_ids = [str(x) for x in pend.get(TABLE_KEY_JOBS) or [] if str(x).strip()]
-            if pend_ids:
-                st.warning(f"Delete **{len(pend_ids)}** job(s)? This cannot be undone.")
-                dc1, dc2 = st.columns(2)
-                with dc1:
-                    if st.button("Confirm delete", type="primary", key="job_db_confirm_delete"):
-                        for jid in pend_ids:
-                            try:
-                                delete_rows_admin("jobs", {"id": jid})
-                            except Exception as exc:
-                                st.error(f"Could not delete job {jid}: {exc}")
-                        pend.pop(TABLE_KEY_JOBS, None)
-                        clear_selected_ids(TABLE_KEY_JOBS)
-                        _clear_job_mode()
-                        st.success("Delete completed where permitted.")
+                    try:
+                        if pd.isna(v):
+                            return ""
+                    except Exception:
+                        pass
+                    return contact_label_by_id.get(str(v).strip(), "")
+    
+                jobs_df["Contact"] = jobs_df["customer_contact_id"].map(_contact_cell)
+            else:
+                jobs_df["Contact"] = ""
+    
+            sel_ids = get_selected_ids(TABLE_KEY_JOBS)
+            n_sel = len(sel_ids)
+            one = n_sel == 1
+            none = n_sel == 0
+    
+            # Top action bar (button-driven workflow)
+            with st.container(border=True):
+                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+                left, b1, b2, b3 = st.columns([1.25, 1, 1, 1], gap="small")
+                with left:
+                    st.markdown(
+                        f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
+                        unsafe_allow_html=True,
+                    )
+                with b1:
+                    if st.button(
+                        "Create New Job",
+                        key="job_add_btn",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not can_edit,
+                    ):
+                        st.session_state["job_mode"] = "add"
+                        st.session_state.pop("job_edit_id", None)
                         st.rerun()
-                with dc2:
-                    if st.button("Cancel", key="job_db_cancel_delete"):
-                        pend.pop(TABLE_KEY_JOBS, None)
+                with b2:
+                    if st.button(
+                        "Edit",
+                        key="job_edit_btn",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=(not can_edit or not one),
+                    ):
+                        st.session_state["job_mode"] = "edit"
+                        st.session_state["job_edit_id"] = str(sel_ids[0])
                         st.rerun()
-
-        f1, f2, f3, f4 = st.columns([1, 1, 2, 1])
-
-        customer_names = sorted(
-            [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
-        )
-        selected_customer = f1.selectbox(
-            "Filter Customer",
-            ["All"] + customer_names,
-            disabled="customer_id" not in jobs_df.columns,
-        )
-
-        selected_status = f2.selectbox(
-            "Filter Status",
-            ["All"] + JOB_STATUSES,
-            disabled="status" not in jobs_df.columns,
-        )
-
-        _search_hint = "Search across visible fields"
-        if has_job_number_column:
-            _search_hint = "Source, quote, contact, job_number, job_name, customer, status, …"
-        else:
-            _search_hint = "Source, quote, contact, job_name, customer, status, …"
-
-        search = f3.text_input(
-            "Search Jobs",
-            placeholder=_search_hint,
-        )
-
-        selected_source = f4.selectbox(
-            "Source",
-            ["All", "Estimate", "Other"],
-            disabled="Source" not in jobs_df.columns,
-            help="Estimate = created or linked to an estimate (estimate_id set).",
-        )
-
-        filtered = jobs_df.copy()
-
-        if selected_customer != "All" and "customer_name" in filtered.columns:
-            filtered = filtered[filtered["customer_name"].astype(str) == selected_customer]
-
-        if selected_status != "All" and "status" in filtered.columns:
-            filtered = filtered[filtered["status"].astype(str) == selected_status]
-
-        if selected_source == "Estimate" and "Source" in filtered.columns:
-            filtered = filtered[filtered["Source"].astype(str) == "Estimate"]
-        elif selected_source == "Other" and "Source" in filtered.columns:
-            filtered = filtered[filtered["Source"].astype(str) != "Estimate"]
-
-        if search.strip():
-            s = search.strip().lower()
-            mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            filtered = filtered[mask.any(axis=1)]
-
-        show_cols: list[str] = []
-        if has_job_number_column and "job_number" in filtered.columns:
-            show_cols.append("job_number")
-        for c in ("Source", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
-            if c in filtered.columns and c not in show_cols:
-                show_cols.append(c)
-        show_cols.extend(
-            [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
-        )
-
-        if "id" not in filtered.columns:
-            st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
-        else:
-            st.caption("Checkbox column on the **left**. Select rows, then use the **buttons above**.")
-            render_selectable_dataframe(
-                filtered,
-                table_key=TABLE_KEY_JOBS,
-                id_column="id",
-                columns=show_cols,
-                editor_key="job_db_sel_editor",
+                with b3:
+                    if st.button(
+                        "Delete",
+                        key="job_delete_btn",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=(not can_edit or none),
+                    ):
+                        pending = st.session_state.get(IPS_PENDING_DELETE)
+                        if not isinstance(pending, dict):
+                            pending = {}
+                            st.session_state[IPS_PENDING_DELETE] = pending
+                        pending[TABLE_KEY_JOBS] = list(sel_ids)
+                        st.rerun()
+    
+            pend = st.session_state.get(IPS_PENDING_DELETE) or {}
+            if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):
+                pend_ids = [str(x) for x in pend.get(TABLE_KEY_JOBS) or [] if str(x).strip()]
+                if pend_ids:
+                    st.warning(f"Delete **{len(pend_ids)}** job(s)? This cannot be undone.")
+                    dc1, dc2 = st.columns(2)
+                    with dc1:
+                        if st.button("Confirm delete", type="primary", key="job_db_confirm_delete"):
+                            for jid in pend_ids:
+                                try:
+                                    delete_rows_admin("jobs", {"id": jid})
+                                except Exception as exc:
+                                    st.error(f"Could not delete job {jid}: {exc}")
+                            pend.pop(TABLE_KEY_JOBS, None)
+                            clear_selected_ids(TABLE_KEY_JOBS)
+                            _clear_job_mode()
+                            st.success("Delete completed where permitted.")
+                            st.rerun()
+                    with dc2:
+                        if st.button("Cancel", key="job_db_cancel_delete"):
+                            pend.pop(TABLE_KEY_JOBS, None)
+                            st.rerun()
+    
+            f1, f2, f3, f4 = st.columns([1, 1, 2, 1])
+    
+            customer_names = sorted(
+                [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
             )
+            selected_customer = f1.selectbox(
+                "Filter Customer",
+                ["All"] + customer_names,
+                disabled="customer_id" not in jobs_df.columns,
+            )
+    
+            selected_status = f2.selectbox(
+                "Filter Status",
+                ["All"] + JOB_STATUSES,
+                disabled="status" not in jobs_df.columns,
+            )
+    
+            _search_hint = "Search across visible fields"
+            if has_job_number_column:
+                _search_hint = "Source, quote, contact, job_number, job_name, customer, status, …"
+            else:
+                _search_hint = "Source, quote, contact, job_name, customer, status, …"
+    
+            search = f3.text_input(
+                "Search Jobs",
+                placeholder=_search_hint,
+            )
+    
+            selected_source = f4.selectbox(
+                "Source",
+                ["All", "Estimate", "Other"],
+                disabled="Source" not in jobs_df.columns,
+                help="Estimate = created or linked to an estimate (estimate_id set).",
+            )
+    
+            filtered = jobs_df.copy()
+            bypass = st.session_state.get("job_db_bypass_filters", True)
+            if not bypass:
+                if selected_customer != "All" and "customer_name" in filtered.columns:
+                    filtered = filtered[filtered["customer_name"].astype(str) == selected_customer]
+
+                if selected_status != "All" and "status" in filtered.columns:
+                    filtered = filtered[filtered["status"].astype(str) == selected_status]
+
+                if selected_source == "Estimate" and "Source" in filtered.columns:
+                    filtered = filtered[filtered["Source"].astype(str) == "Estimate"]
+                elif selected_source == "Other" and "Source" in filtered.columns:
+                    filtered = filtered[filtered["Source"].astype(str) != "Estimate"]
+
+            if search.strip():
+                s = search.strip().lower()
+                mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
+                filtered = filtered[mask.any(axis=1)]
+    
+            show_cols: list[str] = []
+            if has_job_number_column and "job_number" in filtered.columns:
+                show_cols.append("job_number")
+            for c in ("Source", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
+                if c in filtered.columns and c not in show_cols:
+                    show_cols.append(c)
+            show_cols.extend(
+                [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
+            )
+    
+            if "id" not in filtered.columns:
+                st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
+            else:
+                st.caption("Checkbox column on the **left**. Select rows, then use the **buttons above**.")
+                render_selectable_dataframe(
+                    filtered,
+                    table_key=TABLE_KEY_JOBS,
+                    id_column="id",
+                    columns=show_cols,
+                    editor_key="job_db_sel_editor",
+                )
 
     if panel_open and side_col is not None:
         with side_col:

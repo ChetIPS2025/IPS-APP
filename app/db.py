@@ -188,6 +188,43 @@ def fetch_table_with_order_fallback(
         return fetch_table(table_name, columns=columns, limit=limit, order_by=None)
 
 
+def fetch_rows_unfiltered(
+    table_name: str,
+    *,
+    limit: int = 5000,
+    order_by: str | None = None,
+    use_admin: bool = False,
+) -> list[dict[str, Any]]:
+    """
+    ``select('*')`` with optional ``order_by`` — same normalization as :func:`fetch_table`
+    (e.g. jobs column mapping). Use ``use_admin=True`` for service-role reads when RLS hides rows.
+    """
+    fn = fetch_table_admin if use_admin else fetch_table
+    return fn(table_name, columns="*", limit=limit, order_by=order_by)
+
+
+def fetch_jobs_with_order_fallback(
+    *,
+    limit: int = 5000,
+    use_admin: bool = False,
+) -> list[dict[str, Any]]:
+    """
+    Load ``public.jobs`` with ``select('*')``, trying common ``order_by`` columns until one works.
+
+    Use when typed column lists fail (schema drift) or to diagnose empty Job Database grids.
+    """
+    last_err: BaseException | None = None
+    for ob in ("created_at", "updated_at", "job_number", "job_name", "status", None):
+        try:
+            return fetch_rows_unfiltered("jobs", limit=limit, order_by=ob, use_admin=use_admin)
+        except Exception as exc:
+            last_err = exc
+            _LOG.debug("fetch_jobs_with_order_fallback order_by=%r failed: %s", ob, exc)
+    if last_err is not None:
+        _LOG.warning("fetch_jobs_with_order_fallback: all order attempts failed: %s", last_err)
+    return []
+
+
 def fetch_by_match(
     table_name: str,
     match: dict[str, Any],
