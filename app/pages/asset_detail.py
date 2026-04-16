@@ -572,19 +572,6 @@ def _merge_asset_document_rows(asset_documents: list[dict], from_asset_photos: l
     return out
 
 
-def _document_row_icon(file_name: str) -> str:
-    ext = Path(file_name).suffix.lower()
-    if ext == ".pdf":
-        return "📄"
-    if ext in (".doc", ".docx"):
-        return "📝"
-    if ext in (".xls", ".xlsx"):
-        return "📊"
-    if ext in (".ppt", ".pptx"):
-        return "📽️"
-    return "📎"
-
-
 def _render_asset_documents_list(
     documents: list,
     *,
@@ -592,105 +579,39 @@ def _render_asset_documents_list(
     show_hint: bool = True,
     mobile_layout: bool = False,
 ) -> None:
-    """Open / download linked files; cloud uses signed HTTPS URLs, local uses download_button."""
+    """One action per row: open cloud signed URL or local file URI in a new tab (same storage resolution as before)."""
+    _ = key_prefix
+    _ = mobile_layout
     if not documents:
         st.caption("No documents uploaded yet.")
         return
     if show_hint:
-        st.caption("Signed links expire after about one hour — use **Open** again if needed.")
-    for i, doc in enumerate(documents):
-        did = str(doc.get("id") or i)
+        st.caption("Signed links expire after about one hour — use the button again if needed.")
+    for doc in documents:
         fp = str(doc.get("file_path") or "").strip()
         fn = str(doc.get("file_name") or "").strip() or Path(fp).name or "document"
-        dt = str(doc.get("document_type") or "").strip()
-        created = str(doc.get("created_at") or "")[:19]
-        ctype = str(doc.get("content_type") or "").strip()
-        src = str(doc.get("_doc_source") or "")
-        src_note = ""
-        if src == "asset_photos":
-            src_note = "Equipment files"
-        elif src == "asset_documents":
-            src_note = "Registered document"
         ref = create_signed_url(fp, expires_in=3600) if fp else ""
         is_pdf = ".pdf" in fn.lower()
-        is_manual = is_pdf or ("manual" in dt.lower())
-        open_label = "Manual" if is_manual else "Open"
-        meta_bits = [x for x in (dt, created) if x]
-        if src_note:
-            meta_bits.append(src_note)
-        meta = " · ".join(meta_bits) if meta_bits else "—"
-        cap = meta + (f" · {ctype}" if ctype else "")
+        label = "Manual" if is_pdf else "Open"
 
-        if mobile_layout:
-            st.markdown('<div class="ips-ad-doc-mobile-card">', unsafe_allow_html=True)
-            st.markdown(
-                f'<p class="ips-ad-doc-mobile-icon">{_document_row_icon(fn)}</p>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(f"**{html.escape(fn)}**")
-            st.caption(cap)
-            if not ref:
-                st.caption("Unavailable")
+        open_url: str | None = None
+        if ref:
+            if ref.startswith("http://") or ref.startswith("https://"):
+                open_url = ref
             else:
-                is_http = ref.startswith("http://") or ref.startswith("https://")
-                if is_http:
-                    st.link_button(
-                        open_label,
-                        url=ref,
-                        use_container_width=True,
-                    )
-                else:
-                    p = Path(ref)
-                    if p.is_file():
-                        mime = ctype or "application/octet-stream"
-                        st.download_button(
-                            "Download document",
-                            data=p.read_bytes(),
-                            file_name=fn,
-                            mime=mime,
-                            key=f"{key_prefix}_dl_{did}",
-                            use_container_width=True,
-                        )
-                    else:
-                        st.caption("Missing file")
-            st.markdown("</div>", unsafe_allow_html=True)
-            continue
+                p = Path(ref)
+                if p.is_file():
+                    open_url = str(p.resolve().as_uri())
 
-        c_icon, c_main, c_act = st.columns([0.55, 3.4, 1.35], gap="small")
-        with c_icon:
-            st.markdown(
-                f'<p style="font-size:1.5rem;margin:0;line-height:1.2;">{_document_row_icon(fn)}</p>',
-                unsafe_allow_html=True,
-            )
-        with c_main:
-            st.markdown(f"**{html.escape(fn)}**")
-            st.caption(cap)
-        with c_act:
-            if not ref:
-                st.caption("Unavailable")
+        _, mid, _ = st.columns([1, 10, 1])
+        with mid:
+            if open_url:
+                st.link_button(label, url=open_url, use_container_width=True)
+            elif ref:
+                st.caption("Missing file")
             else:
-                is_http = ref.startswith("http://") or ref.startswith("https://")
-                if is_http:
-                    st.link_button(
-                        open_label,
-                        url=ref,
-                        use_container_width=True,
-                    )
-                else:
-                    p = Path(ref)
-                    if p.is_file():
-                        mime = ctype or "application/octet-stream"
-                        st.download_button(
-                            "Download",
-                            data=p.read_bytes(),
-                            file_name=fn,
-                            mime=mime,
-                            key=f"{key_prefix}_dl_{did}",
-                            use_container_width=True,
-                        )
-                    else:
-                        st.caption("Missing file")
-        st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
+                st.caption("Unavailable")
+        st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 
 
 def _gallery_image_row_indices(rows: list[dict]) -> list[int]:

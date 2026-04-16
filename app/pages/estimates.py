@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 import streamlit as st
 
 from branding import render_header
 from auth import current_role
-from db import delete_rows_admin, fetch_one, fetch_table
+from db import (
+    delete_rows_admin,
+    fetch_by_match_admin,
+    fetch_one,
+    fetch_table,
+    fetch_table_admin,
+)
 
 try:
     from table_actions import (
@@ -39,6 +47,44 @@ from pages.estimate_editor import (
     parse_estimate_json_bytes,
     render_estimate_editor,
 )
+
+
+def _estimates_page_admin_read() -> bool:
+    """Internal roles use service-role reads so admin-written rows stay visible under RLS."""
+    return current_role() in {"admin", "estimator"}
+
+
+def _fetch_one_estimate_row(estimate_id: str) -> dict[str, Any] | None:
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return None
+    if _estimates_page_admin_read():
+        rows = fetch_by_match_admin("estimates", {"id": eid}, limit=1)
+        return rows[0] if rows else None
+    return fetch_one("estimates", {"id": eid})
+
+
+def _fetch_estimates_list_rows() -> list[dict[str, Any]]:
+    if _estimates_page_admin_read():
+        return fetch_table_admin("estimates", limit=1000, order_by="updated_at")
+    return fetch_table("estimates", limit=1000, order_by="updated_at")
+
+
+def _fetch_jobs_for_estimate_links() -> list[dict[str, Any]]:
+    if _estimates_page_admin_read():
+        return fetch_table_admin(
+            "jobs",
+            columns="id,job_number,estimate_id",
+            limit=5000,
+            order_by="job_number",
+        )
+    return fetch_table(
+        "jobs",
+        columns="id,job_number,estimate_id",
+        limit=5000,
+        order_by="job_number",
+    )
+
 
 _EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
     # New form-based Materials/Labor widgets (avoid stale inputs across estimates)
@@ -84,7 +130,7 @@ def _reset_estimate_editor_transients(*, clear_import_hints: bool = True) -> Non
 
 def _load_estimate_into_session(selected_id: str) -> None:
     _reset_estimate_editor_transients(clear_import_hints=True)
-    row = fetch_one("estimates", {"id": selected_id})
+    row = _fetch_one_estimate_row(selected_id)
     if not row:
         return
     loaded = row.get("estimate_json") or {}
@@ -118,10 +164,10 @@ def _load_estimate_into_session(selected_id: str) -> None:
 
 def _render_estimate_list() -> None:
     can_edit = current_role() in {"admin", "estimator"}
-    rows = fetch_table("estimates", limit=1000, order_by="updated_at")
+    rows = _fetch_estimates_list_rows()
     df = pd.DataFrame(rows)
 
-    job_rows = fetch_table("jobs", columns="id,job_number,estimate_id", limit=5000, order_by="job_number")
+    job_rows = _fetch_jobs_for_estimate_links()
     job_by_id = {str(r["id"]): r for r in job_rows if r.get("id")}
     job_by_estimate_id = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
 
@@ -272,7 +318,7 @@ def _render_estimate_list() -> None:
                             st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
                             st.session_state["job_mode"] = "edit"
                             st.session_state["job_edit_id"] = jid
-                            st.rerun()
+                        st.rerun()
                     elif res.message:
                         if res.error_code == "duplicate":
                             st.warning(res.message)

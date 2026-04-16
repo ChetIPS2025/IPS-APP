@@ -10,24 +10,24 @@ from auth import current_role
 from branding import render_header
 from db import (
     delete_rows_admin,
+    fetch_by_match,
+    fetch_by_match_admin,
     fetch_one,
+    fetch_table_admin,
     fetch_table_with_order_fallback,
     insert_row_admin,
-    update_rows,
     update_rows_admin,
 )
 
 try:
     from services.customer_contacts import (
         delete_contact,
-        fetch_contacts_for_customer,
         insert_contact_row,
         set_primary_contact,
     )
 except ImportError:
     from app.services.customer_contacts import (  # type: ignore
         delete_contact,
-        fetch_contacts_for_customer,
         insert_contact_row,
         set_primary_contact,
     )
@@ -102,6 +102,125 @@ _LOGICAL_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
 _MAX_CUSTOMER_NAME_LEN = 500
 # Reasonable upper bound for single-line address fragments (DB is typically text).
 _MAX_ADDRESS_FIELD_LEN = 2000
+
+
+def _fetch_customers_list_rows(*, admin_read: bool) -> list[dict[str, Any]]:
+    """Admin/estimator uses service-role reads so rows written with admin policies stay visible (RLS)."""
+    if admin_read:
+        try:
+            return fetch_table_admin("customers", limit=5000, order_by="customer_name")
+        except Exception:
+            return fetch_table_admin("customers", limit=5000, order_by=None)
+    return fetch_table_with_order_fallback("customers", limit=5000, order_by="customer_name")
+
+
+def _fetch_one_row(
+    table_name: str,
+    match: dict[str, Any],
+    *,
+    admin_read: bool,
+) -> dict[str, Any] | None:
+    if admin_read:
+        rows = fetch_by_match_admin(table_name, match, limit=1)
+        return rows[0] if rows else None
+    return fetch_one(table_name, match)
+
+
+def _fetch_contacts_for_customer_row(
+    customer_id: str,
+    *,
+    admin_read: bool,
+    include_inactive: bool = False,
+) -> list[dict[str, Any]]:
+    """Same ordering as ``fetch_contacts_for_customer`` but optional admin read for internal roles."""
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    try:
+        if admin_read:
+            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
+        else:
+            rows = fetch_by_match("customer_contacts", {"customer_id": cid}, limit=500)
+    except Exception:
+        return []
+    rows = list(rows or [])
+    if not include_inactive:
+        rows = [r for r in rows if bool(r.get("is_active", True))]
+
+    def _sort_key(r: dict) -> tuple:
+        prim = 0 if r.get("is_primary") else 1
+        name = str(r.get("contact_name") or "").strip().lower()
+        return (prim, name)
+
+    rows.sort(key=_sort_key)
+    return rows
+
+
+def _contact_row_union_keys(contacts: list[dict]) -> set[str]:
+    u: set[str] = set()
+    for c in contacts:
+        if isinstance(c, dict):
+            u |= {str(k) for k in c.keys()}
+    return u
+
+
+def _contact_title_display(ct: dict) -> str:
+    return str(ct.get("title") or ct.get("role") or "").strip()
+
+
+def _contact_schema_keys(contacts: list[dict], edit_row: dict | None) -> set[str]:
+    keys = _contact_row_union_keys(contacts)
+    if isinstance(edit_row, dict):
+        keys |= {str(k) for k in edit_row.keys()}
+    return keys
+
+
+def _build_contact_write_pair(
+    *,
+    contact_name: str,
+    title_text: str,
+    email: str,
+    phone: str,
+    mobile: str,
+    notes: str,
+    is_active: bool,
+    is_primary: bool,
+    customer_id: str | None,
+    schema_keys: set[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    tt = str(title_text or "").strip()
+    mob = str(mobile or "").strip()
+    minimal: dict[str, Any] = {
+        "contact_name": str(contact_name or "").strip(),
+        "role": tt,
+        "email": str(email or "").strip(),
+        "phone": str(phone or "").strip(),
+        "notes": str(notes or "").strip(),
+        "is_active": bool(is_active),
+        "is_primary": bool(is_primary),
+    }
+    if customer_id is not None:
+        minimal["customer_id"] = str(customer_id).strip()
+    full = dict(minimal)
+    if "title" in schema_keys:
+        full["title"] = tt
+    if "mobile" in schema_keys:
+        full["mobile"] = mob
+    return full, minimal
+
+
+def _insert_contact_pair(full: dict[str, Any], minimal: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return insert_contact_row(full)
+    except Exception:
+        return insert_contact_row(minimal)
+
+
+def _update_contact_pair(contact_id: str, full: dict[str, Any], minimal: dict[str, Any]) -> None:
+    try:
+        update_rows_admin("customer_contacts", full, {"id": contact_id})
+    except Exception:
+        update_rows_admin("customer_contacts", minimal, {"id": contact_id})
 
 
 def _default_available_columns() -> set[str]:
@@ -366,18 +485,36 @@ def _render_add_form(
             st.rerun()
 
 
-def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
+def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
     cid = str(customer_row.get("id") or "")
     if not cid:
         return
 
     st.markdown("##### Contacts")
-    st.caption("People at this company — separate from billing address above.")
+    st.caption(
+        "Multiple contacts per company — stored in **customer_contacts** (separate from the company row)."
+    )
 
     mode = st.session_state.get("customer_contact_mode")
-    edit_ct = st.session_state.get("customer_contact_edit_id")
+    edit_ct_raw = st.session_state.get("customer_contact_edit_id")
+    edit_ct = str(edit_ct_raw or "").strip() or None
 
-    contacts = fetch_contacts_for_customer(cid)
+    edit_row: dict[str, Any] | None = None
+    if mode == "edit" and edit_ct:
+        edit_row = _fetch_one_row("customer_contacts", {"id": edit_ct}, admin_read=admin_read)
+        if not edit_row or str(edit_row.get("customer_id") or "") != cid:
+            _clear_contact_subpanel()
+            st.warning("That contact is not on this company.")
+            st.rerun()
+            return
+
+    key_show_inact = f"cust_ct_show_inactive_{cid}"
+    st.session_state.setdefault(key_show_inact, False)
+    st.checkbox("Show inactive contacts", key=key_show_inact)
+
+    load_inactive = bool(st.session_state.get(key_show_inact, False) or (mode == "edit" and bool(edit_ct)))
+    contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
+    schema_keys = _contact_schema_keys(contacts, edit_row)
 
     if can_edit:
         if st.button("Add Contact", type="primary", use_container_width=True, key=f"cust_ct_add_{cid}"):
@@ -386,23 +523,26 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
             st.rerun()
 
     if not contacts and mode != "add":
-        st.caption("No contacts yet. Use **Add Contact**.")
+        st.caption("No contacts yet. Use **Add Contact** (editors) or add from the list once this company is saved.")
     else:
         for ct in contacts:
             ctid = str(ct.get("id") or "")
             nm = str(ct.get("contact_name") or "").strip() or "—"
-            role = str(ct.get("role") or "").strip()
+            title = _contact_title_display(ct)
             em = str(ct.get("email") or "").strip()
             ph = str(ct.get("phone") or "").strip()
+            mob = str(ct.get("mobile") or "").strip()
             prim = bool(ct.get("is_primary"))
             active = bool(ct.get("is_active", True))
             line = f"**{html.escape(nm)}**"
-            if role:
-                line += f" · {html.escape(role)}"
+            if title:
+                line += f" · *{html.escape(title)}*"
             if em:
                 line += f" · {html.escape(em)}"
             if ph:
                 line += f" · {html.escape(ph)}"
+            if mob:
+                line += f" · M {html.escape(mob)}"
             badges = []
             if prim:
                 badges.append("Primary")
@@ -412,19 +552,42 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
             with st.container(border=True):
                 st.markdown(line + (f" · *{badge_s}*" if badge_s else ""), unsafe_allow_html=True)
                 if can_edit and ctid:
-                    r1, r2, r3, r4 = st.columns([1, 1, 1, 1])
-                    with r1:
+                    a1, a2, a3, a4, a5 = st.columns(5)
+                    with a1:
                         if st.button("Edit", key=f"cust_ct_edbtn_{ctid}", use_container_width=True):
                             st.session_state["customer_contact_mode"] = "edit"
                             st.session_state["customer_contact_edit_id"] = ctid
                             st.rerun()
-                    with r2:
-                        if not prim:
-                            if st.button("Set Primary", key=f"cust_ct_pri_{ctid}", use_container_width=True):
+                    with a2:
+                        if active and not prim:
+                            if st.button("Primary", key=f"cust_ct_pri_{ctid}", use_container_width=True):
                                 set_primary_contact(customer_id=cid, contact_id=ctid)
                                 st.success("Primary contact updated.")
                                 st.rerun()
-                    with r3:
+                    with a3:
+                        if active and st.button("Deactivate", key=f"cust_ct_deact_{ctid}", use_container_width=True):
+                            try:
+                                update_rows_admin("customer_contacts", {"is_active": False}, {"id": ctid})
+                            except Exception as exc:
+                                st.error(f"Could not deactivate: {exc}")
+                                st.stop()
+                            if prim:
+                                try:
+                                    update_rows_admin("customer_contacts", {"is_primary": False}, {"id": ctid})
+                                except Exception:
+                                    pass
+                            st.success("Contact deactivated.")
+                            st.rerun()
+                    with a4:
+                        if not active and st.button("Reactivate", key=f"cust_ct_react_{ctid}", use_container_width=True):
+                            try:
+                                update_rows_admin("customer_contacts", {"is_active": True}, {"id": ctid})
+                            except Exception as exc:
+                                st.error(f"Could not reactivate: {exc}")
+                                st.stop()
+                            st.success("Contact reactivated.")
+                            st.rerun()
+                    with a5:
                         if st.button("Delete", key=f"cust_ct_del_{ctid}", use_container_width=True):
                             open_destructive_confirmation(_CONTACT_DELETE_PREFIX)
                             st.session_state["customer_contact_pending_delete_ids"] = [ctid]
@@ -436,39 +599,50 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
     if mode == "add":
         st.markdown("**New contact**")
         pk = f"cust_ct_new_{cid}"
-        cn = st.text_input("Contact Name", key=f"{pk}_name")
-        rl = st.text_input("Role", key=f"{pk}_role")
+        cn = st.text_input("Contact name", key=f"{pk}_name")
+        tl = st.text_input("Title", key=f"{pk}_title", help="Job title or role (saved to title + role when supported)")
         em = st.text_input("Email", key=f"{pk}_email")
-        ph = st.text_input("Phone", key=f"{pk}_phone")
+        cph1, cph2 = st.columns(2)
+        with cph1:
+            ph = st.text_input("Phone", key=f"{pk}_phone")
+        with cph2:
+            mob = st.text_input("Mobile", key=f"{pk}_mobile")
         nt = st.text_area("Notes", key=f"{pk}_notes", height=56)
         pr = st.checkbox("Primary contact", value=False, key=f"{pk}_prim")
         act = st.checkbox("Active", value=True, key=f"{pk}_act")
         s1, s2 = st.columns(2)
         with s1:
-            if st.button("Save Contact", type="primary", use_container_width=True, key=f"{pk}_save"):
+            if st.button("Save contact", type="primary", use_container_width=True, key=f"{pk}_save"):
                 t = str(cn or "").strip()
                 if not t:
-                    st.error("Contact Name is required.")
+                    st.error("Contact name is required.")
                     st.stop()
-                payload = {
-                    "customer_id": cid,
-                    "contact_name": t,
-                    "role": str(rl or "").strip(),
-                    "email": str(em or "").strip(),
-                    "phone": str(ph or "").strip(),
-                    "notes": str(nt or "").strip(),
-                    "is_primary": False,
-                    "is_active": bool(act),
-                }
+                pr_b = bool(pr)
+                act_b = bool(act)
+                if pr_b and not act_b:
+                    st.warning("Inactive contacts cannot be primary — saving without primary flag.")
+                    pr_b = False
+                full, minimal = _build_contact_write_pair(
+                    contact_name=t,
+                    title_text=str(tl or ""),
+                    email=str(em or ""),
+                    phone=str(ph or ""),
+                    mobile=str(mob or ""),
+                    notes=str(nt or ""),
+                    is_active=act_b,
+                    is_primary=False,
+                    customer_id=cid,
+                    schema_keys=schema_keys,
+                )
                 try:
-                    inserted = insert_contact_row(payload)
+                    inserted = _insert_contact_pair(full, minimal)
                 except Exception as exc:
                     st.error("Could not save the contact.")
                     with st.expander("Technical details"):
                         st.code(repr(exc), language="text")
                     st.stop()
                 new_id = str((inserted or {}).get("id") or "")
-                if pr and new_id:
+                if pr_b and new_id:
                     set_primary_contact(customer_id=cid, contact_id=new_id)
                 _clear_contact_subpanel()
                 st.success("Contact added.")
@@ -478,45 +652,58 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool) -> None:
                 _clear_contact_subpanel()
                 st.rerun()
 
-    elif mode == "edit" and edit_ct:
-        er = fetch_one("customer_contacts", {"id": edit_ct})
-        if not er or str(er.get("customer_id")) != cid:
-            _clear_contact_subpanel()
-            st.rerun()
-            return
+    elif mode == "edit" and edit_ct and edit_row:
         st.markdown("**Edit contact**")
         pk = f"cust_ct_ed_{edit_ct}"
-        cn = st.text_input("Contact Name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
-        rl = st.text_input("Role", value=str(er.get("role") or ""), key=f"{pk}_role")
+        er = edit_row
+        cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
+        tl = st.text_input(
+            "Title",
+            value=_contact_title_display(er),
+            key=f"{pk}_title",
+            help="Job title or role",
+        )
         em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
-        ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
+        cph1, cph2 = st.columns(2)
+        with cph1:
+            ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
+        with cph2:
+            mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
         nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
         pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
         act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
         s1, s2 = st.columns(2)
         with s1:
-            if st.button("Update Contact", type="primary", use_container_width=True, key=f"{pk}_save"):
+            if st.button("Update contact", type="primary", use_container_width=True, key=f"{pk}_save"):
                 t = str(cn or "").strip()
                 if not t:
-                    st.error("Contact Name is required.")
+                    st.error("Contact name is required.")
                     st.stop()
-                payload = {
-                    "contact_name": t,
-                    "role": str(rl or "").strip(),
-                    "email": str(em or "").strip(),
-                    "phone": str(ph or "").strip(),
-                    "notes": str(nt or "").strip(),
-                    "is_primary": bool(pr),
-                    "is_active": bool(act),
-                }
+                pr_b = bool(pr)
+                act_b = bool(act)
+                if pr_b and not act_b:
+                    st.warning("Inactive contacts cannot be primary — clearing primary flag.")
+                    pr_b = False
+                full, minimal = _build_contact_write_pair(
+                    contact_name=t,
+                    title_text=str(tl or ""),
+                    email=str(em or ""),
+                    phone=str(ph or ""),
+                    mobile=str(mob or ""),
+                    notes=str(nt or ""),
+                    is_active=act_b,
+                    is_primary=pr_b,
+                    customer_id=None,
+                    schema_keys=schema_keys,
+                )
                 try:
-                    update_rows("customer_contacts", payload, {"id": er["id"]})
+                    _update_contact_pair(str(er["id"]), full, minimal)
                 except Exception as exc:
                     st.error("Could not update the contact.")
                     with st.expander("Technical details"):
                         st.code(repr(exc), language="text")
                     st.stop()
-                if pr:
+                if pr_b:
                     set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
                 _clear_contact_subpanel()
                 st.success("Contact updated.")
@@ -533,6 +720,7 @@ def _render_edit_form(
     can_edit: bool,
     resolved: dict[str, str],
     available: set[str],
+    admin_read: bool,
 ) -> None:
     cid = str(row.get("id") or "")
     st.caption(f"ID `{cid[:8]}…`")
@@ -625,7 +813,7 @@ def _render_edit_form(
             st.rerun()
 
     st.markdown("---")
-    _render_contacts_section(customer_row=row, can_edit=can_edit)
+    _render_contacts_section(customer_row=row, can_edit=can_edit, admin_read=admin_read)
 
 
 def _render_customer_side_panel(
@@ -634,6 +822,7 @@ def _render_customer_side_panel(
     existing_customer_names: set[str],
     resolved: dict[str, str],
     available: set[str],
+    admin_read: bool,
 ) -> None:
     inject_ips_crud_list_styles()
     with st.container(border=True):
@@ -648,13 +837,19 @@ def _render_customer_side_panel(
         elif mode == "edit":
             st.markdown("### Customer detail")
             eid = st.session_state.get("customer_edit_id")
-            er = fetch_one("customers", {"id": eid}) if eid else None
+            er = _fetch_one_row("customers", {"id": eid}, admin_read=admin_read) if eid else None
             if not er:
                 st.warning("Customer not found.")
                 _clear_customer_mode()
             else:
                 can_edit = current_role() in {"admin", "estimator"}
-                _render_edit_form(er, can_edit=can_edit, resolved=resolved, available=available)
+                _render_edit_form(
+                    er,
+                    can_edit=can_edit,
+                    resolved=resolved,
+                    available=available,
+                    admin_read=admin_read,
+                )
 
 
 def _visible_customer_columns(filtered: pd.DataFrame, resolved: dict[str, str]) -> list[str]:
@@ -750,7 +945,7 @@ def render_customers() -> None:
 
     load_error: BaseException | None = None
     try:
-        rows = fetch_table_with_order_fallback("customers", limit=5000, order_by="customer_name")
+        rows = _fetch_customers_list_rows(admin_read=can_add)
     except Exception as exc:
         load_error = exc
         rows = []
@@ -902,6 +1097,7 @@ def render_customers() -> None:
                 existing_customer_names=existing_names,
                 resolved=resolved,
                 available=available,
+                admin_read=can_add,
             )
     else:
         _render_customers_main(df=df, can_add=can_add, resolved=resolved)

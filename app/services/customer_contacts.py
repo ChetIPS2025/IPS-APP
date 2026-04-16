@@ -126,26 +126,27 @@ def contact_none_option_label() -> str:
 
 
 def contact_option_label(c: dict) -> str:
-    """Dropdown label: ``Name — Role`` (primary contacts sort first via :func:`fetch_contacts_for_customer`)."""
+    """Dropdown label: ``Name — Title/role`` (primary contacts sort first via :func:`fetch_contacts_for_customer`)."""
     name = str(c.get("contact_name") or "").strip() or "—"
-    role = str(c.get("role") or "").strip()
-    if role:
-        return f"{name} — {role}"
+    title = str(c.get("title") or c.get("role") or "").strip()
+    if title:
+        return f"{name} — {title}"
     return name
 
 
 def render_contact_detail_preview(picked: dict | None) -> None:
-    """Role + email / phone preview under the contact field."""
+    """Title/role + email / phone / mobile preview under the contact field."""
     if not picked:
         return
     inject_contact_picker_styles()
     nm = str(picked.get("contact_name") or "").strip() or "—"
-    role = str(picked.get("role") or "").strip()
+    title = str(picked.get("title") or picked.get("role") or "").strip()
     em = str(picked.get("email") or "").strip()
     ph = str(picked.get("phone") or "").strip()
-    if not role and not em and not ph:
+    mob = str(picked.get("mobile") or "").strip()
+    if not title and not em and not ph and not mob:
         return
-    role_html = f'<p class="ips-cp-role">{html.escape(role)}</p>' if role else ""
+    role_html = f'<p class="ips-cp-role">{html.escape(title)}</p>' if title else ""
     lines = []
     if em:
         lines.append(
@@ -154,6 +155,10 @@ def render_contact_detail_preview(picked: dict | None) -> None:
     if ph:
         lines.append(
             f'<p class="ips-cp-line"><span class="ips-cp-label">Phone</span>{html.escape(ph)}</p>'
+        )
+    if mob:
+        lines.append(
+            f'<p class="ips-cp-line"><span class="ips-cp-label">Mobile</span>{html.escape(mob)}</p>'
         )
     st.markdown(
         f'<div class="ips-contact-preview">'
@@ -184,26 +189,35 @@ def render_contact_quick_add_when_empty(
         )
         st.caption("No contacts yet — add someone for this customer.")
         n1 = st.text_input("Name", key=f"{key_prefix}_qc_name_{suf}")
-        n2 = st.text_input("Role", key=f"{key_prefix}_qc_role_{suf}")
+        n2 = st.text_input("Title", key=f"{key_prefix}_qc_title_{suf}", help="Job title or role")
         n3 = st.text_input("Email", key=f"{key_prefix}_qc_email_{suf}")
         n4 = st.text_input("Phone", key=f"{key_prefix}_qc_phone_{suf}")
+        n5 = st.text_input("Mobile", key=f"{key_prefix}_qc_mobile_{suf}")
         prim = st.checkbox("Set as primary contact", value=True, key=f"{key_prefix}_qc_prim_{suf}")
         if st.button("Save contact", type="primary", use_container_width=True, key=f"{key_prefix}_qc_save_{suf}"):
             t = str(n1 or "").strip()
             if not t:
                 st.error("Name is required.")
                 st.stop()
+            tt = str(n2 or "").strip()
             payload = {
                 "customer_id": str(customer_id).strip(),
                 "contact_name": t,
-                "role": str(n2 or "").strip(),
+                "role": tt,
+                "title": tt,
                 "email": str(n3 or "").strip(),
                 "phone": str(n4 or "").strip(),
+                "mobile": str(n5 or "").strip(),
                 "notes": "",
                 "is_primary": False,
                 "is_active": True,
             }
-            inserted = insert_contact_row(payload)
+            try:
+                inserted = insert_contact_row(payload)
+            except Exception:
+                payload.pop("title", None)
+                payload.pop("mobile", None)
+                inserted = insert_contact_row(payload)
             new_id = str((inserted or {}).get("id") or "")
             if prim and new_id:
                 set_primary_contact(customer_id=str(customer_id).strip(), contact_id=new_id)
@@ -224,17 +238,17 @@ def clear_primary_for_customer_except(*, customer_id: str, keep_contact_id: str)
             continue
         if r.get("is_primary"):
             try:
-                update_rows("customer_contacts", {"is_primary": False}, {"id": rid})
-            except Exception:
                 update_rows_admin("customer_contacts", {"is_primary": False}, {"id": rid})
+            except Exception:
+                update_rows("customer_contacts", {"is_primary": False}, {"id": rid})
 
 
 def set_primary_contact(*, customer_id: str, contact_id: str) -> None:
     clear_primary_for_customer_except(customer_id=customer_id, keep_contact_id=contact_id)
     try:
-        update_rows("customer_contacts", {"is_primary": True}, {"id": contact_id})
-    except Exception:
         update_rows_admin("customer_contacts", {"is_primary": True}, {"id": contact_id})
+    except Exception:
+        update_rows("customer_contacts", {"is_primary": True}, {"id": contact_id})
 
 
 def insert_contact_row(payload: dict[str, Any]) -> dict[str, Any]:
