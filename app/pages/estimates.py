@@ -20,18 +20,20 @@ try:
         IPS_PENDING_DELETE,
         TABLE_KEY_ESTIMATES,
         clear_selected_ids,
+        get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
         render_table_action_bar,
+        set_selected_ids,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
         IPS_PENDING_DELETE,
         TABLE_KEY_ESTIMATES,
         clear_selected_ids,
+        get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
         render_table_action_bar,
+        set_selected_ids,
     )
 
 try:
@@ -118,6 +120,27 @@ def _fetch_jobs_for_estimate_links() -> list[dict[str, Any]]:
         limit=5000,
         order_by="job_number",
     )
+
+
+def _cleanup_est_list_row_pick_keys() -> None:
+    """Clear per-row list checkbox keys after Select All / Clear so widgets resync to stored IDs."""
+    for k in list(st.session_state.keys()):
+        if str(k).startswith("est_list_pick_"):
+            st.session_state.pop(k, None)
+
+
+def _estimate_list_cell_text(val: Any) -> str:
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    s = str(val).strip()
+    if len(s) > 72:
+        return f"{s[:69]}…"
+    return s
 
 
 _EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
@@ -266,6 +289,20 @@ def _render_estimate_list() -> None:
         s = str(v).strip().lower()
         return s in ("true", "1", "yes", "t")
 
+    def _row_estimate_id(est_row: pd.Series) -> str:
+        """Primary key for API calls — always the estimate ``id`` column, never quote text."""
+        if "id" not in est_row.index:
+            return ""
+        raw = est_row["id"]
+        if raw is None:
+            return ""
+        try:
+            if pd.isna(raw):
+                return ""
+        except Exception:
+            pass
+        return str(raw).strip()
+
     if not df.empty:
         keep = [
             c
@@ -315,28 +352,6 @@ def _render_estimate_list() -> None:
         st.dataframe(df, use_container_width=True, hide_index=True)
         return
 
-    st.caption(
-        "Checkbox column on the **left**. Select rows, then use the **action bar** directly under the grid."
-    )
-    _, sel = render_selectable_dataframe(
-        df,
-        table_key=TABLE_KEY_ESTIMATES,
-        id_column="id",
-        columns=show_cols,
-        editor_key="est_list_sel_editor",
-    )
-    actions = render_table_action_bar(
-        TABLE_KEY_ESTIMATES,
-        sel,
-        can_view=True,
-        can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df,
-        visible_df=df,
-        id_column="id",
-        export_filename="estimates_export.csv",
-    )
-
     try:
         from services.job_from_estimate import (
             create_job_from_estimate,
@@ -347,6 +362,11 @@ def _render_estimate_list() -> None:
             create_job_from_estimate,
             estimate_status_allows_job_creation,
         )
+
+    try:
+        from ui import IPS_NAV_PENDING_KEY
+    except ImportError:
+        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
 
     def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
         """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
@@ -364,44 +384,45 @@ def _render_estimate_list() -> None:
             )
         return ""
 
-    try:
-        from ui import IPS_NAV_PENDING_KEY
-    except ImportError:
-        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-
-    st.markdown("##### Job Received")
     st.caption(
-        "One click per row when the estimate is ready (customer set, status allowed). "
-        "Shows **Job Created** when a job is already linked. "
-        "The estimate row is updated with **job_id** and **job_received** in the database."
+        "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "
+        "Use the **action bar** below for view, edit, delete, and export."
     )
-    jr_nav, jr_cap = st.columns([1, 3])
-    with jr_nav:
+    nav1, nav2 = st.columns([1.15, 3])
+    with nav1:
         st.checkbox(
             "Open new job in Job Database",
             value=True,
             key="est_job_recv_open_job_db",
-            help="After success, go to Job Database with that job open for editing.",
+            help="After Job Received success, go to Job Database with that job open.",
         )
-    with jr_cap:
-        st.caption("Uncheck to stay on this list (filters and search are unchanged).")
+    with nav2:
+        st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
 
+    col_weights = [1.15, 0.48] + [1.0] * len(show_cols)
+    head = st.columns(col_weights)
+    with head[0]:
+        st.caption("Job")
+    with head[1]:
+        st.caption(" ")
+    for hi, col_name in enumerate(show_cols):
+        with head[2 + hi]:
+            lab = str(col_name).replace("_", " ")
+            st.caption(lab[:22] + ("…" if len(lab) > 22 else ""))
+
+    picked: list[str] = []
     for _, est_row in df.iterrows():
-        eid = str(est_row.get("id") or "").strip()
+        eid = _row_estimate_id(est_row)
         if not eid:
             continue
         linked_id = _linked_job_id_for_row(est_row)
         cust_id = eid_to_customer.get(eid, "")
-        qn = str(est_row.get("quote_number") or "").strip() or "(no quote #)"
-        stc = str(est_row.get("status") or "").strip()
-        r1, r2 = st.columns([4, 1])
-        with r1:
-            st.caption(f"**{qn}** · {stc}")
-        with r2:
+        rc = st.columns(col_weights)
+        with rc[0]:
             if linked_id:
                 st.button(
                     "Job Created",
-                    key=f"est_job_created_{eid}",
+                    key=f"job_created_{eid}",
                     disabled=True,
                     use_container_width=True,
                     help="A job is already linked to this estimate.",
@@ -411,7 +432,7 @@ def _render_estimate_list() -> None:
                 ready = not reason
                 clicked = st.button(
                     "Job Received",
-                    key=f"est_job_received_{eid}",
+                    key=f"job_received_{eid}",
                     disabled=not ready,
                     use_container_width=True,
                     help=(
@@ -421,7 +442,7 @@ def _render_estimate_list() -> None:
                     ),
                 )
                 if clicked and ready:
-                    res = create_job_from_estimate(eid, mark_job_received=True)
+                    res = create_job_from_estimate(str(eid), mark_job_received=True)
                     if res.ok and res.job:
                         jid = str(res.job.get("id") or "")
                         if jid and st.session_state.get("est_job_recv_open_job_db", True):
@@ -437,6 +458,32 @@ def _render_estimate_list() -> None:
                             st.info(res.message)
                         else:
                             st.error(res.message)
+        with rc[1]:
+            ck = f"est_list_pick_{eid}"
+            if ck not in st.session_state:
+                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
+            checked = st.checkbox("", key=ck, label_visibility="collapsed")
+            if checked:
+                picked.append(eid)
+        for ci, col in enumerate(show_cols):
+            with rc[2 + ci]:
+                st.text(_estimate_list_cell_text(est_row.get(col)))
+
+    set_selected_ids(TABLE_KEY_ESTIMATES, picked)
+    sel = picked
+
+    actions = render_table_action_bar(
+        TABLE_KEY_ESTIMATES,
+        sel,
+        can_view=True,
+        can_edit=can_edit,
+        can_delete=can_edit,
+        export_df=df,
+        visible_df=df,
+        id_column="id",
+        export_filename="estimates_export.csv",
+        on_bulk_selection_change=_cleanup_est_list_row_pick_keys,
+    )
 
     if can_edit and sel and len(sel) == 1:
         row_one = df[df["id"].astype(str) == str(sel[0])]
@@ -502,6 +549,7 @@ def _render_estimate_list() -> None:
                 st.error(f"Could not delete {eid}: {exc}")
         pend.pop(TABLE_KEY_ESTIMATES, None)
         clear_selected_ids(TABLE_KEY_ESTIMATES)
+        _cleanup_est_list_row_pick_keys()
         st.success("Delete completed where permitted.")
         st.rerun()
 

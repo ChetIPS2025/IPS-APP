@@ -22,6 +22,8 @@ accurate selection count for the current run.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pandas as pd
 import streamlit as st
 
@@ -39,6 +41,7 @@ TABLE_KEY_EQUIPMENT = "equipment"
 TABLE_KEY_JOBS = "jobs"
 TABLE_KEY_ESTIMATES = "estimates"
 TABLE_KEY_CUSTOMERS = "customers"
+TABLE_KEY_USERS = "users"
 TABLE_KEY_MATERIALS = "materials"
 TABLE_KEY_LABOR = "labor"
 TABLE_KEY_PO_EXPENSES = "po_expenses"
@@ -306,6 +309,7 @@ def render_table_action_bar(
     edit_label: str = "Edit",
     delete_label: str = "Delete",
     delete_selected_label: str = "Delete Selected",
+    on_bulk_selection_change: Callable[[], None] | None = None,
 ) -> dict:
     """
     IPS action bar: summary on the **left**, actions on the **right**.
@@ -313,6 +317,9 @@ def render_table_action_bar(
     - 0 selected: show ``0 selected``; primary actions disabled (export / clear as before).
     - 1 selected: **View** | **Edit** | **Delete** | **Export Selected** | …
     - 2+ selected: **Delete Selected** | **Export Selected** | … (View/Edit not shown).
+
+    ``on_bulk_selection_change`` runs after **Select All Visible** or **Clear selection** updates
+    stored IDs (e.g. to reset per-row checkbox widget keys that mirror selection).
 
     Returns flags: ``view``, ``edit``, ``confirm_delete``, ``cancel_delete``.
     """
@@ -398,17 +405,23 @@ def render_table_action_bar(
                             key=f"ips_sel_all_{table_key}",
                         ):
                             set_selected_ids(table_key, list(vis_ids or []))
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
                     with b4:
                         if st.button("Clear selection", use_container_width=True, key=f"ips_ta_clr_{table_key}"):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
                 else:
                     with b3:
                         if st.button("Clear selection", use_container_width=True, key=f"ips_ta_clr_{table_key}"):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
             else:
                 b1, b2, b3, b4, b5, b6 = st.columns([1, 1, 1, 1, 1, 1])
@@ -452,6 +465,8 @@ def render_table_action_bar(
                             key=f"ips_sel_all_{table_key}",
                         ):
                             set_selected_ids(table_key, list(vis_ids or []))
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
                     with b6:
                         clr_dis = n < 1
@@ -463,6 +478,8 @@ def render_table_action_bar(
                         ):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
                 else:
                     with b5:
@@ -475,6 +492,8 @@ def render_table_action_bar(
                         ):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
+                            if on_bulk_selection_change:
+                                on_bulk_selection_change()
                             st.rerun()
 
     pend_ids = pending.get(table_key)

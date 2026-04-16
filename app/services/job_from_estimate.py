@@ -13,9 +13,9 @@ from datetime import datetime
 from typing import Any, FrozenSet
 
 try:
-    from db import fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin
+    from db import fetch_by_match, fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin
 except ImportError:
-    from app.db import fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin  # type: ignore
+    from app.db import fetch_by_match, fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin  # type: ignore
 
 try:
     from services.job_schema import fetch_jobs_for_job_database
@@ -65,6 +65,38 @@ def _jobs_has_customer_contact_column() -> bool:
         return True
     except Exception:
         return False
+
+
+def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
+    """
+    Load the estimate row by primary key ``id``.
+
+    Admin/estimator use service-role reads first (same as the Estimates list); falls back to the
+    user client so the row is found whenever it appears in the grid.
+    """
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return None
+    try:
+        from auth import current_role
+
+        admin_read = current_role() in {"admin", "estimator"}
+    except Exception:
+        admin_read = False
+    if admin_read:
+        try:
+            rows = fetch_by_match_admin("estimates", {"id": eid}, limit=1)
+            if rows:
+                return rows[0]
+        except Exception:
+            pass
+    try:
+        rows = fetch_by_match("estimates", {"id": eid}, limit=1)
+        if rows:
+            return rows[0]
+    except Exception:
+        pass
+    return fetch_one("estimates", {"id": eid})
 
 
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
@@ -161,7 +193,7 @@ def create_job_from_estimate(
     if not eid:
         return CreateJobFromEstimateResult(ok=False, message="Invalid estimate id.", error_code="invalid_id")
 
-    row = fetch_one("estimates", {"id": eid})
+    row = _fetch_estimate_row_for_create(eid)
     if not row:
         return CreateJobFromEstimateResult(ok=False, message="Estimate not found.", error_code="not_found")
 
@@ -204,7 +236,17 @@ def create_job_from_estimate(
             error_code="no_customer",
         )
 
-    cust_row = fetch_one("customers", {"id": customer_id}, columns="customer_name")
+    cust_row = None
+    try:
+        from auth import current_role as _cust_role
+
+        if _cust_role() in {"admin", "estimator"}:
+            crows = fetch_by_match_admin("customers", {"id": customer_id}, columns="customer_name", limit=1)
+            cust_row = crows[0] if crows else None
+    except Exception:
+        pass
+    if not cust_row:
+        cust_row = fetch_one("customers", {"id": customer_id}, columns="customer_name")
     customer_name = str((cust_row or {}).get("customer_name") or "").strip()
 
     job_name = _derive_job_name(row, ej, customer_name).strip() or "Awarded job"
