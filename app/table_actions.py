@@ -46,6 +46,7 @@ TABLE_KEY_MATERIALS = "materials"
 TABLE_KEY_LABOR = "labor"
 TABLE_KEY_PO_EXPENSES = "po_expenses"
 TABLE_KEY_EMPLOYEES = "employees"
+TABLE_KEY_PEOPLE = "people"
 # Time Tracking flat table -> ``selected_time_entries_ids``; Weekly Timesheet saved headers -> ``selected_timesheets_ids``
 TABLE_KEY_TIME_ENTRIES = "time_entries"
 TABLE_KEY_TIMESHEETS = "timesheets"

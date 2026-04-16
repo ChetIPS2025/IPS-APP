@@ -154,7 +154,11 @@ def _render_users_toolbar(*, sel: list[str]) -> None:
                 st.rerun()
 
 
-def _render_add_user_panel(*, existing_emails: set[str]) -> None:
+def _render_add_user_panel(
+    *,
+    existing_emails: set[str],
+    clear_selection_table_key: str | None = None,
+) -> None:
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
@@ -217,7 +221,7 @@ def _render_add_user_panel(*, existing_emails: set[str]) -> None:
                     "They can sign in immediately with the temporary password (if your Auth policy allows it)."
                 )
                 _clear_add_panel()
-                clear_selected_ids(TABLE_KEY_USERS)
+                clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
                 st.rerun()
         with s2:
             if st.button("Cancel", use_container_width=True, key="users_add_cancel"):
@@ -225,7 +229,11 @@ def _render_add_user_panel(*, existing_emails: set[str]) -> None:
                 st.rerun()
 
 
-def _render_edit_user_panel(*, profile_row: dict[str, Any]) -> None:
+def _render_edit_user_panel(
+    *,
+    profile_row: dict[str, Any],
+    clear_selection_table_key: str | None = None,
+) -> None:
     """Side-panel editor: email (read-only), full_name, role, is_active, single Update User action."""
     inject_ips_crud_list_styles()
     uid = str(profile_row.get("id") or "")
@@ -288,11 +296,11 @@ def _render_edit_user_panel(*, profile_row: dict[str, Any]) -> None:
                 st.stop()
 
             st.success("User updated.")
-            clear_selected_ids(TABLE_KEY_USERS)
+            clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
             st.rerun()
 
         if st.button("Clear selection", use_container_width=True, key=f"{pk}_clear_sel"):
-            clear_selected_ids(TABLE_KEY_USERS)
+            clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
             st.rerun()
 
 
@@ -400,9 +408,8 @@ def _render_users_main(*, df: pd.DataFrame) -> list[str]:
     return sel
 
 
-def render() -> None:
-    render_header("Users")
-
+def render_body(*, compact: bool = False) -> None:
+    """Profiles / auth UI without page header (used by ``People`` combined page)."""
     if current_role() != "admin":
         st.error("Admin only")
         return
@@ -416,9 +423,10 @@ def render() -> None:
         return
 
     df = pd.DataFrame(users)
-    render_crud_list_subtitle(
-        "Manage user accounts, roles, and status. Selecting one row opens the editor on the right."
-    )
+    if not compact:
+        render_crud_list_subtitle(
+            "Manage user accounts, roles, and status. Selecting one row opens the editor on the right."
+        )
 
     add_mode = st.session_state.get(_USERS_PANEL_MODE) == "add"
 
@@ -438,3 +446,8 @@ def render() -> None:
         sel = _render_users_main(df=df)
     with side_col:
         _render_users_side_panel(add_mode=add_mode, users=users, sel=sel)
+
+
+def render() -> None:
+    render_header("Users")
+    render_body(compact=False)

@@ -40,18 +40,16 @@ _NAV_PRIMARY: tuple[str, ...] = (
 
 # Secondary: tools & operations (shown below divider + TOOLS label).
 _NAV_SECONDARY: tuple[str, ...] = (
-    "Employees",
+    "People",
     "Employee Toolbox",
     "Time Tracking",
     "PM Matrix Time Entry",
     "Weekly Timesheet",
     "PO / Expenses",
-    "Admin",
-    "Users",
 )
 
 _SECONDARY_ADMIN_ONLY: frozenset[str] = frozenset(
-    {"Materials", "Labor", "Equipment", "Employees", "Admin", "Users"}
+    {"Materials", "Labor", "Equipment", "People"}
 )
 
 # All keys that may appear in the sidebar or session for routing validation.
@@ -81,6 +79,16 @@ def apply_pending_navigation() -> None:
     """Apply a deferred sidebar selection change before the sidebar nav is rendered."""
     pending = st.session_state.pop(IPS_NAV_PENDING_KEY, None)
     if not pending:
+        return
+    if pending == "Users":
+        st.session_state[IPS_NAV_PAGE_KEY] = "People"
+        st.session_state["people_section_radio"] = "User accounts"
+        st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+        return
+    if pending == "Employees":
+        st.session_state[IPS_NAV_PAGE_KEY] = "People"
+        st.session_state["people_section_radio"] = "Employees"
+        st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
         return
     if pending == "Asset Detail":
         st.session_state[IPS_ACTIVE_PAGE_KEY] = "Asset Detail"
@@ -241,16 +249,27 @@ def _migrate_legacy_nav_session_keys() -> None:
 
 def _ensure_valid_nav_page() -> None:
     _migrate_legacy_nav_session_keys()
+    cur0 = st.session_state.get(IPS_NAV_PAGE_KEY)
+    if cur0 == "Users":
+        st.session_state[IPS_NAV_PAGE_KEY] = "People"
+        st.session_state["people_section_radio"] = "User accounts"
+    elif cur0 == "Employees":
+        st.session_state[IPS_NAV_PAGE_KEY] = "People"
+        st.session_state["people_section_radio"] = "Employees"
+
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
     visible_resources = set(_NAV_RESOURCES) if role in _NAV_RESOURCES_ROLES else set()
     visible: set[str] = set(_NAV_PRIMARY) | set(_NAV_JOBS) | set(_NAV_ASSETS) | visible_resources | visible_secondary
 
     cur = st.session_state.get(IPS_NAV_PAGE_KEY)
-    if cur not in IPS_SIDEBAR_PAGES:
+    routable = frozenset(IPS_SIDEBAR_PAGES) | {"Admin"}
+    if cur not in routable:
         st.session_state[IPS_NAV_PAGE_KEY] = IPS_SIDEBAR_PAGES[0]
         return
-    if cur not in visible:
+
+    admin_only_routes = {"Admin"} if role == "admin" else frozenset()
+    if cur not in visible and cur not in admin_only_routes:
         st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
 
 

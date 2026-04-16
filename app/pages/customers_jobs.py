@@ -347,11 +347,34 @@ def _clear_customer_mode() -> None:
     st.session_state.pop("customer_edit_id", None)
     st.session_state.pop("customer_contact_mode", None)
     st.session_state.pop("customer_contact_edit_id", None)
+    st.session_state.pop("customer_contact_selected_id", None)
 
 
 def _clear_contact_subpanel() -> None:
     st.session_state.pop("customer_contact_mode", None)
     st.session_state.pop("customer_contact_edit_id", None)
+    st.session_state.pop("customer_contact_selected_id", None)
+
+
+def _on_contact_pick_changed(cid: str, ctid: str, wkey: str) -> None:
+    """Single-select: checked row becomes ``customer_contact_selected_id``; uncheck clears if same."""
+    sel_key = "customer_contact_selected_id"
+    prefix = f"cust_ct_pick_{cid}_"
+    if st.session_state.get(wkey):
+        st.session_state[sel_key] = ctid
+        for k in list(st.session_state.keys()):
+            if isinstance(k, str) and k.startswith(prefix) and k != wkey:
+                st.session_state[k] = False
+    else:
+        if str(st.session_state.get(sel_key) or "") == ctid:
+            st.session_state[sel_key] = None
+
+
+def _contact_row_by_id(contacts: list[dict[str, Any]], ctid: str) -> dict[str, Any] | None:
+    for c in contacts:
+        if str(c.get("id") or "") == str(ctid):
+            return c
+    return None
 
 
 def _render_action_buttons(*, sel: list[str], can_add: bool) -> None:
@@ -490,6 +513,8 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
     if not cid:
         return
 
+    sel_key = "customer_contact_selected_id"
+
     st.markdown("##### Contacts")
     st.caption(
         "Multiple contacts per company — stored in **customer_contacts** (separate from the company row)."
@@ -516,10 +541,18 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
     contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
     schema_keys = _contact_schema_keys(contacts, edit_row)
 
+    sid = str(st.session_state.get(sel_key) or "").strip()
+    if sid and not any(str(c.get("id") or "") == sid for c in contacts):
+        st.session_state.pop(sel_key, None)
+        sid = ""
+    if mode == "edit" and edit_ct:
+        st.session_state[sel_key] = str(edit_ct)
+
     if can_edit:
         if st.button("Add Contact", type="primary", use_container_width=True, key=f"cust_ct_add_{cid}"):
             st.session_state["customer_contact_mode"] = "add"
             st.session_state.pop("customer_contact_edit_id", None)
+            st.session_state.pop(sel_key, None)
             st.rerun()
 
     if not contacts and mode != "add":
@@ -543,55 +576,129 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                 line += f" · {html.escape(ph)}"
             if mob:
                 line += f" · M {html.escape(mob)}"
-            badges = []
+            badges: list[str] = []
             if prim:
                 badges.append("Primary")
             if not active:
                 badges.append("Inactive")
             badge_s = " · ".join(badges)
+            full_line = line + (f" · *{badge_s}*" if badge_s else "")
+
+            if can_edit and ctid:
+                wkey = f"cust_ct_pick_{cid}_{ctid}"
+                sel_now = str(st.session_state.get(sel_key) or "")
+                st.session_state[wkey] = sel_now == ctid
+                chk_col, body_col = st.columns([0.055, 0.945], gap="small")
+                with chk_col:
+                    st.checkbox(
+                        "Select",
+                        key=wkey,
+                        on_change=_on_contact_pick_changed,
+                        args=(cid, ctid, wkey),
+                        label_visibility="collapsed",
+                    )
+                with body_col:
+                    with st.container(border=True):
+                        st.markdown(full_line, unsafe_allow_html=True)
+            else:
+                with st.container(border=True):
+                    st.markdown(full_line, unsafe_allow_html=True)
+
+        if can_edit and contacts:
+            pick = str(st.session_state.get(sel_key) or "").strip()
+            picked_row = _contact_row_by_id(contacts, pick) if pick else None
+            if pick and picked_row is None:
+                st.session_state.pop(sel_key, None)
+                pick = ""
+                picked_row = None
+            prim_p = bool((picked_row or {}).get("is_primary"))
+            active_p = bool((picked_row or {}).get("is_active", True))
+
+            st.caption(
+                "Use the checkbox to select **one** contact. Actions below apply **only** to that selection."
+            )
             with st.container(border=True):
-                st.markdown(line + (f" · *{badge_s}*" if badge_s else ""), unsafe_allow_html=True)
-                if can_edit and ctid:
-                    a1, a2, a3, a4, a5 = st.columns(5)
-                    with a1:
-                        if st.button("Edit", key=f"cust_ct_edbtn_{ctid}", use_container_width=True):
-                            st.session_state["customer_contact_mode"] = "edit"
-                            st.session_state["customer_contact_edit_id"] = ctid
-                            st.rerun()
-                    with a2:
-                        if active and not prim:
-                            if st.button("Primary", key=f"cust_ct_pri_{ctid}", use_container_width=True):
-                                set_primary_contact(customer_id=cid, contact_id=ctid)
-                                st.success("Primary contact updated.")
-                                st.rerun()
-                    with a3:
-                        if active and st.button("Deactivate", key=f"cust_ct_deact_{ctid}", use_container_width=True):
+                r1a, r1b, r1c, r1d = st.columns(4, gap="small")
+                with r1a:
+                    if st.button(
+                        "Edit Contact",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not pick,
+                        key=f"cust_ct_tool_edit_{cid}",
+                    ):
+                        if not pick or _contact_row_by_id(contacts, pick) is None:
+                            st.error("Select a contact first.")
+                            st.stop()
+                        st.session_state["customer_contact_mode"] = "edit"
+                        st.session_state["customer_contact_edit_id"] = pick
+                        st.rerun()
+                with r1b:
+                    if st.button(
+                        "Set Primary",
+                        use_container_width=True,
+                        disabled=(not pick or not active_p or prim_p),
+                        key=f"cust_ct_tool_pri_{cid}",
+                    ):
+                        if not pick or _contact_row_by_id(contacts, pick) is None:
+                            st.error("Select a contact first.")
+                            st.stop()
+                        set_primary_contact(customer_id=cid, contact_id=pick)
+                        st.success("Primary contact updated.")
+                        st.rerun()
+                with r1c:
+                    if st.button(
+                        "Deactivate",
+                        use_container_width=True,
+                        disabled=(not pick or not active_p),
+                        key=f"cust_ct_tool_deact_{cid}",
+                    ):
+                        if not pick or (pr := _contact_row_by_id(contacts, pick)) is None:
+                            st.error("Select a contact first.")
+                            st.stop()
+                        try:
+                            update_rows_admin("customer_contacts", {"is_active": False}, {"id": pick})
+                        except Exception as exc:
+                            st.error(f"Could not deactivate: {exc}")
+                            st.stop()
+                        if bool(pr.get("is_primary")):
                             try:
-                                update_rows_admin("customer_contacts", {"is_active": False}, {"id": ctid})
-                            except Exception as exc:
-                                st.error(f"Could not deactivate: {exc}")
-                                st.stop()
-                            if prim:
-                                try:
-                                    update_rows_admin("customer_contacts", {"is_primary": False}, {"id": ctid})
-                                except Exception:
-                                    pass
-                            st.success("Contact deactivated.")
-                            st.rerun()
-                    with a4:
-                        if not active and st.button("Reactivate", key=f"cust_ct_react_{ctid}", use_container_width=True):
-                            try:
-                                update_rows_admin("customer_contacts", {"is_active": True}, {"id": ctid})
-                            except Exception as exc:
-                                st.error(f"Could not reactivate: {exc}")
-                                st.stop()
-                            st.success("Contact reactivated.")
-                            st.rerun()
-                    with a5:
-                        if st.button("Delete", key=f"cust_ct_del_{ctid}", use_container_width=True):
-                            open_destructive_confirmation(_CONTACT_DELETE_PREFIX)
-                            st.session_state["customer_contact_pending_delete_ids"] = [ctid]
-                            st.rerun()
+                                update_rows_admin("customer_contacts", {"is_primary": False}, {"id": pick})
+                            except Exception:
+                                pass
+                        st.success("Contact deactivated.")
+                        st.rerun()
+                with r1d:
+                    if st.button(
+                        "Delete",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=not pick,
+                        key=f"cust_ct_tool_del_{cid}",
+                    ):
+                        if not pick or _contact_row_by_id(contacts, pick) is None:
+                            st.error("Select a contact first.")
+                            st.stop()
+                        open_destructive_confirmation(_CONTACT_DELETE_PREFIX)
+                        st.session_state["customer_contact_pending_delete_ids"] = [pick]
+                        st.rerun()
+                if pick and not active_p:
+                    if st.button(
+                        "Reactivate",
+                        type="secondary",
+                        use_container_width=False,
+                        key=f"cust_ct_tool_react_{cid}",
+                    ):
+                        if not pick or _contact_row_by_id(contacts, pick) is None:
+                            st.error("Select a contact first.")
+                            st.stop()
+                        try:
+                            update_rows_admin("customer_contacts", {"is_active": True}, {"id": pick})
+                        except Exception as exc:
+                            st.error(f"Could not reactivate: {exc}")
+                            st.stop()
+                        st.success("Contact reactivated.")
+                        st.rerun()
 
     if not can_edit:
         return

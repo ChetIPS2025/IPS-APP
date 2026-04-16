@@ -394,7 +394,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
     employees_all = fetch_active_employees()
     jobs_all = fetch_jobs_for_pm_matrix()
     if not employees_all:
-        st.warning("No active employees. Add staff under **Employees**.")
+        st.warning("No active employees. Add staff under **People** → Employees.")
         return
     if not jobs_all:
         st.warning("No jobs in **Job Database**.")

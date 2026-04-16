@@ -35,6 +35,7 @@ from pages import pm_matrix_entry
 from pages import weekly_timesheet
 from pages import employees
 from pages import employee_toolbox
+from pages import people
 from pages import po_expenses
 from pages import admin
 from pages import users
@@ -54,6 +55,7 @@ PAGES = {
     "Time Tracking": time_tracking.render,
     "PM Matrix Time Entry": pm_matrix_entry.render,
     "Weekly Timesheet": weekly_timesheet.render,
+    "People": people.render,
     "Employees": employees.render,
     "Employee Toolbox": employee_toolbox.render,
     "PO / Expenses": po_expenses.render,
@@ -67,7 +69,7 @@ PAGES = {
 
 # Catalog pages (Materials, Labor, Equipment, Inventory) gate writes inside each page;
 # non-admins may browse lists read-only.
-_ADMIN_ONLY_PAGES = frozenset({"Employees", "Admin", "Users"})
+_ADMIN_ONLY_PAGES = frozenset({"People", "Employees", "Admin", "Users"})
 
 
 def main() -> None:

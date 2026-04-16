@@ -338,10 +338,8 @@ def _render_employees_main(
             _render_action_buttons(sel=sel, can_edit=can_edit)
 
 
-def render() -> None:
-    render_header("Employees")
-    render_crud_list_subtitle("Search, filter, and manage employee records, roles, and pay rates.")
-
+def render_body() -> None:
+    """Full employees CRUD without page header (used by ``People`` combined page)."""
     can_edit = current_role() == "admin"
     mode = st.session_state.get("employee_mode")
 
@@ -436,3 +434,9 @@ def render() -> None:
 
     if not can_edit:
         st.info("Only admin users can manage employees.")
+
+
+def render() -> None:
+    render_header("Employees")
+    render_crud_list_subtitle("Search, filter, and manage employee records, roles, and pay rates.")
+    render_body()
