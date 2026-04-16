@@ -33,10 +33,17 @@ _IMAGE_ROLES = ("overview", "serial_tag", "meter", "mixed", "unknown")
 
 
 def _client() -> OpenAI:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
+    """Sync OpenAI client. Uses env `OPENAI_API_KEY` (same as `OpenAI()` default)."""
+    if not os.getenv("OPENAI_API_KEY", "").strip():
         raise RuntimeError("OPENAI_API_KEY is missing from .env")
-    return OpenAI(api_key=api_key)
+    # openai<2 has no `responses` (Responses API); photo autofill requires openai>=2.
+    client = OpenAI()
+    if not hasattr(client, "responses"):
+        raise RuntimeError(
+            "Asset photo autofill requires the Responses API (openai>=2.0.0). "
+            "Upgrade with: pip install 'openai>=2.0.0'"
+        )
+    return client
 
 
 def _model_name() -> str:
@@ -362,7 +369,13 @@ def extract_asset_from_photos(photos: list[tuple[bytes, str]]) -> dict[str, Any]
 
     response = client.responses.create(
         model=_model_name(),
-        input=[{"role": "user", "content": content}],
+        input=[
+            {
+                "type": "message",
+                "role": "user",
+                "content": content,
+            }
+        ],
         text={"format": _response_text_format(n)},
     )
 
