@@ -47,15 +47,27 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle
+    from app.ips_crud_list_styles import (
+        IPS_CRUD_LIST_PAGE_GAP,
+        IPS_CRUD_LIST_PAGE_SPLIT,
+        inject_ips_crud_list_styles,
+        render_crud_list_subtitle,
+    )
 except ImportError:
     from ips_crud_list_styles import (  # type: ignore
+        IPS_CRUD_LIST_PAGE_GAP,
+        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
 
 MARKUP_PCT = 0.25
 _MAT_DELETE_CONFIRM_PREFIX = "materials_delete"
+
+# Hidden from the main catalog grid only (still in DB, add/edit forms, and search).
+_MATERIAL_LIST_HIDDEN_COLS: frozenset[str] = frozenset(
+    {"inventory_id", "item_key", "stock_length", "subgroup"}
+)
 
 
 def next_inventory_id(rows) -> str:
@@ -111,8 +123,104 @@ def _category_subgroup_options(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     return category_options, subgroup_options
 
 
-def _render_material_action_buttons(*, sel: list[str], can_import: bool) -> None:
-    """Add | Edit | Deactivate | Delete | View — matches Employees / Customers + read-only View."""
+def _visible_material_list_columns(filtered: pd.DataFrame) -> list[str]:
+    """Columns shown in the main selectable grid (excludes internal / hidden fields)."""
+    preferred_order = [
+        "description",
+        "category",
+        "unit",
+        "purchase_price",
+        "sell_price",
+        "is_active",
+    ]
+    return [c for c in preferred_order if c in filtered.columns and c not in _MATERIAL_LIST_HIDDEN_COLS]
+
+
+def _render_material_filter_row(*, df: pd.DataFrame, can_import: bool) -> None:
+    """Full-width filters (Customers-style) — keeps the split main column to list + caption only."""
+    if df.empty:
+        return
+    f1, f2 = st.columns([2, 1], gap="small")
+    with f1:
+        st.markdown(
+            '<span class="ips-crud-filter-row-start" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.text_input(
+            "Search",
+            placeholder="Description, category, unit, pricing (includes hidden fields)",
+            key="mat_f_search",
+        )
+    active_options = ["All", "Active Only", "Inactive Only"]
+    with f2:
+        st.selectbox("Status", active_options, key="mat_f_active")
+
+    categories = sorted(
+        [
+            c
+            for c in df.get("category", pd.Series(dtype=str))
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+            if c.strip()
+        ]
+    )
+    if can_import:
+        cat_row_l, cat_row_r = st.columns([2, 1], gap="small")
+        with cat_row_l:
+            st.selectbox("Category", ["All"] + categories, key="mat_f_cat")
+        with cat_row_r:
+            if st.button("Import quote", type="secondary", use_container_width=True, key="mat_imp_quote"):
+                _clear_material_panel()
+                st.session_state["materials_quote_import_mode"] = True
+                st.rerun()
+    else:
+        st.selectbox("Category", ["All"] + categories, key="mat_f_cat")
+
+
+def _filtered_materials_df(df: pd.DataFrame) -> pd.DataFrame:
+    search = str(st.session_state.get("mat_f_search", "") or "")
+    selected_category = st.session_state.get("mat_f_cat", "All")
+    selected_active = st.session_state.get("mat_f_active", "All")
+
+    filtered = df.copy()
+    if selected_category != "All" and "category" in filtered.columns:
+        filtered = filtered[filtered["category"].astype(str) == selected_category]
+    if selected_active == "Active Only" and "is_active" in filtered.columns:
+        filtered = filtered[filtered["is_active"] == True]  # noqa: E712
+    elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
+        filtered = filtered[filtered["is_active"] == False]  # noqa: E712
+    if search.strip():
+        s = search.strip().lower()
+        mask = filtered.astype(str).apply(
+            lambda col: col.str.lower().str.contains(s, na=False, regex=False),
+        )
+        filtered = filtered[mask.any(axis=1)]
+    return filtered
+
+
+def _sync_selection_to_panel(sel: list[str]) -> None:
+    """Single selection drives browse + edit target; multi/clear exits edit."""
+    if len(sel) == 1:
+        sid = str(sel[0])
+        st.session_state["material_selected_id"] = sid
+        mode = st.session_state.get("material_panel_mode")
+        if mode == "edit":
+            st.session_state["material_panel_id"] = sid
+        elif mode != "add":
+            st.session_state["material_panel_id"] = sid
+        return
+
+    st.session_state.pop("material_selected_id", None)
+    mode = st.session_state.get("material_panel_mode")
+    if mode == "edit":
+        _clear_material_panel()
+    elif mode != "add":
+        st.session_state.pop("material_panel_id", None)
+
+
+def _render_material_right_actions(*, sel: list[str], can_import: bool) -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     n = len(sel)
@@ -121,7 +229,7 @@ def _render_material_action_buttons(*, sel: list[str], can_import: bool) -> None
 
     with st.container(border=True):
         st.markdown('<div class="ips-crud-toolbar-root"></div>', unsafe_allow_html=True)
-        left, b0, b1, b2, b3, b4 = st.columns([1.1, 1, 1, 1, 1, 1], gap="small")
+        left, b0, b1, b2, b3 = st.columns([1.05, 1, 1, 1, 1], gap="small")
         with left:
             st.markdown(
                 f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
@@ -129,7 +237,7 @@ def _render_material_action_buttons(*, sel: list[str], can_import: bool) -> None
             )
         with b0:
             if st.button(
-                "Add Material",
+                "Add",
                 type="primary",
                 use_container_width=True,
                 disabled=not can_import,
@@ -148,6 +256,7 @@ def _render_material_action_buttons(*, sel: list[str], can_import: bool) -> None
             ):
                 st.session_state["material_panel_mode"] = "edit"
                 st.session_state["material_panel_id"] = str(sel[0])
+                st.session_state["material_selected_id"] = str(sel[0])
                 st.rerun()
         with b2:
             if st.button(
@@ -170,37 +279,23 @@ def _render_material_action_buttons(*, sel: list[str], can_import: bool) -> None
                 open_destructive_confirmation(_MAT_DELETE_CONFIRM_PREFIX)
                 st.session_state["materials_pending_delete_ids"] = [str(x) for x in sel]
                 st.rerun()
-        with b4:
-            if st.button(
-                "View",
-                type="secondary",
-                use_container_width=True,
-                disabled=not one,
-                key="mat_btn_view",
-            ):
-                st.session_state["material_panel_mode"] = "view"
-                st.session_state["material_panel_id"] = str(sel[0])
-                st.rerun()
 
 
-def _render_material_view_details(row: dict) -> None:
+def _render_material_compact_details(row: dict) -> None:
+    """Read-only summary (visible catalog fields only — matches hidden-column policy in the grid)."""
+    st.markdown(f"**{row.get('description') or '—'}**")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown(f"**Inventory ID:** {row.get('inventory_id') or '—'}")
-        st.markdown(f"**Item key:** {row.get('item_key') or '—'}")
-        st.markdown(f"**Description:** {row.get('description') or '—'}")
-        st.markdown(f"**Category:** {row.get('category') or '—'}")
-        st.markdown(f"**Subgroup:** {row.get('subgroup') or '—'}")
+        st.caption("Category")
+        st.markdown(str(row.get("category") or "—"))
+        st.caption("Unit")
+        st.markdown(str(row.get("unit") or "—"))
     with c2:
-        st.markdown(f"**Unit:** {row.get('unit') or '—'}")
-        st.markdown(f"**Stock length:** {row.get('stock_length') or '—'}")
-        st.markdown(f"**Purchase price:** {_money(row.get('purchase_price'))}")
-        st.markdown(f"**Sell price:** {_money(row.get('sell_price'))}")
+        st.caption("Purchase / Sell")
+        st.markdown(f"{_money(row.get('purchase_price'))} → {_money(row.get('sell_price'))}")
         active = row.get("is_active")
-        st.markdown(f"**Status:** {'Active' if active else 'Inactive'}")
-    if st.button("Close", use_container_width=True, key="mat_panel_close_view"):
-        _clear_material_panel()
-        st.rerun()
+        st.caption("Status")
+        st.markdown("Active" if active else "Inactive")
 
 
 def _render_material_add_form(*, df: pd.DataFrame, rows: list) -> None:
@@ -371,132 +466,92 @@ def _render_material_edit_form(row: dict) -> None:
             st.rerun()
 
 
-def _render_material_side_panel(
+def _render_material_right_panel(
     *,
-    mode: str,
-    panel_row: dict | None,
     df: pd.DataFrame,
     rows: list,
     can_import: bool,
+    panel_mode: str | None,
+    panel_row: dict | None,
 ) -> None:
     inject_ips_crud_list_styles()
+    sel = get_selected_ids(TABLE_KEY_MATERIALS)
+
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        if mode == "add" and can_import:
-            st.markdown("### Add material")
+        st.markdown("### Material")
+
+        _render_material_right_actions(sel=sel, can_import=can_import)
+
+        if panel_mode == "add" and can_import:
+            st.markdown("#### New catalog row")
             _render_material_add_form(df=df, rows=rows)
-        elif mode == "edit" and panel_row and can_import:
-            st.markdown("### Edit material")
+            return
+
+        if panel_mode == "edit" and panel_row and can_import:
+            st.markdown("#### Edit")
             _render_material_edit_form(panel_row)
-        elif mode == "view" and panel_row:
-            st.markdown("### Material details")
-            _render_material_view_details(panel_row)
+            return
+
+        st.markdown("#### Details")
+        sid = st.session_state.get("material_panel_id") or st.session_state.get("material_selected_id")
+        browse_row: dict | None = None
+        if sid:
+            browse_row = fetch_one("materials_catalog", {"id": sid})
+        if browse_row:
+            _render_material_compact_details(browse_row)
+        elif sid:
+            st.warning("Material not found (it may have been deleted).")
+        elif len(sel) > 1:
+            st.caption("Select a single row to see details here.")
+        else:
+            st.caption("Select a material in the table to load details.")
 
 
-def _render_materials_main(
+def _render_materials_table_main(
     *,
+    filtered: pd.DataFrame,
     df: pd.DataFrame,
-    rows: list,
     can_import: bool,
 ) -> None:
+    """Left column: caption + table only (filters live above the page split)."""
     inject_table_action_styles()
 
-    if can_import:
-        with st.container(border=True):
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            if st.button(
-                "Import Materials",
-                type="secondary",
-                use_container_width=True,
-                key="mat_top_imp",
-            ):
-                _clear_material_panel()
-                st.session_state["materials_quote_import_mode"] = True
-                st.rerun()
+    if df.empty:
+        st.info("No materials found.")
+        if st.session_state.get("material_panel_mode") not in ("add", "edit"):
+            st.session_state.pop("material_panel_id", None)
+            st.session_state.pop("material_selected_id", None)
+        if can_import and st.button("Add Material", type="primary", key="mat_empty_add"):
+            st.session_state["material_panel_mode"] = "add"
+            st.session_state.pop("material_panel_id", None)
+            st.rerun()
+        return
+
+    show_cols = _visible_material_list_columns(filtered)
 
     st.caption(
         "Checkbox column on the **left**; selection is stored as **selected_materials_ids**."
     )
 
-    if df.empty:
-        st.info("No materials found.")
-        if can_import:
-            inject_table_action_styles()
-            if st.button("Add Material", type="primary", key="mat_empty_add"):
-                st.session_state["material_panel_mode"] = "add"
-                st.session_state.pop("material_panel_id", None)
-                st.rerun()
-        return
-
-    filter_cols = st.columns([1, 2, 1])
-    categories = sorted(
-        [
-            c
-            for c in df.get("category", pd.Series(dtype=str))
-            .dropna()
-            .astype(str)
-            .unique()
-            .tolist()
-            if c.strip()
-        ]
-    )
-    filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="mat_f_cat")
-    filter_cols[1].text_input(
-        "Search Materials",
-        placeholder="Search item key, description, category, subgroup",
-        key="mat_f_search",
-    )
-    active_options = ["All", "Active Only", "Inactive Only"]
-    filter_cols[2].selectbox("Status", active_options, key="mat_f_active")
-
-    selected_category = st.session_state.get("mat_f_cat", "All")
-    search = st.session_state.get("mat_f_search", "")
-    selected_active = st.session_state.get("mat_f_active", "All")
-
-    filtered = df.copy()
-    if selected_category != "All" and "category" in filtered.columns:
-        filtered = filtered[filtered["category"].astype(str) == selected_category]
-    if selected_active == "Active Only" and "is_active" in filtered.columns:
-        filtered = filtered[filtered["is_active"] == True]
-    elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
-        filtered = filtered[filtered["is_active"] == False]
-    if search.strip():
-        s = search.strip().lower()
-        mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-        filtered = filtered[mask.any(axis=1)]
-
-    show_cols = [
-        c
-        for c in [
-            "inventory_id",
-            "item_key",
-            "description",
-            "category",
-            "subgroup",
-            "unit",
-            "stock_length",
-            "purchase_price",
-            "sell_price",
-            "is_active",
-        ]
-        if c in filtered.columns
-    ]
-
     if filtered.empty:
         st.warning("No materials match your filters.")
-        if can_import:
-            inject_table_action_styles()
-            if st.button("Add Material", type="primary", key="mat_filtered_empty_add"):
-                st.session_state["material_panel_mode"] = "add"
-                st.session_state.pop("material_panel_id", None)
-                st.rerun()
+        if st.session_state.get("material_panel_mode") not in ("add", "edit"):
+            st.session_state.pop("material_panel_id", None)
+            st.session_state.pop("material_selected_id", None)
+        if can_import and st.button("Add Material", type="primary", key="mat_filtered_empty_add"):
+            st.session_state["material_panel_mode"] = "add"
+            st.session_state.pop("material_panel_id", None)
+            st.rerun()
         return
 
     if "id" not in filtered.columns:
         st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
+        if st.session_state.get("material_panel_mode") not in ("add", "edit"):
+            st.session_state.pop("material_panel_id", None)
+            st.session_state.pop("material_selected_id", None)
         return
 
-    bar_ph = st.empty()
     _, sel = render_selectable_dataframe(
         filtered,
         table_key=TABLE_KEY_MATERIALS,
@@ -504,18 +559,18 @@ def _render_materials_main(
         columns=show_cols,
         editor_key="mat_sel_editor",
     )
-    with bar_ph.container():
-        _render_material_action_buttons(sel=sel, can_import=can_import)
+    _sync_selection_to_panel(sel)
 
 
 def render() -> None:
     render_header("Materials Catalog")
     render_crud_list_subtitle(
-        "Search, filter, and manage catalog items. Add, view, or edit materials in the side panel."
+        "Filter above, catalog grid on the left, details and actions on the right — same rhythm as Customers."
     )
 
-    if "materials_quote_import_mode" not in st.session_state:
-        st.session_state["materials_quote_import_mode"] = False
+    st.session_state.setdefault("materials_quote_import_mode", False)
+    st.session_state.setdefault("material_panel_mode", None)
+    st.session_state.setdefault("material_panel_id", None)
 
     can_import = current_role() == "admin"
 
@@ -524,11 +579,15 @@ def render() -> None:
         st.session_state.pop("material_panel_id", None)
 
     if st.session_state.get("material_edit_id"):
-        st.session_state["material_panel_id"] = st.session_state.pop("material_edit_id")
+        mid = str(st.session_state.pop("material_edit_id"))
+        st.session_state["material_panel_id"] = mid
         st.session_state["material_panel_mode"] = "edit"
+        st.session_state["material_selected_id"] = mid
     elif st.session_state.get("material_view_id"):
-        st.session_state["material_panel_id"] = st.session_state.pop("material_view_id")
-        st.session_state["material_panel_mode"] = "view"
+        mid = str(st.session_state.pop("material_view_id"))
+        st.session_state["material_panel_id"] = mid
+        st.session_state["material_selected_id"] = mid
+        st.session_state.pop("material_panel_mode", None)
 
     if can_import and st.session_state.get("materials_quote_import_mode"):
         if st.button("← Back to Materials catalog", use_container_width=True, key="mqi_back"):
@@ -636,33 +695,27 @@ def render() -> None:
         panel_id = None
 
     panel_row: dict | None = None
-    if panel_mode in ("view", "edit") and panel_id:
+    if panel_mode == "edit" and panel_id:
         panel_row = fetch_one("materials_catalog", {"id": panel_id})
         if not panel_row:
             _clear_material_panel()
             panel_mode = None
             panel_id = None
 
-    panel_open = bool(
-        (panel_mode == "add" and can_import)
-        or (panel_mode == "edit" and can_import and panel_row is not None)
-        or (panel_mode == "view" and panel_row is not None)
-    )
+    _render_material_filter_row(df=df, can_import=can_import)
+    filtered = _filtered_materials_df(df)
 
-    if panel_open:
-        main_col, side_col = st.columns([2.35, 1], gap="medium")
-        with main_col:
-            _render_materials_main(df=df, rows=rows, can_import=can_import)
-        with side_col:
-            _render_material_side_panel(
-                mode=str(panel_mode),
-                panel_row=panel_row,
-                df=df,
-                rows=rows,
-                can_import=can_import,
-            )
-    else:
-        _render_materials_main(df=df, rows=rows, can_import=can_import)
+    main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
+    with main_col:
+        _render_materials_table_main(filtered=filtered, df=df, can_import=can_import)
+    with side_col:
+        _render_material_right_panel(
+            df=df,
+            rows=rows,
+            can_import=can_import,
+            panel_mode=(str(panel_mode) if panel_mode else None),
+            panel_row=panel_row,
+        )
 
     if not can_import:
         st.info("Only admin users can add, edit, deactivate, or delete catalog rows.")

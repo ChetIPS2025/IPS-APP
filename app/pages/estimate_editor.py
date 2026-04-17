@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from branding import render_header
 
 from auth import current_profile, current_role
@@ -29,7 +30,7 @@ from db import (
 )
 from proposal import (
     build_proposal_docx,
-    proposal_combined_preview_html,
+    proposal_preview_html,
     proposal_values,
     try_convert_proposal_docx_to_pdf,
 )
@@ -431,10 +432,35 @@ def _inject_proposal_preview_styles() -> None:
 
 
 def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
+    """
+    Show the proposal preview in an iframe via ``components.html``.
+
+    ``st.markdown(..., unsafe_allow_html=True)`` often strips or empties rich HTML (tables / styled
+    blocks), which produced a blank preview while the Word download was correct.
+    """
     _inject_proposal_preview_styles()
     if caption:
         st.caption(caption)
-    st.markdown(html_block, unsafe_allow_html=True)
+    plain = re.sub(r"<[^>]+>", " ", html_block or "")
+    plain = re.sub(r"\s+", " ", plain).strip()
+    if not plain:
+        st.info(
+            "Proposal preview has no readable content. "
+            "Use **Download Proposal (Word)** — the file matches this estimate."
+        )
+        return
+    doc = (
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
+        "<style>"
+        "body{margin:12px 14px;font-family:Georgia,'Times New Roman',serif;background:#fafafa;color:#111;"
+        "font-size:15px;line-height:1.45;}"
+        "table{border-collapse:collapse;width:100%;}"
+        "td{border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;}"
+        "h3,h4,h5{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#0f172a;}"
+        "</style></head><body>"
+        f"{html_block}</body></html>"
+    )
+    components.html(doc, height=720, scrolling=True)
 
 
 def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:
@@ -1686,8 +1712,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 if embed_docx is not None:
                     _vals = proposal_values(est, totals, **_pe)
                     _render_proposal_preview_html(
-                        proposal_combined_preview_html(embed_docx, fallback_vals=_vals),
-                        caption="From the generated Word document (same data as **Download Proposal (Word)**).",
+                        proposal_preview_html(embed_docx, fallback_vals=_vals),
+                        caption="From the generated Word document (same bytes as **Download Proposal (Word)**).",
                     )
                     st.download_button(
                         "Download Proposal (Word)",
@@ -3006,9 +3032,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             _pv_vals = proposal_values(est, totals, **_pe)
             with st.expander("Proposal preview", expanded=False):
                 _render_proposal_preview_html(
-                    proposal_combined_preview_html(docx_bytes, fallback_vals=_pv_vals),
-                    caption="Rendered in-app from the generated Word document (same filled data as download). "
-                    "Formatting is approximate; open the .docx for the exact layout.",
+                    proposal_preview_html(docx_bytes, fallback_vals=_pv_vals),
+                    caption="Same filled **.docx** as download; in-app view is text/HTML only (open Word for exact layout).",
                 )
 
     with tabs[7]:

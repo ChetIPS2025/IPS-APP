@@ -349,11 +349,49 @@ def _inject_tt_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) {
             padding: 10px 10px 12px 10px !important;
         }
+        /* Day cell row actions — compact, single-line labels */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button {
-            min-height: 2.25rem !important;
+            min-height: 1.55rem !important;
+            max-height: 2rem !important;
+            padding: 0.15rem 0.45rem !important;
+            font-size: 0.78rem !important;
+            border-radius: 6px !important;
+            line-height: 1.15 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button p {
+            white-space: nowrap !important;
+            font-size: 0.78rem !important;
+            line-height: 1.15 !important;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) p {
             word-break: break-word;
+        }
+        /* Quick actions expander — compact buttons */
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button {
+            min-height: 1.55rem !important;
+            max-height: 2rem !important;
+            padding: 0.15rem 0.5rem !important;
+            font-size: 0.78rem !important;
+            border-radius: 6px !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button p {
+            white-space: nowrap !important;
+            font-size: 0.78rem !important;
+            line-height: 1.15 !important;
+        }
+        /* Flat edit panel */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button {
+            min-height: 1.55rem !important;
+            max-height: 2rem !important;
+            padding: 0.15rem 0.5rem !important;
+            font-size: 0.78rem !important;
+            border-radius: 6px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button p {
+            white-space: nowrap !important;
+            font-size: 0.78rem !important;
         }
         .ips-tt-field-label {
             font-size: 11px !important;
@@ -466,7 +504,7 @@ def render() -> None:
                 "use **PM Matrix Time Entry** in the sidebar."
             )
     with pm_row2:
-        if st.button("Open PM Matrix", key="tt_open_pm_matrix", use_container_width=True):
+        if st.button("PM Matrix", key="tt_open_pm_matrix", use_container_width=True, help="Open PM Matrix Time Entry"):
             st.session_state[IPS_NAV_PENDING_KEY] = "PM Matrix Time Entry"
             st.rerun()
 
@@ -483,13 +521,13 @@ def render() -> None:
 
     # —— Top controls ——
     cnav1, cnav2, cnav3, cnav4, cnav5 = st.columns([1, 1, 1, 2, 2])
-    if cnav1.button("◀ Previous week", use_container_width=True):
+    if cnav1.button("◀ Prev week", use_container_width=True, help="Previous week"):
         st.session_state["tt_week_start"] = week_start - timedelta(days=7)
         st.rerun()
-    if cnav2.button("Next week ▶", use_container_width=True):
+    if cnav2.button("Next week ▶", use_container_width=True, help="Next week"):
         st.session_state["tt_week_start"] = week_start + timedelta(days=7)
         st.rerun()
-    if cnav3.button("This week", use_container_width=True):
+    if cnav3.button("This week", use_container_width=True, help="Jump to this week"):
         st.session_state["tt_week_start"] = monday_of_week(today)
         st.rerun()
 
@@ -665,7 +703,7 @@ def render() -> None:
             st.markdown(f"**Job:** {j_nm}")
             st.markdown(f"**Hours:** {float(vr.get('hours') or 0):.2f}")
             st.markdown(f"**Notes:** {vr.get('notes') or '—'}")
-            if st.button("← Back to week", use_container_width=True, key="tt_entry_view_back"):
+            if st.button("← Week", use_container_width=True, key="tt_entry_view_back", help="Back to week grid"):
                 st.session_state.pop("tt_entry_view_id", None)
                 st.rerun()
             st.divider()
@@ -676,91 +714,96 @@ def render() -> None:
         if not er:
             st.session_state.pop(TT_EDIT_ID_KEY, None)
         else:
-            st.subheader("Edit time entry")
-            cur_jid = str(er.get("job_id") or "")
-            cur_label = next(
-                (lb for lb, j in job_label_to_id.items() if j == cur_jid),
-                job_labels_sorted[0] if job_labels_sorted else "",
-            )
-            j_ix = job_labels_sorted.index(cur_label) if cur_label in job_labels_sorted else 0
-            flat_id = str(te_ed)
-            snap_flat = f"tt_row_snap_flat_{flat_id}"
-            if snap_flat not in st.session_state:
-                st.session_state[snap_flat] = (
-                    cur_label,
-                    float(er.get("hours") or 0),
-                    str(er.get("notes") or "").strip(),
+            with st.container(border=True):
+                st.markdown(
+                    '<span class="ips-tt-flat-panel" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
                 )
+                st.subheader("Edit time entry")
+                cur_jid = str(er.get("job_id") or "")
+                cur_label = next(
+                    (lb for lb, j in job_label_to_id.items() if j == cur_jid),
+                    job_labels_sorted[0] if job_labels_sorted else "",
+                )
+                j_ix = job_labels_sorted.index(cur_label) if cur_label in job_labels_sorted else 0
+                flat_id = str(te_ed)
+                snap_flat = f"tt_row_snap_flat_{flat_id}"
+                if snap_flat not in st.session_state:
+                    st.session_state[snap_flat] = (
+                        cur_label,
+                        float(er.get("hours") or 0),
+                        str(er.get("notes") or "").strip(),
+                    )
 
-            fe = _tt_fast_entry()
-            ec1, ec2, ec3, ec4 = (
-                st.columns([4.0, 1.35, 2.55, 2.5], gap="small")
-                if fe
-                else st.columns([3.4, 1.15, 2.9, 2.35], gap="small")
-            )
-            autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
-            flat_ac = _flat_panel_autosave_factory(str(te_ed), snap_flat) if autosave else None
-            ac_kw = {"on_change": flat_ac} if flat_ac else {}
+                fe = _tt_fast_entry()
+                ec1, ec2, ec3, ec4 = (
+                    st.columns([4.0, 1.35, 2.55, 2.5], gap="small")
+                    if fe
+                    else st.columns([3.4, 1.15, 2.9, 2.35], gap="small")
+                )
+                autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
+                flat_ac = _flat_panel_autosave_factory(str(te_ed), snap_flat) if autosave else None
+                ac_kw = {"on_change": flat_ac} if flat_ac else {}
 
-            with ec1:
-                jp = st.selectbox(
-                    "Job",
-                    job_labels_sorted,
-                    index=j_ix,
-                    key="tt_flat_edit_job",
-                    label_visibility="collapsed",
-                    **ac_kw,
-                )
-            with ec2:
-                hrs = st.number_input(
-                    "Hours",
-                    min_value=0.0,
-                    max_value=24.0,
-                    value=float(er.get("hours") or 0),
-                    step=_hours_step(fast=fe),
-                    format="%.2f",
-                    key="tt_flat_edit_h",
-                    label_visibility="collapsed",
-                    **ac_kw,
-                )
-            with ec3:
-                note = st.text_input(
-                    "Notes",
-                    value=str(er.get("notes") or ""),
-                    key="tt_flat_edit_n",
-                    label_visibility="collapsed",
-                    placeholder="Notes",
-                    **ac_kw,
-                )
-            with ec4:
-                bc1, bc2 = st.columns(2, gap="small")
-                with bc1:
-                    if st.button("Save", type="primary", use_container_width=True, key="tt_flat_edit_sv"):
-                        new_jid = job_label_to_id.get(jp)
-                        if not new_jid:
-                            st.error("Pick a job.")
-                        else:
-                            payload = {
-                                "job_id": new_jid,
-                                "hours": float(hrs or 0),
-                                "notes": str(note).strip(),
-                                "updated_at": datetime.now(timezone.utc).isoformat(),
-                            }
-                            try:
-                                update_rows("time_entries", payload, {"id": str(te_ed)})
-                                st.session_state.pop(TT_EDIT_ID_KEY, None)
-                                st.session_state.pop(snap_flat, None)
-                                st.success("Updated.")
-                                st.rerun()
-                            except Exception as exc:
-                                st.error(f"Save failed: {exc}")
-                with bc2:
-                    if st.button("Cancel", use_container_width=True, key="tt_flat_edit_ca"):
-                        st.session_state.pop(TT_EDIT_ID_KEY, None)
-                        st.session_state.pop(snap_flat, None)
-                        st.rerun()
+                with ec1:
+                    jp = st.selectbox(
+                        "Job",
+                        job_labels_sorted,
+                        index=j_ix,
+                        key="tt_flat_edit_job",
+                        label_visibility="collapsed",
+                        **ac_kw,
+                    )
+                with ec2:
+                    hrs = st.number_input(
+                        "Hours",
+                        min_value=0.0,
+                        max_value=24.0,
+                        value=float(er.get("hours") or 0),
+                        step=_hours_step(fast=fe),
+                        format="%.2f",
+                        key="tt_flat_edit_h",
+                        label_visibility="collapsed",
+                        **ac_kw,
+                    )
+                with ec3:
+                    note = st.text_input(
+                        "Notes",
+                        value=str(er.get("notes") or ""),
+                        key="tt_flat_edit_n",
+                        label_visibility="collapsed",
+                        placeholder="Notes",
+                        **ac_kw,
+                    )
+                with ec4:
+                    bc1, bc2 = st.columns(2, gap="small")
+                    with bc1:
+                        if st.button("Save", use_container_width=True, key="tt_flat_edit_sv", help="Save changes"):
+                            new_jid = job_label_to_id.get(jp)
+                            if not new_jid:
+                                st.error("Pick a job.")
+                            else:
+                                payload = {
+                                    "job_id": new_jid,
+                                    "hours": float(hrs or 0),
+                                    "notes": str(note).strip(),
+                                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                                }
+                                try:
+                                    update_rows("time_entries", payload, {"id": str(te_ed)})
+                                    st.session_state.pop(TT_EDIT_ID_KEY, None)
+                                    st.session_state.pop(snap_flat, None)
+                                    st.success("Updated.")
+                                    st.rerun()
+                                except Exception as exc:
+                                    st.error(f"Save failed: {exc}")
+                    with bc2:
+                        if st.button("Cancel", use_container_width=True, key="tt_flat_edit_ca", help="Discard edits"):
+                            st.session_state.pop(TT_EDIT_ID_KEY, None)
+                            st.session_state.pop(snap_flat, None)
+                            st.rerun()
 
-            st.divider()
+                st.divider()
 
     if not entries_df.empty and "id" in entries_df.columns:
         st.subheader("Time entries (this week)")
@@ -923,9 +966,18 @@ def _render_quick_actions(
 ) -> None:
     day_labels = [d.strftime("%a %m/%d") for d in days]
     with st.expander("⚡ Quick actions", expanded=False):
+        st.markdown(
+            '<span class="ips-tt-qa-panel" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         st.caption("Copy **from the previous calendar day** into the day you select (Monday uses the prior Sunday).")
         dest_pick = st.selectbox("Destination day", day_labels, key=f"tt_qdest_{eid}")
-        if st.button("Copy previous day → selected day", key=f"tt_cpday_{eid}", use_container_width=True):
+        if st.button(
+            "Copy prev → day",
+            key=f"tt_cpday_{eid}",
+            use_container_width=True,
+            help="Copy previous calendar day into the selected day",
+        ):
             di = day_labels.index(dest_pick)
             dest_date = days[di]
             from_date = dest_date - timedelta(days=1)
@@ -942,7 +994,12 @@ def _render_quick_actions(
                 st.error(str(exc))
 
         st.divider()
-        if st.button("Copy entire previous week (replaces this week)", key=f"tt_cpw_{eid}", use_container_width=True):
+        if st.button(
+            "Copy prev week",
+            key=f"tt_cpw_{eid}",
+            use_container_width=True,
+            help="Copy entire previous calendar week into this week (replaces)",
+        ):
             try:
                 copy_employee_previous_week_to_current(
                     employee_id=eid,
@@ -959,7 +1016,12 @@ def _render_quick_actions(
         fill_j = st.selectbox("Job", job_labels_sorted, key=f"tt_fillj_{eid}")
         fill_h = st.number_input("Hours per day", 0.0, 24.0, 8.0, step=0.5, key=f"tt_fillh_{eid}")
         fill_n = st.text_input("Notes (optional)", "", key=f"tt_filln_{eid}")
-        if st.button("Fill selected job Mon–Sun", key=f"tt_fill_{eid}", use_container_width=True):
+        if st.button(
+            "Fill Mon–Sun",
+            key=f"tt_fill_{eid}",
+            use_container_width=True,
+            help="Fill selected job across Mon–Sun (upserts hours per day)",
+        ):
             jid = job_label_to_id.get(fill_j)
             if not jid:
                 st.error("Pick a job.")
@@ -981,7 +1043,13 @@ def _render_quick_actions(
         st.divider()
         st.caption("Delete every **time_entries** row for this employee in this week.")
         confirm = st.checkbox("I understand entries will be removed", key=f"tt_clr_{eid}")
-        if st.button("Clear week", key=f"tt_clrb_{eid}", disabled=not confirm, use_container_width=True):
+        if st.button(
+            "Clear week",
+            key=f"tt_clrb_{eid}",
+            disabled=not confirm,
+            use_container_width=True,
+            help="Delete all time entries for this employee this week",
+        ):
             try:
                 delete_employee_week(eid, week_start, week_end)
                 st.rerun()
@@ -1046,12 +1114,11 @@ def _render_entry_editor(
             placeholder="Optional notes",
             **ch_as,
         )
-    b_save, b_del = st.columns(2, gap="medium")
+    b_save, b_del = st.columns(2, gap="small")
     with b_save:
         if st.button(
             "Save",
             key=f"tt_sv_{te_id}",
-            type="primary",
             use_container_width=True,
             help="Save this row",
         ):
@@ -1128,12 +1195,11 @@ def _render_new_entry_form(
             placeholder="Optional notes",
         )
     dup_label = "Dup" if fast else "Duplicate"
-    ba, bd = st.columns(2, gap="medium")
+    ba, bd = st.columns(2, gap="small")
     with ba:
         if st.button(
             "Add",
             key=f"tt_add_{employee_id}_{work_date_iso}",
-            type="primary",
             use_container_width=True,
             help="Add time entry",
         ):

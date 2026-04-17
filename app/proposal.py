@@ -4,12 +4,21 @@ import html
 import re
 import subprocess
 import tempfile
+import zipfile
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 from datetime import datetime
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from docx import Document
+
+# OOXML namespaces (proposal preview reads raw XML when python-docx body text is sparse).
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _w_tag(local: str) -> str:
+    return "{%s}%s" % (_W_NS, local)
 
 _D0 = Decimal("0")
 _CENT = Decimal("0.01")
@@ -182,13 +191,116 @@ def _first_header_preview_html(document: Document) -> str:
     )
 
 
-def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
-    """
-    Build a readable HTML preview from the **filled** proposal .docx (same bytes as download).
+def _paragraph_text_from_ooxml_w_p(p_el: ET.Element) -> str:
+    """Plain text from a ``w:p`` element (handles split runs, tabs, breaks, simple revisions)."""
+    parts: list[str] = []
+    for node in p_el.iter():
+        tag = node.tag
+        if tag in (_w_tag("t"), _w_tag("delText")):
+            if node.text:
+                parts.append(node.text)
+        elif tag == _w_tag("tab"):
+            parts.append("\t")
+        elif tag in (_w_tag("br"), _w_tag("cr")):
+            parts.append("\n")
+    return "".join(parts).replace("\x07", "").strip()
 
-    Uses ``python-docx`` body order (paragraphs + tables). No PDF/LibreOffice. Best-effort only:
-    complex shapes, text boxes, and heavy formatting may not match Word exactly.
+
+def _table_html_from_ooxml_w_tbl(tbl_el: ET.Element) -> str:
+    rows_out: list[list[str]] = []
+    for tr in tbl_el.findall(_w_tag("tr")):
+        row_cells: list[str] = []
+        for tc in tr.findall(_w_tag("tc")):
+            cell_parts: list[str] = []
+            for t in tc.findall(".//" + _w_tag("t")):
+                if t.text:
+                    cell_parts.append(t.text)
+            row_cells.append("".join(cell_parts).strip())
+        if any(c for c in row_cells):
+            rows_out.append(row_cells)
+    if not rows_out:
+        return ""
+    ncol = max(len(r) for r in rows_out)
+    trs: list[str] = []
+    for r in rows_out:
+        padded = r + [""] * (ncol - len(r))
+        tds = "".join(
+            f"<td style='border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;'>{html.escape(c)}</td>"
+            for c in padded
+        )
+        trs.append(f"<tr>{tds}</tr>")
+    return (
+        "<table style='width:100%;border-collapse:collapse;margin:0.55em 0;font-size:0.95em;'>"
+        "<tbody>" + "".join(trs) + "</tbody></table>"
+    )
+
+
+def _ooxml_headers_footers_preview_html(zf: zipfile.ZipFile) -> str:
+    """Letterhead / footer text from ``word/header*.xml`` and ``word/footer*.xml``."""
+    lines: list[str] = []
+    for name in sorted(zf.namelist()):
+        if not (name.startswith("word/header") or name.startswith("word/footer")):
+            continue
+        if not name.endswith(".xml"):
+            continue
+        try:
+            root = ET.fromstring(zf.read(name))
+        except Exception:
+            continue
+        for p in root.findall(_w_tag("p")):
+            t = _paragraph_text_from_ooxml_w_p(p)
+            if t:
+                lines.append(html.escape(t))
+    if not lines:
+        return ""
+    inner = "<br/>".join(lines[:48])
+    return (
+        '<div style="font-size:0.88em;color:#444;line-height:1.35;margin-bottom:0.75rem;padding-bottom:0.55rem;'
+        f'border-bottom:1px solid #e6e6e6;">{inner}</div>'
+    )
+
+
+def _preview_inner_html_from_docx_ooxml(docx_bytes: bytes) -> str:
     """
+    Build inner HTML from the raw OOXML package (``word/document.xml``).
+
+    Catches paragraph text that lives only in split ``w:r``/``w:t`` nodes, which ``python-docx``
+    sometimes surfaces as empty ``paragraph.text`` in heavily styled templates.
+    """
+    chunks: list[str] = []
+    try:
+        with zipfile.ZipFile(BytesIO(docx_bytes), "r") as zf:
+            if "word/document.xml" not in zf.namelist():
+                return ""
+            hf = _ooxml_headers_footers_preview_html(zf)
+            if hf:
+                chunks.append(hf)
+            root = ET.fromstring(zf.read("word/document.xml"))
+    except Exception:
+        return ""
+
+    body = root.find(_w_tag("body"))
+    if body is None:
+        return ""
+    for child in body:
+        local = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+        if local == "p":
+            text = _paragraph_text_from_ooxml_w_p(child)
+            if not text:
+                continue
+            esc = html.escape(text).replace("\n", "<br/>")
+            chunks.append(f'<p style="margin:0.22em 0;line-height:1.52;">{esc}</p>')
+        elif local == "tbl":
+            th = _table_html_from_ooxml_w_tbl(child)
+            if th:
+                chunks.append(th)
+        elif local == "sectPr":
+            break
+    return "\n".join(chunks)
+
+
+def _preview_inner_html_from_python_docx(docx_bytes: bytes) -> str:
+    """Body preview via ``python-docx`` (headings + tables) — secondary to OOXML for coverage."""
     doc = Document(BytesIO(docx_bytes))
     chunks: list[str] = []
     hf = _first_header_preview_html(doc)
@@ -213,8 +325,18 @@ def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
             th = _table_to_preview_html(block)
             if th:
                 chunks.append(th)
-    inner = "\n".join(chunks)
-    if not inner.strip():
+    return "\n".join(chunks)
+
+
+def _preview_plain_text_len(inner_html: str) -> int:
+    plain = re.sub(r"<[^>]+>", " ", inner_html or "")
+    plain = re.sub(r"\s+", " ", plain).strip()
+    return len(plain)
+
+
+def _wrap_docx_preview(inner: str) -> str:
+    inner = (inner or "").strip()
+    if not inner:
         return ""
     return (
         '<div class="ips-proposal-docx-preview" style="max-height:min(720px,78vh);overflow:auto;'
@@ -222,6 +344,25 @@ def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
         'font-family:Georgia,\"Times New Roman\",serif;">'
         f"{inner}</div>"
     )
+
+
+def _best_preview_inner_html_from_docx_bytes(docx_bytes: bytes) -> str:
+    """Pick the richest HTML extraction for the same filled DOCX bytes used for download."""
+    xml_inner = _preview_inner_html_from_docx_ooxml(docx_bytes)
+    pc_inner = _preview_inner_html_from_python_docx(docx_bytes)
+    if _preview_plain_text_len(xml_inner) >= _preview_plain_text_len(pc_inner):
+        return xml_inner.strip()
+    return pc_inner.strip()
+
+
+def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
+    """
+    Build a readable HTML preview from the **filled** proposal .docx (same bytes as download).
+
+    Uses OOXML (``word/document.xml``) first, then ``python-docx``, whichever yields more text.
+    """
+    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
+    return _wrap_docx_preview(inner)
 
 
 def proposal_values_preview_html(vals: dict[str, str]) -> str:
@@ -262,18 +403,37 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
     )
 
 
-def proposal_combined_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
+def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
     """
-    Prefer HTML extracted from the filled DOCX; if that is empty, show the mapped key-field table.
+    Single preview entry point: HTML from the **same** filled DOCX bytes as **Download Proposal (Word)**.
 
-    ``fallback_vals`` should be :func:`proposal_values` for the same estimate context as the DOCX.
+    If the document cannot be read into HTML text, returns a short notice plus the same mapped
+    placeholder values as the template (``fallback_vals`` = :func:`proposal_values` for this estimate).
     """
-    if docx_bytes:
-        doc_html = filled_proposal_docx_to_preview_html(docx_bytes)
-        plain = re.sub(r"<[^>]+>", "", doc_html or "")
-        if plain.strip():
-            return doc_html
-    return proposal_values_preview_html(fallback_vals)
+    if not docx_bytes:
+        return (
+            '<div class="ips-proposal-docx-preview" style="padding:1rem 1.1rem;border:1px solid #e4e4e4;'
+            'border-radius:10px;background:#fafafa;">'
+            "<p><strong>No proposal document was generated.</strong></p>"
+            "<p>Fix any Word template errors above, then try again.</p></div>"
+        )
+
+    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
+    wrapped = _wrap_docx_preview(inner)
+    if _preview_plain_text_len(inner) >= 4:
+        return wrapped
+
+    notice = (
+        "<p style='margin:0 0 0.75rem 0;color:#92400e;font-size:0.95em;'>"
+        "<strong>Preview could not read text from the generated Word file.</strong> "
+        "The download is unchanged — open the .docx in Word. Below are the same filled placeholder values.</p>"
+    )
+    fields = proposal_values_preview_html(fallback_vals)
+    return (
+        '<div class="ips-proposal-docx-preview" style="padding:1rem 1.1rem;border:1px solid #e4e4e4;'
+        'border-radius:10px;background:#fafafa;font-family:Georgia,serif;">'
+        f"{notice}{fields}</div>"
+    )
 
 
 def proposal_values(
