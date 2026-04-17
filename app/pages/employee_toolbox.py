@@ -259,12 +259,64 @@ def _toolbox_file_icon(file_name: str) -> str:
     return "📁"
 
 
-def _truncate_tile_title(raw: str, *, max_chars: int = 28) -> str:
-    """Short, readable label under launcher icons."""
-    s = " ".join(str(raw or "").split()).strip() or "—"
-    if len(s) <= max_chars:
-        return s
-    return s[: max_chars - 1].rstrip() + "…"
+def _split_toolbox_title_two_lines(raw: str, *, soft_max_line: int = 20) -> tuple[str, str | None]:
+    """
+    Split a toolbox document title into one or two lines (word-aware) for the tile label.
+
+    Returns plain-text lines (caller escapes for HTML). Empty input becomes a single em dash.
+    """
+    s = " ".join(str(raw or "").split()).strip()
+    if not s:
+        return ("—", None)
+    if len(s) <= soft_max_line + 4:
+        return (s, None)
+    words = s.split()
+    if len(words) == 1:
+        w = words[0]
+        if len(w) <= soft_max_line + 4:
+            return (w, None)
+        cut = max(10, min(len(w) // 2 + 4, soft_max_line + 6))
+        a, b = w[:cut].rstrip("-_ "), w[cut:].lstrip("-_ ")
+        return (a or w, b or None)
+    # Prefer break near middle by words
+    best_i = 0
+    best_score = 1e9
+    total = len(s)
+    for i in range(len(words) - 1):
+        line1 = " ".join(words[: i + 1])
+        line2 = " ".join(words[i + 1 :])
+        if not line2:
+            continue
+        score = abs(len(line1) - len(line2)) + abs(len(line1) - total / 2) * 0.15
+        if len(line1) > soft_max_line + 14 or len(line2) > soft_max_line + 14:
+            score += 50
+        if score < best_score:
+            best_score = score
+            best_i = i
+    if best_i > 0:
+        line1 = " ".join(words[: best_i + 1]).strip()
+        line2 = " ".join(words[best_i + 1 :]).strip()
+        return (line1, line2 or None)
+    cut = min(len(s), soft_max_line + 8)
+    return (s[:cut].rstrip(), s[cut:].lstrip() or None)
+
+
+def _build_tile_title_inner_html(raw: str) -> str:
+    """Escaped HTML for ``<p class=\"ips-toolbox-launcher-title\">`` (1–2 lines, optional ``<br/>``)."""
+    a, b = _split_toolbox_title_two_lines(raw)
+    out = html.escape(a)
+    if b:
+        out += f"<br/>{html.escape(b)}"
+    return out
+
+
+def _download_overlay_button_label(*, title_raw: str, file_fallback: str) -> str:
+    """Visible/accessible label on the full-tile download overlay (Streamlit has no label_visibility here)."""
+    base = str(title_raw or "").strip() or str(file_fallback or "").strip() or "FILE"
+    single = " ".join(base.replace("\n", " ").split())
+    if len(single) > 48:
+        single = single[:45].rstrip() + "…"
+    return single.upper()
 
 
 def _normalize_url(url: str) -> str:
@@ -293,7 +345,7 @@ def _build_toolbox_storage_path(*, original_filename: str) -> str:
 
 def _tile_visual_inner_html(
     *,
-    title: str,
+    title_inner_html: str,
     desc: str,
     badge: str,
     icon: str,
@@ -303,6 +355,8 @@ def _tile_visual_inner_html(
     brand_image_path: Path | None = None,
 ) -> tuple[str, bool]:
     """Branded: full-bleed image as button surface + footer title. Fallback: compact emoji tile.
+
+    ``title_inner_html`` must be **pre-escaped** HTML (may include ``<br/>`` for a second line).
 
     Returns ``(html, full_bleed_brand)`` for matching outer tile padding / marker classes.
     """
@@ -317,7 +371,7 @@ def _tile_visual_inner_html(
                 f'<img src="{html.escape(data_uri, quote=True)}" alt="" loading="lazy" />',
                 "</div>",
                 '<div class="ips-toolbox-launcher-footer">',
-                f'<p class="ips-toolbox-launcher-title">{html.escape(title)}</p>',
+                f'<p class="ips-toolbox-launcher-title">{title_inner_html}</p>',
             ]
             if can_manage and not active:
                 parts.append('<p class="ips-toolbox-tile-meta ips-toolbox-tile-meta--compact">Hidden</p>')
@@ -334,7 +388,7 @@ def _tile_visual_inner_html(
     parts: list[str] = [
         f'<div class="{stack_cls}">',
         icon_block,
-        f'<p class="ips-toolbox-launcher-title">{html.escape(title)}</p>',
+        f'<p class="ips-toolbox-launcher-title">{title_inner_html}</p>',
     ]
     if can_manage and not active:
         parts.append('<p class="ips-toolbox-tile-meta ips-toolbox-tile-meta--compact">Hidden</p>')
@@ -493,6 +547,10 @@ def _inject_toolbox_hub_styles() -> None:
             max-height: none;
             -webkit-line-clamp: unset;
             display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile--fullbleed.ips-toolbox-tile-dl) div[data-testid="stButton"] > button {
             min-height: 300px !important;
@@ -573,18 +631,23 @@ def _inject_toolbox_hub_styles() -> None:
         }
         p.ips-toolbox-launcher-title {
             color: #f1f5f9 !important;
-            font-size: 0.76rem !important;
+            font-size: 0.72rem !important;
             font-weight: 600 !important;
             text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
             margin: 2px 0 0 0 !important;
-            line-height: 1.28 !important;
-            min-height: 2.35em;
-            max-height: 2.55em;
+            line-height: 1.22 !important;
+            min-height: 2.2em;
+            max-height: 2.75em;
             overflow: hidden;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            padding: 0 2px;
+            padding: 0 4px;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            hyphens: auto;
         }
         p.ips-toolbox-tile-meta--compact {
             color: #94a3b8 !important;
@@ -1104,8 +1167,7 @@ def _render_edit_tool_panel(*, row: dict, existing_rows: list[dict]) -> None:
 
 def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
     """App-launcher tile: whole-tile open/link, overlay download, small admin actions."""
-    title_raw = str(row.get("title") or "—").strip() or "—"
-    title = _truncate_tile_title(title_raw)
+    title_inner_html = _build_tile_title_inner_html(str(row.get("title") or "").strip())
     desc = str(row.get("description") or "").strip()
     url = str(row.get("url") or "").strip()
     rid = str(row.get("id") or "")
@@ -1117,7 +1179,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
         str(row.get("original_filename") or row.get("file_name") or "").strip() or Path(fp).name or "document"
     )
     icon = _toolbox_file_icon(fn_display) if is_file else "🔗"
-    brand_path = _brand_image_path_for_title(title_raw)
+    brand_path = _brand_image_path_for_title(str(row.get("title") or "").strip())
 
     ref = ""
     use_dl_overlay = False
@@ -1160,7 +1222,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
         if is_file:
             if not ref:
                 inner, full_bleed = _tile_visual_inner_html(
-                    title=title,
+                    title_inner_html=title_inner_html,
                     desc=desc,
                     badge=badge,
                     icon=icon,
@@ -1186,7 +1248,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
             elif ref.startswith("http://") or ref.startswith("https://"):
                 safe_href = html.escape(ref, quote=True)
                 inner, full_bleed = _tile_visual_inner_html(
-                    title=title,
+                    title_inner_html=title_inner_html,
                     desc=desc,
                     badge=badge,
                     icon=icon,
@@ -1213,7 +1275,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                 p = Path(ref)
                 if p.is_file():
                     inner, full_bleed = _tile_visual_inner_html(
-                        title=title,
+                        title_inner_html=title_inner_html,
                         desc=desc,
                         badge=badge,
                         icon=icon,
@@ -1236,19 +1298,27 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         unsafe_allow_html=True,
                     )
                     ctype = str(row.get("content_type") or "").strip() or "application/octet-stream"
+                    _dl_lbl = _download_overlay_button_label(
+                        title_raw=str(row.get("title") or "").strip(),
+                        file_fallback=fn_display,
+                    )
+                    _t_disp = str(row.get("title") or "").strip()
+                    _dl_help = " — ".join(
+                        [p for p in (_t_disp, desc) if p]
+                    ) or f"Download {_t_disp or fn_display}"
                     st.download_button(
-                        " ",
+                        _dl_lbl,
                         data=p.read_bytes(),
                         file_name=fn_display,
                         mime=ctype,
                         type="primary",
                         use_container_width=True,
                         key=f"etb_dl_{rid}",
-                        help=desc if desc else None,
+                        help=_dl_help,
                     )
                 else:
                     inner, full_bleed = _tile_visual_inner_html(
-                        title=title,
+                        title_inner_html=title_inner_html,
                         desc=desc,
                         badge=badge,
                         icon=icon,
@@ -1275,7 +1345,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
             nu = _normalize_url(url)
             safe_href = html.escape(nu, quote=True)
             inner, full_bleed = _tile_visual_inner_html(
-                title=title,
+                title_inner_html=title_inner_html,
                 desc=desc,
                 badge=badge,
                 icon=icon,
@@ -1300,7 +1370,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
             )
         else:
             inner, full_bleed = _tile_visual_inner_html(
-                title=title,
+                title_inner_html=title_inner_html,
                 desc=desc,
                 badge=badge,
                 icon=icon,

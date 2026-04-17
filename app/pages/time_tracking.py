@@ -86,16 +86,20 @@ def _hours_step(*, fast: bool) -> float:
 
 
 def _inject_tt_fast_compact_css() -> None:
+    """Extra squeeze in Fast Entry Mode (stacked on base dense styles)."""
     st.markdown(
         """
         <style>
-        .ips-tt-fast-toolbar { padding: 4px 8px 6px 8px !important; margin-bottom: 6px !important; }
-        .ips-tt-new-row { padding: 3px 6px 5px 6px !important; margin-top: 2px !important; margin-bottom: 2px !important; }
-        .ips-tt-entry-gap { height: 3px !important; min-height: 3px !important; }
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stNumberInput"] input {
-            min-height: 2.1rem !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) {
+            padding: 2px 5px 4px 5px !important;
+            margin-bottom: 4px !important;
         }
-        .ips-tt-day-head { font-size: 11px !important; margin-bottom: 2px !important; }
+        .ips-tt-new-row { padding: 2px 4px 4px 4px !important; margin-top: 1px !important; margin-bottom: 1px !important; }
+        .ips-tt-entry-gap { height: 2px !important; min-height: 2px !important; }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] input {
+            min-height: 1.15rem !important;
+        }
+        .ips-tt-day-head { font-size: 10px !important; margin-bottom: 1px !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -303,118 +307,244 @@ def _inject_tt_styles() -> None:
         }
         .ips-tt-entry-gap {
             display: block;
-            height: 6px;
-            min-height: 6px;
+            height: 4px;
+            min-height: 4px;
         }
-        .ips-tt-fast-toolbar {
-            border: 1px solid rgba(71, 85, 105, 0.45);
-            border-radius: 10px;
-            padding: 8px 10px 10px 10px;
-            margin-bottom: 10px;
-            background: rgba(15, 23, 42, 0.55);
+        hr.ips-tt-entry-sep {
+            border: none;
+            border-top: 1px solid rgba(100, 116, 139, 0.35);
+            margin: 0.2rem 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) {
+            border: 1px solid rgba(71, 85, 105, 0.45) !important;
+            border-radius: 8px !important;
+            padding: 4px 6px 6px 6px !important;
+            margin-bottom: 6px !important;
+            background: rgba(15, 23, 42, 0.55) !important;
         }
         .ips-tt-new-row {
             border: 1px dashed rgba(100, 116, 139, 0.55);
-            border-radius: 8px;
-            padding: 6px 8px 8px 8px;
-            margin-top: 4px;
-            margin-bottom: 4px;
+            border-radius: 6px;
+            padding: 3px 5px 5px 5px;
+            margin-top: 2px;
+            margin-bottom: 2px;
             background: rgba(30, 41, 59, 0.35);
         }
         .ips-tt-new-block {
-            margin-top: 4px;
-            padding-top: 8px;
+            margin-top: 2px;
+            padding-top: 4px;
             border-top: 1px dashed rgba(100, 116, 139, 0.4);
         }
         .ips-tt-row-over {
             border-left: 4px solid #f87171 !important;
             background: rgba(248, 113, 113, 0.12) !important;
             border-radius: 6px;
-            padding-left: 8px !important;
+            padding-left: 6px !important;
         }
         .ips-tt-day-head {
             color: #9fb6d9 !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
             font-weight: 600 !important;
             text-align: center !important;
-            margin-bottom: 2px !important;
+            margin-bottom: 1px !important;
             letter-spacing: 0.02em;
         }
         .ips-tt-day-sum {
             text-align: center !important;
-            font-size: 11px !important;
+            font-size: 10px !important;
             color: #94a3b8 !important;
-            margin-bottom: 6px !important;
+            margin-bottom: 3px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) {
-            padding: 10px 10px 12px 10px !important;
+            padding: 5px 6px 6px 6px !important;
         }
         /* Day cell row actions — compact, single-line labels */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button {
-            min-height: 1.55rem !important;
-            max-height: 2rem !important;
-            padding: 0.15rem 0.45rem !important;
-            font-size: 0.78rem !important;
-            border-radius: 6px !important;
-            line-height: 1.15 !important;
+            min-height: 1.35rem !important;
+            max-height: 1.75rem !important;
+            padding: 0.08rem 0.35rem !important;
+            font-size: 0.72rem !important;
+            border-radius: 5px !important;
+            line-height: 1.1 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button p {
             white-space: nowrap !important;
-            font-size: 0.78rem !important;
-            line-height: 1.15 !important;
+            font-size: 0.72rem !important;
+            line-height: 1.1 !important;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) p {
             word-break: break-word;
         }
-        /* Quick actions expander — compact buttons */
-        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button {
-            min-height: 1.55rem !important;
-            max-height: 2rem !important;
-            padding: 0.15rem 0.5rem !important;
-            font-size: 0.78rem !important;
-            border-radius: 6px !important;
+        /* Dense inputs: Job / Hours / Notes inside day cards */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stSelectbox"] label,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] label,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stTextInput"] label {
+            min-height: 0 !important;
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+            font-size: 0.68rem !important;
         }
-        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button p {
-            white-space: nowrap !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+            min-height: 1.35rem !important;
             font-size: 0.78rem !important;
-            line-height: 1.15 !important;
         }
-        /* Flat edit panel */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] input {
+            min-height: 1.32rem !important;
+            height: 1.32rem !important;
+            padding: 0.06rem 0.28rem !important;
+            font-size: 0.78rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stTextInput"] input {
+            min-height: 1.32rem !important;
+            padding: 0.06rem 0.28rem !important;
+            font-size: 0.78rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stVerticalBlock"] > div {
+            gap: 0.1rem 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stHorizontalBlock"] {
+            gap: 0.2rem !important;
+            flex-wrap: nowrap !important;
+        }
+        /* Flat edit panel — same density */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) {
+            padding: 6px 8px 8px 8px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+            min-height: 1.35rem !important;
+            font-size: 0.78rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stNumberInput"] input {
+            min-height: 1.32rem !important;
+            padding: 0.06rem 0.28rem !important;
+            font-size: 0.78rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stTextInput"] input {
+            min-height: 1.32rem !important;
+            padding: 0.06rem 0.28rem !important;
+            font-size: 0.78rem !important;
+        }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button {
-            min-height: 1.55rem !important;
-            max-height: 2rem !important;
-            padding: 0.15rem 0.5rem !important;
-            font-size: 0.78rem !important;
-            border-radius: 6px !important;
+            min-height: 1.35rem !important;
+            max-height: 1.75rem !important;
+            padding: 0.08rem 0.35rem !important;
+            font-size: 0.72rem !important;
+            border-radius: 5px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button p {
             white-space: nowrap !important;
+            font-size: 0.72rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stHorizontalBlock"] {
+            gap: 0.25rem !important;
+        }
+        /* Top nav row — span lives in first column of same horizontal block */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) [data-testid="stMultiSelect"] button {
+            min-height: 1.4rem !important;
+            font-size: 0.8rem !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) label[data-testid="stWidgetLabel"] {
+            font-size: 0.72rem !important;
+            margin-bottom: 0 !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-week-options) [data-testid="stNumberInput"] input {
+            min-height: 1.35rem !important;
+            font-size: 0.8rem !important;
+            padding: 0.08rem 0.35rem !important;
+        }
+        /* Toolbar (marker span + widgets in same vertical block) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) [data-testid="stNumberInput"] input,
+        div[data-testid="stVerticalBlock"]:has(span.ips-tt-fast-toolbar-scope) [data-testid="stNumberInput"] input {
+            min-height: 1.32rem !important;
+            font-size: 0.78rem !important;
+            padding: 0.06rem 0.3rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) label[data-testid="stWidgetLabel"],
+        div[data-testid="stVerticalBlock"]:has(span.ips-tt-fast-toolbar-scope) label[data-testid="stWidgetLabel"] {
+            font-size: 0.72rem !important;
+            margin-bottom: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) [data-testid="stHorizontalBlock"] {
+            gap: 0.2rem !important;
+        }
+        .ips-tt-flat-title {
+            font-size: 0.92rem !important;
+            font-weight: 600 !important;
+            margin: 0 0 0.2rem 0 !important;
+            color: #e2e8f0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-ot-scope) [data-testid="stNumberInput"] input,
+        div[data-testid="stVerticalBlock"]:has(span.ips-tt-ot-scope) [data-testid="stNumberInput"] input {
+            min-height: 1.32rem !important;
+            font-size: 0.8rem !important;
+            padding: 0.06rem 0.3rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-ot-scope) label[data-testid="stWidgetLabel"],
+        div[data-testid="stVerticalBlock"]:has(span.ips-tt-ot-scope) label[data-testid="stWidgetLabel"] {
+            font-size: 0.72rem !important;
+            margin-bottom: 0 !important;
+        }
+        /* Quick actions expander — compact buttons + inputs */
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button {
+            min-height: 1.35rem !important;
+            max-height: 1.75rem !important;
+            padding: 0.08rem 0.4rem !important;
+            font-size: 0.72rem !important;
+            border-radius: 5px !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) button p {
+            white-space: nowrap !important;
+            font-size: 0.72rem !important;
+            line-height: 1.1 !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+            min-height: 1.35rem !important;
             font-size: 0.78rem !important;
         }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) [data-testid="stNumberInput"] input {
+            min-height: 1.3rem !important;
+            font-size: 0.78rem !important;
+            padding: 0.06rem 0.28rem !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) [data-testid="stTextInput"] input {
+            min-height: 1.3rem !important;
+            font-size: 0.78rem !important;
+            padding: 0.06rem 0.28rem !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) [data-testid="stHorizontalBlock"] {
+            gap: 0.25rem !important;
+        }
+        div[data-testid="stExpanderDetails"]:has(span.ips-tt-qa-panel) label[data-testid="stWidgetLabel"] {
+            font-size: 0.72rem !important;
+            margin-bottom: 0 !important;
+        }
         .ips-tt-field-label {
-            font-size: 11px !important;
+            font-size: 9px !important;
             font-weight: 600 !important;
             color: #94a3b8 !important;
-            margin: 0 0 2px 0 !important;
+            margin: 0 !important;
+            line-height: 1.05 !important;
+            padding: 0 !important;
         }
         .ips-tt-metric {
             color: #e2e8f0 !important;
-            font-size: 13px !important;
+            font-size: 12px !important;
             font-weight: 600 !important;
         }
         .ips-tt-job-badge {
             display: inline-block;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.02em;
             color: #f8fafc !important;
             background: var(--badge, #334155);
             border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 6px;
-            padding: 3px 8px;
-            margin-bottom: 6px;
+            border-radius: 5px;
+            padding: 2px 6px;
+            margin-bottom: 3px;
             max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -423,7 +553,7 @@ def _inject_tt_styles() -> None:
         .ips-tt-legend {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }
         </style>
@@ -521,9 +651,11 @@ def render() -> None:
 
     # —— Top controls ——
     cnav1, cnav2, cnav3, cnav4, cnav5 = st.columns([1, 1, 1, 2, 2])
-    if cnav1.button("◀ Prev week", use_container_width=True, help="Previous week"):
-        st.session_state["tt_week_start"] = week_start - timedelta(days=7)
-        st.rerun()
+    with cnav1:
+        st.markdown('<span class="ips-tt-nav-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
+        if st.button("◀ Prev week", use_container_width=True, help="Previous week"):
+            st.session_state["tt_week_start"] = week_start - timedelta(days=7)
+            st.rerun()
     if cnav2.button("Next week ▶", use_container_width=True, help="Next week"):
         st.session_state["tt_week_start"] = week_start + timedelta(days=7)
         st.rerun()
@@ -570,6 +702,7 @@ def render() -> None:
 
     if fast:
         with st.expander("Week options", expanded=False):
+            st.markdown('<span class="ips-tt-week-options" aria-hidden="true"></span>', unsafe_allow_html=True)
             ot_threshold = st.number_input(
                 "Weekly OT highlight (h)",
                 min_value=0.0,
@@ -579,14 +712,16 @@ def render() -> None:
                 key="tt_ot_threshold_input",
             )
     else:
-        ot_threshold = st.number_input(
-            "Weekly hours threshold (overtime highlight)",
-            min_value=0.0,
-            max_value=120.0,
-            value=float(st.session_state.get("tt_ot_threshold", _OT_THRESHOLD_DEFAULT)),
-            step=1.0,
-            key="tt_ot_threshold_input",
-        )
+        with st.container():
+            st.markdown('<span class="ips-tt-ot-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
+            ot_threshold = st.number_input(
+                "Weekly hours threshold (overtime highlight)",
+                min_value=0.0,
+                max_value=120.0,
+                value=float(st.session_state.get("tt_ot_threshold", _OT_THRESHOLD_DEFAULT)),
+                step=1.0,
+                key="tt_ot_threshold_input",
+            )
     st.session_state["tt_ot_threshold"] = ot_threshold
 
     # —— Load grid data ——
@@ -648,46 +783,49 @@ def render() -> None:
     if can_edit:
         st.session_state.setdefault(TT_DEFAULT_HOURS_KEY, 8.0)
         st.session_state.setdefault(TT_AUTOSAVE_KEY, False)
-        st.markdown('<div class="ips-tt-fast-toolbar">', unsafe_allow_html=True)
-        if fast:
-            tb1, tb2 = st.columns([1.4, 1.25], gap="small")
-            with tb1:
-                dh = st.number_input(
-                    "Def hrs",
-                    min_value=0.0,
-                    max_value=24.0,
-                    value=float(_tt_default_hours()),
-                    step=_hours_step(fast=True),
-                    key="tt_toolbar_default_hrs",
-                    label_visibility="visible",
-                )
-                st.session_state[TT_DEFAULT_HOURS_KEY] = float(dh)
-            with tb2:
-                st.checkbox("Auto-save", key=TT_AUTOSAVE_KEY)
-        else:
-            tb1, tb2, tb3, tb4 = st.columns([1.15, 1.35, 2.2, 2.8], gap="small")
-            with tb1:
-                dh = st.number_input(
-                    "Default hrs",
-                    min_value=0.0,
-                    max_value=24.0,
-                    value=float(_tt_default_hours()),
-                    step=0.5,
-                    key="tt_toolbar_default_hrs",
-                    help="Prefills new-line hours for each day.",
-                )
-                st.session_state[TT_DEFAULT_HOURS_KEY] = float(dh)
-            with tb2:
-                st.checkbox(
-                    "Auto-save",
-                    key=TT_AUTOSAVE_KEY,
-                    help="When on, job / hours / notes save on change. Save still works for explicit commit.",
-                )
-            with tb3:
-                st.caption("Rows: **Save** · **Del** · **Dup** copies last line (or filter job + default hrs).")
-            with tb4:
-                st.caption("Stable keys by entry id. One job per employee per day.")
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(
+                '<span class="ips-tt-fast-toolbar-scope" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            if fast:
+                tb1, tb2 = st.columns([1.4, 1.25], gap="none")
+                with tb1:
+                    dh = st.number_input(
+                        "Def hrs",
+                        min_value=0.0,
+                        max_value=24.0,
+                        value=float(_tt_default_hours()),
+                        step=_hours_step(fast=True),
+                        key="tt_toolbar_default_hrs",
+                        label_visibility="visible",
+                    )
+                    st.session_state[TT_DEFAULT_HOURS_KEY] = float(dh)
+                with tb2:
+                    st.checkbox("Auto-save", key=TT_AUTOSAVE_KEY)
+            else:
+                tb1, tb2, tb3, tb4 = st.columns([1.15, 1.35, 2.2, 2.8], gap="none")
+                with tb1:
+                    dh = st.number_input(
+                        "Default hrs",
+                        min_value=0.0,
+                        max_value=24.0,
+                        value=float(_tt_default_hours()),
+                        step=0.5,
+                        key="tt_toolbar_default_hrs",
+                        help="Prefills new-line hours for each day.",
+                    )
+                    st.session_state[TT_DEFAULT_HOURS_KEY] = float(dh)
+                with tb2:
+                    st.checkbox(
+                        "Auto-save",
+                        key=TT_AUTOSAVE_KEY,
+                        help="When on, job / hours / notes save on change. Save still works for explicit commit.",
+                    )
+                with tb3:
+                    st.caption("Rows: **Save** · **Del** · **Dup** copies last line (or filter job + default hrs).")
+                with tb4:
+                    st.caption("Stable keys by entry id. One job per employee per day.")
 
     tv_id = st.session_state.get("tt_entry_view_id")
     if tv_id:
@@ -719,7 +857,10 @@ def render() -> None:
                     '<span class="ips-tt-flat-panel" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                st.subheader("Edit time entry")
+                st.markdown(
+                    '<p class="ips-tt-flat-title">Edit time entry</p>',
+                    unsafe_allow_html=True,
+                )
                 cur_jid = str(er.get("job_id") or "")
                 cur_label = next(
                     (lb for lb, j in job_label_to_id.items() if j == cur_jid),
@@ -737,9 +878,9 @@ def render() -> None:
 
                 fe = _tt_fast_entry()
                 ec1, ec2, ec3, ec4 = (
-                    st.columns([4.0, 1.35, 2.55, 2.5], gap="small")
+                    st.columns([2.85, 0.62, 1.75, 0.95], gap="none")
                     if fe
-                    else st.columns([3.4, 1.15, 2.9, 2.35], gap="small")
+                    else st.columns([2.55, 0.58, 1.85, 0.95], gap="none")
                 )
                 autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
                 flat_ac = _flat_panel_autosave_factory(str(te_ed), snap_flat) if autosave else None
@@ -776,7 +917,7 @@ def render() -> None:
                         **ac_kw,
                     )
                 with ec4:
-                    bc1, bc2 = st.columns(2, gap="small")
+                    bc1, bc2 = st.columns(2, gap="none")
                     with bc1:
                         if st.button("Save", use_container_width=True, key="tt_flat_edit_sv", help="Save changes"):
                             new_jid = job_label_to_id.get(jp)
@@ -803,7 +944,7 @@ def render() -> None:
                             st.session_state.pop(snap_flat, None)
                             st.rerun()
 
-                st.divider()
+                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
 
     if not entries_df.empty and "id" in entries_df.columns:
         st.subheader("Time entries (this week)")
@@ -923,11 +1064,11 @@ def render() -> None:
                             st.caption("—")
                         for ei, ent in enumerate(ents_show):
                             if ei:
-                                st.divider()
+                                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
                             _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
                         if job_labels_sorted:
                             if ents_show:
-                                st.divider()
+                                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
                             _render_new_entry_form(
                                 eid,
                                 wd,
@@ -971,29 +1112,39 @@ def _render_quick_actions(
             unsafe_allow_html=True,
         )
         st.caption("Copy **from the previous calendar day** into the day you select (Monday uses the prior Sunday).")
-        dest_pick = st.selectbox("Destination day", day_labels, key=f"tt_qdest_{eid}")
-        if st.button(
-            "Copy prev → day",
-            key=f"tt_cpday_{eid}",
-            use_container_width=True,
-            help="Copy previous calendar day into the selected day",
-        ):
-            di = day_labels.index(dest_pick)
-            dest_date = days[di]
-            from_date = dest_date - timedelta(days=1)
-            try:
-                copy_employee_day_to_day(
-                    employee_id=eid,
-                    from_date=from_date,
-                    to_date=dest_date,
-                    created_by=user_id,
-                    updated_at_iso=ts_iso,
-                )
-                st.rerun()
-            except Exception as exc:
-                st.error(str(exc))
+        qd1, qd2 = st.columns([1.55, 1.0], gap="none")
+        with qd1:
+            st.markdown('<p class="ips-tt-field-label">To day</p>', unsafe_allow_html=True)
+            dest_pick = st.selectbox(
+                "Destination day",
+                day_labels,
+                key=f"tt_qdest_{eid}",
+                label_visibility="collapsed",
+            )
+        with qd2:
+            st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+            if st.button(
+                "Copy prev → day",
+                key=f"tt_cpday_{eid}",
+                use_container_width=True,
+                help="Copy previous calendar day into the selected day",
+            ):
+                di = day_labels.index(dest_pick)
+                dest_date = days[di]
+                from_date = dest_date - timedelta(days=1)
+                try:
+                    copy_employee_day_to_day(
+                        employee_id=eid,
+                        from_date=from_date,
+                        to_date=dest_date,
+                        created_by=user_id,
+                        updated_at_iso=ts_iso,
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
 
-        st.divider()
+        st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
         if st.button(
             "Copy prev week",
             key=f"tt_cpw_{eid}",
@@ -1011,36 +1162,53 @@ def _render_quick_actions(
             except Exception as exc:
                 st.error(str(exc))
 
-        st.divider()
+        st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
         st.caption("Fill one job across Mon–Sun (upserts hours per day).")
-        fill_j = st.selectbox("Job", job_labels_sorted, key=f"tt_fillj_{eid}")
-        fill_h = st.number_input("Hours per day", 0.0, 24.0, 8.0, step=0.5, key=f"tt_fillh_{eid}")
-        fill_n = st.text_input("Notes (optional)", "", key=f"tt_filln_{eid}")
-        if st.button(
-            "Fill Mon–Sun",
-            key=f"tt_fill_{eid}",
-            use_container_width=True,
-            help="Fill selected job across Mon–Sun (upserts hours per day)",
-        ):
-            jid = job_label_to_id.get(fill_j)
-            if not jid:
-                st.error("Pick a job.")
-            else:
-                try:
-                    fill_employee_job_across_week(
-                        employee_id=eid,
-                        job_id=jid,
-                        week_dates=days,
-                        hours_per_day=float(fill_h),
-                        notes=str(fill_n).strip(),
-                        created_by=user_id,
-                        updated_at_iso=ts_iso,
-                    )
-                    st.rerun()
-                except Exception as exc:
-                    st.error(str(exc))
+        fq1, fq2, fq3, fq4 = st.columns([1.85, 0.68, 1.25, 0.95], gap="none")
+        with fq1:
+            st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+            fill_j = st.selectbox("Job", job_labels_sorted, key=f"tt_fillj_{eid}", label_visibility="collapsed")
+        with fq2:
+            st.markdown('<p class="ips-tt-field-label">Hrs/d</p>', unsafe_allow_html=True)
+            fill_h = st.number_input(
+                "Hours per day",
+                0.0,
+                24.0,
+                8.0,
+                step=0.5,
+                key=f"tt_fillh_{eid}",
+                label_visibility="collapsed",
+            )
+        with fq3:
+            st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+            fill_n = st.text_input("Notes (optional)", "", key=f"tt_filln_{eid}", label_visibility="collapsed")
+        with fq4:
+            st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+            if st.button(
+                "Fill week",
+                key=f"tt_fill_{eid}",
+                use_container_width=True,
+                help="Fill selected job across Mon–Sun (upserts hours per day)",
+            ):
+                jid = job_label_to_id.get(fill_j)
+                if not jid:
+                    st.error("Pick a job.")
+                else:
+                    try:
+                        fill_employee_job_across_week(
+                            employee_id=eid,
+                            job_id=jid,
+                            week_dates=days,
+                            hours_per_day=float(fill_h),
+                            notes=str(fill_n).strip(),
+                            created_by=user_id,
+                            updated_at_iso=ts_iso,
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
 
-        st.divider()
+        st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
         st.caption("Delete every **time_entries** row for this employee in this week.")
         confirm = st.checkbox("I understand entries will be removed", key=f"tt_clr_{eid}")
         if st.button(
@@ -1081,18 +1249,19 @@ def _render_entry_editor(
     del_label = "Clear" if fast else "Delete"
     del_help = "Remove this time entry" if fast else "Delete this time entry"
 
-    st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
-    st.selectbox(
-        "Job",
-        job_labels_sorted,
-        index=j_ix,
-        key=f"tt_job_{te_id}",
-        label_visibility="collapsed",
-        **ch_as,
-    )
-    rh1, rh2 = st.columns([1, 2], gap="small")
-    with rh1:
-        st.markdown('<p class="ips-tt-field-label">Hours</p>', unsafe_allow_html=True)
+    cj, ch, cn, cb = st.columns([2.2, 0.62, 1.65, 0.92], gap="none")
+    with cj:
+        st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+        st.selectbox(
+            "Job",
+            job_labels_sorted,
+            index=j_ix,
+            key=f"tt_job_{te_id}",
+            label_visibility="collapsed",
+            **ch_as,
+        )
+    with ch:
+        st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
         st.number_input(
             "Hours",
             min_value=0.0,
@@ -1104,43 +1273,45 @@ def _render_entry_editor(
             label_visibility="collapsed",
             **ch_as,
         )
-    with rh2:
+    with cn:
         st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
         st.text_input(
             "Notes",
             value=str(ent.get("notes") or ""),
             key=f"tt_n_{te_id}",
             label_visibility="collapsed",
-            placeholder="Optional notes",
+            placeholder="Notes",
             **ch_as,
         )
-    b_save, b_del = st.columns(2, gap="small")
-    with b_save:
-        if st.button(
-            "Save",
-            key=f"tt_sv_{te_id}",
-            use_container_width=True,
-            help="Save this row",
-        ):
-            ok, err = _persist_time_entry_row(te_id, job_label_to_id)
-            if ok:
-                st.success("Updated.")
-                st.rerun()
-            elif err:
-                st.error(err)
-    with b_del:
-        if st.button(
-            del_label,
-            key=f"tt_del_{te_id}",
-            use_container_width=True,
-            help=del_help,
-        ):
-            try:
-                delete_rows("time_entries", {"id": te_id})
-                _clear_row_snap(te_id)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Delete failed: {exc}")
+    with cb:
+        st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+        b_save, b_del = st.columns(2, gap="none")
+        with b_save:
+            if st.button(
+                "Save",
+                key=f"tt_sv_{te_id}",
+                use_container_width=True,
+                help="Save this row",
+            ):
+                ok, err = _persist_time_entry_row(te_id, job_label_to_id)
+                if ok:
+                    st.success("Updated.")
+                    st.rerun()
+                elif err:
+                    st.error(err)
+        with b_del:
+            if st.button(
+                del_label,
+                key=f"tt_del_{te_id}",
+                use_container_width=True,
+                help=del_help,
+            ):
+                try:
+                    delete_rows("time_entries", {"id": te_id})
+                    _clear_row_snap(te_id)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Delete failed: {exc}")
 
 
 def _render_new_entry_form(
@@ -1166,16 +1337,18 @@ def _render_new_entry_form(
         '<p class="ips-tt-field-label">New entry</p>' if fast else '<p class="ips-tt-field-label">Add row</p>',
         unsafe_allow_html=True,
     )
-    st.selectbox(
-        "Job",
-        job_labels_sorted,
-        index=d0,
-        key=f"tt_newj_{employee_id}_{work_date_iso}",
-        label_visibility="collapsed",
-    )
-    nh1, nh2 = st.columns([1, 2], gap="small")
-    with nh1:
-        st.markdown('<p class="ips-tt-field-label">Hours</p>', unsafe_allow_html=True)
+    nj1, nj2, nj3, nj4 = st.columns([2.15, 0.62, 1.55, 0.95], gap="none")
+    with nj1:
+        st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+        st.selectbox(
+            "Job",
+            job_labels_sorted,
+            index=d0,
+            key=f"tt_newj_{employee_id}_{work_date_iso}",
+            label_visibility="collapsed",
+        )
+    with nj2:
+        st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
         st.number_input(
             "Hours",
             min_value=0.0,
@@ -1185,94 +1358,96 @@ def _render_new_entry_form(
             key=f"tt_newh_{employee_id}_{work_date_iso}",
             label_visibility="collapsed",
         )
-    with nh2:
+    with nj3:
         st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
         st.text_input(
             "Notes",
             value="",
             key=f"tt_newn_{employee_id}_{work_date_iso}",
             label_visibility="collapsed",
-            placeholder="Optional notes",
+            placeholder="Notes",
         )
-    dup_label = "Dup" if fast else "Duplicate"
-    ba, bd = st.columns(2, gap="small")
-    with ba:
-        if st.button(
-            "Add",
-            key=f"tt_add_{employee_id}_{work_date_iso}",
-            use_container_width=True,
-            help="Add time entry",
-        ):
-            job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
-            hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
-            note = str(st.session_state.get(f"tt_newn_{employee_id}_{work_date_iso}") or "").strip()
-            jid = job_label_to_id.get(job_pick) if isinstance(job_pick, str) else None
-            if not jid:
-                st.error("Invalid job.")
-                st.stop()
-            if hrs <= 0:
-                st.error("Enter hours greater than zero.")
-                st.stop()
-            payload = {
-                "employee_id": employee_id,
-                "job_id": jid,
-                "work_date": work_date_iso[:10],
-                "hours": float(hrs),
-                "notes": note,
-                "created_by": current_profile().get("id"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            try:
-                insert_row("time_entries", payload)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Could not add (duplicate job for this day?): {exc}")
-    with bd:
-        dup_key = f"tt_dup_{employee_id}_{work_date_iso}"
-        if st.button(
-            dup_label,
-            key=dup_key,
-            use_container_width=True,
-            help="Copy last line this day (or filter job + default hours)",
-        ):
-            src = entries_for_day[-1] if entries_for_day else None
-            if src:
-                sjid = str(src.get("job_id") or "")
-                slabel = _job_label_for_id(job_label_to_id, sjid)
-                if not slabel:
-                    st.error("Could not resolve job for duplicate.")
-                    st.stop()
-                hrs = float(src.get("hours") or 0) or def_h
-                note = str(src.get("notes") or "").strip()
-                jid = job_label_to_id.get(slabel)
+    with nj4:
+        st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+        dup_label = "Dup" if fast else "Duplicate"
+        ba, bd = st.columns(2, gap="none")
+        with ba:
+            if st.button(
+                "Add",
+                key=f"tt_add_{employee_id}_{work_date_iso}",
+                use_container_width=True,
+                help="Add time entry",
+            ):
+                job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
+                hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
+                note = str(st.session_state.get(f"tt_newn_{employee_id}_{work_date_iso}") or "").strip()
+                jid = job_label_to_id.get(job_pick) if isinstance(job_pick, str) else None
                 if not jid:
-                    st.error("Invalid job on source row.")
+                    st.error("Invalid job.")
                     st.stop()
-            else:
-                if not default_job_label or default_job_label not in job_label_to_id:
-                    st.error("No line to copy — pick a filter job or add a row first.")
+                if hrs <= 0:
+                    st.error("Enter hours greater than zero.")
                     st.stop()
-                slabel = default_job_label
-                jid = job_label_to_id[slabel]
-                hrs = float(def_h)
-                note = ""
-            if hrs <= 0:
-                st.error("Hours must be greater than zero.")
-                st.stop()
-            payload = {
-                "employee_id": employee_id,
-                "job_id": jid,
-                "work_date": work_date_iso[:10],
-                "hours": float(hrs),
-                "notes": note,
-                "created_by": current_profile().get("id"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            try:
-                insert_row("time_entries", payload)
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Duplicate not added (same job this day?): {exc}")
+                payload = {
+                    "employee_id": employee_id,
+                    "job_id": jid,
+                    "work_date": work_date_iso[:10],
+                    "hours": float(hrs),
+                    "notes": note,
+                    "created_by": current_profile().get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                try:
+                    insert_row("time_entries", payload)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Could not add (duplicate job for this day?): {exc}")
+        with bd:
+            dup_key = f"tt_dup_{employee_id}_{work_date_iso}"
+            if st.button(
+                dup_label,
+                key=dup_key,
+                use_container_width=True,
+                help="Copy last line this day (or filter job + default hours)",
+            ):
+                src = entries_for_day[-1] if entries_for_day else None
+                if src:
+                    sjid = str(src.get("job_id") or "")
+                    slabel = _job_label_for_id(job_label_to_id, sjid)
+                    if not slabel:
+                        st.error("Could not resolve job for duplicate.")
+                        st.stop()
+                    hrs = float(src.get("hours") or 0) or def_h
+                    note = str(src.get("notes") or "").strip()
+                    jid = job_label_to_id.get(slabel)
+                    if not jid:
+                        st.error("Invalid job on source row.")
+                        st.stop()
+                else:
+                    if not default_job_label or default_job_label not in job_label_to_id:
+                        st.error("No line to copy — pick a filter job or add a row first.")
+                        st.stop()
+                    slabel = default_job_label
+                    jid = job_label_to_id[slabel]
+                    hrs = float(def_h)
+                    note = ""
+                if hrs <= 0:
+                    st.error("Hours must be greater than zero.")
+                    st.stop()
+                payload = {
+                    "employee_id": employee_id,
+                    "job_id": jid,
+                    "work_date": work_date_iso[:10],
+                    "hours": float(hrs),
+                    "notes": note,
+                    "created_by": current_profile().get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                try:
+                    insert_row("time_entries", payload)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Duplicate not added (same job this day?): {exc}")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
