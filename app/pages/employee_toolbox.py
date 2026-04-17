@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import html
 import re
 import uuid
@@ -7,6 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
+
+# Module-level handle for nested callbacks (e.g. delete confirm). Using this avoids
+# UnboundLocalError if an outer scope ever binds the name `st`.
+_streamlit = st
 
 try:
     from app.auth import current_role
@@ -68,7 +73,7 @@ _PANEL_MODE_KEY = "employee_toolbox_panel_mode"
 _EDIT_ID_KEY = "employee_toolbox_edit_id"
 _DELETE_PREFIX = "employee_toolbox_delete"
 _PENDING_DELETE_KEY = "employee_toolbox_pending_delete_ids"
-_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v5"
+_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v6"
 
 _FETCH_COLUMNS = (
     "id,title,url,description,category,is_active,sort_order,created_at,"
@@ -129,8 +134,61 @@ def _is_file_row(row: dict) -> bool:
     return bool(str(row.get("file_path") or "").strip())
 
 
+def _employee_toolbox_assets_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets"
+
+
+# Map normalized titles (see _norm_title_for_brand_lookup) to PNGs under ``assets/``.
+_BRAND_TITLE_TO_IMAGE: dict[str, str] = {
+    "employee handbook": "ips_employee_handbook.png",
+    "contract welder agreement": "ips_welder_service_agreement.png",
+    "pipe tap chart": "ips_pipe_tap.png",
+    "bolt tap chart bolt torque specs": "ips_bolt_torque.png",
+    "#150 flange bolt chart": "ips_flange_150.png",
+    "150 flange bolt chart": "ips_flange_150.png",
+    "conduit wire fill": "ips_conduit_fill.png",
+    "handrail standard": "ips_handrail_standard.png",
+    "wire size": "ips_wire_size.png",
+    "tap/drill": "ips_tap_drill.png",
+    "tap drill": "ips_tap_drill.png",
+}
+
+
+def _norm_title_for_brand_lookup(raw: str) -> str:
+    s = " ".join(str(raw or "").split()).strip().lower()
+    s = s.replace("/", " ")
+    s = " ".join(s.split())
+    return s
+
+
+def _brand_image_path_for_title(title_raw: str) -> Path | None:
+    """Return path to a branded tile image when title matches and the file exists on disk."""
+    n = _norm_title_for_brand_lookup(title_raw)
+    fn = _BRAND_TITLE_TO_IMAGE.get(n)
+    if not fn:
+        n2 = " ".join(n.replace("#", " ").split())
+        n2 = " ".join(n2.split())
+        fn = _BRAND_TITLE_TO_IMAGE.get(n2)
+    if not fn:
+        return None
+    p = _employee_toolbox_assets_dir() / fn
+    return p if p.is_file() else None
+
+
+def _image_to_data_uri(path: Path) -> str:
+    ext = path.suffix.lower()
+    if ext in (".jpg", ".jpeg"):
+        mime = "image/jpeg"
+    elif ext == ".webp":
+        mime = "image/webp"
+    else:
+        mime = "image/png"
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
 def _toolbox_file_icon(file_name: str) -> str:
-    """Tile icons: PDF / Word / Excel / generic file (app-style launcher)."""
+    """Fallback tile icons: PDF / Word / Excel / generic file when no branded image."""
     ext = Path(file_name).suffix.lower()
     if ext == ".pdf":
         return "📄"
@@ -182,10 +240,23 @@ def _tile_visual_inner_html(
     can_manage: bool,
     active: bool,
     hint: str,
+    brand_image_path: Path | None = None,
 ) -> str:
-    """Inner HTML: icon (top) → title → category badge → optional one-line desc → hint."""
+    """Inner HTML: branded image or icon (top) → title → category badge → optional one-line desc → hint."""
+    if brand_image_path is not None and brand_image_path.is_file():
+        try:
+            data_uri = _image_to_data_uri(brand_image_path)
+            top_html = (
+                '<div class="ips-toolbox-tile-thumb">'
+                f'<img src="{html.escape(data_uri, quote=True)}" alt="" loading="lazy" />'
+                "</div>"
+            )
+        except OSError:
+            top_html = f'<p class="ips-toolbox-tile-icon">{icon}</p>'
+    else:
+        top_html = f'<p class="ips-toolbox-tile-icon">{icon}</p>'
     parts: list[str] = [
-        f'<p class="ips-toolbox-tile-icon">{icon}</p>',
+        top_html,
         f'<p class="ips-toolbox-tile-title">{html.escape(title)}</p>',
         f'<div class="ips-toolbox-tile-badges"><span class="ips-toolbox-badge">{html.escape(badge)}</span></div>',
     ]
@@ -290,6 +361,25 @@ def _inject_toolbox_hub_styles() -> None:
             margin: 0 0 12px 0;
             user-select: none;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+        }
+        div.ips-toolbox-tile-thumb {
+            text-align: center;
+            margin: 0 0 12px 0;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        div.ips-toolbox-tile-thumb img {
+            max-height: 96px;
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 10px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+            user-select: none;
+            pointer-events: none;
         }
         p.ips-toolbox-tile-title {
             color: #f8fafc !important;
@@ -831,6 +921,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
         str(row.get("original_filename") or row.get("file_name") or "").strip() or Path(fp).name or "document"
     )
     icon = _toolbox_file_icon(fn_display) if is_file else "🔗"
+    brand_path = _brand_image_path_for_title(title_raw)
 
     ref = ""
     use_dl_overlay = False
@@ -868,6 +959,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                     can_manage=can_manage,
                     active=active,
                     hint="",
+                    brand_image_path=brand_path,
                 )
                 st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
                 st.markdown('<p class="ips-toolbox-tile-meta">File unavailable</p>', unsafe_allow_html=True)
@@ -881,6 +973,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                     can_manage=can_manage,
                     active=active,
                     hint="Open",
+                    brand_image_path=brand_path,
                 )
                 st.markdown(
                     f'<a class="ips-toolbox-tile-link" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
@@ -898,6 +991,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         can_manage=can_manage,
                         active=active,
                         hint="Download",
+                        brand_image_path=brand_path,
                     )
                     st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
                     ctype = str(row.get("content_type") or "").strip() or "application/octet-stream"
@@ -920,6 +1014,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         can_manage=can_manage,
                         active=active,
                         hint="",
+                        brand_image_path=brand_path,
                     )
                     st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
                     st.markdown('<p class="ips-toolbox-tile-meta">Missing file</p>', unsafe_allow_html=True)
@@ -934,6 +1029,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                 can_manage=can_manage,
                 active=active,
                 hint="Open",
+                brand_image_path=brand_path,
             )
             st.markdown(
                 f'<a class="ips-toolbox-tile-link" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
@@ -949,6 +1045,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                 can_manage=can_manage,
                 active=active,
                 hint="",
+                brand_image_path=brand_path,
             )
             st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
             st.markdown('<p class="ips-toolbox-tile-meta">No URL</p>', unsafe_allow_html=True)
@@ -1055,21 +1152,21 @@ def render() -> None:
                 try:
                     delete_rows_admin(_TABLE, {"id": lid})
                 except Exception as exc:
-                    st.error(f"Could not delete {lid}: {exc}")
+                    _streamlit.error(f"Could not delete {lid}: {exc}")
                     continue
                 if is_file:
                     try:
                         delete_storage_object_admin(fp)
                     except Exception as exc:
-                        st.warning(f"Could not remove stored file for {lid}: {exc}")
-            st.session_state.pop(_PENDING_DELETE_KEY, None)
-            eid = st.session_state.get(_EDIT_ID_KEY)
+                        _streamlit.warning(f"Could not remove stored file for {lid}: {exc}")
+            _streamlit.session_state.pop(_PENDING_DELETE_KEY, None)
+            eid = _streamlit.session_state.get(_EDIT_ID_KEY)
             if eid and str(eid) in {str(x) for x in pending}:
                 _clear_toolbox_panel()
-            st.success("Deleted where permitted.")
+            _streamlit.success("Deleted where permitted.")
 
         def _on_cancel_delete() -> None:
-            st.session_state.pop(_PENDING_DELETE_KEY, None)
+            _streamlit.session_state.pop(_PENDING_DELETE_KEY, None)
 
         render_destructive_confirmation(
             key_prefix=_DELETE_PREFIX,
