@@ -63,6 +63,7 @@ from pages.estimate_editor import (
     coalesce_imported_estimate,
     ensure_state,
     insert_imported_estimate,
+    merge_estimate_row_scalar_fields_into_editor,
     parse_estimate_json_bytes,
     render_estimate_editor,
 )
@@ -207,6 +208,7 @@ def _load_estimate_into_session(selected_id: str) -> None:
         "po_date": str(row.get("po_date") or ""),
         "po_amount": float(row.get("po_amount", 0) or 0),
     })
+    merge_estimate_row_scalar_fields_into_editor(row, loaded)
     # Only fill missing numeric fields; never overwrites real saved values.
     try:
         from pages.estimate_editor import ensure_numeric_defaults

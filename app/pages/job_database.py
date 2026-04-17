@@ -18,8 +18,8 @@ from db import (
     fetch_jobs_with_order_fallback,
     fetch_table,
     fetch_table_admin,
-    insert_row,
-    update_rows,
+    insert_row_admin,
+    update_rows_admin,
 )
 
 try:
@@ -506,7 +506,7 @@ def _render_job_form_panel(
                 }
                 if has_job_number_column:
                     payload["job_number"] = next_job_number()
-                insert_row("jobs", payload)
+                insert_row_admin("jobs", payload)
                 _clear_job_mode()
                 st.success("Job created.")
                 st.rerun()
@@ -536,7 +536,7 @@ def _render_job_form_panel(
                     "awarded_amount": float(awarded_amount or 0),
                     "notes": notes.strip(),
                 }
-                update_rows("jobs", payload, {"id": selected_job["id"]})
+                update_rows_admin("jobs", payload, {"id": selected_job["id"]})
                 _clear_job_mode()
                 st.success("Job updated.")
                 st.rerun()

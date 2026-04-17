@@ -135,6 +135,23 @@ _PROFILE_CARD_CSS = """
     margin: 0 0 8px 0;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
+/* Quick Edit active: full-width callout */
+.ips-ad-edit-mode-banner {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #fffbeb;
+    background: linear-gradient(90deg, rgba(180, 83, 9, 0.55), rgba(217, 119, 6, 0.7), rgba(180, 83, 9, 0.55));
+    border: 1px solid rgba(251, 191, 36, 0.85);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 0 0 14px 0;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
 .ips-badge-rental {
     display: inline-block;
     background: rgba(56, 189, 248, 0.2);
@@ -614,7 +631,7 @@ def _render_asset_title_quick_edit(
                 st.session_state["asset_detail_flash"] = "Quick changes saved."
                 st.session_state[qe_key] = False
                 st.rerun()
-        st.caption("Exit Quick Edit (✏️) to use the full **rental rates** form below.")
+        st.caption("**Rental rates**, **uploads**, and **AI autofill** are available below while Quick Edit is active.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1242,6 +1259,7 @@ def render() -> None:
     is_narrow = bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY, False))
 
     qe_key = f"ad_quick_edit_{aid}"
+    # In-page edit mode (✏️): rental form, uploads, AI. ``asset_edit_id`` is for Asset Manager full-form edit, not this page.
     quick_edit = can_edit and bool(st.session_state.get(qe_key, False))
 
     _sync_asset_gallery_preview_query(str(aid))
@@ -1298,6 +1316,12 @@ def render() -> None:
                 st.session_state["asset_return_to"] = "asset_detail"
                 st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
                 st.rerun()
+
+    if quick_edit:
+        st.markdown(
+            '<div class="ips-ad-edit-mode-banner" role="status">Editing Asset</div>',
+            unsafe_allow_html=True,
+        )
 
     # --- Hero: large image + title + compact facts / QR ---
     with st.container(border=True):
@@ -1395,7 +1419,9 @@ def render() -> None:
         if photo_rows:
             _render_asset_uploaded_files_gallery(str(aid), photo_rows, asset, can_edit, mobile=is_narrow)
         else:
-            st.caption("No photos yet. Use **Upload photos** in **Asset updates** below.")
+            st.caption(
+                "No photos yet. Open **Quick Edit** (✏️) to use **Upload photos** in **Asset updates**."
+            )
 
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-docs"></span>', unsafe_allow_html=True)
@@ -1413,7 +1439,8 @@ def render() -> None:
     if not can_edit:
         st.info("You can view this profile. Admin or estimator role is required for check-out and other actions.")
     else:
-        if not quick_edit:
+        # Full rental form + uploads + AI only while Quick Edit (✏️) is active — same session keys as before.
+        if quick_edit:
             st.markdown("##### Rent to Customer")
             st.caption("Flag for customer rental and optional daily / weekly / monthly rates.")
             rc1 = st.checkbox(
@@ -1475,66 +1502,66 @@ def render() -> None:
                     st.success("Rental settings saved.")
                     st.rerun()
 
-        st.markdown("##### Asset updates")
-        st.caption("Upload images or PDFs, then **Upload photos** or **Run AI autofill**.")
-        _up_lbl = (
-            "Photos & files"
-            if is_narrow
-            else "Equipment photos & files (images → **Photos**; PDFs → **Documents**)"
-        )
-        if is_narrow:
-            detail_photos = st.file_uploader(
-                _up_lbl,
-                type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
-                accept_multiple_files=True,
-                key=f"ad_photos_{aid}",
-                help="PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI.",
+            st.markdown("##### Asset updates")
+            st.caption("Upload images or PDFs, then **Upload photos** or **Run AI autofill**.")
+            _up_lbl = (
+                "Photos & files"
+                if is_narrow
+                else "Equipment photos & files (images → **Photos**; PDFs → **Documents**)"
             )
-            st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
-            pa1, pa2 = st.columns(2)
-            with pa1:
-                upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
-            with pa2:
-                run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            _au_u, _au_b = st.columns([2.5, 1])
-            with _au_u:
+            if is_narrow:
                 detail_photos = st.file_uploader(
                     _up_lbl,
                     type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
                     accept_multiple_files=True,
                     key=f"ad_photos_{aid}",
-                    help="Supported: PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
+                    help="PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI.",
                 )
-            with _au_b:
                 st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
-                upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
-                run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
+                pa1, pa2 = st.columns(2)
+                with pa1:
+                    upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
+                with pa2:
+                    run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-
-        if upload_photos:
-            if not detail_photos:
-                st.error("Choose one or more photos first.")
             else:
-                batch = [{"file_name": f.name, "file_bytes": f.getvalue(), "photo_type": "overview"} for f in detail_photos]
-                append_asset_photos(asset, batch, uploaded_by=current_profile().get("id"))
-                st.success("Photos saved.")
+                _au_u, _au_b = st.columns([2.5, 1])
+                with _au_u:
+                    detail_photos = st.file_uploader(
+                        _up_lbl,
+                        type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
+                        accept_multiple_files=True,
+                        key=f"ad_photos_{aid}",
+                        help="Supported: PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
+                    )
+                with _au_b:
+                    st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
+                    upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
+                    run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-        if run_ai:
-            if not detail_photos:
-                st.error("Choose one or more files before running AI autofill.")
-            else:
-                try:
-                    with st.spinner("Analyzing uploads…"):
-                        batch_tuples = [(f.getvalue(), f.name) for f in detail_photos]
-                        result = extract_asset_from_photos(batch_tuples)
-                    apply_extraction_to_asset(asset, result)
-                    st.session_state["asset_detail_flash"] = "Asset fields updated from AI — review history and notes below."
-                except ValueError as exc:
-                    st.error(str(exc))
-                except Exception as exc:
-                    st.error(f"AI autofill failed: {exc}")
+            if upload_photos:
+                if not detail_photos:
+                    st.error("Choose one or more photos first.")
+                else:
+                    batch = [{"file_name": f.name, "file_bytes": f.getvalue(), "photo_type": "overview"} for f in detail_photos]
+                    append_asset_photos(asset, batch, uploaded_by=current_profile().get("id"))
+                    st.success("Photos saved.")
+
+            if run_ai:
+                if not detail_photos:
+                    st.error("Choose one or more files before running AI autofill.")
+                else:
+                    try:
+                        with st.spinner("Analyzing uploads…"):
+                            batch_tuples = [(f.getvalue(), f.name) for f in detail_photos]
+                            result = extract_asset_from_photos(batch_tuples)
+                        apply_extraction_to_asset(asset, result)
+                        st.session_state["asset_detail_flash"] = "Asset fields updated from AI — review history and notes below."
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    except Exception as exc:
+                        st.error(f"AI autofill failed: {exc}")
 
         act = st.session_state.get("asset_detail_action")
         if act:

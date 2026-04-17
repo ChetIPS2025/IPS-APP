@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from collections import Counter
 from datetime import datetime
 import difflib
@@ -427,7 +428,7 @@ def create_or_get_job_by_name(name: str, *, customer_id: str | None) -> tuple[st
 
 
 def blank_estimate() -> dict:
-    return {
+    out = {
         "quote_number": "",
         "customer_id": None,
         "customer_contact_id": None,
@@ -462,7 +463,150 @@ def blank_estimate() -> dict:
         "po_number": "",
         "po_date": "",
         "po_amount": 0.0,
+        "prepared_by_id": "",
+        "prepared_by_name": "",
     }
+    _apply_default_prepared_by_from_profile(out)
+    return out
+
+
+_UUID_LOOSE = re.compile(r"^[0-9a-fA-F-]{36}$")
+
+
+def _estimate_table_column_names() -> frozenset[str]:
+    """Best-effort column set for ``public.estimates`` (cached per session)."""
+    cache_key = "_ips_estimates_physical_columns_v1"
+    cached = st.session_state.get(cache_key)
+    if isinstance(cached, frozenset):
+        return cached
+    try:
+        rows = fetch_table_admin("estimates", limit=1)
+        cols = frozenset(rows[0].keys()) if rows else frozenset()
+    except Exception:
+        cols = frozenset()
+    st.session_state[cache_key] = cols
+    return cols
+
+
+def _prepared_by_use_admin_fetch() -> bool:
+    return current_role() in {"admin", "estimator"}
+
+
+def _fetch_prepared_by_choices() -> list[tuple[str, str]]:
+    """
+    Roster for **Estimate Prepared By**: login profiles plus employees.
+
+    Keys are ``p:<profile_uuid>`` or ``e:<employee_uuid>`` so references stay unambiguous.
+    """
+    cache_key = "_est_prepared_by_roster_v1"
+    hit = st.session_state.get(cache_key)
+    if isinstance(hit, list):
+        return hit
+
+    def _profiles() -> list[dict]:
+        if _prepared_by_use_admin_fetch():
+            return fetch_table_admin(
+                "profiles",
+                columns="id,full_name,email,is_active",
+                limit=2000,
+                order_by="full_name",
+            )
+        return fetch_table(
+            "profiles",
+            columns="id,full_name,email,is_active",
+            limit=2000,
+            order_by="full_name",
+        )
+
+    def _employees() -> list[dict]:
+        if _prepared_by_use_admin_fetch():
+            return fetch_table_admin(
+                "employees",
+                columns="id,name,is_active",
+                limit=2000,
+                order_by="name",
+            )
+        return fetch_table(
+            "employees",
+            columns="id,name,is_active",
+            limit=2000,
+            order_by="name",
+        )
+
+    out: list[tuple[str, str]] = []
+    for p in _profiles() or []:
+        if not p.get("is_active", True):
+            continue
+        uid = str(p.get("id") or "").strip()
+        if not uid:
+            continue
+        nm = str(p.get("full_name") or "").strip() or str(p.get("email") or "").strip()
+        label = f"{nm} (account)" if nm else uid
+        out.append((f"p:{uid}", label))
+    for e in _employees() or []:
+        if not e.get("is_active", True):
+            continue
+        eid = str(e.get("id") or "").strip()
+        nm = str(e.get("name") or "").strip()
+        if not eid or not nm:
+            continue
+        out.append((f"e:{eid}", f"{nm} (employee)"))
+    out.sort(key=lambda t: t[1].lower())
+    st.session_state[cache_key] = out
+    return out
+
+
+def _normalize_prepared_by_id_value(raw: str) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    if s.startswith("p:") or s.startswith("e:"):
+        return s
+    if _UUID_LOOSE.match(s):
+        return f"p:{s}"
+    return s
+
+
+def merge_estimate_row_scalar_fields_into_editor(row: dict, loaded: dict) -> None:
+    """Overlay denormalized estimate row columns after ``estimate_json`` is merged."""
+    if "prepared_by_name" in row:
+        v = row.get("prepared_by_name")
+        loaded["prepared_by_name"] = "" if v is None else str(v).strip()
+    if "prepared_by_id" in row:
+        v = row.get("prepared_by_id")
+        loaded["prepared_by_id"] = _normalize_prepared_by_id_value("" if v is None else str(v))
+
+
+def _payload_prepared_by_for_db(est: dict) -> dict:
+    """Subset of ``estimates`` row fields, compatible with older schemas."""
+    cols = _estimate_table_column_names()
+    name = str(est.get("prepared_by_name") or "").strip()
+    pid = _normalize_prepared_by_id_value(str(est.get("prepared_by_id") or "").strip())
+    has_n = "prepared_by_name" in cols
+    has_i = "prepared_by_id" in cols
+    out: dict = {}
+    if has_n and has_i:
+        out["prepared_by_name"] = name[:500] if name else None
+        out["prepared_by_id"] = pid[:200] if pid else None
+    elif has_n:
+        out["prepared_by_name"] = name[:500] if name else None
+    elif has_i:
+        # Single text slot: keep human-readable (name wins over opaque id).
+        slot = (name or pid)[:500] if (name or pid) else None
+        out["prepared_by_id"] = slot
+    return out
+
+
+def _apply_default_prepared_by_from_profile(est: dict) -> None:
+    prof = current_profile()
+    uid = str(prof.get("id") or "").strip()
+    if not uid:
+        return
+    label = str(prof.get("full_name") or "").strip() or str(prof.get("email") or "").strip()
+    if not label:
+        label = uid
+    est["prepared_by_id"] = f"p:{uid}"
+    est["prepared_by_name"] = f"{label} (account)"
 
 
 def ensure_state():
@@ -509,6 +653,9 @@ def ensure_state():
     est0.setdefault("travel", {})
     est0.setdefault("controls", {})
     ensure_numeric_defaults(est0)
+    est0.setdefault("prepared_by_id", "")
+    est0.setdefault("prepared_by_name", "")
+    est0["prepared_by_id"] = _normalize_prepared_by_id_value(str(est0.get("prepared_by_id") or ""))
     # Quote numbers must never change on rerun. We only allocate a new number at commit time
     # (Save / Submit / Approve / Award) for brand-new estimates when quote_number is blank.
     qn = str(est0.get("quote_number", "") or "").strip()
@@ -867,6 +1014,7 @@ def save_revision(estimate_id: str, revision_number: int, snapshot_json: dict, n
 
 
 def persist_estimate(payload: dict, est: dict, revision_note: str = "") -> str:
+    payload = {**payload, **_payload_prepared_by_for_db(est)}
     current_id = st.session_state.get("loaded_estimate_id")
     if current_id:
         current_row = fetch_one("estimates", {"id": current_id}, columns="revision_number")
@@ -1011,6 +1159,11 @@ def insert_imported_estimate(
 
     cid = validate_import_customer_id(est.get("customer_id"))
     est["customer_id"] = cid
+    est.setdefault("prepared_by_id", "")
+    est.setdefault("prepared_by_name", "")
+    if not str(est.get("prepared_by_id") or "").strip() and not str(est.get("prepared_by_name") or "").strip():
+        _apply_default_prepared_by_from_profile(est)
+    est["prepared_by_id"] = _normalize_prepared_by_id_value(str(est.get("prepared_by_id") or ""))
     est_for_storage = _sanitize_estimate_json_for_storage(est)
 
     payload = {
@@ -1042,6 +1195,7 @@ def insert_imported_estimate(
         "revision_number": 1,
         "updated_at": datetime.utcnow().isoformat(),
     }
+    payload.update(_payload_prepared_by_for_db(est))
     inserted = insert_row_admin("estimates", payload)
     estimate_id = str(inserted.get("id", ""))
     save_revision(estimate_id, 1, est_for_storage, f"Imported from {source_file_name}.{note_suffix}")
@@ -1061,6 +1215,62 @@ def insert_imported_estimate(
         },
     )
     return estimate_id, note_suffix
+
+
+_PREP_NONE = "__prep_none__"
+_LEGACY_UNLISTED = "__legacy_unlisted__"
+
+
+def _render_estimate_prepared_by_field(est: dict, *, is_locked: bool) -> None:
+    """Compact select for **Estimate Prepared By** (profiles + employees)."""
+    roster = _fetch_prepared_by_choices()
+    label_by_key: dict[str, str] = {_PREP_NONE: "—"}
+    for k, lab in roster:
+        label_by_key[k] = lab
+    keys: list[str] = [_PREP_NONE] + [k for k, _ in roster]
+
+    cur_id = _normalize_prepared_by_id_value(str(est.get("prepared_by_id") or "").strip())
+    cur_name = str(est.get("prepared_by_name") or "").strip()
+
+    if cur_id and cur_id not in label_by_key:
+        keys.insert(1, cur_id)
+        label_by_key[cur_id] = cur_name or cur_id or "(saved preparer)"
+    if not cur_id and cur_name:
+        keys.insert(1, _LEGACY_UNLISTED)
+        label_by_key[_LEGACY_UNLISTED] = cur_name
+
+    if cur_id and cur_id in label_by_key:
+        sel = cur_id
+    elif cur_id:
+        sel = cur_id
+    elif cur_name:
+        sel = _LEGACY_UNLISTED
+    else:
+        sel = _PREP_NONE
+
+    try:
+        default_idx = keys.index(sel)
+    except ValueError:
+        default_idx = 0
+
+    chosen = st.selectbox(
+        "Estimate Prepared By",
+        options=keys,
+        index=min(default_idx, len(keys) - 1),
+        format_func=lambda k: label_by_key.get(k, k),
+        disabled=is_locked,
+        key="est_prepared_by_select_main",
+        help="Shown on proposals and reports. Pulled from Users (profiles) and Employees.",
+    )
+    if chosen == _PREP_NONE:
+        est["prepared_by_id"] = ""
+        est["prepared_by_name"] = ""
+    elif chosen == _LEGACY_UNLISTED:
+        est["prepared_by_id"] = ""
+        est["prepared_by_name"] = cur_name
+    else:
+        est["prepared_by_id"] = chosen
+        est["prepared_by_name"] = str(label_by_key.get(chosen, "") or "").strip()
 
 
 def _imported_estimate_missing_customer(est: dict, *, pending_pdf_import: bool) -> bool:
@@ -1146,6 +1356,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         "po_date": str(row.get("po_date") or ""),
                         "po_amount": float(row.get("po_amount", 0) or 0),
                     })
+                    merge_estimate_row_scalar_fields_into_editor(row, loaded)
                     ensure_numeric_defaults(loaded)
                     st.session_state["estimate_editor_state"] = loaded
                     st.session_state["loaded_estimate_id"] = selected_id
@@ -1375,8 +1586,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             continue
         job_id_by_norm[_norm_name_key(nm)] = str(j.get("id") or "")
 
-    # Row 2: Contact | Job — second compact row.
-    row2_contact, row2_job = st.columns([1, 1.25], gap="small")
+    # Row 2: Contact | Job | Prepared by — second compact row.
+    row2_contact, row2_job, row2_prep = st.columns([1, 1.15, 1.1], gap="small")
     est.setdefault("customer_contact_id", None)
     with row2_contact:
         if est.get("customer_id"):
@@ -1486,6 +1697,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             if job_pick:
                 st.session_state["est_job_query"] = job_pick
                 st.rerun()
+
+    with row2_prep:
+        _render_estimate_prepared_by_field(est, is_locked=is_locked)
 
     try:
         from table_actions import inject_table_action_styles
@@ -2602,94 +2816,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             and (qn_now or not loaded_id)
         )
 
-        try:
-            from ui import IPS_NAV_PENDING_KEY
-        except ImportError:
-            from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-
-        st.markdown("##### Job from estimate")
-        can_create_job_ui = current_role() in {"admin", "estimator"}
-        do_create = False
-
-        if linked_job_id:
-            with st.container(border=True):
-                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-                _rjn = job_number_display((linked_job_row or {}).get("job_number"))
-                _rjm = str((linked_job_row or {}).get("job_name") or "").strip()
-                _hdr_parts = ["**Linked job**"]
-                if _rjn:
-                    _hdr_parts.append(f"**{_rjn}**")
-                if _rjm:
-                    _hdr_parts.append(_rjm)
-                st.markdown(" · ".join(_hdr_parts), unsafe_allow_html=True)
-                st.caption("This estimate is already linked. Use **Open Job** to view or edit it in Job Database.")
-                if can_create_job_ui:
-                    if st.button("Open Job", type="primary", use_container_width=True, key="est_review_open_job"):
-                        st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                        st.session_state["job_mode"] = "edit"
-                        st.session_state["job_edit_id"] = str(linked_job_id)
-                        st.rerun()
-        else:
-            try:
-                from services.job_from_estimate import (
-                    create_job_from_estimate,
-                    estimate_status_allows_job_creation,
-                )
-            except ImportError:
-                from app.services.job_from_estimate import (  # type: ignore
-                    create_job_from_estimate,
-                    estimate_status_allows_job_creation,
-                )
-            create_job_disabled_reason: str | None = None
-            if not loaded_id:
-                create_job_disabled_reason = "Save the estimate first so it has an id in the database."
-            elif not can_create_job_ui:
-                create_job_disabled_reason = "Only admin or estimator can create jobs."
-            elif not est.get("customer_id"):
-                create_job_disabled_reason = "Select a customer on this estimate before creating a job."
-            elif not estimate_status_allows_job_creation(str(est.get("status") or "")):
-                create_job_disabled_reason = (
-                    "Estimate status is not allowed for job creation (see job_from_estimate settings)."
-                )
-            if create_job_disabled_reason:
-                st.caption(create_job_disabled_reason)
-            cj1, cj2, cj3 = st.columns([1, 1, 2])
-            with cj1:
-                do_create = st.button(
-                    "Create Job from Estimate",
-                    use_container_width=True,
-                    disabled=bool(create_job_disabled_reason),
-                    key="est_review_create_job",
-                )
-            with cj2:
-                st.checkbox(
-                    "After create, open Job Database",
-                    value=True,
-                    key="est_create_job_open_job_db",
-                )
-            with cj3:
-                st.caption("Creates a new **J#####** job and links it to this quote.")
-
-        if not linked_job_id and do_create:
-            res = create_job_from_estimate(str(loaded_id))
-            if res.ok and res.job:
-                jid = str(res.job.get("id") or "")
-                if jid:
-                    est["job_id"] = jid
-                st.success(res.message)
-                if st.session_state.get("est_create_job_open_job_db", True) and jid and can_create_job_ui:
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                    st.session_state["job_mode"] = "edit"
-                    st.session_state["job_edit_id"] = jid
-                    st.rerun()
-            elif res.message:
-                if res.error_code == "duplicate" and res.job and res.job.get("id"):
-                    est["job_id"] = str(res.job.get("id"))
-                if res.error_code == "duplicate":
-                    st.warning(res.message)
-                else:
-                    st.error(res.message)
-
         def _resolve_customer_job_on_commit() -> list[str]:
             msgs: list[str] = []
             # Job (requires customer_id when creating)
@@ -3062,9 +3188,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     signed = create_signed_url(att["storage_path"])
                     if signed:
                         st.markdown(f'- **{att["category"]}**: [{att["file_name"]}]({signed})')
-
-        with st.expander("Draft snapshot (debug)", expanded=False):
-            st.code(json.dumps(est, indent=2), language="json")
 
     # Persistent estimate summary/totals panel (stays visible while editing).
     # This is intentionally rendered outside the tab bodies so it runs regardless of

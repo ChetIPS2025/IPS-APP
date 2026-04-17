@@ -13,9 +13,23 @@ from datetime import datetime
 from typing import Any, FrozenSet
 
 try:
-    from db import fetch_by_match, fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin
+    from db import (
+        fetch_by_match,
+        fetch_by_match_admin,
+        fetch_one,
+        fetch_table,
+        insert_row_admin,
+        update_rows_admin,
+    )
 except ImportError:
-    from app.db import fetch_by_match, fetch_by_match_admin, fetch_one, fetch_table, insert_row, update_rows_admin  # type: ignore
+    from app.db import (  # type: ignore
+        fetch_by_match,
+        fetch_by_match_admin,
+        fetch_one,
+        fetch_table,
+        insert_row_admin,
+        update_rows_admin,
+    )
 
 try:
     from services.job_schema import fetch_jobs_for_job_database
@@ -283,7 +297,7 @@ def create_job_from_estimate(
         payload["job_number"] = next_job_number()
 
     try:
-        inserted = insert_row("jobs", payload)
+        inserted = insert_row_admin("jobs", payload)
     except Exception as exc:
         return CreateJobFromEstimateResult(
             ok=False,
