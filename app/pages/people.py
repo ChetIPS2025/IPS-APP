@@ -7,6 +7,11 @@ import streamlit as st
 
 from auth import current_role
 from branding import render_header
+
+try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 from db import delete_rows_admin, fetch_one, fetch_table, update_rows
 
 try:
@@ -419,7 +424,10 @@ def render() -> None:
         st.error("Admin access required.")
         return
 
-    inject_ips_crud_list_styles()
+    render_crud_list_subtitle(
+        "One directory: employee records (time tracking), login accounts, and linked rows when profile "
+        "full name matches employee name (case-insensitive)."
+    )
 
     if st.session_state.get(_PEOPLE_PANEL_KEY) in ("add_emp", "add_user"):
         st.session_state[_PEOPLE_PANEL_KEY] = "list"
@@ -441,11 +449,6 @@ def render() -> None:
     except Exception as exc:
         st.error(f"Could not load profiles: {exc}")
         profiles = []
-
-    st.caption(
-        "One directory: **Employee** rows (time tracking), **Account** rows (sign-in), and **Linked** when "
-        "the profile **full name** matches the employee **name** (case-insensitive)."
-    )
 
     unified = _build_unified_frame(employees, profiles)
 

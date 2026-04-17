@@ -42,31 +42,31 @@ def inject_ips_app_shell_styles() -> None:
             margin-right: auto;
         }
         section[data-testid="stMain"] .block-container {
-            padding-top: 0.5rem !important;
-            padding-bottom: 2rem !important;
+            padding-top: 0.45rem !important;
+            padding-bottom: 1.25rem !important;
         }
 
         /* ----- Typography hierarchy (Streamlit markdown + headers) ----- */
         section[data-testid="stMain"] h1 {
             color: #f8fafc !important;
-            font-size: 1.65rem !important;
+            font-size: 1.55rem !important;
             font-weight: 750 !important;
             letter-spacing: -0.02em;
-            margin: 0.15rem 0 0.35rem 0 !important;
+            margin: 0.1rem 0 0.28rem 0 !important;
         }
         section[data-testid="stMain"] h2,
         section[data-testid="stMain"] h3 {
             color: #e2e8f0 !important;
-            font-size: 1.12rem !important;
+            font-size: 1.05rem !important;
             font-weight: 650 !important;
-            margin: 0.65rem 0 0.4rem 0 !important;
+            margin: 0.45rem 0 0.28rem 0 !important;
         }
         section[data-testid="stMain"] h4,
         section[data-testid="stMain"] h5 {
             color: #cbd5e1 !important;
-            font-size: 0.98rem !important;
+            font-size: 0.92rem !important;
             font-weight: 600 !important;
-            margin: 0.5rem 0 0.3rem 0 !important;
+            margin: 0.4rem 0 0.22rem 0 !important;
         }
         section[data-testid="stMain"] .stMarkdown p,
         section[data-testid="stMain"] [data-testid="stCaptionContainer"] {
@@ -116,9 +116,10 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Main-area buttons (not sidebar): size + role ----- */
         section[data-testid="stMain"] .stButton > button {
             border-radius: var(--ips-radius) !important;
-            min-height: 2.35rem !important;
+            min-height: 2.25rem !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
+            padding: 0.35rem 0.75rem !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="primary"],
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-primary"] {
@@ -153,6 +154,69 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Sidebar: slightly tighter on all sizes ----- */
         section[data-testid="stSidebar"] .block-container {
             padding-top: 0.5rem !important;
+        }
+
+        /* ----- Compact main widgets (dense business pages) ----- */
+        section[data-testid="stMain"] [data-testid="stTextInput"] input,
+        section[data-testid="stMain"] [data-testid="stTextArea"] textarea {
+            min-height: 2.05rem !important;
+            padding-top: 0.28rem !important;
+            padding-bottom: 0.28rem !important;
+            font-size: 0.875rem !important;
+        }
+        section[data-testid="stMain"] [data-testid="stNumberInput"] input {
+            min-height: 2.05rem !important;
+            font-size: 0.875rem !important;
+        }
+        section[data-testid="stMain"] [data-baseweb="select"] > div {
+            min-height: 2.1rem !important;
+            font-size: 0.875rem !important;
+        }
+        section[data-testid="stMain"] .stMetric {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            border-radius: var(--ips-radius-lg);
+            padding: 0.45rem 0.55rem !important;
+        }
+        section[data-testid="stMain"] [data-testid="stMetricLabel"] {
+            font-size: 0.72rem !important;
+        }
+        section[data-testid="stMain"] [data-testid="stMetricValue"] {
+            font-size: 1.05rem !important;
+        }
+
+        /* ----- Dashboard / summary strips ----- */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
+            padding: 6px 8px 8px 8px !important;
+            margin-bottom: 8px !important;
+            background: rgba(15, 23, 42, 0.5) !important;
+            border-color: rgba(100, 116, 139, 0.38) !important;
+        }
+
+        /* ----- Estimate editor: totals strip + document-style proposal surface ----- */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
+            padding: 6px 8px 8px 8px !important;
+            margin-bottom: 0.45rem !important;
+            background: rgba(15, 23, 42, 0.55) !important;
+            border-color: rgba(100, 116, 139, 0.38) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
+            background: rgba(248, 250, 252, 0.04) !important;
+            border-color: rgba(148, 163, 184, 0.35) !important;
+            padding: 10px 12px 12px 12px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) .stMarkdown p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) [data-testid="stCaptionContainer"] {
+            color: #cbd5e1 !important;
+        }
+
+        /* ----- Destructive (Streamlit tertiary when available) ----- */
+        section[data-testid="stMain"] .stButton > button[kind="tertiary"],
+        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-tertiary"] {
+            color: #fecaca !important;
+            border-color: rgba(248, 113, 113, 0.45) !important;
+            background: rgba(127, 29, 29, 0.22) !important;
+            font-weight: 500 !important;
         }
         </style>
         """,

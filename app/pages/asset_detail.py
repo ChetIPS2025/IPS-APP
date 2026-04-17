@@ -78,8 +78,8 @@ except ImportError:
 _PRIMARY_IMAGE_WIDTH_DESKTOP = 520
 _PRIMARY_IMAGE_WIDTH_MOBILE = 280
 # QR in hero: secondary, compact (still scannable).
-_QR_IMAGE_WIDTH_DESKTOP = 152
-_QR_IMAGE_WIDTH_MOBILE = 132
+_QR_IMAGE_WIDTH_DESKTOP = 118
+_QR_IMAGE_WIDTH_MOBILE = 102
 
 _PROFILE_CARD_CSS = """
 <style>
@@ -1000,16 +1000,15 @@ def render() -> None:
                 _render_asset_facts_panel(asset, jobs, quick_edit=quick_edit)
                 _render_asset_detail_qr_block(asset, str(aid), compact=False)
 
-    # --- Dashboard actions: one aligned row (equal-width buttons; mobile stacks via asset_responsive) ---
+    # --- Field actions (always for editors) + edit-only actions (Quick Edit on) ---
     if can_edit:
         st.markdown('<div class="ips-ad-actions-hero"></div>', unsafe_allow_html=True)
-        st.markdown("##### Actions")
+        st.markdown("##### Field actions")
         st.markdown(
             '<div class="ips-ad-actions-primary ips-ad-actions-service ips-ad-dash-actions">',
             unsafe_allow_html=True,
         )
-        _n_action = 7 if current_role() == "admin" else 6
-        _ac = st.columns(_n_action)
+        _ac = st.columns(5)
         with _ac[0]:
             if st.button("Check out", key=f"ad_co_{aid}", use_container_width=True):
                 st.session_state["asset_detail_action"] = "checkout"
@@ -1025,14 +1024,21 @@ def render() -> None:
         with _ac[4]:
             if st.button("Add inspection", key=f"ad_insp_{aid}", use_container_width=True):
                 st.session_state["asset_detail_action"] = "insp"
-        with _ac[5]:
-            if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
-                st.session_state["asset_detail_action"] = "doc"
-        if _n_action == 7:
-            with _ac[6]:
-                if st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True):
-                    st.session_state["asset_detail_action"] = "delete"
         st.markdown("</div>", unsafe_allow_html=True)
+
+        if quick_edit:
+            st.caption("While **Quick Edit** is on: upload documents or remove this asset.")
+            if current_role() == "admin":
+                ed1, ed2 = st.columns(2, gap="small")
+                with ed1:
+                    if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
+                        st.session_state["asset_detail_action"] = "doc"
+                with ed2:
+                    if st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True):
+                        st.session_state["asset_detail_action"] = "delete"
+            else:
+                if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
+                    st.session_state["asset_detail_action"] = "doc"
 
     detail_photos = None
     upload_photos_clicked = False

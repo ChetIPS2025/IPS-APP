@@ -263,11 +263,20 @@ def _toolbox_document_title_two_lines(raw: str) -> tuple[str, str | None]:
     """
     Split a document title into one or two plain-text lines (tile + download overlay).
 
-    Two or more words: first ``ceil(n/2)`` words on line 1, remainder on line 2 — e.g.
-    ``#150 Flange Bolt Chart`` → ``#150 Flange`` / ``Bolt Chart``;
-    ``Pipe Tap Chart`` → ``Pipe Tap`` / ``Chart`` (uppercase applied via CSS or caller).
+    Explicit ``\\n`` forces a two-line split. Otherwise two or more words: first ``ceil(n/2)``
+    words on line 1, remainder on line 2.
     """
-    s = " ".join(str(raw or "").split()).strip()
+    s0 = str(raw or "").strip()
+    if not s0:
+        return ("—", None)
+    if "\n" in s0:
+        a, b = s0.split("\n", 1)
+        a, b = a.strip(), b.strip()
+        if a and b:
+            return (a, b)
+        s = " ".join((a or b).split()).strip()
+    else:
+        s = " ".join(s0.split()).strip()
     if not s:
         return ("—", None)
     words = s.split()
@@ -302,14 +311,14 @@ def _truncate_overlay_button_line(s: str, *, max_len: int = 28) -> str:
 
 
 def _download_overlay_button_label(*, title_raw: str, file_fallback: str) -> str:
-    """Visible label on the full-tile download overlay: ``row['title']``, two lines, uppercase, no generic text."""
+    """Visible label on the full-tile download overlay — preserves file name casing."""
     base = str(title_raw or "").strip() or str(file_fallback or "").strip() or "Document"
     a, b = _toolbox_document_title_two_lines(base)
-    la = _truncate_overlay_button_line(a.upper(), max_len=28)
+    la = _truncate_overlay_button_line(a, max_len=30)
     if b:
-        lb = _truncate_overlay_button_line(b.upper(), max_len=28)
+        lb = _truncate_overlay_button_line(b, max_len=30)
         return f"{la}\n{lb}"
-    return _truncate_overlay_button_line(la, max_len=32)
+    return _truncate_overlay_button_line(la, max_len=34)
 
 
 def _normalize_url(url: str) -> str:
@@ -540,11 +549,11 @@ def _inject_toolbox_hub_styles() -> None:
             max-height: 3.1em;
             display: block;
             white-space: pre-line;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
+            text-transform: none;
+            letter-spacing: 0.01em;
             word-break: break-word;
             overflow-wrap: anywhere;
-            font-weight: 700 !important;
+            font-weight: 650 !important;
             overflow: hidden;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile--fullbleed.ips-toolbox-tile-dl) div[data-testid="stButton"] > button {
@@ -626,11 +635,11 @@ def _inject_toolbox_hub_styles() -> None:
         }
         p.ips-toolbox-launcher-title {
             color: #f1f5f9 !important;
-            font-size: 0.72rem !important;
-            font-weight: 700 !important;
+            font-size: 0.76rem !important;
+            font-weight: 650 !important;
             text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
+            text-transform: none;
+            letter-spacing: 0.01em;
             margin: 2px 0 0 0 !important;
             line-height: 1.22 !important;
             min-height: 2.2em;
@@ -1164,7 +1173,6 @@ def _render_edit_tool_panel(*, row: dict, existing_rows: list[dict]) -> None:
 
 def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
     """App-launcher tile: whole-tile open/link, overlay download, small admin actions."""
-    title_inner_html = _build_tile_title_inner_html(str(row.get("title") or "").strip())
     desc = str(row.get("description") or "").strip()
     url = str(row.get("url") or "").strip()
     rid = str(row.get("id") or "")
@@ -1175,6 +1183,15 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
     fn_display = (
         str(row.get("original_filename") or row.get("file_name") or "").strip() or Path(fp).name or "document"
     )
+    title_lbl = str(row.get("title") or "").strip()
+    if is_file and fn_display:
+        if title_lbl and title_lbl.lower() != fn_display.lower():
+            display_raw = f"{fn_display}\n{title_lbl}"
+        else:
+            display_raw = fn_display
+    else:
+        display_raw = title_lbl or fn_display or "—"
+    title_inner_html = _build_tile_title_inner_html(display_raw)
     icon = _toolbox_file_icon(fn_display) if is_file else "🔗"
     brand_path = _brand_image_path_for_title(str(row.get("title") or "").strip())
 
@@ -1296,10 +1313,10 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                     )
                     ctype = str(row.get("content_type") or "").strip() or "application/octet-stream"
                     _dl_lbl = _download_overlay_button_label(
-                        title_raw=str(row.get("title") or "").strip(),
+                        title_raw=fn_display,
                         file_fallback=fn_display,
                     )
-                    _t_disp = str(row.get("title") or "").strip()
+                    _t_disp = str(row.get("title") or "").strip() or fn_display
                     _dl_help = " — ".join(
                         [p for p in (_t_disp, desc) if p]
                     ) or f"Download {_t_disp or fn_display}"

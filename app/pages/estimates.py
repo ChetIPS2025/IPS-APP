@@ -7,6 +7,11 @@ import pandas as pd
 import streamlit as st
 
 from branding import render_header
+
+try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 from auth import current_role
 from db import (
     delete_rows_admin,
@@ -813,13 +818,13 @@ def render() -> None:
     inject_table_action_styles()
 
     if view == "list":
-        st.caption("Search and open estimates, create new, or import JSON / PDF quotes.")
+        render_crud_list_subtitle("Search and open estimates, create new rows, or import JSON / PDF vendor quotes.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
                 unsafe_allow_html=True,
             )
-            a1, a2, a3 = st.columns([1, 1, 2])
+            a1, a2 = st.columns(2, gap="small")
             with a1:
                 if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):
                     _reset_estimate_editor_transients(clear_import_hints=True)
@@ -842,7 +847,7 @@ def render() -> None:
         _render_estimate_list()
 
     elif view == "import":
-        st.caption("Upload PDF vendor quotes or JSON estimate exports.")
+        render_crud_list_subtitle("Upload PDF vendor quotes or JSON estimate exports, then return to the editor.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
@@ -858,12 +863,13 @@ def render() -> None:
 
     else:
         # view == "edit"
+        render_crud_list_subtitle("Line items, proposal export, and approval — use **Back to list** when finished.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
                 unsafe_allow_html=True,
             )
-            c1, c2, c3 = st.columns([1, 1, 4])
+            c1, c2 = st.columns(2, gap="small")
             with c1:
                 if st.button("← Back to list", type="secondary", use_container_width=True, key="est_ed_back"):
                     _reset_estimate_editor_transients(clear_import_hints=True)
@@ -879,6 +885,4 @@ def render() -> None:
                     _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimates_view"] = "import"
                     st.rerun()
-            with c3:
-                pass
         render_estimate_editor(embedded=True)

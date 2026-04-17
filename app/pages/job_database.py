@@ -42,6 +42,11 @@ except ImportError:
     )
 
 try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+
+try:
     from services.customer_contacts import (
         contact_none_option_label,
         contact_option_label,
@@ -548,6 +553,7 @@ def _render_job_form_panel(
 
 def render() -> None:
     render_header("Job Database")
+    render_crud_list_subtitle("Search and maintain jobs, link estimates, and keep customer contacts aligned.")
 
     can_edit = current_role() in {"admin", "estimator"}
     st.session_state.setdefault("job_db_bypass_filters", True)
@@ -623,26 +629,26 @@ def render() -> None:
     except Exception:
         pass
 
-    qa1, qa2, qa3 = st.columns(3)
-    with qa1:
-        if st.button(
-            "Add job",
-            type="primary",
-            use_container_width=True,
-            disabled=not can_edit,
-            key="job_qa_add",
-        ):
-            st.session_state["job_mode"] = "add"
-            st.session_state.pop("job_edit_id", None)
-            st.rerun()
-    with qa2:
-        if st.button("Refresh jobs", use_container_width=True, key="job_qa_refresh"):
-            st.rerun()
-    with qa3:
-        st.markdown(
-            '<p style="font-size:1.05rem;margin:0.35rem 0 0 0;">View jobs: use the list below.</p>',
-            unsafe_allow_html=True,
-        )
+    inject_table_action_styles()
+    with st.container(border=True):
+        st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+        qa1, qa2, qa3 = st.columns([1, 1, 2], gap="small")
+        with qa1:
+            if st.button(
+                "Add job",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_edit,
+                key="job_qa_add",
+            ):
+                st.session_state["job_mode"] = "add"
+                st.session_state.pop("job_edit_id", None)
+                st.rerun()
+        with qa2:
+            if st.button("Refresh", type="secondary", use_container_width=True, key="job_qa_refresh"):
+                st.rerun()
+        with qa3:
+            st.caption("Select rows in the table for bulk actions · double-click a row label to focus details.")
 
     with st.expander("Database debug & checklist", expanded=False):
         st.write("DEBUG - Job Count:", len(jobs))

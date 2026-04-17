@@ -11,6 +11,7 @@ try:
     from app.asset_responsive import inject_asset_workflow_mobile_css
     from app.auth import current_role
     from app.branding import render_header
+    from app.ips_crud_list_styles import render_crud_list_subtitle
     from app.db import delete_rows_admin, fetch_table
     from app.pages.asset_database import (
         ASSET_TABLE_COLS,
@@ -24,6 +25,7 @@ except ImportError:
     from asset_responsive import inject_asset_workflow_mobile_css  # type: ignore
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
     from db import delete_rows_admin, fetch_table  # type: ignore
     from pages.asset_database import (  # type: ignore
         ASSET_TABLE_COLS,
@@ -39,6 +41,7 @@ try:
         IPS_PENDING_DELETE,
         TABLE_KEY_EQUIPMENT,
         clear_selected_ids,
+        inject_table_action_styles,
         render_selectable_dataframe,
         render_selection_action_bar,
     )
@@ -47,6 +50,7 @@ except ImportError:
         IPS_PENDING_DELETE,
         TABLE_KEY_EQUIPMENT,
         clear_selected_ids,
+        inject_table_action_styles,
         render_selectable_dataframe,
         render_selection_action_bar,
     )
@@ -56,40 +60,42 @@ def render() -> None:
     """Filtered Asset Database view: ``category`` = Equipment only. Same card list as Asset Database."""
     inject_asset_workflow_mobile_css()
     render_header("Equipment")
+    render_crud_list_subtitle(
+        "Filtered Asset Database view (Equipment category only). Open a card for rental rates and details."
+    )
 
     can_add = current_role() in {"admin", "estimator"}
 
-    st.caption(
-        "Filtered view of the **Asset Database** — only assets with **Category** set to **Equipment**. "
-        "Open a profile to edit rental rates and details. Estimates are unchanged."
-    )
-
-    a1, a2, a3 = st.columns([1, 1, 1])
-    with a1:
-        if st.button(
-            "Add Equipment",
-            type="primary",
-            use_container_width=True,
-            disabled=not can_add,
-            key="eq_btn_add_equipment",
-            help="Opens Asset Database in add mode with Category preset to Equipment.",
-        ):
-            st.session_state["asset_db_add_mode"] = True
-            st.session_state["intake_category_default"] = "Equipment"
-            st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
-            st.rerun()
-    with a2:
-        if st.button(
-            "View All Assets",
-            use_container_width=True,
-            key="eq_btn_view_all_assets",
-            help="Go to the full Asset Database.",
-        ):
-            st.session_state["asset_db_add_mode"] = False
-            st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
-            st.rerun()
-    with a3:
-        st.empty()
+    inject_table_action_styles()
+    with st.container(border=True):
+        st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+        a1, a2, a3 = st.columns([1, 1, 2], gap="small")
+        with a1:
+            if st.button(
+                "Add Equipment",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_add,
+                key="eq_btn_add_equipment",
+                help="Opens Asset Database in add mode with Category preset to Equipment.",
+            ):
+                st.session_state["asset_db_add_mode"] = True
+                st.session_state["intake_category_default"] = "Equipment"
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+                st.rerun()
+        with a2:
+            if st.button(
+                "View All Assets",
+                type="secondary",
+                use_container_width=True,
+                key="eq_btn_view_all_assets",
+                help="Go to the full Asset Database.",
+            ):
+                st.session_state["asset_db_add_mode"] = False
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+                st.rerun()
+        with a3:
+            st.caption("Same data as Asset Database — this page is the estimator-friendly equipment lens.")
 
     rows = fetch_table("assets", limit=5000, order_by="asset_name")
     df = prepare_assets_dataframe(rows)

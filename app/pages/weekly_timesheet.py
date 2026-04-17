@@ -44,6 +44,11 @@ except ImportError:
     )
 
 try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+
+try:
     from services.job_service import job_display_primary, job_row_select_label
 except ImportError:
     from app.services.job_service import job_display_primary, job_row_select_label  # type: ignore
@@ -225,15 +230,17 @@ def _signature_b64(canvas_result) -> str | None:
 
 
 def render() -> None:
-    render_header("Weekly Timesheet")
+    render_header(
+        "Weekly Timesheet",
+        subtitle="Dense grid — same labor pool as Time Tracking",
+    )
 
     if current_role() not in {"admin", "estimator", "project_manager"}:
         st.info("Only admin, estimator, or project manager users can use the weekly timesheet.")
         return
 
-    st.caption(
-        "Hours can auto-fill from **employee time entries** (same data as Time Tracking). "
-        "Apply the SQL migration `sql/004_weekly_timesheets.sql` in Supabase before saving."
+    render_crud_list_subtitle(
+        "Hours can pull from **employee time entries**. Apply **sql/004_weekly_timesheets.sql** in Supabase before first save."
     )
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")

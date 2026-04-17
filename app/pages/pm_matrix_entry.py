@@ -74,22 +74,22 @@ def _inject_pm_matrix_css() -> None:
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid rgba(71, 85, 105, 0.5);
             border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 12px;
+            padding: 8px 10px 10px 10px;
+            margin-bottom: 8px;
         }
         .ips-pm-filters {
             background: rgba(15, 23, 42, 0.55);
             border: 1px solid rgba(71, 85, 105, 0.4);
             border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 12px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
         }
         .ips-pm-matrix-wrap {
             background: rgba(15, 23, 42, 0.72);
             border: 1px solid rgba(148, 163, 184, 0.28);
             border-radius: 10px;
-            padding: 10px 12px 12px 12px;
-            margin-bottom: 10px;
+            padding: 8px 10px 10px 10px;
+            margin-bottom: 8px;
         }
         .ips-pm-matrix-wrap div[data-testid="stDataEditor"] {
             font-size: 12px;

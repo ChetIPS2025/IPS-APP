@@ -79,10 +79,10 @@ _IPS_GLOBAL_MOBILE_CSS = """
   }
   [data-testid="stMain"] .stButton > button,
   [data-testid="stMain"] main .stButton > button {
-    min-height: 2.85rem !important;
-    padding: 0.55rem 0.9rem !important;
-    font-size: 1rem !important;
-    border-radius: 10px !important;
+    min-height: 2.45rem !important;
+    padding: 0.42rem 0.75rem !important;
+    font-size: 0.95rem !important;
+    border-radius: 9px !important;
   }
   [data-testid="stMain"] [data-testid="stDataFrame"],
   [data-testid="stMain"] main [data-testid="stDataFrame"] {
@@ -96,14 +96,14 @@ _IPS_GLOBAL_MOBILE_CSS = """
   [data-testid="stMain"] div[data-testid="stTextInput"] input,
   [data-testid="stMain"] div[data-testid="stNumberInput"] input,
   [data-testid="stMain"] div[data-testid="stTextArea"] textarea {
-    min-height: 2.75rem !important;
-    font-size: 1rem !important;
-    padding: 0.45rem 0.65rem !important;
+    min-height: 2.4rem !important;
+    font-size: 0.95rem !important;
+    padding: 0.38rem 0.55rem !important;
   }
   [data-testid="stMain"] [data-baseweb="select"] > div,
   [data-testid="stMain"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div {
-    min-height: 2.75rem !important;
-    font-size: 1rem !important;
+    min-height: 2.4rem !important;
+    font-size: 0.95rem !important;
   }
   [data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {
     flex-wrap: wrap !important;
@@ -139,7 +139,7 @@ _IPS_GLOBAL_MOBILE_CSS = """
   }
   div[data-testid="stHorizontalBlock"]:has(.ips-crud-toolbar-root) .stButton > button {
     width: 100% !important;
-    min-height: 2.85rem !important;
+    min-height: 2.5rem !important;
   }
   /* Asset Database: filter rows stack */
   div[data-testid="stHorizontalBlock"]:has(.ips-adb-filter-row) {
@@ -166,7 +166,7 @@ _IPS_GLOBAL_MOBILE_CSS = """
   }
   div[data-testid="stHorizontalBlock"]:has(.ips-ta-bar-root) .stButton > button {
     width: 100% !important;
-    min-height: 2.8rem !important;
+    min-height: 2.45rem !important;
   }
   [data-testid="stMain"] [data-testid="stMetricValue"] {
     font-size: 1.1rem !important;

@@ -5,6 +5,11 @@ import streamlit as st
 
 from auth import current_profile, current_role
 from branding import render_header
+
+try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows
 
 try:
@@ -59,6 +64,7 @@ def _safe_date_value(value):
 
 def render() -> None:
     render_header("PO / Expenses")
+    render_crud_list_subtitle("Job-linked expenses and PO lines — filter by job, then add or edit in the form.")
 
     can_add = current_role() in {"admin", "estimator"}
     can_approve = current_role() == "admin"

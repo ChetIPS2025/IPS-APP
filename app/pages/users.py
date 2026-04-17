@@ -226,22 +226,25 @@ def _fetch_profile_row(profile_id: str) -> dict[str, Any] | None:
         return None
 
 
-def _render_users_toolbar(*, sel: list[str]) -> None:
-    """Selection summary + optional clear (Customers-style compact bar)."""
+def _render_users_toolbar(*, sel: list[str], existing_emails: set[str]) -> None:
+    """Customers-style bar: selection summary, Add User, Clear selection."""
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     n = len(sel)
 
     with st.container(border=True):
         st.markdown('<div class="ips-crud-toolbar-root"></div>', unsafe_allow_html=True)
-        left, right = st.columns([1.4, 1], gap="small")
+        left, b_add, b_clear = st.columns([1.15, 1, 1], gap="small")
         with left:
             st.markdown(
                 f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
                 unsafe_allow_html=True,
             )
-        with right:
-            if n and st.button("Clear selection", use_container_width=True, key="users_btn_clear_sel"):
+        with b_add:
+            if st.button("Add User", type="primary", use_container_width=True, key="users_btn_add"):
+                add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=TABLE_KEY_USERS)
+        with b_clear:
+            if n and st.button("Clear selection", type="secondary", use_container_width=True, key="users_btn_clear_sel"):
                 clear_selected_ids(TABLE_KEY_USERS)
                 st.session_state.pop(USERS_EDIT_ID_KEY, None)
                 st.rerun()
@@ -379,7 +382,7 @@ def _render_users_right_panel(
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### User panel")
+        st.markdown("### User detail")
 
         _render_add_user_inline(existing_emails=existing_emails)
 
@@ -470,7 +473,7 @@ def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[s
         editor_key="users_sel_editor",
     )
     with bar_ph.container():
-        _render_users_toolbar(sel=sel)
+        _render_users_toolbar(sel=sel, existing_emails=existing_emails)
 
     return sel
 

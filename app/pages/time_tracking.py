@@ -292,8 +292,8 @@ def _inject_tt_styles() -> None:
             background: rgba(15, 23, 42, 0.65);
             border: 1px solid rgba(148, 163, 184, 0.25);
             border-radius: 10px;
-            padding: 10px 12px 14px 12px;
-            margin-bottom: 8px;
+            padding: 8px 10px 11px 10px;
+            margin-bottom: 6px;
         }
         .ips-tt-wrap { }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {

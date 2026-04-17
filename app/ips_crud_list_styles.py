@@ -148,10 +148,11 @@ def inject_ips_crud_list_styles() -> None:
         /* ----- Page subtitle (under render_header) ----- */
         p.ips-crud-page-subtitle {
             color: #94a3b8;
-            font-size: 0.9rem;
+            font-size: 0.8125rem;
             line-height: 1.45;
-            margin: 0 0 1rem 0;
+            margin: 0 0 0.55rem 0;
             padding: 0;
+            max-width: 960px;
         }
 
         /* ----- Search + Status row: match column rhythm ----- */
@@ -208,16 +209,16 @@ def inject_ips_crud_list_styles() -> None:
             background: rgba(15, 23, 42, 0.72) !important;
             border-color: rgba(71, 85, 105, 0.55) !important;
             border-radius: 10px !important;
-            padding: 12px 14px 14px 14px !important;
+            padding: 10px 12px 12px 12px !important;
             margin-bottom: 8px !important;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) h3 {
             color: #e2e8f0 !important;
-            font-size: 1.05rem !important;
+            font-size: 1rem !important;
             font-weight: 650 !important;
-            margin: 0 0 10px 0 !important;
-            padding-bottom: 8px !important;
+            margin: 0 0 8px 0 !important;
+            padding-bottom: 6px !important;
             border-bottom: 1px solid rgba(100, 116, 139, 0.35) !important;
         }
         /* Side panel: Save / Cancel / Close — match toolbar button height and radius */

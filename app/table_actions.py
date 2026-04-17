@@ -152,25 +152,25 @@ def inject_table_action_styles() -> None:
     st.markdown(
         """
         <style>
-        /* ----- List-page top actions (Estimates, Asset Database, Materials) ----- */
+        /* ----- List-page top actions (aligned with ips-crud-toolbar-root rhythm) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
-            padding: 8px 10px 10px 10px !important;
-            margin-bottom: 10px !important;
+            padding: 6px 8px 8px 8px !important;
+            margin-bottom: 8px !important;
             background: rgba(15, 23, 42, 0.55) !important;
             border-color: rgba(100, 116, 139, 0.4) !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="stHorizontalBlock"] {
-            gap: 0.5rem !important;
-            align-items: stretch !important;
+            gap: 0.4rem !important;
+            align-items: center !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) button {
-            min-height: 2.35rem !important;
+            min-height: 2.25rem !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.4rem 0.85rem !important;
+            padding: 0.35rem 0.75rem !important;
             line-height: 1.25 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
@@ -182,24 +182,24 @@ def inject_table_action_styles() -> None:
 
         /* ----- Table action bar (under data_editor) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) {
-            padding: 8px 10px 10px 10px !important;
-            margin-bottom: 10px !important;
-            margin-top: 4px !important;
+            padding: 6px 8px 8px 8px !important;
+            margin-bottom: 8px !important;
+            margin-top: 2px !important;
             background: rgba(15, 23, 42, 0.72) !important;
             border-color: rgba(100, 116, 139, 0.42) !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             div[data-testid="stHorizontalBlock"] {
-            gap: 0.45rem !important;
-            align-items: stretch !important;
+            gap: 0.35rem !important;
+            align-items: center !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) button {
-            min-height: 2.35rem !important;
+            min-height: 2.25rem !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.4rem 0.75rem !important;
+            padding: 0.35rem 0.7rem !important;
             line-height: 1.25 !important;
         }
 

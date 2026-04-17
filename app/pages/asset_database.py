@@ -44,6 +44,11 @@ except ImportError:
         render_table_action_bar,
     )
 
+try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+
 _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
 _ADB_VIEW_TOGGLE_CSS_KEY = "ips_asset_db_view_toggle_css_injected"
 _ADB_MOBILE_CSS_KEY = "ips_asset_db_mobile_css_injected_v2"
@@ -58,9 +63,9 @@ def _inject_asset_database_mobile_css() -> None:
         <style>
         @media (max-width: 900px) {
           .ips-adb-actions-mobile .stButton > button {
-            min-height: 3rem !important;
-            font-size: 1.05rem !important;
-            font-weight: 650 !important;
+            min-height: 2.55rem !important;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
           }
           div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-adb-card-mobile) {
             padding-top: 8px !important;
@@ -676,6 +681,9 @@ def render() -> None:
     ensure_narrow_viewport_detected()
     _inject_asset_database_mobile_css()
     render_header("Asset Database")
+    render_crud_list_subtitle(
+        "Filter and browse assets. Use Table for checkboxes, export, and bulk delete; Cards when you want photo-first browsing."
+    )
 
     can_add = current_role() in {"admin", "estimator"}
     if "asset_db_add_mode" not in st.session_state:
@@ -735,10 +743,7 @@ def render() -> None:
                 "**Table** on a phone can feel tight. Prefer **Cards** for browsing in the field; "
                 "use **Table** when you need checkboxes, export, or bulk delete."
             )
-        st.caption(
-            "Checkbox column on the **left**; selection is **selected_assets_ids**. "
-            "Action bar is **directly under** the grid."
-        )
+        st.caption("Checkbox column on the left — action bar sits directly under the grid.")
         table_cols = [
             c
             for c in [
@@ -882,15 +887,10 @@ def render() -> None:
             _render_asset_db_view_toggle(vm=vm)
 
         else:
-            st.caption(
-                "Filter the list, use **View** / **Edit** for the side panel, or **New Asset** / **Asset Scanner**. "
-                "**Cards** works best on phones; switch to **Table** for CSV export and bulk delete."
-            )
-
             with st.container(border=True):
                 st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
                 if can_add:
-                    vt, a1, a2, sp = st.columns([1.2, 1.05, 1.05, 1.9], gap="small")
+                    vt, a1, a2 = st.columns([1.25, 1, 1], gap="small")
                     with vt:
                         _render_asset_db_view_toggle(vm=vm)
                     with a1:
@@ -908,10 +908,8 @@ def render() -> None:
                             _clear_asset_panel()
                             st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
                             st.rerun()
-                    with sp:
-                        st.empty()
                 else:
-                    vt, s1, s2 = st.columns([1.2, 1.05, 3.5], gap="small")
+                    vt, s1 = st.columns([1.25, 1], gap="small")
                     with vt:
                         _render_asset_db_view_toggle(vm=vm)
                     with s1:
@@ -924,8 +922,6 @@ def render() -> None:
                             _clear_asset_panel()
                             st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
                             st.rerun()
-                    with s2:
-                        st.empty()
 
             if df.empty:
                 st.info("No assets found.")

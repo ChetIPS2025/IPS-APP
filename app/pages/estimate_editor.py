@@ -1502,9 +1502,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         )
     else:
         # Estimates page already called render_header; avoid duplicate logo/title.
-        st.caption(
-            "Edit estimate lines, proposal export, and approval. Use the list to open other quotes."
-        )
+        st.caption("Tabs below · list on the Estimates page opens other quotes.")
         st.markdown('<span class="ips-estimate-editor-root"></span>', unsafe_allow_html=True)
 
     current_status = est.get("status", "draft")
@@ -1643,12 +1641,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
 
     totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-    m1, m2, m3, m4, m5 = st.columns(5, gap="small")
-    m1.metric("Materials", money(totals["material_sell_basis"]))
-    m2.metric("Labor", money(totals["labor_total"]))
-    m3.metric("Equipment", money(totals["equipment_total"]))
-    m4.metric("Travel", money(totals["travel_total"]))
-    m5.metric("Proposal", money(totals["proposal_total"]))
+    with st.container(border=True):
+        st.markdown('<span class="ips-estimate-metrics-strip"></span>', unsafe_allow_html=True)
+        m1, m2, m3, m4, m5 = st.columns(5, gap="small")
+        m1.metric("Materials", money(totals["material_sell_basis"]))
+        m2.metric("Labor", money(totals["labor_total"]))
+        m3.metric("Equipment", money(totals["equipment_total"]))
+        m4.metric("Travel", money(totals["travel_total"]))
+        m5.metric("Proposal", money(totals["proposal_total"]))
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
@@ -2941,9 +2941,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
         st.caption(
-            "Proposals always use **assets/estimate_template_autofill_logo_updated.docx** (no overrides). "
-            "Text placeholders are filled from this estimate. A standard company logo from **assets/** "
-            "(e.g. **company_logo.png**) is merged into every export when that file is present."
+            "Standard Word template **estimate_template_autofill_logo_updated.docx** — placeholders from this "
+            "estimate; optional **company_logo.png** in **assets/** is merged when present."
         )
 
         docx_bytes: bytes | None = None
@@ -2959,7 +2958,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             pdf_bytes, _conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
 
         with st.container(border=True):
-            st.caption("Downloads use the current estimate draft and the standard proposal template.")
+            st.markdown('<span class="ips-proposal-doc-surface"></span>', unsafe_allow_html=True)
+            st.caption("Exports reflect the draft on screen. Open Word for exact pagination.")
             if word_build_error:
                 st.error(word_build_error)
             elif pdf_bytes is None and docx_bytes is not None:
@@ -3022,10 +3022,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
         if docx_bytes is not None:
             _pv_vals = proposal_values(est, totals, **_pe)
-            with st.expander("Proposal preview", expanded=False):
+            with st.expander("Proposal preview (read-only)", expanded=True):
                 _render_proposal_preview_html(
                     proposal_preview_html(docx_bytes, fallback_vals=_pv_vals),
-                    caption="Same filled **.docx** as download; in-app view is text/HTML only (open Word for exact layout).",
+                    caption="HTML preview of the same filled document — use Word for print layout.",
                 )
 
     with tabs[7]:

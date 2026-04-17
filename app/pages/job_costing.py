@@ -4,6 +4,11 @@ import pandas as pd
 import streamlit as st
 
 from branding import render_header
+
+try:
+    from app.ips_crud_list_styles import render_crud_list_subtitle
+except ImportError:
+    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 from db import fetch_table
 
 try:
@@ -24,6 +29,7 @@ except ImportError:
 
 def render() -> None:
     render_header("Job Costing")
+    render_crud_list_subtitle("Estimated vs actual labor, materials, travel, assets, and expenses by job.")
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")
     jobs = fetch_table("jobs", limit=5000, order_by="job_number")
