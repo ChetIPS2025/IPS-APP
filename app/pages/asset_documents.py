@@ -42,7 +42,7 @@ def render() -> None:
 
         doc_type = st.selectbox("Document Type", DOCUMENT_TYPES)
         expiration_date = st.date_input("Expiration Date", value=None)
-        notes = st.text_area("Notes")
+        notes = st.text_area("Notes", height=72)
         uploaded = st.file_uploader(
             "Document",
             accept_multiple_files=False,

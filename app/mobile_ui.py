@@ -77,12 +77,36 @@ _IPS_GLOBAL_MOBILE_CSS = """
     padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
     padding-top: 0.35rem !important;
   }
+  /* Main buttons: match IPS shell tokens (slightly taller touch target, same rhythm) */
   [data-testid="stMain"] .stButton > button,
-  [data-testid="stMain"] main .stButton > button {
-    min-height: 2.45rem !important;
-    padding: 0.42rem 0.75rem !important;
-    font-size: 0.95rem !important;
-    border-radius: 9px !important;
+  [data-testid="stMain"] main .stButton > button,
+  [data-testid="stMain"] [data-testid="stDownloadButton"] button,
+  [data-testid="stMain"] [data-testid="stFormSubmitButton"] button {
+    min-height: 2.25rem !important;
+    padding: 0.32rem 0.7rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    line-height: 1.25 !important;
+    box-sizing: border-box !important;
+  }
+  [data-testid="stMain"] .stButton > button p,
+  [data-testid="stMain"] main .stButton > button p,
+  [data-testid="stMain"] [data-testid="stDownloadButton"] button p,
+  [data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
+  }
+  [data-testid="stMain"] .stLinkButton > a,
+  [data-testid="stMain"] main .stLinkButton > a {
+    min-height: 2.25rem !important;
+    padding: 0.32rem 0.7rem !important;
+    font-size: 0.875rem !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
   [data-testid="stMain"] [data-testid="stDataFrame"],
   [data-testid="stMain"] main [data-testid="stDataFrame"] {
@@ -93,17 +117,18 @@ _IPS_GLOBAL_MOBILE_CSS = """
   [data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] {
     font-size: 0.88rem;
   }
+  /* Align with ips_app_shell control rhythm; slightly taller for touch */
   [data-testid="stMain"] div[data-testid="stTextInput"] input,
   [data-testid="stMain"] div[data-testid="stNumberInput"] input,
   [data-testid="stMain"] div[data-testid="stTextArea"] textarea {
-    min-height: 2.4rem !important;
-    font-size: 0.95rem !important;
-    padding: 0.38rem 0.55rem !important;
+    min-height: 2.1rem !important;
+    font-size: 0.875rem !important;
+    padding: 0.28rem 0.5rem !important;
   }
-  [data-testid="stMain"] [data-baseweb="select"] > div,
-  [data-testid="stMain"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div {
-    min-height: 2.4rem !important;
-    font-size: 0.95rem !important;
+  [data-testid="stMain"] div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+  [data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+    min-height: 2.2rem !important;
+    font-size: 0.875rem !important;
   }
   [data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {
     flex-wrap: wrap !important;

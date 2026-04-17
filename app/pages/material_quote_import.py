@@ -175,7 +175,7 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
     st.markdown("---")
     st.subheader("Review Quote")
 
-    top1, top2, top3, top4 = st.columns(4)
+    top1, top2, top3, top4 = st.columns(4, gap="small")
     top1.metric("Confidence", f"{float(result.get('confidence', 0) or 0) * 100:.0f}%")
     top2.metric("Items Found", len(result.get("items", [])))
     top3.metric("Quote Total", f"${float(result.get('quote_total', 0) or 0):,.2f}")
@@ -185,18 +185,18 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
     if flags:
         st.warning("Review flags: " + ", ".join(flags))
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns(4, gap="small")
     vendor_name = col1.text_input("Vendor Name", value=result.get("vendor_name", ""))
     quote_number = col2.text_input("Quote Number", value=result.get("quote_number", ""))
     quote_date = col3.text_input("Quote Date", value=result.get("quote_date", ""))
     default_markup = col4.number_input("Default Markup %", min_value=0.0, value=float(DEFAULT_MARKUP_PCT * 100), step=1.0) / 100.0
 
-    fin1, fin2, fin3 = st.columns(3)
+    fin1, fin2, fin3 = st.columns(3, gap="small")
     quote_total = fin1.number_input("Quote Total", min_value=0.0, value=float(result.get("quote_total", 0) or 0), step=1.0)
     shipping_total = fin2.number_input("Shipping", min_value=0.0, value=float(result.get("shipping_total", 0) or 0), step=1.0)
     tax_total = fin3.number_input("Tax", min_value=0.0, value=float(result.get("tax_total", 0) or 0), step=1.0)
 
-    quote_notes = st.text_area("Quote Notes", value=result.get("notes", ""))
+    quote_notes = st.text_area("Quote Notes", value=result.get("notes", ""), height=72)
 
     suggest_threshold = 0.35
 

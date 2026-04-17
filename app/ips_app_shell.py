@@ -33,6 +33,27 @@ def inject_ips_app_shell_styles() -> None:
             --ips-border: rgba(71, 85, 105, 0.45);
             --ips-text-muted: #94a3b8;
             --ips-surface: rgba(15, 23, 42, 0.35);
+            /* Button system (main content) — dense pages override with more specific rules */
+            --ips-btn-height: 2.125rem;
+            --ips-btn-pad-y: 0.32rem;
+            --ips-btn-pad-x: 0.7rem;
+            --ips-btn-fs: 0.875rem;
+            --ips-btn-fw: 500;
+            --ips-btn-fw-strong: 600;
+            --ips-btn-radius: 8px;
+            /* Form controls (main) — dense pages override with more specific selectors */
+            --ips-ctrl-fs: 0.875rem;
+            --ips-ctrl-lh: 1.32;
+            --ips-ctrl-radius: 8px;
+            --ips-ctrl-pad-y: 0.24rem;
+            --ips-ctrl-pad-x: 0.5rem;
+            --ips-ctrl-h: 2rem;
+            --ips-ctrl-border: rgba(71, 85, 105, 0.58);
+            --ips-ctrl-bg: rgba(15, 23, 42, 0.55);
+            --ips-ctrl-fg: #f1f5f9;
+            --ips-label-fs: 0.76rem;
+            --ips-label-color: #94a3b8;
+            --ips-widget-gap: 0.28rem;
         }
 
         /* ----- Main block: consistent horizontal padding & max readable width ----- */
@@ -42,8 +63,8 @@ def inject_ips_app_shell_styles() -> None:
             margin-right: auto;
         }
         section[data-testid="stMain"] .block-container {
-            padding-top: 0.45rem !important;
-            padding-bottom: 1.25rem !important;
+            padding-top: 0.4rem !important;
+            padding-bottom: 1rem !important;
         }
 
         /* ----- Typography hierarchy (Streamlit markdown + headers) ----- */
@@ -75,7 +96,7 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Dividers ----- */
         section[data-testid="stMain"] hr {
-            margin: 0.65rem 0 !important;
+            margin: 0.5rem 0 !important;
             border: none !important;
             border-top: 1px solid var(--ips-border) !important;
         }
@@ -91,7 +112,7 @@ def inject_ips_app_shell_styles() -> None:
             padding: 0.4rem 0.75rem !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            min-height: 2.35rem !important;
+            min-height: 2.2rem !important;
             color: #94a3b8 !important;
         }
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
@@ -113,23 +134,73 @@ def inject_ips_app_shell_styles() -> None:
             font-size: 0.9rem !important;
         }
 
-        /* ----- Main-area buttons (not sidebar): size + role ----- */
-        section[data-testid="stMain"] .stButton > button {
-            border-radius: var(--ips-radius) !important;
-            min-height: 2.25rem !important;
-            font-size: 0.875rem !important;
-            font-weight: 500 !important;
-            padding: 0.35rem 0.75rem !important;
+        /* ----- IPS button system (main): primary / secondary / tertiary + downloads + link buttons ----- */
+        section[data-testid="stMain"] .stButton > button,
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button {
+            border-radius: var(--ips-btn-radius) !important;
+            min-height: var(--ips-btn-height) !important;
+            height: auto !important;
+            font-size: var(--ips-btn-fs) !important;
+            font-weight: var(--ips-btn-fw) !important;
+            padding: var(--ips-btn-pad-y) var(--ips-btn-pad-x) !important;
+            line-height: 1.25 !important;
+            box-sizing: border-box !important;
+        }
+        section[data-testid="stMain"] .stButton > button p,
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
+            line-height: 1.25 !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="primary"],
-        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-primary"] {
-            font-weight: 600 !important;
+        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-primary"],
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="primary"],
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[data-testid="baseButton-primary"],
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"],
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
+            font-weight: var(--ips-btn-fw-strong) !important;
             box-shadow: 0 1px 6px rgba(37, 99, 235, 0.25) !important;
         }
-        section[data-testid="stMain"] .stButton > button[kind="secondary"] {
+        section[data-testid="stMain"] .stButton > button[kind="secondary"],
+        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="secondary"],
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
             color: #cbd5e1 !important;
             border-color: rgba(100, 116, 139, 0.45) !important;
             background: rgba(30, 41, 59, 0.55) !important;
+            font-weight: var(--ips-btn-fw) !important;
+        }
+        section[data-testid="stMain"] .stLinkButton > a {
+            border-radius: var(--ips-btn-radius) !important;
+            min-height: var(--ips-btn-height) !important;
+            font-size: var(--ips-btn-fs) !important;
+            font-weight: var(--ips-btn-fw) !important;
+            padding: var(--ips-btn-pad-y) var(--ips-btn-pad-x) !important;
+            line-height: 1.25 !important;
+            box-sizing: border-box !important;
+            white-space: nowrap !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button {
+            border-radius: var(--ips-btn-radius) !important;
+            min-height: var(--ips-btn-height) !important;
+            height: auto !important;
+            font-size: var(--ips-btn-fs) !important;
+            font-weight: var(--ips-btn-fw) !important;
+            padding: var(--ips-btn-pad-y) var(--ips-btn-pad-x) !important;
+            line-height: 1.25 !important;
+            box-sizing: border-box !important;
+        }
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
+            line-height: 1.25 !important;
         }
 
         /* ----- Data tables / editors: calmer chrome ----- */
@@ -140,15 +211,108 @@ def inject_ips_app_shell_styles() -> None:
             overflow: hidden;
         }
 
-        /* ----- Inputs (main only) ----- */
-        section[data-testid="stMain"] [data-testid="stTextInput"] input,
-        section[data-testid="stMain"] [data-testid="stTextArea"] textarea,
-        section[data-testid="stMain"] [data-testid="stNumberInput"] input {
-            border-radius: var(--ips-radius) !important;
+        /* ----- IPS form controls (main + sidebar): labels + fields ----- */
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stWidgetLabel"] label,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stWidgetLabel"] span {
+            font-size: var(--ips-label-fs) !important;
+            color: var(--ips-label-color) !important;
+            font-weight: 500 !important;
+            line-height: 1.25 !important;
+            margin-bottom: 0.1rem !important;
+            letter-spacing: 0.01em;
         }
-        section[data-testid="stMain"] [data-testid="stWidgetLabel"] label {
-            font-size: 0.8125rem !important;
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stElementContainer"] {
+            margin-bottom: var(--ips-widget-gap) !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextInput"] input {
+            border-radius: var(--ips-ctrl-radius) !important;
+            min-height: var(--ips-ctrl-h) !important;
+            height: auto !important;
+            padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            line-height: var(--ips-ctrl-lh) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border: 1px solid var(--ips-ctrl-border) !important;
+            color: var(--ips-ctrl-fg) !important;
+            box-sizing: border-box !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea {
+            border-radius: var(--ips-ctrl-radius) !important;
+            min-height: 3rem !important;
+            padding: 0.32rem 0.5rem !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            line-height: var(--ips-ctrl-lh) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border: 1px solid var(--ips-ctrl-border) !important;
+            color: var(--ips-ctrl-fg) !important;
+            box-sizing: border-box !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stNumberInput"] input {
+            border-radius: var(--ips-ctrl-radius) !important;
+            min-height: var(--ips-ctrl-h) !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border: 1px solid var(--ips-ctrl-border) !important;
+            color: var(--ips-ctrl-fg) !important;
+            box-sizing: border-box !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+            min-height: var(--ips-ctrl-h) !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            line-height: var(--ips-ctrl-lh) !important;
+            border-radius: var(--ips-ctrl-radius) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border-color: var(--ips-ctrl-border) !important;
+            color: var(--ips-ctrl-fg) !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+            min-height: var(--ips-ctrl-h) !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            border-radius: var(--ips-ctrl-radius) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border-color: var(--ips-ctrl-border) !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] input,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] [data-baseweb="input"] {
+            min-height: var(--ips-ctrl-h) !important;
+            font-size: var(--ips-ctrl-fs) !important;
+            border-radius: var(--ips-ctrl-radius) !important;
+            background: var(--ips-ctrl-bg) !important;
+            border: 1px solid var(--ips-ctrl-border) !important;
+            color: var(--ips-ctrl-fg) !important;
+            padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
+            box-sizing: border-box !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stCheckbox"] label,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stCheckbox"] span {
+            font-size: var(--ips-ctrl-fs) !important;
             color: #cbd5e1 !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stRadio"] label,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stRadio"] span {
+            font-size: var(--ips-ctrl-fs) !important;
+            color: #cbd5e1 !important;
+        }
+
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] {
+            border-radius: var(--ips-ctrl-radius) !important;
+            border: 1px dashed rgba(100, 116, 139, 0.5) !important;
+            background: rgba(15, 23, 42, 0.35) !important;
+            padding: 0.28rem 0.4rem !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] section {
+            padding: 0 !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] small,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] [data-testid="stCaptionContainer"] {
+            font-size: 0.75rem !important;
         }
 
         /* ----- Sidebar: slightly tighter on all sizes ----- */
@@ -156,22 +320,6 @@ def inject_ips_app_shell_styles() -> None:
             padding-top: 0.5rem !important;
         }
 
-        /* ----- Compact main widgets (dense business pages) ----- */
-        section[data-testid="stMain"] [data-testid="stTextInput"] input,
-        section[data-testid="stMain"] [data-testid="stTextArea"] textarea {
-            min-height: 2.05rem !important;
-            padding-top: 0.28rem !important;
-            padding-bottom: 0.28rem !important;
-            font-size: 0.875rem !important;
-        }
-        section[data-testid="stMain"] [data-testid="stNumberInput"] input {
-            min-height: 2.05rem !important;
-            font-size: 0.875rem !important;
-        }
-        section[data-testid="stMain"] [data-baseweb="select"] > div {
-            min-height: 2.1rem !important;
-            font-size: 0.875rem !important;
-        }
         section[data-testid="stMain"] .stMetric {
             background: rgba(15, 23, 42, 0.45);
             border: 1px solid rgba(71, 85, 105, 0.4);
@@ -210,13 +358,17 @@ def inject_ips_app_shell_styles() -> None:
             color: #cbd5e1 !important;
         }
 
-        /* ----- Destructive (Streamlit tertiary when available) ----- */
+        /* Destructive / danger (Streamlit tertiary) */
         section[data-testid="stMain"] .stButton > button[kind="tertiary"],
-        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-tertiary"] {
+        section[data-testid="stMain"] .stButton > button[data-testid="baseButton-tertiary"],
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="tertiary"],
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-tertiary"],
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="tertiary"],
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[data-testid="baseButton-tertiary"] {
             color: #fecaca !important;
             border-color: rgba(248, 113, 113, 0.45) !important;
             background: rgba(127, 29, 29, 0.22) !important;
-            font-weight: 500 !important;
+            font-weight: var(--ips-btn-fw) !important;
         }
         </style>
         """,

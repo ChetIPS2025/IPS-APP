@@ -1492,7 +1492,7 @@ def render() -> None:
 
     with tab_notes:
         if can_edit:
-            new_notes = st.text_area("Notes", value=str(asset.get("notes") or ""), height=160, key=f"notes_ed_{aid}")
+            new_notes = st.text_area("Notes", value=str(asset.get("notes") or ""), height=120, key=f"notes_ed_{aid}")
             if is_narrow:
                 (notes_save_col,) = st.columns(1)
             else:

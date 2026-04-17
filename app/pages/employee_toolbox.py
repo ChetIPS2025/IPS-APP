@@ -1555,7 +1555,7 @@ def render() -> None:
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
                 unsafe_allow_html=True,
             )
-            ac1, ac2, ac3 = st.columns([1, 1, 3])
+            ac1, ac2, ac3 = st.columns([1, 1, 3], gap="small")
             with ac1:
                 if st.button(
                     "Add Tool",

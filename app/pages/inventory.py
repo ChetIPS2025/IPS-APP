@@ -193,11 +193,11 @@ def _render_add_panel() -> None:
         st.markdown("### Add inventory item")
 
         name = st.text_input("Item Name", key="inv_add_name")
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2, gap="small")
         category = c1.text_input("Category", key="inv_add_cat")
         unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
 
-        r1, r2, r3 = st.columns(3)
+        r1, r2, r3 = st.columns(3, gap="small")
         qty = r1.number_input(
             "Quantity on Hand", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_qty"
         )
@@ -213,14 +213,14 @@ def _render_add_panel() -> None:
             key="inv_add_cost",
         )
 
-        v1, v2 = st.columns(2)
+        v1, v2 = st.columns(2, gap="small")
         vendor = v1.text_input("Vendor", key="inv_add_vendor")
         storage_location = v2.text_input("Storage Location", key="inv_add_loc")
 
         notes = st.text_area("Notes", key="inv_add_notes", height=72)
         is_active = st.checkbox("Active", value=True, key="inv_add_active")
 
-        u1, u2 = st.columns(2)
+        u1, u2 = st.columns(2, gap="small")
         with u1:
             if st.button("Save Inventory Item", type="primary", use_container_width=True, key="inv_add_save"):
                 t = str(name or "").strip()
@@ -263,11 +263,11 @@ def _render_edit_panel(row: dict) -> None:
         st.caption(f"ID `{rid[:8]}…`")
 
         name = st.text_input("Item Name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2, gap="small")
         category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
         unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
 
-        r1, r2, r3 = st.columns(3)
+        r1, r2, r3 = st.columns(3, gap="small")
         qty = r1.number_input(
             "Quantity on Hand",
             min_value=0.0,
@@ -298,7 +298,7 @@ def _render_edit_panel(row: dict) -> None:
             key=f"{pk}_cost",
         )
 
-        v1, v2 = st.columns(2)
+        v1, v2 = st.columns(2, gap="small")
         vendor = v1.text_input("Vendor", value=str(row.get("vendor") or ""), key=f"{pk}_vendor")
         storage_location = v2.text_input(
             "Storage Location", value=str(row.get("storage_location") or ""), key=f"{pk}_loc"
@@ -307,7 +307,7 @@ def _render_edit_panel(row: dict) -> None:
         notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
         is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
 
-        u1, u2 = st.columns(2)
+        u1, u2 = st.columns(2, gap="small")
         with u1:
             if st.button("Update Inventory Item", type="primary", use_container_width=True, key=f"{pk}_save"):
                 t = str(name or "").strip()
@@ -459,13 +459,15 @@ def render() -> None:
 
         if df.empty:
             st.info("No inventory items found.")
-            if can_edit and st.button("Add Inventory Item", type="primary", key="inv_empty_add"):
+            if can_edit and st.button(
+                "Add Inventory Item", type="primary", use_container_width=True, key="inv_empty_add"
+            ):
                 st.session_state["inventory_panel_mode"] = "add"
                 st.session_state["inventory_panel_id"] = None
                 st.rerun()
             return
 
-        filter_cols = st.columns([1, 2, 1])
+        filter_cols = st.columns([1, 2, 1], gap="small")
         categories = sorted(
             [
                 c
@@ -520,7 +522,9 @@ def render() -> None:
 
         if filtered.empty:
             st.warning("No inventory items match your filters.")
-            if can_edit and st.button("Add Inventory Item", type="primary", key="inv_filtered_empty_add"):
+            if can_edit and st.button(
+                "Add Inventory Item", type="primary", use_container_width=True, key="inv_filtered_empty_add"
+            ):
                 st.session_state["inventory_panel_mode"] = "add"
                 st.session_state["inventory_panel_id"] = None
                 st.rerun()

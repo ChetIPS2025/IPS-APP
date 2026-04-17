@@ -140,11 +140,8 @@ def _inject_asset_db_top_actions_css() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="column"] .stButton > button {
-            min-height: 2.25rem !important;
             width: 100% !important;
             box-sizing: border-box !important;
-            padding: 0.35rem 0.4rem !important;
-            font-size: 0.875rem !important;
         }
         /* Keep this toolbar on one row on phones (global mobile CSS stacks columns elsewhere) */
         @media (max-width: 900px) {
@@ -432,7 +429,7 @@ def _render_asset_panel_edit(
             )
             rental_notes_val = st.text_area("Rental notes", value=rental_notes_val, height=72, key=pk("rnotes"))
 
-        notes = st.text_area("Notes", value=str(cv("notes")), key=pk("notes"))
+        notes = st.text_area("Notes", value=str(cv("notes")), height=88, key=pk("notes"))
 
         u1, u2 = st.columns(2)
         with u1:

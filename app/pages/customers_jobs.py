@@ -1061,7 +1061,7 @@ def _render_customers_main(
     if df.empty:
         st.info("No customers found.")
         if can_add:
-            if st.button("Add Customer", type="primary", key="cust_empty_add"):
+            if st.button("Add Customer", type="primary", use_container_width=True, key="cust_empty_add"):
                 _add_customer_dialog(
                     existing_customer_names=existing_customer_names,
                     resolved=resolved,
@@ -1107,7 +1107,7 @@ def _render_customers_main(
         st.warning("No customers match your filters.")
         if can_add:
             inject_table_action_styles()
-            if st.button("Add Customer", type="primary", key="cust_filtered_empty_add"):
+            if st.button("Add Customer", type="primary", use_container_width=True, key="cust_filtered_empty_add"):
                 _add_customer_dialog(
                     existing_customer_names=existing_customer_names,
                     resolved=resolved,

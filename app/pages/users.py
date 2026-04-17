@@ -187,10 +187,10 @@ def add_user_dialog(
 ) -> None:
     """Modal entry path (empty list, People page); same validation as inline Add user."""
     st.caption(f"Temporary password · min {_MIN_PASSWORD_LENGTH} characters")
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     new_email = c1.text_input("Email", key="dlg_users_add_email", max_chars=_MAX_EMAIL_LENGTH)
     new_password = c2.text_input("Temporary password", type="password", key="dlg_users_add_password")
-    c3, c4 = st.columns(2)
+    c3, c4 = st.columns(2, gap="small")
     new_full_name = c3.text_input("Full name", key="dlg_users_add_full_name")
     new_role = c4.selectbox("Role", list(_ROLE_OPTIONS), key="dlg_users_add_role")
 

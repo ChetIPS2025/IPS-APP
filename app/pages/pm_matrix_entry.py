@@ -555,7 +555,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
                 cur_h = float(hours_index.get((jid_p, eid_p), 0.0))
             st.markdown(f"**Hours this day:** {cur_h:.2f} (change in the matrix)")
             nk = "pm_popn_" + hashlib.md5(f"{jid_p}|{eid_p}".encode()).hexdigest()[:16]
-            nt = st.text_area("Notes", value=cur_note, height=96, key=nk)
+            nt = st.text_area("Notes", value=cur_note, height=80, key=nk)
             if can_edit and st.button("Save notes", key="pm_pop_save"):
                 try:
                     upsert_matrix_cell_full(
@@ -722,7 +722,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
         except Exception:
             cur_h = float(hours_index.get((jid_n, eid_n), 0.0))
         n_h = st.number_input("Hours", 0.0, 24.0, cur_h, 0.25, key="pm_note_h")
-        n_t = st.text_area("Notes", value=cur_note, key="pm_note_t")
+        n_t = st.text_area("Notes", value=cur_note, height=72, key="pm_note_t")
         if can_edit and st.button("Save hours + notes", key="pm_note_save"):
             try:
                 upsert_matrix_cell_full(
@@ -825,7 +825,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
         except Exception as exc:
             st.caption(f"Week Excel needs openpyxl: {exc}")
 
-    a1, a2, a3 = st.columns([1, 1, 2])
+    a1, a2, a3 = st.columns([1, 1, 2], gap="small")
     with a1:
         if can_edit and st.button("Copy previous day → this day", key="pm_copy_prev", use_container_width=True):
             try:
@@ -847,9 +847,14 @@ def render_pm_matrix(*, can_edit: bool) -> None:
     with a3:
         if clear_open and can_edit:
             st.warning(f"This removes **all** time entries on **{selected_day.isoformat()}**.")
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns(2, gap="small")
             with c1:
-                if st.button("Confirm clear", type="primary", key="pm_clear_yes"):
+                if st.button(
+                    "Confirm clear",
+                    type="primary",
+                    use_container_width=True,
+                    key="pm_clear_yes",
+                ):
                     try:
                         n = delete_all_entries_for_work_date(selected_day)
                         st.session_state.pop("pm_clear_confirm_open", None)
@@ -858,7 +863,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
                     except Exception as exc:
                         st.error(str(exc))
             with c2:
-                if st.button("Cancel", key="pm_clear_no"):
+                if st.button("Cancel", use_container_width=True, key="pm_clear_no"):
                     st.session_state.pop("pm_clear_confirm_open", None)
                     st.rerun()
 

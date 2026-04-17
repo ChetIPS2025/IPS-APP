@@ -403,7 +403,7 @@ def render() -> None:
     rental_daily = rental_weekly = rental_monthly = 0.0
     rental_notes_val = str(current_value("rental_notes", "") or "")
     if is_rental:
-        z1, z2, z3 = st.columns(3)
+        z1, z2, z3 = st.columns(3, gap="small")
         rental_daily = z1.number_input(
             "Daily rate",
             min_value=0.0,
@@ -443,6 +443,7 @@ def render() -> None:
         "Notes",
         value=current_value("notes"),
         disabled=not can_edit,
+        height=88,
         key=_am_key("notes"),
     )
 

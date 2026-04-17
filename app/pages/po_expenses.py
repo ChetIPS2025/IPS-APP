@@ -325,7 +325,7 @@ def render() -> None:
         disabled=not can_add,
     )
 
-    c7, c8, c9 = st.columns(3)
+    c7, c8, c9 = st.columns(3, gap="small")
     po_number = c7.text_input("PO Number", value=current_value("po_number"), disabled=not can_add)
     invoice_number = c8.text_input("Invoice Number", value=current_value("invoice_number"), disabled=not can_add)
 
@@ -344,8 +344,21 @@ def render() -> None:
         expense_status = status_default
         c9.text_input("Status", value=expense_status, disabled=True)
 
-    description = st.text_area("Description", value=current_value("description"), disabled=not can_add)
-    notes = st.text_area("Notes", value=current_value("notes"), disabled=not can_add)
+    d1, d2 = st.columns(2, gap="small")
+    with d1:
+        description = st.text_area(
+            "Description",
+            value=current_value("description"),
+            disabled=not can_add,
+            height=88,
+        )
+    with d2:
+        notes = st.text_area(
+            "Notes",
+            value=current_value("notes"),
+            disabled=not can_add,
+            height=88,
+        )
 
     if not can_add:
         st.info("Only admin or estimator users can add or update expenses.")

@@ -301,15 +301,15 @@ def _render_material_compact_details(row: dict) -> None:
 def _render_material_add_form(*, df: pd.DataFrame, rows: list) -> None:
     category_options, subgroup_options = _category_subgroup_options(df)
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     inventory_id = c1.text_input("Inventory ID (blank = auto)", key="mat_add_inv")
     item_key = c2.text_input("Item Key (blank = auto)", key="mat_add_key")
 
-    c3, c4 = st.columns(2)
+    c3, c4 = st.columns(2, gap="small")
     description = c3.text_input("Description", key="mat_add_desc")
     category = c4.selectbox("Category", options=[""] + category_options, key="mat_add_cat")
 
-    c5, c6, c7, c8 = st.columns(4)
+    c5, c6, c7, c8 = st.columns(4, gap="small")
     subgroup = c5.selectbox("Subgroup", options=[""] + subgroup_options, key="mat_add_sub")
     unit = c6.text_input("Unit", value="EA", key="mat_add_unit")
     stock_length = c7.text_input("Stock Length", key="mat_add_slen")
@@ -334,7 +334,7 @@ def _render_material_add_form(*, df: pd.DataFrame, rows: list) -> None:
 
     is_active = st.checkbox("Active", value=True, key="mat_add_act")
 
-    u1, u2 = st.columns(2)
+    u1, u2 = st.columns(2, gap="small")
     with u1:
         if st.button("Save Material", type="primary", use_container_width=True, key="mat_add_save"):
             if not str(description).strip():
@@ -373,7 +373,7 @@ def _render_material_edit_form(row: dict) -> None:
 
     st.caption(f"ID `{rid[:8]}…`")
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     inventory_id = c1.text_input(
         "Inventory ID",
         value=str(row.get("inventory_id") or ""),
@@ -384,7 +384,7 @@ def _render_material_edit_form(row: dict) -> None:
         value=str(row.get("item_key") or ""),
         key=pk("ikey"),
     )
-    c3, c4 = st.columns(2)
+    c3, c4 = st.columns(2, gap="small")
     description = c3.text_input(
         "Description",
         value=str(row.get("description") or ""),
@@ -396,7 +396,7 @@ def _render_material_edit_form(row: dict) -> None:
         key=pk("cat"),
     )
 
-    c5, c6, c7, c8 = st.columns(4)
+    c5, c6, c7, c8 = st.columns(4, gap="small")
     subgroup = c5.text_input(
         "Subgroup",
         value=str(row.get("subgroup") or ""),
@@ -434,7 +434,7 @@ def _render_material_edit_form(row: dict) -> None:
         key=pk("active"),
     )
 
-    u1, u2 = st.columns(2)
+    u1, u2 = st.columns(2, gap="small")
     with u1:
         if st.button("Update Material", type="primary", use_container_width=True, key=pk("save")):
             if not str(description).strip():
@@ -522,7 +522,9 @@ def _render_materials_table_main(
         if st.session_state.get("material_panel_mode") not in ("add", "edit"):
             st.session_state.pop("material_panel_id", None)
             st.session_state.pop("material_selected_id", None)
-        if can_import and st.button("Add Material", type="primary", key="mat_empty_add"):
+        if can_import and st.button(
+            "Add Material", type="primary", use_container_width=True, key="mat_empty_add"
+        ):
             st.session_state["material_panel_mode"] = "add"
             st.session_state.pop("material_panel_id", None)
             st.rerun()
@@ -539,7 +541,9 @@ def _render_materials_table_main(
         if st.session_state.get("material_panel_mode") not in ("add", "edit"):
             st.session_state.pop("material_panel_id", None)
             st.session_state.pop("material_selected_id", None)
-        if can_import and st.button("Add Material", type="primary", key="mat_filtered_empty_add"):
+        if can_import and st.button(
+            "Add Material", type="primary", use_container_width=True, key="mat_filtered_empty_add"
+        ):
             st.session_state["material_panel_mode"] = "add"
             st.session_state.pop("material_panel_id", None)
             st.rerun()

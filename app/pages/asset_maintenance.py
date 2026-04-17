@@ -61,21 +61,21 @@ def render() -> None:
         selected_label = st.selectbox("Asset", list(asset_options.keys()))
         selected_asset = asset_options[selected_label]
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3, gap="small")
         service_type = c1.text_input("Service Type", value="PM Service")
         service_date = c2.date_input("Service Date")
         vendor = c3.text_input("Vendor")
 
-        c4, c5, c6 = st.columns(3)
+        c4, c5, c6 = st.columns(3, gap="small")
         hour_meter = c4.number_input("Hour Meter", min_value=0.0, value=float(selected_asset.get("hour_meter") or 0), step=1.0)
         mileage = c5.number_input("Mileage", min_value=0.0, value=float(selected_asset.get("mileage") or 0), step=1.0)
         cost = c6.number_input("Cost", min_value=0.0, value=0.0, step=10.0)
 
-        c7, c8 = st.columns(2)
+        c7, c8 = st.columns(2, gap="small")
         po_number = c7.text_input("PO Number")
         performed_by = c8.text_input("Performed By")
 
-        notes = st.text_area("Notes")
+        notes = st.text_area("Notes", height=72)
 
         if st.button("Save Maintenance Record", use_container_width=True):
             record = save_maintenance_record(

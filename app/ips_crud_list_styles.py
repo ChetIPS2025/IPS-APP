@@ -75,18 +75,25 @@ def inject_ips_modal_styles() -> None:
             border-top: 1px solid rgba(71, 85, 105, 0.45) !important;
         }
         div[data-testid="stDialog"] [data-baseweb="input"],
-        div[data-testid="stDialog"] input,
+        div[data-testid="stDialog"] input:not([type="checkbox"]):not([type="radio"]),
         div[data-testid="stDialog"] textarea {
             background: rgba(15, 23, 42, 0.72) !important;
             border: 1px solid rgba(71, 85, 105, 0.5) !important;
             border-radius: 8px !important;
             color: #f8fafc !important;
             font-size: 0.875rem !important;
+            min-height: 2.125rem !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stDialog"] textarea {
+            min-height: 3rem !important;
+            line-height: 1.32 !important;
         }
         div[data-testid="stDialog"] label,
         div[data-testid="stDialog"] [data-testid="stWidgetLabel"] {
-            color: #cbd5e1 !important;
-            font-size: 0.8125rem !important;
+            color: #94a3b8 !important;
+            font-size: 0.78rem !important;
+            font-weight: 500 !important;
         }
         div[data-testid="stDialog"] [data-testid="stCheckbox"] label {
             color: #e2e8f0 !important;
@@ -105,7 +112,9 @@ def inject_ips_modal_styles() -> None:
             color: #ffffff !important;
             font-weight: 600 !important;
             border-radius: 8px !important;
-            min-height: 2.35rem !important;
+            min-height: 2.25rem !important;
+            padding: 0.35rem 0.75rem !important;
+            box-sizing: border-box !important;
             box-shadow: 0 2px 10px rgba(37, 99, 235, 0.38) !important;
         }
         div[data-testid="stDialog"] button[kind="primary"]:hover:not(:disabled),
@@ -119,7 +128,15 @@ def inject_ips_modal_styles() -> None:
             color: #94a3b8 !important;
             font-weight: 500 !important;
             border-radius: 8px !important;
-            min-height: 2.35rem !important;
+            min-height: 2.25rem !important;
+            padding: 0.35rem 0.75rem !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stDialog"] .stButton > button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
         }
         div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled) {
             background: rgba(51, 65, 85, 0.95) !important;
@@ -168,8 +185,11 @@ def inject_ips_crud_list_styles() -> None:
             margin-bottom: 8px !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] {
-            align-items: center;
+            align-items: stretch;
             gap: 0.35rem;
+        }
+        .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 0 !important;
         }
         /* Selection count vertically centered with buttons */
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
@@ -181,9 +201,19 @@ def inject_ips_crud_list_styles() -> None:
             line-height: 1.35;
         }
         /* All action buttons: same min-height (Materials-style) */
-        .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] button {
+        .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] .stButton > button {
             min-height: 2.25rem !important;
             border-radius: 8px !important;
+            font-size: 0.875rem !important;
+            font-weight: 500 !important;
+            padding: 0.35rem 0.75rem !important;
+            box-sizing: border-box !important;
+        }
+        .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] .stButton > button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) button:not(:disabled) {
             background: rgba(234, 179, 8, 0.14) !important;
@@ -209,8 +239,8 @@ def inject_ips_crud_list_styles() -> None:
             background: rgba(15, 23, 42, 0.72) !important;
             border-color: rgba(71, 85, 105, 0.55) !important;
             border-radius: 10px !important;
-            padding: 10px 12px 12px 12px !important;
-            margin-bottom: 8px !important;
+            padding: 8px 10px 10px 10px !important;
+            margin-bottom: 6px !important;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) h3 {
@@ -227,11 +257,23 @@ def inject_ips_crud_list_styles() -> None:
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
+            padding: 0.35rem 0.75rem !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) .stButton > button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor)
             button[data-testid="baseButton-primary"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) button[kind="primary"] {
             font-weight: 600 !important;
+        }
+        /* Side panel: tighter vertical rhythm (inherits ips_app_shell control chrome) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) [data-testid="stElementContainer"] {
+            margin-bottom: 0.22rem !important;
         }
         </style>
         """,

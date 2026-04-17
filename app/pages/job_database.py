@@ -335,7 +335,7 @@ def _render_job_form_panel(
 
         _ro = not can_edit
 
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2, gap="small")
         cust_keys = [""] + sorted(customer_options.keys())
         selected_cust_name = ""
         if selected_job:
@@ -419,7 +419,7 @@ def _render_job_form_panel(
 
         location = st.text_input("Location", value=current_value("location"), disabled=_ro, key="job_form_location")
 
-        c5, c6 = st.columns(2)
+        c5, c6 = st.columns(2, gap="small")
         status_options = list(JOB_STATUSES)
         current_status = str(current_value("status", "Draft") or "Draft").strip() or "Draft"
         if current_status not in status_options:
@@ -451,7 +451,7 @@ def _render_job_form_panel(
             key="job_form_linked_estimate",
         )
 
-        c7, c8, c9 = st.columns(3)
+        c7, c8, c9 = st.columns(3, gap="small")
         project_manager = c7.text_input("Project Manager", value=current_value("project_manager"), disabled=_ro, key="job_form_pm")
         supervisor = c8.text_input("Supervisor", value=current_value("supervisor"), disabled=_ro, key="job_form_supervisor")
         awarded_amount = c9.number_input(
@@ -464,7 +464,7 @@ def _render_job_form_panel(
             key="job_form_awarded_amount",
         )
 
-        c10, c11, c12 = st.columns(3)
+        c10, c11, c12 = st.columns(3, gap="small")
         start_date = c10.text_input("Start Date (YYYY-MM-DD)", value=str(current_value("start_date")), disabled=_ro, key="job_form_start")
         target_completion_date = c11.text_input(
             "Target Completion (YYYY-MM-DD)",
@@ -479,13 +479,19 @@ def _render_job_form_panel(
             key="job_form_completed",
         )
 
-        notes = st.text_area("Notes", value=current_value("notes"), disabled=_ro, key="job_form_notes")
+        notes = st.text_area(
+            "Notes",
+            value=current_value("notes"),
+            disabled=_ro,
+            height=80,
+            key="job_form_notes",
+        )
 
         if not can_edit:
             st.info("Only admin or estimator users can add or update jobs.")
             return
 
-        b1, b2 = st.columns(2)
+        b1, b2 = st.columns(2, gap="small")
         if mode == "add":
             if b1.button("Create Job", type="primary", use_container_width=True, disabled=_ro, key="job_form_create"):
                 if not customer_name:
@@ -632,7 +638,7 @@ def render() -> None:
     inject_table_action_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-        qa1, qa2, qa3 = st.columns([1, 1, 2], gap="small")
+        qa1, qa2, qa3 = st.columns([1, 1, 3], gap="small")
         with qa1:
             if st.button(
                 "Add job",
@@ -859,9 +865,14 @@ def render() -> None:
                 pend_ids = [str(x) for x in pend.get(TABLE_KEY_JOBS) or [] if str(x).strip()]
                 if pend_ids:
                     st.warning(f"Delete **{len(pend_ids)}** job(s)? This cannot be undone.")
-                    dc1, dc2 = st.columns(2)
+                    dc1, dc2 = st.columns(2, gap="small")
                     with dc1:
-                        if st.button("Confirm delete", type="primary", key="job_db_confirm_delete"):
+                        if st.button(
+                            "Confirm delete",
+                            type="primary",
+                            use_container_width=True,
+                            key="job_db_confirm_delete",
+                        ):
                             for jid in pend_ids:
                                 try:
                                     delete_rows_admin("jobs", {"id": jid})
@@ -873,7 +884,7 @@ def render() -> None:
                             st.success("Delete completed where permitted.")
                             st.rerun()
                     with dc2:
-                        if st.button("Cancel", key="job_db_cancel_delete"):
+                        if st.button("Cancel", use_container_width=True, key="job_db_cancel_delete"):
                             pend.pop(TABLE_KEY_JOBS, None)
                             st.rerun()
     

@@ -43,9 +43,9 @@ def render() -> None:
         employee = st.text_input("Assign To")
         job_name = st.selectbox("Job", list(job_options.keys()))
         location = st.text_input("Assignment Location", value=str(selected_asset.get("location", "")))
-        notes = st.text_area("Notes")
+        notes = st.text_area("Notes", height=72)
 
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2, gap="small")
         if c1.button("Check Out", use_container_width=True):
             insert_row_admin(
                 "asset_assignments",

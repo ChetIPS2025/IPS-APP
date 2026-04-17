@@ -356,13 +356,13 @@ def render_asset_intake_form() -> None:
 
     st.checkbox("Rent to Customer", key="intake_is_rental")
     if st.session_state.get("intake_is_rental"):
-        ir1, ir2, ir3 = st.columns(3)
+        ir1, ir2, ir3 = st.columns(3, gap="small")
         ir1.number_input("Daily rate", min_value=0.0, step=1.0, format="%.2f", key="intake_rental_daily")
         ir2.number_input("Weekly rate", min_value=0.0, step=1.0, format="%.2f", key="intake_rental_weekly")
         ir3.number_input("Monthly rate", min_value=0.0, step=1.0, format="%.2f", key="intake_rental_monthly")
         st.text_area("Rental notes", key="intake_rental_notes", height=72)
 
-    st.text_area("Notes", key="intake_notes", height=120)
+    st.text_area("Notes", key="intake_notes", height=96)
 
     st.subheader("Photos to save")
     save_photos = st.file_uploader(

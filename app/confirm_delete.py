@@ -73,6 +73,12 @@ def inject_delete_confirm_styles() -> None:
             max-height: 140px;
             overflow-y: auto;
         }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-del-anchor) .stButton > button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -103,7 +109,7 @@ def _render_destructive_panel_ui(
                 f'<div class="ips-del-names-box"><pre style="margin:0;white-space:pre-wrap;font-size:0.88rem;">{items}</pre></div>',
                 unsafe_allow_html=True,
             )
-        bc1, bc2 = st.columns(2)
+        bc1, bc2 = st.columns(2, gap="small")
         with bc1:
             confirm = st.button(
                 confirm_label,

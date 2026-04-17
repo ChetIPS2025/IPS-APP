@@ -163,20 +163,37 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="stHorizontalBlock"] {
             gap: 0.4rem !important;
-            align-items: center !important;
+            align-items: stretch !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) button {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) .stButton > button,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+            [data-testid="stDownloadButton"] button {
             min-height: 2.25rem !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
             padding: 0.35rem 0.75rem !important;
             line-height: 1.25 !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) .stButton > button p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+            [data-testid="stDownloadButton"] button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            button[data-testid="baseButton-primary"],
+            .stButton > button[data-testid="baseButton-primary"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            button[kind="primary"] {
+            .stButton > button[kind="primary"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+            [data-testid="stDownloadButton"] button[kind="primary"] {
             font-weight: 600 !important;
         }
 
@@ -192,15 +209,30 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             div[data-testid="stHorizontalBlock"] {
             gap: 0.35rem !important;
-            align-items: center !important;
+            align-items: stretch !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) button {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) .stButton > button,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
+            [data-testid="stDownloadButton"] button {
             min-height: 2.25rem !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.35rem 0.7rem !important;
+            padding: 0.35rem 0.75rem !important;
             line-height: 1.25 !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) .stButton > button p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
+            [data-testid="stDownloadButton"] button p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
         }
 
         .ips-table-actions-bar {
@@ -500,12 +532,17 @@ def render_table_action_bar(
     pend_ids = pending.get(table_key)
     if pend_ids:
         st.warning(f"Delete **{len(pend_ids)}** row(s)? This cannot be undone.")
-        dc1, dc2 = st.columns(2)
+        dc1, dc2 = st.columns(2, gap="small")
         with dc1:
-            if st.button("Confirm delete", type="primary", key=f"ips_ta_del_y_{table_key}"):
+            if st.button(
+                "Confirm delete",
+                type="primary",
+                use_container_width=True,
+                key=f"ips_ta_del_y_{table_key}",
+            ):
                 out["confirm_delete"] = True
         with dc2:
-            if st.button("Cancel", key=f"ips_ta_del_n_{table_key}"):
+            if st.button("Cancel", use_container_width=True, key=f"ips_ta_del_n_{table_key}"):
                 pending.pop(table_key, None)
                 out["cancel_delete"] = True
                 st.rerun()

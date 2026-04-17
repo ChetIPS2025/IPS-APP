@@ -1718,7 +1718,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     )
                 else:
                     st.caption("Build the Word proposal first to enable preview.")
-            if st.button("Hide preview", key="est_embed_hide_preview"):
+            if st.button("Hide preview", use_container_width=True, key="est_embed_hide_preview"):
                 st.session_state["est_embed_proposal_preview"] = False
                 st.rerun()
 
@@ -1732,7 +1732,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         )
 
     # Row 1: Quote | Status | Customer — single compact row (no full-width fields).
-    q_col, stat_col, cust_col = st.columns([0.9, 1.0, 2.5], gap="small")
+    q_col, stat_col, cust_col = st.columns([1, 1, 2.2], gap="small")
     quote_locked_after_save = bool(
         str(st.session_state.get("loaded_estimate_id") or "").strip()
         and str(est.get("quote_number", "") or "").strip()
@@ -1807,7 +1807,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         job_id_by_norm[_norm_name_key(nm)] = str(j.get("id") or "")
 
     # Row 2: Contact | Job | Prepared by — second compact row.
-    row2_contact, row2_job, row2_prep = st.columns([1, 1.15, 1.1], gap="small")
+    row2_contact, row2_job, row2_prep = st.columns([1, 1, 1], gap="small")
     est.setdefault("customer_contact_id", None)
     with row2_contact:
         if est.get("customer_id"):
@@ -2108,11 +2108,21 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         st.metric(label="Line subtotal", value=money(subtotal))
                     c_edit, c_rem = st.columns([1, 1], gap="small")
                     with c_edit:
-                        if st.button("Edit", disabled=is_locked, key=f"est_material_edit_btn_{idx}"):
+                        if st.button(
+                            "Edit",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_material_edit_btn_{idx}",
+                        ):
                             st.session_state["est_material_edit_idx"] = idx
                             st.rerun()
                     with c_rem:
-                        if st.button("Remove", disabled=is_locked, key=f"est_material_remove_btn_{idx}"):
+                        if st.button(
+                            "Remove",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_material_remove_btn_{idx}",
+                        ):
                             est["materials"] = [x for j, x in enumerate(mat_lines) if j != idx]
                             if st.session_state.get("est_material_edit_idx") == idx:
                                 st.session_state["est_material_edit_idx"] = None
@@ -2321,11 +2331,21 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         st.metric(label="Line subtotal", value=money(subtotal))
                     c_edit, c_rem = st.columns([1, 1], gap="small")
                     with c_edit:
-                        if st.button("Edit", disabled=is_locked, key=f"est_labor_edit_btn_{idx}"):
+                        if st.button(
+                            "Edit",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_labor_edit_btn_{idx}",
+                        ):
                             st.session_state["est_labor_edit_idx"] = idx
                             st.rerun()
                     with c_rem:
-                        if st.button("Remove", disabled=is_locked, key=f"est_labor_remove_btn_{idx}"):
+                        if st.button(
+                            "Remove",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_labor_remove_btn_{idx}",
+                        ):
                             est["labor"] = [x for j, x in enumerate(labor_lines) if j != idx]
                             if st.session_state.get("est_labor_edit_idx") == idx:
                                 st.session_state["est_labor_edit_idx"] = None
@@ -2552,11 +2572,21 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         st.metric(label="Line subtotal", value=money(subtotal))
                     c_edit, c_rem = st.columns([1, 1], gap="small")
                     with c_edit:
-                        if st.button("Edit", disabled=is_locked, key=f"est_equipment_edit_btn_{idx}"):
+                        if st.button(
+                            "Edit",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_equipment_edit_btn_{idx}",
+                        ):
                             st.session_state["est_equipment_edit_idx"] = idx
                             st.rerun()
                     with c_rem:
-                        if st.button("Remove", disabled=is_locked, key=f"est_equipment_remove_btn_{idx}"):
+                        if st.button(
+                            "Remove",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_equipment_remove_btn_{idx}",
+                        ):
                             est["equipment"] = [x for j, x in enumerate(eq_lines) if j != idx]
                             if st.session_state.get("est_equipment_edit_idx") == idx:
                                 st.session_state["est_equipment_edit_idx"] = None
@@ -2732,13 +2762,23 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                             st.caption(detail)
                     with right:
                         st.metric(label="Amount", value=money(val))
-                    c1, c2 = st.columns(2, gap="small")
+                    c1, c2 = st.columns([1, 1], gap="small")
                     with c1:
-                        if st.button("Edit", disabled=is_locked, key=f"est_travel_edit_{k}"):
+                        if st.button(
+                            "Edit",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_travel_edit_{k}",
+                        ):
                             st.session_state["est_travel_last_kind"] = k
                             st.rerun()
                     with c2:
-                        if st.button("Remove", disabled=is_locked, key=f"est_travel_remove_{k}"):
+                        if st.button(
+                            "Remove",
+                            disabled=is_locked,
+                            use_container_width=True,
+                            key=f"est_travel_remove_{k}",
+                        ):
                             if k == "Mileage":
                                 travel["round_trip_miles"] = 0.0
                                 travel["mileage_rate"] = 0.0
@@ -2827,14 +2867,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             scope_of_work = st.text_area(
                 "Scope of Work",
                 value=str(est.get("scope_of_work") or ""),
-                height=160,
+                height=112,
                 disabled=is_locked,
                 key="est_scope_scope_of_work",
             )
             customer_responsibilities = st.text_area(
                 "Customer Responsibilities",
                 value=str(est.get("customer_responsibilities") or ""),
-                height=160,
+                height=112,
                 disabled=is_locked,
                 key="est_scope_customer_responsibilities",
             )
@@ -2878,7 +2918,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 nm = str(f.get("file_name") or "file")
                 with st.container(border=True):
                     st.markdown(f"**{nm}**")
-                    if st.button("Remove", disabled=is_locked, key=f"est_quote_attach_remove_{i}"):
+                    if st.button(
+                        "Remove",
+                        disabled=is_locked,
+                        use_container_width=True,
+                        key=f"est_quote_attach_remove_{i}",
+                    ):
                         st.session_state["est_pending_quote_attachments"] = [
                             x for j, x in enumerate(pending_quotes) if j != i
                         ]
@@ -2934,7 +2979,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.markdown("**Pending PO attachment**")
             with st.container(border=True):
                 st.markdown(f"**{po.get('file_name') or 'po'}**")
-                if st.button("Remove PO attachment", disabled=is_locked, key="est_po_remove_pending"):
+                if st.button(
+                    "Remove PO attachment",
+                    disabled=is_locked,
+                    use_container_width=True,
+                    key="est_po_remove_pending",
+                ):
                     st.session_state["est_pending_po_attachment"] = None
                     st.rerun()
 
@@ -3058,7 +3108,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         elif not customer_name:
             st.warning("Select a customer before saving.")
 
-        save_cols = st.columns(4)
+        save_cols = st.columns(4, gap="small")
         can_save = bool(
             bool(est.get("customer_id"))
             and (qn_now or not loaded_id)

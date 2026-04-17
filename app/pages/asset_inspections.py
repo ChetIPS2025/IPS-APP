@@ -36,14 +36,17 @@ def render() -> None:
         selected_label = st.selectbox("Asset", list(asset_options.keys()))
         selected_asset = asset_options[selected_label]
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3, gap="small")
         inspection_type = c1.selectbox("Inspection Type", ["Daily", "Weekly", "Monthly", "Pre-Use", "Damage Report"])
         inspection_date = c2.date_input("Inspection Date")
         inspector = c3.text_input("Inspector")
 
         status = st.selectbox("Status", ["Pass", "Needs Attention", "Fail"])
-        issues_found = st.text_area("Issues Found")
-        corrective_action = st.text_area("Corrective Action")
+        ia1, ia2 = st.columns(2, gap="small")
+        with ia1:
+            issues_found = st.text_area("Issues Found", height=72)
+        with ia2:
+            corrective_action = st.text_area("Corrective Action", height=72)
 
         if st.button("Save Inspection", use_container_width=True):
             insert_row_admin(

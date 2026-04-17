@@ -149,19 +149,32 @@ section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   box-shadow: 0 1px 0 0 rgba(17, 24, 39, 0.6);
   opacity: 1;
 }
-/* Primary nav buttons (full-width + column children): default weight */
+/* Primary nav buttons — align with main IPS button rhythm (height, radius, no wrap) */
 section[data-testid="stSidebar"] div.stButton > button {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
-  min-height: 2.45rem !important;
+  min-height: 2.25rem !important;
+  padding: 0.35rem 0.75rem !important;
+  border-radius: 8px !important;
+  line-height: 1.25 !important;
+  box-sizing: border-box !important;
+}
+section[data-testid="stSidebar"] div.stButton > button p {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin: 0 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button {
   font-size: 0.8125rem !important;
   font-weight: 500 !important;
-  min-height: 2.3rem !important;
+  min-height: 2.25rem !important;
+  padding: 0.35rem 0.65rem !important;
+  border-radius: 8px !important;
   margin-left: 2px !important;
   border-left: 3px solid rgba(75, 85, 99, 0.65) !important;
   padding-left: 10px !important;
+  box-sizing: border-box !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button[kind="primary"] {
   border-left-color: #60a5fa !important;
@@ -200,11 +213,13 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
   padding: 2px 8px 12px 8px !important;
 }
-/* Secondary tools: smaller + dimmer when not active */
+/* Secondary tools: compact but same radius / nowrap as main chrome */
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"] {
-  font-size: 0.74rem !important;
+  font-size: 0.8125rem !important;
   font-weight: 500 !important;
-  min-height: 2.0rem !important;
+  min-height: 2.125rem !important;
+  padding: 0.28rem 0.6rem !important;
+  border-radius: 8px !important;
   opacity: 0.92 !important;
   color: #a1a1aa !important;
   background: rgba(17, 24, 39, 0.25) !important;
@@ -220,7 +235,9 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"] {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
-  min-height: 2.45rem !important;
+  min-height: 2.25rem !important;
+  padding: 0.35rem 0.75rem !important;
+  border-radius: 8px !important;
   opacity: 1 !important;
   color: #f8fafc !important;
   background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;

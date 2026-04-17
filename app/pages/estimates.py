@@ -556,7 +556,7 @@ def _render_estimate_list() -> None:
                     st.session_state["job_edit_id"] = str(open_jid)
                     st.rerun()
             else:
-                lc1, lc2, lc3 = st.columns([1.1, 1, 2])
+                lc1, lc2, lc3 = st.columns([1, 1, 2], gap="small")
                 with lc1:
                     run_cj = st.button(
                         "Create Job from Estimate",

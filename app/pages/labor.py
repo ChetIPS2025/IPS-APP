@@ -155,7 +155,7 @@ def _render_labor_action_buttons(*, sel: list[str], can_add: bool) -> None:
 
 def _render_add_form(*, rows_for_uniq: list) -> None:
     classification = st.text_input("Labor Classification", key="labor_add_class")
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     st_rate = c1.number_input(
         "Straight Time Rate",
         min_value=0.0,
@@ -174,7 +174,7 @@ def _render_add_form(*, rows_for_uniq: list) -> None:
     )
     is_active = st.checkbox("Active", value=True, key="labor_add_active")
 
-    s1, s2 = st.columns(2)
+    s1, s2 = st.columns(2, gap="small")
     with s1:
         if st.button("Save Labor Rate", type="primary", use_container_width=True, key="labor_add_save"):
             if not str(classification).strip():
@@ -212,7 +212,7 @@ def _render_edit_form(row: dict, rows_for_uniq: list) -> None:
         value=str(row.get("classification") or ""),
         key=f"{pk}_class",
     )
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     st_rate = c1.number_input(
         "Straight Time Rate",
         min_value=0.0,
@@ -231,7 +231,7 @@ def _render_edit_form(row: dict, rows_for_uniq: list) -> None:
     )
     is_active = st.checkbox("Active", value=bool(row.get("is_active")), key=f"{pk}_active")
 
-    u1, u2 = st.columns(2)
+    u1, u2 = st.columns(2, gap="small")
     with u1:
         if st.button("Update Labor Rate", type="primary", use_container_width=True, key=f"{pk}_save"):
             if not str(classification).strip():
@@ -307,7 +307,7 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
         st.info("No labor rates found.")
         if can_add:
             inject_ips_crud_list_styles()
-            if st.button("Add Labor Rate", type="primary", key="labor_empty_add"):
+            if st.button("Add Labor Rate", type="primary", use_container_width=True, key="labor_empty_add"):
                 st.session_state["labor_panel_mode"] = "add"
                 st.session_state.pop("labor_panel_id", None)
                 st.rerun()
@@ -357,7 +357,9 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
         st.warning("No labor rates match your filters.")
         if can_add:
             inject_table_action_styles()
-            if st.button("Add Labor Rate", type="primary", key="labor_filtered_empty_add"):
+            if st.button(
+                "Add Labor Rate", type="primary", use_container_width=True, key="labor_filtered_empty_add"
+            ):
                 st.session_state["labor_panel_mode"] = "add"
                 st.session_state.pop("labor_panel_id", None)
                 st.rerun()

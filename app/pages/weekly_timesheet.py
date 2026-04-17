@@ -277,7 +277,7 @@ def render() -> None:
             st.session_state.pop("wt_saved_view_id", None)
         else:
             st.subheader("Saved timesheet detail")
-            cva, cvb = st.columns(2)
+            cva, cvb = st.columns(2, gap="small")
             with cva:
                 st.markdown(f"**Week start:** {hr.get('week_start') or '—'}")
                 st.markdown(f"**Job #:** {hr.get('job_number') or '—'}")
@@ -294,7 +294,7 @@ def render() -> None:
     today = date.today()
     default_week = _monday_of_week(today)
 
-    c0, c1, c2 = st.columns([1, 1, 2])
+    c0, c1, c2 = st.columns([1, 1, 2], gap="small")
     week_start = c0.date_input("Week starting (Monday)", value=default_week, key="wt_week_start")
     if week_start.weekday() != 0:
         st.warning("Timesheet weeks are Monday–Sunday. Adjusting to the Monday of the selected week.")
@@ -359,7 +359,7 @@ def render() -> None:
         st.session_state["wt_date_str"] = week_end.isoformat()
 
     st.markdown("##### Timesheet header")
-    h1, h2, h3, h4, h5 = st.columns(5)
+    h1, h2, h3, h4, h5 = st.columns(5, gap="small")
     v_job_num = h1.text_input("JOB #", key="wt_job_number")
     v_client = h2.text_input("CLIENT", key="wt_client")
     v_job_name = h3.text_input("JOB NAME", key="wt_job_name")
@@ -375,7 +375,7 @@ def render() -> None:
             _build_rows_from_time_entries([], week_start, job_id or "", wt_employees_by_id, [])
         )
 
-    ac1, ac2, ac3 = st.columns(3)
+    ac1, ac2, ac3 = st.columns(3, gap="small")
     if ac1.button("Load hours from time entries", use_container_width=True, disabled=not job_id):
         st.session_state["wt_grid_df"] = _rows_to_dataframe(
             _build_rows_from_time_entries(
@@ -451,7 +451,7 @@ def render() -> None:
         rt = rt.rename(columns={"row_total": "TOTAL HRS"})
         st.dataframe(rt, use_container_width=True, hide_index=True)
 
-    tc = st.columns(7)
+    tc = st.columns(7, gap="small")
     for i, k in enumerate(DAY_KEYS):
         tc[i].metric(f"Total {DAY_LABELS[i]}", f"{total_row[k]:.2f}")
     st.metric("Grand total (all days)", f"{grand:.2f}")

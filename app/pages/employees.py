@@ -214,7 +214,12 @@ def _render_edit_form(row: dict) -> None:
         format="%.2f",
         key=f"{pk}_ot",
     )
-    ed_notes = st.text_area("Notes", value=str(row.get("notes") or ""), key=f"{pk}_notes")
+    ed_notes = st.text_area(
+        "Notes",
+        value=str(row.get("notes") or ""),
+        height=56,
+        key=f"{pk}_notes",
+    )
     ed_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
 
     c1, c2 = st.columns(2)
@@ -267,7 +272,7 @@ def _render_employees_main(
     if df.empty:
         st.info("No employees yet. Run `sql/008_employees.sql` in Supabase if the table is missing.")
         if can_edit:
-            if st.button("Add Employee", type="primary", key="emp_empty_add"):
+            if st.button("Add Employee", type="primary", use_container_width=True, key="emp_empty_add"):
                 add_employee_dialog()
         return
 
@@ -315,7 +320,7 @@ def _render_employees_main(
         st.warning("No employees match your filters.")
         if can_edit:
             inject_table_action_styles()
-            if st.button("Add Employee", type="primary", key="emp_filtered_empty_add"):
+            if st.button("Add Employee", type="primary", use_container_width=True, key="emp_filtered_empty_add"):
                 add_employee_dialog()
     elif "id" not in filtered.columns:
         disp = filtered[show_cols].copy()

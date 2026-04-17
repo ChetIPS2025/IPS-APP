@@ -329,7 +329,7 @@ def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool
         st.info("No inventory items yet. Use **Add Item** to create stocked supplies.")
         if can_edit:
             inject_table_action_styles()
-            if st.button("Add Item", type="primary", key="inv_empty_add"):
+            if st.button("Add Item", type="primary", use_container_width=True, key="inv_empty_add"):
                 st.session_state["inv_panel_mode"] = "add"
                 st.session_state.pop("inv_panel_id", None)
                 st.rerun()
@@ -413,7 +413,7 @@ def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool
         st.warning("No items match your filters.")
         if can_edit:
             inject_table_action_styles()
-            if st.button("Add Item", type="primary", key="inv_filtered_empty_add"):
+            if st.button("Add Item", type="primary", use_container_width=True, key="inv_filtered_empty_add"):
                 st.session_state["inv_panel_mode"] = "add"
                 st.session_state.pop("inv_panel_id", None)
                 st.rerun()

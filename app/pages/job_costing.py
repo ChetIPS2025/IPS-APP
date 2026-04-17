@@ -200,7 +200,7 @@ def render() -> None:
 
     df = pd.DataFrame(rows)
 
-    f1, f2, f3 = st.columns([1, 1, 2])
+    f1, f2, f3 = st.columns([1, 1, 2], gap="small")
 
     customer_names = sorted([r["customer_name"] for r in rows if str(r["customer_name"]).strip()])
     selected_customer = f1.selectbox("Filter Customer", ["All"] + sorted(set(customer_names)))
