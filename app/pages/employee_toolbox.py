@@ -73,7 +73,7 @@ _PANEL_MODE_KEY = "employee_toolbox_panel_mode"
 _EDIT_ID_KEY = "employee_toolbox_edit_id"
 _DELETE_PREFIX = "employee_toolbox_delete"
 _PENDING_DELETE_KEY = "employee_toolbox_pending_delete_ids"
-_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v6"
+_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v9"
 
 _FETCH_COLUMNS = (
     "id,title,url,description,category,is_active,sort_order,created_at,"
@@ -138,14 +138,57 @@ def _employee_toolbox_assets_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "assets"
 
 
-# Map normalized titles (see _norm_title_for_brand_lookup) to PNGs under ``assets/``.
+# Optional absolute path (e.g. Cursor / Linux sandboxes). Checked before ``app/assets/``.
+_TOOLBOX_MNT_DATA_DIR = Path("/mnt/data")
+# Combined IPS icon sheet (fallback when a mapped per-title PNG is missing).
+_COMBINED_ICON_SHEET_FILENAME = "894fdc1c-9c41-45b4-94a1-fcf7942c928d.png"
+
+
+def _toolbox_brand_asset_search_roots() -> tuple[Path, ...]:
+    """Search order for branded PNGs: ``/mnt/data`` (when present), then ``app/assets``."""
+    roots: list[Path] = []
+    try:
+        if _TOOLBOX_MNT_DATA_DIR.is_dir():
+            roots.append(_TOOLBOX_MNT_DATA_DIR)
+    except OSError:
+        pass
+    app_assets = _employee_toolbox_assets_dir()
+    if app_assets not in roots:
+        roots.append(app_assets)
+    return tuple(roots)
+
+
+def _resolve_toolbox_brand_image(filename: str) -> Path | None:
+    """First existing ``filename`` under :func:`_toolbox_brand_asset_search_roots`."""
+    fn = str(filename or "").strip()
+    if not fn or "/" in fn or "\\" in fn:
+        return None
+    for root in _toolbox_brand_asset_search_roots():
+        p = root / fn
+        try:
+            if p.is_file():
+                return p
+        except OSError:
+            continue
+    return None
+
+
+def _combined_icon_sheet_path() -> Path | None:
+    """Optional sprite sheet used when a specific mapped PNG is not on disk."""
+    return _resolve_toolbox_brand_image(_COMBINED_ICON_SHEET_FILENAME)
+
+
+# Map normalized titles (see _norm_title_for_brand_lookup) to basenames in ``/mnt/data`` or ``app/assets``.
 _BRAND_TITLE_TO_IMAGE: dict[str, str] = {
     "employee handbook": "ips_employee_handbook.png",
     "contract welder agreement": "ips_welder_service_agreement.png",
     "pipe tap chart": "ips_pipe_tap.png",
+    "pipe tap": "ips_pipe_tap.png",
     "bolt tap chart bolt torque specs": "ips_bolt_torque.png",
     "#150 flange bolt chart": "ips_flange_150.png",
     "150 flange bolt chart": "ips_flange_150.png",
+    "#300 flange bolt chart": "ips_flange_300.png",
+    "300 flange bolt chart": "ips_flange_300.png",
     "conduit wire fill": "ips_conduit_fill.png",
     "handrail standard": "ips_handrail_standard.png",
     "wire size": "ips_wire_size.png",
@@ -162,17 +205,34 @@ def _norm_title_for_brand_lookup(raw: str) -> str:
 
 
 def _brand_image_path_for_title(title_raw: str) -> Path | None:
-    """Return path to a branded tile image when title matches and the file exists on disk."""
+    """
+    Resolve branded artwork: title → basename, then search ``/mnt/data`` then ``app/assets``.
+
+    * ``ips_flange_300.png``: if missing, use ``ips_flange_150.png`` (closest flange) from the same search order.
+    * If the mapped PNG is still missing, use the combined icon sheet when present.
+    """
     n = _norm_title_for_brand_lookup(title_raw)
     fn = _BRAND_TITLE_TO_IMAGE.get(n)
     if not fn:
         n2 = " ".join(n.replace("#", " ").split())
         n2 = " ".join(n2.split())
         fn = _BRAND_TITLE_TO_IMAGE.get(n2)
+    if not fn and "pipe tap" in n:
+        fn = _BRAND_TITLE_TO_IMAGE.get("pipe tap chart") or _BRAND_TITLE_TO_IMAGE.get("pipe tap")
+    if not fn:
+        if "300" in n and "flange" in n and "bolt" in n:
+            fn = "ips_flange_300.png"
     if not fn:
         return None
-    p = _employee_toolbox_assets_dir() / fn
-    return p if p.is_file() else None
+
+    p = _resolve_toolbox_brand_image(fn)
+    if p is not None:
+        return p
+    if fn == "ips_flange_300.png":
+        p150 = _resolve_toolbox_brand_image("ips_flange_150.png")
+        if p150 is not None:
+            return p150
+    return _combined_icon_sheet_path()
 
 
 def _image_to_data_uri(path: Path) -> str:
@@ -199,8 +259,8 @@ def _toolbox_file_icon(file_name: str) -> str:
     return "📁"
 
 
-def _truncate_tile_title(raw: str, *, max_chars: int = 42) -> str:
-    """Short, readable label for app-icon tiles."""
+def _truncate_tile_title(raw: str, *, max_chars: int = 28) -> str:
+    """Short, readable label under launcher icons."""
     s = " ".join(str(raw or "").split()).strip() or "—"
     if len(s) <= max_chars:
         return s
@@ -241,34 +301,45 @@ def _tile_visual_inner_html(
     active: bool,
     hint: str,
     brand_image_path: Path | None = None,
-) -> str:
-    """Inner HTML: branded image or icon (top) → title → category badge → optional one-line desc → hint."""
-    if brand_image_path is not None and brand_image_path.is_file():
+) -> tuple[str, bool]:
+    """Branded: full-bleed image as button surface + footer title. Fallback: compact emoji tile.
+
+    Returns ``(html, full_bleed_brand)`` for matching outer tile padding / marker classes.
+    """
+    _ = badge, hint, desc  # full text stays on outer tooltip / Streamlit help where applicable
+    has_brand_file = brand_image_path is not None and brand_image_path.is_file()
+    if has_brand_file:
         try:
             data_uri = _image_to_data_uri(brand_image_path)
-            top_html = (
-                '<div class="ips-toolbox-tile-thumb">'
-                f'<img src="{html.escape(data_uri, quote=True)}" alt="" loading="lazy" />'
-                "</div>"
-            )
+            parts = [
+                '<div class="ips-toolbox-launcher-stack ips-toolbox-launcher-stack--fullbleed">',
+                '<div class="ips-toolbox-fullbleed-media">',
+                f'<img src="{html.escape(data_uri, quote=True)}" alt="" loading="lazy" />',
+                "</div>",
+                '<div class="ips-toolbox-launcher-footer">',
+                f'<p class="ips-toolbox-launcher-title">{html.escape(title)}</p>',
+            ]
+            if can_manage and not active:
+                parts.append('<p class="ips-toolbox-tile-meta ips-toolbox-tile-meta--compact">Hidden</p>')
+            parts.extend(["</div>", "</div>"])
+            return "\n".join(parts), True
         except OSError:
-            top_html = f'<p class="ips-toolbox-tile-icon">{icon}</p>'
-    else:
-        top_html = f'<p class="ips-toolbox-tile-icon">{icon}</p>'
+            pass
+
+    icon_block = (
+        '<div class="ips-toolbox-launcher-icon-wrap ips-toolbox-launcher-icon-wrap--fallback">'
+        f'<p class="ips-toolbox-tile-icon">{icon}</p></div>'
+    )
+    stack_cls = "ips-toolbox-launcher-stack ips-toolbox-launcher-stack--fallback"
     parts: list[str] = [
-        top_html,
-        f'<p class="ips-toolbox-tile-title">{html.escape(title)}</p>',
-        f'<div class="ips-toolbox-tile-badges"><span class="ips-toolbox-badge">{html.escape(badge)}</span></div>',
+        f'<div class="{stack_cls}">',
+        icon_block,
+        f'<p class="ips-toolbox-launcher-title">{html.escape(title)}</p>',
     ]
-    if desc:
-        short = desc if len(desc) <= 56 else desc[:53] + "…"
-        desc_safe = html.escape(short).replace("\n", " ")
-        parts.append(f'<p class="ips-toolbox-tile-desc">{desc_safe}</p>')
     if can_manage and not active:
-        parts.append('<p class="ips-toolbox-tile-meta">Inactive · hidden from employees</p>')
-    if hint:
-        parts.append(f'<p class="ips-toolbox-tile-hint">{html.escape(hint)}</p>')
-    return "\n".join(parts)
+        parts.append('<p class="ips-toolbox-tile-meta ips-toolbox-tile-meta--compact">Hidden</p>')
+    parts.append("</div>")
+    return "\n".join(parts), False
 
 
 def _tile_tooltip_attr(description: str) -> str:
@@ -279,8 +350,27 @@ def _tile_tooltip_attr(description: str) -> str:
     return f' title="{html.escape(t, quote=True)}"'
 
 
-def _tile_marker_span(*, is_download: bool, has_admin_overlay: bool, interactive: bool) -> str:
+def _toolbox_tile_tip(*, desc: str, action: str = "") -> str:
+    """Tooltip: description plus optional action hint (Open / Download) since on-tile hints were removed."""
+    d = " ".join(str(desc or "").split()).strip()
+    a = str(action or "").strip()
+    if d and a:
+        return _tile_tooltip_attr(f"{d} ({a})")
+    if d:
+        return _tile_tooltip_attr(d)
+    return _tile_tooltip_attr(a)
+
+
+def _tile_marker_span(
+    *,
+    is_download: bool,
+    has_admin_overlay: bool,
+    interactive: bool,
+    full_bleed_brand: bool = False,
+) -> str:
     parts = ["ips-toolbox-card", "ips-toolbox-tile"]
+    if full_bleed_brand:
+        parts.append("ips-toolbox-tile--fullbleed")
     if interactive:
         parts.append("ips-toolbox-tile-interactive")
     if is_download:
@@ -300,11 +390,11 @@ def _inject_toolbox_hub_styles() -> None:
         /* App launcher tile shell */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile) {
             position: relative !important;
-            background: rgba(15, 23, 42, 0.68) !important;
-            border: 1px solid rgba(71, 85, 105, 0.55) !important;
-            border-radius: 16px !important;
-            padding: 16px 12px 10px 12px !important;
-            margin-bottom: 12px !important;
+            background: rgba(15, 23, 42, 0.72) !important;
+            border: 1px solid rgba(71, 85, 105, 0.5) !important;
+            border-radius: 18px !important;
+            padding: 12px 10px 8px 10px !important;
+            margin-bottom: 10px !important;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
             transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
                 transform 0.22s ease !important;
@@ -330,7 +420,8 @@ def _inject_toolbox_hub_styles() -> None:
         }
         /* Whole-tile link (http/https resources) */
         a.ips-toolbox-tile-link {
-            display: block;
+            display: flex;
+            justify-content: center;
             text-decoration: none !important;
             color: inherit !important;
             border-radius: 12px;
@@ -349,82 +440,167 @@ def _inject_toolbox_hub_styles() -> None:
             outline: 2px solid rgba(96, 165, 250, 0.85);
             outline-offset: 2px;
         }
-        div.ips-toolbox-tile-body {
+        /* Full-bleed branded tiles: no shell padding; artwork edge-to-edge */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile--fullbleed) {
+            padding: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        a.ips-toolbox-tile-link--fullbleed {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+        }
+        a.ips-toolbox-tile-link--fullbleed:hover {
+            background: transparent !important;
+        }
+        div.ips-toolbox-tile-body.ips-toolbox-tile-body--fullbleed.ips-toolbox-tile-body--launcher {
+            max-width: none !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        div.ips-toolbox-launcher-stack--fullbleed {
+            width: 100%;
+            align-items: stretch;
+        }
+        div.ips-toolbox-fullbleed-media {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            overflow: hidden;
+            border-radius: 17px 17px 0 0;
+            margin: 0;
+            padding: 0;
+            background: rgba(15, 23, 42, 0.5);
+        }
+        div.ips-toolbox-fullbleed-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+        div.ips-toolbox-launcher-footer {
+            padding: 8px 10px 10px 10px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        div.ips-toolbox-launcher-stack--fullbleed p.ips-toolbox-launcher-title {
+            min-height: auto;
+            max-height: none;
+            -webkit-line-clamp: unset;
+            display: block;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile--fullbleed.ips-toolbox-tile-dl) div[data-testid="stButton"] > button {
+            min-height: 300px !important;
+        }
+        div.ips-toolbox-tile-body.ips-toolbox-tile-body--launcher {
             position: relative;
             z-index: 0;
-            min-height: 118px;
+            min-height: 0;
+            width: 100%;
+            max-width: 148px;
+            margin: 0 auto;
         }
-        p.ips-toolbox-tile-icon {
+        div.ips-toolbox-launcher-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
-            font-size: 3.1rem;
-            line-height: 1;
-            margin: 0 0 12px 0;
-            user-select: none;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+            gap: 0;
         }
-        div.ips-toolbox-tile-thumb {
-            text-align: center;
-            margin: 0 0 12px 0;
-            min-height: 72px;
+        div.ips-toolbox-launcher-icon-wrap {
+            width: 100%;
+            height: 128px;
+            min-height: 128px;
+            max-height: 128px;
+            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin: 0 auto 8px auto;
+            max-width: 132px;
+            border-radius: 20px;
+            background: linear-gradient(165deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.55);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.07),
+                0 6px 18px rgba(0, 0, 0, 0.38);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
-        div.ips-toolbox-tile-thumb img {
-            max-height: 96px;
-            max-width: 100%;
-            width: auto;
-            height: auto;
+        div.ips-toolbox-launcher-icon-wrap--brand {
+            padding: 10px;
+        }
+        div.ips-toolbox-launcher-icon-wrap--brand img {
+            width: 104px;
+            height: 104px;
+            max-width: 104px;
+            max-height: 104px;
             object-fit: contain;
-            border-radius: 10px;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+            object-position: center;
+            border-radius: 14px;
+            filter: drop-shadow(0 3px 12px rgba(0,0,0,0.42));
             user-select: none;
             pointer-events: none;
         }
-        p.ips-toolbox-tile-title {
-            color: #f8fafc !important;
-            font-size: 0.88rem !important;
-            font-weight: 650 !important;
+        div.ips-toolbox-launcher-icon-wrap--fallback {
+            padding: 0;
+        }
+        p.ips-toolbox-tile-icon {
             text-align: center;
-            margin: 0 0 6px 0 !important;
-            line-height: 1.25 !important;
+            font-size: 2.85rem;
+            line-height: 1;
+            margin: 0;
+            width: 104px;
+            height: 104px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile-interactive):hover
+            div.ips-toolbox-launcher-icon-wrap {
+            border-color: rgba(96, 165, 250, 0.55);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 0 1px rgba(96, 165, 250, 0.25),
+                0 12px 28px rgba(0, 0, 0, 0.4);
+            transform: translateY(-1px);
+        }
+        p.ips-toolbox-launcher-title {
+            color: #f1f5f9 !important;
+            font-size: 0.76rem !important;
+            font-weight: 600 !important;
+            text-align: center;
+            margin: 2px 0 0 0 !important;
+            line-height: 1.28 !important;
             min-height: 2.35em;
             max-height: 2.55em;
             overflow: hidden;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+            padding: 0 2px;
         }
-        div.ips-toolbox-tile-badges {
-            text-align: center;
-            margin: 0 0 6px 0;
-            line-height: 1.4;
-        }
-        p.ips-toolbox-tile-desc {
+        p.ips-toolbox-tile-meta--compact {
             color: #94a3b8 !important;
-            font-size: 0.65rem !important;
-            line-height: 1.3 !important;
+            font-size: 0.58rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
             text-align: center;
-            margin: 0 0 4px 0 !important;
-            max-height: 1.35em;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
+            margin: 4px 0 0 0 !important;
+            opacity: 0.9;
         }
         p.ips-toolbox-tile-meta {
             color: #64748b !important;
-            font-size: 0.68rem !important;
+            font-size: 0.65rem !important;
             text-align: center;
-            margin: 0 0 6px 0 !important;
-        }
-        p.ips-toolbox-tile-hint {
-            color: #64748b !important;
-            font-size: 0.62rem !important;
-            font-weight: 600 !important;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            text-align: center;
-            margin: 6px 0 0 0 !important;
+            margin: 4px 0 0 0 !important;
         }
         /* Invisible download hit-area over tile body (local files only) */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile-dl) div[data-testid="stButton"] {
@@ -438,7 +614,7 @@ def _inject_toolbox_hub_styles() -> None:
             height: auto !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile-has-admin) div[data-testid="stButton"] {
-            bottom: 52px !important;
+            bottom: 44px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile-dl):not(:has(.ips-toolbox-tile-has-admin)) div[data-testid="stButton"] {
             bottom: 0 !important;
@@ -448,25 +624,26 @@ def _inject_toolbox_hub_styles() -> None:
             inset: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            min-height: 140px !important;
+            min-height: 210px !important;
             opacity: 0.03 !important;
             cursor: pointer !important;
-            border-radius: 14px !important;
+            border-radius: 16px !important;
         }
         hr.ips-toolbox-tile-admin-sep {
-            margin: 8px 0 6px 0 !important;
+            margin: 6px 0 4px 0 !important;
             border: none !important;
-            border-top: 1px solid rgba(51, 65, 85, 0.5) !important;
+            border-top: 1px solid rgba(51, 65, 85, 0.42) !important;
+            opacity: 0.9;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile) div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
             position: relative !important;
             z-index: 5 !important;
-            min-height: 1.85rem !important;
-            padding: 0.15rem 0.35rem !important;
-            font-size: 0.64rem !important;
-            border-radius: 7px !important;
+            min-height: 1.32rem !important;
+            padding: 0.05rem 0.22rem !important;
+            font-size: 0.56rem !important;
+            border-radius: 6px !important;
             font-weight: 500 !important;
-            opacity: 0.82 !important;
+            opacity: 0.68 !important;
         }
         .ips-toolbox-category {
             color: #94a3b8;
@@ -491,13 +668,32 @@ def _inject_toolbox_hub_styles() -> None:
             border: 1px solid rgba(148, 163, 184, 0.32) !important;
             white-space: nowrap;
         }
+        [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-toolbox-tile) {
+            justify-content: center !important;
+            align-items: start !important;
+            gap: 0.55rem !important;
+        }
+        [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-toolbox-tile) > div[data-testid="column"] {
+            display: flex !important;
+            justify-content: center !important;
+        }
         @media (max-width: 900px) {
-            p.ips-toolbox-tile-icon { font-size: 2.75rem; margin-bottom: 10px; }
-            p.ips-toolbox-tile-title { font-size: 0.84rem !important; }
+            p.ips-toolbox-tile-icon { font-size: 2.55rem; width: 92px !important; height: 92px !important; }
+            p.ips-toolbox-launcher-title { font-size: 0.74rem !important; }
+            div.ips-toolbox-launcher-icon-wrap {
+                height: 118px !important;
+                min-height: 118px !important;
+                max-height: 118px !important;
+                max-width: 124px !important;
+            }
+            div.ips-toolbox-launcher-icon-wrap--brand img {
+                width: 92px !important;
+                height: 92px !important;
+                max-height: 92px !important;
+            }
             [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-toolbox-tile) {
                 flex-direction: row !important;
                 flex-wrap: wrap !important;
-                gap: 0.5rem !important;
                 align-items: stretch !important;
             }
             [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-toolbox-tile) > div[data-testid="column"] {
@@ -937,21 +1133,33 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
     elif url.strip():
         interactive = True
 
-    tip = _tile_tooltip_attr(desc)
+    action_hint = ""
+    if is_file and fp and ref:
+        if use_dl_overlay:
+            action_hint = "Download"
+        elif ref.startswith("http://") or ref.startswith("https://"):
+            action_hint = "Open"
+    elif url.strip() and interactive:
+        action_hint = "Open"
+
+    tip = _toolbox_tile_tip(desc=desc, action=action_hint)
+
+    def _body_classes(*, full_bleed: bool) -> str:
+        c = "ips-toolbox-tile-body ips-toolbox-tile-body--launcher"
+        if full_bleed:
+            c += " ips-toolbox-tile-body--fullbleed"
+        return c
+
+    def _link_classes(*, full_bleed: bool) -> str:
+        c = "ips-toolbox-tile-link"
+        if full_bleed:
+            c += " ips-toolbox-tile-link--fullbleed"
+        return c
 
     with st.container(border=True):
-        st.markdown(
-            _tile_marker_span(
-                is_download=use_dl_overlay,
-                has_admin_overlay=bool(use_dl_overlay and can_manage),
-                interactive=interactive,
-            ),
-            unsafe_allow_html=True,
-        )
-
         if is_file:
             if not ref:
-                inner = _tile_visual_inner_html(
+                inner, full_bleed = _tile_visual_inner_html(
                     title=title,
                     desc=desc,
                     badge=badge,
@@ -961,11 +1169,23 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                     hint="",
                     brand_image_path=brand_path,
                 )
-                st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    _tile_marker_span(
+                        is_download=use_dl_overlay,
+                        has_admin_overlay=bool(use_dl_overlay and can_manage),
+                        interactive=interactive,
+                        full_bleed_brand=full_bleed,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
+                    unsafe_allow_html=True,
+                )
                 st.markdown('<p class="ips-toolbox-tile-meta">File unavailable</p>', unsafe_allow_html=True)
             elif ref.startswith("http://") or ref.startswith("https://"):
                 safe_href = html.escape(ref, quote=True)
-                inner = _tile_visual_inner_html(
+                inner, full_bleed = _tile_visual_inner_html(
                     title=title,
                     desc=desc,
                     badge=badge,
@@ -976,14 +1196,23 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                     brand_image_path=brand_path,
                 )
                 st.markdown(
-                    f'<a class="ips-toolbox-tile-link" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
-                    f'<div class="ips-toolbox-tile-body">{inner}</div></a>',
+                    _tile_marker_span(
+                        is_download=use_dl_overlay,
+                        has_admin_overlay=bool(use_dl_overlay and can_manage),
+                        interactive=interactive,
+                        full_bleed_brand=full_bleed,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<a class="{_link_classes(full_bleed=full_bleed)}" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
+                    f'<div class="{_body_classes(full_bleed=full_bleed)}">{inner}</div></a>',
                     unsafe_allow_html=True,
                 )
             else:
                 p = Path(ref)
                 if p.is_file():
-                    inner = _tile_visual_inner_html(
+                    inner, full_bleed = _tile_visual_inner_html(
                         title=title,
                         desc=desc,
                         badge=badge,
@@ -993,7 +1222,19 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         hint="Download",
                         brand_image_path=brand_path,
                     )
-                    st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        _tile_marker_span(
+                            is_download=use_dl_overlay,
+                            has_admin_overlay=bool(use_dl_overlay and can_manage),
+                            interactive=interactive,
+                            full_bleed_brand=full_bleed,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
+                        unsafe_allow_html=True,
+                    )
                     ctype = str(row.get("content_type") or "").strip() or "application/octet-stream"
                     st.download_button(
                         " ",
@@ -1006,7 +1247,7 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         help=desc if desc else None,
                     )
                 else:
-                    inner = _tile_visual_inner_html(
+                    inner, full_bleed = _tile_visual_inner_html(
                         title=title,
                         desc=desc,
                         badge=badge,
@@ -1016,12 +1257,24 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         hint="",
                         brand_image_path=brand_path,
                     )
-                    st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        _tile_marker_span(
+                            is_download=use_dl_overlay,
+                            has_admin_overlay=bool(use_dl_overlay and can_manage),
+                            interactive=interactive,
+                            full_bleed_brand=full_bleed,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
+                        unsafe_allow_html=True,
+                    )
                     st.markdown('<p class="ips-toolbox-tile-meta">Missing file</p>', unsafe_allow_html=True)
         elif url:
             nu = _normalize_url(url)
             safe_href = html.escape(nu, quote=True)
-            inner = _tile_visual_inner_html(
+            inner, full_bleed = _tile_visual_inner_html(
                 title=title,
                 desc=desc,
                 badge=badge,
@@ -1032,12 +1285,21 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                 brand_image_path=brand_path,
             )
             st.markdown(
-                f'<a class="ips-toolbox-tile-link" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
-                f'<div class="ips-toolbox-tile-body">{inner}</div></a>',
+                _tile_marker_span(
+                    is_download=use_dl_overlay,
+                    has_admin_overlay=bool(use_dl_overlay and can_manage),
+                    interactive=interactive,
+                    full_bleed_brand=full_bleed,
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<a class="{_link_classes(full_bleed=full_bleed)}" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
+                f'<div class="{_body_classes(full_bleed=full_bleed)}">{inner}</div></a>',
                 unsafe_allow_html=True,
             )
         else:
-            inner = _tile_visual_inner_html(
+            inner, full_bleed = _tile_visual_inner_html(
                 title=title,
                 desc=desc,
                 badge=badge,
@@ -1047,7 +1309,19 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                 hint="",
                 brand_image_path=brand_path,
             )
-            st.markdown(f'<div class="ips-toolbox-tile-body"{tip}>{inner}</div>', unsafe_allow_html=True)
+            st.markdown(
+                _tile_marker_span(
+                    is_download=use_dl_overlay,
+                    has_admin_overlay=bool(use_dl_overlay and can_manage),
+                    interactive=interactive,
+                    full_bleed_brand=full_bleed,
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
+                unsafe_allow_html=True,
+            )
             st.markdown('<p class="ips-toolbox-tile-meta">No URL</p>', unsafe_allow_html=True)
 
         if can_manage:
@@ -1080,8 +1354,8 @@ def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
 
     st.markdown("##### Resource hub")
     st.caption(
-        "Grouped by category — **tap the tile** to open a link or cloud document; **local files** use a full-tile "
-        "download target. Admins: **Edit** / **Delete** below each tile. Signed URLs expire after about one hour."
+        "Grouped by category — **tap the icon** (or the tile) to open. **Local files:** invisible download over the "
+        "tile. **Admins:** small **Edit** / **Delete** under each item. Signed URLs expire after about one hour."
     )
 
     for i, (cat_label, group) in enumerate(_group_by_category_ordered(rows)):

@@ -10,9 +10,16 @@ from datetime import date, timedelta
 from typing import Any
 
 try:
-    from db import delete_rows, fetch_by_match, fetch_table, insert_row, update_rows
+    from db import delete_rows, fetch_by_match, fetch_table, fetch_table_admin, insert_row, update_rows
 except ImportError:
-    from app.db import delete_rows, fetch_by_match, fetch_table, insert_row, update_rows  # type: ignore
+    from app.db import (  # type: ignore
+        delete_rows,
+        fetch_by_match,
+        fetch_table,
+        fetch_table_admin,
+        insert_row,
+        update_rows,
+    )
 
 try:
     from services.job_service import sort_jobs_by_number_then_name
@@ -42,7 +49,7 @@ def fetch_jobs_for_matrix_rows(*, limit: int = 5000) -> list[dict[str, Any]]:
     rely on ``status`` only.
     """
     try:
-        jobs = fetch_table("jobs", limit=limit, order_by="job_number")
+        jobs = fetch_table_admin("jobs", limit=limit, order_by="job_number")
     except Exception:
         return []
     jobs = sort_jobs_by_number_then_name(jobs)

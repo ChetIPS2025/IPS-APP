@@ -8,10 +8,10 @@ from typing import Any
 import pandas as pd
 
 try:
-    from db import fetch_table
+    from db import fetch_table_admin
     from db_time_tracking import delete_time_entry_by_natural_key, fetch_jobs_for_matrix_rows
 except ImportError:
-    from app.db import fetch_table  # type: ignore
+    from app.db import fetch_table_admin  # type: ignore
     from app.db_time_tracking import (  # type: ignore
         delete_time_entry_by_natural_key,
         fetch_jobs_for_matrix_rows,
@@ -54,7 +54,7 @@ def fetch_jobs_ordered() -> list[dict[str, Any]]:
     except ImportError:
         from app.services.job_service import sort_jobs_by_number_then_name  # type: ignore
     try:
-        jobs = fetch_table("jobs", limit=5000, order_by="job_number")
+        jobs = fetch_table_admin("jobs", limit=5000, order_by="job_number")
     except Exception:
         return []
     return sort_jobs_by_number_then_name(jobs)
