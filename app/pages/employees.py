@@ -340,7 +340,7 @@ def _render_employees_main(
 
 
 def render_body() -> None:
-    """Full employees CRUD without page header (used by ``People`` combined page)."""
+    """Full employees CRUD without page header (used by the ``Users`` combined page)."""
     can_edit = current_role() == "admin"
     if st.session_state.get("employee_mode") == "add":
         st.session_state.pop("employee_mode", None)

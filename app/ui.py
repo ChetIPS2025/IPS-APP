@@ -69,6 +69,13 @@ def _nav_btn_key(page: str) -> str:
     return "ips_nav__" + page.replace(" ", "_").replace("/", "_")
 
 
+def _sidebar_display_label(route_key: str) -> str:
+    """Visible sidebar label; route/session keys stay unchanged (e.g. People → Users)."""
+    if route_key == "People":
+        return "Users"
+    return route_key
+
+
 def _visible_secondary_pages(role: str) -> tuple[str, ...]:
     if role == "admin":
         return _NAV_SECONDARY
@@ -351,7 +358,8 @@ def render_sidebar() -> str:
             active = current == p
             btn_type = "primary" if active else "secondary"
             key = _nav_btn_key(p)
-            if st.button(p, key=key, type=btn_type, use_container_width=True):
+            label = _sidebar_display_label(p)
+            if st.button(label, key=key, type=btn_type, use_container_width=True):
                 st.session_state[IPS_NAV_PAGE_KEY] = p
                 st.rerun()
 

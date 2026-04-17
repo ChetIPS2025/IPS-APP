@@ -288,7 +288,7 @@ def render() -> None:
 
     visible_emps = [e for e in active_employees if str(e.get("id")) in show_emp_ids]
     if not visible_emps:
-        st.warning("No employees match the filter. Adjust filters or add employees (**People** → Employees).")
+        st.warning("No employees match the filter. Adjust filters or add employees (**Users** → Employees).")
         return
 
     # —— Summary metrics ——

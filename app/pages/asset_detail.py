@@ -35,10 +35,8 @@ try:
         append_asset_photos,
         apply_extraction_to_asset,
         delete_asset_and_related,
-        delete_asset_photo,
         optional_numeric,
         save_maintenance_record,
-        set_asset_primary_photo,
     )
     from app.services.job_service import job_row_select_label
     from app.ui import IPS_NAV_PENDING_KEY
@@ -70,22 +68,18 @@ except ImportError:
         append_asset_photos,
         apply_extraction_to_asset,
         delete_asset_and_related,
-        delete_asset_photo,
         optional_numeric,
         save_maintenance_record,
-        set_asset_primary_photo,
     )
     from services.job_service import job_row_select_label  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
 
-# Centered primary hero image (not full container width; ``width=`` for Streamlit 1.33+).
-_PRIMARY_IMAGE_WIDTH_DESKTOP = 360
-_PRIMARY_IMAGE_WIDTH_MOBILE = 260
-# Gallery thumbnail / preview sizing
-_GALLERY_THUMB_WIDTH_DESKTOP = 128
-_GALLERY_THUMB_WIDTH_MOBILE = 180
-_GALLERY_PREVIEW_IMAGE_WIDTH_DESKTOP = 400
-_GALLERY_PREVIEW_IMAGE_WIDTH_MOBILE = 260
+# Primary hero image: visually dominant on desktop (``width=`` for Streamlit 1.33+).
+_PRIMARY_IMAGE_WIDTH_DESKTOP = 520
+_PRIMARY_IMAGE_WIDTH_MOBILE = 280
+# QR in hero: secondary, compact (still scannable).
+_QR_IMAGE_WIDTH_DESKTOP = 152
+_QR_IMAGE_WIDTH_MOBILE = 132
 
 _PROFILE_CARD_CSS = """
 <style>
@@ -114,8 +108,16 @@ _PROFILE_CARD_CSS = """
     line-height: 1.2;
 }
 .ips-ad-hero-centerblock {
-    max-width: 560px;
-    margin: 0 auto 4px auto;
+    max-width: 600px;
+    margin: 0 auto 2px auto;
+}
+/* Desktop hero: title under left-aligned primary image */
+.ips-ad-meta-col.ips-ad-hero-stack:not(.ips-ad-hero-centerblock) {
+    margin-top: 2px;
+    max-width: 640px;
+}
+.ips-ad-meta-col.ips-ad-hero-stack:not(.ips-ad-hero-centerblock) .ips-hero-title {
+    margin-bottom: 6px;
 }
 @media (max-width: 900px) {
     .ips-hero-title { font-size: 1.35rem !important; margin-bottom: 12px !important; }
@@ -165,50 +167,20 @@ _PROFILE_CARD_CSS = """
     border: 1px solid rgba(56, 189, 248, 0.45);
     margin: 0 0 10px 0;
 }
-/* Uploaded-files gallery: click thumbnail to expand (linked image) */
-.ips-ad-gallery-wrap a[href*="ips_gpv"] {
-    cursor: zoom-in;
-    border-radius: 8px;
-    display: inline-block;
-    line-height: 0;
-}
-.ips-ad-gallery-wrap a[href*="ips_gpv"]:hover {
-    outline: 2px solid rgba(96, 165, 250, 0.9);
-    outline-offset: 2px;
-}
-.ips-ad-gallery-wrap a[href*="ips_gpv"] img {
-    border-radius: 8px;
-}
-.ips-ad-gallery-thumb-hint {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-top: 2px;
-    margin-bottom: 6px;
-}
-.ips-ad-gallery-preview-panel {
-    background: rgba(15, 23, 42, 0.75);
-    border: 1px solid rgba(51, 65, 85, 0.95);
-    border-radius: 12px;
-    padding: 12px 14px 14px 14px;
-    margin-top: 4px;
-}
-.ips-ad-gallery-preview-panel h5 {
-    color: #e2e8f0 !important;
-    margin-bottom: 10px !important;
-}
-.ips-ad-gallery-preview-pos {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.95rem;
-    margin: 0.25rem 0 0.5rem 0;
+.ips-ad-photos-upload-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 6px;
 }
 .ips-ad-qr-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #94a3b8;
-    margin: 0 0 8px 0;
+    margin: 0 0 4px 0;
 }
 /* Read-only rental rates (IPS dark) */
 .ips-ad-rental-panel {
@@ -283,7 +255,7 @@ _PROFILE_CARD_CSS = """
     background: rgba(15, 23, 42, 0.48);
     border: 1px solid rgba(71, 85, 105, 0.4);
     border-radius: 10px;
-    padding: 10px 12px 10px 12px;
+    padding: 8px 10px 8px 10px;
     margin-top: 0;
 }
 .ips-ad-facts-panel .ips-facts-head {
@@ -372,8 +344,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) {
     background: rgba(15, 23, 42, 0.58) !important;
     border-color: rgba(71, 85, 105, 0.5) !important;
     border-radius: 10px !important;
-    padding: 8px 10px 10px 10px !important;
-    margin-bottom: 6px !important;
+    padding: 6px 8px 8px 8px !important;
+    margin-bottom: 4px !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-primary) h5 {
@@ -410,20 +382,24 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-section-docs) h5 {
     padding-bottom: 4px !important;
     margin-bottom: 4px !important;
 }
-/* Compact QR tool card (col1) */
+/* Compact QR tool card (secondary; narrow width) */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-qr-tool) {
-    max-width: 260px !important;
+    max-width: 200px !important;
     background: rgba(15, 23, 42, 0.65) !important;
     border-color: rgba(71, 85, 105, 0.55) !important;
-    border-radius: 10px !important;
-    padding: 10px 12px 12px 12px !important;
-    margin-bottom: 10px !important;
+    border-radius: 8px !important;
+    padding: 6px 8px 8px 8px !important;
+    margin-top: 4px !important;
+    margin-bottom: 0 !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ad-qr-tool) [data-testid="stImage"] {
+    margin-bottom: 0.25rem !important;
 }
 </style>
 """
 
-_IPS_AD_SECTIONS_CSS_KEY = "ips_ad_detail_sections_css_injected_v4"
+_IPS_AD_SECTIONS_CSS_KEY = "ips_ad_detail_sections_css_injected_v5"
 
 
 def _inject_asset_detail_sections_css() -> None:
@@ -466,11 +442,11 @@ def _kv(label: str, value: str) -> None:
 
 
 def _render_asset_detail_qr_block(asset: dict, aid: str, *, compact: bool) -> None:
-    """QR downloads in a bordered card; ``compact`` uses a smaller image (still scannable on phones)."""
+    """QR downloads in a bordered card; width follows layout constants (compact = stacked/mobile)."""
     qr_text = qr_payload(asset)
     if not qr_text:
         return
-    img_w = 120 if compact else 220
+    img_w = _QR_IMAGE_WIDTH_MOBILE if compact else _QR_IMAGE_WIDTH_DESKTOP
     with st.container(border=True):
         st.markdown(
             '<span class="ips-ad-qr-tool"></span>'
@@ -481,7 +457,7 @@ def _render_asset_detail_qr_block(asset: dict, aid: str, *, compact: bool) -> No
             st.image(
                 qr_png_bytes(qr_text),
                 width=img_w,
-                caption=None if compact else f"Asset QR · {qr_text}",
+                caption=None,
             )
         except Exception:
             st.caption(f"QR value: {qr_text} (image unavailable)")
@@ -842,48 +818,23 @@ def _render_asset_documents_list(
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _gallery_image_row_indices(rows: list[dict]) -> list[int]:
-    """Indices into ``rows`` that are image files (preview navigates across these only)."""
-    out: list[int] = []
-    for i, row in enumerate(rows):
-        fp = str(row.get("file_path") or "").strip()
-        fn = str(row.get("file_name") or "").strip() or Path(fp).name or "file"
-        if _asset_file_kind(fn) == "image":
-            out.append(i)
-    return out
-
-
-def _gallery_preview_session_key(aid: str) -> str:
-    return f"asset_gallery_preview_{aid}"
-
-
 _GALLERY_PREVIEW_QP = "ips_gpv"
 
 
-def _sync_asset_gallery_preview_query(aid: str) -> None:
-    """Apply ?ips_gpv=<index> from a thumbnail click into session state, then clear the URL."""
-    raw = st.query_params.get(_GALLERY_PREVIEW_QP)
-    if raw is None:
-        return
-    try:
-        idx = int(raw)
-    except (TypeError, ValueError):
-        st.query_params.pop(_GALLERY_PREVIEW_QP, None)
-        return
-    st.session_state[_gallery_preview_session_key(aid)] = idx
+def _clear_legacy_gallery_state(aid: str) -> None:
+    """Clear stale thumbnail-gallery preview/session state (gallery UI removed)."""
+    st.session_state.pop(f"asset_gallery_preview_{aid}", None)
     st.query_params.pop(_GALLERY_PREVIEW_QP, None)
 
 
-def _clear_asset_gallery_preview(aid: str) -> None:
-    """Clear expanded preview: session index and any lingering ``ips_gpv`` query param."""
-    st.session_state.pop(_gallery_preview_session_key(aid), None)
-    st.query_params.pop(_GALLERY_PREVIEW_QP, None)
+def _pending_delete_session_key(aid: str) -> str:
+    return f"asset_photo_delete_pending_{aid}"
 
 
 def _back_to_asset_list(*, aid: str | None) -> None:
     """Clear asset-detail state and navigate back to Asset Database list."""
     if aid:
-        _clear_asset_gallery_preview(str(aid))
+        _clear_legacy_gallery_state(str(aid))
         st.session_state.pop(_pending_delete_session_key(str(aid)), None)
         st.session_state.pop(f"del_confirm_{aid}", None)
         st.session_state.pop(f"ad_quick_edit_{aid}", None)
@@ -897,329 +848,6 @@ def _back_to_asset_list(*, aid: str | None) -> None:
     st.session_state.pop("_asset_detail_do_nav_rerun", None)
     st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
     st.rerun()
-
-
-def _pending_delete_session_key(aid: str) -> str:
-    return f"asset_photo_delete_pending_{aid}"
-
-
-def _paths_equal_storage(a: str, b: str) -> bool:
-    return str(a or "").strip().replace("\\", "/") == str(b or "").strip().replace("\\", "/")
-
-
-def _render_one_asset_file_tile(
-    aid: str,
-    idx: int,
-    row: dict,
-    asset: dict,
-    can_edit: bool,
-    *,
-    thumb_width: int = 160,
-) -> None:
-    """Thumbnail for images; PDF/other via link or download (cloud URL vs local path)."""
-    storage_path = str(row.get("file_path") or "").strip()
-    file_name = str(row.get("file_name") or "").strip() or Path(storage_path).name or "file"
-    row_id = str(row.get("id") or "").strip()
-    key_base = f"af_{aid}_{idx}"
-    pending_key = _pending_delete_session_key(aid)
-    pending = str(st.session_state.get(pending_key) or "").strip()
-
-    if can_edit and row_id and pending == row_id:
-        st.warning("Delete this file from storage and the database?")
-        c_yes, c_no = st.columns(2)
-        if c_yes.button("Yes, delete", key=f"{key_base}_del_yes", use_container_width=True):
-            try:
-                delete_asset_photo(row, asset)
-            except Exception as exc:
-                st.error(f"Could not delete file: {exc}")
-            else:
-                st.session_state.pop(pending_key, None)
-                _clear_asset_gallery_preview(aid)
-                st.session_state["asset_detail_flash"] = "File removed."
-                st.rerun()
-        if c_no.button("Cancel", key=f"{key_base}_del_no", use_container_width=True):
-            st.session_state.pop(pending_key, None)
-            st.rerun()
-        return
-
-    def _offer_delete(suffix: str = "del") -> None:
-        if not (can_edit and row_id):
-            return
-        if st.button("Delete", key=f"{key_base}_{suffix}", use_container_width=True):
-            st.session_state[pending_key] = row_id
-            st.rerun()
-
-    def _offer_set_primary() -> None:
-        cur = str(storage_path or "").strip()
-        primary = str(asset.get("photo_path") or "").strip()
-        is_primary = _paths_equal_storage(primary, cur)
-        if is_primary:
-            st.markdown(
-                '<span class="ips-primary-badge">Primary Image</span>',
-                unsafe_allow_html=True,
-            )
-            if can_edit:
-                st.button(
-                    "Set as Primary Image",
-                    key=f"{key_base}_primary",
-                    use_container_width=True,
-                    disabled=True,
-                    help="This photo is already the primary image for this asset.",
-                )
-            return
-        if not (can_edit and row_id):
-            return
-        if st.button(
-            "Set as Primary Image",
-            key=f"{key_base}_primary",
-            use_container_width=True,
-        ):
-            try:
-                set_asset_primary_photo(asset, storage_path)
-            except Exception as exc:
-                st.error(f"Could not set primary image: {exc}")
-            else:
-                st.session_state["asset_detail_flash"] = "Primary image updated"
-                st.rerun()
-
-    ref = create_signed_url(storage_path, expires_in=3600) if storage_path else ""
-    if not ref:
-        st.caption(f"Unavailable · {file_name}")
-        _offer_delete("del_unavail")
-        return
-
-    kind = _asset_file_kind(file_name)
-    is_http = ref.startswith("http://") or ref.startswith("https://")
-
-    if kind == "image":
-        cap_short = file_name[:48] + ("…" if len(file_name) > 48 else "")
-        try:
-            # Streamlit 1.33: st.image has no ``link=``; use same-page query param for gallery preview.
-            safe_ref = html.escape(str(ref), quote=True)
-            st.markdown(
-                f'<a href="?{_GALLERY_PREVIEW_QP}={idx}" class="ips-ad-gallery-thumb-link" '
-                'style="display:block;text-decoration:none;">'
-                f'<img src="{safe_ref}" alt="" '
-                f'style="max-width:100%;width:{int(thumb_width)}px;height:auto;border-radius:8px;'
-                f'cursor:pointer;object-fit:cover;" />'
-                f"</a>",
-                unsafe_allow_html=True,
-            )
-            st.caption(cap_short)
-            st.markdown(
-                '<p class="ips-ad-gallery-thumb-hint">Click image to enlarge</p>',
-                unsafe_allow_html=True,
-            )
-        except Exception:
-            st.caption(file_name)
-            if is_http:
-                st.link_button("Open file", url=ref, use_container_width=True)
-            else:
-                p = Path(ref)
-                if p.is_file():
-                    st.download_button(
-                        "Download",
-                        data=p.read_bytes(),
-                        file_name=file_name,
-                        key=f"{key_base}_img_dl",
-                    )
-        _offer_set_primary()
-        _offer_delete()
-        return
-
-    if kind == "pdf":
-        st.markdown("##### 📄")
-        if is_http:
-            st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref, use_container_width=True)
-        else:
-            p = Path(ref)
-            if p.is_file():
-                st.download_button(
-                    f"Download · {file_name[:32]}",
-                    data=p.read_bytes(),
-                    file_name=file_name,
-                    mime="application/pdf",
-                    key=f"{key_base}_pdf_dl",
-                )
-            else:
-                st.caption(file_name)
-        _offer_delete()
-        return
-
-    st.markdown("##### 📎")
-    if is_http:
-        st.link_button(file_name[:40] + ("…" if len(file_name) > 40 else ""), url=ref, use_container_width=True)
-    else:
-        p = Path(ref)
-        if p.is_file():
-            st.download_button(
-                f"Download · {file_name[:32]}",
-                data=p.read_bytes(),
-                file_name=file_name,
-                key=f"{key_base}_oth_dl",
-            )
-        else:
-            st.caption(file_name)
-    _offer_delete()
-
-
-def _render_asset_image_preview_panel(aid: str, rows: list[dict], *, mobile: bool = False) -> None:
-    """Full-width image below the gallery when user expands a thumbnail."""
-    pk = _gallery_preview_session_key(aid)
-    raw = st.session_state.get(pk)
-    if raw is None:
-        return
-    try:
-        idx = int(raw)
-    except (TypeError, ValueError):
-        st.session_state.pop(pk, None)
-        return
-    if idx < 0 or idx >= len(rows):
-        st.session_state.pop(pk, None)
-        return
-
-    row = rows[idx]
-    fp = str(row.get("file_path") or "").strip()
-    fn = str(row.get("file_name") or "").strip() or Path(fp).name or "file"
-    if _asset_file_kind(fn) != "image":
-        st.session_state.pop(pk, None)
-        return
-
-    ref = create_signed_url(fp, expires_in=3600) if fp else ""
-    if not ref:
-        st.session_state.pop(pk, None)
-        return
-
-    image_indices = _gallery_image_row_indices(rows)
-    try:
-        img_pos = image_indices.index(idx)
-    except ValueError:
-        st.session_state.pop(pk, None)
-        return
-    prev_idx = image_indices[img_pos - 1] if img_pos > 0 else None
-    next_idx = image_indices[img_pos + 1] if img_pos < len(image_indices) - 1 else None
-    pos_label = f"{img_pos + 1} / {len(image_indices)}"
-
-    st.markdown('<div class="ips-ad-gallery-preview-panel">', unsafe_allow_html=True)
-    if mobile:
-        st.markdown("##### Preview")
-        if st.button(
-            "Close Preview",
-            key=f"asset_gallery_close_{aid}",
-            use_container_width=True,
-            type="secondary",
-            help="Exit full-size preview",
-        ):
-            _clear_asset_gallery_preview(aid)
-            st.rerun()
-        st.markdown(
-            f'<p class="ips-ad-gallery-preview-pos">{html.escape(pos_label)}</p>',
-            unsafe_allow_html=True,
-        )
-        prev_c, next_c = st.columns(2)
-        with prev_c:
-            if st.button(
-                "Previous",
-                key=f"asset_gallery_prev_{aid}",
-                use_container_width=True,
-                disabled=prev_idx is None,
-                help="Previous image",
-            ):
-                if prev_idx is not None:
-                    st.session_state[pk] = prev_idx
-                    st.rerun()
-        with next_c:
-            if st.button(
-                "Next",
-                key=f"asset_gallery_next_{aid}",
-                use_container_width=True,
-                disabled=next_idx is None,
-                help="Next image",
-            ):
-                if next_idx is not None:
-                    st.session_state[pk] = next_idx
-                    st.rerun()
-    else:
-        ch_l, ch_r = st.columns([4, 1])
-        with ch_l:
-            st.markdown("##### Preview")
-        with ch_r:
-            if st.button(
-                "Close Preview",
-                key=f"asset_gallery_close_{aid}",
-                use_container_width=True,
-                type="secondary",
-                help="Exit full-size preview",
-            ):
-                _clear_asset_gallery_preview(aid)
-                st.rerun()
-
-        np1, np2, np3 = st.columns([1, 2, 1])
-        with np1:
-            if st.button(
-                "Previous",
-                key=f"asset_gallery_prev_{aid}",
-                use_container_width=True,
-                disabled=prev_idx is None,
-                help="Previous image",
-            ):
-                if prev_idx is not None:
-                    st.session_state[pk] = prev_idx
-                    st.rerun()
-        with np2:
-            st.markdown(
-                f'<p style="text-align:center;color:#94a3b8;font-size:0.9rem;margin:0.35rem 0 0 0;">{pos_label}</p>',
-                unsafe_allow_html=True,
-            )
-        with np3:
-            if st.button(
-                "Next",
-                key=f"asset_gallery_next_{aid}",
-                use_container_width=True,
-                disabled=next_idx is None,
-                help="Next image",
-            ):
-                if next_idx is not None:
-                    st.session_state[pk] = next_idx
-                    st.rerun()
-
-    prev_w = _GALLERY_PREVIEW_IMAGE_WIDTH_MOBILE if mobile else _GALLERY_PREVIEW_IMAGE_WIDTH_DESKTOP
-    try:
-        _, _prev_mid, _ = st.columns([1, 2, 1])
-        with _prev_mid:
-            st.image(ref, width=prev_w)
-    except Exception as exc:
-        st.warning(f"Could not load image: {exc}")
-    st.caption(fn)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def _render_asset_uploaded_files_gallery(
-    aid: str,
-    rows: list[dict],
-    asset: dict,
-    can_edit: bool,
-    *,
-    mobile: bool = False,
-) -> None:
-    if not rows:
-        return
-    st.caption(
-        "Image thumbnails — **tap** for a large preview below. "
-        "Use **Set as Primary Image** for the hero image above."
-    )
-    st.markdown('<div class="ips-ad-gallery-wrap">', unsafe_allow_html=True)
-    per_row = 2 if mobile else 4
-    thumb_w = _GALLERY_THUMB_WIDTH_MOBILE if mobile else _GALLERY_THUMB_WIDTH_DESKTOP
-    for i in range(0, len(rows), per_row):
-        chunk = rows[i : i + per_row]
-        cols = st.columns(len(chunk))
-        for j, row in enumerate(chunk):
-            with cols[j]:
-                _render_one_asset_file_tile(aid, i + j, row, asset, can_edit, thumb_width=thumb_w)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    _render_asset_image_preview_panel(aid, rows, mobile=mobile)
 
 
 def render() -> None:
@@ -1261,8 +889,6 @@ def render() -> None:
     qe_key = f"ad_quick_edit_{aid}"
     # In-page edit mode (✏️): rental form, uploads, AI. ``asset_edit_id`` is for Asset Manager full-form edit, not this page.
     quick_edit = can_edit and bool(st.session_state.get(qe_key, False))
-
-    _sync_asset_gallery_preview_query(str(aid))
 
     jobs = fetch_table("jobs", limit=5000, order_by="job_number")
     job_options: dict[str, str | None] = {"": None}
@@ -1330,14 +956,12 @@ def render() -> None:
         if is_narrow:
             if signed:
                 try:
-                    _, _hm, _ = st.columns([1, 2, 1])
-                    with _hm:
-                        st.image(signed, width=_hero_w)
+                    st.image(signed, width=_hero_w)
                 except Exception as exc:
                     st.warning(f"Could not load primary image: {exc}")
             else:
                 st.caption(
-                    "No primary image. Upload below or set **Primary Image** on a gallery photo."
+                    "No primary image. Add files in **Photos & files** below while **Quick Edit** (✏️) is on."
                 )
             _render_asset_title_quick_edit(
                 asset,
@@ -1351,18 +975,17 @@ def render() -> None:
             _render_asset_facts_panel(asset, jobs, quick_edit=quick_edit)
             _render_asset_detail_qr_block(asset, str(aid), compact=True)
         else:
-            _h_left, _h_right = st.columns([1.25, 1.0], gap="medium")
+            # Left: dominant primary photo + title; right: equipment details + compact QR
+            _h_left, _h_right = st.columns([1.9, 1.0], gap="small")
             with _h_left:
                 if signed:
                     try:
-                        _, _hm, _ = st.columns([1, 1.15, 1])
-                        with _hm:
-                            st.image(signed, width=_hero_w)
+                        st.image(signed, width=_hero_w)
                     except Exception as exc:
                         st.warning(f"Could not load primary image: {exc}")
                 else:
                     st.caption(
-                        "No primary image. Upload below or set **Primary Image** on a gallery photo."
+                        "No primary image. Add files in **Photos & files** below while **Quick Edit** (✏️) is on."
                     )
                 _render_asset_title_quick_edit(
                     asset,
@@ -1371,7 +994,7 @@ def render() -> None:
                     qe_key=qe_key,
                     can_edit=can_edit,
                     is_narrow=False,
-                    centered=True,
+                    centered=False,
                 )
             with _h_right:
                 _render_asset_facts_panel(asset, jobs, quick_edit=quick_edit)
@@ -1411,17 +1034,46 @@ def render() -> None:
                     st.session_state["asset_detail_action"] = "delete"
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- Gallery + documents ---
+    detail_photos = None
+    upload_photos_clicked = False
+
+    # --- Photos & files (compact upload; thumbnail gallery removed) ---
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-photos"></span>', unsafe_allow_html=True)
-        st.markdown("##### Photo gallery")
-        st.caption("Thumbnails — tap to enlarge. PDFs and manuals are listed under **Documents**.")
-        if photo_rows:
-            _render_asset_uploaded_files_gallery(str(aid), photo_rows, asset, can_edit, mobile=is_narrow)
-        else:
-            st.caption(
-                "No photos yet. Open **Quick Edit** (✏️) to use **Upload photos** in **Asset updates**."
+        st.markdown("##### Photos & files")
+        if can_edit and quick_edit:
+            st.caption("Add images or PDFs. PDFs are also listed under **Documents**.")
+            detail_photos = st.file_uploader(
+                "Choose files",
+                type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
+                accept_multiple_files=True,
+                key=f"ad_photos_{aid}",
+                help="PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
             )
+            st.markdown('<div class="ips-ad-photos-upload-row">', unsafe_allow_html=True)
+            upload_photos_clicked = st.button(
+                "Upload",
+                type="primary",
+                key=f"ad_upphotos_{aid}",
+                use_container_width=False,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+        elif can_edit and not quick_edit:
+            st.caption("Open **Quick Edit** (✏️) to add photos or files.")
+        else:
+            st.caption("Editors can add files using **Quick Edit** (✏️).")
+
+    if can_edit and quick_edit and upload_photos_clicked:
+        if not detail_photos:
+            st.error("Choose one or more files first.")
+        else:
+            batch = [
+                {"file_name": f.name, "file_bytes": f.getvalue(), "photo_type": "overview"}
+                for f in detail_photos
+            ]
+            append_asset_photos(asset, batch, uploaded_by=current_profile().get("id"))
+            st.success("Files saved.")
+            st.rerun()
 
     with st.container(border=True):
         st.markdown('<span class="ips-ad-section-docs"></span>', unsafe_allow_html=True)
@@ -1503,50 +1155,10 @@ def render() -> None:
                     st.rerun()
 
             st.markdown("##### Asset updates")
-            st.caption("Upload images or PDFs, then **Upload photos** or **Run AI autofill**.")
-            _up_lbl = (
-                "Photos & files"
-                if is_narrow
-                else "Equipment photos & files (images → **Photos**; PDFs → **Documents**)"
+            st.caption(
+                "Choose files in **Photos & files** above, then **Upload** or **Run AI autofill** to suggest field values."
             )
-            if is_narrow:
-                detail_photos = st.file_uploader(
-                    _up_lbl,
-                    type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
-                    accept_multiple_files=True,
-                    key=f"ad_photos_{aid}",
-                    help="PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI.",
-                )
-                st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
-                pa1, pa2 = st.columns(2)
-                with pa1:
-                    upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
-                with pa2:
-                    run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                _au_u, _au_b = st.columns([2.5, 1])
-                with _au_u:
-                    detail_photos = st.file_uploader(
-                        _up_lbl,
-                        type=["pdf", "heic", "jpg", "jpeg", "png", "webp"],
-                        accept_multiple_files=True,
-                        key=f"ad_photos_{aid}",
-                        help="Supported: PDF, HEIC, JPG, JPEG, PNG, WEBP. PDFs use rendered pages for AI; HEIC is converted for analysis.",
-                    )
-                with _au_b:
-                    st.markdown('<div class="ips-ad-actions-updates">', unsafe_allow_html=True)
-                    upload_photos = st.button("Upload photos", key=f"ad_upphotos_{aid}", use_container_width=True)
-                    run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-            if upload_photos:
-                if not detail_photos:
-                    st.error("Choose one or more photos first.")
-                else:
-                    batch = [{"file_name": f.name, "file_bytes": f.getvalue(), "photo_type": "overview"} for f in detail_photos]
-                    append_asset_photos(asset, batch, uploaded_by=current_profile().get("id"))
-                    st.success("Photos saved.")
+            run_ai = st.button("Run AI autofill", key=f"ad_runai_{aid}", use_container_width=True)
 
             if run_ai:
                 if not detail_photos:

@@ -346,6 +346,96 @@ def _fetch_customer_row_by_id_for_editor(cid: str) -> dict | None:
         return None
 
 
+def _fetch_customer_row_for_proposal(cid: str) -> dict | None:
+    """Full customer row (address fields) for proposal placeholders."""
+    admin_read = current_role() in {"admin", "estimator"}
+    try:
+        if admin_read:
+            rows = fetch_by_match_admin("customers", {"id": cid}, columns="*", limit=1)
+        else:
+            rows = fetch_by_match("customers", {"id": cid}, columns="*", limit=1)
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def _format_customer_location_line(row: dict | None) -> str:
+    """Single-line location for {{CUSTOMER_LOCATION}} (matches Customers tab field names)."""
+    if not row:
+        return ""
+
+    def _first(keys: tuple[str, ...]) -> str:
+        for k in keys:
+            v = row.get(k)
+            if v is not None and str(v).strip():
+                return str(v).strip()
+        return ""
+
+    addr = _first(("address", "street_address", "address_line1", "line1"))
+    city = _first(("city",))
+    state = _first(("state", "region", "province"))
+    z = _first(("zip", "zip_code", "postal_code", "postcode"))
+    parts: list[str] = []
+    if addr:
+        parts.append(addr)
+    cs = ", ".join(p for p in (city, state) if p)
+    if cs:
+        parts.append(cs)
+    if z:
+        parts.append(z)
+    return ", ".join(parts)
+
+
+def _lookup_prepared_by_phone(est: dict) -> str:
+    """Estimator phone for {{PREPARED_BY_PHONE}} when ``profiles.phone`` exists."""
+    pid = _normalize_prepared_by_id_value(str(est.get("prepared_by_id") or ""))
+    if not pid.startswith("p:"):
+        return ""
+    uid = pid[2:].strip()
+    if not uid:
+        return ""
+    try:
+        row = fetch_one("profiles", {"id": uid}, columns="id,phone")
+        if row and str(row.get("phone") or "").strip():
+            return str(row.get("phone") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:
+    """Shared context for Word/PDF proposal generation (placeholders + PDF layout)."""
+    cid = str(est.get("customer_id") or "").strip()
+    cust_row = _fetch_customer_row_for_proposal(cid) if cid else None
+    location = _format_customer_location_line(cust_row)
+    cust_name = customer_name_by_id.get(cid, "") or (
+        str(cust_row.get("customer_name") or "").strip() if cust_row else ""
+    )
+    jid = est.get("job_id")
+    job_name = ""
+    for j in jobs:
+        if j.get("id") == jid:
+            job_name = str(j.get("job_name") or "").strip()
+            break
+    contact_name = ""
+    ccid = str(est.get("customer_contact_id") or "").strip()
+    if ccid:
+        try:
+            crow = fetch_one("customer_contacts", {"id": ccid}, columns="id,contact_name")
+            if crow:
+                contact_name = str(crow.get("contact_name") or "").strip()
+        except Exception:
+            pass
+    phone = _lookup_prepared_by_phone(est)
+    return {
+        "customer_name": cust_name,
+        "job_name": job_name,
+        "customer_location": location,
+        "contact_name": contact_name,
+        "prepared_by_phone": phone,
+    }
+
+
 def _fetch_contacts_for_estimate_editor(customer_id: str) -> list[dict]:
     """Contacts for the selected customer only; same read pattern as the Customers tab (RLS-aware)."""
     admin_read = current_role() in {"admin", "estimator"}
@@ -1506,9 +1596,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     m5.metric("Proposal", money(totals["proposal_total"]))
 
     if embedded:
-        _cust = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
-        _job = next((j["job_name"] for j in jobs if j["id"] == est.get("job_id")), "")
-        pdf_toolbar = build_proposal_pdf(est, totals, customer_name=_cust, job_name=_job)
+        _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
+        pdf_toolbar = build_proposal_pdf(est, totals, **_pe)
         ep1, ep2, ep3 = st.columns([1, 1, 4])
         with ep1:
             if st.button("Preview Proposal", use_container_width=True, key="est_embed_preview_btn"):
@@ -2636,40 +2725,26 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
 
     with tabs[4]:
-        st.caption("Edit scope sections in one submit to avoid rerun/reset issues.")
+        st.caption(
+            "Edit **Scope of Work** and **Customer Responsibilities** in one submit to avoid rerun/reset issues."
+        )
         with st.form(key="est_scope_form", clear_on_submit=False):
             scope_of_work = st.text_area(
                 "Scope of Work",
                 value=str(est.get("scope_of_work") or ""),
-                height=140,
+                height=160,
                 disabled=is_locked,
                 key="est_scope_scope_of_work",
-            )
-            exclusions = st.text_area(
-                "Exclusions",
-                value=str(est.get("exclusions") or ""),
-                height=110,
-                disabled=is_locked,
-                key="est_scope_exclusions",
-            )
-            additional_charges = st.text_area(
-                "Additional Charges",
-                value=str(est.get("additional_charges") or ""),
-                height=110,
-                disabled=is_locked,
-                key="est_scope_additional_charges",
             )
             customer_responsibilities = st.text_area(
                 "Customer Responsibilities",
                 value=str(est.get("customer_responsibilities") or ""),
-                height=110,
+                height=160,
                 disabled=is_locked,
                 key="est_scope_customer_responsibilities",
             )
             if st.form_submit_button("Save scope sections", disabled=is_locked):
                 est["scope_of_work"] = str(scope_of_work or "")
-                est["exclusions"] = str(exclusions or "")
-                est["additional_charges"] = str(additional_charges or "")
                 est["customer_responsibilities"] = str(customer_responsibilities or "")
                 st.rerun()
 
@@ -2769,14 +2844,31 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.rerun()
 
     with tabs[6]:
-        customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
-        job_name = next((j["job_name"] for j in jobs if j["id"] == est.get("job_id")), "")
-        docx_bytes = build_proposal_docx(est, totals, customer_name=customer_name, job_name=job_name)
-        pdf_bytes = build_proposal_pdf(est, totals, customer_name=customer_name, job_name=job_name)
+        _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
+        tpl_uploader = st.file_uploader(
+            "Proposal Word template (.docx)",
+            type=["docx"],
+            accept_multiple_files=False,
+            key="est_proposal_tpl_uploader",
+            help="Upload the IPS .docx template (default layout when set). Messy tokens like {{ Customer Name}} are normalized to {{CUSTOMER_NAME}} before fill.",
+        )
+        if tpl_uploader is not None:
+            st.session_state["ips_proposal_template_bytes"] = tpl_uploader.getvalue()
+        tpl_bytes = st.session_state.get("ips_proposal_template_bytes")
+        if tpl_bytes and st.button("Clear uploaded Word template", key="est_proposal_tpl_clear"):
+            st.session_state.pop("ips_proposal_template_bytes", None)
+            st.rerun()
+
+        docx_bytes = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_bytes)
+        pdf_bytes = build_proposal_pdf(est, totals, **_pe)
 
         # Top action card: downloads + (optional) save-to-storage.
         with st.container(border=True):
-            st.caption("Exports are generated from the current draft. Download anytime; save-to-storage requires a saved estimate.")
+            st.caption(
+                "Exports use the current draft. Word uses your uploaded template, else **assets/proposal_template.docx**, "
+                "else the built-in layout. Placeholder labels are normalized to **{{CUSTOMER_NAME}}**, **{{SCOPE_OF_WORK}}**, etc., then filled. "
+                "Save-to-storage requires a saved estimate."
+            )
             d1, d2 = st.columns(2)
             with d1:
                 st.download_button(

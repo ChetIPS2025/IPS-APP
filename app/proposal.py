@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 from datetime import datetime
@@ -14,10 +15,9 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas as pdf_canvas
 
 IPS_BLUE = (46, 102, 165)
-IPS_DARK = (20, 20, 20)
 IPS_GRAY = (140, 140, 140)
 
-# IPS Quote PDF (matches unified quote layout; DOCX path unchanged)
+# IPS Quote PDF (ReportLab layout; DOCX uses Word template when present)
 PDF_QUOTE_OPENING = (
     "Industrial Plant Solutions, LLC (IPS) proposes to perform the following scope of work..."
 )
@@ -47,6 +47,20 @@ PDF_CONTACT_LINE = 0.12 * inch
 
 _D0 = Decimal("0")
 _CENT = Decimal("0.01")
+
+# Canonical Word tokens (underscore, uppercase) used after normalization + value fill.
+_DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
+    "JOB_NAME",
+    "QUOTE_NUMBER",
+    "CUSTOMER_NAME",
+    "CUSTOMER_LOCATION",
+    "CONTACT_NAME",
+    "PROPOSAL_AMOUNT",
+    "SCOPE_OF_WORK",
+    "PREPARED_BY",
+    "DATE",
+    "PREPARED_BY_PHONE",
+)
 
 
 def _dec(v) -> Decimal:
@@ -79,36 +93,180 @@ def _find_logo() -> Path | None:
     return None
 
 
-def proposal_values(est: dict, totals: dict, customer_name: str = "", job_name: str = "") -> dict:
+def _pdf_prepared_by(est: dict) -> str:
+    """Session profile name/email when the estimate has no prepared-by name."""
+    try:
+        from auth import current_profile
+
+        prof = current_profile()
+        name = str(prof.get("full_name") or "").strip()
+        if name:
+            return name
+        email = str(prof.get("email") or "").strip()
+        if email:
+            return email
+    except Exception:
+        pass
+    return str(est.get("prepared_by_name") or est.get("prepared_by") or "").strip()
+
+
+def _proposal_prepared_by_display(est: dict) -> str:
+    """{{PREPARED_BY}}: prefer saved estimate name, then profile/session fallback."""
+    n = str(est.get("prepared_by_name") or "").strip()
+    if n:
+        return n
+    return _pdf_prepared_by(est)
+
+
+def proposal_values(
+    est: dict,
+    totals: dict,
+    customer_name: str = "",
+    job_name: str = "",
+    *,
+    customer_location: str = "",
+    contact_name: str = "",
+    prepared_by_phone: str = "",
+) -> dict:
+    """
+    Values for proposal export (PDF + Word + programmatic DOCX fallback).
+
+    Word templates use ``{{TOKEN}}`` after normalization; see ``_normalize_placeholder_tokens``.
+    Money is always formatted with 2 decimals.
+    """
+    cust = customer_name or str(est.get("customer_name") or "").strip() or ""
+    pt = _money(totals.get("proposal_total", 0) or 0)
+    prepared = _proposal_prepared_by_display(est)
     return {
-        "JOB_NAME": job_name or est.get("job_name", "") or "Project Quote",
-        "QUOTE_NUMBER": est.get("quote_number", ""),
-        "CUSTOMER": customer_name or est.get("customer_name", "") or "",
-        "TOTAL": _money(totals.get("proposal_total", 0) or 0),
+        "JOB_NAME": job_name or str(est.get("job_name") or "").strip() or "Project Quote",
+        "QUOTE_NUMBER": str(est.get("quote_number") or ""),
+        "CUSTOMER_NAME": cust,
+        "CUSTOMER_LOCATION": str(customer_location or "").strip(),
+        "CONTACT_NAME": str(contact_name or "").strip(),
+        "PROPOSAL_AMOUNT": pt,
+        "SCOPE_OF_WORK": str(est.get("scope_of_work") or ""),
         "DATE": datetime.now().strftime("%m/%d/%Y"),
-        "SCOPE_OF_WORK": est.get("scope_of_work", ""),
-        "EXCLUSIONS": est.get("exclusions", ""),
-        "ADDITIONAL_CHARGES": est.get("additional_charges", ""),
-        "CUSTOMER_RESPONSIBILITIES": est.get("customer_responsibilities", ""),
-        "MATERIALS_TOTAL": _money(totals.get("material_sell_basis", 0) or 0),
-        "LABOR_TOTAL": _money(totals.get("labor_total", 0) or 0),
-        "EQUIPMENT_TOTAL": _money(totals.get("equipment_total", 0) or 0),
-        "TRAVEL_TOTAL": _money(totals.get("travel_total", 0) or 0),
-        "FINAL_BID": _money(totals.get("final_bid", 0) or 0),
+        "PREPARED_BY": prepared,
+        "PREPARED_BY_PHONE": str(prepared_by_phone or "").strip(),
     }
 
 
-def _replace_placeholders_doc(doc, replacements: dict):
-    for paragraph in doc.paragraphs:
-        for key, value in replacements.items():
-            if key in paragraph.text:
-                paragraph.text = paragraph.text.replace(key, str(value))
-    for table in doc.tables:
+def _default_proposal_template_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets" / "proposal_template.docx"
+
+
+def _resolve_proposal_template_bytes(
+    template_bytes: bytes | None,
+    template_path: str | None,
+) -> bytes | None:
+    """
+    Prefer session-uploaded bytes, then explicit path, then ``assets/proposal_template.docx``.
+    """
+    if template_bytes:
+        return template_bytes
+    if template_path:
+        p = Path(template_path)
+        if p.is_file():
+            return p.read_bytes()
+    default = _default_proposal_template_path()
+    if default.is_file():
+        return default.read_bytes()
+    return None
+
+
+def _normalize_placeholder_tokens(text: str) -> str:
+    """
+    Rewrite inconsistent template tokens to canonical ``{{UPPER_SNAKE}}`` tokens.
+
+    Covers explicit IPS normalizations (e.g. ``{{ Customer Name}}``, ``{{Scope of Work}}``)
+    plus flexible whitespace around known tokens.
+    """
+    if not text:
+        return text
+    s = text
+    # Explicit user-specified label forms -> canonical tokens (flexible inner whitespace).
+    explicit: list[tuple[str, str]] = [
+        (r"\{\{\s*Customer\s+Name\s*\}\}", "{{CUSTOMER_NAME}}"),
+        (r"\{\{\s*Customer\s+Location\s*\}\}", "{{CUSTOMER_LOCATION}}"),
+        (r"\{\{\s*Scope\s+of\s+Work\s*\}\}", "{{SCOPE_OF_WORK}}"),
+        # Other common human-readable variants
+        (r"\{\{\s*Job\s*Name\s*\}\}", "{{JOB_NAME}}"),
+        (r"\{\{\s*Quote\s*Number\s*\}\}", "{{QUOTE_NUMBER}}"),
+        (r"\{\{\s*Contact\s*Name\s*\}\}", "{{CONTACT_NAME}}"),
+        (r"\{\{\s*Proposal\s*Amount\s*\}\}", "{{PROPOSAL_AMOUNT}}"),
+        (r"\{\{\s*Prepared\s*By\s*\}\}", "{{PREPARED_BY}}"),
+        (r"\{\{\s*Prepared\s*By\s*Phone\s*\}\}", "{{PREPARED_BY_PHONE}}"),
+        (r"\{\{\s*Prepared\s*By\s*Phone\s*Number\s*\}\}", "{{PREPARED_BY_PHONE}}"),
+        (r"\{\{\s*Date\s*\}\}", "{{DATE}}"),
+    ]
+    for pat, repl in explicit:
+        s = re.sub(pat, repl, s, flags=re.IGNORECASE)
+
+    # Normalize spacing around known canonical tokens: ``{{ JOB_NAME }}`` -> ``{{JOB_NAME}}``
+    for tok in _DOCX_CANONICAL_TOKENS:
+        s = re.sub(
+            r"\{\{\s*" + re.escape(tok) + r"\s*\}\}",
+            "{{" + tok + "}}",
+            s,
+            flags=re.IGNORECASE,
+        )
+    return s
+
+
+def _docx_placeholder_replacements(vals: dict) -> dict[str, str]:
+    """Map ``{{TOKEN}}`` -> value for canonical proposal fields only."""
+    repl: dict[str, str] = {}
+    for k in _DOCX_CANONICAL_TOKENS:
+        if k in vals:
+            repl["{{" + k + "}}"] = str(vals[k])
+    return repl
+
+
+def _apply_to_paragraph_text(doc: Document, fn) -> None:
+    """Walk body, tables, headers/footers; set paragraph text via ``fn(text) -> new_text``."""
+
+    def apply_paragraph(p) -> None:
+        text = p.text
+        if not text:
+            return
+        new = fn(text)
+        if new != text:
+            p.text = new
+
+    def walk_table(table) -> None:
         for row in table.rows:
             for cell in row.cells:
-                for key, value in replacements.items():
-                    if key in cell.text:
-                        cell.text = cell.text.replace(key, str(value))
+                for p in cell.paragraphs:
+                    apply_paragraph(p)
+                for tbl in cell.tables:
+                    walk_table(tbl)
+
+    for p in doc.paragraphs:
+        apply_paragraph(p)
+    for tbl in doc.tables:
+        walk_table(tbl)
+
+    for section in doc.sections:
+        for part in (section.header, section.footer):
+            for p in part.paragraphs:
+                apply_paragraph(p)
+            for tbl in getattr(part, "tables", []) or []:
+                walk_table(tbl)
+
+
+def _normalize_docx_placeholders(doc: Document) -> None:
+    _apply_to_paragraph_text(doc, _normalize_placeholder_tokens)
+
+
+def _replace_placeholders_doc(doc: Document, replacements: dict[str, str]) -> None:
+    def replace(text: str) -> str:
+        new = text
+        for k, v in replacements.items():
+            if k in new:
+                new = new.replace(k, str(v))
+        return new
+
+    _apply_to_paragraph_text(doc, replace)
 
 
 def _default_intro(vals: dict) -> str:
@@ -125,23 +283,6 @@ def _clean_lines(text: str) -> list[str]:
         if s:
             lines.append(s)
     return lines
-
-
-def _pdf_prepared_by(est: dict) -> str:
-    """Prefer logged-in profile name/email when Streamlit session is available."""
-    try:
-        from auth import current_profile
-
-        prof = current_profile()
-        name = str(prof.get("full_name") or "").strip()
-        if name:
-            return name
-        email = str(prof.get("email") or "").strip()
-        if email:
-            return email
-    except Exception:
-        pass
-    return str(est.get("prepared_by") or est.get("prepared_by_name") or "").strip()
 
 
 def _pdf_draw_wrapped(
@@ -216,24 +357,35 @@ def _pdf_draw_section(
     return y
 
 
-def build_proposal_docx(est: dict, totals: dict, customer_name: str = "", job_name: str = "", template_path: str | None = None) -> bytes:
-    vals = proposal_values(est, totals, customer_name=customer_name, job_name=job_name)
-
-    if template_path:
+def build_proposal_docx(
+    est: dict,
+    totals: dict,
+    customer_name: str = "",
+    job_name: str = "",
+    *,
+    customer_location: str = "",
+    contact_name: str = "",
+    prepared_by_phone: str = "",
+    template_path: str | None = None,
+    template_bytes: bytes | None = None,
+) -> bytes:
+    """Build Word proposal: normalized template (uploaded or assets/proposal_template.docx), else built-in layout."""
+    vals = proposal_values(
+        est,
+        totals,
+        customer_name=customer_name,
+        job_name=job_name,
+        customer_location=customer_location,
+        contact_name=contact_name,
+        prepared_by_phone=prepared_by_phone,
+    )
+    repl = _docx_placeholder_replacements(vals)
+    raw = _resolve_proposal_template_bytes(template_bytes, template_path)
+    if raw:
         try:
-            doc = Document(template_path)
-            replacements = {
-                "{{JOB_NAME}}": vals["JOB_NAME"],
-                "{{QUOTE_NUMBER}}": vals["QUOTE_NUMBER"],
-                "{{CUSTOMER}}": vals["CUSTOMER"],
-                "{{TOTAL}}": vals["TOTAL"],
-                "{{DATE}}": vals["DATE"],
-                "{{SCOPE_OF_WORK}}": vals["SCOPE_OF_WORK"],
-                "{{EXCLUSIONS}}": vals["EXCLUSIONS"],
-                "{{ADDITIONAL_CHARGES}}": vals["ADDITIONAL_CHARGES"],
-                "{{CUSTOMER_RESPONSIBILITIES}}": vals["CUSTOMER_RESPONSIBILITIES"],
-            }
-            _replace_placeholders_doc(doc, replacements)
+            doc = Document(BytesIO(raw))
+            _normalize_docx_placeholders(doc)
+            _replace_placeholders_doc(doc, repl)
             bio = BytesIO()
             doc.save(bio)
             return bio.getvalue()
@@ -260,38 +412,39 @@ def build_proposal_docx(est: dict, totals: dict, customer_name: str = "", job_na
     title_tbl = doc.add_table(rows=2, cols=1)
     title_tbl.autofit = False
     title_tbl.columns[0].width = Inches(6.8)
-    for cell in [title_tbl.cell(0,0), title_tbl.cell(1,0)]:
+    for cell in [title_tbl.cell(0, 0), title_tbl.cell(1, 0)]:
         tc_pr = cell._tc.get_or_add_tcPr()
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
-        shd = OxmlElement('w:shd')
-        shd.set(qn('w:fill'), "2E66A5")
+
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), "2E66A5")
         tc_pr.append(shd)
 
-    p = title_tbl.cell(0,0).paragraphs[0]
+    p = title_tbl.cell(0, 0).paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(f"{vals['JOB_NAME']} – Quote")
     r.bold = True
     r.font.size = Pt(16)
-    r.font.color.rgb = RGBColor(255,255,255)
+    r.font.color.rgb = RGBColor(255, 255, 255)
 
-    p = title_tbl.cell(1,0).paragraphs[0]
+    p = title_tbl.cell(1, 0).paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run(f"Quote #: {vals['QUOTE_NUMBER']}")
     r.bold = True
     r.font.size = Pt(12)
-    r.font.color.rgb = RGBColor(255,255,255)
+    r.font.color.rgb = RGBColor(255, 255, 255)
 
     meta = doc.add_table(rows=1, cols=2)
     meta.columns[0].width = Inches(3.2)
     meta.columns[1].width = Inches(3.6)
-    p = meta.cell(0,0).paragraphs[0]
-    r = p.add_run(f"Attn: {vals['CUSTOMER']}")
+    p = meta.cell(0, 0).paragraphs[0]
+    r = p.add_run(f"Attn: {vals['CUSTOMER_NAME']}")
     r.bold = True
     r.font.italic = True
-    p = meta.cell(0,1).paragraphs[0]
+    p = meta.cell(0, 1).paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    r = p.add_run(f"Quote Amt: {vals['TOTAL']}")
+    r = p.add_run(f"Quote Amt: {vals['PROPOSAL_AMOUNT']}")
     r.bold = True
 
     # Divider
@@ -324,33 +477,10 @@ def build_proposal_docx(est: dict, totals: dict, customer_name: str = "", job_na
         r = p.add_run(f"•  {line}")
         r.bold = False
 
-    if vals["EXCLUSIONS"]:
-        p = doc.add_paragraph()
-        r = p.add_run("Exclusions")
-        r.bold = True
-        r.font.size = Pt(16)
-        for line in _clean_lines(vals["EXCLUSIONS"]):
-            doc.add_paragraph(f"•  {line}")
-
-    if vals["ADDITIONAL_CHARGES"]:
-        p = doc.add_paragraph()
-        r = p.add_run("Additional Charges")
-        r.bold = True
-        r.font.size = Pt(16)
-        for line in _clean_lines(vals["ADDITIONAL_CHARGES"]):
-            doc.add_paragraph(f"•  {line}")
-
-    if vals["CUSTOMER_RESPONSIBILITIES"]:
-        p = doc.add_paragraph()
-        r = p.add_run("Customer Responsibilities")
-        r.bold = True
-        r.font.size = Pt(16)
-        doc.add_paragraph("Customer will provide:")
-        for line in _clean_lines(vals["CUSTOMER_RESPONSIBILITIES"]):
-            doc.add_paragraph(f"•  {line}")
-
     doc.add_paragraph("")
-    doc.add_paragraph(f"Prepared By: {est.get('prepared_by', '')}")
+    doc.add_paragraph(f"Prepared By: {vals['PREPARED_BY']}")
+    if vals.get("PREPARED_BY_PHONE"):
+        doc.add_paragraph(f"Phone: {vals['PREPARED_BY_PHONE']}")
     doc.add_paragraph(f"Date: {vals['DATE']}")
     doc.add_paragraph("If you have any questions regarding this Quote, please contact IPS.")
 
@@ -359,9 +489,26 @@ def build_proposal_docx(est: dict, totals: dict, customer_name: str = "", job_na
     return bio.getvalue()
 
 
-def build_proposal_pdf(est: dict, totals: dict, customer_name: str = "", job_name: str = "") -> bytes:
-    """IPS quote PDF: header (Quote / # / Attn / Amt), body sections, footer. Signature unchanged for callers."""
-    vals = proposal_values(est, totals, customer_name=customer_name, job_name=job_name)
+def build_proposal_pdf(
+    est: dict,
+    totals: dict,
+    customer_name: str = "",
+    job_name: str = "",
+    *,
+    customer_location: str = "",
+    contact_name: str = "",
+    prepared_by_phone: str = "",
+) -> bytes:
+    """IPS quote PDF: header, scope, prepared-by/date; same field mapping as Word (ReportLab layout)."""
+    vals = proposal_values(
+        est,
+        totals,
+        customer_name=customer_name,
+        job_name=job_name,
+        customer_location=customer_location,
+        contact_name=contact_name,
+        prepared_by_phone=prepared_by_phone,
+    )
 
     buffer = BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=letter)
@@ -384,9 +531,9 @@ def build_proposal_pdf(est: dict, totals: dict, customer_name: str = "", job_nam
 
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica-BoldOblique", 12)
-    c.drawString(left, y, f"Attn: {vals['CUSTOMER']}")
+    c.drawString(left, y, f"Attn: {vals['CUSTOMER_NAME']}")
     c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(right, y, f"Quote Amt: {vals['TOTAL']}")
+    c.drawRightString(right, y, f"Quote Amt: {vals['PROPOSAL_AMOUNT']}")
     y -= PDF_ATTN_ROW
 
     c.setLineWidth(1.0)
@@ -395,7 +542,7 @@ def build_proposal_pdf(est: dict, totals: dict, customer_name: str = "", job_nam
     c.setStrokeColorRGB(0, 0, 0)
     y -= PDF_AFTER_RULE
 
-    # BODY: opening + sections (text blocks, not tables)
+    # BODY: opening + scope (aligned with proposal field mapping)
     y = _pdf_draw_wrapped(
         c,
         PDF_QUOTE_OPENING,
@@ -413,29 +560,6 @@ def build_proposal_pdf(est: dict, totals: dict, customer_name: str = "", job_nam
     y = _pdf_draw_section(
         c, "Scope of Work", vals["SCOPE_OF_WORK"], left=left, right=right, y=y, height=height, section_gap=gap
     )
-    y = _pdf_draw_section(
-        c, "Exclusions", vals["EXCLUSIONS"], left=left, right=right, y=y, height=height, section_gap=gap
-    )
-    y = _pdf_draw_section(
-        c,
-        "Additional Charges",
-        vals["ADDITIONAL_CHARGES"],
-        left=left,
-        right=right,
-        y=y,
-        height=height,
-        section_gap=gap,
-    )
-    y = _pdf_draw_section(
-        c,
-        "Orion Responsibilities",
-        vals["CUSTOMER_RESPONSIBILITIES"],
-        left=left,
-        right=right,
-        y=y,
-        height=height,
-        section_gap=gap,
-    )
 
     # FOOTER: Prepared By, Date, contact
     if y < 1.05 * inch:
@@ -444,8 +568,11 @@ def build_proposal_pdf(est: dict, totals: dict, customer_name: str = "", job_nam
 
     y -= PDF_FOOTER_TOP_PAD
     c.setFont("Times-Roman", 11)
-    c.drawString(left, y, f"Prepared By: {_pdf_prepared_by(est)}")
+    c.drawString(left, y, f"Prepared By: {vals['PREPARED_BY']}")
     y -= PDF_FOOTER_LINE
+    if vals.get("PREPARED_BY_PHONE"):
+        c.drawString(left, y, f"Phone: {vals['PREPARED_BY_PHONE']}")
+        y -= PDF_FOOTER_LINE
     c.drawString(left, y, f"Date: {vals['DATE']}")
     y -= PDF_FOOTER_LINE
     for contact_line in IPS_QUOTE_CONTACT_LINES:

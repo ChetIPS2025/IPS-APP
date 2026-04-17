@@ -405,6 +405,7 @@ def _render_right_panel(
                 usr_mod._render_edit_user_panel(
                     profile_row=prow,
                     clear_selection_table_key=TABLE_KEY_PEOPLE,
+                    embedded_in_people=True,
                 )
             else:
                 st.warning("Profile not found.")
@@ -412,7 +413,7 @@ def _render_right_panel(
 
 def render() -> None:
     """Unified roster: employees + login profiles, with shared filters and a single detail panel."""
-    render_header("People")
+    render_header("Users")
 
     if current_role() != "admin":
         st.error("Admin access required.")
