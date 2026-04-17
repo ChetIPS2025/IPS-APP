@@ -30,6 +30,18 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
 
 ESTIMATE_PROPOSAL_TEMPLATE_FILENAME = "estimate_template_autofill_logo_updated.docx"
 
+# Standard company logo for proposals (first existing file wins). Same folder as the app ``assets``.
+# Optional Word placeholder: ``{{COMPANY_LOGO}}`` in header/body/footer — replaced with this image when present.
+COMPANY_LOGO_CANDIDATE_FILENAMES: tuple[str, ...] = (
+    "company_logo.png",
+    "company_logo.jpg",
+    "company_logo.jpeg",
+    "ips_logo_wide.png",
+    "IPS LOGO WIDE.png",
+)
+
+_PROPOSAL_LOGO_PLACEHOLDER_RE = re.compile(r"\{\{\s*COMPANY\s*LOGO\s*\}\}", re.IGNORECASE)
+
 # Shown when LibreOffice / Word PDF conversion is not available (UI may prepend context).
 PROPOSAL_PDF_UNAVAILABLE_MSG = (
     "PDF export is not available in this environment (Word could not be converted to PDF). "
@@ -299,32 +311,116 @@ def proposal_values(
     }
 
 
+def _proposal_assets_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets"
+
+
 def _default_estimate_proposal_template_path() -> Path:
     """IPS APP/assets/estimate_template_autofill_logo_updated.docx"""
-    return Path(__file__).resolve().parents[1] / "assets" / ESTIMATE_PROPOSAL_TEMPLATE_FILENAME
+    return _proposal_assets_dir() / ESTIMATE_PROPOSAL_TEMPLATE_FILENAME
 
 
-def _resolve_proposal_template_bytes(
-    template_bytes: bytes | None,
-    template_path: str | None,
-) -> bytes:
+def _load_standard_proposal_template_bytes() -> bytes:
     """
-    Order: session/uploaded bytes, explicit path, then packaged assets template.
-    Raises FileNotFoundError if nothing usable is found.
+    Load the single packaged proposal template (no overrides):
+    ``assets/estimate_template_autofill_logo_updated.docx``.
     """
-    if template_bytes:
-        return template_bytes
-    if template_path:
-        p = Path(template_path)
-        if p.is_file():
-            return p.read_bytes()
     default = _default_estimate_proposal_template_path()
     if default.is_file():
         return default.read_bytes()
     raise FileNotFoundError(
         f"Proposal template not found. Add {ESTIMATE_PROPOSAL_TEMPLATE_FILENAME} under the project "
-        f"**assets** folder ({default.parent}), or upload a .docx in the estimate editor."
+        f"**assets** folder ({default.parent})."
     )
+
+
+def _resolve_standard_company_logo_path() -> Path | None:
+    """First matching file under ``assets/``; ``None`` if no standard logo is shipped."""
+    root = _proposal_assets_dir()
+    for name in COMPANY_LOGO_CANDIDATE_FILENAMES:
+        p = root / name
+        if p.is_file():
+            return p
+    return None
+
+
+def _clear_paragraph_runs(paragraph) -> None:
+    for r in list(paragraph.runs):
+        paragraph._element.remove(r._element)
+
+
+def _paragraph_full_text(paragraph) -> str:
+    if paragraph.runs:
+        return "".join(r.text or "" for r in paragraph.runs)
+    return paragraph.text or ""
+
+
+def _replace_company_logo_placeholders_in_container(container, logo_path: Path, width) -> int:
+    """Replace ``{{COMPANY_LOGO}}`` paragraphs with an inline image. Returns count replaced."""
+    replaced = 0
+    for p in container.paragraphs:
+        if not _PROPOSAL_LOGO_PLACEHOLDER_RE.search(_paragraph_full_text(p)):
+            continue
+        _clear_paragraph_runs(p)
+        run = p.add_run()
+        run.add_picture(str(logo_path), width=width)
+        replaced += 1
+    for tbl in getattr(container, "tables", []) or []:
+        for row in tbl.rows:
+            for cell in row.cells:
+                replaced += _replace_company_logo_placeholders_in_container(cell, logo_path, width)
+    return replaced
+
+
+def _replace_company_logo_placeholders_in_document(doc: Document, logo_path: Path, width) -> int:
+    n = 0
+    for p in doc.paragraphs:
+        if not _PROPOSAL_LOGO_PLACEHOLDER_RE.search(_paragraph_full_text(p)):
+            continue
+        _clear_paragraph_runs(p)
+        p.add_run().add_picture(str(logo_path), width=width)
+        n += 1
+    for tbl in doc.tables:
+        for row in tbl.rows:
+            for cell in row.cells:
+                n += _replace_company_logo_placeholders_in_container(cell, logo_path, width)
+    for section in doc.sections:
+        for part in (section.header, section.footer):
+            n += _replace_company_logo_placeholders_in_container(part, logo_path, width)
+    return n
+
+
+def _prepend_company_logo_primary_header(doc: Document, logo_path: Path, width) -> None:
+    """Insert a logo row above the first header paragraph (section 0 only) for consistent letterhead."""
+    if not doc.sections:
+        return
+    hdr = doc.sections[0].header
+    if not hdr.paragraphs:
+        hdr.add_paragraph()
+    anchor = hdr.paragraphs[0]
+    logo_p = anchor.insert_paragraph_before("")
+    logo_p.add_run().add_picture(str(logo_path), width=width)
+
+
+def _apply_standard_proposal_branding(doc: Document) -> None:
+    """
+    Apply the standard company logo to the generated document.
+
+    - If ``{{COMPANY_LOGO}}`` appears in the template, those blocks become the canonical logo image.
+    - Otherwise, when a standard logo file exists under ``assets/``, it is prepended to the primary header.
+    """
+    from docx.shared import Inches
+
+    logo_path = _resolve_standard_company_logo_path()
+    if not logo_path:
+        return
+    width = Inches(1.35)
+    replaced = _replace_company_logo_placeholders_in_document(doc, logo_path, width)
+    if replaced == 0:
+        try:
+            _prepend_company_logo_primary_header(doc, logo_path, width)
+        except Exception:
+            pass
 
 
 def _normalize_placeholder_tokens(text: str) -> str:
@@ -343,6 +439,7 @@ def _normalize_placeholder_tokens(text: str) -> str:
         (r"\{\{\s*Prepared\s*By\s*Phone\s*\}\}", "{{PREPARED_BY_PHONE}}"),
         (r"\{\{\s*Prepared\s*By\s*Phone\s*Number\s*\}\}", "{{PREPARED_BY_PHONE}}"),
         (r"\{\{\s*Date\s*\}\}", "{{DATE}}"),
+        (r"\{\{\s*Company\s+Logo\s*\}\}", "{{COMPANY_LOGO}}"),
     ]
     for pat, repl in explicit:
         s = re.sub(pat, repl, s, flags=re.IGNORECASE)
@@ -425,6 +522,7 @@ def _fill_proposal_docx_from_bytes(raw: bytes, vals: dict[str, str]) -> bytes:
     doc = Document(BytesIO(raw))
     _normalize_docx_placeholders(doc)
     _replace_placeholders_doc(doc, repl)
+    _apply_standard_proposal_branding(doc)
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -493,8 +591,6 @@ def try_build_proposal_pdf(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
-    template_path: str | None = None,
-    template_bytes: bytes | None = None,
     docx_bytes: bytes | None = None,
 ) -> tuple[bytes | None, str]:
     """
@@ -515,8 +611,6 @@ def try_build_proposal_pdf(
                 customer_location=customer_location,
                 contact_name=contact_name,
                 prepared_by_phone=prepared_by_phone,
-                template_path=template_path,
-                template_bytes=template_bytes,
             )
         except FileNotFoundError as e:
             return None, str(e)
@@ -538,12 +632,11 @@ def build_proposal_docx(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
-    template_path: str | None = None,
-    template_bytes: bytes | None = None,
 ) -> bytes:
     """
-    Build the proposal .docx from **estimate_template_autofill_logo_updated.docx** (or uploaded bytes),
-    replacing all {{PLACEHOLDER}} tokens. This is the only proposal layout.
+    Build the proposal .docx from **assets/estimate_template_autofill_logo_updated.docx** only
+    (no template overrides), replace text placeholders, then apply standard **company_logo** /
+    ``{{COMPANY_LOGO}}`` branding from ``assets/`` per :data:`COMPANY_LOGO_CANDIDATE_FILENAMES`.
     """
     vals = proposal_values(
         est,
@@ -554,7 +647,7 @@ def build_proposal_docx(
         contact_name=contact_name,
         prepared_by_phone=prepared_by_phone,
     )
-    raw = _resolve_proposal_template_bytes(template_bytes, template_path)
+    raw = _load_standard_proposal_template_bytes()
     return _fill_proposal_docx_from_bytes(raw, vals)
 
 
@@ -567,8 +660,6 @@ def build_proposal_pdf(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
-    template_path: str | None = None,
-    template_bytes: bytes | None = None,
 ) -> bytes:
     """
     Build the proposal PDF from the **same** filled DOCX as downloads/preview (template + placeholders).
@@ -584,8 +675,6 @@ def build_proposal_pdf(
         customer_location=customer_location,
         contact_name=contact_name,
         prepared_by_phone=prepared_by_phone,
-        template_path=template_path,
-        template_bytes=template_bytes,
         docx_bytes=None,
     )
     if pdf is None:

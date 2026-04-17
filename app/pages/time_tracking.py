@@ -74,10 +74,10 @@ def _tt_fast_entry() -> bool:
 
 
 def _week_grid_column_ratios(*, fast: bool) -> list[float]:
-    """Name column + 7 days + week sum — wider day cells in fast mode."""
+    """Name column + 7 day cards + week sum — day columns weighted for usable entry width."""
     if fast:
-        return [0.78] + [1.52] * 7 + [0.48]
-    return [1.05] + [1.28] * 7 + [0.52]
+        return [0.68] + [1.72] * 7 + [0.42]
+    return [0.92] + [1.45] * 7 + [0.46]
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -321,6 +321,11 @@ def _inject_tt_styles() -> None:
             margin-bottom: 4px;
             background: rgba(30, 41, 59, 0.35);
         }
+        .ips-tt-new-block {
+            margin-top: 4px;
+            padding-top: 8px;
+            border-top: 1px dashed rgba(100, 116, 139, 0.4);
+        }
         .ips-tt-row-over {
             border-left: 4px solid #f87171 !important;
             background: rgba(248, 113, 113, 0.12) !important;
@@ -332,7 +337,29 @@ def _inject_tt_styles() -> None:
             font-size: 12px !important;
             font-weight: 600 !important;
             text-align: center !important;
-            margin-bottom: 4px !important;
+            margin-bottom: 2px !important;
+            letter-spacing: 0.02em;
+        }
+        .ips-tt-day-sum {
+            text-align: center !important;
+            font-size: 11px !important;
+            color: #94a3b8 !important;
+            margin-bottom: 6px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) {
+            padding: 10px 10px 12px 10px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button {
+            min-height: 2.25rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) p {
+            word-break: break-word;
+        }
+        .ips-tt-field-label {
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #94a3b8 !important;
+            margin: 0 0 2px 0 !important;
         }
         .ips-tt-metric {
             color: #e2e8f0 !important;
@@ -839,19 +866,34 @@ def render() -> None:
                     ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
                     day_sum = sum(float(e.get("hours", 0) or 0) for e in ents_show)
                     day_col_totals[di] += day_sum
-
-                    for ent in ents_show:
-                        _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
-
-                    _render_new_entry_form(
-                        eid,
-                        wd,
-                        job_labels_sorted,
-                        job_label_to_id,
-                        default_job_label,
-                        ents_show,
-                        fast=fast,
+                    st.markdown(
+                        f'<div class="ips-tt-day-sum">{day_sum:.1f} h</div>',
+                        unsafe_allow_html=True,
                     )
+
+                    with st.container(border=True):
+                        st.markdown(
+                            '<span class="ips-tt-day-card" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        if not ents_show and not job_labels_sorted:
+                            st.caption("—")
+                        for ei, ent in enumerate(ents_show):
+                            if ei:
+                                st.divider()
+                            _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
+                        if job_labels_sorted:
+                            if ents_show:
+                                st.divider()
+                            _render_new_entry_form(
+                                eid,
+                                wd,
+                                job_labels_sorted,
+                                job_label_to_id,
+                                default_job_label,
+                                ents_show,
+                                fast=fast,
+                            )
             with hlast:
                 st.caption("Σ")
                 st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
@@ -968,63 +1010,70 @@ def _render_entry_editor(
     ch_as = {"on_change": acb} if autosave else {}
 
     hstep = _hours_step(fast=fast)
-    clr_label = "Clr" if fast else "Del"
-    clr_help = "Clear row (delete)" if fast else "Delete entry"
+    del_label = "Clear" if fast else "Delete"
+    del_help = "Remove this time entry" if fast else "Delete this time entry"
 
-    with st.container(border=True):
-        if fast:
-            cj, ch, cn, ca = st.columns([4.35, 1.5, 2.35, 2.55], gap="small")
-        else:
-            cj, ch, cn, ca = st.columns([3.5, 1.15, 2.85, 2.45], gap="small")
-        with cj:
-            st.selectbox(
-                "Job",
-                job_labels_sorted,
-                index=j_ix,
-                key=f"tt_job_{te_id}",
-                label_visibility="collapsed",
-                **ch_as,
-            )
-        with ch:
-            st.number_input(
-                "Hrs",
-                min_value=0.0,
-                max_value=24.0,
-                value=float(ent.get("hours", 0) or 0),
-                step=hstep,
-                format="%.2f",
-                key=f"tt_h_{te_id}",
-                label_visibility="collapsed",
-                **ch_as,
-            )
-        with cn:
-            st.text_input(
-                "Notes",
-                value=str(ent.get("notes") or ""),
-                key=f"tt_n_{te_id}",
-                label_visibility="collapsed",
-                placeholder="Notes",
-                **ch_as,
-            )
-        with ca:
-            b_save, b_del = st.columns(2, gap="small")
-            with b_save:
-                if st.button("Save", key=f"tt_sv_{te_id}", use_container_width=True, help="Save row"):
-                    ok, err = _persist_time_entry_row(te_id, job_label_to_id)
-                    if ok:
-                        st.success("Updated.")
-                        st.rerun()
-                    elif err:
-                        st.error(err)
-            with b_del:
-                if st.button(clr_label, key=f"tt_del_{te_id}", use_container_width=True, help=clr_help):
-                    try:
-                        delete_rows("time_entries", {"id": te_id})
-                        _clear_row_snap(te_id)
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Delete failed: {exc}")
-    st.markdown('<div class="ips-tt-entry-gap" aria-hidden="true"></div>', unsafe_allow_html=True)
+    st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+    st.selectbox(
+        "Job",
+        job_labels_sorted,
+        index=j_ix,
+        key=f"tt_job_{te_id}",
+        label_visibility="collapsed",
+        **ch_as,
+    )
+    rh1, rh2 = st.columns([1, 2], gap="small")
+    with rh1:
+        st.markdown('<p class="ips-tt-field-label">Hours</p>', unsafe_allow_html=True)
+        st.number_input(
+            "Hours",
+            min_value=0.0,
+            max_value=24.0,
+            value=float(ent.get("hours", 0) or 0),
+            step=hstep,
+            format="%.2f",
+            key=f"tt_h_{te_id}",
+            label_visibility="collapsed",
+            **ch_as,
+        )
+    with rh2:
+        st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+        st.text_input(
+            "Notes",
+            value=str(ent.get("notes") or ""),
+            key=f"tt_n_{te_id}",
+            label_visibility="collapsed",
+            placeholder="Optional notes",
+            **ch_as,
+        )
+    b_save, b_del = st.columns(2, gap="medium")
+    with b_save:
+        if st.button(
+            "Save",
+            key=f"tt_sv_{te_id}",
+            type="primary",
+            use_container_width=True,
+            help="Save this row",
+        ):
+            ok, err = _persist_time_entry_row(te_id, job_label_to_id)
+            if ok:
+                st.success("Updated.")
+                st.rerun()
+            elif err:
+                st.error(err)
+    with b_del:
+        if st.button(
+            del_label,
+            key=f"tt_del_{te_id}",
+            use_container_width=True,
+            help=del_help,
+        ):
+            try:
+                delete_rows("time_entries", {"id": te_id})
+                _clear_row_snap(te_id)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Delete failed: {exc}")
 
 
 def _render_new_entry_form(
@@ -1045,22 +1094,21 @@ def _render_new_entry_form(
 
     def_h = _tt_default_hours()
     hstep = _hours_step(fast=fast)
-    st.markdown('<div class="ips-tt-new-row">', unsafe_allow_html=True)
-    if not fast:
-        st.caption("New line")
-    if fast:
-        nk1, nk2, nk3, nk4, nk5 = st.columns([4.1, 1.35, 2.15, 0.95, 1.2], gap="small")
-    else:
-        nk1, nk2, nk3, nk4, nk5 = st.columns([3.2, 1.05, 2.35, 1.05, 1.35], gap="small")
-    with nk1:
-        st.selectbox(
-            "Job",
-            job_labels_sorted,
-            index=d0,
-            key=f"tt_newj_{employee_id}_{work_date_iso}",
-            label_visibility="collapsed",
-        )
-    with nk2:
+    st.markdown('<div class="ips-tt-new-block">', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="ips-tt-field-label">New entry</p>' if fast else '<p class="ips-tt-field-label">Add row</p>',
+        unsafe_allow_html=True,
+    )
+    st.selectbox(
+        "Job",
+        job_labels_sorted,
+        index=d0,
+        key=f"tt_newj_{employee_id}_{work_date_iso}",
+        label_visibility="collapsed",
+    )
+    nh1, nh2 = st.columns([1, 2], gap="small")
+    with nh1:
+        st.markdown('<p class="ips-tt-field-label">Hours</p>', unsafe_allow_html=True)
         st.number_input(
             "Hours",
             min_value=0.0,
@@ -1070,20 +1118,24 @@ def _render_new_entry_form(
             key=f"tt_newh_{employee_id}_{work_date_iso}",
             label_visibility="collapsed",
         )
-    with nk3:
+    with nh2:
+        st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
         st.text_input(
             "Notes",
             value="",
             key=f"tt_newn_{employee_id}_{work_date_iso}",
             label_visibility="collapsed",
-            placeholder="Notes",
+            placeholder="Optional notes",
         )
-    with nk4:
+    dup_label = "Dup" if fast else "Duplicate"
+    ba, bd = st.columns(2, gap="medium")
+    with ba:
         if st.button(
             "Add",
             key=f"tt_add_{employee_id}_{work_date_iso}",
+            type="primary",
             use_container_width=True,
-            help="Add entry",
+            help="Add time entry",
         ):
             job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
             hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
@@ -1109,9 +1161,14 @@ def _render_new_entry_form(
                 st.rerun()
             except Exception as exc:
                 st.error(f"Could not add (duplicate job for this day?): {exc}")
-    with nk5:
+    with bd:
         dup_key = f"tt_dup_{employee_id}_{work_date_iso}"
-        if st.button("Dup", key=dup_key, use_container_width=True, help="Duplicate last line this day"):
+        if st.button(
+            dup_label,
+            key=dup_key,
+            use_container_width=True,
+            help="Copy last line this day (or filter job + default hours)",
+        ):
             src = entries_for_day[-1] if entries_for_day else None
             if src:
                 sjid = str(src.get("job_id") or "")

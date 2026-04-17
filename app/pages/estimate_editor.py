@@ -805,6 +805,7 @@ def ensure_state():
     st.session_state.pop("est_customer_match_pick", None)
     if st.session_state.pop("est_embed_pdf_preview", None):
         st.session_state["est_embed_proposal_preview"] = True
+    st.session_state.pop("ips_proposal_template_bytes", None)
     # Defensive defaults: some imported legacy payloads may omit keys or set them to null.
     est0.setdefault("materials", [])
     est0.setdefault("labor", [])
@@ -1633,11 +1634,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        tpl_ov = st.session_state.get("ips_proposal_template_bytes")
         embed_docx: bytes | None = None
         embed_docx_err = ""
         try:
-            embed_docx = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_ov)
+            embed_docx = build_proposal_docx(est, totals, **_pe)
         except FileNotFoundError as e:
             embed_docx_err = str(e)
         except Exception as e:
@@ -2922,26 +2922,17 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        tpl_uploader = st.file_uploader(
-            "Proposal Word template (.docx)",
-            type=["docx"],
-            accept_multiple_files=False,
-            key="est_proposal_tpl_uploader",
-            help="Optional override. Default: **assets/estimate_template_autofill_logo_updated.docx**. "
-            "Tokens like {{ Customer Name}} normalize to {{CUSTOMER_NAME}} before fill.",
+        st.caption(
+            "Proposals always use **assets/estimate_template_autofill_logo_updated.docx** (no overrides). "
+            "Text placeholders are filled from this estimate. A standard company logo from **assets/** "
+            "(e.g. **company_logo.png**) is merged into every export when that file is present."
         )
-        if tpl_uploader is not None:
-            st.session_state["ips_proposal_template_bytes"] = tpl_uploader.getvalue()
-        tpl_bytes = st.session_state.get("ips_proposal_template_bytes")
-        if tpl_bytes and st.button("Clear uploaded Word template", key="est_proposal_tpl_clear"):
-            st.session_state.pop("ips_proposal_template_bytes", None)
-            st.rerun()
 
         docx_bytes: bytes | None = None
         pdf_bytes: bytes | None = None
         word_build_error = ""
         try:
-            docx_bytes = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_bytes)
+            docx_bytes = build_proposal_docx(est, totals, **_pe)
         except FileNotFoundError as e:
             word_build_error = str(e)
         except Exception as e:
@@ -2950,16 +2941,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             pdf_bytes, _conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
 
         with st.container(border=True):
-            st.caption(
-                "Downloads use the current draft and your uploaded template, or the built-in default .docx."
-            )
+            st.caption("Downloads use the current estimate draft and the standard proposal template.")
             if word_build_error:
                 st.error(word_build_error)
             elif pdf_bytes is None and docx_bytes is not None:
                 st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
 
             if docx_bytes is None:
-                st.caption("Fix the template path or upload a .docx above to enable downloads.")
+                st.caption("Ensure **assets/estimate_template_autofill_logo_updated.docx** exists in the app bundle.")
 
             _, _dl_mid, _ = st.columns([0.15, 1.0, 0.15])
             dc1, dc2 = _dl_mid.columns([1, 1], gap="small")
@@ -2990,7 +2979,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 sc1, sc2 = _sv_mid.columns([1, 1], gap="small")
                 if sc1.button("Save Word to Supabase", use_container_width=True, key="est_save_word_export"):
                     if docx_bytes is None:
-                        st.caption("Build the Word proposal first (fix template or upload).")
+                        st.caption("Build the Word proposal first (check the standard template file).")
                     else:
                         upload_generated_export(
                             st.session_state["loaded_estimate_id"],
