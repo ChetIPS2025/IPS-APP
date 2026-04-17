@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import subprocess
 import tempfile
@@ -82,6 +83,185 @@ def _proposal_prepared_by_display(est: dict) -> str:
     if n:
         return n
     return _pdf_prepared_by(est)
+
+
+def _paragraph_heading_level(paragraph) -> int:
+    """Map Word paragraph style to a rough heading level for HTML preview."""
+    try:
+        name = (paragraph.style.name or "").strip().lower()
+    except Exception:
+        name = ""
+    if name in ("title",):
+        return 1
+    if name in ("subtitle",):
+        return 2
+    if name.startswith("heading"):
+        parts = name.split()
+        if len(parts) >= 2 and parts[1].isdigit():
+            return min(max(int(parts[1]), 1), 4)
+        return 2
+    return 0
+
+
+def _iter_document_body_blocks(document: Document):
+    """Yield (``'p'``, paragraph) or (``'t'``, table) in document body order."""
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    body = document.element.body
+    for el in body.iterchildren():
+        if isinstance(el, CT_P):
+            yield "p", Paragraph(el, document)
+        elif isinstance(el, CT_Tbl):
+            yield "t", Table(el, document)
+
+
+def _cell_plain_text(cell) -> str:
+    parts: list[str] = []
+    for p in cell.paragraphs:
+        t = (p.text or "").strip()
+        if t:
+            parts.append(t)
+    return " ".join(parts).strip()
+
+
+def _table_to_preview_html(table) -> str:
+    rows_out: list[list[str]] = []
+    for row in table.rows:
+        row_cells = [_cell_plain_text(c) for c in row.cells]
+        if any(row_cells):
+            rows_out.append(row_cells)
+    if not rows_out:
+        return ""
+    ncol = max(len(r) for r in rows_out)
+    trs: list[str] = []
+    for r in rows_out:
+        padded = r + [""] * (ncol - len(r))
+        tds = "".join(
+            f"<td style='border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;'>{html.escape(c)}</td>"
+            for c in padded
+        )
+        trs.append(f"<tr>{tds}</tr>")
+    return (
+        "<table style='width:100%;border-collapse:collapse;margin:0.55em 0;font-size:0.95em;'>"
+        "<tbody>" + "".join(trs) + "</tbody></table>"
+    )
+
+
+def _first_header_preview_html(document: Document) -> str:
+    """Optional letterhead lines from the first section header (text only)."""
+    try:
+        hdr = document.sections[0].header
+    except Exception:
+        return ""
+    lines: list[str] = []
+    for p in hdr.paragraphs:
+        t = (p.text or "").strip()
+        if t:
+            lines.append(html.escape(t))
+    if not lines:
+        return ""
+    inner = "<br/>".join(lines)
+    return (
+        f'<div style="font-size:0.88em;color:#444;line-height:1.35;margin-bottom:0.75rem;padding-bottom:0.55rem;'
+        f'border-bottom:1px solid #e6e6e6;">{inner}</div>'
+    )
+
+
+def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
+    """
+    Build a readable HTML preview from the **filled** proposal .docx (same bytes as download).
+
+    Uses ``python-docx`` body order (paragraphs + tables). No PDF/LibreOffice. Best-effort only:
+    complex shapes, text boxes, and heavy formatting may not match Word exactly.
+    """
+    doc = Document(BytesIO(docx_bytes))
+    chunks: list[str] = []
+    hf = _first_header_preview_html(doc)
+    if hf:
+        chunks.append(hf)
+    for kind, block in _iter_document_body_blocks(doc):
+        if kind == "p":
+            text = (block.text or "").replace("\x07", "").strip()
+            if not text:
+                continue
+            esc = html.escape(text).replace("\n", "<br/>")
+            lev = _paragraph_heading_level(block)
+            if lev == 1:
+                chunks.append(f'<h3 style="margin:0.55em 0 0.25em 0;font-weight:650;">{esc}</h3>')
+            elif lev == 2:
+                chunks.append(f'<h4 style="margin:0.45em 0 0.2em 0;font-weight:600;">{esc}</h4>')
+            elif lev >= 3:
+                chunks.append(f'<h5 style="margin:0.35em 0 0.15em 0;font-weight:600;">{esc}</h5>')
+            else:
+                chunks.append(f'<p style="margin:0.22em 0;line-height:1.52;">{esc}</p>')
+        else:
+            th = _table_to_preview_html(block)
+            if th:
+                chunks.append(th)
+    inner = "\n".join(chunks)
+    if not inner.strip():
+        return ""
+    return (
+        '<div class="ips-proposal-docx-preview" style="max-height:min(720px,78vh);overflow:auto;'
+        "padding:1rem 1.15rem;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa;"
+        'font-family:Georgia,\"Times New Roman\",serif;">'
+        f"{inner}</div>"
+    )
+
+
+def proposal_values_preview_html(vals: dict[str, str]) -> str:
+    """Field-based preview (same placeholder map as the DOCX) when body extraction is sparse."""
+    order: tuple[tuple[str, str], ...] = (
+        ("JOB_NAME", "Job / title"),
+        ("QUOTE_NUMBER", "Quote #"),
+        ("CUSTOMER_NAME", "Customer"),
+        ("CUSTOMER_LOCATION", "Location"),
+        ("CONTACT_NAME", "Contact"),
+        ("PROPOSAL_AMOUNT", "Proposal amount"),
+        ("DATE", "Date"),
+        ("PREPARED_BY", "Prepared by"),
+        ("PREPARED_BY_PHONE", "Phone"),
+        ("SCOPE_OF_WORK", "Scope of work"),
+    )
+    trs: list[str] = []
+    for key, label in order:
+        raw = _s(vals.get(key, ""))
+        if not raw and key != "SCOPE_OF_WORK":
+            continue
+        lab_esc = html.escape(label)
+        val_esc = html.escape(raw) if raw else "—"
+        trs.append(
+            "<tr>"
+            f"<td style='padding:0.4rem 0.65rem;font-weight:600;vertical-align:top;width:10.5rem;"
+            "border-bottom:1px solid #eee;'>{lab_esc}</td>"
+            f"<td style='padding:0.4rem 0.65rem;vertical-align:top;border-bottom:1px solid #eee;"
+            "white-space:pre-wrap;'>{val_esc}</td>"
+            "</tr>"
+        )
+    body = "".join(trs)
+    return (
+        '<div class="ips-proposal-fields-preview" style="max-height:min(720px,78vh);overflow:auto;'
+        "padding:1rem 1.1rem;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa;"
+        'font-size:0.96em;font-family:system-ui,-apple-system,sans-serif;">'
+        f"<table style='width:100%;border-collapse:collapse;'>{body}</table></div>"
+    )
+
+
+def proposal_combined_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
+    """
+    Prefer HTML extracted from the filled DOCX; if that is empty, show the mapped key-field table.
+
+    ``fallback_vals`` should be :func:`proposal_values` for the same estimate context as the DOCX.
+    """
+    if docx_bytes:
+        doc_html = filled_proposal_docx_to_preview_html(docx_bytes)
+        plain = re.sub(r"<[^>]+>", "", doc_html or "")
+        if plain.strip():
+            return doc_html
+    return proposal_values_preview_html(fallback_vals)
 
 
 def proposal_values(

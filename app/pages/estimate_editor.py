@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import re
 from collections import Counter
@@ -29,10 +28,14 @@ from db import (
     upload_bytes,
 )
 from proposal import (
-    PROPOSAL_PDF_UNAVAILABLE_MSG,
     build_proposal_docx,
+    proposal_combined_preview_html,
+    proposal_values,
     try_convert_proposal_docx_to_pdf,
 )
+
+# Shown when Word built OK but server-side PDF conversion is missing (no error/warning box).
+PROPOSAL_PDF_UNAVAILABLE_SHORT = "PDF export not available on this server"
 
 try:
     from services.job_service import job_number_display, job_row_select_label
@@ -407,6 +410,33 @@ def _lookup_prepared_by_phone(est: dict) -> str:
     return ""
 
 
+def _inject_proposal_preview_styles() -> None:
+    """One-time CSS for in-app proposal preview panels (DOCX-derived HTML)."""
+    if st.session_state.get("_ips_proposal_preview_css_injected"):
+        return
+    st.markdown(
+        """
+        <style>
+        .ips-proposal-docx-preview h3, .ips-proposal-docx-preview h4, .ips-proposal-docx-preview h5 {
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        .ips-proposal-docx-preview p {
+            font-family: Georgia, "Times New Roman", serif;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.session_state["_ips_proposal_preview_css_injected"] = True
+
+
+def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
+    _inject_proposal_preview_styles()
+    if caption:
+        st.caption(caption)
+    st.markdown(html_block, unsafe_allow_html=True)
+
+
 def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:
     """Shared context for Word/PDF proposal generation (same DOCX template + placeholders)."""
     cid = str(est.get("customer_id") or "").strip()
@@ -773,6 +803,8 @@ def ensure_state():
     # Legacy widget keys from the old free-text customer field (avoid stale session state).
     st.session_state.pop("est_customer_query", None)
     st.session_state.pop("est_customer_match_pick", None)
+    if st.session_state.pop("est_embed_pdf_preview", None):
+        st.session_state["est_embed_proposal_preview"] = True
     # Defensive defaults: some imported legacy payloads may omit keys or set them to null.
     est0.setdefault("materials", [])
     est0.setdefault("labor", [])
@@ -1603,70 +1635,73 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
         tpl_ov = st.session_state.get("ips_proposal_template_bytes")
         embed_docx: bytes | None = None
-        embed_pdf: bytes | None = None
-        embed_pdf_note = ""
+        embed_docx_err = ""
         try:
             embed_docx = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_ov)
         except FileNotFoundError as e:
-            embed_pdf_note = str(e)
+            embed_docx_err = str(e)
         except Exception as e:
-            embed_pdf_note = f"Could not build the Word proposal: {type(e).__name__}: {e}"
-        if embed_docx is not None:
-            embed_pdf, conv_note = try_convert_proposal_docx_to_pdf(embed_docx)
-            if embed_pdf is None and conv_note:
-                embed_pdf_note = conv_note if not embed_pdf_note else embed_pdf_note
+            embed_docx_err = f"Could not build the Word proposal: {type(e).__name__}: {e}"
 
-        ep1, ep2, ep3 = st.columns([1, 1, 4])
-        with ep1:
-            if st.button("Preview Proposal", use_container_width=True, key="est_embed_preview_btn"):
-                st.session_state["est_embed_pdf_preview"] = True
-        with ep2:
-            if st.button("Export PDF", use_container_width=True, key="est_embed_export_btn"):
-                eid = st.session_state.get("loaded_estimate_id")
-                if not eid:
-                    st.warning("Save the estimate first (Review / Save tab) to store the PDF on this quote.")
-                elif embed_pdf is None:
-                    st.warning(
-                        (embed_pdf_note or PROPOSAL_PDF_UNAVAILABLE_MSG)
-                        + " Word export is still available from the **Proposal export** tab."
-                    )
-                else:
-                    upload_generated_export(
-                        str(eid),
-                        f"{est.get('quote_number') or 'proposal'}.pdf",
-                        embed_pdf,
-                        "application/pdf",
-                        "generated_pdf",
-                    )
-                    st.success("PDF saved to storage and linked to this estimate.")
-        if embed_pdf_note and embed_docx is None:
-            st.error(embed_pdf_note)
-        elif embed_pdf is None and embed_docx is not None:
-            st.info(embed_pdf_note or PROPOSAL_PDF_UNAVAILABLE_MSG)
-        if st.session_state.get("est_embed_pdf_preview"):
+        _, _emb_actions, _ = st.columns([0.2, 1.0, 0.2])
+        eb1, eb2, eb3 = _emb_actions.columns([1, 1, 1], gap="small")
+        with eb1:
+            if st.button("Preview", use_container_width=True, key="est_embed_preview_btn"):
+                st.session_state["est_embed_proposal_preview"] = True
+        with eb2:
+            if embed_docx is not None:
+                st.download_button(
+                    "Download Proposal (Word)",
+                    data=embed_docx,
+                    file_name=f"{est.get('quote_number') or 'proposal'}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    type="primary",
+                    key="est_embed_dl_docx_main",
+                )
+        with eb3:
+            if embed_docx is not None:
+                if st.button("Export PDF", use_container_width=True, key="est_embed_export_btn"):
+                    eid = st.session_state.get("loaded_estimate_id")
+                    if not eid:
+                        st.caption("Save the estimate first to store the PDF on this quote.")
+                    else:
+                        embed_pdf, _conv = try_convert_proposal_docx_to_pdf(embed_docx)
+                        if embed_pdf is None:
+                            st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
+                        else:
+                            upload_generated_export(
+                                str(eid),
+                                f"{est.get('quote_number') or 'proposal'}.pdf",
+                                embed_pdf,
+                                "application/pdf",
+                                "generated_pdf",
+                            )
+                            st.success("PDF saved to storage and linked to this estimate.")
+
+        if embed_docx_err and embed_docx is None:
+            st.error(embed_docx_err)
+        if st.session_state.get("est_embed_proposal_preview"):
             with st.expander("Proposal preview", expanded=True):
-                if embed_pdf is not None:
-                    b64 = base64.b64encode(embed_pdf).decode()
-                    st.markdown(
-                        f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="780px"></iframe>',
-                        unsafe_allow_html=True,
+                if embed_docx is not None:
+                    _vals = proposal_values(est, totals, **_pe)
+                    _render_proposal_preview_html(
+                        proposal_combined_preview_html(embed_docx, fallback_vals=_vals),
+                        caption="From the generated Word document (same data as **Download Proposal (Word)**).",
+                    )
+                    st.download_button(
+                        "Download Proposal (Word)",
+                        data=embed_docx,
+                        file_name=f"{est.get('quote_number') or 'proposal'}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        type="primary",
+                        key="est_embed_dl_docx_fallback",
                     )
                 else:
-                    st.warning(
-                        (embed_pdf_note or PROPOSAL_PDF_UNAVAILABLE_MSG)
-                        + " Use **Proposal export** to download the Word file."
-                    )
-                    if embed_docx is not None:
-                        st.download_button(
-                            "Download Word proposal",
-                            data=embed_docx,
-                            file_name=f"{est.get('quote_number') or 'proposal'}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True,
-                            key="est_embed_dl_docx_fallback",
-                        )
+                    st.caption("Build the Word proposal first to enable preview.")
             if st.button("Hide preview", key="est_embed_hide_preview"):
-                st.session_state["est_embed_pdf_preview"] = False
+                st.session_state["est_embed_proposal_preview"] = False
                 st.rerun()
 
     if _imported_estimate_missing_customer(
@@ -2904,60 +2939,58 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
         docx_bytes: bytes | None = None
         pdf_bytes: bytes | None = None
-        proposal_tab_note = ""
+        word_build_error = ""
         try:
             docx_bytes = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_bytes)
         except FileNotFoundError as e:
-            proposal_tab_note = str(e)
+            word_build_error = str(e)
         except Exception as e:
-            proposal_tab_note = f"Could not build the Word proposal: {type(e).__name__}: {e}"
+            word_build_error = f"Could not build the Word proposal: {type(e).__name__}: {e}"
         if docx_bytes is not None:
-            pdf_bytes, conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
-            if pdf_bytes is None and conv_note:
-                proposal_tab_note = conv_note if not proposal_tab_note else proposal_tab_note
+            pdf_bytes, _conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
 
-        # Top action card: downloads + (optional) save-to-storage.
         with st.container(border=True):
             st.caption(
-                "Exports use the current draft. **Word and PDF** both come from the same filled template "
-                "(**assets/estimate_template_autofill_logo_updated.docx**, or your upload). "
-                "PDF needs LibreOffice (`soffice`) or Windows Word + **docx2pdf**. Save-to-storage requires a saved estimate."
+                "Downloads use the current draft and your uploaded template, or the built-in default .docx."
             )
-            if proposal_tab_note:
-                if docx_bytes is None:
-                    st.error(proposal_tab_note)
-                elif pdf_bytes is None:
-                    st.warning(proposal_tab_note)
+            if word_build_error:
+                st.error(word_build_error)
+            elif pdf_bytes is None and docx_bytes is not None:
+                st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
+
             if docx_bytes is None:
                 st.caption("Fix the template path or upload a .docx above to enable downloads.")
-            d1, d2 = st.columns(2)
-            with d1:
+
+            _, _dl_mid, _ = st.columns([0.15, 1.0, 0.15])
+            dc1, dc2 = _dl_mid.columns([1, 1], gap="small")
+            with dc1:
                 st.download_button(
-                    "Download Word Proposal",
+                    "Download Proposal (Word)",
                     data=docx_bytes if docx_bytes is not None else b"",
                     file_name=f"{est.get('quote_number') or 'proposal'}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
+                    type="primary",
                     disabled=docx_bytes is None,
+                    key="est_proposal_dl_docx",
                 )
-            with d2:
-                st.download_button(
-                    "Download PDF Proposal",
-                    data=pdf_bytes if pdf_bytes is not None else b"",
-                    file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    disabled=pdf_bytes is None,
-                    help=None
-                    if pdf_bytes is not None
-                    else "PDF conversion is not available; download Word and export to PDF locally.",
-                )
+            with dc2:
+                if pdf_bytes is not None:
+                    st.download_button(
+                        "Download PDF Proposal",
+                        data=pdf_bytes,
+                        file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="est_proposal_dl_pdf",
+                    )
 
             if st.session_state.get("loaded_estimate_id"):
-                save_export_cols = st.columns(2)
-                if save_export_cols[0].button("Save Word Proposal to Supabase", use_container_width=True):
+                _, _sv_mid, _ = st.columns([0.15, 1.0, 0.15])
+                sc1, sc2 = _sv_mid.columns([1, 1], gap="small")
+                if sc1.button("Save Word to Supabase", use_container_width=True, key="est_save_word_export"):
                     if docx_bytes is None:
-                        st.warning("Build the Word proposal first (fix template or upload).")
+                        st.caption("Build the Word proposal first (fix template or upload).")
                     else:
                         upload_generated_export(
                             st.session_state["loaded_estimate_id"],
@@ -2967,17 +3000,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                             "generated_docx",
                         )
                         st.success("Word proposal saved to Supabase Storage.")
-                if save_export_cols[1].button(
-                    "Save PDF Proposal to Supabase",
-                    use_container_width=True,
-                    disabled=pdf_bytes is None,
-                ):
-                    if pdf_bytes is None:
-                        st.warning(
-                            PROPOSAL_PDF_UNAVAILABLE_MSG
-                            + " Save the Word proposal instead, or fix PDF conversion on the server."
-                        )
-                    else:
+                if pdf_bytes is not None:
+                    if sc2.button("Save PDF to Supabase", use_container_width=True, key="est_save_pdf_export"):
                         upload_generated_export(
                             st.session_state["loaded_estimate_id"],
                             f"{est.get('quote_number') or 'proposal'}.pdf",
@@ -2987,7 +3011,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         )
                         st.success("PDF proposal saved to Supabase Storage.")
             else:
-                st.info("Save the estimate first, then you can save proposal exports to Supabase Storage.")
+                st.caption("Save the estimate first to store exports in Supabase.")
+
+        if docx_bytes is not None:
+            _pv_vals = proposal_values(est, totals, **_pe)
+            with st.expander("Proposal preview", expanded=False):
+                _render_proposal_preview_html(
+                    proposal_combined_preview_html(docx_bytes, fallback_vals=_pv_vals),
+                    caption="Rendered in-app from the generated Word document (same filled data as download). "
+                    "Formatting is approximate; open the .docx for the exact layout.",
+                )
 
     with tabs[7]:
         totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
