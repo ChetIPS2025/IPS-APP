@@ -411,30 +411,180 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 
 def _inject_proposal_preview_styles() -> None:
-    """One-time CSS for in-app proposal preview panels (DOCX-derived HTML)."""
-    if st.session_state.get("_ips_proposal_preview_css_injected"):
+    """One-time CSS: proposal preview as a centered document on a dark workspace (see :mod:`app.proposal`)."""
+    if st.session_state.get("_ips_proposal_preview_css_injected_v2"):
         return
     st.markdown(
         """
         <style>
-        .ips-proposal-preview-desk {
-            margin-left: auto;
-            margin-right: auto;
+        /* Narrow dark mat — one sheet of paper, not a full-width panel */
+        .ips-proposal-preview-root.ips-proposal-preview-desk {
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 30rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin: 0.1rem auto 0.35rem auto;
+            padding: 0.45rem 0.4rem 0.55rem;
+            background: #0b0f1a;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
         .ips-proposal-preview-page {
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 26.25rem;
+            background: #ffffff;
+            color: #0f172a;
+            font-size: 14px;
+            line-height: 1.58;
+            border-radius: 2px;
+            padding: 1.45rem 1.6rem 1.6rem;
+            margin: 0 auto;
+            border: 1px solid #d1d5db;
+            box-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.05),
+                0 6px 20px rgba(15, 23, 42, 0.1);
+            font-family: Georgia, "Times New Roman", serif;
+        }
+        .ips-proposal-intro {
+            margin: 0 0 0.7rem 0;
+            font-size: 0.78rem;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            letter-spacing: 0.01em;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        .ips-proposal-fields-wrap {
+            max-height: min(440px, 48vh);
+            overflow: auto;
+            margin: 0;
+            padding: 0;
+            -webkit-overflow-scrolling: touch;
+        }
+        .ips-proposal-fallback-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .ips-proposal-fallback-table td {
+            padding: 0.4rem 0.55rem;
+            vertical-align: top;
+            border-bottom: 1px solid #e2e8f0;
+            line-height: 1.4;
+        }
+        .ips-proposal-fallback-table tr:last-child td {
+            border-bottom: none;
+        }
+        .ips-proposal-fallback-label {
+            font-weight: 600;
+            width: 9.5rem;
+            background: #f8fafc;
+            color: #475569;
+            border-right: 1px solid #e2e8f0;
+        }
+        .ips-proposal-fallback-val {
+            white-space: pre-wrap;
+            word-break: break-word;
             color: #0f172a;
         }
-        .ips-proposal-docx-preview h3, .ips-proposal-docx-preview h4, .ips-proposal-docx-preview h5 {
+        .ips-proposal-doc-section {
+            margin-top: 0.85rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        .ips-proposal-section-hint {
+            margin: 0 0 0.45rem 0;
+            font-size: 0.75rem;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            line-height: 1.4;
+        }
+        .ips-proposal-section-hint--muted { color: #64748b; }
+        .ips-proposal-section-hint--soft { color: #78716c; }
+        .ips-proposal-preview-error {
+            margin: 0.65rem 0 0 0;
+            font-size: 0.8125rem;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            color: #b45309;
+            line-height: 1.4;
+        }
+        .ips-proposal-letterhead {
+            font-size: 0.8125rem;
+            color: #475569;
+            line-height: 1.4;
+            margin-bottom: 0.65rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        .ips-proposal-docx-body {
+            max-height: min(680px, 72vh);
+            overflow: auto;
+            margin: 0;
+            padding: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            color: #1e293b;
+        }
+        .ips-proposal-docx-body p {
+            margin: 0.32em 0;
+            line-height: 1.58;
+            color: #1e293b;
+        }
+        .ips-proposal-docx-preview h3 {
+            font-size: 1rem;
+            font-weight: 650;
+            margin: 0.55em 0 0.3em 0;
+            line-height: 1.32;
+            color: #0f172a;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        .ips-proposal-docx-preview h4 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            margin: 0.48em 0 0.26em 0;
+            line-height: 1.32;
+            color: #0f172a;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        .ips-proposal-docx-preview h5 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0.4em 0 0.22em 0;
+            line-height: 1.32;
+            color: #1e293b;
             font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         }
         .ips-proposal-docx-preview p {
             font-family: Georgia, "Times New Roman", serif;
         }
+        .ips-proposal-docx-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.45em 0;
+            font-size: 0.92em;
+            border: 1px solid #94a3b8;
+            border-radius: 3px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .ips-proposal-docx-td {
+            border: 1px solid #cbd5e1;
+            padding: 0.35rem 0.45rem;
+            vertical-align: top;
+            color: #1e293b;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v2"] = True
 
 
 def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:

@@ -161,12 +161,13 @@ def _table_to_preview_html(table) -> str:
     for r in rows_out:
         padded = r + [""] * (ncol - len(r))
         tds = "".join(
-            f"<td style='border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;'>{html.escape(c)}</td>"
+            f"<td class='ips-proposal-docx-td'>{html.escape(c)}</td>"
             for c in padded
         )
         trs.append(f"<tr>{tds}</tr>")
     return (
-        "<table style='width:100%;border-collapse:collapse;margin:0.55em 0;font-size:0.95em;'>"
+        "<table class='ips-proposal-docx-table' style='width:100%;border-collapse:collapse;margin:0.55em 0;"
+        "font-size:0.95em;'>"
         "<tbody>" + "".join(trs) + "</tbody></table>"
     )
 
@@ -185,10 +186,7 @@ def _first_header_preview_html(document: Document) -> str:
     if not lines:
         return ""
     inner = "<br/>".join(lines)
-    return (
-        f'<div style="font-size:0.88em;color:#444;line-height:1.35;margin-bottom:0.75rem;padding-bottom:0.55rem;'
-        f'border-bottom:1px solid #e6e6e6;">{inner}</div>'
-    )
+    return f'<div class="ips-proposal-letterhead">{inner}</div>'
 
 
 def _paragraph_text_from_ooxml_w_p(p_el: ET.Element) -> str:
@@ -225,12 +223,14 @@ def _table_html_from_ooxml_w_tbl(tbl_el: ET.Element) -> str:
     for r in rows_out:
         padded = r + [""] * (ncol - len(r))
         tds = "".join(
-            f"<td style='border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;'>{html.escape(c)}</td>"
+            "<td class='ips-proposal-docx-td'>"
+            f"{html.escape(c)}</td>"
             for c in padded
         )
         trs.append(f"<tr>{tds}</tr>")
     return (
-        "<table style='width:100%;border-collapse:collapse;margin:0.55em 0;font-size:0.95em;'>"
+        "<table class='ips-proposal-docx-table' style='width:100%;border-collapse:collapse;margin:0.55em 0;"
+        "font-size:0.95em;'>"
         "<tbody>" + "".join(trs) + "</tbody></table>"
     )
 
@@ -254,10 +254,7 @@ def _ooxml_headers_footers_preview_html(zf: zipfile.ZipFile) -> str:
     if not lines:
         return ""
     inner = "<br/>".join(lines[:48])
-    return (
-        '<div style="font-size:0.88em;color:#444;line-height:1.35;margin-bottom:0.75rem;padding-bottom:0.55rem;'
-        f'border-bottom:1px solid #e6e6e6;">{inner}</div>'
-    )
+    return f'<div class="ips-proposal-letterhead">{inner}</div>'
 
 
 def _ooxml_local_tag(el: ET.Element) -> str:
@@ -429,18 +426,14 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
         val_esc = html.escape(raw) if raw else "—"
         trs.append(
             "<tr>"
-            f"<td style='padding:0.4rem 0.65rem;font-weight:600;vertical-align:top;width:10.5rem;"
-            "border-bottom:1px solid #eee;'>{lab_esc}</td>"
-            f"<td style='padding:0.4rem 0.65rem;vertical-align:top;border-bottom:1px solid #eee;"
-            "white-space:pre-wrap;'>{val_esc}</td>"
+            f"<td class='ips-proposal-fallback-label'>{lab_esc}</td>"
+            f"<td class='ips-proposal-fallback-val'>{val_esc}</td>"
             "</tr>"
         )
     body = "".join(trs)
     return (
-        '<div class="ips-proposal-fields-preview" style="max-height:min(520px,55vh);overflow:auto;'
-        "margin:0;padding:0;font-size:0.96em;font-family:system-ui,-apple-system,sans-serif;"
-        'background:transparent;">'
-        f"<table style='width:100%;border-collapse:collapse;'>{body}</table></div>"
+        '<div class="ips-proposal-fields-wrap">'
+        f"<table class='ips-proposal-fallback-table'><tbody>{body}</tbody></table></div>"
     )
 
 
@@ -451,21 +444,12 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
     """
     fields = proposal_values_preview_html(fallback_vals)
     intro = (
-        "<p style='margin:0 0 1rem 0;font-size:0.9em;color:#475569;'>"
+        '<p class="ips-proposal-intro">'
         "<strong>Proposal values</strong> — same placeholders filled in your downloaded <strong>.docx</strong>.</p>"
     )
-    # Centered white “page” on a neutral desk (margins = page padding + max-width column).
-    desk = (
-        '<div class="ips-proposal-preview-desk" style="width:100%;box-sizing:border-box;'
-        "display:flex;justify-content:center;padding:1rem 0.75rem;background:#e8eaed;"
-        '">'
-    )
-    page_open = (
-        '<div class="ips-proposal-preview-page ips-proposal-docx-preview" style="box-sizing:border-box;'
-        "width:100%;max-width:42rem;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,0.06),"
-        "0 6px 28px rgba(15,23,42,0.08);border-radius:2px;padding:2.25rem 2.75rem;margin:0 auto;"
-        'font-family:Georgia,serif;">'
-    )
+    # Visual chrome (desk + page) is styled via CSS injected in the estimate editor before ``st.html``.
+    desk = '<div class="ips-proposal-preview-root ips-proposal-preview-desk">'
+    page_open = '<div class="ips-proposal-preview-page ips-proposal-docx-preview">'
     page_close = "</div></div>"
 
     docx_block = ""
@@ -476,16 +460,16 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
             n_plain = _preview_plain_text_len(inner)
             if n_plain >= 20:
                 docx_block = (
-                    "<div style='margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid #e2e8f0;'>"
-                    "<p style='margin:0 0 0.65rem 0;font-size:0.9em;color:#475569;'>"
+                    '<div class="ips-proposal-doc-section ips-proposal-doc-section--full">'
+                    '<p class="ips-proposal-section-hint ips-proposal-section-hint--muted">'
                     "<strong>Document preview</strong> — text and tables read from the generated Word file "
                     "(open Word for exact layout).</p>"
                     f"{wrapped}</div>"
                 )
             else:
                 docx_block = (
-                    "<div style='margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid #e2e8f0;'>"
-                    "<p style='margin:0 0 0.65rem 0;font-size:0.9em;color:#64748b;'>"
+                    '<div class="ips-proposal-doc-section ips-proposal-doc-section--partial">'
+                    '<p class="ips-proposal-section-hint ips-proposal-section-hint--soft">'
                     "<strong>Partial text from the .docx</strong> — some templates use shapes or content "
                     "controls with little extractable text here.</p>"
                     f"{wrapped}</div>"
@@ -493,7 +477,7 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
 
     if not docx_bytes:
         tail = (
-            "<p style='margin:1rem 0 0 0;color:#b45309;font-size:0.93em;'>"
+            '<p class="ips-proposal-preview-error">'
             "<strong>No proposal document was generated.</strong> "
             "Fix any Word template errors above, then try again.</p>"
         )

@@ -1041,12 +1041,15 @@ def _render_customer_side_panel(
 
 
 def _visible_customer_columns(filtered: pd.DataFrame, resolved: dict[str, str]) -> list[str]:
-    order = ["customer_name", "address", "city", "state", "zip", "is_active"]
+    # Never show id or is_active in the main list; filters and actions still use them from ``filtered``.
+    order = ["customer_name", "address", "city", "state", "zip"]
     out: list[str] = []
     for logical in order:
         phys = resolved.get(logical)
         if phys and phys in filtered.columns:
             out.append(phys)
+    ia = resolved.get("is_active")
+    out = [c for c in out if c != "id" and c != ia]
     return out
 
 
@@ -1123,6 +1126,7 @@ def _render_customers_main(
             id_column="id",
             columns=show_cols,
             editor_key="cust_sel_editor",
+            hide_id_column=True,
         )
         with bar_ph.container():
             _render_action_buttons(

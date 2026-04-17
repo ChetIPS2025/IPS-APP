@@ -296,18 +296,24 @@ def render_selectable_dataframe(
     columns: list[str] | None = None,
     editor_key: str,
     num_rows: str = "fixed",
+    hide_id_column: bool = False,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Renders a ``data_editor`` with first-column checkboxes. Persists selection under
     ``selected_<table_key>_ids``.
+
+    ``hide_id_column``: when True, the id column stays in the dataframe for selection logic but is
+    not shown in the table (via ``column_order``). Default False for backward compatibility.
 
     Returns (edited dataframe including ``__select__`` and id column, list of selected ids).
     """
     inject_table_action_styles()
     ed_base = _prepare_editor_df(df, id_column, table_key, columns)
     disabled = [c for c in ed_base.columns if c != "__select__"]
-    edited = st.data_editor(
-        ed_base,
+    column_order = None
+    if hide_id_column and id_column in ed_base.columns:
+        column_order = [c for c in ed_base.columns if c != id_column]
+    editor_kw: dict = dict(
         key=editor_key,
         num_rows=num_rows,
         use_container_width=True,
@@ -316,6 +322,12 @@ def render_selectable_dataframe(
         column_config={
             "__select__": st.column_config.CheckboxColumn(" ", default=False, width="small"),
         },
+    )
+    if column_order is not None:
+        editor_kw["column_order"] = column_order
+    edited = st.data_editor(
+        ed_base,
+        **editor_kw,
     )
     if edited is None or edited.empty:
         set_selected_ids(table_key, [])
