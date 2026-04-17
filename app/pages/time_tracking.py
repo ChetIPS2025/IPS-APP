@@ -789,7 +789,7 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
             if fast:
-                tb1, tb2 = st.columns([1.4, 1.25], gap="none")
+                tb1, tb2 = st.columns([1.4, 1.25], gap="small")
                 with tb1:
                     dh = st.number_input(
                         "Def hrs",
@@ -804,7 +804,7 @@ def render() -> None:
                 with tb2:
                     st.checkbox("Auto-save", key=TT_AUTOSAVE_KEY)
             else:
-                tb1, tb2, tb3, tb4 = st.columns([1.15, 1.35, 2.2, 2.8], gap="none")
+                tb1, tb2, tb3, tb4 = st.columns([1.15, 1.35, 2.2, 2.8], gap="small")
                 with tb1:
                     dh = st.number_input(
                         "Default hrs",
@@ -878,9 +878,9 @@ def render() -> None:
 
                 fe = _tt_fast_entry()
                 ec1, ec2, ec3, ec4 = (
-                    st.columns([2.85, 0.62, 1.75, 0.95], gap="none")
+                    st.columns([2.85, 0.62, 1.75, 0.95], gap="small")
                     if fe
-                    else st.columns([2.55, 0.58, 1.85, 0.95], gap="none")
+                    else st.columns([2.55, 0.58, 1.85, 0.95], gap="small")
                 )
                 autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
                 flat_ac = _flat_panel_autosave_factory(str(te_ed), snap_flat) if autosave else None
@@ -917,7 +917,7 @@ def render() -> None:
                         **ac_kw,
                     )
                 with ec4:
-                    bc1, bc2 = st.columns(2, gap="none")
+                    bc1, bc2 = st.columns(2, gap="small")
                     with bc1:
                         if st.button("Save", use_container_width=True, key="tt_flat_edit_sv", help="Save changes"):
                             new_jid = job_label_to_id.get(jp)
@@ -1112,7 +1112,7 @@ def _render_quick_actions(
             unsafe_allow_html=True,
         )
         st.caption("Copy **from the previous calendar day** into the day you select (Monday uses the prior Sunday).")
-        qd1, qd2 = st.columns([1.55, 1.0], gap="none")
+        qd1, qd2 = st.columns([1.55, 1.0], gap="small")
         with qd1:
             st.markdown('<p class="ips-tt-field-label">To day</p>', unsafe_allow_html=True)
             dest_pick = st.selectbox(
@@ -1164,7 +1164,7 @@ def _render_quick_actions(
 
         st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
         st.caption("Fill one job across Mon–Sun (upserts hours per day).")
-        fq1, fq2, fq3, fq4 = st.columns([1.85, 0.68, 1.25, 0.95], gap="none")
+        fq1, fq2, fq3, fq4 = st.columns([1.85, 0.68, 1.25, 0.95], gap="small")
         with fq1:
             st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
             fill_j = st.selectbox("Job", job_labels_sorted, key=f"tt_fillj_{eid}", label_visibility="collapsed")
@@ -1249,7 +1249,7 @@ def _render_entry_editor(
     del_label = "Clear" if fast else "Delete"
     del_help = "Remove this time entry" if fast else "Delete this time entry"
 
-    cj, ch, cn, cb = st.columns([2.2, 0.62, 1.65, 0.92], gap="none")
+    cj, ch, cn, cb = st.columns([2.2, 0.62, 1.65, 0.92], gap="small")
     with cj:
         st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
         st.selectbox(
@@ -1285,7 +1285,7 @@ def _render_entry_editor(
         )
     with cb:
         st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
-        b_save, b_del = st.columns(2, gap="none")
+        b_save, b_del = st.columns(2, gap="small")
         with b_save:
             if st.button(
                 "Save",
@@ -1337,7 +1337,7 @@ def _render_new_entry_form(
         '<p class="ips-tt-field-label">New entry</p>' if fast else '<p class="ips-tt-field-label">Add row</p>',
         unsafe_allow_html=True,
     )
-    nj1, nj2, nj3, nj4 = st.columns([2.15, 0.62, 1.55, 0.95], gap="none")
+    nj1, nj2, nj3, nj4 = st.columns([2.15, 0.62, 1.55, 0.95], gap="small")
     with nj1:
         st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
         st.selectbox(
@@ -1370,7 +1370,7 @@ def _render_new_entry_form(
     with nj4:
         st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
         dup_label = "Dup" if fast else "Duplicate"
-        ba, bd = st.columns(2, gap="none")
+        ba, bd = st.columns(2, gap="small")
         with ba:
             if st.button(
                 "Add",

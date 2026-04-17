@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from branding import render_header
 
 from auth import current_profile, current_role
@@ -433,15 +432,15 @@ def _inject_proposal_preview_styles() -> None:
 
 def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
     """
-    Show the proposal preview in an iframe via ``components.html``.
-
-    ``st.markdown(..., unsafe_allow_html=True)`` often strips or empties rich HTML (tables / styled
-    blocks), which produced a blank preview while the Word download was correct.
+    Render proposal HTML using ``st.html`` (Streamlit-native). ``components.html`` iframes and
+    ``st.markdown(..., unsafe_allow_html=True)`` both tended to show an empty/white panel for this
+    content while the Word download was correct.
     """
     _inject_proposal_preview_styles()
     if caption:
         st.caption(caption)
-    plain = re.sub(r"<[^>]+>", " ", html_block or "")
+    raw = html_block or ""
+    plain = re.sub(r"<[^>]+>", " ", raw)
     plain = re.sub(r"\s+", " ", plain).strip()
     if not plain:
         st.info(
@@ -449,18 +448,11 @@ def _render_proposal_preview_html(html_block: str, *, caption: str | None = None
             "Use **Download Proposal (Word)** — the file matches this estimate."
         )
         return
-    doc = (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
-        "<style>"
-        "body{margin:12px 14px;font-family:Georgia,'Times New Roman',serif;background:#fafafa;color:#111;"
-        "font-size:15px;line-height:1.45;}"
-        "table{border-collapse:collapse;width:100%;}"
-        "td{border:1px solid #ddd;padding:0.35rem 0.45rem;vertical-align:top;}"
-        "h3,h4,h5{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#0f172a;}"
-        "</style></head><body>"
-        f"{html_block}</body></html>"
-    )
-    components.html(doc, height=720, scrolling=True)
+    try:
+        # ``width`` on ``st.html`` is newer than our minimum Streamlit pin; default matches parent width.
+        st.html(raw)
+    except Exception:
+        st.markdown(raw, unsafe_allow_html=True)
 
 
 def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:

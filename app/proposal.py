@@ -260,14 +260,53 @@ def _ooxml_headers_footers_preview_html(zf: zipfile.ZipFile) -> str:
     )
 
 
+def _ooxml_local_tag(el: ET.Element) -> str:
+    t = el.tag
+    return t.split("}", 1)[-1] if "}" in t else t
+
+
+def _iter_ooxml_body_blocks(body: ET.Element):
+    """
+    Yield ``w:p`` and ``w:tbl`` elements from ``w:body`` in order, including inside ``w:sdt`` /
+    ``w:sdtContent`` (common for protected regions and content controls in proposal templates).
+    """
+    for child in list(body):
+        tag = _ooxml_local_tag(child)
+        if tag == "sectPr":
+            return
+        if tag in ("p", "tbl"):
+            yield child
+        elif tag == "sdt":
+            sdtc = child.find(_w_tag("sdtContent"))
+            if sdtc is not None:
+                yield from _iter_ooxml_body_blocks(sdtc)
+
+
+def _ooxml_drawingml_supplement_chunks(doc_root: ET.Element, *, min_chars: int = 12) -> list[str]:
+    """Extra visible text from DrawingML ``a:t`` runs (text boxes / shapes) when body text is sparse."""
+    a_ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in doc_root.findall(".//{%s}t" % a_ns):
+        tx = " ".join(str(t.text or "").split()).strip()
+        if len(tx) < min_chars or tx in seen:
+            continue
+        seen.add(tx)
+        esc = html.escape(tx).replace("\n", "<br/>")
+        out.append(f'<p style="margin:0.22em 0;line-height:1.52;opacity:0.95;">{esc}</p>')
+    return out[:24]
+
+
 def _preview_inner_html_from_docx_ooxml(docx_bytes: bytes) -> str:
     """
     Build inner HTML from the raw OOXML package (``word/document.xml``).
 
     Catches paragraph text that lives only in split ``w:r``/``w:t`` nodes, which ``python-docx``
     sometimes surfaces as empty ``paragraph.text`` in heavily styled templates.
+    Walks ``w:sdt`` / ``w:sdtContent`` so content-control templates still preview.
     """
     chunks: list[str] = []
+    doc_root: ET.Element | None = None
     try:
         with zipfile.ZipFile(BytesIO(docx_bytes), "r") as zf:
             if "word/document.xml" not in zf.namelist():
@@ -275,28 +314,32 @@ def _preview_inner_html_from_docx_ooxml(docx_bytes: bytes) -> str:
             hf = _ooxml_headers_footers_preview_html(zf)
             if hf:
                 chunks.append(hf)
-            root = ET.fromstring(zf.read("word/document.xml"))
+            doc_root = ET.fromstring(zf.read("word/document.xml"))
     except Exception:
         return ""
 
-    body = root.find(_w_tag("body"))
+    if doc_root is None:
+        return ""
+    body = doc_root.find(_w_tag("body"))
     if body is None:
         return ""
-    for child in body:
-        local = child.tag.split("}")[-1] if "}" in child.tag else child.tag
-        if local == "p":
+    for child in _iter_ooxml_body_blocks(body):
+        tag = _ooxml_local_tag(child)
+        if tag == "p":
             text = _paragraph_text_from_ooxml_w_p(child)
             if not text:
                 continue
             esc = html.escape(text).replace("\n", "<br/>")
             chunks.append(f'<p style="margin:0.22em 0;line-height:1.52;">{esc}</p>')
-        elif local == "tbl":
+        elif tag == "tbl":
             th = _table_html_from_ooxml_w_tbl(child)
             if th:
                 chunks.append(th)
-        elif local == "sectPr":
-            break
-    return "\n".join(chunks)
+    inner = "\n".join(chunks)
+    if _preview_plain_text_len(inner) < 40 and doc_root is not None:
+        chunks.extend(_ooxml_drawingml_supplement_chunks(doc_root))
+        inner = "\n".join(chunks)
+    return inner
 
 
 def _preview_inner_html_from_python_docx(docx_bytes: bytes) -> str:
@@ -366,26 +409,41 @@ def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
 
 
 def proposal_values_preview_html(vals: dict[str, str]) -> str:
-    """Field-based preview (same placeholder map as the DOCX) when body extraction is sparse."""
-    order: tuple[tuple[str, str], ...] = (
-        ("JOB_NAME", "Job / title"),
+    """Field-based preview (same placeholder map as the DOCX). Core fields always appear (never blank)."""
+    # These six always render a row so the preview never hides quote / customer / amount / scope / prepared / date.
+    core_order: tuple[tuple[str, str], ...] = (
         ("QUOTE_NUMBER", "Quote #"),
         ("CUSTOMER_NAME", "Customer"),
+        ("PROPOSAL_AMOUNT", "Proposal amount"),
+        ("SCOPE_OF_WORK", "Scope of work"),
+        ("PREPARED_BY", "Prepared by"),
+        ("DATE", "Date"),
+    )
+    extra_order: tuple[tuple[str, str], ...] = (
+        ("JOB_NAME", "Job / title"),
         ("CUSTOMER_LOCATION", "Location"),
         ("CONTACT_NAME", "Contact"),
-        ("PROPOSAL_AMOUNT", "Proposal amount"),
-        ("DATE", "Date"),
-        ("PREPARED_BY", "Prepared by"),
         ("PREPARED_BY_PHONE", "Phone"),
-        ("SCOPE_OF_WORK", "Scope of work"),
     )
     trs: list[str] = []
-    for key, label in order:
+    for key, label in core_order:
         raw = _s(vals.get(key, ""))
-        if not raw and key != "SCOPE_OF_WORK":
-            continue
         lab_esc = html.escape(label)
         val_esc = html.escape(raw) if raw else "—"
+        trs.append(
+            "<tr>"
+            f"<td style='padding:0.4rem 0.65rem;font-weight:600;vertical-align:top;width:10.5rem;"
+            "border-bottom:1px solid #eee;'>{lab_esc}</td>"
+            f"<td style='padding:0.4rem 0.65rem;vertical-align:top;border-bottom:1px solid #eee;"
+            "white-space:pre-wrap;'>{val_esc}</td>"
+            "</tr>"
+        )
+    for key, label in extra_order:
+        raw = _s(vals.get(key, ""))
+        if not raw:
+            continue
+        lab_esc = html.escape(label)
+        val_esc = html.escape(raw)
         trs.append(
             "<tr>"
             f"<td style='padding:0.4rem 0.65rem;font-weight:600;vertical-align:top;width:10.5rem;"
@@ -405,35 +463,51 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
 
 def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
     """
-    Single preview entry point: HTML from the **same** filled DOCX bytes as **Download Proposal (Word)**.
-
-    If the document cannot be read into HTML text, returns a short notice plus the same mapped
-    placeholder values as the template (``fallback_vals`` = :func:`proposal_values` for this estimate).
+    Proposal preview: **values table first** (same map as the Word template / :func:`proposal_values`),
+    then optional **DOCX-derived** paragraphs and tables from the filled file when extraction succeeds.
     """
-    if not docx_bytes:
-        return (
-            '<div class="ips-proposal-docx-preview" style="padding:1rem 1.1rem;border:1px solid #e4e4e4;'
-            'border-radius:10px;background:#fafafa;">'
-            "<p><strong>No proposal document was generated.</strong></p>"
-            "<p>Fix any Word template errors above, then try again.</p></div>"
-        )
-
-    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
-    wrapped = _wrap_docx_preview(inner)
-    if _preview_plain_text_len(inner) >= 4:
-        return wrapped
-
-    notice = (
-        "<p style='margin:0 0 0.75rem 0;color:#92400e;font-size:0.95em;'>"
-        "<strong>Preview could not read text from the generated Word file.</strong> "
-        "The download is unchanged — open the .docx in Word. Below are the same filled placeholder values.</p>"
-    )
     fields = proposal_values_preview_html(fallback_vals)
-    return (
+    intro = (
+        "<p style='margin:0 0 0.55rem 0;font-size:0.9em;color:#475569;'>"
+        "<strong>Proposal values</strong> — same placeholders filled in your downloaded <strong>.docx</strong>.</p>"
+    )
+    outer = (
         '<div class="ips-proposal-docx-preview" style="padding:1rem 1.1rem;border:1px solid #e4e4e4;'
         'border-radius:10px;background:#fafafa;font-family:Georgia,serif;">'
-        f"{notice}{fields}</div>"
     )
+
+    docx_block = ""
+    if docx_bytes:
+        inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
+        wrapped = _wrap_docx_preview(inner)
+        if wrapped:
+            n_plain = _preview_plain_text_len(inner)
+            if n_plain >= 20:
+                docx_block = (
+                    "<div style='margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid #e2e8f0;'>"
+                    "<p style='margin:0 0 0.5rem 0;font-size:0.9em;color:#475569;'>"
+                    "<strong>Document preview</strong> — text and tables read from the generated Word file "
+                    "(open Word for exact layout).</p>"
+                    f"{wrapped}</div>"
+                )
+            else:
+                docx_block = (
+                    "<div style='margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid #e2e8f0;'>"
+                    "<p style='margin:0 0 0.5rem 0;font-size:0.9em;color:#64748b;'>"
+                    "<strong>Partial text from the .docx</strong> — some templates use shapes or content "
+                    "controls with little extractable text here.</p>"
+                    f"{wrapped}</div>"
+                )
+
+    if not docx_bytes:
+        tail = (
+            "<p style='margin:0.75rem 0 0 0;color:#b45309;font-size:0.93em;'>"
+            "<strong>No proposal document was generated.</strong> "
+            "Fix any Word template errors above, then try again.</p>"
+        )
+        return f"{outer}{intro}{fields}{tail}</div>"
+
+    return f"{outer}{intro}{fields}{docx_block}</div>"
 
 
 def proposal_values(
