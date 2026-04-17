@@ -73,7 +73,7 @@ _PANEL_MODE_KEY = "employee_toolbox_panel_mode"
 _EDIT_ID_KEY = "employee_toolbox_edit_id"
 _DELETE_PREFIX = "employee_toolbox_delete"
 _PENDING_DELETE_KEY = "employee_toolbox_pending_delete_ids"
-_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v9"
+_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v10"
 
 _FETCH_COLUMNS = (
     "id,title,url,description,category,is_active,sort_order,created_at,"
@@ -259,64 +259,57 @@ def _toolbox_file_icon(file_name: str) -> str:
     return "📁"
 
 
-def _split_toolbox_title_two_lines(raw: str, *, soft_max_line: int = 20) -> tuple[str, str | None]:
+def _toolbox_document_title_two_lines(raw: str) -> tuple[str, str | None]:
     """
-    Split a toolbox document title into one or two lines (word-aware) for the tile label.
+    Split a document title into one or two plain-text lines (tile + download overlay).
 
-    Returns plain-text lines (caller escapes for HTML). Empty input becomes a single em dash.
+    Two or more words: first ``ceil(n/2)`` words on line 1, remainder on line 2 — e.g.
+    ``#150 Flange Bolt Chart`` → ``#150 Flange`` / ``Bolt Chart``;
+    ``Pipe Tap Chart`` → ``Pipe Tap`` / ``Chart`` (uppercase applied via CSS or caller).
     """
     s = " ".join(str(raw or "").split()).strip()
     if not s:
         return ("—", None)
-    if len(s) <= soft_max_line + 4:
-        return (s, None)
     words = s.split()
-    if len(words) == 1:
+    n = len(words)
+    if n == 1:
         w = words[0]
-        if len(w) <= soft_max_line + 4:
+        if len(w) <= 16:
             return (w, None)
-        cut = max(10, min(len(w) // 2 + 4, soft_max_line + 6))
+        cut = max(8, min(len(w) // 2 + 2, len(w) - 3))
         a, b = w[:cut].rstrip("-_ "), w[cut:].lstrip("-_ ")
         return (a or w, b or None)
-    # Prefer break near middle by words
-    best_i = 0
-    best_score = 1e9
-    total = len(s)
-    for i in range(len(words) - 1):
-        line1 = " ".join(words[: i + 1])
-        line2 = " ".join(words[i + 1 :])
-        if not line2:
-            continue
-        score = abs(len(line1) - len(line2)) + abs(len(line1) - total / 2) * 0.15
-        if len(line1) > soft_max_line + 14 or len(line2) > soft_max_line + 14:
-            score += 50
-        if score < best_score:
-            best_score = score
-            best_i = i
-    if best_i > 0:
-        line1 = " ".join(words[: best_i + 1]).strip()
-        line2 = " ".join(words[best_i + 1 :]).strip()
-        return (line1, line2 or None)
-    cut = min(len(s), soft_max_line + 8)
-    return (s[:cut].rstrip(), s[cut:].lstrip() or None)
+    split_i = (n + 1) // 2
+    line1 = " ".join(words[:split_i]).strip()
+    line2 = " ".join(words[split_i:]).strip()
+    return (line1, line2 or None)
 
 
 def _build_tile_title_inner_html(raw: str) -> str:
-    """Escaped HTML for ``<p class=\"ips-toolbox-launcher-title\">`` (1–2 lines, optional ``<br/>``)."""
-    a, b = _split_toolbox_title_two_lines(raw)
+    """Escaped HTML for ``<p class=\"ips-toolbox-launcher-title\">`` (1–2 lines, ``<br/>``, bold via CSS)."""
+    a, b = _toolbox_document_title_two_lines(raw)
     out = html.escape(a)
     if b:
         out += f"<br/>{html.escape(b)}"
-    return out
+    return f"<strong>{out}</strong>"
+
+
+def _truncate_overlay_button_line(s: str, *, max_len: int = 28) -> str:
+    t = " ".join(str(s or "").split()).strip()
+    if len(t) <= max_len:
+        return t
+    return t[: max(1, max_len - 1)].rstrip() + "…"
 
 
 def _download_overlay_button_label(*, title_raw: str, file_fallback: str) -> str:
-    """Visible/accessible label on the full-tile download overlay (Streamlit has no label_visibility here)."""
-    base = str(title_raw or "").strip() or str(file_fallback or "").strip() or "FILE"
-    single = " ".join(base.replace("\n", " ").split())
-    if len(single) > 48:
-        single = single[:45].rstrip() + "…"
-    return single.upper()
+    """Visible label on the full-tile download overlay: ``row['title']``, two lines, uppercase, no generic text."""
+    base = str(title_raw or "").strip() or str(file_fallback or "").strip() or "Document"
+    a, b = _toolbox_document_title_two_lines(base)
+    la = _truncate_overlay_button_line(a.upper(), max_len=28)
+    if b:
+        lb = _truncate_overlay_button_line(b.upper(), max_len=28)
+        return f"{la}\n{lb}"
+    return _truncate_overlay_button_line(la, max_len=32)
 
 
 def _normalize_url(url: str) -> str:
@@ -544,13 +537,15 @@ def _inject_toolbox_hub_styles() -> None:
         }
         div.ips-toolbox-launcher-stack--fullbleed p.ips-toolbox-launcher-title {
             min-height: auto;
-            max-height: none;
-            -webkit-line-clamp: unset;
+            max-height: 3.1em;
             display: block;
+            white-space: pre-line;
             text-transform: uppercase;
             letter-spacing: 0.03em;
             word-break: break-word;
             overflow-wrap: anywhere;
+            font-weight: 700 !important;
+            overflow: hidden;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-toolbox-tile--fullbleed.ips-toolbox-tile-dl) div[data-testid="stButton"] > button {
             min-height: 300px !important;
@@ -632,22 +627,24 @@ def _inject_toolbox_hub_styles() -> None:
         p.ips-toolbox-launcher-title {
             color: #f1f5f9 !important;
             font-size: 0.72rem !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 0.03em;
             margin: 2px 0 0 0 !important;
             line-height: 1.22 !important;
             min-height: 2.2em;
-            max-height: 2.75em;
+            max-height: 3.1em;
             overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
+            display: block;
+            white-space: pre-line;
             padding: 0 4px;
             word-break: break-word;
             overflow-wrap: anywhere;
             hyphens: auto;
+        }
+        p.ips-toolbox-launcher-title strong {
+            font-weight: 700 !important;
         }
         p.ips-toolbox-tile-meta--compact {
             color: #94a3b8 !important;
