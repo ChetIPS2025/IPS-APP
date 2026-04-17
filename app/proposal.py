@@ -1,54 +1,19 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import tempfile
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 from datetime import datetime
-from textwrap import wrap
 from pathlib import Path
 
 from docx import Document
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from reportlab.pdfgen import canvas as pdf_canvas
-
-IPS_BLUE = (46, 102, 165)
-IPS_GRAY = (140, 140, 140)
-
-# IPS Quote PDF (ReportLab layout; DOCX uses Word template when present)
-PDF_QUOTE_OPENING = (
-    "Industrial Plant Solutions, LLC (IPS) proposes to perform the following scope of work..."
-)
-
-IPS_QUOTE_CONTACT_LINES = (
-    "Industrial Plant Solutions, LLC",
-    "For questions regarding this quote, please contact IPS.",
-)
-
-# Tighter vertical rhythm (IPS quote letterhead)
-PDF_PAGE_TOP = 0.48 * inch
-PDF_BAR_H = 0.44 * inch
-PDF_BAR_PAD = 0.05 * inch
-PDF_AFTER_BLUE_BAR = 0.12 * inch
-PDF_ATTN_ROW = 0.14 * inch
-PDF_AFTER_RULE = 0.20 * inch
-PDF_BODY_LINE = 0.118 * inch
-PDF_AFTER_OPENING = 0.10 * inch
-PDF_SECTION_GAP = 0.10 * inch
-PDF_TITLE_TO_BODY = 0.14 * inch
-PDF_AFTER_SECTION_BODY = 0.035 * inch
-PDF_EMPTY_SECTION_TAIL = 0.045 * inch
-PDF_FOOTER_TOP_PAD = 0.08 * inch
-PDF_FOOTER_LINE = 0.13 * inch
-PDF_CONTACT_LINE = 0.12 * inch
-
 
 _D0 = Decimal("0")
 _CENT = Decimal("0.01")
 
-# Canonical Word tokens (underscore, uppercase) used after normalization + value fill.
+# Canonical Word tokens ({{TOKEN}}) after normalization + value fill.
 _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
     "JOB_NAME",
     "QUOTE_NUMBER",
@@ -61,6 +26,8 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
     "DATE",
     "PREPARED_BY_PHONE",
 )
+
+ESTIMATE_PROPOSAL_TEMPLATE_FILENAME = "estimate_template_autofill_logo_updated.docx"
 
 
 def _dec(v) -> Decimal:
@@ -76,43 +43,35 @@ def _q2(v) -> Decimal:
 
 
 def _money(v) -> str:
+    """Format as $X,XXX.XX (always two decimals)."""
     return f"${_q2(v):,.2f}"
 
 
-def _find_logo() -> Path | None:
-    search_paths = [
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo.png",
-        Path(__file__).resolve().parents[1] / "assets" / "IPS LOGO.png",
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo.jpg",
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo.jpeg",
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo.webp",
-    ]
-    for p in search_paths:
-        if p.exists():
-            return p
-    return None
+def _s(v) -> str:
+    """Safe string for placeholders; never None."""
+    if v is None:
+        return ""
+    return str(v).strip() if isinstance(v, str) else str(v)
 
 
 def _pdf_prepared_by(est: dict) -> str:
-    """Session profile name/email when the estimate has no prepared-by name."""
     try:
         from auth import current_profile
 
         prof = current_profile()
-        name = str(prof.get("full_name") or "").strip()
+        name = _s(prof.get("full_name"))
         if name:
             return name
-        email = str(prof.get("email") or "").strip()
+        email = _s(prof.get("email"))
         if email:
             return email
     except Exception:
         pass
-    return str(est.get("prepared_by_name") or est.get("prepared_by") or "").strip()
+    return _s(est.get("prepared_by_name") or est.get("prepared_by"))
 
 
 def _proposal_prepared_by_display(est: dict) -> str:
-    """{{PREPARED_BY}}: prefer saved estimate name, then profile/session fallback."""
-    n = str(est.get("prepared_by_name") or "").strip()
+    n = _s(est.get("prepared_by_name"))
     if n:
         return n
     return _pdf_prepared_by(est)
@@ -127,40 +86,44 @@ def proposal_values(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
-) -> dict:
+) -> dict[str, str]:
     """
-    Values for proposal export (PDF + Word + programmatic DOCX fallback).
+    Placeholder values for the estimate proposal DOCX (and PDF derived from it).
 
-    Word templates use ``{{TOKEN}}`` after normalization; see ``_normalize_placeholder_tokens``.
-    Money is always formatted with 2 decimals.
+    Money: $X,XXX.XX. Date: full US month name. Missing fields -> empty string (or sensible default for title).
     """
-    cust = customer_name or str(est.get("customer_name") or "").strip() or ""
+    cust = _s(customer_name or est.get("customer_name"))
     pt = _money(totals.get("proposal_total", 0) or 0)
     prepared = _proposal_prepared_by_display(est)
+    jn = _s(job_name or est.get("job_name"))
+    if not jn:
+        jn = "Project Quote"
     return {
-        "JOB_NAME": job_name or str(est.get("job_name") or "").strip() or "Project Quote",
-        "QUOTE_NUMBER": str(est.get("quote_number") or ""),
+        "JOB_NAME": jn,
+        "QUOTE_NUMBER": _s(est.get("quote_number")),
         "CUSTOMER_NAME": cust,
-        "CUSTOMER_LOCATION": str(customer_location or "").strip(),
-        "CONTACT_NAME": str(contact_name or "").strip(),
+        "CUSTOMER_LOCATION": _s(customer_location),
+        "CONTACT_NAME": _s(contact_name),
         "PROPOSAL_AMOUNT": pt,
-        "SCOPE_OF_WORK": str(est.get("scope_of_work") or ""),
-        "DATE": datetime.now().strftime("%m/%d/%Y"),
-        "PREPARED_BY": prepared,
-        "PREPARED_BY_PHONE": str(prepared_by_phone or "").strip(),
+        "SCOPE_OF_WORK": _s(est.get("scope_of_work")),
+        "DATE": datetime.now().strftime("%B %d, %Y"),
+        "PREPARED_BY": _s(prepared),
+        "PREPARED_BY_PHONE": _s(prepared_by_phone),
     }
 
 
-def _default_proposal_template_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "assets" / "proposal_template.docx"
+def _default_estimate_proposal_template_path() -> Path:
+    """IPS APP/assets/estimate_template_autofill_logo_updated.docx"""
+    return Path(__file__).resolve().parents[1] / "assets" / ESTIMATE_PROPOSAL_TEMPLATE_FILENAME
 
 
 def _resolve_proposal_template_bytes(
     template_bytes: bytes | None,
     template_path: str | None,
-) -> bytes | None:
+) -> bytes:
     """
-    Prefer session-uploaded bytes, then explicit path, then ``assets/proposal_template.docx``.
+    Order: session/uploaded bytes, explicit path, then packaged assets template.
+    Raises FileNotFoundError if nothing usable is found.
     """
     if template_bytes:
         return template_bytes
@@ -168,28 +131,23 @@ def _resolve_proposal_template_bytes(
         p = Path(template_path)
         if p.is_file():
             return p.read_bytes()
-    default = _default_proposal_template_path()
+    default = _default_estimate_proposal_template_path()
     if default.is_file():
         return default.read_bytes()
-    return None
+    raise FileNotFoundError(
+        f"Proposal template not found. Add {ESTIMATE_PROPOSAL_TEMPLATE_FILENAME} under the project "
+        f"**assets** folder ({default.parent}), or upload a .docx in the estimate editor."
+    )
 
 
 def _normalize_placeholder_tokens(text: str) -> str:
-    """
-    Rewrite inconsistent template tokens to canonical ``{{UPPER_SNAKE}}`` tokens.
-
-    Covers explicit IPS normalizations (e.g. ``{{ Customer Name}}``, ``{{Scope of Work}}``)
-    plus flexible whitespace around known tokens.
-    """
     if not text:
         return text
     s = text
-    # Explicit user-specified label forms -> canonical tokens (flexible inner whitespace).
     explicit: list[tuple[str, str]] = [
         (r"\{\{\s*Customer\s+Name\s*\}\}", "{{CUSTOMER_NAME}}"),
         (r"\{\{\s*Customer\s+Location\s*\}\}", "{{CUSTOMER_LOCATION}}"),
         (r"\{\{\s*Scope\s+of\s+Work\s*\}\}", "{{SCOPE_OF_WORK}}"),
-        # Other common human-readable variants
         (r"\{\{\s*Job\s*Name\s*\}\}", "{{JOB_NAME}}"),
         (r"\{\{\s*Quote\s*Number\s*\}\}", "{{QUOTE_NUMBER}}"),
         (r"\{\{\s*Contact\s*Name\s*\}\}", "{{CONTACT_NAME}}"),
@@ -202,7 +160,6 @@ def _normalize_placeholder_tokens(text: str) -> str:
     for pat, repl in explicit:
         s = re.sub(pat, repl, s, flags=re.IGNORECASE)
 
-    # Normalize spacing around known canonical tokens: ``{{ JOB_NAME }}`` -> ``{{JOB_NAME}}``
     for tok in _DOCX_CANONICAL_TOKENS:
         s = re.sub(
             r"\{\{\s*" + re.escape(tok) + r"\s*\}\}",
@@ -213,25 +170,32 @@ def _normalize_placeholder_tokens(text: str) -> str:
     return s
 
 
-def _docx_placeholder_replacements(vals: dict) -> dict[str, str]:
-    """Map ``{{TOKEN}}`` -> value for canonical proposal fields only."""
+def _docx_placeholder_replacements(vals: dict[str, str]) -> dict[str, str]:
     repl: dict[str, str] = {}
     for k in _DOCX_CANONICAL_TOKENS:
-        if k in vals:
-            repl["{{" + k + "}}"] = str(vals[k])
+        repl["{{" + k + "}}"] = _s(vals.get(k, ""))
     return repl
 
 
-def _apply_to_paragraph_text(doc: Document, fn) -> None:
-    """Walk body, tables, headers/footers; set paragraph text via ``fn(text) -> new_text``."""
+def _set_paragraph_text_merged(p, new_text: str) -> None:
+    """Replace paragraph text while tolerating multi-run paragraphs (common in Word)."""
+    if not p.runs:
+        p.add_run(new_text)
+        return
+    p.runs[0].text = new_text
+    for r in p.runs[1:]:
+        r.text = ""
 
+
+def _apply_to_paragraph_text(doc: Document, fn) -> None:
     def apply_paragraph(p) -> None:
-        text = p.text
+        parts = [r.text for r in p.runs] if p.runs else []
+        text = "".join(parts) if parts else (p.text or "")
         if not text:
             return
         new = fn(text)
         if new != text:
-            p.text = new
+            _set_paragraph_text_merged(p, new)
 
     def walk_table(table) -> None:
         for row in table.rows:
@@ -263,98 +227,59 @@ def _replace_placeholders_doc(doc: Document, replacements: dict[str, str]) -> No
         new = text
         for k, v in replacements.items():
             if k in new:
-                new = new.replace(k, str(v))
+                new = new.replace(k, v)
         return new
 
     _apply_to_paragraph_text(doc, replace)
 
 
-def _default_intro(vals: dict) -> str:
-    return (
-        f"Industrial Plant Solutions (IPS) proposes to perform the following scope of work for "
-        f"{vals['JOB_NAME']}."
+def _fill_proposal_docx_from_bytes(raw: bytes, vals: dict[str, str]) -> bytes:
+    repl = _docx_placeholder_replacements(vals)
+    doc = Document(BytesIO(raw))
+    _normalize_docx_placeholders(doc)
+    _replace_placeholders_doc(doc, repl)
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
+def _convert_docx_bytes_to_pdf(docx_bytes: bytes) -> bytes:
+    """
+    Convert filled .docx to PDF using LibreOffice/soffice (any OS) or docx2pdf (Windows + Word).
+    """
+    with tempfile.TemporaryDirectory() as td:
+        tdir = Path(td)
+        src = tdir / "proposal.docx"
+        src.write_bytes(docx_bytes)
+        pdf_out = tdir / "proposal.pdf"
+        for exe in ("soffice", "libreoffice"):
+            try:
+                subprocess.run(
+                    [exe, "--headless", "--convert-to", "pdf", "--outdir", str(tdir), str(src)],
+                    check=True,
+                    timeout=180,
+                    capture_output=True,
+                    text=True,
+                )
+            except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+                continue
+            if pdf_out.is_file():
+                return pdf_out.read_bytes()
+
+        try:
+            from docx2pdf import convert  # type: ignore
+
+            convert(str(src.resolve()))
+            win_pdf = src.with_suffix(".pdf")
+            if win_pdf.is_file():
+                return win_pdf.read_bytes()
+        except Exception:
+            pass
+
+    raise RuntimeError(
+        "Could not convert the proposal Word file to PDF. Install **LibreOffice** (command `soffice` or "
+        "`libreoffice` on PATH), or on Windows install **Microsoft Word** and run `pip install docx2pdf`."
     )
-
-
-def _clean_lines(text: str) -> list[str]:
-    lines = []
-    for raw in (text or "").splitlines():
-        s = raw.strip()
-        if s:
-            lines.append(s)
-    return lines
-
-
-def _pdf_draw_wrapped(
-    c: pdf_canvas.Canvas,
-    text: str,
-    *,
-    left: float,
-    right: float,
-    y: float,
-    height: float,
-    font: str = "Times-Roman",
-    size: int = 11,
-    line_step: float | None = None,
-) -> float:
-    """Draw wrapped paragraph text; return updated y (baseline)."""
-    step = line_step if line_step is not None else PDF_BODY_LINE
-    chars_per_line = 96
-    c.setFont(font, size)
-    for line in (text or "").splitlines():
-        s = line.strip()
-        if not s:
-            y -= step * 0.5
-            continue
-        for sub in wrap(s, width=chars_per_line):
-            if y < 0.75 * inch:
-                c.showPage()
-                y = height - 0.7 * inch
-                c.setFont(font, size)
-            c.drawString(left, y, sub)
-            y -= step
-    return y
-
-
-def _pdf_draw_section(
-    c: pdf_canvas.Canvas,
-    title: str,
-    body: str,
-    *,
-    left: float,
-    right: float,
-    y: float,
-    height: float,
-    section_gap: float,
-) -> float:
-    """Bold section title + plain body block(s). Empty body still draws the title."""
-    if y < 1.0 * inch:
-        c.showPage()
-        y = height - 0.75 * inch
-
-    y -= section_gap
-    c.setFont("Times-Bold", 12)
-    c.drawString(left, y, title)
-    y -= PDF_TITLE_TO_BODY
-
-    body_stripped = (body or "").strip()
-    if not body_stripped:
-        y -= PDF_EMPTY_SECTION_TAIL
-        return y
-
-    y = _pdf_draw_wrapped(
-        c,
-        body_stripped,
-        left=left,
-        right=right,
-        y=y,
-        height=height,
-        font="Times-Roman",
-        size=11,
-        line_step=PDF_BODY_LINE,
-    )
-    y -= PDF_AFTER_SECTION_BODY
-    return y
 
 
 def build_proposal_docx(
@@ -369,7 +294,10 @@ def build_proposal_docx(
     template_path: str | None = None,
     template_bytes: bytes | None = None,
 ) -> bytes:
-    """Build Word proposal: normalized template (uploaded or assets/proposal_template.docx), else built-in layout."""
+    """
+    Build the proposal .docx from **estimate_template_autofill_logo_updated.docx** (or uploaded bytes),
+    replacing all {{PLACEHOLDER}} tokens. This is the only proposal layout.
+    """
     vals = proposal_values(
         est,
         totals,
@@ -379,114 +307,8 @@ def build_proposal_docx(
         contact_name=contact_name,
         prepared_by_phone=prepared_by_phone,
     )
-    repl = _docx_placeholder_replacements(vals)
     raw = _resolve_proposal_template_bytes(template_bytes, template_path)
-    if raw:
-        try:
-            doc = Document(BytesIO(raw))
-            _normalize_docx_placeholders(doc)
-            _replace_placeholders_doc(doc, repl)
-            bio = BytesIO()
-            doc.save(bio)
-            return bio.getvalue()
-        except Exception:
-            pass
-
-    doc = Document()
-    sec = doc.sections[0]
-    sec.top_margin = Inches(0.35)
-    sec.bottom_margin = Inches(0.45)
-    sec.left_margin = Inches(0.55)
-    sec.right_margin = Inches(0.55)
-
-    logo = _find_logo()
-    if logo:
-        try:
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.add_run().add_picture(str(logo), width=Inches(4.8))
-        except Exception:
-            pass
-
-    # Blue title bar
-    title_tbl = doc.add_table(rows=2, cols=1)
-    title_tbl.autofit = False
-    title_tbl.columns[0].width = Inches(6.8)
-    for cell in [title_tbl.cell(0, 0), title_tbl.cell(1, 0)]:
-        tc_pr = cell._tc.get_or_add_tcPr()
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        shd = OxmlElement("w:shd")
-        shd.set(qn("w:fill"), "2E66A5")
-        tc_pr.append(shd)
-
-    p = title_tbl.cell(0, 0).paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run(f"{vals['JOB_NAME']} – Quote")
-    r.bold = True
-    r.font.size = Pt(16)
-    r.font.color.rgb = RGBColor(255, 255, 255)
-
-    p = title_tbl.cell(1, 0).paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run(f"Quote #: {vals['QUOTE_NUMBER']}")
-    r.bold = True
-    r.font.size = Pt(12)
-    r.font.color.rgb = RGBColor(255, 255, 255)
-
-    meta = doc.add_table(rows=1, cols=2)
-    meta.columns[0].width = Inches(3.2)
-    meta.columns[1].width = Inches(3.6)
-    p = meta.cell(0, 0).paragraphs[0]
-    r = p.add_run(f"Attn: {vals['CUSTOMER_NAME']}")
-    r.bold = True
-    r.font.italic = True
-    p = meta.cell(0, 1).paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    r = p.add_run(f"Quote Amt: {vals['PROPOSAL_AMOUNT']}")
-    r.bold = True
-
-    # Divider
-    p = doc.add_paragraph()
-    p.add_run("―" * 55).bold = True
-
-    doc.add_paragraph(_default_intro(vals))
-
-    p = doc.add_paragraph()
-    r = p.add_run("Work Included")
-    r.bold = True
-    r.font.size = Pt(20)
-
-    p = doc.add_paragraph()
-    p.add_run("―" * 55)
-
-    scope_lines = _clean_lines(vals["SCOPE_OF_WORK"])
-    if not scope_lines:
-        scope_lines = [
-            "Provide supervision and labor required to execute the quoted scope.",
-            "Furnish materials identified in the estimate.",
-            "Provide listed tools, trailers, and rental equipment as required.",
-            "Mobilization, travel, per diem, and lodging as included in the estimate.",
-            "Complete the described work in accordance with the selected estimate assumptions and scope.",
-        ]
-
-    for line in scope_lines:
-        p = doc.add_paragraph(style=None)
-        p.paragraph_format.left_indent = Inches(0.25)
-        r = p.add_run(f"•  {line}")
-        r.bold = False
-
-    doc.add_paragraph("")
-    doc.add_paragraph(f"Prepared By: {vals['PREPARED_BY']}")
-    if vals.get("PREPARED_BY_PHONE"):
-        doc.add_paragraph(f"Phone: {vals['PREPARED_BY_PHONE']}")
-    doc.add_paragraph(f"Date: {vals['DATE']}")
-    doc.add_paragraph("If you have any questions regarding this Quote, please contact IPS.")
-
-    bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    return _fill_proposal_docx_from_bytes(raw, vals)
 
 
 def build_proposal_pdf(
@@ -498,9 +320,13 @@ def build_proposal_pdf(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
+    template_path: str | None = None,
+    template_bytes: bytes | None = None,
 ) -> bytes:
-    """IPS quote PDF: header, scope, prepared-by/date; same field mapping as Word (ReportLab layout)."""
-    vals = proposal_values(
+    """
+    Build the proposal PDF from the **same** filled DOCX as downloads/preview (template + placeholders).
+    """
+    docx_bytes = build_proposal_docx(
         est,
         totals,
         customer_name=customer_name,
@@ -508,80 +334,7 @@ def build_proposal_pdf(
         customer_location=customer_location,
         contact_name=contact_name,
         prepared_by_phone=prepared_by_phone,
+        template_path=template_path,
+        template_bytes=template_bytes,
     )
-
-    buffer = BytesIO()
-    c = pdf_canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    margin = 0.7 * inch
-    left = margin
-    right = width - margin
-    y = height - PDF_PAGE_TOP
-
-    # HEADER: title "Quote", quote #, Attn, Quote Amt
-    bar_h = PDF_BAR_H
-    c.setFillColorRGB(*(v / 255 for v in IPS_BLUE))
-    c.rect(left, y - bar_h + PDF_BAR_PAD, right - left, bar_h, fill=1, stroke=0)
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString((left + right) / 2, y - 0.10 * inch, "Quote")
-    c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString((left + right) / 2, y - 0.28 * inch, f"Quote #: {vals['QUOTE_NUMBER']}")
-    y -= bar_h + PDF_AFTER_BLUE_BAR
-
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-BoldOblique", 12)
-    c.drawString(left, y, f"Attn: {vals['CUSTOMER_NAME']}")
-    c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(right, y, f"Quote Amt: {vals['PROPOSAL_AMOUNT']}")
-    y -= PDF_ATTN_ROW
-
-    c.setLineWidth(1.0)
-    c.setStrokeColorRGB(*(v / 255 for v in IPS_GRAY))
-    c.line(left, y, right, y)
-    c.setStrokeColorRGB(0, 0, 0)
-    y -= PDF_AFTER_RULE
-
-    # BODY: opening + scope (aligned with proposal field mapping)
-    y = _pdf_draw_wrapped(
-        c,
-        PDF_QUOTE_OPENING,
-        left=left,
-        right=right,
-        y=y,
-        height=height,
-        font="Times-Roman",
-        size=11,
-        line_step=PDF_BODY_LINE,
-    )
-    y -= PDF_AFTER_OPENING
-
-    gap = PDF_SECTION_GAP
-    y = _pdf_draw_section(
-        c, "Scope of Work", vals["SCOPE_OF_WORK"], left=left, right=right, y=y, height=height, section_gap=gap
-    )
-
-    # FOOTER: Prepared By, Date, contact
-    if y < 1.05 * inch:
-        c.showPage()
-        y = height - 0.78 * inch
-
-    y -= PDF_FOOTER_TOP_PAD
-    c.setFont("Times-Roman", 11)
-    c.drawString(left, y, f"Prepared By: {vals['PREPARED_BY']}")
-    y -= PDF_FOOTER_LINE
-    if vals.get("PREPARED_BY_PHONE"):
-        c.drawString(left, y, f"Phone: {vals['PREPARED_BY_PHONE']}")
-        y -= PDF_FOOTER_LINE
-    c.drawString(left, y, f"Date: {vals['DATE']}")
-    y -= PDF_FOOTER_LINE
-    for contact_line in IPS_QUOTE_CONTACT_LINES:
-        if y < 0.65 * inch:
-            c.showPage()
-            y = height - 0.72 * inch
-            c.setFont("Times-Roman", 11)
-        c.drawString(left, y, contact_line)
-        y -= PDF_CONTACT_LINE
-
-    c.save()
-    return buffer.getvalue()
+    return _convert_docx_bytes_to_pdf(docx_bytes)

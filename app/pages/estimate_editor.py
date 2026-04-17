@@ -404,7 +404,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 
 def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:
-    """Shared context for Word/PDF proposal generation (placeholders + PDF layout)."""
+    """Shared context for Word/PDF proposal generation (same DOCX template + placeholders)."""
     cid = str(est.get("customer_id") or "").strip()
     cust_row = _fetch_customer_row_for_proposal(cid) if cid else None
     location = _format_customer_location_line(cust_row)
@@ -1597,7 +1597,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        pdf_toolbar = build_proposal_pdf(est, totals, **_pe)
+        tpl_ov = st.session_state.get("ips_proposal_template_bytes")
+        pdf_toolbar = build_proposal_pdf(est, totals, **_pe, template_bytes=tpl_ov)
         ep1, ep2, ep3 = st.columns([1, 1, 4])
         with ep1:
             if st.button("Preview Proposal", use_container_width=True, key="est_embed_preview_btn"):
@@ -2850,7 +2851,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             type=["docx"],
             accept_multiple_files=False,
             key="est_proposal_tpl_uploader",
-            help="Upload the IPS .docx template (default layout when set). Messy tokens like {{ Customer Name}} are normalized to {{CUSTOMER_NAME}} before fill.",
+            help="Optional override. Default: **assets/estimate_template_autofill_logo_updated.docx**. "
+            "Tokens like {{ Customer Name}} normalize to {{CUSTOMER_NAME}} before fill.",
         )
         if tpl_uploader is not None:
             st.session_state["ips_proposal_template_bytes"] = tpl_uploader.getvalue()
@@ -2860,14 +2862,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.rerun()
 
         docx_bytes = build_proposal_docx(est, totals, **_pe, template_bytes=tpl_bytes)
-        pdf_bytes = build_proposal_pdf(est, totals, **_pe)
+        pdf_bytes = build_proposal_pdf(est, totals, **_pe, template_bytes=tpl_bytes)
 
         # Top action card: downloads + (optional) save-to-storage.
         with st.container(border=True):
             st.caption(
-                "Exports use the current draft. Word uses your uploaded template, else **assets/proposal_template.docx**, "
-                "else the built-in layout. Placeholder labels are normalized to **{{CUSTOMER_NAME}}**, **{{SCOPE_OF_WORK}}**, etc., then filled. "
-                "Save-to-storage requires a saved estimate."
+                "Exports use the current draft. **Word and PDF** both come from the same filled template "
+                "(**assets/estimate_template_autofill_logo_updated.docx**, or your upload). "
+                "PDF needs LibreOffice (`soffice`) or Windows Word + **docx2pdf**. Save-to-storage requires a saved estimate."
             )
             d1, d2 = st.columns(2)
             with d1:
