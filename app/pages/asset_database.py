@@ -50,7 +50,7 @@ except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 
 _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
-_ADB_VIEW_TOGGLE_CSS_KEY = "ips_asset_db_view_toggle_css_injected"
+_ADB_TOP_ACTIONS_CSS_KEY = "ips_asset_db_top_actions_css_injected"
 _ADB_MOBILE_CSS_KEY = "ips_asset_db_mobile_css_injected_v2"
 
 
@@ -62,11 +62,6 @@ def _inject_asset_database_mobile_css() -> None:
         """
         <style>
         @media (max-width: 900px) {
-          .ips-adb-actions-mobile .stButton > button {
-            min-height: 2.55rem !important;
-            font-size: 0.95rem !important;
-            font-weight: 600 !important;
-          }
           div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-adb-card-mobile) {
             padding-top: 8px !important;
             padding-bottom: 10px !important;
@@ -130,44 +125,42 @@ def _inject_asset_database_mobile_css() -> None:
     )
 
 
-def _inject_asset_db_view_toggle_css() -> None:
-    if st.session_state.get(_ADB_VIEW_TOGGLE_CSS_KEY):
+def _inject_asset_db_top_actions_css() -> None:
+    if st.session_state.get(_ADB_TOP_ACTIONS_CSS_KEY):
         return
-    st.session_state[_ADB_VIEW_TOGGLE_CSS_KEY] = True
+    st.session_state[_ADB_TOP_ACTIONS_CSS_KEY] = True
     st.markdown(
         """
         <style>
+        /* One row: Cards | Table | New Asset | Asset Scanner — equal columns, equal button height */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="stColumn"]:has(.ips-adb-view-toggle),
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="column"]:has(.ips-adb-view-toggle) {
-            background: rgba(30, 41, 59, 0.78) !important;
-            border: 1px solid rgba(71, 85, 105, 0.55) !important;
-            border-radius: 9px !important;
-            padding: 5px 7px 7px 7px !important;
-            align-self: center !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="stColumn"]:has(.ips-adb-view-toggle) [data-testid="stHorizontalBlock"],
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="column"]:has(.ips-adb-view-toggle) [data-testid="stHorizontalBlock"] {
-            gap: 6px !important;
+            div[data-testid="stHorizontalBlock"] {
+            gap: 0.4rem !important;
             align-items: stretch !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="stColumn"]:has(.ips-adb-view-toggle) button[kind="secondary"],
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="column"]:has(.ips-adb-view-toggle) button[kind="secondary"] {
-            background: rgba(15, 23, 42, 0.45) !important;
-            border-color: rgba(71, 85, 105, 0.45) !important;
-            color: #cbd5e1 !important;
+            div[data-testid="column"] .stButton > button {
+            min-height: 2.25rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 0.35rem 0.4rem !important;
+            font-size: 0.875rem !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="stColumn"]:has(.ips-adb-view-toggle) button[kind="primary"],
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
-            div[data-testid="column"]:has(.ips-adb-view-toggle) button[kind="primary"] {
-            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.45), 0 1px 8px rgba(37, 99, 235, 0.25) !important;
-            font-weight: 650 !important;
+        /* Keep this toolbar on one row on phones (global mobile CSS stacks columns elsewhere) */
+        @media (max-width: 900px) {
+          div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+              div[data-testid="stHorizontalBlock"] {
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: stretch !important;
+          }
+          div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
+              div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            width: auto !important;
+            min-width: 0 !important;
+            flex: 1 1 0 !important;
+            max-width: none !important;
+          }
         }
         </style>
         """,
@@ -175,10 +168,13 @@ def _inject_asset_db_view_toggle_css() -> None:
     )
 
 
-def _render_asset_db_view_toggle(*, vm: str) -> None:
-    st.markdown('<span class="ips-adb-view-toggle"></span>', unsafe_allow_html=True)
-    t1, t2 = st.columns(2, gap="small")
-    with t1:
+def _render_asset_db_top_action_row(*, vm: str, can_add: bool) -> None:
+    """Cards, Table, New Asset (when allowed), Asset Scanner — single row, equal-width columns."""
+    if can_add:
+        c_cards, c_table, c_new, c_scan = st.columns(4, gap="small")
+    else:
+        c_cards, c_table, c_scan = st.columns(3, gap="small")
+    with c_cards:
         if st.button(
             "Cards",
             type="primary" if vm == "Cards" else "secondary",
@@ -189,7 +185,7 @@ def _render_asset_db_view_toggle(*, vm: str) -> None:
             st.session_state["asset_db_view_user_chose"] = True
             st.session_state["asset_db_view_mode"] = "Cards"
             st.rerun()
-    with t2:
+    with c_table:
         if st.button(
             "Table",
             type="primary" if vm == "Table" else "secondary",
@@ -200,6 +196,33 @@ def _render_asset_db_view_toggle(*, vm: str) -> None:
             st.session_state["asset_db_view_user_chose"] = True
             st.session_state["asset_db_view_mode"] = "Table"
             st.rerun()
+    if can_add:
+        with c_new:
+            if st.button("New Asset", type="primary", use_container_width=True, key="asset_db_new"):
+                _clear_asset_panel()
+                st.session_state["asset_db_add_mode"] = True
+                st.rerun()
+        with c_scan:
+            if st.button(
+                "Asset Scanner",
+                type="secondary",
+                use_container_width=True,
+                key="asset_db_scanner",
+            ):
+                _clear_asset_panel()
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
+                st.rerun()
+    else:
+        with c_scan:
+            if st.button(
+                "Asset Scanner",
+                type="secondary",
+                use_container_width=True,
+                key="asset_db_scanner",
+            ):
+                _clear_asset_panel()
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
+                st.rerun()
 
 
 ASSET_STATUSES = [
@@ -820,38 +843,16 @@ def render() -> None:
 
         st.session_state.setdefault("asset_db_view_mode", "Cards")
         vm = str(st.session_state.get("asset_db_view_mode", "Cards"))
-        _inject_asset_db_view_toggle_css()
+        _inject_asset_db_top_actions_css()
 
         if is_narrow:
             st.caption(
                 "Search and filters below — **Cards** is the default on phones. "
                 "Use **Table** when you need export or bulk delete."
             )
-            st.markdown('<span class="ips-adb-actions-mobile"></span>', unsafe_allow_html=True)
-            if can_add:
-                if st.button("New Asset", type="primary", use_container_width=True, key="asset_db_new"):
-                    _clear_asset_panel()
-                    st.session_state["asset_db_add_mode"] = True
-                    st.rerun()
-                if st.button(
-                    "Asset Scanner",
-                    type="secondary",
-                    use_container_width=True,
-                    key="asset_db_scanner",
-                ):
-                    _clear_asset_panel()
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
-                    st.rerun()
-            else:
-                if st.button(
-                    "Asset Scanner",
-                    type="secondary",
-                    use_container_width=True,
-                    key="asset_db_scanner",
-                ):
-                    _clear_asset_panel()
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
-                    st.rerun()
+            with st.container(border=True):
+                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+                _render_asset_db_top_action_row(vm=vm, can_add=can_add)
 
             if df.empty:
                 st.info("No assets found.")
@@ -882,46 +883,13 @@ def render() -> None:
             st.selectbox("Serial #", serial_options, key="asset_db_f_serial")
             st.caption(
                 "**Show** filters rentable assets or **Equipment** category. "
-                "Use **Cards / Table** when you need to switch layout."
+                "View mode switches are in the top row above."
             )
-            _render_asset_db_view_toggle(vm=vm)
 
         else:
             with st.container(border=True):
                 st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-                if can_add:
-                    vt, a1, a2 = st.columns([1.25, 1, 1], gap="small")
-                    with vt:
-                        _render_asset_db_view_toggle(vm=vm)
-                    with a1:
-                        if st.button("New Asset", type="primary", use_container_width=True, key="asset_db_new"):
-                            _clear_asset_panel()
-                            st.session_state["asset_db_add_mode"] = True
-                            st.rerun()
-                    with a2:
-                        if st.button(
-                            "Asset Scanner",
-                            type="secondary",
-                            use_container_width=True,
-                            key="asset_db_scanner",
-                        ):
-                            _clear_asset_panel()
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
-                            st.rerun()
-                else:
-                    vt, s1 = st.columns([1.25, 1], gap="small")
-                    with vt:
-                        _render_asset_db_view_toggle(vm=vm)
-                    with s1:
-                        if st.button(
-                            "Asset Scanner",
-                            type="secondary",
-                            use_container_width=True,
-                            key="asset_db_scanner",
-                        ):
-                            _clear_asset_panel()
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
-                            st.rerun()
+                _render_asset_db_top_action_row(vm=vm, can_add=can_add)
 
             if df.empty:
                 st.info("No assets found.")
