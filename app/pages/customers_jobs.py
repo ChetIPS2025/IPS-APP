@@ -39,6 +39,7 @@ try:
         get_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
@@ -47,6 +48,7 @@ except ImportError:
         get_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 
 try:
@@ -69,6 +71,7 @@ try:
         IPS_CRUD_LIST_PAGE_GAP,
         IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
+        inject_ips_modal_styles,
         render_crud_list_subtitle,
     )
 except ImportError:
@@ -76,6 +79,7 @@ except ImportError:
         IPS_CRUD_LIST_PAGE_GAP,
         IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
+        inject_ips_modal_styles,
         render_crud_list_subtitle,
     )
 
@@ -342,6 +346,213 @@ def _friendly_customer_db_message(exc: BaseException) -> str:
     return "Could not save the customer. See **Technical details** below."
 
 
+# --- IPS modal layout (st.dialog): header (title + subtitle/hint) | compact body | divider | footer (spacer | Cancel | Save) ---
+
+
+def _ips_modal_subtitle(text: str) -> None:
+    """IPS modal: short line under the dialog title (styled via inject_ips_modal_styles)."""
+    inject_ips_modal_styles()
+    st.markdown(
+        f'<p class="ips-modal-subtitle">{html.escape(text)}</p>',
+        unsafe_allow_html=True,
+    )
+
+
+def _ips_modal_hint(text: str) -> None:
+    """IPS modal: smaller secondary note (e.g. schema limitations)."""
+    inject_ips_modal_styles()
+    st.markdown(
+        f'<p class="ips-modal-hint">{html.escape(text)}</p>',
+        unsafe_allow_html=True,
+    )
+
+
+def _ips_modal_header(*, subtitle: str | None = None, hint: str | None = None) -> None:
+    """IPS modal header: optional helper + hint under the ``@st.dialog`` title."""
+    if subtitle:
+        _ips_modal_subtitle(subtitle)
+    if hint:
+        _ips_modal_hint(hint)
+
+
+@st.dialog("Add Customer", width="small")
+def _add_customer_dialog(
+    *,
+    existing_customer_names: set[str],
+    resolved: dict[str, str],
+    available: set[str],
+) -> None:
+    # --- header: @st.dialog title + subtitle / hint ---
+    _ips_modal_header(
+        subtitle="Company name is required · address optional",
+        hint=(
+            "No `is_active` column on this database — table default applies."
+            if resolved["is_active"] not in available
+            else None
+        ),
+    )
+
+    # --- body: compact groups (2 columns where it fits) ---
+    r0a, r0b = st.columns([2, 1], gap="small")
+    with r0a:
+        customer_name = st.text_input("Customer name", key="dlg_cust_add_name")
+    with r0b:
+        is_active_customer = st.checkbox("Active", value=True, key="dlg_cust_add_active")
+
+    a1, a2 = st.columns(2, gap="small")
+    with a1:
+        address = st.text_input("Address", key="dlg_cust_add_addr")
+        city = st.text_input("City", key="dlg_cust_add_city")
+    with a2:
+        state = st.text_input("State", key="dlg_cust_add_state")
+        zip_code = st.text_input("ZIP", key="dlg_cust_add_zip")
+
+    # --- footer: spacer | Cancel (secondary) | Save (primary), right-aligned ---
+    st.divider()
+    sp, fc, fs = st.columns([4, 1, 1], gap="small")
+    with sp:
+        st.empty()
+    with fc:
+        if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_cust_add_cancel"):
+            st.rerun()
+    with fs:
+        if st.button("Save", type="primary", use_container_width=True, key="dlg_cust_add_save"):
+            err = _validate_customer_name_text(customer_name)
+            if err:
+                st.error(err)
+                st.stop()
+            name_upper = str(customer_name).strip().upper()
+            if name_upper in existing_customer_names:
+                st.error("A customer with this name already exists.")
+                st.stop()
+            for label, val in (
+                ("Address", address),
+                ("City", city),
+                ("State", state),
+                ("ZIP", zip_code),
+            ):
+                ve = _validate_address_field(label, str(val))
+                if ve:
+                    st.error(ve)
+                    st.stop()
+
+            active_val: bool | None = bool(is_active_customer) if resolved["is_active"] in available else None
+            try:
+                payload = _build_customer_write_payload(
+                    customer_name=str(customer_name).strip(),
+                    address=str(address).strip(),
+                    city=str(city).strip(),
+                    state=str(state).strip(),
+                    zip_value=str(zip_code).strip(),
+                    is_active=active_val,
+                    resolved=resolved,
+                    available=available,
+                )
+                inserted = insert_row_admin("customers", payload)
+            except Exception as exc:
+                st.error(_friendly_customer_db_message(exc))
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+
+            new_id = str((inserted or {}).get("id") or "").strip()
+            st.session_state.pop("customer_contact_mode", None)
+            st.session_state.pop("customer_contact_edit_id", None)
+            st.session_state.pop("customer_contact_selected_id", None)
+            if new_id:
+                st.session_state["customer_mode"] = "edit"
+                st.session_state["customer_edit_id"] = new_id
+                set_selected_ids(TABLE_KEY_CUSTOMERS, [new_id])
+            st.toast("Customer added.", icon="✅")
+            st.rerun()
+
+
+@st.dialog("Add Contact", width="small")
+def _add_contact_dialog(cid: str, admin_read: bool) -> None:
+    key_show_inact = f"cust_ct_show_inactive_{cid}"
+    load_inactive = bool(st.session_state.get(key_show_inact, False))
+    contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
+    schema_keys = _contact_schema_keys(contacts, None)
+    pk = f"dlg_ct_{cid}"
+
+    # --- header: @st.dialog title + subtitle ---
+    _ips_modal_header(subtitle="New row in customer_contacts · primary and active optional")
+
+    # --- body: compact groups (2 columns) ---
+    r1a, r1b = st.columns(2, gap="small")
+    with r1a:
+        cn = st.text_input("Contact name", key=f"{pk}_name")
+    with r1b:
+        tl = st.text_input(
+            "Title",
+            key=f"{pk}_title",
+            help="Job title or role (saved to title + role when supported)",
+        )
+    r2a, r2b = st.columns(2, gap="small")
+    with r2a:
+        em = st.text_input("Email", key=f"{pk}_email")
+    with r2b:
+        ph = st.text_input("Phone", key=f"{pk}_phone")
+    r3a, r3b = st.columns(2, gap="small")
+    with r3a:
+        mob = st.text_input("Mobile", key=f"{pk}_mobile")
+    with r3b:
+        nt = st.text_area("Notes", key=f"{pk}_notes", height=56)
+    r4a, r4b = st.columns(2, gap="small")
+    with r4a:
+        pr = st.checkbox("Primary contact", value=False, key=f"{pk}_prim")
+    with r4b:
+        act = st.checkbox("Active", value=True, key=f"{pk}_act")
+
+    # --- footer: spacer | Cancel (secondary) | Save (primary), right-aligned ---
+    st.divider()
+    sp, fc, fs = st.columns([4, 1, 1], gap="small")
+    with sp:
+        st.empty()
+    with fc:
+        if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
+            st.rerun()
+    with fs:
+        if st.button("Save", type="primary", use_container_width=True, key=f"{pk}_save"):
+            t = str(cn or "").strip()
+            if not t:
+                st.error("Contact name is required.")
+                st.stop()
+            pr_b = bool(pr)
+            act_b = bool(act)
+            if pr_b and not act_b:
+                st.warning("Inactive contacts cannot be primary — saving without primary flag.")
+                pr_b = False
+            full, minimal = _build_contact_write_pair(
+                contact_name=t,
+                title_text=str(tl or ""),
+                email=str(em or ""),
+                phone=str(ph or ""),
+                mobile=str(mob or ""),
+                notes=str(nt or ""),
+                is_active=act_b,
+                is_primary=False,
+                customer_id=cid,
+                schema_keys=schema_keys,
+            )
+            try:
+                inserted = _insert_contact_pair(full, minimal)
+            except Exception as exc:
+                st.error("Could not save the contact.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+            new_id = str((inserted or {}).get("id") or "")
+            if pr_b and new_id:
+                set_primary_contact(customer_id=cid, contact_id=new_id)
+            st.session_state.pop("customer_contact_mode", None)
+            st.session_state.pop("customer_contact_edit_id", None)
+            if new_id:
+                st.session_state["customer_contact_selected_id"] = new_id
+            st.toast("Contact added.", icon="✅")
+            st.rerun()
+
+
 def _clear_customer_mode() -> None:
     st.session_state.pop("customer_mode", None)
     st.session_state.pop("customer_edit_id", None)
@@ -377,7 +588,14 @@ def _contact_row_by_id(contacts: list[dict[str, Any]], ctid: str) -> dict[str, A
     return None
 
 
-def _render_action_buttons(*, sel: list[str], can_add: bool) -> None:
+def _render_action_buttons(
+    *,
+    sel: list[str],
+    can_add: bool,
+    existing_customer_names: set[str],
+    resolved: dict[str, str],
+    available: set[str],
+) -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     n = len(sel)
@@ -400,10 +618,11 @@ def _render_action_buttons(*, sel: list[str], can_add: bool) -> None:
                 disabled=not can_add,
                 key="cust_btn_add",
             ):
-                st.session_state["customer_mode"] = "add"
-                st.session_state.pop("customer_edit_id", None)
-                _clear_contact_subpanel()
-                st.rerun()
+                _add_customer_dialog(
+                    existing_customer_names=existing_customer_names,
+                    resolved=resolved,
+                    available=available,
+                )
         with b1:
             if st.button(
                 "Edit",
@@ -437,75 +656,6 @@ def _render_action_buttons(*, sel: list[str], can_add: bool) -> None:
                 open_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
                 st.session_state["customers_pending_delete_ids"] = [str(x) for x in sel]
                 st.rerun()
-
-
-def _render_add_form(
-    *,
-    existing_customer_names: set[str],
-    resolved: dict[str, str],
-    available: set[str],
-) -> None:
-    c1 = st.columns(1)[0]
-    customer_name = c1.text_input("Customer Name", key="cust_add_name")
-
-    c5, c6, c7, c8 = st.columns(4)
-    address = c5.text_input("Address", key="cust_add_addr")
-    city = c6.text_input("City", key="cust_add_city")
-    state = c7.text_input("State", key="cust_add_state")
-    zip_code = c8.text_input("ZIP", key="cust_add_zip")
-
-    is_active_customer = st.checkbox("Active Customer", value=True, key="cust_add_active")
-    if resolved["is_active"] not in available:
-        st.caption("Note: this database has no `is_active` column; new customers use the table default.")
-
-    s1, s2 = st.columns(2)
-    with s1:
-        if st.button("Save Customer", type="primary", use_container_width=True, key="cust_add_save"):
-            err = _validate_customer_name_text(customer_name)
-            if err:
-                st.error(err)
-                st.stop()
-            name_upper = str(customer_name).strip().upper()
-            if name_upper in existing_customer_names:
-                st.error("A customer with this name already exists.")
-                st.stop()
-            for label, val in (
-                ("Address", address),
-                ("City", city),
-                ("State", state),
-                ("ZIP", zip_code),
-            ):
-                ve = _validate_address_field(label, str(val))
-                if ve:
-                    st.error(ve)
-                    st.stop()
-
-            active_val: bool | None = bool(is_active_customer) if resolved["is_active"] in available else None
-            try:
-                payload = _build_customer_write_payload(
-                    customer_name=str(customer_name).strip(),
-                    address=str(address).strip(),
-                    city=str(city).strip(),
-                    state=str(state).strip(),
-                    zip_value=str(zip_code).strip(),
-                    is_active=active_val,
-                    resolved=resolved,
-                    available=available,
-                )
-                insert_row_admin("customers", payload)
-            except Exception as exc:
-                st.error(_friendly_customer_db_message(exc))
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
-                st.stop()
-
-            _clear_customer_mode()
-            st.success("Customer added. Open **Edit** to add contacts.")
-            st.rerun()
-    with s2:
-        if st.button("Cancel", use_container_width=True, key="cust_add_cancel"):
-            _clear_customer_mode()
-            st.rerun()
 
 
 def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
@@ -550,12 +700,9 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
 
     if can_edit:
         if st.button("Add Contact", type="primary", use_container_width=True, key=f"cust_ct_add_{cid}"):
-            st.session_state["customer_contact_mode"] = "add"
-            st.session_state.pop("customer_contact_edit_id", None)
-            st.session_state.pop(sel_key, None)
-            st.rerun()
+            _add_contact_dialog(cid, admin_read)
 
-    if not contacts and mode != "add":
+    if not contacts:
         st.caption("No contacts yet. Use **Add Contact** (editors) or add from the list once this company is saved.")
     else:
         for ct in contacts:
@@ -703,63 +850,7 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
     if not can_edit:
         return
 
-    if mode == "add":
-        st.markdown("**New contact**")
-        pk = f"cust_ct_new_{cid}"
-        cn = st.text_input("Contact name", key=f"{pk}_name")
-        tl = st.text_input("Title", key=f"{pk}_title", help="Job title or role (saved to title + role when supported)")
-        em = st.text_input("Email", key=f"{pk}_email")
-        cph1, cph2 = st.columns(2)
-        with cph1:
-            ph = st.text_input("Phone", key=f"{pk}_phone")
-        with cph2:
-            mob = st.text_input("Mobile", key=f"{pk}_mobile")
-        nt = st.text_area("Notes", key=f"{pk}_notes", height=56)
-        pr = st.checkbox("Primary contact", value=False, key=f"{pk}_prim")
-        act = st.checkbox("Active", value=True, key=f"{pk}_act")
-        s1, s2 = st.columns(2)
-        with s1:
-            if st.button("Save contact", type="primary", use_container_width=True, key=f"{pk}_save"):
-                t = str(cn or "").strip()
-                if not t:
-                    st.error("Contact name is required.")
-                    st.stop()
-                pr_b = bool(pr)
-                act_b = bool(act)
-                if pr_b and not act_b:
-                    st.warning("Inactive contacts cannot be primary — saving without primary flag.")
-                    pr_b = False
-                full, minimal = _build_contact_write_pair(
-                    contact_name=t,
-                    title_text=str(tl or ""),
-                    email=str(em or ""),
-                    phone=str(ph or ""),
-                    mobile=str(mob or ""),
-                    notes=str(nt or ""),
-                    is_active=act_b,
-                    is_primary=False,
-                    customer_id=cid,
-                    schema_keys=schema_keys,
-                )
-                try:
-                    inserted = _insert_contact_pair(full, minimal)
-                except Exception as exc:
-                    st.error("Could not save the contact.")
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-                    st.stop()
-                new_id = str((inserted or {}).get("id") or "")
-                if pr_b and new_id:
-                    set_primary_contact(customer_id=cid, contact_id=new_id)
-                _clear_contact_subpanel()
-                st.success("Contact added.")
-                st.rerun()
-        with s2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                _clear_contact_subpanel()
-                st.rerun()
-
-    elif mode == "edit" and edit_ct and edit_row:
+    if mode == "edit" and edit_ct and edit_row:
         st.markdown("**Edit contact**")
         pk = f"cust_ct_ed_{edit_ct}"
         er = edit_row
@@ -925,8 +1016,6 @@ def _render_edit_form(
 
 def _render_customer_side_panel(
     *,
-    mode: str,
-    existing_customer_names: set[str],
     resolved: dict[str, str],
     available: set[str],
     admin_read: bool,
@@ -934,29 +1023,21 @@ def _render_customer_side_panel(
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        if mode == "add":
-            st.markdown("### Add customer")
-            _render_add_form(
-                existing_customer_names=existing_customer_names,
+        st.markdown("### Customer detail")
+        eid = st.session_state.get("customer_edit_id")
+        er = _fetch_one_row("customers", {"id": eid}, admin_read=admin_read) if eid else None
+        if not er:
+            st.warning("Customer not found.")
+            _clear_customer_mode()
+        else:
+            can_edit = current_role() in {"admin", "estimator"}
+            _render_edit_form(
+                er,
+                can_edit=can_edit,
                 resolved=resolved,
                 available=available,
+                admin_read=admin_read,
             )
-        elif mode == "edit":
-            st.markdown("### Customer detail")
-            eid = st.session_state.get("customer_edit_id")
-            er = _fetch_one_row("customers", {"id": eid}, admin_read=admin_read) if eid else None
-            if not er:
-                st.warning("Customer not found.")
-                _clear_customer_mode()
-            else:
-                can_edit = current_role() in {"admin", "estimator"}
-                _render_edit_form(
-                    er,
-                    can_edit=can_edit,
-                    resolved=resolved,
-                    available=available,
-                    admin_read=admin_read,
-                )
 
 
 def _visible_customer_columns(filtered: pd.DataFrame, resolved: dict[str, str]) -> list[str]:
@@ -974,15 +1055,18 @@ def _render_customers_main(
     df: pd.DataFrame,
     can_add: bool,
     resolved: dict[str, str],
+    available: set[str],
+    existing_customer_names: set[str],
 ) -> None:
     if df.empty:
         st.info("No customers found.")
         if can_add:
             if st.button("Add Customer", type="primary", key="cust_empty_add"):
-                st.session_state["customer_mode"] = "add"
-                st.session_state.pop("customer_edit_id", None)
-                _clear_contact_subpanel()
-                st.rerun()
+                _add_customer_dialog(
+                    existing_customer_names=existing_customer_names,
+                    resolved=resolved,
+                    available=available,
+                )
         return
 
     f1, f2 = st.columns([2, 1], gap="small")
@@ -1024,10 +1108,11 @@ def _render_customers_main(
         if can_add:
             inject_table_action_styles()
             if st.button("Add Customer", type="primary", key="cust_filtered_empty_add"):
-                st.session_state["customer_mode"] = "add"
-                st.session_state.pop("customer_edit_id", None)
-                _clear_contact_subpanel()
-                st.rerun()
+                _add_customer_dialog(
+                    existing_customer_names=existing_customer_names,
+                    resolved=resolved,
+                    available=available,
+                )
     elif "id" not in filtered.columns:
         st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
     else:
@@ -1040,7 +1125,13 @@ def _render_customers_main(
             editor_key="cust_sel_editor",
         )
         with bar_ph.container():
-            _render_action_buttons(sel=sel, can_add=can_add)
+            _render_action_buttons(
+                sel=sel,
+                can_add=can_add,
+                existing_customer_names=existing_customer_names,
+                resolved=resolved,
+                available=available,
+            )
 
         if len(sel) == 1:
             one_cid = str(sel[0]).strip()
@@ -1068,6 +1159,8 @@ def render_customers() -> None:
     render_crud_list_subtitle("Manage customer companies and billing addresses. Contacts are stored per company.")
 
     can_add = current_role() in {"admin", "estimator"}
+    if st.session_state.get("customer_mode") == "add":
+        st.session_state.pop("customer_mode", None)
     mode = st.session_state.get("customer_mode")
 
     load_error: BaseException | None = None
@@ -1204,7 +1297,7 @@ def render_customers() -> None:
                     st.success("Selected customers deactivated.")
                     st.rerun()
 
-    panel_open = bool(can_add and mode in ("add", "edit"))
+    panel_open = bool(can_add and mode == "edit")
 
     existing_names: set[str] = set()
     name_col = resolved["customer_name"]
@@ -1217,17 +1310,27 @@ def render_customers() -> None:
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
         with main_col:
-            _render_customers_main(df=df, can_add=can_add, resolved=resolved)
+            _render_customers_main(
+                df=df,
+                can_add=can_add,
+                resolved=resolved,
+                available=available,
+                existing_customer_names=existing_names,
+            )
         with side_col:
             _render_customer_side_panel(
-                mode=str(mode),
-                existing_customer_names=existing_names,
                 resolved=resolved,
                 available=available,
                 admin_read=can_add,
             )
     else:
-        _render_customers_main(df=df, can_add=can_add, resolved=resolved)
+        _render_customers_main(
+            df=df,
+            can_add=can_add,
+            resolved=resolved,
+            available=available,
+            existing_customer_names=existing_names,
+        )
 
     if not can_add:
         st.info("Only admin or estimator users can manage customers.")

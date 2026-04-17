@@ -10,18 +10,22 @@ from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_row
 try:
     from table_actions import (
         TABLE_KEY_EMPLOYEES,
+        TABLE_KEY_PEOPLE,
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
         TABLE_KEY_EMPLOYEES,
+        TABLE_KEY_PEOPLE,
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 
 try:
@@ -69,6 +73,56 @@ def _clear_employee_mode() -> None:
     st.session_state.pop("employee_edit_id", None)
 
 
+@st.dialog("Add Employee")
+def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
+    st.caption("Job info and pay rates · time tracking / roster")
+    n1, n2 = st.columns(2)
+    new_name = n1.text_input("Name", key="dlg_emp_add_name")
+    new_role = n2.text_input("Role", key="dlg_emp_add_role", placeholder="e.g. Foreman, Welder")
+    new_trade = st.text_input("Trade (optional)", key="dlg_emp_add_trade")
+    r1, r2 = st.columns(2)
+    new_hr = r1.number_input("Hourly rate", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="dlg_emp_add_hr")
+    new_ot = r2.number_input(
+        "Overtime rate (optional)",
+        min_value=0.0,
+        value=0.0,
+        step=0.5,
+        format="%.2f",
+        key="dlg_emp_add_ot",
+        help="Leave 0 to use 1.5 × hourly rate for overtime.",
+    )
+    new_notes = st.text_area("Notes (optional)", key="dlg_emp_add_notes", height=56)
+
+    st.divider()
+    bc, bs = st.columns(2, gap="small")
+    with bc:
+        if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_emp_add_cancel"):
+            st.rerun()
+    with bs:
+        if st.button("Save", type="primary", use_container_width=True, key="dlg_emp_add_save"):
+            if not str(new_name).strip():
+                st.error("Name is required.")
+                st.stop()
+            payload = {
+                "name": str(new_name).strip(),
+                "role": str(new_role).strip(),
+                "trade": str(new_trade).strip(),
+                "hourly_rate": float(new_hr or 0),
+                "overtime_rate": float(new_ot) if float(new_ot or 0) > 0 else None,
+                "is_active": True,
+                "notes": str(new_notes).strip(),
+            }
+            row = insert_row("employees", payload)
+            new_id = str((row or {}).get("id") or "").strip()
+            if new_id:
+                tkey = selection_table_key or TABLE_KEY_EMPLOYEES
+                sel_val = f"e:{new_id}" if tkey == TABLE_KEY_PEOPLE else new_id
+                set_selected_ids(tkey, [sel_val])
+            _clear_employee_mode()
+            st.toast("Employee added.", icon="✅")
+            st.rerun()
+
+
 def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
     """Inline actions: Add (primary), Edit (secondary), Deactivate (warning), Delete (danger)."""
     inject_ips_crud_list_styles()
@@ -93,9 +147,7 @@ def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
                 disabled=not can_edit,
                 key="emp_btn_add",
             ):
-                st.session_state["employee_mode"] = "add"
-                st.session_state.pop("employee_edit_id", None)
-                st.rerun()
+                add_employee_dialog()
         with b1:
             if st.button(
                 "Edit",
@@ -128,50 +180,6 @@ def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
                 open_destructive_confirmation(_EMP_DELETE_CONFIRM_PREFIX)
                 st.session_state["employees_pending_delete_ids"] = [str(x) for x in sel]
                 st.rerun()
-
-
-def _render_add_form() -> None:
-    n1, n2, n3 = st.columns(3)
-    new_name = n1.text_input("Name", key="emp_add_name")
-    new_role = n2.text_input("Role", key="emp_add_role", placeholder="e.g. Foreman, Welder")
-    new_trade = n3.text_input("Trade (optional)", key="emp_add_trade")
-
-    r1, r2 = st.columns(2)
-    new_hr = r1.number_input("Hourly rate", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="emp_add_hr")
-    new_ot = r2.number_input(
-        "Overtime rate (optional)",
-        min_value=0.0,
-        value=0.0,
-        step=0.5,
-        format="%.2f",
-        key="emp_add_ot",
-        help="Leave 0 to use 1.5 × hourly rate for overtime.",
-    )
-    new_notes = st.text_area("Notes (optional)", key="emp_add_notes")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Save Employee", type="primary", use_container_width=True, key="emp_add_save"):
-            if not str(new_name).strip():
-                st.error("Name is required.")
-                st.stop()
-            payload = {
-                "name": str(new_name).strip(),
-                "role": str(new_role).strip(),
-                "trade": str(new_trade).strip(),
-                "hourly_rate": float(new_hr or 0),
-                "overtime_rate": float(new_ot) if float(new_ot or 0) > 0 else None,
-                "is_active": True,
-                "notes": str(new_notes).strip(),
-            }
-            insert_row("employees", payload)
-            _clear_employee_mode()
-            st.success("Employee added.")
-            st.rerun()
-    with c2:
-        if st.button("Cancel", use_container_width=True, key="emp_add_cancel"):
-            _clear_employee_mode()
-            st.rerun()
 
 
 def _render_edit_form(row: dict) -> None:
@@ -235,14 +243,11 @@ def _render_edit_form(row: dict) -> None:
 
 
 def _render_employee_side_panel(*, mode: str) -> None:
-    """Right column: bordered panel for add or edit."""
+    """Right column: bordered panel for edit."""
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        if mode == "add":
-            st.markdown("### Add employee")
-            _render_add_form()
-        elif mode == "edit":
+        if mode == "edit":
             st.markdown("### Edit employee")
             eid = st.session_state.get("employee_edit_id")
             er = fetch_one("employees", {"id": eid}) if eid else None
@@ -263,9 +268,7 @@ def _render_employees_main(
         st.info("No employees yet. Run `sql/008_employees.sql` in Supabase if the table is missing.")
         if can_edit:
             if st.button("Add Employee", type="primary", key="emp_empty_add"):
-                st.session_state["employee_mode"] = "add"
-                st.session_state.pop("employee_edit_id", None)
-                st.rerun()
+                add_employee_dialog()
         return
 
     f1, f2 = st.columns([2, 1], gap="small")
@@ -313,9 +316,7 @@ def _render_employees_main(
         if can_edit:
             inject_table_action_styles()
             if st.button("Add Employee", type="primary", key="emp_filtered_empty_add"):
-                st.session_state["employee_mode"] = "add"
-                st.session_state.pop("employee_edit_id", None)
-                st.rerun()
+                add_employee_dialog()
     elif "id" not in filtered.columns:
         disp = filtered[show_cols].copy()
         if "hourly_rate" in disp.columns:
@@ -341,6 +342,8 @@ def _render_employees_main(
 def render_body() -> None:
     """Full employees CRUD without page header (used by ``People`` combined page)."""
     can_edit = current_role() == "admin"
+    if st.session_state.get("employee_mode") == "add":
+        st.session_state.pop("employee_mode", None)
     mode = st.session_state.get("employee_mode")
 
     try:
@@ -421,7 +424,7 @@ def render_body() -> None:
             st.success("Selected employees deactivated.")
             st.rerun()
 
-    panel_open = bool(can_edit and mode in ("add", "edit"))
+    panel_open = bool(can_edit and mode == "edit")
 
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)

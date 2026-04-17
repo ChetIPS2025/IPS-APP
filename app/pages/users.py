@@ -32,17 +32,21 @@ except ImportError:
 
 try:
     from app.table_actions import (
+        TABLE_KEY_PEOPLE,
         TABLE_KEY_USERS,
         clear_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 except ImportError:
     from table_actions import (  # type: ignore
+        TABLE_KEY_PEOPLE,
         TABLE_KEY_USERS,
         clear_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
+        set_selected_ids,
     )
 
 _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "estimator", "admin")
@@ -119,6 +123,73 @@ def _clear_add_panel() -> None:
     st.session_state.pop(_USERS_PANEL_MODE, None)
 
 
+@st.dialog("Add User")
+def add_user_dialog(
+    *,
+    existing_emails: set[str],
+    clear_selection_table_key: str | None = None,
+) -> None:
+    st.caption(f"Temporary password · min {_MIN_PASSWORD_LENGTH} characters")
+    c1, c2 = st.columns(2)
+    new_email = c1.text_input("Email", key="dlg_users_add_email", max_chars=_MAX_EMAIL_LENGTH)
+    new_password = c2.text_input("Temporary password", type="password", key="dlg_users_add_password")
+    c3, c4 = st.columns(2)
+    new_full_name = c3.text_input("Full name", key="dlg_users_add_full_name")
+    new_role = c4.selectbox("Role", list(_ROLE_OPTIONS), key="dlg_users_add_role")
+
+    st.divider()
+    bc, bs = st.columns(2, gap="small")
+    with bc:
+        if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_users_add_cancel"):
+            st.rerun()
+    with bs:
+        if st.button("Save", type="primary", use_container_width=True, key="dlg_users_add_save"):
+            email_norm = _normalize_email(new_email)
+            pw = str(new_password or "").strip()
+            fn = str(new_full_name or "").strip()
+
+            if not email_norm:
+                st.error("Email is required.")
+                st.stop()
+            if not _email_looks_valid(email_norm):
+                st.error("Enter a valid email address (e.g. name@company.com).")
+                st.stop()
+            if not _password_meets_policy(pw):
+                st.error(f"Temporary password must be at least {_MIN_PASSWORD_LENGTH} characters.")
+                st.stop()
+            if new_role not in _ROLE_OPTIONS:
+                st.error("Invalid role selected.")
+                st.stop()
+            if email_norm in existing_emails:
+                st.error(
+                    "A profile with that email already exists. Use another email or edit the existing user."
+                )
+                st.stop()
+
+            try:
+                created = create_auth_user(
+                    email=email_norm,
+                    password=pw,
+                    role=new_role,
+                    full_name=fn,
+                )
+            except Exception as exc:
+                st.error(_friendly_create_user_message(exc))
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+
+            new_id = str((created or {}).get("id") or "").strip()
+            if new_id:
+                tkey = clear_selection_table_key or TABLE_KEY_USERS
+                sel_val = f"p:{new_id}" if tkey == TABLE_KEY_PEOPLE else new_id
+                set_selected_ids(tkey, [sel_val])
+            _clear_add_panel()
+            em = str((created or {}).get("email") or email_norm)
+            st.toast(f"User created · {em}", icon="✅")
+            st.rerun()
+
+
 def _fetch_profile_row(profile_id: str) -> dict[str, Any] | None:
     pid = str(profile_id or "").strip()
     if not pid:
@@ -129,7 +200,7 @@ def _fetch_profile_row(profile_id: str) -> dict[str, Any] | None:
         return None
 
 
-def _render_users_toolbar(*, sel: list[str]) -> None:
+def _render_users_toolbar(*, sel: list[str], existing_emails: set[str]) -> None:
     """Toolbar: selection summary + Add User (matches Customers: primary list actions)."""
     inject_ips_crud_list_styles()
     inject_table_action_styles()
@@ -150,83 +221,7 @@ def _render_users_toolbar(*, sel: list[str]) -> None:
                 use_container_width=True,
                 key="users_btn_add",
             ):
-                st.session_state[_USERS_PANEL_MODE] = "add"
-                st.rerun()
-
-
-def _render_add_user_panel(
-    *,
-    existing_emails: set[str],
-    clear_selection_table_key: str | None = None,
-) -> None:
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Add user")
-        st.caption(
-            f"Password must be at least {_MIN_PASSWORD_LENGTH} characters. "
-            "The user can change it after signing in if your app allows password updates."
-        )
-
-        c1, c2 = st.columns(2)
-        new_email = c1.text_input("Email", key="users_add_email", max_chars=_MAX_EMAIL_LENGTH)
-        new_password = c2.text_input("Temporary password", type="password", key="users_add_password")
-
-        c3, c4 = st.columns(2)
-        new_full_name = c3.text_input("Full name", key="users_add_full_name")
-        new_role = c4.selectbox("Role", list(_ROLE_OPTIONS), key="users_add_role")
-
-        s1, s2 = st.columns(2)
-        with s1:
-            if st.button("Add user", type="primary", use_container_width=True, key="users_add_save"):
-                email_norm = _normalize_email(new_email)
-                pw = str(new_password or "").strip()
-                fn = str(new_full_name or "").strip()
-
-                if not email_norm:
-                    st.error("Email is required.")
-                    st.stop()
-                if not _email_looks_valid(email_norm):
-                    st.error("Enter a valid email address (e.g. name@company.com).")
-                    st.stop()
-                if not _password_meets_policy(pw):
-                    st.error(
-                        f"Temporary password must be at least {_MIN_PASSWORD_LENGTH} characters."
-                    )
-                    st.stop()
-                if new_role not in _ROLE_OPTIONS:
-                    st.error("Invalid role selected.")
-                    st.stop()
-                if email_norm in existing_emails:
-                    st.error(
-                        "A profile with that email already exists. Use another email or edit the existing user."
-                    )
-                    st.stop()
-
-                try:
-                    created = create_auth_user(
-                        email=email_norm,
-                        password=pw,
-                        role=new_role,
-                        full_name=fn,
-                    )
-                except Exception as exc:
-                    st.error(_friendly_create_user_message(exc))
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-                    st.stop()
-
-                st.success(f"User created: {created.get('email', email_norm)}")
-                st.info(
-                    "They can sign in immediately with the temporary password (if your Auth policy allows it)."
-                )
-                _clear_add_panel()
-                clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
-                st.rerun()
-        with s2:
-            if st.button("Cancel", use_container_width=True, key="users_add_cancel"):
-                _clear_add_panel()
-                st.rerun()
+                add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=None)
 
 
 def _render_edit_user_panel(
@@ -316,17 +311,7 @@ def _render_users_side_empty() -> None:
         )
 
 
-def _render_users_side_panel(
-    *,
-    add_mode: bool,
-    users: list[dict[str, Any]],
-    sel: list[str],
-) -> None:
-    if add_mode:
-        existing_emails = {_normalize_email(str(u.get("email", ""))) for u in users if u.get("email")}
-        _render_add_user_panel(existing_emails=existing_emails)
-        return
-
+def _render_users_side_panel(*, sel: list[str]) -> None:
     if len(sel) == 1:
         row = _fetch_profile_row(sel[0])
         if not row:
@@ -340,13 +325,12 @@ def _render_users_side_panel(
     _render_users_side_empty()
 
 
-def _render_users_main(*, df: pd.DataFrame) -> list[str]:
+def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[str]:
     """Filters + selectable table + toolbar. Returns selected profile ids from the table."""
     if df.empty:
         st.info("No users found.")
         if st.button("Add user", type="primary", use_container_width=True, key="users_empty_add"):
-            st.session_state[_USERS_PANEL_MODE] = "add"
-            st.rerun()
+            add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=None)
         return []
 
     f1, f2 = st.columns([2, 1], gap="small")
@@ -382,8 +366,7 @@ def _render_users_main(*, df: pd.DataFrame) -> list[str]:
     if filtered.empty:
         st.warning("No users match your filters.")
         if st.button("Add user", type="primary", use_container_width=True, key="users_filtered_empty_add"):
-            st.session_state[_USERS_PANEL_MODE] = "add"
-            st.rerun()
+            add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=None)
         return []
 
     st.caption(
@@ -403,7 +386,7 @@ def _render_users_main(*, df: pd.DataFrame) -> list[str]:
         editor_key="users_sel_editor",
     )
     with bar_ph.container():
-        _render_users_toolbar(sel=sel)
+        _render_users_toolbar(sel=sel, existing_emails=existing_emails)
 
     return sel
 
@@ -414,6 +397,9 @@ def render_body(*, compact: bool = False) -> None:
         st.error("Admin only")
         return
 
+    if st.session_state.get(_USERS_PANEL_MODE) == "add":
+        st.session_state.pop(_USERS_PANEL_MODE, None)
+
     try:
         users = fetch_table("profiles", limit=1000, order_by="email")
     except Exception as exc:
@@ -423,29 +409,21 @@ def render_body(*, compact: bool = False) -> None:
         return
 
     df = pd.DataFrame(users)
+    existing_emails = {_normalize_email(str(u.get("email", ""))) for u in users if u.get("email")}
     if not compact:
         render_crud_list_subtitle(
             "Manage user accounts, roles, and status. Selecting one row opens the editor on the right."
         )
 
-    add_mode = st.session_state.get(_USERS_PANEL_MODE) == "add"
-
     if df.empty:
-        if add_mode:
-            main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-            with main_col:
-                st.info("No users found yet. Create the first account using the form.")
-            with side_col:
-                _render_users_side_panel(add_mode=True, users=users, sel=[])
-        else:
-            _render_users_main(df=df)
+        _render_users_main(df=df, existing_emails=existing_emails)
         return
 
     main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
     with main_col:
-        sel = _render_users_main(df=df)
+        sel = _render_users_main(df=df, existing_emails=existing_emails)
     with side_col:
-        _render_users_side_panel(add_mode=add_mode, users=users, sel=sel)
+        _render_users_side_panel(sel=sel)
 
 
 def render() -> None:

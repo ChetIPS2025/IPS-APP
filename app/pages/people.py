@@ -217,7 +217,12 @@ def _display_df_for_editor(filtered: pd.DataFrame) -> pd.DataFrame:
     return disp
 
 
-def _render_people_toolbar(*, sel: list[str], can_edit: bool) -> None:
+def _render_people_toolbar(
+    *,
+    sel: list[str],
+    can_edit: bool,
+    profiles: list[dict[str, Any]],
+) -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     n = len(sel)
@@ -242,9 +247,7 @@ def _render_people_toolbar(*, sel: list[str], can_edit: bool) -> None:
                 disabled=not can_edit,
                 key="people_btn_add_emp",
             ):
-                st.session_state.pop(_USERS_PANEL_MODE, None)
-                st.session_state[_PEOPLE_PANEL_KEY] = "add_emp"
-                st.rerun()
+                emp_mod.add_employee_dialog(selection_table_key=TABLE_KEY_PEOPLE)
         with b1:
             if st.button(
                 "Add user",
@@ -253,10 +256,11 @@ def _render_people_toolbar(*, sel: list[str], can_edit: bool) -> None:
                 disabled=not can_edit,
                 key="people_btn_add_user",
             ):
-                st.session_state[_PEOPLE_PANEL_KEY] = "add_user"
-                st.session_state[_USERS_PANEL_MODE] = "add"
-                emp_mod._clear_employee_mode()
-                st.rerun()
+                emails = {usr_mod._normalize_email(str(u.get("email", ""))) for u in profiles if u.get("email")}
+                usr_mod.add_user_dialog(
+                    existing_emails=emails,
+                    clear_selection_table_key=TABLE_KEY_PEOPLE,
+                )
         with b2:
             if st.button(
                 "Edit details",
@@ -374,21 +378,6 @@ def _render_right_panel(
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
 
-        if panel == "add_emp":
-            st.markdown("### Add employee")
-            st.caption("Pay rates and job role for time tracking / PM matrix.")
-            emp_mod._render_add_form()
-            return
-
-        if panel == "add_user":
-            st.markdown("### Add user account")
-            emails = {usr_mod._normalize_email(str(u.get("email", ""))) for u in profiles if u.get("email")}
-            usr_mod._render_add_user_panel(
-                existing_emails=emails,
-                clear_selection_table_key=TABLE_KEY_PEOPLE,
-            )
-            return
-
         if len(sel) != 1:
             st.markdown("### Details")
             st.caption(
@@ -430,6 +419,11 @@ def render() -> None:
         return
 
     inject_ips_crud_list_styles()
+
+    if st.session_state.get(_PEOPLE_PANEL_KEY) in ("add_emp", "add_user"):
+        st.session_state[_PEOPLE_PANEL_KEY] = "list"
+    if st.session_state.get(_USERS_PANEL_MODE) == "add":
+        st.session_state.pop(_USERS_PANEL_MODE, None)
 
     if st.session_state.get(_PEOPLE_PANEL_KEY) == "detail":
         if len(get_selected_ids(TABLE_KEY_PEOPLE)) != 1:
@@ -475,13 +469,14 @@ def render() -> None:
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("Add employee", type="primary", use_container_width=True, key="people_empty_add_emp"):
-                    st.session_state[_PEOPLE_PANEL_KEY] = "add_emp"
-                    st.rerun()
+                    emp_mod.add_employee_dialog(selection_table_key=TABLE_KEY_PEOPLE)
             with c2:
                 if st.button("Add user", type="primary", use_container_width=True, key="people_empty_add_user"):
-                    st.session_state[_PEOPLE_PANEL_KEY] = "add_user"
-                    st.session_state[_USERS_PANEL_MODE] = "add"
-                    st.rerun()
+                    emails = {usr_mod._normalize_email(str(u.get("email", ""))) for u in profiles if u.get("email")}
+                    usr_mod.add_user_dialog(
+                        existing_emails=emails,
+                        clear_selection_table_key=TABLE_KEY_PEOPLE,
+                    )
         else:
             show_cols = [c for c in filtered.columns if c != "unified_id"]
             disp = _display_df_for_editor(filtered)
@@ -494,14 +489,12 @@ def render() -> None:
                 editor_key="people_unified_editor",
             )
             with bar_ph.container():
-                _render_people_toolbar(sel=sel, can_edit=True)
+                _render_people_toolbar(sel=sel, can_edit=True, profiles=profiles)
 
     with side_col:
         sel_ids = get_selected_ids(TABLE_KEY_PEOPLE)
         stored_panel = str(st.session_state.get(_PEOPLE_PANEL_KEY, "list"))
-        if stored_panel in ("add_emp", "add_user"):
-            eff_panel = stored_panel
-        elif stored_panel == "detail" and len(sel_ids) == 1:
+        if stored_panel == "detail" and len(sel_ids) == 1:
             eff_panel = "detail"
         else:
             eff_panel = "list"
