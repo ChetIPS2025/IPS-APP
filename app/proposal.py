@@ -83,6 +83,17 @@ def _s(v) -> str:
     return str(v).strip() if isinstance(v, str) else str(v)
 
 
+def _s_contact(v) -> str:
+    """Contact / Attn line: never show literal 'None' or placeholder noise."""
+    s = _s(v)
+    if not s:
+        return ""
+    low = s.lower()
+    if low in ("none", "null"):
+        return ""
+    return s
+
+
 def _pdf_prepared_by(est: dict) -> str:
     try:
         from auth import current_profile
@@ -512,7 +523,7 @@ def proposal_values(
         "QUOTE_NUMBER": _s(est.get("quote_number")),
         "CUSTOMER_NAME": cust,
         "CUSTOMER_LOCATION": _s(customer_location),
-        "CONTACT_NAME": _s(contact_name),
+        "CONTACT_NAME": _s_contact(contact_name),
         "PROPOSAL_AMOUNT": pt,
         "SCOPE_OF_WORK": _s(est.get("scope_of_work")),
         "DATE": datetime.now().strftime("%B %d, %Y"),
@@ -672,44 +683,71 @@ def _docx_placeholder_replacements(vals: dict[str, str]) -> dict[str, str]:
 
 
 def _set_paragraph_text_merged(p, new_text: str) -> None:
-    """Replace paragraph text while tolerating multi-run paragraphs (common in Word)."""
-    if not p.runs:
-        p.add_run(new_text)
-        return
-    p.runs[0].text = new_text
-    for r in p.runs[1:]:
-        r.text = ""
+    """
+    Set paragraph text after Word split content across runs.
+
+    Merge is logical only: remove **all** runs, then add **one** run with the final string so
+    placeholders that span runs are replaced reliably and the saved OOXML stays consistent.
+    """
+    tx = new_text if new_text is not None else ""
+    _clear_paragraph_runs(p)
+    p.add_run(tx)
+
+
+def _walk_table_paragraphs(table):
+    """Yield every paragraph inside a table, including nested tables."""
+    for row in table.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                yield p
+            for tbl in cell.tables:
+                yield from _walk_table_paragraphs(tbl)
+
+
+def _iter_all_paragraphs(doc: Document):
+    """Body, tables, headers, and footers — every paragraph that can hold {{PLACEHOLDERS}}."""
+    for p in doc.paragraphs:
+        yield p
+    for tbl in doc.tables:
+        yield from _walk_table_paragraphs(tbl)
+    for section in doc.sections:
+        for part in (section.header, section.footer):
+            for p in part.paragraphs:
+                yield p
+            for tbl in getattr(part, "tables", []) or []:
+                yield from _walk_table_paragraphs(tbl)
+
+
+def _replace_placeholders_in_text(text: str, replacements: dict[str, str]) -> str:
+    """
+    Substitute all canonical ``{{TOKEN}}`` occurrences with values.
+
+    Uses exact keys first, then case-insensitive regex so spacing variants inside braces still match.
+    """
+    new = text
+    for tok in _DOCX_CANONICAL_TOKENS:
+        k = "{{" + tok + "}}"
+        v = replacements.get(k, "")
+        if k in new:
+            new = new.replace(k, v)
+        pat = re.compile(r"\{\{\s*" + re.escape(tok) + r"\s*\}\}", re.IGNORECASE)
+        new = pat.sub(lambda _m, val=v: val, new)
+    return new
 
 
 def _apply_to_paragraph_text(doc: Document, fn) -> None:
+    """Apply ``fn(full_paragraph_text) -> new_text`` to every paragraph; merged run write on change."""
+
     def apply_paragraph(p) -> None:
-        parts = [r.text for r in p.runs] if p.runs else []
-        text = "".join(parts) if parts else (p.text or "")
+        text = _paragraph_full_text(p)
         if not text:
             return
         new = fn(text)
         if new != text:
             _set_paragraph_text_merged(p, new)
 
-    def walk_table(table) -> None:
-        for row in table.rows:
-            for cell in row.cells:
-                for p in cell.paragraphs:
-                    apply_paragraph(p)
-                for tbl in cell.tables:
-                    walk_table(tbl)
-
-    for p in doc.paragraphs:
+    for p in _iter_all_paragraphs(doc):
         apply_paragraph(p)
-    for tbl in doc.tables:
-        walk_table(tbl)
-
-    for section in doc.sections:
-        for part in (section.header, section.footer):
-            for p in part.paragraphs:
-                apply_paragraph(p)
-            for tbl in getattr(part, "tables", []) or []:
-                walk_table(tbl)
 
 
 def _normalize_docx_placeholders(doc: Document) -> None:
@@ -718,11 +756,7 @@ def _normalize_docx_placeholders(doc: Document) -> None:
 
 def _replace_placeholders_doc(doc: Document, replacements: dict[str, str]) -> None:
     def replace(text: str) -> str:
-        new = text
-        for k, v in replacements.items():
-            if k in new:
-                new = new.replace(k, v)
-        return new
+        return _replace_placeholders_in_text(text, replacements)
 
     _apply_to_paragraph_text(doc, replace)
 

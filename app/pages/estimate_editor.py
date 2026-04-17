@@ -612,6 +612,48 @@ def _render_proposal_preview_html(html_block: str, *, caption: str | None = None
         st.markdown(raw, unsafe_allow_html=True)
 
 
+def _normalize_contact_placeholder_text(val) -> str:
+    """Strip and drop literal 'none' / empty so {{CONTACT_NAME}} / Attn never show junk."""
+    if val is None:
+        return ""
+    t = str(val).strip()
+    if not t:
+        return ""
+    if t.lower() in ("none", "null"):
+        return ""
+    return t
+
+
+def _proposal_contact_name_for_export(est: dict) -> str:
+    """
+    Display name for proposal {{CONTACT_NAME}} (Attn).
+
+    Prefer ``est['contact_name']`` (kept in sync with the Contact picker). Otherwise resolve
+    ``customer_contact_id`` using the same contact list fetch as the UI (RLS-aware), then
+    fall back to a direct ``customer_contacts`` row read.
+    """
+    t = _normalize_contact_placeholder_text(est.get("contact_name"))
+    if t:
+        return t
+    ccid = str(est.get("customer_contact_id") or "").strip()
+    cid = str(est.get("customer_id") or "").strip()
+    if not ccid or not cid:
+        return ""
+    try:
+        for r in _fetch_contacts_for_estimate_editor(cid):
+            if str(r.get("id") or "").strip() == ccid:
+                return _normalize_contact_placeholder_text(r.get("contact_name"))
+    except Exception:
+        pass
+    try:
+        crow = fetch_one("customer_contacts", {"id": ccid}, columns="id,contact_name")
+        if crow:
+            return _normalize_contact_placeholder_text(crow.get("contact_name"))
+    except Exception:
+        pass
+    return ""
+
+
 def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) -> dict:
     """Shared context for Word/PDF proposal generation (same DOCX template + placeholders)."""
     cid = str(est.get("customer_id") or "").strip()
@@ -626,15 +668,7 @@ def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) ->
         if j.get("id") == jid:
             job_name = str(j.get("job_name") or "").strip()
             break
-    contact_name = ""
-    ccid = str(est.get("customer_contact_id") or "").strip()
-    if ccid:
-        try:
-            crow = fetch_one("customer_contacts", {"id": ccid}, columns="id,contact_name")
-            if crow:
-                contact_name = str(crow.get("contact_name") or "").strip()
-        except Exception:
-            pass
+    contact_name = _proposal_contact_name_for_export(est)
     phone = _lookup_prepared_by_phone(est)
     return {
         "customer_name": cust_name,
@@ -764,6 +798,7 @@ def blank_estimate() -> dict:
         "quote_number": "",
         "customer_id": None,
         "customer_contact_id": None,
+        "contact_name": "",
         "job_id": None,
         "status": "draft",
         "controls": {
@@ -990,6 +1025,7 @@ def ensure_state():
     ensure_numeric_defaults(est0)
     est0.setdefault("prepared_by_id", "")
     est0.setdefault("prepared_by_name", "")
+    est0.setdefault("contact_name", "")
     est0["prepared_by_id"] = _normalize_prepared_by_id_value(str(est0.get("prepared_by_id") or ""))
     # Quote numbers must never change on rerun. We only allocate a new number at commit time
     # (Save / Submit / Approve / Award) for brand-new estimates when quote_number is blank.
@@ -1809,11 +1845,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        vals = proposal_values(est, totals, **_pe)
+        contact_name = _pe["contact_name"]
+        vals = proposal_values(est, totals, **_pe, contact_name=contact_name)
         embed_docx: bytes | None = None
         embed_docx_err = ""
         try:
-            embed_docx = build_proposal_docx(est, totals, **_pe)
+            embed_docx = build_proposal_docx(est, totals, **_pe, contact_name=contact_name)
         except FileNotFoundError as e:
             embed_docx_err = str(e)
         except Exception as e:
@@ -1945,6 +1982,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             if sel == _EMPTY_CUSTOMER:
                 if not is_locked:
                     est["customer_id"] = None
+                    est["customer_contact_id"] = None
+                    est["contact_name"] = ""
             else:
                 est["customer_id"] = sel
 
@@ -1953,6 +1992,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     cur_cust = est.get("customer_id")
     if prev_cust is not None and cur_cust != prev_cust:
         est["customer_contact_id"] = None
+        est["contact_name"] = ""
     st.session_state["_est_prev_customer_id"] = cur_cust
 
     matching_jobs = jobs_by_customer.get(est.get("customer_id"), []) if est.get("customer_id") else jobs
@@ -2001,6 +2041,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     help="Optional: add contacts for this customer on the Customers tab.",
                 )
                 est["customer_contact_id"] = None
+                est["contact_name"] = ""
                 render_contact_quick_add_when_empty(
                     customer_id=cid_key,
                     key_prefix="est",
@@ -2034,11 +2075,20 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     help="Only contacts linked to the selected customer. Optional for this quote.",
                 )
                 est["customer_contact_id"] = ids[int(ci)]
+                _sel_cid = est["customer_contact_id"]
+                if _sel_cid:
+                    _row = by_id.get(str(_sel_cid))
+                    est["contact_name"] = (
+                        str(_row.get("contact_name") or "").strip() if _row else ""
+                    )
+                else:
+                    est["contact_name"] = ""
 
                 render_contact_detail_preview(by_id.get(str(est.get("customer_contact_id") or "")))
         else:
             st.caption("Select a customer to choose a contact.")
             est["customer_contact_id"] = None
+            est["contact_name"] = ""
 
     with row2_job:
         selected_job_name = next(
@@ -3148,7 +3198,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        vals = proposal_values(est, totals, **_pe)
+        contact_name = _pe["contact_name"]
+        vals = proposal_values(est, totals, **_pe, contact_name=contact_name)
         st.caption(
             "Standard Word template **estimate_template_autofill_logo_updated.docx** — placeholders from this "
             "estimate; optional **company_logo.png** in **assets/** is merged when present."
@@ -3158,7 +3209,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         pdf_bytes: bytes | None = None
         word_build_error = ""
         try:
-            docx_bytes = build_proposal_docx(est, totals, **_pe)
+            docx_bytes = build_proposal_docx(est, totals, **_pe, contact_name=contact_name)
         except FileNotFoundError as e:
             word_build_error = str(e)
         except Exception as e:
