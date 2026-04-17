@@ -29,6 +29,13 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
 
 ESTIMATE_PROPOSAL_TEMPLATE_FILENAME = "estimate_template_autofill_logo_updated.docx"
 
+# Shown when LibreOffice / Word PDF conversion is not available (UI may prepend context).
+PROPOSAL_PDF_UNAVAILABLE_MSG = (
+    "PDF export is not available in this environment (Word could not be converted to PDF). "
+    "You can still use **Download Word Proposal** and save or print to PDF locally. "
+    "To enable server PDFs, install **LibreOffice** so `soffice` is on PATH, or on Windows use **Microsoft Word** with the **docx2pdf** package."
+)
+
 
 def _dec(v) -> Decimal:
     if v is None or v == "":
@@ -282,6 +289,66 @@ def _convert_docx_bytes_to_pdf(docx_bytes: bytes) -> bytes:
     )
 
 
+def try_convert_proposal_docx_to_pdf(docx_bytes: bytes) -> tuple[bytes | None, str]:
+    """
+    Convert a filled proposal .docx to PDF without raising.
+
+    Returns ``(pdf_bytes, "")`` on success, or ``(None, short_user_message)`` on failure.
+    """
+    try:
+        return _convert_docx_bytes_to_pdf(docx_bytes), ""
+    except RuntimeError as e:
+        msg = str(e).strip() or PROPOSAL_PDF_UNAVAILABLE_MSG
+        return None, msg
+    except Exception as e:
+        return None, f"{PROPOSAL_PDF_UNAVAILABLE_MSG} ({type(e).__name__}: {e})"
+
+
+def try_build_proposal_pdf(
+    est: dict,
+    totals: dict,
+    customer_name: str = "",
+    job_name: str = "",
+    *,
+    customer_location: str = "",
+    contact_name: str = "",
+    prepared_by_phone: str = "",
+    template_path: str | None = None,
+    template_bytes: bytes | None = None,
+    docx_bytes: bytes | None = None,
+) -> tuple[bytes | None, str]:
+    """
+    Build proposal PDF from the same filled DOCX pipeline, without raising on conversion failure.
+
+    If ``docx_bytes`` is provided, skips rebuilding the DOCX (caller already built it).
+
+    Returns ``(pdf_bytes, "")`` on success, or ``(None, error_message)`` if the Word file could not be
+    built or PDF conversion failed. Word-only failures return a message about the template/build step.
+    """
+    if docx_bytes is None:
+        try:
+            docx_bytes = build_proposal_docx(
+                est,
+                totals,
+                customer_name=customer_name,
+                job_name=job_name,
+                customer_location=customer_location,
+                contact_name=contact_name,
+                prepared_by_phone=prepared_by_phone,
+                template_path=template_path,
+                template_bytes=template_bytes,
+            )
+        except FileNotFoundError as e:
+            return None, str(e)
+        except Exception as e:
+            return None, f"Could not build the Word proposal: {type(e).__name__}: {e}"
+
+    pdf, err = try_convert_proposal_docx_to_pdf(docx_bytes)
+    if pdf is None and not err:
+        return None, PROPOSAL_PDF_UNAVAILABLE_MSG
+    return pdf, err
+
+
 def build_proposal_docx(
     est: dict,
     totals: dict,
@@ -325,8 +392,11 @@ def build_proposal_pdf(
 ) -> bytes:
     """
     Build the proposal PDF from the **same** filled DOCX as downloads/preview (template + placeholders).
+
+    Raises ``RuntimeError`` (or ``FileNotFoundError`` from the DOCX step) if PDF conversion is unavailable;
+    for non-throwing behavior use :func:`try_build_proposal_pdf` or :func:`try_convert_proposal_docx_to_pdf`.
     """
-    docx_bytes = build_proposal_docx(
+    pdf, err = try_build_proposal_pdf(
         est,
         totals,
         customer_name=customer_name,
@@ -336,5 +406,10 @@ def build_proposal_pdf(
         prepared_by_phone=prepared_by_phone,
         template_path=template_path,
         template_bytes=template_bytes,
+        docx_bytes=None,
     )
-    return _convert_docx_bytes_to_pdf(docx_bytes)
+    if pdf is None:
+        if err and "Proposal template not found" in err:
+            raise FileNotFoundError(err)
+        raise RuntimeError(err or PROPOSAL_PDF_UNAVAILABLE_MSG)
+    return pdf

@@ -1,0 +1,19 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Native Python web service; LibreOffice is installed via aptPackages so
+# `proposal._convert_docx_bytes_to_pdf` can invoke `soffice` headless on deploy.
+
+services:
+  - type: web
+    name: ips-app
+    runtime: python
+    # Set region/plan in the Render dashboard when you create the service, or add them here.
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_app.py
+    pythonVersion: "3.12"
+    # DOCX → PDF (same pipeline as local); provides /usr/bin/soffice
+    aptPackages:
+      - libreoffice-writer
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
