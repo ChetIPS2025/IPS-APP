@@ -12,6 +12,11 @@ from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
 from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
 from branding import apply_branding, render_header
+
+try:
+    from app.ips_app_shell import inject_ips_app_shell_styles
+except ImportError:
+    from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
 try:
     from app.pwa import inject_pwa_support
 except ImportError:
@@ -83,6 +88,7 @@ def main() -> None:
 
     init_session()
     apply_branding()
+    inject_ips_app_shell_styles()
     inject_pwa_support()
 
     if not require_login():

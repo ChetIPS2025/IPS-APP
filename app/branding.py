@@ -41,16 +41,19 @@ def apply_branding() -> None:
         }
 
         .ips-page-title {
-            color: white;
-            font-size: 28px;
-            font-weight: 800;
-            margin: 6px 0 4px 0;
+            color: #f8fafc;
+            font-size: 1.45rem;
+            font-weight: 750;
+            letter-spacing: -0.02em;
+            margin: 4px 0 2px 0;
+            line-height: 1.2;
         }
 
         .ips-page-subtitle {
-            color: #9fb6d9;
-            font-size: 13px;
-            margin-bottom: 12px;
+            color: #94a3b8;
+            font-size: 0.8125rem;
+            margin-bottom: 0.65rem;
+            line-height: 1.45;
         }
         </style>
         """,

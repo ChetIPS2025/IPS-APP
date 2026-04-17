@@ -171,6 +171,12 @@ _IPS_GLOBAL_MOBILE_CSS = """
   [data-testid="stMain"] [data-testid="stMetricValue"] {
     font-size: 1.1rem !important;
   }
+  /* Sidebar toggle: thumb-friendly on phones */
+  button[data-testid="collapsedControl"] {
+    min-width: 2.75rem !important;
+    min-height: 2.75rem !important;
+    border-radius: 10px !important;
+  }
   [data-testid="stMain"] iframe[title="stMarkdown"],
   [data-testid="stMain"] iframe[src*="data:application/pdf"] {
     max-height: min(70vh, 560px) !important;
