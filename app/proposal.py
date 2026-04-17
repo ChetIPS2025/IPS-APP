@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 from datetime import datetime
 from textwrap import wrap
@@ -44,6 +45,26 @@ PDF_FOOTER_LINE = 0.13 * inch
 PDF_CONTACT_LINE = 0.12 * inch
 
 
+_D0 = Decimal("0")
+_CENT = Decimal("0.01")
+
+
+def _dec(v) -> Decimal:
+    if v is None or v == "":
+        return _D0
+    if isinstance(v, Decimal):
+        return v
+    return Decimal(str(v))
+
+
+def _q2(v) -> Decimal:
+    return _dec(v).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def _money(v) -> str:
+    return f"${_q2(v):,.2f}"
+
+
 def _find_logo() -> Path | None:
     search_paths = [
         Path(__file__).resolve().parents[1] / "assets" / "ips_logo.png",
@@ -63,17 +84,17 @@ def proposal_values(est: dict, totals: dict, customer_name: str = "", job_name: 
         "JOB_NAME": job_name or est.get("job_name", "") or "Project Quote",
         "QUOTE_NUMBER": est.get("quote_number", ""),
         "CUSTOMER": customer_name or est.get("customer_name", "") or "",
-        "TOTAL": f"${float(totals.get('proposal_total', 0) or 0):,.2f}",
+        "TOTAL": _money(totals.get("proposal_total", 0) or 0),
         "DATE": datetime.now().strftime("%m/%d/%Y"),
         "SCOPE_OF_WORK": est.get("scope_of_work", ""),
         "EXCLUSIONS": est.get("exclusions", ""),
         "ADDITIONAL_CHARGES": est.get("additional_charges", ""),
         "CUSTOMER_RESPONSIBILITIES": est.get("customer_responsibilities", ""),
-        "MATERIALS_TOTAL": f"${float(totals.get('material_sell_basis', 0) or 0):,.2f}",
-        "LABOR_TOTAL": f"${float(totals.get('labor_total', 0) or 0):,.2f}",
-        "EQUIPMENT_TOTAL": f"${float(totals.get('equipment_total', 0) or 0):,.2f}",
-        "TRAVEL_TOTAL": f"${float(totals.get('travel_total', 0) or 0):,.2f}",
-        "FINAL_BID": f"${float(totals.get('final_bid', 0) or 0):,.2f}",
+        "MATERIALS_TOTAL": _money(totals.get("material_sell_basis", 0) or 0),
+        "LABOR_TOTAL": _money(totals.get("labor_total", 0) or 0),
+        "EQUIPMENT_TOTAL": _money(totals.get("equipment_total", 0) or 0),
+        "TRAVEL_TOTAL": _money(totals.get("travel_total", 0) or 0),
+        "FINAL_BID": _money(totals.get("final_bid", 0) or 0),
     }
 
 

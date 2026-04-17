@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import pandas as pd
@@ -130,7 +131,45 @@ def _cleanup_est_list_row_pick_keys() -> None:
             st.session_state.pop(k, None)
 
 
-def _estimate_list_cell_text(val: Any) -> str:
+_MONEY_LIST_COLUMNS: frozenset[str] = frozenset({"proposal_total", "final_bid"})
+
+
+def _estimate_money_display(val: Any) -> str:
+    """DB / saved numeric → $ with commas and exactly 2 decimal places (Decimal-safe)."""
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    try:
+        d = Decimal(str(val).replace(",", "").strip()).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return f"${d:,.2f}"
+    except Exception:
+        s = str(val).strip()
+        return s[:72] + ("…" if len(s) > 72 else "")
+
+
+def _estimate_money_csv(val: Any) -> str:
+    """Same cents as display; plain numeric string for CSV (2 decimals, no $)."""
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    try:
+        d = Decimal(str(val).replace(",", "").strip()).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return f"{d:.2f}"
+    except Exception:
+        return str(val).strip()
+
+
+def _estimate_list_cell_text(val: Any, col: str | None = None) -> str:
+    if col and col in _MONEY_LIST_COLUMNS:
+        return _estimate_money_display(val)
     if val is None:
         return ""
     try:
@@ -469,18 +508,22 @@ def _render_estimate_list() -> None:
                 picked.append(eid)
         for ci, col in enumerate(show_cols):
             with rc[2 + ci]:
-                st.text(_estimate_list_cell_text(est_row.get(col)))
+                st.text(_estimate_list_cell_text(est_row.get(col), col=str(col)))
 
     set_selected_ids(TABLE_KEY_ESTIMATES, picked)
     sel = picked
+
+    df_export = df.copy()
+    for _mc in _MONEY_LIST_COLUMNS:
+        if _mc in df_export.columns:
+            df_export[_mc] = df_export[_mc].map(_estimate_money_csv)
 
     actions = render_table_action_bar(
         TABLE_KEY_ESTIMATES,
         sel,
         can_view=True,
         can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df,
+        export_df=df_export,
         visible_df=df,
         id_column="id",
         export_filename="estimates_export.csv",

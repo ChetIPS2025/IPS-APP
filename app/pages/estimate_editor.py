@@ -4,6 +4,7 @@ import base64
 import json
 import re
 from collections import Counter
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 import difflib
 from pathlib import Path
@@ -80,6 +81,38 @@ def _num0(v) -> float:
         return float(v)
     except (TypeError, ValueError):
         return 0.0
+
+
+_D0 = Decimal("0")
+_CENT = Decimal("0.01")
+
+
+def _dec(v) -> Decimal:
+    """
+    Decimal-safe conversion for money math.
+    - always uses Decimal(str(v)) to avoid binary float artifacts
+    - treats None/"" as 0
+    """
+    if v is None or v == "":
+        return _D0
+    if isinstance(v, Decimal):
+        return v
+    return Decimal(str(v))
+
+
+def _q2(v) -> Decimal:
+    """Quantize to cents with HALF_UP rounding."""
+    return _dec(v).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+def money_db(v) -> str:
+    """DB-safe numeric string with exactly 2 decimals (Postgres numeric accepts strings)."""
+    return f"{_q2(v):.2f}"
+
+
+def money_str(v) -> str:
+    """Two decimal places, no currency symbol (for tables/captions that add their own prefix)."""
+    return f"{_q2(v):.2f}"
 
 
 def ensure_numeric_defaults(est: dict) -> dict:
@@ -674,8 +707,9 @@ def _duplicate_quote_message(quote: str, loaded_estimate_id: str | None) -> str 
     return None
 
 
-def money(v: float) -> str:
-    return f"${float(v or 0):,.2f}"
+def money(v) -> str:
+    """Display formatter: always 2 decimals, comma grouped."""
+    return f"${_q2(v):,.2f}"
 
 
 def _truthy_rental(val) -> bool:
@@ -687,13 +721,13 @@ def _truthy_rental(val) -> bool:
     return s in ("true", "1", "yes", "t")
 
 
-def _safe_rate(val) -> float:
+def _safe_rate(val) -> Decimal:
     try:
         if val is None or val == "":
-            return 0.0
-        return float(val)
-    except (TypeError, ValueError):
-        return 0.0
+            return _D0
+        return _dec(val)
+    except Exception:
+        return _D0
 
 
 def load_estimate_equipment_from_assets() -> list[dict]:
@@ -916,65 +950,65 @@ def compute_totals(est: dict, materials_catalog: list[dict], labor_rates: list[d
     equipment_map = {e["equipment_item"]: e for e in equipment_pricing}
 
     controls = est.get("controls", {})
-    material_markup = float(controls.get("material_markup_pct", 0) or 0)
-    overhead_pct = float(controls.get("overhead_pct", 0) or 0)
-    profit_pct = float(controls.get("profit_pct", 0) or 0)
-    contingency_pct = float(controls.get("contingency_pct", 0) or 0)
-    sales_tax_pct = float(controls.get("sales_tax_pct", 0) or 0)
+    material_markup = _dec(controls.get("material_markup_pct", 0) or 0)
+    overhead_pct = _dec(controls.get("overhead_pct", 0) or 0)
+    profit_pct = _dec(controls.get("profit_pct", 0) or 0)
+    contingency_pct = _dec(controls.get("contingency_pct", 0) or 0)
+    sales_tax_pct = _dec(controls.get("sales_tax_pct", 0) or 0)
 
-    material_sell_basis = 0.0
+    material_sell_basis = _D0
     for row in est.get("materials", []):
         item = material_map.get(row.get("item"))
         if not item:
             continue
-        qty = float(row.get("qty", 0) or 0)
-        purchase = float(item.get("purchase_price", 0) or 0)
-        sell = float(item.get("sell_price", 0) or 0)
-        base_sell = sell if sell > 0 else purchase * (1 + material_markup)
+        qty = _dec(row.get("qty", 0) or 0)
+        purchase = _dec(item.get("purchase_price", 0) or 0)
+        sell = _dec(item.get("sell_price", 0) or 0)
+        base_sell = sell if sell > _D0 else purchase * (Decimal("1") + material_markup)
         material_sell_basis += qty * base_sell
 
-    labor_total = 0.0
+    labor_total = _D0
     for row in est.get("labor", []):
         item = labor_map.get(row.get("classification"))
         if not item:
             continue
-        headcount = float(row.get("headcount", 0) or 0)
-        st_hrs = float(row.get("st_hours_per_day", 0) or 0)
-        ot_hrs = float(row.get("ot_hours_per_day", 0) or 0)
-        days = float(row.get("days", 0) or 0)
-        st_rate = float(item.get("st_rate", 0) or 0)
-        ot_rate = float(item.get("ot_rate", 0) or 0)
+        headcount = _dec(row.get("headcount", 0) or 0)
+        st_hrs = _dec(row.get("st_hours_per_day", 0) or 0)
+        ot_hrs = _dec(row.get("ot_hours_per_day", 0) or 0)
+        days = _dec(row.get("days", 0) or 0)
+        st_rate = _dec(item.get("st_rate", 0) or 0)
+        ot_rate = _dec(item.get("ot_rate", 0) or 0)
         labor_total += headcount * days * ((st_hrs * st_rate) + (ot_hrs * ot_rate))
 
-    equipment_total = 0.0
+    equipment_total = _D0
     for row in est.get("equipment", []):
         item = equipment_map.get(row.get("equipment_item"))
         if not item:
             continue
-        qty = float(row.get("qty", 0) or 0)
+        qty = _dec(row.get("qty", 0) or 0)
         basis = row.get("basis", "Day")
-        duration = float(row.get("duration", 0) or 0)
+        duration = _dec(row.get("duration", 0) or 0)
         rate = {
-            "Day": float(item.get("daily_rate", 0) or 0),
-            "Week": float(item.get("weekly_rate", 0) or 0),
-            "Month": float(item.get("monthly_rate", 0) or 0),
-        }.get(basis, 0.0)
+            "Day": _dec(item.get("daily_rate", 0) or 0),
+            "Week": _dec(item.get("weekly_rate", 0) or 0),
+            "Month": _dec(item.get("monthly_rate", 0) or 0),
+        }.get(basis, _D0)
         equipment_total += qty * duration * rate
 
     travel = est.get("travel", {})
-    miles_total = _num0(travel.get("round_trip_miles")) * _num0(travel.get("mileage_rate"))
-    per_diem_total = _num0(travel.get("per_diem_per_person_per_day"))
-    hotel_total = _num0(travel.get("hotel_nights")) * _num0(travel.get("hotel_rate_per_room_per_night"))
+    miles_total = _dec(travel.get("round_trip_miles")) * _dec(travel.get("mileage_rate"))
+    per_diem_total = _dec(travel.get("per_diem_per_person_per_day"))
+    hotel_total = _dec(travel.get("hotel_nights")) * _dec(travel.get("hotel_rate_per_room_per_night"))
     travel_total = (
         miles_total
         + per_diem_total
         + hotel_total
-        + _num0(travel.get("airfare"))
-        + _num0(travel.get("rental_car"))
-        + _num0(travel.get("fuel"))
+        + _dec(travel.get("airfare"))
+        + _dec(travel.get("rental_car"))
+        + _dec(travel.get("fuel"))
     )
-    lt = _num0(travel.get("line_total"))
-    if lt > 0 and travel_total <= 0:
+    lt = _dec(travel.get("line_total"))
+    if lt > _D0 and travel_total <= _D0:
         travel_total = lt
 
     direct_sell = material_sell_basis + labor_total + equipment_total + travel_total
@@ -984,19 +1018,21 @@ def compute_totals(est: dict, materials_catalog: list[dict], labor_rates: list[d
     profit_total = subtotal_before_profit * profit_pct
     sales_tax_total = material_sell_basis * sales_tax_pct
     final_bid = subtotal_before_profit + profit_total + sales_tax_total
-    proposal_total = round(final_bid / 100.0) * 100.0 if final_bid else 0.0
+    final_bid_q = _q2(final_bid)
+    # Proposal total matches final bid (cent-quantized); no rounding to whole dollars.
+    proposal_total = final_bid_q
 
     return {
-        "material_sell_basis": material_sell_basis,
-        "labor_total": labor_total,
-        "equipment_total": equipment_total,
-        "travel_total": travel_total,
-        "overhead_total": overhead_total,
-        "profit_total": profit_total,
-        "contingency_total": contingency_total,
-        "sales_tax_total": sales_tax_total,
-        "final_bid": final_bid,
-        "proposal_total": proposal_total,
+        "material_sell_basis": _q2(material_sell_basis),
+        "labor_total": _q2(labor_total),
+        "equipment_total": _q2(equipment_total),
+        "travel_total": _q2(travel_total),
+        "overhead_total": _q2(overhead_total),
+        "profit_total": _q2(profit_total),
+        "contingency_total": _q2(contingency_total),
+        "sales_tax_total": _q2(sales_tax_total),
+        "final_bid": final_bid_q,
+        "proposal_total": _q2(proposal_total),
     }
 
 
@@ -1136,14 +1172,14 @@ def insert_imported_estimate(
     meta = est.get("import_meta") if isinstance(est.get("import_meta"), dict) else {}
     if meta.get("vendor_quote"):
         try:
-            vt = float(meta.get("total") or 0)
-            if vt > 0:
+            vt = _q2(meta.get("total") or 0)
+            if vt > _D0:
                 totals = {
                     **totals,
                     "proposal_total": vt,
                     "final_bid": vt,
                 }
-        except (TypeError, ValueError):
+        except Exception:
             pass
 
     qn = str(est.get("quote_number", "") or "").strip()
@@ -1173,16 +1209,16 @@ def insert_imported_estimate(
         "job_id": est.get("job_id"),
         "estimator_user_id": current_profile().get("id"),
         "status": est.get("status", "draft"),
-        "proposal_total": totals["proposal_total"],
-        "final_bid": totals["final_bid"],
-        "material_sell_basis": totals["material_sell_basis"],
-        "labor_total": totals["labor_total"],
-        "equipment_total": totals["equipment_total"],
-        "travel_total": totals["travel_total"],
-        "overhead_total": totals["overhead_total"],
-        "profit_total": totals["profit_total"],
-        "contingency_total": totals["contingency_total"],
-        "sales_tax_total": totals["sales_tax_total"],
+        "proposal_total": money_db(totals["proposal_total"]),
+        "final_bid": money_db(totals["final_bid"]),
+        "material_sell_basis": money_db(totals["material_sell_basis"]),
+        "labor_total": money_db(totals["labor_total"]),
+        "equipment_total": money_db(totals["equipment_total"]),
+        "travel_total": money_db(totals["travel_total"]),
+        "overhead_total": money_db(totals["overhead_total"]),
+        "profit_total": money_db(totals["profit_total"]),
+        "contingency_total": money_db(totals["contingency_total"]),
+        "sales_tax_total": money_db(totals["sales_tax_total"]),
         "scope_of_work": est.get("scope_of_work", ""),
         "exclusions": est.get("exclusions", ""),
         "additional_charges": est.get("additional_charges", ""),
@@ -1731,7 +1767,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         # Materials row cards + form-based add/edit to avoid "enter twice" UX.
         est.setdefault("materials", [])
         controls = est.get("controls", {}) or {}
-        material_markup = float(controls.get("material_markup_pct", 0) or 0)
+        material_markup_dec = _dec(controls.get("material_markup_pct", 0) or 0)
         material_map = {m.get("item_key"): m for m in materials_catalog if isinstance(m, dict) and m.get("item_key")}
 
         # Optional category filter (resilient to schema differences).
@@ -1872,18 +1908,18 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 if not isinstance(line, dict):
                     continue
                 item_key = str(line.get("item") or "").strip()
-                qty = float(line.get("qty", 0) or 0.0)
+                qty_d = _dec(line.get("qty", 0) or 0)
                 m = material_map.get(item_key)
-                purchase = float((m or {}).get("purchase_price", 0) or 0)
-                sell = float((m or {}).get("sell_price", 0) or 0)
-                base_sell = sell if sell > 0 else purchase * (1 + material_markup)
-                subtotal = qty * base_sell
+                purchase_d = _dec((m or {}).get("purchase_price", 0) or 0)
+                sell_d = _dec((m or {}).get("sell_price", 0) or 0)
+                base_sell = sell_d if sell_d > _D0 else purchase_d * (Decimal("1") + material_markup_dec)
+                subtotal = _q2(qty_d * base_sell)
 
                 with st.container(border=True):
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{item_key or 'Unknown material'}**")
-                        st.caption(f"Qty: {qty:.2f}")
+                        st.caption(f"Qty: {money_str(qty_d)}")
                     with right:
                         st.metric(label="Line subtotal", value=money(subtotal))
                     c_edit, c_rem = st.columns([1, 1], gap="small")
@@ -2083,14 +2119,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 if not isinstance(line, dict):
                     continue
                 classification = str(line.get("classification") or "").strip()
-                headcount = float(line.get("headcount", 0) or 0.0)
-                st_hrs = float(line.get("st_hours_per_day", 0) or 0.0)
-                ot_hrs = float(line.get("ot_hours_per_day", 0) or 0.0)
-                days = float(line.get("days", 0) or 0.0)
+                headcount = _dec(line.get("headcount", 0) or 0)
+                st_hrs = _dec(line.get("st_hours_per_day", 0) or 0)
+                ot_hrs = _dec(line.get("ot_hours_per_day", 0) or 0)
+                days = _dec(line.get("days", 0) or 0)
                 lr = labor_map.get(classification)
-                st_rate = float((lr or {}).get("st_rate", 0) or 0.0)
-                ot_rate = float((lr or {}).get("ot_rate", 0) or 0.0)
-                subtotal = headcount * days * ((st_hrs * st_rate) + (ot_hrs * ot_rate))
+                st_rate = _dec((lr or {}).get("st_rate", 0) or 0)
+                ot_rate = _dec((lr or {}).get("ot_rate", 0) or 0)
+                subtotal = _q2(headcount * days * ((st_hrs * st_rate) + (ot_hrs * ot_rate)))
 
                 with st.container(border=True):
                     left, right = st.columns([1.65, 1], gap="small")
@@ -2311,21 +2347,23 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 if not isinstance(line, dict):
                     continue
                 name = str(line.get("equipment_item") or "").strip()
-                qty = float(line.get("qty", 0) or 0.0)
+                qty_d = _dec(line.get("qty", 0) or 0)
                 basis = str(line.get("basis") or "Day")
-                duration = float(line.get("duration", 0) or 0.0)
+                duration_d = _dec(line.get("duration", 0) or 0)
                 meta = equipment_map.get(name) or {}
                 rate = {
-                    "Day": float(meta.get("daily_rate", 0) or 0.0),
-                    "Week": float(meta.get("weekly_rate", 0) or 0.0),
-                    "Month": float(meta.get("monthly_rate", 0) or 0.0),
-                }.get(basis, 0.0)
-                subtotal = qty * duration * rate
+                    "Day": _dec(meta.get("daily_rate", 0) or 0),
+                    "Week": _dec(meta.get("weekly_rate", 0) or 0),
+                    "Month": _dec(meta.get("monthly_rate", 0) or 0),
+                }.get(basis, _D0)
+                subtotal = _q2(qty_d * duration_d * rate)
                 with st.container(border=True):
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{name or 'Unknown equipment'}**")
-                        st.caption(f"Qty: {qty:.2f} · Basis: {basis} · Duration: {duration:.2f} · Rate: {money(rate)}")
+                        st.caption(
+                            f"Qty: {money_str(qty_d)} · Basis: {basis} · Duration: {money_str(duration_d)} · Rate: {money(rate)}"
+                        )
                     with right:
                         st.metric(label="Line subtotal", value=money(subtotal))
                     c_edit, c_rem = st.columns([1, 1], gap="small")
@@ -2474,27 +2512,27 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
 
         # Draft cards (edit/remove)
-        def _travel_cards() -> list[tuple[str, str, float]]:
-            miles_total = _num0(travel.get("round_trip_miles")) * _num0(travel.get("mileage_rate"))
-            hotel_total = _num0(travel.get("hotel_nights")) * _num0(travel.get("hotel_rate_per_room_per_night"))
-            items: list[tuple[str, str, float]] = [
-                ("Mileage", f'{_num0(travel.get("round_trip_miles")):.2f} mi × {money(_num0(travel.get("mileage_rate")))}', miles_total),
-                ("Per diem", "", _num0(travel.get("per_diem_per_person_per_day"))),
-                ("Hotel", f'{_num0(travel.get("hotel_nights")):.2f} nights × {money(_num0(travel.get("hotel_rate_per_room_per_night")))}', hotel_total),
-                ("Airfare", "", _num0(travel.get("airfare"))),
-                ("Rental car", "", _num0(travel.get("rental_car"))),
-                ("Fuel", "", _num0(travel.get("fuel"))),
-                ("Override", "If set (>0) and computed travel is 0, totals use this.", _num0(travel.get("line_total"))),
+        def _travel_cards() -> list[tuple[str, str, Decimal]]:
+            miles_total = _dec(travel.get("round_trip_miles")) * _dec(travel.get("mileage_rate"))
+            hotel_total = _dec(travel.get("hotel_nights")) * _dec(travel.get("hotel_rate_per_room_per_night"))
+            items: list[tuple[str, str, Decimal]] = [
+                ("Mileage", f'{_num0(travel.get("round_trip_miles")):.2f} mi × {money(_dec(travel.get("mileage_rate")))}', miles_total),
+                ("Per diem", "", _dec(travel.get("per_diem_per_person_per_day"))),
+                ("Hotel", f'{_num0(travel.get("hotel_nights")):.2f} nights × {money(_dec(travel.get("hotel_rate_per_room_per_night")))}', hotel_total),
+                ("Airfare", "", _dec(travel.get("airfare"))),
+                ("Rental car", "", _dec(travel.get("rental_car"))),
+                ("Fuel", "", _dec(travel.get("fuel"))),
+                ("Override", "If set (>0) and computed travel is 0, totals use this.", _dec(travel.get("line_total"))),
             ]
             # Show only non-zero-ish items (but always show mileage/hotel if either field is set).
-            out: list[tuple[str, str, float]] = []
+            out: list[tuple[str, str, Decimal]] = []
             for k, d, v in items:
                 if k in ("Mileage", "Hotel"):
                     if _num0(travel.get("round_trip_miles")) > 0 or _num0(travel.get("mileage_rate")) > 0 or k == "Hotel" and (_num0(travel.get("hotel_nights")) > 0 or _num0(travel.get("hotel_rate_per_room_per_night")) > 0):
                         out.append((k, d, v))
                 else:
-                    if float(v or 0) != 0.0:
-                        out.append((k, d, float(v or 0.0)))
+                    if _q2(v) != _D0:
+                        out.append((k, d, _q2(v)))
             return out
 
         cards = _travel_cards()
@@ -2850,16 +2888,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": est.get("status", "draft"),
-                    "proposal_total": totals["proposal_total"],
-                    "final_bid": totals["final_bid"],
-                    "material_sell_basis": totals["material_sell_basis"],
-                    "labor_total": totals["labor_total"],
-                    "equipment_total": totals["equipment_total"],
-                    "travel_total": totals["travel_total"],
-                    "overhead_total": totals["overhead_total"],
-                    "profit_total": totals["profit_total"],
-                    "contingency_total": totals["contingency_total"],
-                    "sales_tax_total": totals["sales_tax_total"],
+                    "proposal_total": money_db(totals["proposal_total"]),
+                    "final_bid": money_db(totals["final_bid"]),
+                    "material_sell_basis": money_db(totals["material_sell_basis"]),
+                    "labor_total": money_db(totals["labor_total"]),
+                    "equipment_total": money_db(totals["equipment_total"]),
+                    "travel_total": money_db(totals["travel_total"]),
+                    "overhead_total": money_db(totals["overhead_total"]),
+                    "profit_total": money_db(totals["profit_total"]),
+                    "contingency_total": money_db(totals["contingency_total"]),
+                    "sales_tax_total": money_db(totals["sales_tax_total"]),
                     "scope_of_work": est.get("scope_of_work", ""),
                     "exclusions": est.get("exclusions", ""),
                     "additional_charges": est.get("additional_charges", ""),
@@ -2936,16 +2974,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": "submitted",
-                    "proposal_total": totals["proposal_total"],
-                    "final_bid": totals["final_bid"],
-                    "material_sell_basis": totals["material_sell_basis"],
-                    "labor_total": totals["labor_total"],
-                    "equipment_total": totals["equipment_total"],
-                    "travel_total": totals["travel_total"],
-                    "overhead_total": totals["overhead_total"],
-                    "profit_total": totals["profit_total"],
-                    "contingency_total": totals["contingency_total"],
-                    "sales_tax_total": totals["sales_tax_total"],
+                    "proposal_total": money_db(totals["proposal_total"]),
+                    "final_bid": money_db(totals["final_bid"]),
+                    "material_sell_basis": money_db(totals["material_sell_basis"]),
+                    "labor_total": money_db(totals["labor_total"]),
+                    "equipment_total": money_db(totals["equipment_total"]),
+                    "travel_total": money_db(totals["travel_total"]),
+                    "overhead_total": money_db(totals["overhead_total"]),
+                    "profit_total": money_db(totals["profit_total"]),
+                    "contingency_total": money_db(totals["contingency_total"]),
+                    "sales_tax_total": money_db(totals["sales_tax_total"]),
                     "scope_of_work": est.get("scope_of_work", ""),
                     "exclusions": est.get("exclusions", ""),
                     "additional_charges": est.get("additional_charges", ""),
@@ -3023,16 +3061,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": "approved",
-                    "proposal_total": totals["proposal_total"],
-                    "final_bid": totals["final_bid"],
-                    "material_sell_basis": totals["material_sell_basis"],
-                    "labor_total": totals["labor_total"],
-                    "equipment_total": totals["equipment_total"],
-                    "travel_total": totals["travel_total"],
-                    "overhead_total": totals["overhead_total"],
-                    "profit_total": totals["profit_total"],
-                    "contingency_total": totals["contingency_total"],
-                    "sales_tax_total": totals["sales_tax_total"],
+                    "proposal_total": money_db(totals["proposal_total"]),
+                    "final_bid": money_db(totals["final_bid"]),
+                    "material_sell_basis": money_db(totals["material_sell_basis"]),
+                    "labor_total": money_db(totals["labor_total"]),
+                    "equipment_total": money_db(totals["equipment_total"]),
+                    "travel_total": money_db(totals["travel_total"]),
+                    "overhead_total": money_db(totals["overhead_total"]),
+                    "profit_total": money_db(totals["profit_total"]),
+                    "contingency_total": money_db(totals["contingency_total"]),
+                    "sales_tax_total": money_db(totals["sales_tax_total"]),
                     "scope_of_work": est.get("scope_of_work", ""),
                     "exclusions": est.get("exclusions", ""),
                     "additional_charges": est.get("additional_charges", ""),
@@ -3110,16 +3148,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": "awarded",
-                    "proposal_total": totals["proposal_total"],
-                    "final_bid": totals["final_bid"],
-                    "material_sell_basis": totals["material_sell_basis"],
-                    "labor_total": totals["labor_total"],
-                    "equipment_total": totals["equipment_total"],
-                    "travel_total": totals["travel_total"],
-                    "overhead_total": totals["overhead_total"],
-                    "profit_total": totals["profit_total"],
-                    "contingency_total": totals["contingency_total"],
-                    "sales_tax_total": totals["sales_tax_total"],
+                    "proposal_total": money_db(totals["proposal_total"]),
+                    "final_bid": money_db(totals["final_bid"]),
+                    "material_sell_basis": money_db(totals["material_sell_basis"]),
+                    "labor_total": money_db(totals["labor_total"]),
+                    "equipment_total": money_db(totals["equipment_total"]),
+                    "travel_total": money_db(totals["travel_total"]),
+                    "overhead_total": money_db(totals["overhead_total"]),
+                    "profit_total": money_db(totals["profit_total"]),
+                    "contingency_total": money_db(totals["contingency_total"]),
+                    "sales_tax_total": money_db(totals["sales_tax_total"]),
                     "scope_of_work": est.get("scope_of_work", ""),
                     "exclusions": est.get("exclusions", ""),
                     "additional_charges": est.get("additional_charges", ""),
@@ -3220,10 +3258,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
             st.caption(
                 "Breakdown: "
-                f"Materials ${totals_preview.get('material_sell_basis', 0.0):,.2f} · "
-                f"Labor ${totals_preview.get('labor_total', 0.0):,.2f} · "
-                f"Equipment ${totals_preview.get('equipment_total', 0.0):,.2f} · "
-                f"Travel ${totals_preview.get('travel_total', 0.0):,.2f}"
+                f"Materials {money(totals_preview.get('material_sell_basis', 0))} · "
+                f"Labor {money(totals_preview.get('labor_total', 0))} · "
+                f"Equipment {money(totals_preview.get('equipment_total', 0))} · "
+                f"Travel {money(totals_preview.get('travel_total', 0))}"
             )
 
         # Line-item counts for quick context (no inputs).
