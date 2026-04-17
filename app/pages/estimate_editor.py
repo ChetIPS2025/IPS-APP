@@ -417,6 +417,13 @@ def _inject_proposal_preview_styles() -> None:
     st.markdown(
         """
         <style>
+        .ips-proposal-preview-desk {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .ips-proposal-preview-page {
+            color: #0f172a;
+        }
         .ips-proposal-docx-preview h3, .ips-proposal-docx-preview h4, .ips-proposal-docx-preview h5 {
             font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         }
@@ -1652,6 +1659,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
+        vals = proposal_values(est, totals, **_pe)
         embed_docx: bytes | None = None
         embed_docx_err = ""
         try:
@@ -1702,9 +1710,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         if st.session_state.get("est_embed_proposal_preview"):
             with st.expander("Proposal preview", expanded=True):
                 if embed_docx is not None:
-                    _vals = proposal_values(est, totals, **_pe)
+                    preview_html = proposal_preview_html(embed_docx, fallback_vals=vals)
                     _render_proposal_preview_html(
-                        proposal_preview_html(embed_docx, fallback_vals=_vals),
+                        preview_html,
                         caption="From the generated Word document (same bytes as **Download Proposal (Word)**).",
                     )
                     st.download_button(
@@ -2990,6 +2998,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
+        vals = proposal_values(est, totals, **_pe)
         st.caption(
             "Standard Word template **estimate_template_autofill_logo_updated.docx** — placeholders from this "
             "estimate; optional **company_logo.png** in **assets/** is merged when present."
@@ -3071,10 +3080,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.caption("Save the estimate first to store exports in Supabase.")
 
         if docx_bytes is not None:
-            _pv_vals = proposal_values(est, totals, **_pe)
+            preview_html = proposal_preview_html(docx_bytes, fallback_vals=vals)
             with st.expander("Proposal preview (read-only)", expanded=True):
                 _render_proposal_preview_html(
-                    proposal_preview_html(docx_bytes, fallback_vals=_pv_vals),
+                    preview_html,
                     caption="HTML preview of the same filled document — use Word for print layout.",
                 )
 

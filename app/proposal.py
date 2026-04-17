@@ -382,9 +382,8 @@ def _wrap_docx_preview(inner: str) -> str:
     if not inner:
         return ""
     return (
-        '<div class="ips-proposal-docx-preview" style="max-height:min(720px,78vh);overflow:auto;'
-        "padding:1rem 1.15rem;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa;"
-        'font-family:Georgia,\"Times New Roman\",serif;">'
+        '<div class="ips-proposal-docx-body" style="max-height:min(720px,78vh);overflow:auto;'
+        "margin:0;padding:0;font-family:Georgia,\"Times New Roman\",serif;\">"
         f"{inner}</div>"
     )
 
@@ -409,24 +408,22 @@ def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
 
 
 def proposal_values_preview_html(vals: dict[str, str]) -> str:
-    """Field-based preview (same placeholder map as the DOCX). Core fields always appear (never blank)."""
-    # These six always render a row so the preview never hides quote / customer / amount / scope / prepared / date.
-    core_order: tuple[tuple[str, str], ...] = (
+    """Field-based preview (same placeholder map as the DOCX / :func:`proposal_values`). All rows always render."""
+    # Same keys as ``proposal_values`` — always show a row (empty → em dash) so preview matches Word placeholders.
+    row_order: tuple[tuple[str, str], ...] = (
+        ("JOB_NAME", "Job / title"),
         ("QUOTE_NUMBER", "Quote #"),
         ("CUSTOMER_NAME", "Customer"),
+        ("CUSTOMER_LOCATION", "Location"),
+        ("CONTACT_NAME", "Contact"),
         ("PROPOSAL_AMOUNT", "Proposal amount"),
         ("SCOPE_OF_WORK", "Scope of work"),
         ("PREPARED_BY", "Prepared by"),
         ("DATE", "Date"),
-    )
-    extra_order: tuple[tuple[str, str], ...] = (
-        ("JOB_NAME", "Job / title"),
-        ("CUSTOMER_LOCATION", "Location"),
-        ("CONTACT_NAME", "Contact"),
         ("PREPARED_BY_PHONE", "Phone"),
     )
     trs: list[str] = []
-    for key, label in core_order:
+    for key, label in row_order:
         raw = _s(vals.get(key, ""))
         lab_esc = html.escape(label)
         val_esc = html.escape(raw) if raw else "—"
@@ -438,25 +435,11 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
             "white-space:pre-wrap;'>{val_esc}</td>"
             "</tr>"
         )
-    for key, label in extra_order:
-        raw = _s(vals.get(key, ""))
-        if not raw:
-            continue
-        lab_esc = html.escape(label)
-        val_esc = html.escape(raw)
-        trs.append(
-            "<tr>"
-            f"<td style='padding:0.4rem 0.65rem;font-weight:600;vertical-align:top;width:10.5rem;"
-            "border-bottom:1px solid #eee;'>{lab_esc}</td>"
-            f"<td style='padding:0.4rem 0.65rem;vertical-align:top;border-bottom:1px solid #eee;"
-            "white-space:pre-wrap;'>{val_esc}</td>"
-            "</tr>"
-        )
     body = "".join(trs)
     return (
-        '<div class="ips-proposal-fields-preview" style="max-height:min(720px,78vh);overflow:auto;'
-        "padding:1rem 1.1rem;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa;"
-        'font-size:0.96em;font-family:system-ui,-apple-system,sans-serif;">'
+        '<div class="ips-proposal-fields-preview" style="max-height:min(520px,55vh);overflow:auto;'
+        "margin:0;padding:0;font-size:0.96em;font-family:system-ui,-apple-system,sans-serif;"
+        'background:transparent;">'
         f"<table style='width:100%;border-collapse:collapse;'>{body}</table></div>"
     )
 
@@ -468,13 +451,22 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
     """
     fields = proposal_values_preview_html(fallback_vals)
     intro = (
-        "<p style='margin:0 0 0.55rem 0;font-size:0.9em;color:#475569;'>"
+        "<p style='margin:0 0 1rem 0;font-size:0.9em;color:#475569;'>"
         "<strong>Proposal values</strong> — same placeholders filled in your downloaded <strong>.docx</strong>.</p>"
     )
-    outer = (
-        '<div class="ips-proposal-docx-preview" style="padding:1rem 1.1rem;border:1px solid #e4e4e4;'
-        'border-radius:10px;background:#fafafa;font-family:Georgia,serif;">'
+    # Centered white “page” on a neutral desk (margins = page padding + max-width column).
+    desk = (
+        '<div class="ips-proposal-preview-desk" style="width:100%;box-sizing:border-box;'
+        "display:flex;justify-content:center;padding:1rem 0.75rem;background:#e8eaed;"
+        '">'
     )
+    page_open = (
+        '<div class="ips-proposal-preview-page ips-proposal-docx-preview" style="box-sizing:border-box;'
+        "width:100%;max-width:42rem;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,0.06),"
+        "0 6px 28px rgba(15,23,42,0.08);border-radius:2px;padding:2.25rem 2.75rem;margin:0 auto;"
+        'font-family:Georgia,serif;">'
+    )
+    page_close = "</div></div>"
 
     docx_block = ""
     if docx_bytes:
@@ -484,16 +476,16 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
             n_plain = _preview_plain_text_len(inner)
             if n_plain >= 20:
                 docx_block = (
-                    "<div style='margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid #e2e8f0;'>"
-                    "<p style='margin:0 0 0.5rem 0;font-size:0.9em;color:#475569;'>"
+                    "<div style='margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid #e2e8f0;'>"
+                    "<p style='margin:0 0 0.65rem 0;font-size:0.9em;color:#475569;'>"
                     "<strong>Document preview</strong> — text and tables read from the generated Word file "
                     "(open Word for exact layout).</p>"
                     f"{wrapped}</div>"
                 )
             else:
                 docx_block = (
-                    "<div style='margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid #e2e8f0;'>"
-                    "<p style='margin:0 0 0.5rem 0;font-size:0.9em;color:#64748b;'>"
+                    "<div style='margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid #e2e8f0;'>"
+                    "<p style='margin:0 0 0.65rem 0;font-size:0.9em;color:#64748b;'>"
                     "<strong>Partial text from the .docx</strong> — some templates use shapes or content "
                     "controls with little extractable text here.</p>"
                     f"{wrapped}</div>"
@@ -501,13 +493,13 @@ def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, 
 
     if not docx_bytes:
         tail = (
-            "<p style='margin:0.75rem 0 0 0;color:#b45309;font-size:0.93em;'>"
+            "<p style='margin:1rem 0 0 0;color:#b45309;font-size:0.93em;'>"
             "<strong>No proposal document was generated.</strong> "
             "Fix any Word template errors above, then try again.</p>"
         )
-        return f"{outer}{intro}{fields}{tail}</div>"
+        return f"{desk}{page_open}{intro}{fields}{tail}{page_close}"
 
-    return f"{outer}{intro}{fields}{docx_block}</div>"
+    return f"{desk}{page_open}{intro}{fields}{docx_block}{page_close}"
 
 
 def proposal_values(
