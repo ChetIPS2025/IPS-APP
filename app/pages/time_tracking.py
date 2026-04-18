@@ -79,14 +79,10 @@ def _tt_fast_entry() -> bool:
 
 
 def _week_grid_column_ratios(*, fast: bool) -> list[float]:
-    """9 columns: employee (name + hours + ⚡ stacked) + Mon–Sun + Σ.
-
-    Do not nest ``st.columns`` inside the employee column on the same row as the
-    week grid — that breaks Streamlit and stacks every day under Monday.
-    """
+    """9 columns: narrow employee + Mon–Sun + Σ (week row must not nest columns in col 1)."""
     if fast:
-        return [0.48] + [1.72] * 7 + [0.34]
-    return [0.58] + [1.48] * 7 + [0.36]
+        return [0.38] + [1.82] * 7 + [0.3]
+    return [0.46] + [1.56] * 7 + [0.32]
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -351,21 +347,22 @@ def _inject_tt_styles() -> None:
             padding-left: 6px !important;
         }
         .ips-tt-day-head {
-            color: #9fb6d9 !important;
-            font-size: 11px !important;
-            font-weight: 600 !important;
+            color: #cbd5e1 !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
             text-align: center !important;
-            margin-bottom: 1px !important;
-            letter-spacing: 0.02em;
+            margin-bottom: 0 !important;
+            letter-spacing: 0.03em;
         }
         .ips-tt-day-sum {
             text-align: center !important;
             font-size: 10px !important;
             color: #94a3b8 !important;
-            margin-bottom: 3px !important;
+            margin-bottom: 4px !important;
+            font-variant-numeric: tabular-nums !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) {
-            padding: 5px 6px 6px 6px !important;
+            padding: 4px 5px 5px 5px !important;
         }
         /* Day cell row actions — compact, single-line labels */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button {
@@ -496,27 +493,42 @@ def _inject_tt_styles() -> None:
             font-size: 0.72rem !important;
             margin-bottom: 0 !important;
         }
-        /* Quick actions (popover) */
+        /* Quick actions — small trigger, tight panel */
+        div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) {
+            max-width: 20rem !important;
+            padding: 0.35rem 0.5rem 0.5rem 0.5rem !important;
+        }
+        div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) [data-testid="stVerticalBlock"] > div {
+            gap: 0.25rem !important;
+        }
         div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) button {
-            min-height: 1.35rem !important;
-            max-height: 1.75rem !important;
-            padding: 0.08rem 0.4rem !important;
-            font-size: 0.72rem !important;
-            border-radius: 5px !important;
+            min-height: 1.3rem !important;
+            max-height: 1.65rem !important;
+            padding: 0.06rem 0.35rem !important;
+            font-size: 0.7rem !important;
+            border-radius: 4px !important;
         }
         div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-            min-height: 1.35rem !important;
-            font-size: 0.78rem !important;
+            min-height: 1.28rem !important;
+            font-size: 0.75rem !important;
         }
         div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) [data-testid="stNumberInput"] input,
         div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) [data-testid="stTextInput"] input {
-            min-height: 1.3rem !important;
-            font-size: 0.78rem !important;
-            padding: 0.06rem 0.28rem !important;
+            min-height: 1.25rem !important;
+            font-size: 0.75rem !important;
+            padding: 0.05rem 0.25rem !important;
         }
         div[data-testid="stPopoverBody"]:has(span.ips-tt-qa-panel) label[data-testid="stWidgetLabel"] {
-            font-size: 0.72rem !important;
+            font-size: 0.68rem !important;
             margin-bottom: 0 !important;
+        }
+        button[data-testid="stBaseButton-popover"][kind="tertiary"],
+        button[kind="tertiary"][data-testid="stBaseButton-popover"] {
+            min-height: 1.35rem !important;
+            max-height: 1.55rem !important;
+            padding: 0.1rem 0.35rem !important;
+            font-size: 0.75rem !important;
+            opacity: 0.92;
         }
         .ips-tt-field-label {
             font-size: 9px !important;
@@ -571,20 +583,178 @@ def _inject_tt_styles() -> None:
             line-height: 1.25;
         }
         .ips-tt-emp-name {
-            font-size: 0.95rem !important;
+            font-size: 0.88rem !important;
             font-weight: 650 !important;
             color: #f1f5f9 !important;
             margin: 0 0 2px 0 !important;
+            line-height: 1.2 !important;
         }
         .ips-tt-emp-total {
-            font-size: 0.82rem !important;
+            font-size: 0.76rem !important;
             font-weight: 600 !important;
             color: #94a3b8 !important;
         }
-        button[kind="secondary"][data-testid="stBaseButton-popover"] {
-            min-height: 1.5rem !important;
+
+        /* —— Spreadsheet / Excel-like weekly grid (IPS dark theme) —— */
+        span.ips-tt-sheet-row { display: none !important; }
+
+        /* Header row: strong band + grid lines */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) {
+            background: linear-gradient(180deg, rgba(51, 65, 85, 0.92) 0%, rgba(30, 41, 59, 0.88) 100%) !important;
+            border: 1px solid rgba(148, 163, 184, 0.5) !important;
+            border-radius: 3px 3px 0 0 !important;
+            margin-bottom: 0 !important;
+            padding: 0 !important;
+            box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.5);
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) > div[data-testid="column"] {
+            border-right: 1px solid rgba(71, 85, 105, 0.75) !important;
+            padding: 6px 5px 7px 5px !important;
+            align-self: stretch !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) > div[data-testid="column"]:first-child {
+            background: rgba(15, 23, 42, 0.35) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) > div[data-testid="column"]:last-child {
+            border-right: none !important;
+            background: rgba(15, 23, 42, 0.28) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) .ips-tt-week-hdr-day,
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) .ips-tt-week-hdr-sum {
+            color: #f1f5f9 !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.06em !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) .ips-tt-wh-dow {
+            color: #cbd5e1 !important;
+            font-size: 10px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-hdr-corner) .ips-tt-wh-date {
+            color: #e2e8f0 !important;
+            font-size: 11px !important;
+        }
+
+        /* Data rows: zebra + hover + column lines + sticky employee/total tint */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row.ips-tt-zebra-0) {
+            background: rgba(22, 32, 48, 0.72) !important;
+            border-left: 1px solid rgba(71, 85, 105, 0.65) !important;
+            border-right: 1px solid rgba(71, 85, 105, 0.65) !important;
+            margin-top: -1px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row.ips-tt-zebra-1) {
+            background: rgba(17, 26, 39, 0.78) !important;
+            border-left: 1px solid rgba(71, 85, 105, 0.65) !important;
+            border-right: 1px solid rgba(71, 85, 105, 0.65) !important;
+            margin-top: -1px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row):hover {
+            background: rgba(59, 130, 246, 0.14) !important;
+            box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.35) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row) > div[data-testid="column"] {
+            border-right: 1px solid rgba(71, 85, 105, 0.55) !important;
+            padding: 4px 4px 5px 4px !important;
+            align-self: stretch !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row) > div[data-testid="column"]:first-child {
+            background: rgba(30, 41, 59, 0.65) !important;
+            border-right: 1px solid rgba(100, 116, 139, 0.45) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-row) > div[data-testid="column"]:last-child {
+            background: rgba(30, 41, 59, 0.5) !important;
+            border-right: none !important;
+            border-left: 1px solid rgba(100, 116, 139, 0.35) !important;
+        }
+
+        /* Remove heavy “card” chrome around whole employee row */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-sheet-row) {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Footer totals row */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-footer-row) {
+            background: rgba(51, 65, 85, 0.55) !important;
+            border: 1px solid rgba(148, 163, 184, 0.45) !important;
+            border-top: 2px solid rgba(100, 116, 139, 0.55) !important;
+            border-radius: 0 0 3px 3px !important;
+            margin-top: -1px !important;
+            padding: 2px 0 !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-footer-row) > div[data-testid="column"] {
+            border-right: 1px solid rgba(71, 85, 105, 0.55) !important;
+            padding: 5px 4px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-footer-row) > div[data-testid="column"]:first-child {
+            background: rgba(15, 23, 42, 0.4) !important;
+            font-weight: 700 !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tt-sheet-footer-row) > div[data-testid="column"]:last-child {
+            border-right: none !important;
+            background: rgba(15, 23, 42, 0.35) !important;
+        }
+
+        /* Day sub-header (sum line) — spreadsheet sublabel */
+        .ips-tt-day-head {
+            background: rgba(15, 23, 42, 0.45) !important;
+            border: 1px solid rgba(71, 85, 105, 0.4) !important;
+            border-radius: 2px 2px 0 0 !important;
+            padding: 3px 4px !important;
+            margin-bottom: 0 !important;
+        }
+        .ips-tt-day-sum {
+            background: rgba(15, 23, 42, 0.35) !important;
+            border: 1px solid rgba(71, 85, 105, 0.4) !important;
+            border-top: none !important;
+            border-radius: 0 0 2px 2px !important;
+            padding: 2px 4px 3px 4px !important;
+            margin-bottom: 4px !important;
+            font-variant-numeric: tabular-nums !important;
+        }
+
+        /* Day “cells”: flat, grid-like, not floating cards */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) {
+            border-radius: 2px !important;
+            border: 1px solid rgba(71, 85, 105, 0.65) !important;
+            background: rgba(15, 23, 42, 0.55) !important;
+            box-shadow: none !important;
+            padding: 4px 4px 5px 4px !important;
+            margin-top: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell):focus-within {
+            box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.65) !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            border-color: rgba(96, 165, 250, 0.45) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) input:focus,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) textarea:focus,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) [data-baseweb="select"]:focus-within {
+            outline: 2px solid rgba(59, 130, 246, 0.9) !important;
+            outline-offset: 0px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-empty) {
+            background: rgba(15, 23, 42, 0.25) !important;
+            border: 1px dashed rgba(100, 116, 139, 0.45) !important;
+            min-height: 2.75rem !important;
+            text-align: center !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-empty) button {
+            font-size: 0.76rem !important;
+            min-height: 1.45rem !important;
             padding: 0.15rem 0.45rem !important;
-            font-size: 0.8rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-sheet-narrow.ips-tt-zebra-0) {
+            background: rgba(22, 32, 48, 0.5) !important;
+            border: 1px solid rgba(71, 85, 105, 0.5) !important;
+            border-radius: 3px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-sheet-narrow.ips-tt-zebra-1) {
+            background: rgba(17, 26, 39, 0.55) !important;
+            border: 1px solid rgba(71, 85, 105, 0.5) !important;
+            border-radius: 3px !important;
         }
         </style>
         """,
@@ -628,10 +798,11 @@ def _tt_flat_entry_rows(
 
 
 def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> None:
-    """One row aligned to the grid: Employee + Mon–Sun + Σ."""
+    """One row aligned to the grid: Employee + Mon–Sun + Σ (spreadsheet header band)."""
     h0, *hday, hlast = st.columns(grid_ratios)
     with h0:
         st.markdown(
+            '<span class="ips-tt-sheet-hdr-corner" aria-hidden="true"></span>'
             '<div class="ips-tt-week-hdr-cell ips-tt-week-hdr-emp">'
             '<span class="ips-tt-week-hdr-title">Employee</span></div>',
             unsafe_allow_html=True,
@@ -639,14 +810,14 @@ def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> No
     for di, d in enumerate(days):
         with hday[di]:
             st.markdown(
-                f'<div class="ips-tt-week-hdr-day">'
+                f'<div class="ips-tt-week-hdr-day ips-tt-sheet-hdr-day">'
                 f'<span class="ips-tt-wh-dow">{d.strftime("%a")}</span>'
                 f'<span class="ips-tt-wh-date">{d.strftime("%b %d")}</span></div>',
                 unsafe_allow_html=True,
             )
     with hlast:
         st.markdown(
-            '<div class="ips-tt-week-hdr-sum">Σ</div>',
+            '<div class="ips-tt-week-hdr-sum ips-tt-sheet-hdr-sum">Σ</div>',
             unsafe_allow_html=True,
         )
 
@@ -1059,12 +1230,13 @@ def render() -> None:
     if not is_narrow:
         _render_week_header_row(grid_ratios=grid_ratios, days=days)
 
-    for emp in visible_emps:
+    for ri, emp in enumerate(visible_emps):
         eid = str(emp.get("id"))
         row_h = sum_employee_week_hours(grid_rows, eid, days)
         over = row_h > ot_threshold
         nm = str(emp.get("name", "") or "—")
         tot_s = f"{row_h:.1f} h" if fast else f"{row_h:.1f} h / week"
+        zebra = ri % 2
 
         def _emp_name_block() -> None:
             if over:
@@ -1084,6 +1256,10 @@ def render() -> None:
 
         if is_narrow:
             with st.container(border=True):
+                st.markdown(
+                    f'<span class="ips-tt-sheet-narrow ips-tt-zebra-{zebra}" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 _emp_name_block()
                 _render_quick_actions(
                     eid=eid,
@@ -1117,6 +1293,10 @@ def render() -> None:
             with row_container:
                 h0, *hday, hlast = st.columns(grid_ratios)
                 with h0:
+                    st.markdown(
+                        f'<span class="ips-tt-sheet-row ips-tt-zebra-{zebra}" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     _emp_name_block()
                     _render_quick_actions(
                         eid=eid,
@@ -1147,9 +1327,10 @@ def render() -> None:
                     st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
 
     # Footer totals row
-    st.markdown("##### Week totals")
+    st.caption("Week totals")
     f0, *fday, fl = st.columns(grid_ratios)
     with f0:
+        st.markdown('<span class="ips-tt-sheet-footer-row" aria-hidden="true"></span>', unsafe_allow_html=True)
         st.markdown("**Day Σ**")
     for di, d in enumerate(days):
         with fday[di]:
@@ -1170,7 +1351,11 @@ def _render_quick_actions(
     ts_iso: str,
 ) -> None:
     day_labels = [d.strftime("%a %m/%d") for d in days]
-    with st.popover("⚡", help="Copy day/week, fill week, clear week"):
+    with st.popover(
+        "⚡",
+        help="Copy day or week · fill week · clear",
+        type="tertiary",
+    ):
         st.markdown(
             '<span class="ips-tt-qa-panel" aria-hidden="true"></span>',
             unsafe_allow_html=True,
@@ -1524,11 +1709,16 @@ def _render_day_column_body(
     fast: bool,
     show_day_heading: bool,
 ) -> float:
-    """Day cell: sum + bordered card with editors / add form. Returns visible day hours sum."""
+    """Day cell under week header: subtotal + card(s). Returns visible day hours sum."""
     wd = d.isoformat()
     ents_all = idx.get((eid, wd), [])
     ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
     day_sum = sum(float(e.get("hours", 0) or 0) for e in ents_show)
+    expand_key = f"tt_day_add_open_{eid}_{wd}"
+    if ents_show:
+        st.session_state.pop(expand_key, None)
+    add_open = bool(st.session_state.get(expand_key))
+
     if show_day_heading:
         st.markdown(
             f'<div class="ips-tt-day-head">{d.strftime("%a %m/%d")}</div>',
@@ -1538,20 +1728,28 @@ def _render_day_column_body(
         f'<div class="ips-tt-day-sum">{day_sum:.1f} h</div>',
         unsafe_allow_html=True,
     )
+
     with st.container(border=True):
-        st.markdown(
-            '<span class="ips-tt-day-card" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
         if not ents_show and not job_labels_sorted:
             st.caption("—")
-        for ei, ent in enumerate(ents_show):
-            if ei:
-                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-            _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
-        if job_labels_sorted:
-            if ents_show:
-                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+        elif not ents_show and job_labels_sorted and not add_open:
+            st.markdown(
+                '<span class="ips-tt-day-cell ips-tt-day-empty" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "+ Add entry",
+                key=f"tt_open_add_{eid}_{wd}",
+                use_container_width=True,
+                type="secondary",
+            ):
+                st.session_state[expand_key] = True
+                st.rerun()
+        elif not ents_show and job_labels_sorted and add_open:
+            st.markdown(
+                '<span class="ips-tt-day-cell ips-tt-day-card" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             _render_new_entry_form(
                 eid,
                 wd,
@@ -1561,6 +1759,34 @@ def _render_day_column_body(
                 ents_show,
                 fast=fast,
             )
+            if st.button(
+                "Cancel",
+                key=f"tt_cancel_add_{eid}_{wd}",
+                use_container_width=True,
+                type="tertiary",
+            ):
+                st.session_state.pop(expand_key, None)
+                st.rerun()
+        else:
+            st.markdown(
+                '<span class="ips-tt-day-cell ips-tt-day-card" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            for ei, ent in enumerate(ents_show):
+                if ei:
+                    st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+                _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
+            if job_labels_sorted:
+                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+                _render_new_entry_form(
+                    eid,
+                    wd,
+                    job_labels_sorted,
+                    job_label_to_id,
+                    default_job_label,
+                    ents_show,
+                    fast=fast,
+                )
     return day_sum
 
 
