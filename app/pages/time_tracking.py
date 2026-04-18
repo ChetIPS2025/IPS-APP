@@ -6,6 +6,11 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import streamlit as st
 
+try:
+    from mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected
+except ImportError:
+    from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected  # type: ignore
+
 from auth import current_profile, current_role
 from branding import render_header
 from db import delete_rows, fetch_one, fetch_table, insert_row, update_rows
@@ -74,10 +79,14 @@ def _tt_fast_entry() -> bool:
 
 
 def _week_grid_column_ratios(*, fast: bool) -> list[float]:
-    """Name column + 7 day cards + week sum — day columns weighted for usable entry width."""
+    """10 columns: employee (fixed-narrow) + quick-actions + Mon–Sun + Σ.
+
+    Nested ``st.columns`` inside the employee cell breaks Streamlit row layout and
+    stacks all day editors under Monday; QA must be its own top-level column.
+    """
     if fast:
-        return [0.68] + [1.72] * 7 + [0.42]
-    return [0.92] + [1.45] * 7 + [0.46]
+        return [0.4, 0.22] + [1.8] * 7 + [0.34]
+    return [0.5, 0.24] + [1.5] * 7 + [0.36]
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -556,6 +565,40 @@ def _inject_tt_styles() -> None:
             gap: 6px;
             align-items: center;
         }
+        .ips-tt-week-hdr-cell, .ips-tt-week-hdr-day, .ips-tt-week-hdr-sum {
+            text-align: center;
+            color: #94a3b8 !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 2px 0 4px 0;
+        }
+        .ips-tt-week-hdr-emp { text-align: left !important; }
+        .ips-tt-week-hdr-qa { min-height: 1px; opacity: 0.35; }
+        .ips-tt-week-hdr-title { display: block; color: #cbd5e1 !important; font-size: 10px !important; }
+        .ips-tt-wh-dow { display: block; color: #e2e8f0 !important; font-size: 11px !important; }
+        .ips-tt-wh-date { display: block; font-size: 10px !important; font-weight: 600 !important; opacity: 0.9; }
+        .ips-tt-emp-cell {
+            padding: 2px 2px 4px 0;
+            line-height: 1.25;
+        }
+        .ips-tt-emp-name {
+            font-size: 0.95rem !important;
+            font-weight: 650 !important;
+            color: #f1f5f9 !important;
+            margin: 0 0 2px 0 !important;
+        }
+        .ips-tt-emp-total {
+            font-size: 0.82rem !important;
+            font-weight: 600 !important;
+            color: #94a3b8 !important;
+        }
+        button[kind="secondary"][data-testid="stBaseButton-popover"] {
+            min-height: 1.5rem !important;
+            padding: 0.15rem 0.45rem !important;
+            font-size: 0.8rem !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -597,10 +640,40 @@ def _tt_flat_entry_rows(
     return out
 
 
+def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> None:
+    """Aligned header: employee + QA slot + Mon–Sun + Σ (matches 10-column grid)."""
+    h_emp, h_qa, *hday, hlast = st.columns(grid_ratios)
+    with h_emp:
+        st.markdown(
+            '<div class="ips-tt-week-hdr-cell ips-tt-week-hdr-emp">'
+            '<span class="ips-tt-week-hdr-title">Employee</span></div>',
+            unsafe_allow_html=True,
+        )
+    with h_qa:
+        st.markdown(
+            '<div class="ips-tt-week-hdr-cell ips-tt-week-hdr-qa" aria-hidden="true">\u00a0</div>',
+            unsafe_allow_html=True,
+        )
+    for di, d in enumerate(days):
+        with hday[di]:
+            st.markdown(
+                f'<div class="ips-tt-week-hdr-day">'
+                f'<span class="ips-tt-wh-dow">{d.strftime("%a")}</span>'
+                f'<span class="ips-tt-wh-date">{d.strftime("%b %d")}</span></div>',
+                unsafe_allow_html=True,
+            )
+    with hlast:
+        st.markdown(
+            '<div class="ips-tt-week-hdr-sum">Σ</div>',
+            unsafe_allow_html=True,
+        )
+
+
 def render() -> None:
     render_header("Time Tracking", subtitle="Weekly calendar — fast row entry by employee and job")
 
     _inject_tt_styles()
+    ensure_narrow_viewport_detected()
     try:
         from ui import IPS_NAV_PENDING_KEY
     except ImportError:
@@ -804,7 +877,7 @@ def render() -> None:
                 with tb2:
                     st.checkbox("Auto-save", key=TT_AUTOSAVE_KEY)
             else:
-                tb1, tb2, tb3, tb4 = st.columns([1.15, 1.35, 2.2, 2.8], gap="small")
+                tb1, tb2, tb3 = st.columns([1.15, 1.35, 4.0], gap="small")
                 with tb1:
                     dh = st.number_input(
                         "Default hrs",
@@ -823,9 +896,9 @@ def render() -> None:
                         help="When on, job / hours / notes save on change. Save still works for explicit commit.",
                     )
                 with tb3:
-                    st.caption("Rows: **Save** · **Del** · **Dup** copies last line (or filter job + default hrs).")
-                with tb4:
-                    st.caption("Stable keys by entry id. One job per employee per day.")
+                    st.caption(
+                        "**Save / Del / Dup** — stable keys by entry id; one job line per employee per day."
+                    )
 
     tv_id = st.session_state.get("tt_entry_view_id")
     if tv_id:
@@ -1002,91 +1075,116 @@ def render() -> None:
         _render_readonly_pivot(visible_emps, days, idx, job_id_to_label)
         return
 
-    # —— Editable grid —— (wider day columns in Fast Entry Mode)
+    # —— Editable grid —— weekly timesheet: header + employee rows (wide) or stacked days (narrow)
     day_col_totals = [0.0] * 7
     uid = current_profile().get("id")
     ts_now = datetime.now(timezone.utc).isoformat()
     grid_ratios = _week_grid_column_ratios(fast=fast)
+    is_narrow = bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY))
+
+    if not is_narrow:
+        _render_week_header_row(grid_ratios=grid_ratios, days=days)
 
     for emp in visible_emps:
         eid = str(emp.get("id"))
         row_h = sum_employee_week_hours(grid_rows, eid, days)
         over = row_h > ot_threshold
+        nm = str(emp.get("name", "") or "—")
+        tot_s = f"{row_h:.1f} h" if fast else f"{row_h:.1f} h / week"
 
-        row_container = st.container(border=True)
-        with row_container:
-            h0, *hday, hlast = st.columns(grid_ratios)
-            with h0:
-                if over:
-                    st.markdown(
-                        f'<p class="ips-tt-row-over ips-tt-metric">{emp.get("name", "")} — {row_h:.1f} h (over {ot_threshold:g} h)</p>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(f'<p class="ips-tt-metric">{emp.get("name", "")}</p>', unsafe_allow_html=True)
-                if fast:
-                    st.caption(f"{row_h:.1f}h")
-                else:
-                    st.caption(f"{row_h:.1f} h / week")
-                _render_quick_actions(
-                    eid=eid,
-                    days=days,
-                    week_start=week_start,
-                    week_end=week_end,
-                    job_labels_sorted=job_labels_sorted,
-                    job_label_to_id=job_label_to_id,
-                    user_id=uid,
-                    ts_iso=ts_now,
+        def _emp_name_block() -> None:
+            if over:
+                st.markdown(
+                    f'<div class="ips-tt-emp-cell">'
+                    f'<p class="ips-tt-emp-name ips-tt-row-over">{nm}</p>'
+                    f'<p class="ips-tt-emp-total">{tot_s} · over {ot_threshold:g} h</p></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="ips-tt-emp-cell">'
+                    f'<p class="ips-tt-emp-name">{nm}</p>'
+                    f'<p class="ips-tt-emp-total">{tot_s}</p></div>',
+                    unsafe_allow_html=True,
                 )
 
-            for di, d in enumerate(days):
-                wd = d.isoformat()
-                with hday[di]:
-                    st.markdown(
-                        f'<div class="ips-tt-day-head">{d.strftime("%a %m/%d")}</div>',
-                        unsafe_allow_html=True,
+        if is_narrow:
+            with st.container(border=True):
+                h_top_l, h_top_r = st.columns([3.2, 1.0], gap="small")
+                with h_top_l:
+                    _emp_name_block()
+                with h_top_r:
+                    _render_quick_actions(
+                        eid=eid,
+                        days=days,
+                        week_start=week_start,
+                        week_end=week_end,
+                        job_labels_sorted=job_labels_sorted,
+                        job_label_to_id=job_label_to_id,
+                        user_id=uid,
+                        ts_iso=ts_now,
                     )
-                    ents_all = idx.get((eid, wd), [])
-                    ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
-                    day_sum = sum(float(e.get("hours", 0) or 0) for e in ents_show)
-                    day_col_totals[di] += day_sum
-                    st.markdown(
-                        f'<div class="ips-tt-day-sum">{day_sum:.1f} h</div>',
-                        unsafe_allow_html=True,
+                for di, d in enumerate(days):
+                    ds = _render_day_column_body(
+                        d=d,
+                        eid=eid,
+                        idx=idx,
+                        fj_id=fj_id,
+                        job_labels_sorted=job_labels_sorted,
+                        job_label_to_id=job_label_to_id,
+                        default_job_label=default_job_label,
+                        fast=fast,
+                        show_day_heading=True,
+                        compact=True,
                     )
-
-                    with st.container(border=True):
-                        st.markdown(
-                            '<span class="ips-tt-day-card" aria-hidden="true"></span>',
-                            unsafe_allow_html=True,
+                    day_col_totals[di] += ds
+                st.markdown(
+                    f'<p class="ips-tt-metric" style="text-align:right;margin-top:0.35rem;">Week Σ · {row_h:.1f} h</p>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            row_container = st.container(border=True)
+            with row_container:
+                h_emp, h_qa, *hday, hlast = st.columns(grid_ratios)
+                with h_emp:
+                    _emp_name_block()
+                with h_qa:
+                    _render_quick_actions(
+                        eid=eid,
+                        days=days,
+                        week_start=week_start,
+                        week_end=week_end,
+                        job_labels_sorted=job_labels_sorted,
+                        job_label_to_id=job_label_to_id,
+                        user_id=uid,
+                        ts_iso=ts_now,
+                    )
+                for di, d in enumerate(days):
+                    with hday[di]:
+                        ds = _render_day_column_body(
+                            d=d,
+                            eid=eid,
+                            idx=idx,
+                            fj_id=fj_id,
+                            job_labels_sorted=job_labels_sorted,
+                            job_label_to_id=job_label_to_id,
+                            default_job_label=default_job_label,
+                            fast=fast,
+                            show_day_heading=False,
+                            compact=True,
                         )
-                        if not ents_show and not job_labels_sorted:
-                            st.caption("—")
-                        for ei, ent in enumerate(ents_show):
-                            if ei:
-                                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-                            _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
-                        if job_labels_sorted:
-                            if ents_show:
-                                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-                            _render_new_entry_form(
-                                eid,
-                                wd,
-                                job_labels_sorted,
-                                job_label_to_id,
-                                default_job_label,
-                                ents_show,
-                                fast=fast,
-                            )
-            with hlast:
-                st.caption("Σ")
-                st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
+                        day_col_totals[di] += ds
+                with hlast:
+                    st.caption("Σ")
+                    st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
 
     # Footer totals row
     st.markdown("##### Week totals")
-    f0, *fday, fl = st.columns(grid_ratios)
-    with f0:
+    f_emp, f_qa, *fday, fl = st.columns(grid_ratios)
+    with f_emp:
         st.markdown("**Day Σ**")
+    with f_qa:
+        st.markdown('<span class="ips-tt-footer-qa-spacer"></span>', unsafe_allow_html=True)
     for di, d in enumerate(days):
         with fday[di]:
             st.markdown(f'<p class="ips-tt-metric">{day_col_totals[di]:.1f} h</p>', unsafe_allow_html=True)
@@ -1106,12 +1204,12 @@ def _render_quick_actions(
     ts_iso: str,
 ) -> None:
     day_labels = [d.strftime("%a %m/%d") for d in days]
-    with st.expander("⚡ Quick actions", expanded=False):
+    with st.popover("⚡", help="Copy day/week, fill week, clear week"):
         st.markdown(
             '<span class="ips-tt-qa-panel" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        st.caption("Copy **from the previous calendar day** into the day you select (Monday uses the prior Sunday).")
+        st.caption("Copy **previous calendar day** into selected day (Mon ← Sun).")
         qd1, qd2 = st.columns([1.55, 1.0], gap="small")
         with qd1:
             st.markdown('<p class="ips-tt-field-label">To day</p>', unsafe_allow_html=True)
@@ -1231,6 +1329,7 @@ def _render_entry_editor(
     job_label_to_id: dict[str, str],
     *,
     fast: bool,
+    compact: bool = False,
 ) -> None:
     te_id = str(ent.get("id"))
     cur_jid = str(ent.get("job_id") or "")
@@ -1249,42 +1348,7 @@ def _render_entry_editor(
     del_label = "Clear" if fast else "Delete"
     del_help = "Remove this time entry" if fast else "Delete this time entry"
 
-    cj, ch, cn, cb = st.columns([2.2, 0.62, 1.65, 0.92], gap="small")
-    with cj:
-        st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
-        st.selectbox(
-            "Job",
-            job_labels_sorted,
-            index=j_ix,
-            key=f"tt_job_{te_id}",
-            label_visibility="collapsed",
-            **ch_as,
-        )
-    with ch:
-        st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
-        st.number_input(
-            "Hours",
-            min_value=0.0,
-            max_value=24.0,
-            value=float(ent.get("hours", 0) or 0),
-            step=hstep,
-            format="%.2f",
-            key=f"tt_h_{te_id}",
-            label_visibility="collapsed",
-            **ch_as,
-        )
-    with cn:
-        st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
-        st.text_input(
-            "Notes",
-            value=str(ent.get("notes") or ""),
-            key=f"tt_n_{te_id}",
-            label_visibility="collapsed",
-            placeholder="Notes",
-            **ch_as,
-        )
-    with cb:
-        st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+    def _save_del_row() -> None:
         b_save, b_del = st.columns(2, gap="small")
         with b_save:
             if st.button(
@@ -1313,6 +1377,80 @@ def _render_entry_editor(
                 except Exception as exc:
                     st.error(f"Delete failed: {exc}")
 
+    if compact:
+        st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+        st.selectbox(
+            "Job",
+            job_labels_sorted,
+            index=j_ix,
+            key=f"tt_job_{te_id}",
+            label_visibility="collapsed",
+            **ch_as,
+        )
+        ch, cn = st.columns([0.45, 1.0], gap="small")
+        with ch:
+            st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
+            st.number_input(
+                "Hours",
+                min_value=0.0,
+                max_value=24.0,
+                value=float(ent.get("hours", 0) or 0),
+                step=hstep,
+                format="%.2f",
+                key=f"tt_h_{te_id}",
+                label_visibility="collapsed",
+                **ch_as,
+            )
+        with cn:
+            st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+            st.text_input(
+                "Notes",
+                value=str(ent.get("notes") or ""),
+                key=f"tt_n_{te_id}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+                **ch_as,
+            )
+        _save_del_row()
+    else:
+        cj, ch, cn, cb = st.columns([2.2, 0.62, 1.65, 0.92], gap="small")
+        with cj:
+            st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+            st.selectbox(
+                "Job",
+                job_labels_sorted,
+                index=j_ix,
+                key=f"tt_job_{te_id}",
+                label_visibility="collapsed",
+                **ch_as,
+            )
+        with ch:
+            st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
+            st.number_input(
+                "Hours",
+                min_value=0.0,
+                max_value=24.0,
+                value=float(ent.get("hours", 0) or 0),
+                step=hstep,
+                format="%.2f",
+                key=f"tt_h_{te_id}",
+                label_visibility="collapsed",
+                **ch_as,
+            )
+        with cn:
+            st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+            st.text_input(
+                "Notes",
+                value=str(ent.get("notes") or ""),
+                key=f"tt_n_{te_id}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+                **ch_as,
+            )
+        with cb:
+            st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+            _save_del_row()
+
 
 def _render_new_entry_form(
     employee_id: str,
@@ -1323,6 +1461,7 @@ def _render_new_entry_form(
     entries_for_day: list[dict],
     *,
     fast: bool,
+    compact: bool = False,
 ) -> None:
     if not job_labels_sorted:
         return
@@ -1332,13 +1471,80 @@ def _render_new_entry_form(
 
     def_h = _tt_default_hours()
     hstep = _hours_step(fast=fast)
+    dup_label = "Dup" if fast else "Duplicate"
+
+    def _on_add() -> None:
+        job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
+        hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
+        note = str(st.session_state.get(f"tt_newn_{employee_id}_{work_date_iso}") or "").strip()
+        jid = job_label_to_id.get(job_pick) if isinstance(job_pick, str) else None
+        if not jid:
+            st.error("Invalid job.")
+            st.stop()
+        if hrs <= 0:
+            st.error("Enter hours greater than zero.")
+            st.stop()
+        payload = {
+            "employee_id": employee_id,
+            "job_id": jid,
+            "work_date": work_date_iso[:10],
+            "hours": float(hrs),
+            "notes": note,
+            "created_by": current_profile().get("id"),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            insert_row("time_entries", payload)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Could not add (duplicate job for this day?): {exc}")
+
+    def _on_dup() -> None:
+        src = entries_for_day[-1] if entries_for_day else None
+        if src:
+            sjid = str(src.get("job_id") or "")
+            slabel = _job_label_for_id(job_label_to_id, sjid)
+            if not slabel:
+                st.error("Could not resolve job for duplicate.")
+                st.stop()
+            hrs = float(src.get("hours") or 0) or def_h
+            note = str(src.get("notes") or "").strip()
+            jid = job_label_to_id.get(slabel)
+            if not jid:
+                st.error("Invalid job on source row.")
+                st.stop()
+        else:
+            if not default_job_label or default_job_label not in job_label_to_id:
+                st.error("No line to copy — pick a filter job or add a row first.")
+                st.stop()
+            slabel = default_job_label
+            jid = job_label_to_id[slabel]
+            hrs = float(def_h)
+            note = ""
+        if hrs <= 0:
+            st.error("Hours must be greater than zero.")
+            st.stop()
+        payload = {
+            "employee_id": employee_id,
+            "job_id": jid,
+            "work_date": work_date_iso[:10],
+            "hours": float(hrs),
+            "notes": note,
+            "created_by": current_profile().get("id"),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            insert_row("time_entries", payload)
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Duplicate not added (same job this day?): {exc}")
+
     st.markdown('<div class="ips-tt-new-block">', unsafe_allow_html=True)
     st.markdown(
         '<p class="ips-tt-field-label">New entry</p>' if fast else '<p class="ips-tt-field-label">Add row</p>',
         unsafe_allow_html=True,
     )
-    nj1, nj2, nj3, nj4 = st.columns([2.15, 0.62, 1.55, 0.95], gap="small")
-    with nj1:
+    if compact:
         st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
         st.selectbox(
             "Job",
@@ -1347,29 +1553,27 @@ def _render_new_entry_form(
             key=f"tt_newj_{employee_id}_{work_date_iso}",
             label_visibility="collapsed",
         )
-    with nj2:
-        st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
-        st.number_input(
-            "Hours",
-            min_value=0.0,
-            max_value=24.0,
-            value=float(def_h),
-            step=hstep,
-            key=f"tt_newh_{employee_id}_{work_date_iso}",
-            label_visibility="collapsed",
-        )
-    with nj3:
-        st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
-        st.text_input(
-            "Notes",
-            value="",
-            key=f"tt_newn_{employee_id}_{work_date_iso}",
-            label_visibility="collapsed",
-            placeholder="Notes",
-        )
-    with nj4:
-        st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
-        dup_label = "Dup" if fast else "Duplicate"
+        r1, r2 = st.columns([0.45, 1.0], gap="small")
+        with r1:
+            st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
+            st.number_input(
+                "Hours",
+                min_value=0.0,
+                max_value=24.0,
+                value=float(def_h),
+                step=hstep,
+                key=f"tt_newh_{employee_id}_{work_date_iso}",
+                label_visibility="collapsed",
+            )
+        with r2:
+            st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+            st.text_input(
+                "Notes",
+                value="",
+                key=f"tt_newn_{employee_id}_{work_date_iso}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+            )
         ba, bd = st.columns(2, gap="small")
         with ba:
             if st.button(
@@ -1378,30 +1582,7 @@ def _render_new_entry_form(
                 use_container_width=True,
                 help="Add time entry",
             ):
-                job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
-                hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
-                note = str(st.session_state.get(f"tt_newn_{employee_id}_{work_date_iso}") or "").strip()
-                jid = job_label_to_id.get(job_pick) if isinstance(job_pick, str) else None
-                if not jid:
-                    st.error("Invalid job.")
-                    st.stop()
-                if hrs <= 0:
-                    st.error("Enter hours greater than zero.")
-                    st.stop()
-                payload = {
-                    "employee_id": employee_id,
-                    "job_id": jid,
-                    "work_date": work_date_iso[:10],
-                    "hours": float(hrs),
-                    "notes": note,
-                    "created_by": current_profile().get("id"),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-                try:
-                    insert_row("time_entries", payload)
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Could not add (duplicate job for this day?): {exc}")
+                _on_add()
         with bd:
             dup_key = f"tt_dup_{employee_id}_{work_date_iso}"
             if st.button(
@@ -1410,45 +1591,119 @@ def _render_new_entry_form(
                 use_container_width=True,
                 help="Copy last line this day (or filter job + default hours)",
             ):
-                src = entries_for_day[-1] if entries_for_day else None
-                if src:
-                    sjid = str(src.get("job_id") or "")
-                    slabel = _job_label_for_id(job_label_to_id, sjid)
-                    if not slabel:
-                        st.error("Could not resolve job for duplicate.")
-                        st.stop()
-                    hrs = float(src.get("hours") or 0) or def_h
-                    note = str(src.get("notes") or "").strip()
-                    jid = job_label_to_id.get(slabel)
-                    if not jid:
-                        st.error("Invalid job on source row.")
-                        st.stop()
-                else:
-                    if not default_job_label or default_job_label not in job_label_to_id:
-                        st.error("No line to copy — pick a filter job or add a row first.")
-                        st.stop()
-                    slabel = default_job_label
-                    jid = job_label_to_id[slabel]
-                    hrs = float(def_h)
-                    note = ""
-                if hrs <= 0:
-                    st.error("Hours must be greater than zero.")
-                    st.stop()
-                payload = {
-                    "employee_id": employee_id,
-                    "job_id": jid,
-                    "work_date": work_date_iso[:10],
-                    "hours": float(hrs),
-                    "notes": note,
-                    "created_by": current_profile().get("id"),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-                try:
-                    insert_row("time_entries", payload)
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Duplicate not added (same job this day?): {exc}")
+                _on_dup()
+    else:
+        nj1, nj2, nj3, nj4 = st.columns([2.15, 0.62, 1.55, 0.95], gap="small")
+        with nj1:
+            st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+            st.selectbox(
+                "Job",
+                job_labels_sorted,
+                index=d0,
+                key=f"tt_newj_{employee_id}_{work_date_iso}",
+                label_visibility="collapsed",
+            )
+        with nj2:
+            st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
+            st.number_input(
+                "Hours",
+                min_value=0.0,
+                max_value=24.0,
+                value=float(def_h),
+                step=hstep,
+                key=f"tt_newh_{employee_id}_{work_date_iso}",
+                label_visibility="collapsed",
+            )
+        with nj3:
+            st.markdown('<p class="ips-tt-field-label">Notes</p>', unsafe_allow_html=True)
+            st.text_input(
+                "Notes",
+                value="",
+                key=f"tt_newn_{employee_id}_{work_date_iso}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+            )
+        with nj4:
+            st.markdown('<p class="ips-tt-field-label">\u00a0</p>', unsafe_allow_html=True)
+            ba, bd = st.columns(2, gap="small")
+            with ba:
+                if st.button(
+                    "Add",
+                    key=f"tt_add_{employee_id}_{work_date_iso}",
+                    use_container_width=True,
+                    help="Add time entry",
+                ):
+                    _on_add()
+            with bd:
+                dup_key = f"tt_dup_{employee_id}_{work_date_iso}"
+                if st.button(
+                    dup_label,
+                    key=dup_key,
+                    use_container_width=True,
+                    help="Copy last line this day (or filter job + default hours)",
+                ):
+                    _on_dup()
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_day_column_body(
+    *,
+    d: date,
+    eid: str,
+    idx: dict,
+    fj_id: str | None,
+    job_labels_sorted: list[str],
+    job_label_to_id: dict[str, str],
+    default_job_label: str | None,
+    fast: bool,
+    show_day_heading: bool,
+    compact: bool = False,
+) -> float:
+    """Day cell: sum + bordered card with editors / add form. Returns visible day hours sum."""
+    wd = d.isoformat()
+    ents_all = idx.get((eid, wd), [])
+    ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
+    day_sum = sum(float(e.get("hours", 0) or 0) for e in ents_show)
+    if show_day_heading:
+        st.markdown(
+            f'<div class="ips-tt-day-head">{d.strftime("%a %m/%d")}</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        f'<div class="ips-tt-day-sum">{day_sum:.1f} h</div>',
+        unsafe_allow_html=True,
+    )
+    with st.container(border=True):
+        st.markdown(
+            '<span class="ips-tt-day-card" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        if not ents_show and not job_labels_sorted:
+            st.caption("—")
+        for ei, ent in enumerate(ents_show):
+            if ei:
+                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+            _render_entry_editor(
+                ent,
+                job_labels_sorted,
+                job_label_to_id,
+                fast=fast,
+                compact=compact,
+            )
+        if job_labels_sorted:
+            if ents_show:
+                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+            _render_new_entry_form(
+                eid,
+                wd,
+                job_labels_sorted,
+                job_label_to_id,
+                default_job_label,
+                ents_show,
+                fast=fast,
+                compact=compact,
+            )
+    return day_sum
 
 
 def _render_readonly_pivot(

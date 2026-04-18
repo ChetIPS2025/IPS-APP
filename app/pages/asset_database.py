@@ -294,7 +294,7 @@ def _render_asset_panel_view(row: dict) -> None:
         with c_img:
             _render_asset_list_thumbnail(row)
         with c_txt:
-            st.markdown(f"**{_disp(row.get('asset_id'))}** · {_disp(row.get('asset_name'))}")
+            st.markdown(f"**{_disp(row.get('asset_name'))}**")
             st.caption(
                 f"{_disp(row.get('manufacturer'))} · {_disp(row.get('model'))} · "
                 f"Serial {_disp(row.get('serial_number'))}"
@@ -348,12 +348,12 @@ def _render_asset_panel_edit(
     with st.container(border=True):
         st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
         st.markdown("### Edit asset")
-        st.caption(f"ID `{rid[:8]}…`")
+        # Business asset id (e.g. EQCAT-…) kept for save payload — not shown in the UI.
+        asset_id = str(cv("asset_id") or "").strip()
 
-        c1, c2, c3 = st.columns(3)
-        asset_id = c1.text_input("Asset ID", value=str(cv("asset_id")), disabled=True, key=pk("aid"))
-        asset_name = c2.text_input("Asset Name", value=str(cv("asset_name")), key=pk("name"))
-        asset_type = c3.selectbox(
+        c1, c2 = st.columns(2)
+        asset_name = c1.text_input("Asset Name", value=str(cv("asset_name")), key=pk("name"))
+        asset_type = c2.selectbox(
             "Asset Type",
             ASSET_TYPES,
             index=ASSET_TYPES.index(cv("asset_type", "Other"))
@@ -776,7 +776,6 @@ def render() -> None:
         table_cols = [
             c
             for c in [
-                "asset_id",
                 "asset_name",
                 "manufacturer",
                 "model",
@@ -797,6 +796,7 @@ def render() -> None:
             id_column="id",
             columns=table_cols,
             editor_key="asset_db_sel_editor",
+            hide_id_column=True,
         )
         actions = render_table_action_bar(
             TABLE_KEY_ASSETS,
@@ -868,7 +868,7 @@ def render() -> None:
 
             st.text_input(
                 "Search Assets",
-                placeholder="Search asset id, name, manufacturer, model, serial, status, category",
+                placeholder="Search name, manufacturer, model, serial, status, category",
                 key="asset_db_f_search",
             )
             statuses = sorted(
@@ -920,7 +920,7 @@ def render() -> None:
                 st.selectbox("Filter Status", ["All"] + statuses, key="asset_db_f_status")
             filter_cols[1].text_input(
                 "Search Assets",
-                placeholder="Search asset id, name, manufacturer, model, serial, status, category",
+                placeholder="Search name, manufacturer, model, serial, status, category",
                 key="asset_db_f_search",
             )
             serial_options = ["All", "Has serial", "No serial"]
