@@ -477,6 +477,15 @@ def _render_asset_panel_edit(
 
 _ASSET_DB_LIST_CSS = """
 <style>
+.ips-adb-card-title-line {
+  margin: 0;
+  line-height: 1.35;
+}
+.ips-adb-card-title-line .ips-adb-card-name {
+  font-weight: 650;
+  font-size: 1.05rem;
+  color: inherit;
+}
 .ips-asset-thumb-placeholder {
   width: 88px;
   height: 88px;
@@ -637,8 +646,6 @@ def render_asset_database_card_list(
                 with c_body:
                     st.markdown(
                         '<p class="ips-adb-card-title-line">'
-                        f'<span class="ips-adb-card-id">{html.escape(_disp(rec.get("asset_id")))}</span>'
-                        '<span class="ips-adb-card-sep"> · </span>'
                         f'<span class="ips-adb-card-name">{html.escape(_disp(rec.get("asset_name")))}</span>'
                         f"{rental_badge}</p>",
                         unsafe_allow_html=True,
@@ -674,7 +681,9 @@ def render_asset_database_card_list(
             _render_asset_list_thumbnail(rec, thumb_px=thumb_px)
         with cm:
             st.markdown(
-                f"**{_disp(rec.get('asset_id'))}** · {_disp(rec.get('asset_name'))}{rental_badge}",
+                '<p class="ips-adb-card-title-line">'
+                f'<span class="ips-adb-card-name">{html.escape(_disp(rec.get("asset_name")))}</span>'
+                f"{rental_badge}</p>",
                 unsafe_allow_html=True,
             )
             cat_suffix = ""

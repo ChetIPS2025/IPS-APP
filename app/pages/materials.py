@@ -64,9 +64,9 @@ except ImportError:
 MARKUP_PCT = 0.25
 _MAT_DELETE_CONFIRM_PREFIX = "materials_delete"
 
-# Hidden from the main catalog grid only (still in DB, add/edit forms, and search).
+# Hidden from the main catalog grid only (still in DB, selection, add/edit, filters, and search).
 _MATERIAL_LIST_HIDDEN_COLS: frozenset[str] = frozenset(
-    {"inventory_id", "item_key", "stock_length", "subgroup"}
+    {"id", "is_active", "inventory_id", "item_key", "stock_length", "subgroup"}
 )
 
 
@@ -124,16 +124,16 @@ def _category_subgroup_options(df: pd.DataFrame) -> tuple[list[str], list[str]]:
 
 
 def _visible_material_list_columns(filtered: pd.DataFrame) -> list[str]:
-    """Columns shown in the main selectable grid (excludes internal / hidden fields)."""
+    """Columns shown in the main selectable grid — user-facing fields only; never id / is_active / internal keys."""
     preferred_order = [
         "description",
         "category",
         "unit",
         "purchase_price",
         "sell_price",
-        "is_active",
     ]
-    return [c for c in preferred_order if c in filtered.columns and c not in _MATERIAL_LIST_HIDDEN_COLS]
+    out = [c for c in preferred_order if c in filtered.columns and c not in _MATERIAL_LIST_HIDDEN_COLS]
+    return [c for c in out if c not in ("id", "is_active")]
 
 
 def _render_material_filter_row(*, df: pd.DataFrame, can_import: bool) -> None:
@@ -562,6 +562,7 @@ def _render_materials_table_main(
         id_column="id",
         columns=show_cols,
         editor_key="mat_sel_editor",
+        hide_id_column=True,
     )
     _sync_selection_to_panel(sel)
 

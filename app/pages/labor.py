@@ -338,15 +338,15 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
         mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
         filtered = filtered[mask.any(axis=1)]
 
+    # Main grid: business fields only — never show id / is_active (still in ``filtered`` for filters & selection).
     show_cols = [
         c
         for c in [
             "classification",
             "st_rate",
             "ot_rate",
-            "is_active",
         ]
-        if c in filtered.columns
+        if c in filtered.columns and c not in ("id", "is_active")
     ]
 
     st.caption(
@@ -373,6 +373,7 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
             id_column="id",
             columns=show_cols,
             editor_key="labor_sel_editor",
+            hide_id_column=True,
         )
         with bar_ph.container():
             _render_labor_action_buttons(sel=sel, can_add=can_add)

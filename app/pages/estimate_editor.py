@@ -1845,12 +1845,11 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        contact_name = _pe["contact_name"]
-        vals = proposal_values(est, totals, **_pe, contact_name=contact_name)
+        vals = proposal_values(est, totals, **_pe)
         embed_docx: bytes | None = None
         embed_docx_err = ""
         try:
-            embed_docx = build_proposal_docx(est, totals, **_pe, contact_name=contact_name)
+            embed_docx = build_proposal_docx(est, totals, **_pe)
         except FileNotFoundError as e:
             embed_docx_err = str(e)
         except Exception as e:
@@ -3198,8 +3197,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        contact_name = _pe["contact_name"]
-        vals = proposal_values(est, totals, **_pe, contact_name=contact_name)
+        vals = proposal_values(est, totals, **_pe)
         st.caption(
             "Standard Word template **estimate_template_autofill_logo_updated.docx** — placeholders from this "
             "estimate; optional **company_logo.png** in **assets/** is merged when present."
@@ -3209,7 +3207,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         pdf_bytes: bytes | None = None
         word_build_error = ""
         try:
-            docx_bytes = build_proposal_docx(est, totals, **_pe, contact_name=contact_name)
+            docx_bytes = build_proposal_docx(est, totals, **_pe)
         except FileNotFoundError as e:
             word_build_error = str(e)
         except Exception as e:
