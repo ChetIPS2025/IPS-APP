@@ -420,15 +420,7 @@ def _render_estimate_list() -> None:
         st.info("No estimates found.")
         return
 
-    # Visible columns (keep list-row layout clean).
-    pref_order = [
-        "quote_number",
-        "Linked job",
-        "status",
-        "proposal_total",
-        "po_number",
-    ]
-    show_cols = [c for c in pref_order if c in df.columns]
+    # Visible columns: fixed order handled explicitly in the row layout below.
     if "id" not in df.columns:
         st.dataframe(df, use_container_width=True, hide_index=True)
         return
@@ -485,21 +477,38 @@ def _render_estimate_list() -> None:
     with nav2:
         st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
 
-    # Row layout: Job action | per-row delete | estimate description | selection checkbox | data columns
-    col_weights = [1.15, 0.36, 1.65, 0.48] + [1.0] * len(show_cols)
+    # Visible order (exact):
+    # Blank | Job | quote number | Estimate Description | proposal total | status | linked job | po number | delete
+    col_weights = [
+        0.42,  # Blank / checkbox
+        1.35,  # Job button
+        1.15,  # quote number
+        2.35,  # estimate description
+        1.10,  # proposal total
+        0.95,  # status
+        1.90,  # linked job
+        1.05,  # po number
+        0.48,  # delete
+    ]
     head = st.columns(col_weights)
     with head[0]:
-        st.caption("Job")
-    with head[1]:
-        st.caption("Del")
-    with head[2]:
-        st.caption("Estimate Description")
-    with head[3]:
         st.caption(" ")
-    for hi, col_name in enumerate(show_cols):
-        with head[4 + hi]:
-            lab = str(col_name).replace("_", " ")
-            st.caption(lab[:22] + ("…" if len(lab) > 22 else ""))
+    with head[1]:
+        st.caption("Job")
+    with head[2]:
+        st.caption("Quote")
+    with head[3]:
+        st.caption("Estimate Description")
+    with head[4]:
+        st.caption("Proposal total")
+    with head[5]:
+        st.caption("Status")
+    with head[6]:
+        st.caption("Linked job")
+    with head[7]:
+        st.caption("PO #")
+    with head[8]:
+        st.caption("Del")
 
     picked: list[str] = []
     for _, est_row in df.iterrows():
@@ -510,6 +519,13 @@ def _render_estimate_list() -> None:
         cust_id = eid_to_customer.get(eid, "")
         rc = st.columns(col_weights)
         with rc[0]:
+            ck = f"est_list_pick_{eid}"
+            if ck not in st.session_state:
+                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
+            checked = st.checkbox("", key=ck, label_visibility="collapsed")
+            if checked:
+                picked.append(eid)
+        with rc[1]:
             if linked_id:
                 st.button(
                     "Job Created",
@@ -549,7 +565,19 @@ def _render_estimate_list() -> None:
                             st.info(res.message)
                         else:
                             st.error(res.message)
-        with rc[1]:
+        with rc[2]:
+            st.text(_estimate_list_cell_text(est_row.get("quote_number"), col="quote_number"))
+        with rc[3]:
+            st.text(_estimate_description_display(est_row))
+        with rc[4]:
+            st.text(_estimate_list_cell_text(est_row.get("proposal_total"), col="proposal_total"))
+        with rc[5]:
+            st.text(_estimate_list_cell_text(est_row.get("status"), col="status"))
+        with rc[6]:
+            st.text(_estimate_list_cell_text(est_row.get("Linked job"), col="Linked job"))
+        with rc[7]:
+            st.text(_estimate_list_cell_text(est_row.get("po_number"), col="po_number"))
+        with rc[8]:
             row_status = str(est_row.get("status") or "").strip().lower()
             del_enabled = bool(can_edit and row_status == "draft")
             if not can_edit:
@@ -568,18 +596,6 @@ def _render_estimate_list() -> None:
                 # Trigger the same confirmation flow the bulk action bar uses.
                 st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
                 st.rerun()
-        with rc[2]:
-            st.text(_estimate_description_display(est_row))
-        with rc[3]:
-            ck = f"est_list_pick_{eid}"
-            if ck not in st.session_state:
-                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
-            checked = st.checkbox("", key=ck, label_visibility="collapsed")
-            if checked:
-                picked.append(eid)
-        for ci, col in enumerate(show_cols):
-            with rc[4 + ci]:
-                st.text(_estimate_list_cell_text(est_row.get(col), col=str(col)))
 
     set_selected_ids(TABLE_KEY_ESTIMATES, picked)
     sel = picked
