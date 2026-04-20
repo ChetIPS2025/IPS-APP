@@ -210,6 +210,21 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid rgba(51, 65, 85, 0.55) !important;
             overflow: hidden;
         }
+        /* Force dark table surfaces (avoid mixed light tables on some machines) */
+        .stDataFrame, .stTable,
+        section[data-testid="stMain"] [data-testid="stDataFrame"],
+        section[data-testid="stMain"] [data-testid="stTable"],
+        section[data-testid="stMain"] [data-testid="stDataEditor"] {
+            background-color: #0b2247 !important;
+            color: #f3f6fb !important;
+        }
+        .stDataFrame div, .stTable div,
+        section[data-testid="stMain"] [data-testid="stDataFrame"] div,
+        section[data-testid="stMain"] [data-testid="stTable"] div,
+        section[data-testid="stMain"] [data-testid="stDataEditor"] div {
+            background-color: #0b2247 !important;
+            color: #f3f6fb !important;
+        }
 
         /* ----- IPS form controls (main + sidebar): labels + fields ----- */
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stWidgetLabel"] label,

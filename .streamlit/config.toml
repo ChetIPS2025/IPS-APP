@@ -11,9 +11,9 @@ enableXsrfProtection = true
 gatherUsageStats = false
 
 [theme]
-# Force consistent IPS-dark theme across devices (avoid inheriting local Streamlit theme)
-base = "light"
+# Force consistent IPS dark theme across devices (avoid inheriting local Streamlit theme)
+base = "dark"
 primaryColor = "#ff5a5f"
-backgroundColor = "#f5f8fc"
-secondaryBackgroundColor = "#dfe8f5"
-textColor = "#0f172a"
+backgroundColor = "#031633"
+secondaryBackgroundColor = "#0b2247"
+textColor = "#f3f6fb"
