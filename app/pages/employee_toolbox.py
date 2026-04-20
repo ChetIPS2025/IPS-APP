@@ -73,7 +73,7 @@ _PANEL_MODE_KEY = "employee_toolbox_panel_mode"
 _EDIT_ID_KEY = "employee_toolbox_edit_id"
 _DELETE_PREFIX = "employee_toolbox_delete"
 _PENDING_DELETE_KEY = "employee_toolbox_pending_delete_ids"
-_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v10"
+_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v11"
 
 _FETCH_COLUMNS = (
     "id,title,url,description,category,is_active,sort_order,created_at,"
@@ -415,6 +415,137 @@ def _toolbox_tile_tip(*, desc: str, action: str = "") -> str:
     if d:
         return _tile_tooltip_attr(d)
     return _tile_tooltip_attr(a)
+
+
+def _strip_pdf_extension(text: str) -> str:
+    return re.sub(r"\.pdf$", "", str(text or "").strip(), flags=re.IGNORECASE).strip()
+
+
+# Longer keys first so specific matches win over generic substrings.
+_PRETTY_TITLE_RULES: tuple[tuple[str, str], ...] = (
+    ("#300 flange bolt chart", "#300 Flange Bolt Chart"),
+    ("300 flange bolt chart", "#300 Flange Bolt Chart"),
+    ("#150 flange bolt chart", "#150 Flange Bolt Chart"),
+    ("150 flange bolt chart", "#150 Flange Bolt Chart"),
+    ("flange bolt chart", "#150 Flange Bolt Chart"),
+    ("bolt torque", "Bolt Torque Guide"),
+    ("bolt tap chart", "Bolt Tap Chart"),
+    ("pipe tap chart", "Pipe Tap Chart"),
+    ("pipe tap", "Pipe Tap Chart"),
+    ("contract welder", "Contract / Welding"),
+    ("welder service agreement", "Contract / Welding"),
+    ("welder service", "Contract / Welding"),
+    ("employee handbook", "Employee Handbook"),
+    ("conduit wire fill", "Conduit Wire Fill"),
+    ("handrail standard", "Handrail Standard"),
+    ("wire size", "Wire Size Chart"),
+    ("tap drill", "Tap / Drill Chart"),
+    ("tap / drill", "Tap / Drill Chart"),
+)
+
+
+def _pretty_display_title_for_row(row: dict) -> str:
+    title = str(row.get("title") or "").strip()
+    fn = str(row.get("original_filename") or row.get("file_name") or "").strip()
+    if _is_file_row(row) and fn:
+        combo_source = f"{fn} {title}".strip() if title and title.lower() != fn.lower() else fn
+        base = _strip_pdf_extension(fn)
+    else:
+        combo_source = (title or fn or "—").strip()
+        base = _strip_pdf_extension(combo_source)
+    n = _norm_title_for_brand_lookup(_strip_pdf_extension(combo_source.replace("\n", " ")))
+    for needle, pretty in _PRETTY_TITLE_RULES:
+        if needle in n:
+            return pretty
+    n2 = _norm_title_for_brand_lookup(base)
+    for needle, pretty in _PRETTY_TITLE_RULES:
+        if needle in n2:
+            return pretty
+    return base if base else "—"
+
+
+def _resource_icon_for_row(row: dict) -> str:
+    n = _norm_title_for_brand_lookup(_pretty_display_title_for_row(row))
+    fn = _norm_title_for_brand_lookup(str(row.get("original_filename") or row.get("file_name") or ""))
+    blob = f"{n} {fn}"
+    if "handbook" in blob:
+        return "📘"
+    if "weld" in blob or "contract" in blob or "welder" in blob:
+        return "🔧"
+    if "pipe tap" in blob:
+        return "🧵"
+    if "bolt tap" in blob or ("bolt" in blob and "tap" in blob):
+        return "🪛"
+    if "flange" in blob and "bolt" in blob:
+        return "🔩"
+    if "torque" in blob:
+        return "⚙️"
+    if "conduit" in blob or "wire fill" in blob:
+        return "⚡"
+    if "wire size" in blob or "awg" in blob:
+        return "📐"
+    if "handrail" in blob:
+        return "🏗️"
+    if "tap" in blob and "drill" in blob:
+        return "🪛"
+    if _is_file_row(row):
+        return _toolbox_file_icon(str(row.get("original_filename") or row.get("file_name") or ""))
+    return "🔗"
+
+
+def _resource_subtitle_for_row(row: dict) -> str:
+    cat = _category_display_label(str(row.get("category") or ""))
+    if cat in {"HR", "Training", "Forms"}:
+        return "Reference Guide"
+    if cat in {"Safety", "IT"}:
+        return "Spec Sheet"
+    if cat in {"Operations"}:
+        return "Field Tool"
+    if cat and cat != "General":
+        return "Quick Lookup"
+    if _is_file_row(row):
+        return "Quick Lookup"
+    return "Quick Lookup"
+
+
+def _href_attr(url: str) -> str:
+    """Safe ``href`` value for HTML (http / https / data URLs from trusted storage)."""
+    u = str(url or "").strip()
+    if not u:
+        return ""
+    if u.startswith("data:"):
+        return html.escape(u, quote=True)
+    return html.escape(u, quote=True)
+
+
+_MAX_INLINE_PDF_BYTES = 1_800_000
+
+
+def render_resource_tile(title: str, subtitle: str, icon: str, url: str | None, *, tooltip: str = "") -> None:
+    """
+    IPS-style clickable tool tile (Resource Hub). ``url`` opens in a **new tab** when set;
+    when ``None``, renders a non-clickable tile (pair with ``st.download_button`` for local files).
+    """
+    safe_title = html.escape(title, quote=True)
+    safe_sub = html.escape(subtitle, quote=True)
+    safe_icon = html.escape(icon, quote=True)
+    tip = _tile_tooltip_attr(tooltip) if str(tooltip or "").strip() else ""
+    inner = f"""<div class="ips-resource-tile-inner"{tip}>
+<div class="ips-resource-tile-icon">{safe_icon}</div>
+<div class="ips-resource-tile-title">{safe_title}</div>
+<div class="ips-resource-tile-sub">{safe_sub}</div>
+</div>"""
+    if url:
+        h = _href_attr(url)
+        st.markdown(
+            f'<a class="ips-resource-tile-link" href="{h}" target="_blank" rel="noopener noreferrer">{inner}</a>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<div class="ips-resource-tile-static">{inner}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _tile_marker_span(
@@ -771,6 +902,54 @@ def _inject_toolbox_hub_styles() -> None:
                 min-width: 0 !important;
                 flex: 1 1 calc(50% - 0.25rem) !important;
             }
+        }
+        /* Resource hub: emoji tool tiles (replaces plain list look) */
+        a.ips-resource-tile-link {
+            display: block !important;
+            text-decoration: none !important;
+            color: inherit !important;
+        }
+        div.ips-resource-tile-static {
+            display: block;
+        }
+        div.ips-resource-tile-inner {
+            background: linear-gradient(145deg, #0b2247, #031633);
+            border: 1px solid #2a5fd6;
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 120px;
+            height: 120px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            box-shadow: 0 0 8px rgba(0, 120, 255, 0.22);
+        }
+        a.ips-resource-tile-link:hover div.ips-resource-tile-inner {
+            box-shadow: 0 0 14px rgba(0, 120, 255, 0.55);
+            border-color: rgba(90, 150, 255, 0.95);
+            transform: translateY(-1px);
+        }
+        div.ips-resource-tile-icon {
+            font-size: 1.55rem;
+            line-height: 1.1;
+        }
+        div.ips-resource-tile-title {
+            color: #f8fafc !important;
+            font-weight: 600 !important;
+            font-size: 0.88rem !important;
+            line-height: 1.25 !important;
+        }
+        div.ips-resource-tile-sub {
+            color: #7fb3ff !important;
+            font-size: 0.72rem !important;
+            line-height: 1.2 !important;
+        }
+        [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-resource-tile-grid-marker) {
+            gap: 0.85rem !important;
+            align-items: stretch !important;
         }
         </style>
         """,
@@ -1172,240 +1351,76 @@ def _render_edit_tool_panel(*, row: dict, existing_rows: list[dict]) -> None:
 
 
 def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
-    """App-launcher tile: whole-tile open/link, overlay download, small admin actions."""
+    """Resource hub tile: styled IPS tool card + admin row (Edit / Delete)."""
     desc = str(row.get("description") or "").strip()
-    url = str(row.get("url") or "").strip()
+    url_raw = str(row.get("url") or "").strip()
     rid = str(row.get("id") or "")
-    active = bool(row.get("is_active", True))
-    badge = _category_display_label(str(row.get("category") or ""))
     is_file = _is_file_row(row)
     fp = str(row.get("file_path") or "").strip()
     fn_display = (
         str(row.get("original_filename") or row.get("file_name") or "").strip() or Path(fp).name or "document"
     )
-    title_lbl = str(row.get("title") or "").strip()
-    if is_file and fn_display:
-        if title_lbl and title_lbl.lower() != fn_display.lower():
-            display_raw = f"{fn_display}\n{title_lbl}"
-        else:
-            display_raw = fn_display
-    else:
-        display_raw = title_lbl or fn_display or "—"
-    title_inner_html = _build_tile_title_inner_html(display_raw)
-    icon = _toolbox_file_icon(fn_display) if is_file else "🔗"
-    brand_path = _brand_image_path_for_title(str(row.get("title") or "").strip())
+
+    display_title = _pretty_display_title_for_row(row)
+    subtitle = _resource_subtitle_for_row(row)
+    icon = _resource_icon_for_row(row)
 
     ref = ""
-    use_dl_overlay = False
-    interactive = False
     if is_file and fp:
         ref = create_signed_url(fp, expires_in=3600) or ""
-        if ref:
-            if ref.startswith("http://") or ref.startswith("https://"):
-                interactive = True
-            elif Path(ref).is_file():
-                interactive = True
-                use_dl_overlay = True
-    elif url.strip():
-        interactive = True
 
-    action_hint = ""
-    if is_file and fp and ref:
-        if use_dl_overlay:
-            action_hint = "Download"
-        elif ref.startswith("http://") or ref.startswith("https://"):
-            action_hint = "Open"
-    elif url.strip() and interactive:
-        action_hint = "Open"
-
-    tip = _toolbox_tile_tip(desc=desc, action=action_hint)
-
-    def _body_classes(*, full_bleed: bool) -> str:
-        c = "ips-toolbox-tile-body ips-toolbox-tile-body--launcher"
-        if full_bleed:
-            c += " ips-toolbox-tile-body--fullbleed"
-        return c
-
-    def _link_classes(*, full_bleed: bool) -> str:
-        c = "ips-toolbox-tile-link"
-        if full_bleed:
-            c += " ips-toolbox-tile-link--fullbleed"
-        return c
+    tip_text = desc
 
     with st.container(border=True):
-        if is_file:
+        st.markdown(
+            '<span class="ips-toolbox-tile ips-resource-tile-grid-marker"></span>',
+            unsafe_allow_html=True,
+        )
+
+        if is_file and fp:
             if not ref:
-                inner, full_bleed = _tile_visual_inner_html(
-                    title_inner_html=title_inner_html,
-                    desc=desc,
-                    badge=badge,
-                    icon=icon,
-                    can_manage=can_manage,
-                    active=active,
-                    hint="",
-                    brand_image_path=brand_path,
-                )
-                st.markdown(
-                    _tile_marker_span(
-                        is_download=use_dl_overlay,
-                        has_admin_overlay=bool(use_dl_overlay and can_manage),
-                        interactive=interactive,
-                        full_bleed_brand=full_bleed,
-                    ),
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
-                    unsafe_allow_html=True,
-                )
+                render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
                 st.markdown('<p class="ips-toolbox-tile-meta">File unavailable</p>', unsafe_allow_html=True)
             elif ref.startswith("http://") or ref.startswith("https://"):
-                safe_href = html.escape(ref, quote=True)
-                inner, full_bleed = _tile_visual_inner_html(
-                    title_inner_html=title_inner_html,
-                    desc=desc,
-                    badge=badge,
-                    icon=icon,
-                    can_manage=can_manage,
-                    active=active,
-                    hint="Open",
-                    brand_image_path=brand_path,
-                )
-                st.markdown(
-                    _tile_marker_span(
-                        is_download=use_dl_overlay,
-                        has_admin_overlay=bool(use_dl_overlay and can_manage),
-                        interactive=interactive,
-                        full_bleed_brand=full_bleed,
-                    ),
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<a class="{_link_classes(full_bleed=full_bleed)}" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
-                    f'<div class="{_body_classes(full_bleed=full_bleed)}">{inner}</div></a>',
-                    unsafe_allow_html=True,
-                )
+                render_resource_tile(display_title, subtitle, icon, ref, tooltip=tip_text)
             else:
                 p = Path(ref)
                 if p.is_file():
-                    inner, full_bleed = _tile_visual_inner_html(
-                        title_inner_html=title_inner_html,
-                        desc=desc,
-                        badge=badge,
-                        icon=icon,
-                        can_manage=can_manage,
-                        active=active,
-                        hint="Download",
-                        brand_image_path=brand_path,
-                    )
-                    st.markdown(
-                        _tile_marker_span(
-                            is_download=use_dl_overlay,
-                            has_admin_overlay=bool(use_dl_overlay and can_manage),
-                            interactive=interactive,
-                            full_bleed_brand=full_bleed,
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
-                        unsafe_allow_html=True,
-                    )
-                    ctype = str(row.get("content_type") or "").strip() or "application/octet-stream"
-                    _dl_lbl = _download_overlay_button_label(
-                        title_raw=fn_display,
-                        file_fallback=fn_display,
-                    )
-                    _t_disp = str(row.get("title") or "").strip() or fn_display
-                    _dl_help = " — ".join(
-                        [p for p in (_t_disp, desc) if p]
-                    ) or f"Download {_t_disp or fn_display}"
-                    st.download_button(
-                        _dl_lbl,
-                        data=p.read_bytes(),
-                        file_name=fn_display,
-                        mime=ctype,
-                        type="primary",
-                        use_container_width=True,
-                        key=f"etb_dl_{rid}",
-                        help=_dl_help,
-                    )
+                    try:
+                        data_bytes = p.read_bytes()
+                    except OSError:
+                        data_bytes = b""
+                    sz = len(data_bytes)
+                    ctype = str(row.get("content_type") or "").strip().lower()
+                    is_pdf = fn_display.lower().endswith(".pdf") or "pdf" in ctype
+                    open_url: str | None = None
+                    if is_pdf and sz and sz <= _MAX_INLINE_PDF_BYTES and data_bytes:
+                        b64 = base64.b64encode(data_bytes).decode("ascii")
+                        open_url = f"data:application/pdf;base64,{b64}"
+                    if open_url:
+                        render_resource_tile(display_title, subtitle, icon, open_url, tooltip=tip_text)
+                    else:
+                        render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
+                        ctype_mime = str(row.get("content_type") or "").strip() or "application/octet-stream"
+                        _dl_help = " — ".join([x for x in (display_title, desc) if x]) or f"Download {fn_display}"
+                        st.download_button(
+                            "Download file",
+                            data=data_bytes,
+                            file_name=fn_display,
+                            mime=ctype_mime,
+                            type="primary",
+                            use_container_width=True,
+                            key=f"etb_dl_{rid}",
+                            help=_dl_help,
+                        )
                 else:
-                    inner, full_bleed = _tile_visual_inner_html(
-                        title_inner_html=title_inner_html,
-                        desc=desc,
-                        badge=badge,
-                        icon=icon,
-                        can_manage=can_manage,
-                        active=active,
-                        hint="",
-                        brand_image_path=brand_path,
-                    )
-                    st.markdown(
-                        _tile_marker_span(
-                            is_download=use_dl_overlay,
-                            has_admin_overlay=bool(use_dl_overlay and can_manage),
-                            interactive=interactive,
-                            full_bleed_brand=full_bleed,
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
-                        unsafe_allow_html=True,
-                    )
+                    render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
                     st.markdown('<p class="ips-toolbox-tile-meta">Missing file</p>', unsafe_allow_html=True)
-        elif url:
-            nu = _normalize_url(url)
-            safe_href = html.escape(nu, quote=True)
-            inner, full_bleed = _tile_visual_inner_html(
-                title_inner_html=title_inner_html,
-                desc=desc,
-                badge=badge,
-                icon=icon,
-                can_manage=can_manage,
-                active=active,
-                hint="Open",
-                brand_image_path=brand_path,
-            )
-            st.markdown(
-                _tile_marker_span(
-                    is_download=use_dl_overlay,
-                    has_admin_overlay=bool(use_dl_overlay and can_manage),
-                    interactive=interactive,
-                    full_bleed_brand=full_bleed,
-                ),
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<a class="{_link_classes(full_bleed=full_bleed)}" href="{safe_href}" target="_blank" rel="noopener noreferrer"{tip}>'
-                f'<div class="{_body_classes(full_bleed=full_bleed)}">{inner}</div></a>',
-                unsafe_allow_html=True,
-            )
+        elif url_raw:
+            nu = _normalize_url(url_raw)
+            render_resource_tile(display_title, subtitle, icon, nu, tooltip=tip_text)
         else:
-            inner, full_bleed = _tile_visual_inner_html(
-                title_inner_html=title_inner_html,
-                desc=desc,
-                badge=badge,
-                icon=icon,
-                can_manage=can_manage,
-                active=active,
-                hint="",
-                brand_image_path=brand_path,
-            )
-            st.markdown(
-                _tile_marker_span(
-                    is_download=use_dl_overlay,
-                    has_admin_overlay=bool(use_dl_overlay and can_manage),
-                    interactive=interactive,
-                    full_bleed_brand=full_bleed,
-                ),
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="{_body_classes(full_bleed=full_bleed)}"{tip}>{inner}</div>',
-                unsafe_allow_html=True,
-            )
+            render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
             st.markdown('<p class="ips-toolbox-tile-meta">No URL</p>', unsafe_allow_html=True)
 
         if can_manage:
@@ -1438,8 +1453,8 @@ def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
 
     st.markdown("##### Resource hub")
     st.caption(
-        "Grouped by category — **tap the icon** (or the tile) to open. **Local files:** invisible download over the "
-        "tile. **Admins:** small **Edit** / **Delete** under each item. Signed URLs expire after about one hour."
+        "Grouped by category — **click a tile** to open in a new tab (or **Download file** when the file is served "
+        "locally). **Admins:** **Edit** / **Delete** under each item. Signed URLs expire after about one hour."
     )
 
     for i, (cat_label, group) in enumerate(_group_by_category_ordered(rows)):
@@ -1451,7 +1466,7 @@ def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
         )
         for j in range(0, len(group), ncols):
             chunk = group[j : j + ncols]
-            cols = st.columns(ncols, gap="medium")
+            cols = st.columns(ncols, gap="large")
             for k, row in enumerate(chunk):
                 with cols[k]:
                     _render_tool_tile(row, can_manage=can_manage)
