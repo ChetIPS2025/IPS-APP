@@ -84,6 +84,7 @@ from app.estimate.proposal_exports import (
     _inject_proposal_preview_styles,
     _proposal_export_kwargs,
     _render_proposal_preview_html,
+    proposal_preview_html,
 )
 
 
