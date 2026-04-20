@@ -116,6 +116,15 @@ JOB_STATUSES = [
     "Closed",
 ]
 
+# Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
+_JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
+    {"customer_id", "estimate_label", "Source"}
+)
+
+
+def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
+    return [c for c in columns if c not in _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE]
+
 
 def _job_db_admin_read() -> bool:
     """Admin/estimator use service-role reads so linked estimate/customer rows stay visible under RLS."""
@@ -673,6 +682,11 @@ def _build_jobs_overview_dataframe(
         out["Contact"] = out["customer_contact_id"].map(_contact_cell)
     else:
         out["Contact"] = ""
+    # User-facing estimate link; ``Source`` is retained for the Source filter and search.
+    if "Source" in out.columns:
+        out["Linked estimate"] = out["Source"].astype(str)
+    else:
+        out["Linked estimate"] = "—"
     return out
 
 
@@ -971,7 +985,7 @@ def render() -> None:
                         "Source",
                         ["All", "Estimate", "Other"],
                         disabled="Source" not in jobs_df.columns,
-                        help="Estimate = rows linked to an estimate (see Source column).",
+                        help="Estimate = rows linked to an estimate (same rule as the **Linked estimate** column).",
                         key="job_filt_source",
                     )
 
@@ -988,25 +1002,26 @@ def render() -> None:
             show_cols: list[str] = []
             if has_job_number_column and "job_number" in filtered.columns:
                 show_cols.append("job_number")
-            for c in ("Source", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
+            for c in ("Linked estimate", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
                 if c in filtered.columns and c not in show_cols:
                     show_cols.append(c)
             show_cols.extend(
                 [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
             )
+            visible_cols = _job_db_visible_table_columns(show_cols)
 
             with st.container(border=True):
                 st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
                 st.markdown("##### Job list")
                 st.caption("Checkbox on the **left**. Select rows, then use **Actions** below the table.")
                 if "id" not in filtered.columns:
-                    st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
+                    st.dataframe(filtered[visible_cols], use_container_width=True, hide_index=True)
                 else:
                     render_selectable_dataframe(
                         filtered,
                         table_key=TABLE_KEY_JOBS,
                         id_column="id",
-                        columns=show_cols,
+                        columns=visible_cols,
                         editor_key="job_db_sel_editor",
                     )
 

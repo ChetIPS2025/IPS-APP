@@ -120,6 +120,26 @@ def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
     return fetch_one("estimates", {"id": eid})
 
 
+def estimate_description_value(estimate_row: dict[str, Any]) -> str:
+    """
+    Short label for an estimate (same field as **Estimate Description** in the editor).
+
+    Prefer DB column, then ``estimate_json`` scalars, then legacy ``job`` / ``job_name`` keys.
+    Does not read ``scope_of_work`` (long proposal text).
+    """
+    est_json = estimate_row.get("estimate_json") or {}
+    est_json = est_json if isinstance(est_json, dict) else {}
+    return str(
+        estimate_row.get("estimate_description")
+        or est_json.get("estimate_description")
+        or estimate_row.get("job")
+        or est_json.get("job")
+        or estimate_row.get("job_name")
+        or est_json.get("job_name")
+        or ""
+    ).strip()
+
+
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
     by_ref = fetch_by_match_admin(
         "jobs",
@@ -142,22 +162,28 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
     return None
 
 
-def _derive_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: str) -> str:
-    scope = str(row.get("scope_of_work") or ej.get("scope_of_work") or "").strip()
-    first_line = scope.split("\n")[0].strip() if scope else ""
-    quote = str(row.get("quote_number") or ej.get("quote_number") or "").strip()
+def _fallback_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: str) -> str:
+    """
+    Job name when no short **Estimate Description** (or legacy job/job_name) is set.
+
+    Prefers import title, then customer + quote / quote alone. Uses first line of
+    ``scope_of_work`` only when nothing else is available.
+    """
     meta = _as_json_dict(ej.get("import_meta"))
     vendor_title = str(meta.get("title") or meta.get("project_name") or "").strip()
+    quote = str(row.get("quote_number") or ej.get("quote_number") or "").strip()
 
     if len(vendor_title) >= 3:
         return vendor_title[:500]
-    if len(first_line) >= 8:
-        return first_line[:500]
     parts = [p for p in (customer_name.strip(), quote) if p]
     if parts:
         return " — ".join(parts)[:500]
     if quote:
         return quote[:500]
+    scope = str(row.get("scope_of_work") or ej.get("scope_of_work") or "").strip()
+    first_line = scope.split("\n")[0].strip() if scope else ""
+    if len(first_line) >= 8:
+        return first_line[:500]
     return "Awarded job"
 
 
@@ -270,7 +296,11 @@ def create_job_from_estimate(
         cust_row = fetch_one("customers", {"id": customer_id}, columns="customer_name")
     customer_name = str((cust_row or {}).get("customer_name") or "").strip()
 
-    job_name = _derive_job_name(row, ej, customer_name).strip() or "Awarded job"
+    short_name = estimate_description_value(row)
+    if short_name:
+        job_name = short_name[:500]
+    else:
+        job_name = _fallback_job_name(row, ej, customer_name).strip() or "Awarded job"
 
     _, has_job_number_column = fetch_jobs_for_job_database(limit=1, admin_read=True)
 
