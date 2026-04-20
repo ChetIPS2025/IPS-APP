@@ -100,6 +100,36 @@ def _jobs_has_customer_contact_column() -> bool:
         return False
 
 
+def _jobs_has_customer_location_column() -> bool:
+    try:
+        fetch_table("jobs", columns="id,customer_location_id", limit=1)
+        return True
+    except Exception:
+        return False
+
+
+def _location_text_from_customer_location(location_id: str | None) -> str:
+    lid = str(location_id or "").strip()
+    if not lid:
+        return ""
+    try:
+        loc_row = fetch_one("customer_locations", {"id": lid})
+    except Exception:
+        loc_row = None
+    if not loc_row:
+        return ""
+    try:
+        from services.customer_locations import location_display_name_city_state
+    except ImportError:
+        from app.services.customer_locations import location_display_name_city_state  # type: ignore
+
+    label = location_display_name_city_state(loc_row)
+    if label:
+        return label[:2000]
+    parts = [loc_row.get("address"), loc_row.get("city"), loc_row.get("state"), loc_row.get("zip")]
+    return ", ".join(str(p).strip() for p in parts if p and str(p).strip())[:2000]
+
+
 def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
     """
     Load the estimate row by primary key ``id``.
@@ -307,6 +337,8 @@ def create_job_from_estimate(
 
     ej = _as_json_dict(row.get("estimate_json"))
     customer_id = row.get("customer_id") or ej.get("customer_id")
+    customer_location_id_raw = row.get("customer_location_id") or ej.get("customer_location_id")
+    customer_location_id = str(customer_location_id_raw).strip() if customer_location_id_raw else ""
     if not customer_id:
         return CreateJobFromEstimateResult(
             ok=False,
@@ -343,10 +375,13 @@ def create_job_from_estimate(
     except (TypeError, ValueError):
         awarded_f = 0.0
 
+    site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
+    merged_location = site_loc or _safe_location(ej)
+
     payload: dict[str, Any] = {
         "customer_id": customer_id,
         "job_name": job_name,
-        "location": _safe_location(ej),
+        "location": merged_location,
         # Estimate-converted jobs start as Awarded so they are ready for costing (not Draft).
         "status": JOB_STATUS_AFTER_ESTIMATE_CONVERSION,
         "estimate_id": eid,
@@ -363,6 +398,9 @@ def create_job_from_estimate(
         cc = row.get("customer_contact_id") or ej.get("customer_contact_id")
         if cc:
             payload["customer_contact_id"] = str(cc)
+
+    if _jobs_has_customer_location_column():
+        payload["customer_location_id"] = customer_location_id or None
 
     proposed_jn = ""
     inserted: dict[str, Any] | None = None

@@ -21,6 +21,7 @@ from app.estimate.calculations import _D0, _q2, compute_totals, money_db
 from app.estimate.defaults import (
     _apply_default_prepared_by_from_profile,
     _normalize_prepared_by_id_value,
+    _payload_customer_location_for_db,
     _payload_prepared_by_for_db,
 )
 from app.estimate.equipment import load_estimate_equipment_from_assets
@@ -40,7 +41,7 @@ def save_revision(estimate_id: str, revision_number: int, snapshot_json: dict, n
 
 
 def persist_estimate(payload: dict, est: dict, revision_note: str = "") -> str:
-    payload = {**payload, **_payload_prepared_by_for_db(est)}
+    payload = {**payload, **_payload_prepared_by_for_db(est), **_payload_customer_location_for_db(est)}
     current_id = st.session_state.get("loaded_estimate_id")
     if current_id:
         current_row = fetch_one("estimates", {"id": current_id}, columns="revision_number")
@@ -213,6 +214,7 @@ def insert_imported_estimate(
         "updated_at": datetime.utcnow().isoformat(),
     }
     payload.update(_payload_prepared_by_for_db(est))
+    payload.update(_payload_customer_location_for_db(est))
     inserted = insert_row_admin("estimates", payload)
     estimate_id = str(inserted.get("id", ""))
     save_revision(estimate_id, 1, est_for_storage, f"Imported from {source_file_name}.{note_suffix}")

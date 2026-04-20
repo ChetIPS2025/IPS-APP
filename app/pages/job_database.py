@@ -16,6 +16,7 @@ from db import (
     fetch_by_match,
     fetch_by_match_admin,
     fetch_jobs_with_order_fallback,
+    fetch_one,
     fetch_table,
     fetch_table_admin,
     insert_row_admin,
@@ -274,6 +275,14 @@ def _clear_job_mode() -> None:
     st.session_state.pop("job_edit_id", None)
 
 
+def _jobs_table_has_customer_location_column() -> bool:
+    try:
+        fetch_table("jobs", columns="id,customer_location_id", limit=1)
+        return True
+    except Exception:
+        return False
+
+
 def _job_form_linked_estimate_id(estimate_options: dict[str, Any], linked_label: str) -> str | None:
     """Map the Linked estimate select label to an estimate UUID, or ``None`` for a standalone job."""
     if not str(linked_label or "").strip():
@@ -292,6 +301,7 @@ def _render_job_form_panel(
     selected_job: dict | None,
     jobs: list[dict],
     has_job_number_column: bool,
+    has_customer_location_column: bool,
     customers: list[dict],
     estimates: list[dict],
     customer_name_by_id: dict[str, str],
@@ -410,6 +420,7 @@ def _render_job_form_panel(
         job_name = c2.text_input("Job Name", value=current_value("job_name"), disabled=_ro, key="job_form_job_name")
 
         selected_contact_id: str | None = None
+        selected_customer_location_id: str | None = None
         cust_uuid = customer_options.get(customer_name) if customer_name else None
         if cust_uuid:
             inject_contact_picker_styles()
@@ -461,6 +472,45 @@ def _render_job_form_panel(
                 render_contact_detail_preview(by_id.get(str(selected_contact_id or "")))
         else:
             st.caption("Select a customer to choose a contact.")
+
+        if has_customer_location_column:
+            try:
+                from services.customer_locations import fetch_locations_for_customer, location_option_label
+            except ImportError:
+                from app.services.customer_locations import fetch_locations_for_customer, location_option_label  # type: ignore
+
+            if cust_uuid:
+                loc_rows = fetch_locations_for_customer(
+                    str(cust_uuid),
+                    admin_read=_job_db_admin_read(),
+                    include_inactive=False,
+                )
+                cur_lid = str(current_value("customer_location_id") or "").strip()
+                if cur_lid:
+                    have = {str(r.get("id") or "") for r in loc_rows}
+                    if cur_lid not in have:
+                        orphan = fetch_one("customer_locations", {"id": cur_lid})
+                        if orphan:
+                            loc_rows = [orphan] + list(loc_rows)
+                labels = ["(none)"] + [location_option_label(r) for r in loc_rows]
+                lids: list[str | None] = [None] + [str(r["id"]) for r in loc_rows if r.get("id")]
+                try:
+                    lix = lids.index(cur_lid) if cur_lid else 0
+                except ValueError:
+                    lix = 0
+                lix = min(max(lix, 0), len(labels) - 1)
+                loc_pick = st.selectbox(
+                    "Job site",
+                    options=list(range(len(labels))),
+                    index=lix,
+                    format_func=lambda i: labels[i],
+                    disabled=_ro,
+                    key=f"job_form_custloc_{cust_uuid}",
+                    help="Optional: saved customer site from the Customers tab.",
+                )
+                selected_customer_location_id = lids[int(loc_pick)]
+            else:
+                st.caption("Select a customer to choose a job site.")
 
         st.markdown("#### Job number & location")
         if has_job_number_column and selected_job:
@@ -582,6 +632,8 @@ def _render_job_form_panel(
                     "awarded_amount": float(awarded_amount or 0),
                     "notes": notes.strip(),
                 }
+                if has_customer_location_column:
+                    payload["customer_location_id"] = selected_customer_location_id
                 if has_job_number_column:
                     payload["job_number"] = next_job_number()
                 insert_row_admin("jobs", payload)
@@ -616,6 +668,8 @@ def _render_job_form_panel(
                     "awarded_amount": float(awarded_amount or 0),
                     "notes": notes.strip(),
                 }
+                if has_customer_location_column:
+                    payload["customer_location_id"] = selected_customer_location_id
                 update_rows_admin("jobs", payload, {"id": selected_job["id"]})
                 _clear_job_mode()
                 st.success("Job updated.")
@@ -633,6 +687,7 @@ def _build_jobs_overview_dataframe(
     estimate_label_map: dict[str, str],
     estimate_quote_by_id: dict[str, str],
     contact_label_by_id: dict[str, str],
+    location_by_id: dict[str, dict[str, Any]],
 ) -> pd.DataFrame:
     """Augment jobs rows for overview (customer name, ``source_type``, estimate labels, linked-quote copy)."""
     if jobs_df.empty:
@@ -710,6 +765,32 @@ def _build_jobs_overview_dataframe(
         out["Contact"] = out["customer_contact_id"].map(_contact_cell)
     else:
         out["Contact"] = ""
+
+    try:
+        from services.customer_locations import location_display_name_city_state
+    except ImportError:
+        from app.services.customer_locations import location_display_name_city_state  # type: ignore
+
+    if "customer_location_id" in out.columns:
+
+        def _loc_cell(v) -> str:
+            if v is None:
+                return ""
+            try:
+                if pd.isna(v):
+                    return ""
+            except Exception:
+                pass
+            lid = str(v).strip()
+            if not lid:
+                return ""
+            row = location_by_id.get(lid)
+            return location_display_name_city_state(row) if row else ""
+
+        out["Location"] = out["customer_location_id"].map(_loc_cell)
+    else:
+        out["Location"] = ""
+
     # User-facing estimate link; ``Source`` is retained for the Source filter and search.
     if "Source" in out.columns:
         out["Linked estimate"] = out["Source"].astype(str)
@@ -930,6 +1011,16 @@ def render() -> None:
     except Exception:
         pass
 
+    has_customer_location_column = _jobs_table_has_customer_location_column()
+    location_by_id: dict[str, dict[str, Any]] = {}
+    if has_customer_location_column:
+        try:
+            from services.customer_locations import fetch_all_locations_indexed
+        except ImportError:
+            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
+
+        location_by_id = fetch_all_locations_indexed(admin_read=admin_read)
+
     _render_job_db_top_bar(can_edit=can_edit, estimates=estimates, estimate_label_map=estimate_label_map)
     _render_job_db_debug_expander(jobs=jobs, admin_read=admin_read)
 
@@ -937,7 +1028,7 @@ def render() -> None:
 
     st.markdown("### Jobs overview")
     st.caption(
-        "**Source** shows estimate links; **Quote (estimate)**, **customer**, and **Contact** summarize linked data."
+        "**Source** shows estimate links; **Quote (estimate)**, **customer**, **Contact**, and **Location** summarize linked data."
     )
 
     mode = st.session_state.get("job_mode")
@@ -978,6 +1069,7 @@ def render() -> None:
                 estimate_label_map=estimate_label_map,
                 estimate_quote_by_id=estimate_quote_by_id,
                 contact_label_by_id=contact_label_by_id,
+                location_by_id=location_by_id,
             )
 
             with st.container(border=True):
@@ -1003,9 +1095,9 @@ def render() -> None:
                     )
                 with f3:
                     _search_hint = (
-                        "Source, quote, contact, job_number, job_name, customer, status, …"
+                        "Source, quote, contact, location, job_number, job_name, customer, status, …"
                         if has_job_number_column
-                        else "Source, quote, contact, job_name, customer, status, …"
+                        else "Source, quote, contact, location, job_name, customer, status, …"
                     )
                     search = st.text_input(
                         "Search Jobs",
@@ -1038,6 +1130,7 @@ def render() -> None:
                 "Linked estimate",
                 "job_name",
                 "customer_name",
+                "Location",
                 "source_type",
                 "Quote (estimate)",
                 "Contact",
@@ -1159,6 +1252,7 @@ def render() -> None:
                 selected_job=selected_job,
                 jobs=jobs,
                 has_job_number_column=has_job_number_column,
+                has_customer_location_column=has_customer_location_column,
                 customers=customers,
                 estimates=estimates,
                 customer_name_by_id=customer_name_by_id,

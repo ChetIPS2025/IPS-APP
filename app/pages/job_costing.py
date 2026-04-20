@@ -26,7 +26,7 @@ try:
 except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 
-from db import fetch_table, fetch_table_admin, insert_row, insert_row_admin
+from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
 
 # --- helpers (Phase 1; keep small and local) ---
@@ -322,6 +322,22 @@ def render() -> None:
     )
     job = jobs_sorted[ix]
     job_id = job.get("id")
+
+    try:
+        from app.services.customer_locations import location_display_name_city_state
+    except ImportError:
+        from services.customer_locations import location_display_name_city_state  # type: ignore
+
+    loc_hdr = ""
+    clid = str(job.get("customer_location_id") or "").strip()
+    if clid:
+        loc_row = fetch_one("customer_locations", {"id": clid})
+        if loc_row:
+            loc_hdr = location_display_name_city_state(loc_row)
+    if not loc_hdr:
+        loc_hdr = str(job.get("location") or "").strip()
+    if loc_hdr:
+        st.caption(f"Location: {loc_hdr}")
 
     if time_err and not grid_rows:
         st.warning(f"Could not load **time_entries** for labor: {time_err}")

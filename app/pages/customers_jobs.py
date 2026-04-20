@@ -526,18 +526,97 @@ def _add_contact_dialog(cid: str, admin_read: bool) -> None:
             st.rerun()
 
 
+@st.dialog("Add Location", width="small")
+def _add_location_dialog(cid: str) -> None:
+    pk = f"dlg_loc_{cid}"
+    _ips_modal_header(subtitle="Job site / ship-to address for this customer")
+    nm = st.text_input("Location name", key=f"{pk}_name")
+    ad = st.text_input("Address", key=f"{pk}_addr")
+    r1a, r1b = st.columns(2, gap="small")
+    with r1a:
+        city = st.text_input("City", key=f"{pk}_city")
+        stt = st.text_input("State", key=f"{pk}_state")
+    with r1b:
+        zip_c = st.text_input("ZIP", key=f"{pk}_zip")
+    act = st.checkbox("Active", value=True, key=f"{pk}_act")
+    st.divider()
+    sp, fc, fs = st.columns([4, 1, 1], gap="small")
+    with sp:
+        st.empty()
+    with fc:
+        if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
+            st.rerun()
+    with fs:
+        if st.button("Save", type="primary", use_container_width=True, key=f"{pk}_save"):
+            t = str(nm or "").strip()
+            if not t:
+                st.error("Location name is required.")
+                st.stop()
+            try:
+                insert_row_admin(
+                    "customer_locations",
+                    {
+                        "customer_id": str(cid).strip(),
+                        "location_name": t,
+                        "address": str(ad or "").strip(),
+                        "city": str(city or "").strip(),
+                        "state": str(stt or "").strip(),
+                        "zip": str(zip_c or "").strip(),
+                        "is_active": bool(act),
+                    },
+                )
+            except Exception as exc:
+                st.error("Could not save the location.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+            st.session_state.pop("customer_location_mode", None)
+            st.session_state.pop("customer_location_edit_id", None)
+            st.toast("Location added.", icon="✅")
+            st.rerun()
+
+
+def _fetch_locations_for_customer_row(
+    customer_id: str,
+    *,
+    admin_read: bool,
+    include_inactive: bool,
+) -> list[dict[str, Any]]:
+    try:
+        from services.customer_locations import fetch_locations_for_customer
+    except ImportError:
+        from app.services.customer_locations import fetch_locations_for_customer  # type: ignore
+
+    return fetch_locations_for_customer(
+        customer_id,
+        admin_read=admin_read,
+        include_inactive=include_inactive,
+    )
+
+
 def _clear_customer_mode() -> None:
     st.session_state.pop("customer_mode", None)
     st.session_state.pop("customer_edit_id", None)
     st.session_state.pop("customer_contact_mode", None)
     st.session_state.pop("customer_contact_edit_id", None)
     st.session_state.pop("customer_contact_selected_id", None)
+    st.session_state.pop("customer_location_mode", None)
+    st.session_state.pop("customer_location_edit_id", None)
+    st.session_state.pop("customer_location_selected_id", None)
+    st.session_state.pop("customer_location_pending_delete", None)
 
 
 def _clear_contact_subpanel() -> None:
     st.session_state.pop("customer_contact_mode", None)
     st.session_state.pop("customer_contact_edit_id", None)
     st.session_state.pop("customer_contact_selected_id", None)
+
+
+def _clear_location_subpanel() -> None:
+    st.session_state.pop("customer_location_mode", None)
+    st.session_state.pop("customer_location_edit_id", None)
+    st.session_state.pop("customer_location_selected_id", None)
+    st.session_state.pop("customer_location_pending_delete", None)
 
 
 def _on_contact_pick_changed(cid: str, ctid: str, wkey: str) -> None:
@@ -559,6 +638,224 @@ def _contact_row_by_id(contacts: list[dict[str, Any]], ctid: str) -> dict[str, A
         if str(c.get("id") or "") == str(ctid):
             return c
     return None
+
+
+def _on_location_pick_changed(cid: str, lid: str, wkey: str) -> None:
+    sel_key = "customer_location_selected_id"
+    prefix = f"cust_loc_pick_{cid}_"
+    if st.session_state.get(wkey):
+        st.session_state[sel_key] = lid
+        for k in list(st.session_state.keys()):
+            if isinstance(k, str) and k.startswith(prefix) and k != wkey:
+                st.session_state[k] = False
+    else:
+        if str(st.session_state.get(sel_key) or "") == lid:
+            st.session_state[sel_key] = None
+
+
+def _location_row_by_id(locations: list[dict[str, Any]], lid: str) -> dict[str, Any] | None:
+    for x in locations:
+        if str(x.get("id") or "") == str(lid):
+            return x
+    return None
+
+
+def _render_locations_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
+    cid = str(customer_row.get("id") or "")
+    if not cid:
+        return
+
+    sel_key = "customer_location_selected_id"
+    pend_key = "customer_location_pending_delete"
+
+    st.markdown("##### Locations")
+    st.caption("Job sites used on **Estimates** and **Jobs** (separate from the company address above).")
+
+    mode = st.session_state.get("customer_location_mode")
+    edit_raw = st.session_state.get("customer_location_edit_id")
+    edit_id = str(edit_raw or "").strip() or None
+
+    key_show_inact = f"cust_loc_show_inactive_{cid}"
+    st.session_state.setdefault(key_show_inact, False)
+    st.checkbox("Show inactive locations", key=key_show_inact)
+
+    load_inactive = bool(st.session_state.get(key_show_inact, False) or (mode == "edit" and bool(edit_id)))
+    locs = _fetch_locations_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
+
+    edit_row: dict[str, Any] | None = None
+    if mode == "edit" and edit_id:
+        edit_row = _location_row_by_id(locs, edit_id)
+        if not edit_row:
+            er = _fetch_one_row("customer_locations", {"id": edit_id}, admin_read=admin_read)
+            if er and str(er.get("customer_id") or "") == cid:
+                edit_row = er
+                locs = [er] + [x for x in locs if str(x.get("id") or "") != edit_id]
+            else:
+                _clear_location_subpanel()
+                st.warning("That location is not on this company.")
+                st.rerun()
+                return
+
+    sid = str(st.session_state.get(sel_key) or "").strip()
+    if sid and not any(str(x.get("id") or "") == sid for x in locs):
+        st.session_state.pop(sel_key, None)
+        sid = ""
+    if mode == "edit" and edit_id:
+        st.session_state[sel_key] = str(edit_id)
+
+    pend = st.session_state.get(pend_key)
+    if isinstance(pend, dict) and str(pend.get("cid") or "") == cid and str(pend.get("lid") or "").strip():
+        plid = str(pend.get("lid") or "").strip()
+        st.warning("Delete this location? Estimates or jobs that reference it will clear the site link (FK).")
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            if st.button("Confirm delete", type="primary", use_container_width=True, key=f"cust_loc_conf_{cid}"):
+                try:
+                    delete_rows_admin("customer_locations", {"id": plid})
+                except Exception as exc:
+                    st.error(f"Could not delete: {exc}")
+                    st.stop()
+                st.session_state.pop(pend_key, None)
+                st.session_state.pop(sel_key, None)
+                _clear_location_subpanel()
+                st.success("Location deleted.")
+                st.rerun()
+        with pc2:
+            if st.button("Cancel", use_container_width=True, key=f"cust_loc_canc_{cid}"):
+                st.session_state.pop(pend_key, None)
+                st.rerun()
+
+    if can_edit:
+        if st.button("Add Location", type="primary", use_container_width=True, key=f"cust_loc_add_{cid}"):
+            _add_location_dialog(cid)
+
+    if not locs:
+        st.caption("No locations yet. Use **Add Location** (editors) to create a site.")
+    else:
+        for loc in locs:
+            lid = str(loc.get("id") or "")
+            nm = str(loc.get("location_name") or "").strip() or "—"
+            addr = str(loc.get("address") or "").strip()
+            city = str(loc.get("city") or "").strip()
+            stt = str(loc.get("state") or "").strip()
+            zp = str(loc.get("zip") or "").strip()
+            tail = ", ".join(x for x in (addr, city, stt, zp) if x)
+            line = f"**{html.escape(nm)}**"
+            if tail:
+                line += f" · {html.escape(tail)}"
+            badges: list[str] = []
+            if not bool(loc.get("is_active", True)):
+                badges.append("Inactive")
+            badge_s = " · ".join(badges)
+            full_line = line + (f" · *{badge_s}*" if badge_s else "")
+
+            if can_edit and lid:
+                wkey = f"cust_loc_pick_{cid}_{lid}"
+                sel_now = str(st.session_state.get(sel_key) or "")
+                st.session_state[wkey] = sel_now == lid
+                chk_col, body_col = st.columns([0.055, 0.945], gap="small")
+                with chk_col:
+                    st.checkbox(
+                        "Select",
+                        key=wkey,
+                        on_change=_on_location_pick_changed,
+                        args=(cid, lid, wkey),
+                        label_visibility="collapsed",
+                    )
+                with body_col:
+                    with st.container(border=True):
+                        st.markdown(full_line, unsafe_allow_html=True)
+            else:
+                with st.container(border=True):
+                    st.markdown(full_line, unsafe_allow_html=True)
+
+        if can_edit and locs:
+            pick = str(st.session_state.get(sel_key) or "").strip()
+            picked_row = _location_row_by_id(locs, pick) if pick else None
+            if pick and picked_row is None:
+                st.session_state.pop(sel_key, None)
+                pick = ""
+                picked_row = None
+
+            st.caption("Select **one** location for **Edit** or **Delete**.")
+            with st.container(border=True):
+                r1a, r1b = st.columns(2, gap="small")
+                with r1a:
+                    if st.button(
+                        "Edit Location",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not pick,
+                        key=f"cust_loc_tool_edit_{cid}",
+                    ):
+                        if not pick or _location_row_by_id(locs, pick) is None:
+                            st.error("Select a location first.")
+                            st.stop()
+                        st.session_state["customer_location_mode"] = "edit"
+                        st.session_state["customer_location_edit_id"] = pick
+                        st.rerun()
+                with r1b:
+                    if st.button(
+                        "Delete",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=not pick,
+                        key=f"cust_loc_tool_del_{cid}",
+                    ):
+                        if not pick or _location_row_by_id(locs, pick) is None:
+                            st.error("Select a location first.")
+                            st.stop()
+                        st.session_state[pend_key] = {"cid": cid, "lid": pick}
+                        st.rerun()
+
+    if not can_edit:
+        return
+
+    if mode == "edit" and edit_id and edit_row:
+        st.markdown("**Edit location**")
+        pk = f"cust_loc_ed_{edit_id}"
+        er = edit_row
+        nm = st.text_input("Location name", value=str(er.get("location_name") or ""), key=f"{pk}_name")
+        ad = st.text_input("Address", value=str(er.get("address") or ""), key=f"{pk}_addr")
+        c1, c2 = st.columns(2)
+        with c1:
+            city = st.text_input("City", value=str(er.get("city") or ""), key=f"{pk}_city")
+            stt = st.text_input("State", value=str(er.get("state") or ""), key=f"{pk}_state")
+        with c2:
+            zp = st.text_input("ZIP", value=str(er.get("zip") or ""), key=f"{pk}_zip")
+        act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
+        s1, s2 = st.columns(2)
+        with s1:
+            if st.button("Update location", type="primary", use_container_width=True, key=f"{pk}_save"):
+                t = str(nm or "").strip()
+                if not t:
+                    st.error("Location name is required.")
+                    st.stop()
+                try:
+                    update_rows_admin(
+                        "customer_locations",
+                        {
+                            "location_name": t,
+                            "address": str(ad or "").strip(),
+                            "city": str(city or "").strip(),
+                            "state": str(stt or "").strip(),
+                            "zip": str(zp or "").strip(),
+                            "is_active": bool(act),
+                        },
+                        {"id": er["id"]},
+                    )
+                except Exception as exc:
+                    st.error("Could not update the location.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
+                    st.stop()
+                _clear_location_subpanel()
+                st.success("Location updated.")
+                st.rerun()
+        with s2:
+            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+                _clear_location_subpanel()
+                st.rerun()
 
 
 def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
@@ -915,6 +1212,8 @@ def _render_edit_form(
 
     st.markdown("---")
     _render_contacts_section(customer_row=row, can_edit=can_edit, admin_read=admin_read)
+    st.markdown("---")
+    _render_locations_section(customer_row=row, can_edit=can_edit, admin_read=admin_read)
 
 
 def _render_customer_side_panel_body(
@@ -1042,6 +1341,7 @@ def _render_customers_main(
             st.session_state["customer_mode"] = "edit"
             st.session_state["customer_edit_id"] = cid
             _clear_contact_subpanel()
+            _clear_location_subpanel()
             st.rerun()
 
         def _on_deactivate_customers(_ids: list[str]) -> None:

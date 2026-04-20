@@ -16,6 +16,7 @@ These match :data:`JOBS_JOB_DATABASE_COLUMNS` (minus optional ``job_number`` / `
 - ``id`` (uuid, PK) — required for selection/delete; not shown as a grid column
 - ``customer_id`` (uuid, FK → customers)
 - ``customer_contact_id`` (uuid, nullable, FK → customer_contacts) — **optional** (migration 016)
+- ``customer_location_id`` (uuid, nullable, FK → customer_locations) — **optional** (migration 024)
 - ``job_number`` (text) — **optional** (migration 005); new rows use ``J#####`` via
   :mod:`services.shared_sequence` (same counter as quote numbers ``Q#####``)
 - ``job_name`` (text)
@@ -52,6 +53,7 @@ JOBS_JOB_DATABASE_COLUMNS_CORE: tuple[str, ...] = (
     "id",
     "customer_id",
     "customer_contact_id",
+    "customer_location_id",
     "job_number",
     "job_name",
     "location",
@@ -88,17 +90,34 @@ def _job_database_fetch_column_variants() -> list[tuple[str, ...]]:
     for base in (JOBS_JOB_DATABASE_COLUMNS, JOBS_JOB_DATABASE_COLUMNS_CORE):
         out.append(base)
         out.append(tuple(c for c in base if c != "customer_contact_id"))
+        out.append(tuple(c for c in base if c != "customer_location_id"))
         out.append(tuple(c for c in base if c != "job_number"))
         out.append(
             tuple(c for c in base if c != "job_number" and c != "customer_contact_id"),
         )
-    return out
+        out.append(tuple(c for c in base if c != "job_number" and c != "customer_location_id"))
+        out.append(
+            tuple(
+                c
+                for c in base
+                if c != "job_number" and c != "customer_contact_id" and c != "customer_location_id"
+            ),
+        )
+    # Dedupe (preserve order)
+    seen: set[tuple[str, ...]] = set()
+    uniq: list[tuple[str, ...]] = []
+    for t in out:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return uniq
 
 # Job Database overview: ``jobs`` columns + joined labels (only columns present are shown).
 # ``job_number`` is prepended only when :func:`fetch_jobs_for_job_database` reports it exists.
 JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER: tuple[str, ...] = (
     "job_name",
     "customer_name",
+    "Location",
     "customer_id",
     "source_type",
     "Quote (estimate)",

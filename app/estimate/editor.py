@@ -546,8 +546,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             "Select a saved customer from the list below (add one in the **Customers** tab if needed), then save."
         )
 
-    # Row 1: Quote | Status | Customer — single compact row (no full-width fields).
-    q_col, stat_col, cust_col = st.columns([1, 1, 2.2], gap="small")
+    # Row 1: Quote | Status | Customer | Job site — single compact row (no full-width fields).
+    q_col, stat_col, cust_col, loc_col = st.columns([1, 1, 1.45, 1.45], gap="small")
     quote_locked_after_save = bool(
         str(st.session_state.get("loaded_estimate_id") or "").strip()
         and str(est.get("quote_number", "") or "").strip()
@@ -604,8 +604,67 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     est["customer_id"] = None
                     est["customer_contact_id"] = None
                     est["contact_name"] = ""
+                    est["customer_location_id"] = None
             else:
                 est["customer_id"] = sel
+
+    with loc_col:
+        est.setdefault("customer_location_id", None)
+        _EMPTY_LOC = "__est_no_location__"
+        admin_read_loc = current_role() in {"admin", "estimator"}
+        try:
+            from services.customer_locations import fetch_locations_for_customer, location_option_label
+        except ImportError:
+            from app.services.customer_locations import fetch_locations_for_customer, location_option_label  # type: ignore
+
+        cid_for_loc = str(est.get("customer_id") or "").strip()
+        if not cid_for_loc:
+            st.caption("Select a customer first.")
+            if not is_locked:
+                est["customer_location_id"] = None
+        else:
+            loc_rows = fetch_locations_for_customer(cid_for_loc, admin_read=admin_read_loc, include_inactive=False)
+            cur_loc = str(est.get("customer_location_id") or "").strip()
+            if cur_loc:
+                have_ids = {str(r.get("id") or "") for r in loc_rows}
+                if cur_loc not in have_ids:
+                    try:
+                        orphan = fetch_one("customer_locations", {"id": cur_loc})
+                    except Exception:
+                        orphan = None
+                    if orphan:
+                        loc_rows = [orphan] + list(loc_rows)
+                    else:
+                        est["customer_location_id"] = None
+                        cur_loc = ""
+
+            options = [_EMPTY_LOC] + [str(r.get("id")) for r in loc_rows if r.get("id")]
+
+            def _fmt_loc(lid: str) -> str:
+                if lid == _EMPTY_LOC:
+                    return "— Select location —"
+                for r in loc_rows:
+                    if str(r.get("id")) == lid:
+                        return location_option_label(r)
+                return lid
+
+            default_idx = options.index(cur_loc) if cur_loc in options else 0
+            loc_sel = st.selectbox(
+                "Job site / location",
+                options=options,
+                index=min(default_idx, len(options) - 1),
+                format_func=_fmt_loc,
+                disabled=is_locked,
+                key=f"est_location_sel_{cid_for_loc}",
+                help="Sites are managed per customer on the Customers tab.",
+            )
+            if loc_sel == _EMPTY_LOC:
+                if not is_locked:
+                    est["customer_location_id"] = None
+            else:
+                est["customer_location_id"] = loc_sel
+            if cid_for_loc and not loc_rows and not is_locked:
+                st.caption("No sites yet — add **Locations** on the Customers tab.")
 
     # After customer is chosen: clear contact when customer changes (same run as the selectbox).
     prev_cust = st.session_state.get("_est_prev_customer_id")
@@ -613,6 +672,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     if prev_cust is not None and cur_cust != prev_cust:
         est["customer_contact_id"] = None
         est["contact_name"] = ""
+        est["customer_location_id"] = None
     st.session_state["_est_prev_customer_id"] = cur_cust
 
     matching_jobs = jobs_by_customer.get(est.get("customer_id"), []) if est.get("customer_id") else jobs

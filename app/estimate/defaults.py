@@ -17,6 +17,7 @@ def blank_estimate() -> dict:
     out = {
         "quote_number": "",
         "customer_id": None,
+        "customer_location_id": None,
         "customer_contact_id": None,
         "contact_name": "",
         "estimate_description": "",
@@ -63,7 +64,7 @@ _UUID_LOOSE = re.compile(r"^[0-9a-fA-F-]{36}$")
 
 def _estimate_table_column_names() -> frozenset[str]:
     """Best-effort column set for ``public.estimates`` (cached per session)."""
-    cache_key = "_ips_estimates_physical_columns_v1"
+    cache_key = "_ips_estimates_physical_columns_v2"
     cached = st.session_state.get(cache_key)
     if isinstance(cached, frozenset):
         return cached
@@ -166,6 +167,23 @@ def merge_estimate_row_scalar_fields_into_editor(row: dict, loaded: dict) -> Non
     if "prepared_by_id" in row:
         v = row.get("prepared_by_id")
         loaded["prepared_by_id"] = _normalize_prepared_by_id_value("" if v is None else str(v))
+    if "customer_location_id" in row:
+        v = row.get("customer_location_id")
+        if v is None or str(v).strip() == "":
+            loaded["customer_location_id"] = None
+        else:
+            loaded["customer_location_id"] = str(v).strip()
+
+
+def _payload_customer_location_for_db(est: dict) -> dict:
+    """Subset of ``estimates`` row when ``customer_location_id`` exists."""
+    cols = _estimate_table_column_names()
+    if "customer_location_id" not in cols:
+        return {}
+    raw = est.get("customer_location_id")
+    if raw is None or str(raw).strip() == "":
+        return {"customer_location_id": None}
+    return {"customer_location_id": str(raw).strip()}
 
 
 def _payload_prepared_by_for_db(est: dict) -> dict:
