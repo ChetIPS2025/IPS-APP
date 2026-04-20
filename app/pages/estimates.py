@@ -361,12 +361,9 @@ def _render_estimate_list() -> None:
             for c in [
                 "quote_number",
                 "status",
-                "revision_number",
                 "proposal_total",
-                "final_bid",
                 "job_received",
                 "po_number",
-                "updated_at",
             ]
             if c in df.columns
         ]
@@ -395,11 +392,15 @@ def _render_estimate_list() -> None:
         st.info("No estimates found.")
         return
 
-    pref_order = ["quote_number", "Linked job"]
+    # Visible columns (keep list-row layout clean).
+    pref_order = [
+        "quote_number",
+        "Linked job",
+        "status",
+        "proposal_total",
+        "po_number",
+    ]
     show_cols = [c for c in pref_order if c in df.columns]
-    show_cols.extend(
-        c for c in df.columns if c not in ("id", "job_id") and c not in show_cols
-    )
     if "id" not in df.columns:
         st.dataframe(df, use_container_width=True, hide_index=True)
         return
@@ -432,7 +433,8 @@ def _render_estimate_list() -> None:
         if not estimate_status_allows_job_creation(st_raw):
             return (
                 f"Estimate status {st_raw!r} does not allow creating a job from this page. "
-                "Change status or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
+                "Job creation is only allowed after customer approval (approved/accepted/awarded/po_received). "
+                "Update status first, or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
             )
         return ""
 

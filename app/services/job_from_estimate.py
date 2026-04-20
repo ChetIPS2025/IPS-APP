@@ -39,10 +39,17 @@ except ImportError:
     from app.services.job_service import job_number_display, next_job_number  # type: ignore
 
 
-# --- Status gate (easy to tighten) ---
-# ``None`` = allow any estimate status (use while workflow is still evolving).
-# Set to a non-``None`` frozenset to restrict, e.g. ``frozenset({"approved", "awarded", "won"})``.
-ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION: FrozenSet[str] | None = None
+# --- Status gate (workflow rule) ---
+# Estimates should stay on the Estimates page until accepted by the customer.
+# Only allow job creation once the estimate is customer-approved / accepted.
+ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION: FrozenSet[str] | None = frozenset(
+    {
+        "approved",
+        "accepted",
+        "awarded",
+        "po_received",
+    }
+)
 
 
 def estimate_status_allows_job_creation(status: str | None) -> bool:
@@ -224,7 +231,7 @@ def create_job_from_estimate(
             ok=False,
             message=(
                 f"Creating a job from this estimate is not allowed while status is {status_raw!r}. "
-                "Change status to an approved/awarded state first (or relax "
+                "Change status to an accepted/customer-approved state first (approved/accepted/awarded/po_received), or relax "
                 "ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py)."
             ),
             error_code="bad_status",
