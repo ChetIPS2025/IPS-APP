@@ -30,6 +30,8 @@ try:
 except ImportError:
     from app.services.job_service import job_number_display, job_row_select_label  # type: ignore
 
+from app.utils.formatters import job_display_label
+
 from app.estimate.calculations import (
     _D0,
     _dec,
@@ -42,7 +44,6 @@ from app.estimate.calculations import (
     money_str,
 )
 from app.estimate.customer_job import (
-    create_or_get_job_by_name,
     resolve_estimate_linked_job,
     _customer_dropdown_labels,
     _fetch_contacts_for_estimate_editor,
@@ -710,10 +711,26 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             est["contact_name"] = ""
 
     with row2_job:
-        selected_job_name = next(
-            (str(j.get("job_name") or "").strip() for j in matching_jobs if j.get("id") == est.get("job_id")), ""
+        _loaded_eid_for_job = str(st.session_state.get("loaded_estimate_id") or "").strip() or None
+        linked_job_id_for_field, linked_job_row_for_field = resolve_estimate_linked_job(
+            est, jobs, _loaded_eid_for_job
         )
-        job_initial = selected_job_name or str(st.session_state.get("est_job_query") or "")
+        if linked_job_id_for_field and linked_job_row_for_field is None:
+            linked_job_row_for_field = fetch_one(
+                "jobs",
+                {"id": linked_job_id_for_field},
+                columns="id,job_number,job_name",
+            )
+
+        linked_job_label = ""
+        if linked_job_id_for_field:
+            linked_job_label = job_display_label(
+                (linked_job_row_for_field or {}).get("job_number"),
+                (linked_job_row_for_field or {}).get("job_name"),
+            )
+
+        typed_job_text = str(st.session_state.get("est_job_query") or "")
+        job_initial = linked_job_label or typed_job_text
         job_query = st.text_input(
             "Job",
             value=job_initial,
