@@ -12,6 +12,11 @@ except ImportError:
     from mobile_ui import inject_ips_global_mobile_css  # type: ignore
     from pwa import render_install_app_sidebar_block  # type: ignore
 
+try:
+    from app.utils.document_button import render_document_button
+except ImportError:
+    from utils.document_button import render_document_button  # type: ignore
+
 
 def _repo_root() -> Path:
     """Resolve repository root whether this module is ``app/ui/__init__.py`` or legacy ``app/ui.py``."""
@@ -388,6 +393,8 @@ def render_sidebar() -> str:
             if st.button(label, key=key, type=btn_type, use_container_width=True):
                 st.session_state[IPS_NAV_PAGE_KEY] = p
                 st.rerun()
+        st.caption("Reference")
+        render_document_button("AWG Wire Size Chart", "assets/awg_wire_chart.pdf", container=st)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
     st.sidebar.button("Sign out", on_click=sign_out, use_container_width=True)
