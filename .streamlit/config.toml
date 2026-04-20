@@ -9,3 +9,11 @@ enableXsrfProtection = true
 
 [browser]
 gatherUsageStats = false
+
+[theme]
+# Force consistent IPS-dark theme across devices (avoid inheriting local Streamlit theme)
+base = "light"
+primaryColor = "#ff5a5f"
+backgroundColor = "#f5f8fc"
+secondaryBackgroundColor = "#dfe8f5"
+textColor = "#0f172a"

@@ -78,7 +78,7 @@ def _inject_proposal_preview_styles() -> None:
             align-items: flex-start;
             margin: 0.1rem auto 0.35rem auto;
             padding: 0.45rem 0.4rem 0.55rem;
-            background: #0b0f1a;
+            background: #0f172a;
             border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.06);
         }

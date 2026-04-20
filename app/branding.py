@@ -23,11 +23,12 @@ def apply_branding() -> None:
         """
         <style>
         .stApp {
-            background: linear-gradient(90deg, #020817 0%, #04132f 70%, #031338 100%);
+            /* Slightly softer IPS navy to avoid “crushed blacks” on some displays */
+            background: linear-gradient(90deg, #0b1220 0%, #0b1a3a 70%, #0b1b44 100%);
         }
 
         section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
+            background: linear-gradient(180deg, #111c33 0%, #182544 100%);
         }
 
         .ips-topbar {

@@ -353,6 +353,35 @@ def _render_estimate_list() -> None:
             pass
         return str(raw).strip()
 
+    def _estimate_description_display(est_row: pd.Series) -> str:
+        """
+        Row-level description shown in the Estimates list.
+        Prefer explicit estimate text fields; fall back to the first line of scope.
+        """
+        desc = est_row.get("estimate_description")
+        if desc is None or (isinstance(desc, float) and pd.isna(desc)):
+            desc = ""
+        if not str(desc).strip():
+            # Common persisted field in estimates.
+            desc = est_row.get("scope_of_work") or ""
+        if not str(desc).strip():
+            # Fallbacks from nested JSON (shape varies across imports/older saves).
+            ej = est_row.get("estimate_json")
+            if isinstance(ej, dict):
+                desc = (
+                    ej.get("estimate_description")
+                    or ej.get("job")
+                    or ej.get("job_name")
+                    or ej.get("scope_of_work")
+                    or ""
+                )
+        s = str(desc or "").strip()
+        if not s:
+            return ""
+        # Keep list rows scannable: first line, capped length.
+        s = s.splitlines()[0].strip()
+        return s[:60] + ("…" if len(s) > 60 else "")
+
     if not df.empty:
         keep = [
             c
@@ -362,6 +391,8 @@ def _render_estimate_list() -> None:
                 "proposal_total",
                 "job_received",
                 "po_number",
+                "scope_of_work",
+                "estimate_json",
             ]
             if c in df.columns
         ]
@@ -455,17 +486,19 @@ def _render_estimate_list() -> None:
     with nav2:
         st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
 
-    # Row layout: Job action | per-row delete | selection checkbox | data columns
-    col_weights = [1.15, 0.36, 0.48] + [1.0] * len(show_cols)
+    # Row layout: Job action | per-row delete | estimate description | selection checkbox | data columns
+    col_weights = [1.15, 0.36, 1.65, 0.48] + [1.0] * len(show_cols)
     head = st.columns(col_weights)
     with head[0]:
         st.caption("Job")
     with head[1]:
         st.caption("Del")
     with head[2]:
+        st.caption("Estimate Description")
+    with head[3]:
         st.caption(" ")
     for hi, col_name in enumerate(show_cols):
-        with head[3 + hi]:
+        with head[4 + hi]:
             lab = str(col_name).replace("_", " ")
             st.caption(lab[:22] + ("…" if len(lab) > 22 else ""))
 
@@ -537,6 +570,8 @@ def _render_estimate_list() -> None:
                 st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
                 st.rerun()
         with rc[2]:
+            st.text(_estimate_description_display(est_row))
+        with rc[3]:
             ck = f"est_list_pick_{eid}"
             if ck not in st.session_state:
                 st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
@@ -544,7 +579,7 @@ def _render_estimate_list() -> None:
             if checked:
                 picked.append(eid)
         for ci, col in enumerate(show_cols):
-            with rc[3 + ci]:
+            with rc[4 + ci]:
                 st.text(_estimate_list_cell_text(est_row.get(col), col=str(col)))
 
     set_selected_ids(TABLE_KEY_ESTIMATES, picked)
