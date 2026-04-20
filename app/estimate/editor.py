@@ -732,11 +732,11 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         typed_job_text = str(st.session_state.get("est_job_query") or "")
         job_initial = linked_job_label or typed_job_text
         job_query = st.text_input(
-            "Job",
+            "Estimate Description",
             value=job_initial,
             disabled=is_locked,
             key="est_job_query",
-            placeholder="Search or type a new job…",
+            placeholder="Enter estimate description…",
             help=(
                 "Type to search within the selected customer (when set). "
                 "Jobs are **not** created during estimate save; create jobs only from explicit conversion actions "
@@ -750,7 +750,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.caption("Matched existing job.")
         elif job_norm:
             est["job_id"] = None
-            st.caption("No exact match. Jobs are created only by explicit conversion actions.")
+            st.caption("No matching job found. Jobs are created only after estimate acceptance.")
 
         job_matches = _top_matches(job_query, job_names, limit=7)
         if job_matches and not job_exact_id:
