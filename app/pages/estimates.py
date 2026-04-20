@@ -445,14 +445,17 @@ def _render_estimate_list() -> None:
     with nav2:
         st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
 
-    col_weights = [1.15, 0.48] + [1.0] * len(show_cols)
+    # Row layout: Job action | per-row delete | selection checkbox | data columns
+    col_weights = [1.15, 0.36, 0.48] + [1.0] * len(show_cols)
     head = st.columns(col_weights)
     with head[0]:
         st.caption("Job")
     with head[1]:
+        st.caption("Del")
+    with head[2]:
         st.caption(" ")
     for hi, col_name in enumerate(show_cols):
-        with head[2 + hi]:
+        with head[3 + hi]:
             lab = str(col_name).replace("_", " ")
             st.caption(lab[:22] + ("…" if len(lab) > 22 else ""))
 
@@ -505,6 +508,25 @@ def _render_estimate_list() -> None:
                         else:
                             st.error(res.message)
         with rc[1]:
+            row_status = str(est_row.get("status") or "").strip().lower()
+            del_enabled = bool(can_edit and row_status == "draft")
+            if not can_edit:
+                del_help = "Only admin or estimator can delete estimates."
+            elif row_status != "draft":
+                del_help = "Only draft estimates can be deleted"
+            else:
+                del_help = "Delete this draft estimate."
+            if st.button(
+                "🗑",
+                key=f"est_row_del_{eid}",
+                disabled=not del_enabled,
+                use_container_width=True,
+                help=del_help,
+            ):
+                # Trigger the same confirmation flow the bulk action bar uses.
+                st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
+                st.rerun()
+        with rc[2]:
             ck = f"est_list_pick_{eid}"
             if ck not in st.session_state:
                 st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
@@ -512,7 +534,7 @@ def _render_estimate_list() -> None:
             if checked:
                 picked.append(eid)
         for ci, col in enumerate(show_cols):
-            with rc[2 + ci]:
+            with rc[3 + ci]:
                 st.text(_estimate_list_cell_text(est_row.get(col), col=str(col)))
 
     set_selected_ids(TABLE_KEY_ESTIMATES, picked)
