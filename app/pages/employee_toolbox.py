@@ -73,7 +73,7 @@ _PANEL_MODE_KEY = "employee_toolbox_panel_mode"
 _EDIT_ID_KEY = "employee_toolbox_edit_id"
 _DELETE_PREFIX = "employee_toolbox_delete"
 _PENDING_DELETE_KEY = "employee_toolbox_pending_delete_ids"
-_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v11"
+_TOOLBOX_STYLE_KEY = "ips_employee_toolbox_styles_injected_v12"
 
 _FETCH_COLUMNS = (
     "id,title,url,description,category,is_active,sort_order,created_at,"
@@ -518,22 +518,35 @@ def _href_attr(url: str) -> str:
     return html.escape(u, quote=True)
 
 
-_MAX_INLINE_PDF_BYTES = 1_800_000
+_MAX_INLINE_PDF_BYTES = 4_000_000
 
 
-def render_resource_tile(title: str, subtitle: str, icon: str, url: str | None, *, tooltip: str = "") -> None:
+def render_resource_tile(
+    title: str,
+    subtitle: str,
+    url: str | None,
+    icon: str | None = None,
+    *,
+    tooltip: str = "",
+    muted: bool = False,
+) -> None:
     """
-    IPS-style clickable tool tile (Resource Hub). ``url`` opens in a **new tab** when set;
-    when ``None``, renders a non-clickable tile (pair with ``st.download_button`` for local files).
+    IPS industrial tool tile for Resource Hub: chrome frame, blue header strip, uppercase title,
+    footer subtitle. Whole card is wrapped in ``<a>`` when ``url`` is set (opens in a new tab).
     """
+    ic = html.escape(icon or "📄", quote=True)
     safe_title = html.escape(title, quote=True)
     safe_sub = html.escape(subtitle, quote=True)
-    safe_icon = html.escape(icon, quote=True)
     tip = _tile_tooltip_attr(tooltip) if str(tooltip or "").strip() else ""
-    inner = f"""<div class="ips-resource-tile-inner"{tip}>
-<div class="ips-resource-tile-icon">{safe_icon}</div>
+    muted_cls = " ips-resource-tile-card--muted" if muted else ""
+    inner = f"""<div class="ips-resource-tile-card{muted_cls}"{tip}>
+<div class="ips-resource-tile-chrome"></div>
+<div class="ips-resource-tile-header-strip"></div>
+<div class="ips-resource-tile-mid">
+<div class="ips-resource-tile-icon">{ic}</div>
 <div class="ips-resource-tile-title">{safe_title}</div>
-<div class="ips-resource-tile-sub">{safe_sub}</div>
+</div>
+<div class="ips-resource-tile-footer-strip">{safe_sub}</div>
 </div>"""
     if url:
         h = _href_attr(url)
@@ -903,7 +916,14 @@ def _inject_toolbox_hub_styles() -> None:
                 flex: 1 1 calc(50% - 0.25rem) !important;
             }
         }
-        /* Resource hub: emoji tool tiles (replaces plain list look) */
+        /* Resource hub: chrome tool tiles (no admin row — tile only) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-resource-tile-grid-marker) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 6px 4px 10px 4px !important;
+            margin-bottom: 4px !important;
+        }
         a.ips-resource-tile-link {
             display: block !important;
             text-decoration: none !important;
@@ -912,43 +932,99 @@ def _inject_toolbox_hub_styles() -> None:
         div.ips-resource-tile-static {
             display: block;
         }
-        div.ips-resource-tile-inner {
-            background: linear-gradient(145deg, #0b2247, #031633);
-            border: 1px solid #2a5fd6;
-            border-radius: 12px;
-            padding: 16px;
-            min-height: 120px;
-            height: 120px;
+        div.ips-resource-tile-card {
+            position: relative;
+            border-radius: 14px;
+            height: 142px;
+            min-height: 142px;
+            max-height: 142px;
             box-sizing: border-box;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            gap: 6px;
-            transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-            box-shadow: 0 0 8px rgba(0, 120, 255, 0.22);
+            background: linear-gradient(165deg, #0a1628 0%, #050d18 55%, #0a1424 100%);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.14),
+                inset 0 -2px 6px rgba(0, 0, 0, 0.45),
+                0 0 0 1px rgba(30, 64, 175, 0.35),
+                0 4px 14px rgba(0, 0, 0, 0.35);
+            transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
         }
-        a.ips-resource-tile-link:hover div.ips-resource-tile-inner {
-            box-shadow: 0 0 14px rgba(0, 120, 255, 0.55);
-            border-color: rgba(90, 150, 255, 0.95);
-            transform: translateY(-1px);
+        div.ips-resource-tile-chrome {
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            pointer-events: none;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+                inset 0 0 20px rgba(59, 130, 246, 0.06);
+        }
+        div.ips-resource-tile-header-strip {
+            height: 7px;
+            flex: 0 0 auto;
+            background: linear-gradient(90deg, #1d4ed8, #3b82f6, #60a5fa, #3b82f6, #1d4ed8);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+        }
+        div.ips-resource-tile-mid {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 10px 6px 10px;
+            min-height: 0;
         }
         div.ips-resource-tile-icon {
-            font-size: 1.55rem;
-            line-height: 1.1;
+            font-size: 1.75rem;
+            line-height: 1;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
         }
         div.ips-resource-tile-title {
-            color: #f8fafc !important;
-            font-weight: 600 !important;
-            font-size: 0.88rem !important;
-            line-height: 1.25 !important;
-        }
-        div.ips-resource-tile-sub {
-            color: #7fb3ff !important;
+            color: #f1f5f9 !important;
+            font-weight: 800 !important;
             font-size: 0.72rem !important;
             line-height: 1.2 !important;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            padding: 0 4px;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-height: 2.6em;
+            overflow: hidden;
+        }
+        div.ips-resource-tile-footer-strip {
+            flex: 0 0 auto;
+            padding: 7px 10px 8px 10px;
+            font-size: 0.68rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #93c5fd !important;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.2), rgba(2, 6, 23, 0.92));
+            border-top: 1px solid rgba(51, 65, 85, 0.65);
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        div.ips-resource-tile-card--muted {
+            opacity: 0.52;
+            filter: grayscale(0.25);
+        }
+        a.ips-resource-tile-link:hover div.ips-resource-tile-card:not(.ips-resource-tile-card--muted) {
+            transform: translateY(-4px);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 -2px 8px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(96, 165, 250, 0.55),
+                0 10px 28px rgba(0, 0, 0, 0.42),
+                0 0 22px rgba(59, 130, 246, 0.35);
         }
         [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-resource-tile-grid-marker) {
-            gap: 0.85rem !important;
+            gap: 1rem !important;
             align-items: stretch !important;
         }
         </style>
@@ -1350,8 +1426,8 @@ def _render_edit_tool_panel(*, row: dict, existing_rows: list[dict]) -> None:
         _render_edit_link_panel(row=row, existing_rows=existing_rows)
 
 
-def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
-    """Resource hub tile: styled IPS tool card + admin row (Edit / Delete)."""
+def _render_tool_tile(row: dict) -> None:
+    """Resource hub: single clickable IPS tool tile (no on-tile admin controls)."""
     desc = str(row.get("description") or "").strip()
     url_raw = str(row.get("url") or "").strip()
     rid = str(row.get("id") or "")
@@ -1379,10 +1455,12 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
 
         if is_file and fp:
             if not ref:
-                render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
-                st.markdown('<p class="ips-toolbox-tile-meta">File unavailable</p>', unsafe_allow_html=True)
+                render_resource_tile(
+                    display_title, subtitle, None, icon=icon, tooltip=tip_text, muted=True
+                )
+                st.caption("File unavailable")
             elif ref.startswith("http://") or ref.startswith("https://"):
-                render_resource_tile(display_title, subtitle, icon, ref, tooltip=tip_text)
+                render_resource_tile(display_title, subtitle, ref, icon=icon, tooltip=tip_text)
             else:
                 p = Path(ref)
                 if p.is_file():
@@ -1398,9 +1476,11 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                         b64 = base64.b64encode(data_bytes).decode("ascii")
                         open_url = f"data:application/pdf;base64,{b64}"
                     if open_url:
-                        render_resource_tile(display_title, subtitle, icon, open_url, tooltip=tip_text)
+                        render_resource_tile(display_title, subtitle, open_url, icon=icon, tooltip=tip_text)
                     else:
-                        render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
+                        render_resource_tile(
+                            display_title, subtitle, None, icon=icon, tooltip=tip_text, muted=True
+                        )
                         ctype_mime = str(row.get("content_type") or "").strip() or "application/octet-stream"
                         _dl_help = " — ".join([x for x in (display_title, desc) if x]) or f"Download {fn_display}"
                         st.download_button(
@@ -1414,34 +1494,21 @@ def _render_tool_tile(row: dict, *, can_manage: bool) -> None:
                             help=_dl_help,
                         )
                 else:
-                    render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
-                    st.markdown('<p class="ips-toolbox-tile-meta">Missing file</p>', unsafe_allow_html=True)
+                    render_resource_tile(
+                        display_title, subtitle, None, icon=icon, tooltip=tip_text, muted=True
+                    )
+                    st.caption("Missing file")
         elif url_raw:
             nu = _normalize_url(url_raw)
-            render_resource_tile(display_title, subtitle, icon, nu, tooltip=tip_text)
+            render_resource_tile(display_title, subtitle, nu, icon=icon, tooltip=tip_text)
         else:
-            render_resource_tile(display_title, subtitle, icon, None, tooltip=tip_text)
-            st.markdown('<p class="ips-toolbox-tile-meta">No URL</p>', unsafe_allow_html=True)
-
-        if can_manage:
-            st.markdown(
-                '<hr class="ips-toolbox-tile-admin-sep" />',
-                unsafe_allow_html=True,
+            render_resource_tile(
+                display_title, subtitle, None, icon=icon, tooltip=tip_text, muted=True
             )
-            e1, e2 = st.columns(2, gap="small")
-            with e1:
-                if st.button("Edit", type="secondary", use_container_width=True, key=f"etb_edit_{rid}"):
-                    st.session_state[_PANEL_MODE_KEY] = "edit"
-                    st.session_state[_EDIT_ID_KEY] = rid
-                    st.rerun()
-            with e2:
-                if st.button("Delete", type="secondary", use_container_width=True, key=f"etb_del_{rid}"):
-                    open_destructive_confirmation(_DELETE_PREFIX)
-                    st.session_state[_PENDING_DELETE_KEY] = [rid]
-                    st.rerun()
+            st.caption("No link for this item")
 
 
-def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
+def _render_tools_hub(rows: list[dict]) -> None:
     if not rows:
         st.info("No toolbox resources yet. Admins can add links with **Add Tool** or upload files with **Upload Document**.")
         return
@@ -1453,8 +1520,8 @@ def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
 
     st.markdown("##### Resource hub")
     st.caption(
-        "Grouped by category — **click a tile** to open in a new tab (or **Download file** when the file is served "
-        "locally). **Admins:** **Edit** / **Delete** under each item. Signed URLs expire after about one hour."
+        "Grouped by category — **click a tile** to open in a new tab. "
+        "Large local PDFs may use **Download file** below the tile. Signed URLs expire after about one hour."
     )
 
     for i, (cat_label, group) in enumerate(_group_by_category_ordered(rows)):
@@ -1469,7 +1536,7 @@ def _render_tools_hub(rows: list[dict], *, can_manage: bool) -> None:
             cols = st.columns(ncols, gap="large")
             for k, row in enumerate(chunk):
                 with cols[k]:
-                    _render_tool_tile(row, can_manage=can_manage)
+                    _render_tool_tile(row)
 
 
 def render() -> None:
@@ -1608,7 +1675,7 @@ def render() -> None:
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
         with main_col:
-            _render_tools_hub(display_rows, can_manage=can_manage)
+            _render_tools_hub(display_rows)
         with side_col:
             if panel_add:
                 _render_add_tool_panel(existing_rows=all_rows)
@@ -1617,7 +1684,7 @@ def render() -> None:
             elif panel_edit and edit_row:
                 _render_edit_tool_panel(row=edit_row, existing_rows=all_rows)
     else:
-        _render_tools_hub(display_rows, can_manage=can_manage)
+        _render_tools_hub(display_rows)
 
     if not can_manage:
         st.caption("Need something added? Contact an administrator.")
