@@ -1,9 +1,12 @@
 """
 Create a Job Database row from an approved / awarded estimate.
 
-Quote numbers (``Q#####``) and job numbers (``J#####``) use the shared sequence elsewhere;
-this module only assigns ``job_number`` when the ``jobs`` table has that column (same pattern
-as the Job Database page).
+**Architecture:** this is the **estimate → job** conversion path only. The resulting row is
+the **costing / work** record (``jobs.id`` / ``job_number``); the estimate stays a quote and
+is linked via ``estimate_id``. Time, job costing, and PO expenses should key off ``job_id``.
+
+Quote numbers (``Q#####``) map to ``J#####`` when ``job_number`` exists; see
+:func:`estimate_quote_to_job_number`.
 """
 
 from __future__ import annotations
@@ -32,10 +35,16 @@ except ImportError:
     )
 
 try:
-    from services.job_schema import fetch_jobs_for_job_database
+    from services.job_schema import (
+        JOB_SOURCE_TYPE_ESTIMATE,
+        fetch_jobs_for_job_database,
+    )
     from services.job_service import job_number_display, next_job_number
 except ImportError:
-    from app.services.job_schema import fetch_jobs_for_job_database  # type: ignore
+    from app.services.job_schema import (  # type: ignore
+        JOB_SOURCE_TYPE_ESTIMATE,
+        fetch_jobs_for_job_database,
+    )
     from app.services.job_service import job_number_display, next_job_number  # type: ignore
 
 
@@ -118,6 +127,22 @@ def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
     except Exception:
         pass
     return fetch_one("estimates", {"id": eid})
+
+
+def estimate_quote_to_job_number(quote_number: str) -> str:
+    """
+    Map an estimate **quote_number** (e.g. ``Q26025`` or ``26025``) to a related **job_number**
+    (``J26025``). Leading alphabetic prefix is replaced with ``J``; otherwise ``J`` is prepended.
+
+    Used only for estimate-to-job conversion — standalone jobs keep ``next_job_number()``.
+    """
+    q = str(quote_number or "").strip()
+    if not q:
+        return ""
+    first = q[:1]
+    if first.isalpha():
+        return ("J" + q[1:])[:120]
+    return ("J" + q)[:120]
 
 
 def estimate_description_value(estimate_row: dict[str, Any]) -> str:
@@ -318,6 +343,7 @@ def create_job_from_estimate(
         "location": _safe_location(ej),
         "status": "Awarded",
         "estimate_id": eid,
+        "source_type": JOB_SOURCE_TYPE_ESTIMATE,
         "project_manager": "",
         "supervisor": "",
         "start_date": None,
@@ -330,17 +356,53 @@ def create_job_from_estimate(
         cc = row.get("customer_contact_id") or ej.get("customer_contact_id")
         if cc:
             payload["customer_contact_id"] = str(cc)
-    if has_job_number_column:
-        payload["job_number"] = next_job_number()
 
-    try:
-        inserted = insert_row_admin("jobs", payload)
-    except Exception as exc:
-        return CreateJobFromEstimateResult(
-            ok=False,
-            message=f"Could not create job: {exc}",
-            error_code="insert_failed",
+    proposed_jn = ""
+    inserted: dict[str, Any] | None = None
+    skip_insert = False
+
+    if has_job_number_column:
+        qraw = str(row.get("quote_number") or ej.get("quote_number") or "").strip()
+        proposed_jn = estimate_quote_to_job_number(qraw)
+        if not proposed_jn:
+            proposed_jn = str(next_job_number()).strip()
+        payload["job_number"] = proposed_jn
+
+        hits = fetch_by_match_admin(
+            "jobs",
+            {"job_number": proposed_jn},
+            columns="id,job_number,job_name,estimate_id,customer_id",
+            limit=10,
         )
+        if hits:
+            hit0 = hits[0]
+            hest = str(hit0.get("estimate_id") or "").strip()
+            if hest == eid:
+                inserted = dict(hit0)
+                skip_insert = True
+            else:
+                return CreateJobFromEstimateResult(
+                    ok=False,
+                    message=(
+                        f"Job number {proposed_jn!r} is already in use by another job. "
+                        "Resolve the conflict or adjust the estimate quote number."
+                    ),
+                    error_code="job_number_taken",
+                    job=hit0,
+                )
+
+    if not skip_insert:
+        try:
+            inserted = insert_row_admin("jobs", payload)
+        except Exception as exc:
+            return CreateJobFromEstimateResult(
+                ok=False,
+                message=f"Could not create job: {exc}",
+                error_code="insert_failed",
+            )
+
+    if not inserted:
+        return CreateJobFromEstimateResult(ok=False, message="Job insert returned no row.", error_code="insert_failed")
 
     new_id = str(inserted.get("id") or "")
     if not new_id:
@@ -367,7 +429,14 @@ def create_job_from_estimate(
         )
 
     jn = job_number_display(inserted.get("job_number") if has_job_number_column else None)
-    msg = f"Created job {jn or new_id} and linked it to this estimate." if jn else f"Created job and linked it to this estimate ({new_id})."
+    if skip_insert:
+        msg = f"Using existing job {jn or new_id} linked to this estimate."
+    else:
+        msg = (
+            f"Created job {jn or new_id} and linked it to this estimate."
+            if jn
+            else f"Created job and linked it to this estimate ({new_id})."
+        )
     if mark_job_received:
         msg += " Estimate marked as job received."
     return CreateJobFromEstimateResult(ok=True, message=msg, job=inserted)

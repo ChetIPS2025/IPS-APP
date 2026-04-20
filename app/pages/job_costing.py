@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+"""
+Job Costing rolls up **actuals by job** (``job_id`` on time entries, grid time, expenses, etc.).
+
+When ``jobs.estimate_id`` is set, estimate totals are shown **for comparison only** — quotes
+remain on the Estimates page; the job is the costing / work record.
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -29,7 +36,10 @@ except ImportError:
 
 def render() -> None:
     render_header("Job Costing")
-    render_crud_list_subtitle("Estimated vs actual labor, materials, travel, assets, and expenses by job.")
+    render_crud_list_subtitle(
+        "Actual labor, materials, travel, assets, and expenses **by job** (``job_id``). "
+        "Linked quote totals appear for comparison when the job has an ``estimate_id``."
+    )
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")
     jobs = fetch_table("jobs", limit=5000, order_by="job_number")
@@ -78,7 +88,8 @@ def render() -> None:
         customer_id = job.get("customer_id")
         estimate_id = job.get("estimate_id")
 
-        estimate = estimate_by_id.get(estimate_id, {})
+        # Proposal / pricing snapshot from the linked quote (optional for standalone jobs).
+        estimate = estimate_by_id.get(estimate_id, {}) if estimate_id else {}
 
         estimated_labor = float(estimate.get("labor_total", 0) or 0)
         estimated_equipment = float(estimate.get("equipment_total", 0) or 0)

@@ -460,8 +460,8 @@ def _render_estimate_list() -> None:
         return ""
 
     st.caption(
-        "**Estimate = quote/proposal** (stays here until accepted by the customer). "
-        "**Job = approved work** (created from an accepted estimate)."
+        "**Estimates = quotes / proposals** (pricing and approval live here). "
+        "**Jobs = costing / work records** in Job Database — create from an accepted estimate or standalone for field work."
     )
     st.caption(
         "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "

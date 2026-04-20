@@ -64,7 +64,9 @@ def _safe_date_value(value):
 
 def render() -> None:
     render_header("PO / Expenses")
-    render_crud_list_subtitle("Job-linked expenses and PO lines — filter by job, then add or edit in the form.")
+    render_crud_list_subtitle(
+        "Expenses and PO lines tied to **jobs** (``job_id``) — the work/costing record; pick a job, then add or edit."
+    )
 
     can_add = current_role() in {"admin", "estimator"}
     can_approve = current_role() == "admin"

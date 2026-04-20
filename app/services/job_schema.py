@@ -1,13 +1,17 @@
 """
 Jobs table — columns the **Job Database** page uses on ``public.jobs``.
 
+**Architecture:** jobs are the **costing / work** records (time entries, job costing, PO
+expenses, materials usage key off ``jobs.id``). Estimates are **quotes / proposals** only;
+``estimate_id`` is optional and links a converted or manually attached quote.
+
 There is **no** ``description`` column; long text is ``notes``. The ``job_number`` column is
 added by ``sql/005_jobs_job_number.sql``; databases that have not run it have no
 ``job_number`` — :func:`fetch_jobs_for_job_database` then omits it from SELECT/INSERT.
 
 **Canonical columns read/written by Job Database**
 
-These match :data:`JOBS_JOB_DATABASE_COLUMNS` (minus optional ``job_number``):
+These match :data:`JOBS_JOB_DATABASE_COLUMNS` (minus optional ``job_number`` / ``source_type``):
 
 - ``id`` (uuid, PK) — required for selection/delete; not shown as a grid column
 - ``customer_id`` (uuid, FK → customers)
@@ -22,6 +26,7 @@ These match :data:`JOBS_JOB_DATABASE_COLUMNS` (minus optional ``job_number``):
 - ``start_date``, ``target_completion_date``, ``completed_date`` (date or text)
 - ``awarded_amount`` (numeric)
 - ``notes`` (text)
+- ``source_type`` (text) — **optional** (migration 022): ``estimate`` | ``standalone``
 
 **Overview grid** may also show joined fields (not on ``jobs``): ``customer_name``,
 ``estimate_label`` — see :data:`JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER`.
@@ -39,8 +44,11 @@ try:
 except ImportError:
     from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin  # type: ignore
 
-# All columns this page SELECTs, INSERTs, or UPDATEs (real app usage only).
-JOBS_JOB_DATABASE_COLUMNS: tuple[str, ...] = (
+JOB_SOURCE_TYPE_ESTIMATE = "estimate"
+JOB_SOURCE_TYPE_STANDALONE = "standalone"
+
+# Core columns (always expected once the jobs table exists).
+JOBS_JOB_DATABASE_COLUMNS_CORE: tuple[str, ...] = (
     "id",
     "customer_id",
     "customer_contact_id",
@@ -58,6 +66,9 @@ JOBS_JOB_DATABASE_COLUMNS: tuple[str, ...] = (
     "notes",
 )
 
+# Includes ``source_type`` when migration ``022_jobs_source_type.sql`` has been applied.
+JOBS_JOB_DATABASE_COLUMNS: tuple[str, ...] = JOBS_JOB_DATABASE_COLUMNS_CORE + ("source_type",)
+
 JOBS_JOB_DATABASE_COLUMNS_NO_JOB_NUMBER: tuple[str, ...] = tuple(
     c for c in JOBS_JOB_DATABASE_COLUMNS if c != "job_number"
 )
@@ -70,12 +81,26 @@ JOBS_JOB_DATABASE_COLUMNS_NO_CONTACT_NO_JOB_NUMBER: tuple[str, ...] = tuple(
     c for c in JOBS_JOB_DATABASE_COLUMNS_NO_JOB_NUMBER if c != "customer_contact_id"
 )
 
+
+def _job_database_fetch_column_variants() -> list[tuple[str, ...]]:
+    """Prefer column sets that include ``source_type``; fall back for older databases."""
+    out: list[tuple[str, ...]] = []
+    for base in (JOBS_JOB_DATABASE_COLUMNS, JOBS_JOB_DATABASE_COLUMNS_CORE):
+        out.append(base)
+        out.append(tuple(c for c in base if c != "customer_contact_id"))
+        out.append(tuple(c for c in base if c != "job_number"))
+        out.append(
+            tuple(c for c in base if c != "job_number" and c != "customer_contact_id"),
+        )
+    return out
+
 # Job Database overview: ``jobs`` columns + joined labels (only columns present are shown).
 # ``job_number`` is prepended only when :func:`fetch_jobs_for_job_database` reports it exists.
 JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER: tuple[str, ...] = (
     "job_name",
     "customer_name",
     "customer_id",
+    "source_type",
     "Quote (estimate)",
     "estimate_label",
     "status",
@@ -146,12 +171,7 @@ def fetch_jobs_for_job_database(
     If all typed column lists fail, falls back to :func:`db.fetch_jobs_with_order_fallback`
     (``select('*')``) so the grid can still populate.
     """
-    variants: list[tuple[str, ...]] = [
-        JOBS_JOB_DATABASE_COLUMNS,
-        JOBS_JOB_DATABASE_COLUMNS_NO_CONTACT,
-        JOBS_JOB_DATABASE_COLUMNS_NO_JOB_NUMBER,
-        JOBS_JOB_DATABASE_COLUMNS_NO_CONTACT_NO_JOB_NUMBER,
-    ]
+    variants: list[tuple[str, ...]] = _job_database_fetch_column_variants()
     last_err: Exception | None = None
     for cols in variants:
         try:

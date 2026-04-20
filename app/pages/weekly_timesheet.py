@@ -240,7 +240,7 @@ def render() -> None:
         return
 
     render_crud_list_subtitle(
-        "Hours can pull from **employee time entries**. Apply **sql/004_weekly_timesheets.sql** in Supabase before first save."
+        "Hours roll up under **jobs** (``job_id`` / job picker). Apply **sql/004_weekly_timesheets.sql** in Supabase before first save."
     )
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")

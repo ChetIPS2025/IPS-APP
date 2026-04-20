@@ -76,6 +76,8 @@ except ImportError:
 try:
     from services.job_from_estimate import create_job_from_estimate
     from services.job_schema import (
+        JOB_SOURCE_TYPE_ESTIMATE,
+        JOB_SOURCE_TYPE_STANDALONE,
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
     )
@@ -89,6 +91,8 @@ try:
 except ImportError:
     from app.services.job_from_estimate import create_job_from_estimate  # type: ignore
     from app.services.job_schema import (  # type: ignore
+        JOB_SOURCE_TYPE_ESTIMATE,
+        JOB_SOURCE_TYPE_STANDALONE,
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
     )
@@ -270,6 +274,17 @@ def _clear_job_mode() -> None:
     st.session_state.pop("job_edit_id", None)
 
 
+def _job_form_linked_estimate_id(estimate_options: dict[str, Any], linked_label: str) -> str | None:
+    """Map the Linked estimate select label to an estimate UUID, or ``None`` for a standalone job."""
+    if not str(linked_label or "").strip():
+        return None
+    raw = estimate_options.get(linked_label)
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
+
+
 def _render_job_form_panel(
     *,
     mode: str,
@@ -288,6 +303,11 @@ def _render_job_form_panel(
     with st.container(border=True):
         title = "Add Job" if mode == "add" else "Edit Job"
         st.markdown(f"### {title}")
+        if mode == "add":
+            st.caption(
+                "Standalone job — **no estimate required**. Leave **Linked estimate** empty, "
+                "or pick a quote only if you are attaching this job to an existing estimate."
+            )
 
         if mode == "edit" and selected_job and selected_job.get("estimate_id"):
             st.markdown("#### Estimate source")
@@ -457,6 +477,8 @@ def _render_job_form_panel(
         location = st.text_input("Location", value=current_value("location"), disabled=_ro, key="job_form_location")
 
         st.markdown("#### Status & linked estimate")
+        if mode == "add":
+            st.caption("*Linked estimate* is optional — leave the first row selected for a job with no quote.")
         c5, c6 = st.columns(2, gap="small")
         status_options = list(JOB_STATUSES)
         current_status = str(current_value("status", "Draft") or "Draft").strip() or "Draft"
@@ -481,12 +503,14 @@ def _render_job_form_panel(
                     if lab and str(eid) == _seid:
                         current_estimate_label = lab
                         break
+        _link_lbl = "Linked estimate (optional)" if mode == "add" else "Linked estimate"
         linked_estimate = c6.selectbox(
-            "Linked Estimate",
+            _link_lbl,
             estimate_labels,
             index=estimate_labels.index(current_estimate_label) if current_estimate_label in estimate_labels else 0,
             disabled=_ro,
             key="job_form_linked_estimate",
+            help="Leave blank for a standalone job. Pick a row only when this job should reference an estimate.",
         )
 
         st.markdown("#### Team & awarded amount")
@@ -541,13 +565,15 @@ def _render_job_form_panel(
                 if not job_name.strip():
                     st.error("Job Name required")
                     st.stop()
+                linked_eid = _job_form_linked_estimate_id(estimate_options, linked_estimate)
                 payload = {
                     "customer_id": customer_options[customer_name],
                     "customer_contact_id": selected_contact_id,
                     "job_name": job_name.strip(),
                     "location": location.strip(),
                     "status": status,
-                    "estimate_id": estimate_options.get(linked_estimate),
+                    "estimate_id": linked_eid,
+                    "source_type": JOB_SOURCE_TYPE_ESTIMATE if linked_eid else JOB_SOURCE_TYPE_STANDALONE,
                     "project_manager": project_manager.strip(),
                     "supervisor": supervisor.strip(),
                     "start_date": _safe_date_value(start_date.strip()),
@@ -573,13 +599,15 @@ def _render_job_form_panel(
                 if not job_name.strip():
                     st.error("Job Name required")
                     st.stop()
+                linked_eid = _job_form_linked_estimate_id(estimate_options, linked_estimate)
                 payload = {
                     "customer_id": customer_options[customer_name],
                     "customer_contact_id": selected_contact_id,
                     "job_name": job_name.strip(),
                     "location": location.strip(),
                     "status": status,
-                    "estimate_id": estimate_options.get(linked_estimate),
+                    "estimate_id": linked_eid,
+                    "source_type": JOB_SOURCE_TYPE_ESTIMATE if linked_eid else JOB_SOURCE_TYPE_STANDALONE,
                     "project_manager": project_manager.strip(),
                     "supervisor": supervisor.strip(),
                     "start_date": _safe_date_value(start_date.strip()),
@@ -606,7 +634,7 @@ def _build_jobs_overview_dataframe(
     estimate_quote_by_id: dict[str, str],
     contact_label_by_id: dict[str, str],
 ) -> pd.DataFrame:
-    """Augment jobs rows for Job Database overview (customer name, estimate labels, source, contact)."""
+    """Augment jobs rows for overview (customer name, ``source_type``, estimate labels, linked-quote copy)."""
     if jobs_df.empty:
         return jobs_df
     out = jobs_df.copy()
@@ -735,6 +763,10 @@ def _render_job_db_top_bar(
             '<span class="ips-list-top-anchor ips-job-topbar"></span>',
             unsafe_allow_html=True,
         )
+        st.caption(
+            "**Create New Job** — standalone work (no estimate). "
+            "**Create job from estimate** — converts an approved quote and links the new job."
+        )
         c1, c2, c3 = st.columns([1.0, 1.0, 1.45], gap="small")
         with c1:
             if st.button(
@@ -817,11 +849,11 @@ def render() -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     render_crud_list_subtitle(
-        "Search and maintain jobs, link estimates to work records, and keep customer contacts aligned."
+        "Search and maintain jobs — standalone or estimate-linked — and keep customer contacts aligned."
     )
     st.caption(
-        "**Jobs are approved work** in the Job Database. They may originate from an **estimate (quote/proposal)** "
-        "via **Convert estimate → job** or **Job Received** on the Estimates list."
+        "**Standalone jobs** use **Create New Job** (no quote). **Estimate-linked jobs** use **Convert estimate → job** "
+        "or **Job Received** on the Estimates list once the quote is customer-approved."
     )
 
     can_edit = current_role() in {"admin", "estimator"}
@@ -1002,7 +1034,15 @@ def render() -> None:
             show_cols: list[str] = []
             if has_job_number_column and "job_number" in filtered.columns:
                 show_cols.append("job_number")
-            for c in ("Linked estimate", "job_name", "customer_name", "Quote (estimate)", "Contact", "status"):
+            for c in (
+                "Linked estimate",
+                "job_name",
+                "customer_name",
+                "source_type",
+                "Quote (estimate)",
+                "Contact",
+                "status",
+            ):
                 if c in filtered.columns and c not in show_cols:
                     show_cols.append(c)
             show_cols.extend(
