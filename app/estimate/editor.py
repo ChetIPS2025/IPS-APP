@@ -1955,7 +1955,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         elif not customer_name:
             st.warning("Select a customer before saving.")
 
-        save_cols = st.columns(4, gap="small")
         can_save = bool(
             bool(est.get("customer_id"))
             and (qn_now or not loaded_id)
@@ -1976,7 +1975,291 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     )
             return msgs
 
-        if save_cols[0].button("Save Estimate", use_container_width=True, disabled=(is_locked or not can_save)):
+        # Archived workflow actions (previously exposed as buttons on this tab).
+        # Kept intentionally so the persistence logic is not lost while the editor UI is simplified.
+        def _editor_submit_for_approval_flow() -> None:
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
+            if dup_msg:
+                st.error(dup_msg)
+                return
+
+            created_msgs = _resolve_customer_job_on_commit()
+            totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+            payload = {
+                "quote_number": str(est.get("quote_number", "") or "").strip(),
+                "customer_id": est.get("customer_id"),
+                "customer_contact_id": est.get("customer_contact_id"),
+                "job_id": est.get("job_id"),
+                "estimator_user_id": current_profile().get("id"),
+                "status": "submitted",
+                # Store short description when the DB has a dedicated column (also preserved in estimate_json).
+                "proposal_total": money_db(totals["proposal_total"]),
+                "final_bid": money_db(totals["final_bid"]),
+                "material_sell_basis": money_db(totals["material_sell_basis"]),
+                "labor_total": money_db(totals["labor_total"]),
+                "equipment_total": money_db(totals["equipment_total"]),
+                "travel_total": money_db(totals["travel_total"]),
+                "overhead_total": money_db(totals["overhead_total"]),
+                "profit_total": money_db(totals["profit_total"]),
+                "contingency_total": money_db(totals["contingency_total"]),
+                "sales_tax_total": money_db(totals["sales_tax_total"]),
+                "scope_of_work": est.get("scope_of_work", ""),
+                "exclusions": est.get("exclusions", ""),
+                "additional_charges": est.get("additional_charges", ""),
+                "customer_responsibilities": est.get("customer_responsibilities", ""),
+                "job_received": bool(est.get("job_received", False)),
+                "po_number": est.get("po_number", ""),
+                "po_date": est.get("po_date") or None,
+                "po_amount": float(est.get("po_amount", 0) or 0),
+                "estimate_json": est,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            _cols = _estimate_table_column_names()
+            if "estimate_description" in _cols:
+                _ed = str(est.get("estimate_description") or "").strip()
+                payload["estimate_description"] = _ed[:500] if _ed else None
+            est["status"] = "submitted"
+            eid = persist_estimate(payload, est, "Submitted for approval")
+            attach_pending_pdf_import_source(eid)
+            pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+            for f in pending_quotes:
+                fn = str(f.get("file_name") or "file")
+                storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "quote_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(f.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            pending_po = st.session_state.get("est_pending_po_attachment")
+            if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                fn = str(pending_po.get("file_name") or "po")
+                storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                upload_bytes(
+                    storage_path,
+                    pending_po.get("bytes") or b"",
+                    pending_po.get("content_type") or "application/octet-stream",
+                )
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "po_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(pending_po.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            st.session_state["est_pending_quote_attachments"] = []
+            st.session_state["est_pending_po_attachment"] = None
+            if created_msgs:
+                for m in created_msgs:
+                    st.info(m)
+            st.success("Estimate submitted for approval.")
+            st.session_state.pop("estimate_pdf_suggestions", None)
+            st.rerun()
+
+        def _editor_approve_flow() -> None:
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
+            if dup_msg:
+                st.error(dup_msg)
+                return
+
+            created_msgs = _resolve_customer_job_on_commit()
+            totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+            payload = {
+                "quote_number": str(est.get("quote_number", "") or "").strip(),
+                "customer_id": est.get("customer_id"),
+                "customer_contact_id": est.get("customer_contact_id"),
+                "job_id": est.get("job_id"),
+                "estimator_user_id": current_profile().get("id"),
+                "status": "approved",
+                # Store short description when the DB has a dedicated column (also preserved in estimate_json).
+                "proposal_total": money_db(totals["proposal_total"]),
+                "final_bid": money_db(totals["final_bid"]),
+                "material_sell_basis": money_db(totals["material_sell_basis"]),
+                "labor_total": money_db(totals["labor_total"]),
+                "equipment_total": money_db(totals["equipment_total"]),
+                "travel_total": money_db(totals["travel_total"]),
+                "overhead_total": money_db(totals["overhead_total"]),
+                "profit_total": money_db(totals["profit_total"]),
+                "contingency_total": money_db(totals["contingency_total"]),
+                "sales_tax_total": money_db(totals["sales_tax_total"]),
+                "scope_of_work": est.get("scope_of_work", ""),
+                "exclusions": est.get("exclusions", ""),
+                "additional_charges": est.get("additional_charges", ""),
+                "customer_responsibilities": est.get("customer_responsibilities", ""),
+                "job_received": bool(est.get("job_received", False)),
+                "po_number": est.get("po_number", ""),
+                "po_date": est.get("po_date") or None,
+                "po_amount": float(est.get("po_amount", 0) or 0),
+                "estimate_json": est,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            _cols = _estimate_table_column_names()
+            if "estimate_description" in _cols:
+                _ed = str(est.get("estimate_description") or "").strip()
+                payload["estimate_description"] = _ed[:500] if _ed else None
+            est["status"] = "approved"
+            eid = persist_estimate(payload, est, "Approved")
+            attach_pending_pdf_import_source(eid)
+            pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+            for f in pending_quotes:
+                fn = str(f.get("file_name") or "file")
+                storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "quote_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(f.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            pending_po = st.session_state.get("est_pending_po_attachment")
+            if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                fn = str(pending_po.get("file_name") or "po")
+                storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                upload_bytes(
+                    storage_path,
+                    pending_po.get("bytes") or b"",
+                    pending_po.get("content_type") or "application/octet-stream",
+                )
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "po_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(pending_po.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            st.session_state["est_pending_quote_attachments"] = []
+            st.session_state["est_pending_po_attachment"] = None
+            if created_msgs:
+                for m in created_msgs:
+                    st.info(m)
+            st.success("Estimate approved and locked.")
+            st.session_state.pop("estimate_pdf_suggestions", None)
+            st.rerun()
+
+        def _editor_mark_awarded_flow() -> None:
+            loaded_id = st.session_state.get("loaded_estimate_id")
+            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
+                est["quote_number"] = next_quote_number()
+
+            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
+            if dup_msg:
+                st.error(dup_msg)
+                return
+
+            created_msgs = _resolve_customer_job_on_commit()
+            totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+            payload = {
+                "quote_number": str(est.get("quote_number", "") or "").strip(),
+                "customer_id": est.get("customer_id"),
+                "customer_contact_id": est.get("customer_contact_id"),
+                "job_id": est.get("job_id"),
+                "estimator_user_id": current_profile().get("id"),
+                "status": "awarded",
+                "proposal_total": money_db(totals["proposal_total"]),
+                "final_bid": money_db(totals["final_bid"]),
+                "material_sell_basis": money_db(totals["material_sell_basis"]),
+                "labor_total": money_db(totals["labor_total"]),
+                "equipment_total": money_db(totals["equipment_total"]),
+                "travel_total": money_db(totals["travel_total"]),
+                "overhead_total": money_db(totals["overhead_total"]),
+                "profit_total": money_db(totals["profit_total"]),
+                "contingency_total": money_db(totals["contingency_total"]),
+                "sales_tax_total": money_db(totals["sales_tax_total"]),
+                "scope_of_work": est.get("scope_of_work", ""),
+                "exclusions": est.get("exclusions", ""),
+                "additional_charges": est.get("additional_charges", ""),
+                "customer_responsibilities": est.get("customer_responsibilities", ""),
+                "job_received": True,
+                "po_number": est.get("po_number", ""),
+                "po_date": est.get("po_date") or None,
+                "po_amount": float(est.get("po_amount", 0) or 0),
+                "estimate_json": est,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            _cols = _estimate_table_column_names()
+            if "estimate_description" in _cols:
+                _ed = str(est.get("estimate_description") or "").strip()
+                payload["estimate_description"] = _ed[:500] if _ed else None
+            est["status"] = "awarded"
+            est["job_received"] = True
+            eid = persist_estimate(payload, est, "Marked awarded")
+            attach_pending_pdf_import_source(eid)
+            pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
+            for f in pending_quotes:
+                fn = str(f.get("file_name") or "file")
+                storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
+                upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "quote_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(f.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            pending_po = st.session_state.get("est_pending_po_attachment")
+            if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
+                fn = str(pending_po.get("file_name") or "po")
+                storage_path = f"quotes/{eid}/po/{Path(fn).name}"
+                upload_bytes(
+                    storage_path,
+                    pending_po.get("bytes") or b"",
+                    pending_po.get("content_type") or "application/octet-stream",
+                )
+                insert_row_admin(
+                    "attachments",
+                    {
+                        "estimate_id": eid,
+                        "category": "po_attachment",
+                        "file_name": fn,
+                        "storage_path": storage_path,
+                        "file_type": str(pending_po.get("content_type") or ""),
+                        "uploaded_by": current_profile().get("id"),
+                    },
+                )
+            st.session_state["est_pending_quote_attachments"] = []
+            st.session_state["est_pending_po_attachment"] = None
+            if created_msgs:
+                for m in created_msgs:
+                    st.info(m)
+            st.success("Estimate marked awarded.")
+            st.session_state.pop("estimate_pdf_suggestions", None)
+            st.rerun()
+
+        st.caption("Use the **status** dropdown above, then click **Save Estimate** to write changes to the database.")
+
+        _, _save_mid, _ = st.columns([0.12, 1.0, 0.12], gap="small")
+        if _save_mid.button("Save Estimate", type="primary", use_container_width=True, disabled=(is_locked or not can_save), key="est_save_estimate_primary"):
             # Allocate quote number only for brand-new estimates when blank.
             loaded_id = st.session_state.get("loaded_estimate_id")
             if not loaded_id and not str(est.get("quote_number", "") or "").strip():
@@ -2068,281 +2351,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.success("Estimate saved to Supabase.")
                 st.session_state.pop("estimate_pdf_suggestions", None)
 
-        if save_cols[1].button("Submit for Approval", use_container_width=True, disabled=(is_locked or not can_save)):
-            loaded_id = st.session_state.get("loaded_estimate_id")
-            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
-                est["quote_number"] = next_quote_number()
-
-            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
-            if dup_msg:
-                st.error(dup_msg)
-            else:
-                created_msgs = _resolve_customer_job_on_commit()
-                totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-                payload = {
-                    "quote_number": str(est.get("quote_number", "") or "").strip(),
-                    "customer_id": est.get("customer_id"),
-                    "customer_contact_id": est.get("customer_contact_id"),
-                    "job_id": est.get("job_id"),
-                    "estimator_user_id": current_profile().get("id"),
-                    "status": "submitted",
-                    # Store short description when the DB has a dedicated column (also preserved in estimate_json).
-                    "proposal_total": money_db(totals["proposal_total"]),
-                    "final_bid": money_db(totals["final_bid"]),
-                    "material_sell_basis": money_db(totals["material_sell_basis"]),
-                    "labor_total": money_db(totals["labor_total"]),
-                    "equipment_total": money_db(totals["equipment_total"]),
-                    "travel_total": money_db(totals["travel_total"]),
-                    "overhead_total": money_db(totals["overhead_total"]),
-                    "profit_total": money_db(totals["profit_total"]),
-                    "contingency_total": money_db(totals["contingency_total"]),
-                    "sales_tax_total": money_db(totals["sales_tax_total"]),
-                    "scope_of_work": est.get("scope_of_work", ""),
-                    "exclusions": est.get("exclusions", ""),
-                    "additional_charges": est.get("additional_charges", ""),
-                    "customer_responsibilities": est.get("customer_responsibilities", ""),
-                    "job_received": bool(est.get("job_received", False)),
-                    "po_number": est.get("po_number", ""),
-                    "po_date": est.get("po_date") or None,
-                    "po_amount": float(est.get("po_amount", 0) or 0),
-                    "estimate_json": est,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-                _cols = _estimate_table_column_names()
-                if "estimate_description" in _cols:
-                    _ed = str(est.get("estimate_description") or "").strip()
-                    payload["estimate_description"] = _ed[:500] if _ed else None
-                est["status"] = "submitted"
-                eid = persist_estimate(payload, est, "Submitted for approval")
-                attach_pending_pdf_import_source(eid)
-                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
-                for f in pending_quotes:
-                    fn = str(f.get("file_name") or "file")
-                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
-                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "quote_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(f.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                pending_po = st.session_state.get("est_pending_po_attachment")
-                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
-                    fn = str(pending_po.get("file_name") or "po")
-                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
-                    upload_bytes(
-                        storage_path,
-                        pending_po.get("bytes") or b"",
-                        pending_po.get("content_type") or "application/octet-stream",
-                    )
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "po_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(pending_po.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                st.session_state["est_pending_quote_attachments"] = []
-                st.session_state["est_pending_po_attachment"] = None
-                if created_msgs:
-                    for m in created_msgs:
-                        st.info(m)
-                st.success("Estimate submitted for approval.")
-                st.session_state.pop("estimate_pdf_suggestions", None)
-                st.rerun()
-
-        if save_cols[2].button("Approve", use_container_width=True, disabled=(current_role() != "admin" or not can_save)):
-            loaded_id = st.session_state.get("loaded_estimate_id")
-            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
-                est["quote_number"] = next_quote_number()
-
-            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
-            if dup_msg:
-                st.error(dup_msg)
-            else:
-                created_msgs = _resolve_customer_job_on_commit()
-                totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-                payload = {
-                    "quote_number": str(est.get("quote_number", "") or "").strip(),
-                    "customer_id": est.get("customer_id"),
-                    "customer_contact_id": est.get("customer_contact_id"),
-                    "job_id": est.get("job_id"),
-                    "estimator_user_id": current_profile().get("id"),
-                    "status": "approved",
-                    # Store short description when the DB has a dedicated column (also preserved in estimate_json).
-                    "proposal_total": money_db(totals["proposal_total"]),
-                    "final_bid": money_db(totals["final_bid"]),
-                    "material_sell_basis": money_db(totals["material_sell_basis"]),
-                    "labor_total": money_db(totals["labor_total"]),
-                    "equipment_total": money_db(totals["equipment_total"]),
-                    "travel_total": money_db(totals["travel_total"]),
-                    "overhead_total": money_db(totals["overhead_total"]),
-                    "profit_total": money_db(totals["profit_total"]),
-                    "contingency_total": money_db(totals["contingency_total"]),
-                    "sales_tax_total": money_db(totals["sales_tax_total"]),
-                    "scope_of_work": est.get("scope_of_work", ""),
-                    "exclusions": est.get("exclusions", ""),
-                    "additional_charges": est.get("additional_charges", ""),
-                    "customer_responsibilities": est.get("customer_responsibilities", ""),
-                    "job_received": bool(est.get("job_received", False)),
-                    "po_number": est.get("po_number", ""),
-                    "po_date": est.get("po_date") or None,
-                    "po_amount": float(est.get("po_amount", 0) or 0),
-                    "estimate_json": est,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-                _cols = _estimate_table_column_names()
-                if "estimate_description" in _cols:
-                    _ed = str(est.get("estimate_description") or "").strip()
-                    payload["estimate_description"] = _ed[:500] if _ed else None
-                est["status"] = "approved"
-                eid = persist_estimate(payload, est, "Approved")
-                attach_pending_pdf_import_source(eid)
-                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
-                for f in pending_quotes:
-                    fn = str(f.get("file_name") or "file")
-                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
-                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "quote_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(f.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                pending_po = st.session_state.get("est_pending_po_attachment")
-                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
-                    fn = str(pending_po.get("file_name") or "po")
-                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
-                    upload_bytes(
-                        storage_path,
-                        pending_po.get("bytes") or b"",
-                        pending_po.get("content_type") or "application/octet-stream",
-                    )
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "po_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(pending_po.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                st.session_state["est_pending_quote_attachments"] = []
-                st.session_state["est_pending_po_attachment"] = None
-                if created_msgs:
-                    for m in created_msgs:
-                        st.info(m)
-                st.success("Estimate approved and locked.")
-                st.session_state.pop("estimate_pdf_suggestions", None)
-                st.rerun()
-
-        if save_cols[3].button("Mark Awarded", use_container_width=True, disabled=(current_role() != "admin" or not can_save)):
-            loaded_id = st.session_state.get("loaded_estimate_id")
-            if not loaded_id and not str(est.get("quote_number", "") or "").strip():
-                est["quote_number"] = next_quote_number()
-
-            dup_msg = _duplicate_quote_message(str(est.get("quote_number", "") or "").strip(), loaded_id)
-            if dup_msg:
-                st.error(dup_msg)
-            else:
-                created_msgs = _resolve_customer_job_on_commit()
-                totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-                payload = {
-                    "quote_number": str(est.get("quote_number", "") or "").strip(),
-                    "customer_id": est.get("customer_id"),
-                    "customer_contact_id": est.get("customer_contact_id"),
-                    "job_id": est.get("job_id"),
-                    "estimator_user_id": current_profile().get("id"),
-                    "status": "awarded",
-                    "proposal_total": money_db(totals["proposal_total"]),
-                    "final_bid": money_db(totals["final_bid"]),
-                    "material_sell_basis": money_db(totals["material_sell_basis"]),
-                    "labor_total": money_db(totals["labor_total"]),
-                    "equipment_total": money_db(totals["equipment_total"]),
-                    "travel_total": money_db(totals["travel_total"]),
-                    "overhead_total": money_db(totals["overhead_total"]),
-                    "profit_total": money_db(totals["profit_total"]),
-                    "contingency_total": money_db(totals["contingency_total"]),
-                    "sales_tax_total": money_db(totals["sales_tax_total"]),
-                    "scope_of_work": est.get("scope_of_work", ""),
-                    "exclusions": est.get("exclusions", ""),
-                    "additional_charges": est.get("additional_charges", ""),
-                    "customer_responsibilities": est.get("customer_responsibilities", ""),
-                    "job_received": True,
-                    "po_number": est.get("po_number", ""),
-                    "po_date": est.get("po_date") or None,
-                    "po_amount": float(est.get("po_amount", 0) or 0),
-                    "estimate_json": est,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-                _cols = _estimate_table_column_names()
-                if "estimate_description" in _cols:
-                    _ed = str(est.get("estimate_description") or "").strip()
-                    payload["estimate_description"] = _ed[:500] if _ed else None
-                est["status"] = "awarded"
-                est["job_received"] = True
-                eid = persist_estimate(payload, est, "Marked awarded")
-                attach_pending_pdf_import_source(eid)
-                pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
-                for f in pending_quotes:
-                    fn = str(f.get("file_name") or "file")
-                    storage_path = f"quotes/{eid}/attachments/{Path(fn).name}"
-                    upload_bytes(storage_path, f.get("bytes") or b"", f.get("content_type") or "application/octet-stream")
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "quote_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(f.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                pending_po = st.session_state.get("est_pending_po_attachment")
-                if isinstance(pending_po, dict) and pending_po.get("bytes") is not None:
-                    fn = str(pending_po.get("file_name") or "po")
-                    storage_path = f"quotes/{eid}/po/{Path(fn).name}"
-                    upload_bytes(
-                        storage_path,
-                        pending_po.get("bytes") or b"",
-                        pending_po.get("content_type") or "application/octet-stream",
-                    )
-                    insert_row_admin(
-                        "attachments",
-                        {
-                            "estimate_id": eid,
-                            "category": "po_attachment",
-                            "file_name": fn,
-                            "storage_path": storage_path,
-                            "file_type": str(pending_po.get("content_type") or ""),
-                            "uploaded_by": current_profile().get("id"),
-                        },
-                    )
-                st.session_state["est_pending_quote_attachments"] = []
-                st.session_state["est_pending_po_attachment"] = None
-                if created_msgs:
-                    for m in created_msgs:
-                        st.info(m)
-                st.success("Estimate marked awarded.")
-                st.session_state.pop("estimate_pdf_suggestions", None)
-                st.rerun()
+        # Keep archived workflow entrypoints referenced so they are not accidentally deleted as "unused".
+        _ = (_editor_submit_for_approval_flow, _editor_approve_flow, _editor_mark_awarded_flow)
 
         if st.session_state.get("loaded_estimate_id"):
             attachments = fetch_by_match("attachments", {"estimate_id": st.session_state["loaded_estimate_id"]}, columns="category,file_name,storage_path,uploaded_at", limit=200)

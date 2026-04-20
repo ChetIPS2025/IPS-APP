@@ -19,6 +19,7 @@ from db import (
     fetch_one,
     fetch_table,
     fetch_table_admin,
+    update_rows_admin,
 )
 
 try:
@@ -478,17 +479,18 @@ def _render_estimate_list() -> None:
         st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
 
     # Visible order (exact):
-    # Blank | Job | quote number | Estimate Description | proposal total | status | linked job | po number | delete
+    # Blank | Job | quote | Estimate Description | proposal | status | linked job | po | approve | delete
     col_weights = [
-        0.42,  # Blank / checkbox
-        1.35,  # Job button
-        1.15,  # quote number
-        2.35,  # estimate description
-        1.10,  # proposal total
-        0.95,  # status
-        1.90,  # linked job
-        1.05,  # po number
-        0.48,  # delete
+        0.4,  # checkbox
+        1.3,  # job
+        1.1,  # quote
+        2.4,  # description
+        1.0,  # proposal
+        0.9,  # status
+        1.8,  # linked job
+        1.0,  # po
+        0.8,  # approve
+        0.5,  # delete
     ]
     head = st.columns(col_weights)
     with head[0]:
@@ -508,6 +510,8 @@ def _render_estimate_list() -> None:
     with head[7]:
         st.caption("PO #")
     with head[8]:
+        st.caption("Approve")
+    with head[9]:
         st.caption("Del")
 
     picked: list[str] = []
@@ -517,6 +521,7 @@ def _render_estimate_list() -> None:
             continue
         linked_id = _linked_job_id_for_row(est_row)
         cust_id = eid_to_customer.get(eid, "")
+        row_status = str(est_row.get("status") or "").strip().lower()
         rc = st.columns(col_weights)
         with rc[0]:
             ck = f"est_list_pick_{eid}"
@@ -578,7 +583,32 @@ def _render_estimate_list() -> None:
         with rc[7]:
             st.text(_estimate_list_cell_text(est_row.get("po_number"), col="po_number"))
         with rc[8]:
-            row_status = str(est_row.get("status") or "").strip().lower()
+            is_approved = row_status == "approved"
+            can_approve = can_edit and row_status in ["draft", "submitted"]
+            approve_label = "Approved ✓" if is_approved else "Approve"
+            anchor_cls = "ips-est-approve-anchor" + (" ips-est-approve-done" if is_approved else "")
+            st.markdown(f'<span class="{anchor_cls}"></span>', unsafe_allow_html=True)
+            approve_btn_type = "primary" if (can_approve or is_approved) else "secondary"
+
+            if st.button(
+                approve_label,
+                key=f"est_row_approve_{eid}",
+                type=approve_btn_type,
+                disabled=not can_approve,
+                use_container_width=True,
+                help=(
+                    "Approve this estimate"
+                    if can_approve
+                    else ("Estimate is already approved" if is_approved else "Only draft/submitted estimates can be approved")
+                ),
+            ):
+                try:
+                    update_rows_admin("estimates", {"status": "approved"}, {"id": eid})
+                    st.success("Estimate approved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Could not approve: {exc}")
+        with rc[9]:
             del_enabled = bool(can_edit and row_status == "draft")
             if not can_edit:
                 del_help = "Only admin or estimator can delete estimates."

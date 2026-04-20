@@ -252,6 +252,38 @@ def inject_table_action_styles() -> None:
             color: #e2e8f0;
             font-weight: 600;
         }
+
+        /* Estimates list: per-row Approve — column is marked with a hidden span hook */
+        span.ips-est-approve-anchor {
+            display: none !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor)
+            .stButton > button[kind="primary"]:not(:disabled) {
+            background: linear-gradient(180deg, #059669 0%, #047857 100%) !important;
+            border: 1px solid rgba(52, 211, 153, 0.55) !important;
+            color: #ecfdf5 !important;
+            font-weight: 600 !important;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.28) !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor)
+            .stButton > button[kind="primary"]:not(:disabled):hover {
+            border-color: rgba(110, 231, 183, 0.75) !important;
+            box-shadow: 0 3px 14px rgba(16, 185, 129, 0.38) !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-done)
+            .stButton > button[kind="primary"]:disabled {
+            background: rgba(6, 95, 70, 0.55) !important;
+            border: 1px solid rgba(45, 212, 191, 0.38) !important;
+            color: #ccfbf1 !important;
+            opacity: 1 !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor:not(.ips-est-approve-done))
+            .stButton > button:disabled {
+            background: rgba(30, 41, 59, 0.45) !important;
+            border: 1px solid rgba(71, 85, 105, 0.42) !important;
+            color: #94a3b8 !important;
+            opacity: 1 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
