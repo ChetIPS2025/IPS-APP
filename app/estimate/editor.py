@@ -720,7 +720,11 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             disabled=is_locked,
             key="est_job_query",
             placeholder="Search or type a new job…",
-            help="Type to search within the selected customer (when set). If no exact match exists, a new job will be created when you Save / Submit / Approve / Award.",
+            help=(
+                "Type to search within the selected customer (when set). "
+                "Jobs are **not** created during estimate save; create jobs only from explicit conversion actions "
+                "(e.g. **Job Received** / **Create Job from Estimate**)."
+            ),
         )
         job_norm = _norm_name_key(job_query)
         job_exact_id = job_id_by_norm.get(job_norm) if job_norm else None
@@ -729,7 +733,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.caption("Matched existing job.")
         elif job_norm:
             est["job_id"] = None
-            st.caption("New job will be created on save.")
+            st.caption("No exact match. Jobs are created only by explicit conversion actions.")
 
         job_matches = _top_matches(job_query, job_names, limit=7)
         if job_matches and not job_exact_id:
@@ -1936,17 +1940,17 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
         def _resolve_customer_job_on_commit() -> list[str]:
             msgs: list[str] = []
-            # Job (requires customer_id when creating)
+            # IMPORTANT: Do not create jobs during estimate save.
+            # Jobs are created only from explicit conversion actions (e.g. Estimates list / Job Database workflow).
             job_typed = " ".join(str(st.session_state.get("est_job_query") or "").strip().split())
             if job_typed:
-                if not est.get("customer_id"):
-                    st.error("Select a customer before creating a new job.")
-                    st.stop()
-                jid, created = create_or_get_job_by_name(job_typed, customer_id=str(est.get("customer_id")))
-                if jid:
-                    est["job_id"] = jid
-                    if created:
-                        msgs.append(f"Created new job: {job_typed}")
+                # The UI above will set est["job_id"] when an exact match exists.
+                # If the user typed a new name (no exact match), keep the estimate unlinked and provide guidance.
+                if not est.get("job_id"):
+                    msgs.append(
+                        "Job was not linked: no exact match found, and jobs are not created during estimate save. "
+                        "Use **Job Received** / **Create Job from Estimate** to convert after customer approval."
+                    )
             return msgs
 
         if save_cols[0].button("Save Estimate", use_container_width=True, disabled=(is_locked or not can_save)):
