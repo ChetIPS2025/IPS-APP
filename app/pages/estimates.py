@@ -46,10 +46,8 @@ try:
     from services.job_service import job_number_display
 except ImportError:
     from app.services.job_service import job_number_display  # type: ignore
-    try:
-        from services.job_service import job_display_label
-    except ImportError:
-        from app.services.job_service import job_display_label  # type: ignore
+
+from app.utils.formatters import job_display_label
 
 try:
     from services.estimate_import_customer_match import (

@@ -70,7 +70,6 @@ try:
         fetch_jobs_for_job_database,
     )
     from services.job_service import (
-        job_display_label,
         job_number_display,
         job_row_select_label,
         next_job_number,
@@ -84,13 +83,14 @@ except ImportError:
         fetch_jobs_for_job_database,
     )
     from app.services.job_service import (  # type: ignore
-        job_display_label,
         job_number_display,
         job_row_select_label,
         next_job_number,
         sort_jobs_by_name,
         sort_jobs_by_number_then_name,
     )
+
+from app.utils.formatters import job_display_label
 
 
 JOB_STATUSES = [
