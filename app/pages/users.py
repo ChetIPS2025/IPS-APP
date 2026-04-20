@@ -53,11 +53,8 @@ _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "estimator", "admin")
 _MIN_PASSWORD_LENGTH = 8
 _MAX_EMAIL_LENGTH = 320
 
-# Legacy session key (People combined page may pop this after Add user dialog)
-_USERS_PANEL_MODE = "users_panel_mode"
-
-# Optional: persisted focus after Add (dialog / empty states) — table selection is source of truth for edit
-USERS_EDIT_ID_KEY = "users_edit_id"
+# Legacy: People page may pop this key on navigation (harmless if unused).
+USERS_PANEL_MODE = "users_panel_mode"
 
 
 def _normalize_email(raw: str) -> str:
@@ -122,10 +119,6 @@ def _friendly_create_user_message(exc: BaseException) -> str:
     )
 
 
-def _clear_add_panel() -> None:
-    st.session_state.pop(_USERS_PANEL_MODE, None)
-
-
 def _run_create_user(
     *,
     email_norm: str,
@@ -172,8 +165,6 @@ def _run_create_user(
         tkey = clear_selection_table_key
         sel_val = f"p:{new_id}" if tkey == TABLE_KEY_PEOPLE else new_id
         set_selected_ids(tkey, [sel_val])
-        st.session_state[USERS_EDIT_ID_KEY] = new_id
-    _clear_add_panel()
     em = str((created or {}).get("email") or email_norm)
     st.toast(f"User created · {em}", icon="✅")
     return True
@@ -246,43 +237,7 @@ def _render_users_toolbar(*, sel: list[str], existing_emails: set[str]) -> None:
         with b_clear:
             if n and st.button("Clear selection", type="secondary", use_container_width=True, key="users_btn_clear_sel"):
                 clear_selected_ids(TABLE_KEY_USERS)
-                st.session_state.pop(USERS_EDIT_ID_KEY, None)
                 st.rerun()
-
-
-def _render_add_user_inline(*, existing_emails: set[str]) -> None:
-    """Right panel — Add user (separate from edit)."""
-    st.markdown("##### Add user")
-    st.caption("New login: **Supabase Auth** account + **profiles** row. Temporary password required.")
-    a1, a2 = st.columns(2, gap="small")
-    in_email = a1.text_input(
-        "Email",
-        key="users_inline_add_email",
-        max_chars=_MAX_EMAIL_LENGTH,
-        placeholder="name@company.com",
-    )
-    in_pw = a2.text_input(
-        "Temporary password",
-        type="password",
-        key="users_inline_add_password",
-    )
-    a3, a4 = st.columns(2, gap="small")
-    in_name = a3.text_input("Full name", key="users_inline_add_full_name")
-    in_role = a4.selectbox("Role", list(_ROLE_OPTIONS), key="users_inline_add_role")
-
-    if st.button("Create user", type="primary", use_container_width=True, key="users_inline_add_submit"):
-        email_norm = _normalize_email(in_email)
-        pw = str(in_pw or "").strip()
-        fn = str(in_name or "").strip()
-        if _run_create_user(
-            email_norm=email_norm,
-            pw=pw,
-            fn=fn,
-            new_role=str(in_role),
-            existing_emails=existing_emails,
-            clear_selection_table_key=TABLE_KEY_USERS,
-        ):
-            st.rerun()
 
 
 def _render_edit_user_panel(
@@ -369,7 +324,6 @@ def _render_edit_user_panel(
     with u2:
         if st.button("Clear selection", use_container_width=True, key=f"{pk}_clear_sel"):
             clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
-            st.session_state.pop(USERS_EDIT_ID_KEY, None)
             st.rerun()
 
 
@@ -378,20 +332,17 @@ def _render_users_right_panel(
     sel: list[str],
     existing_emails: set[str],
 ) -> None:
-    """Customers-like right column: Add user (top) + Selected user (bottom), always visible when split layout."""
+    """Right column: selected user only — **Add User** uses the toolbar dialog (single create path)."""
     inject_ips_crud_list_styles()
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### User detail")
-
-        _render_add_user_inline(existing_emails=existing_emails)
-
-        st.divider()
-        st.markdown("##### Selected user")
-        st.caption("Click a row in the table — fields update for the selected account.")
+        st.markdown("### Selected user")
+        st.caption(
+            "**Add User** is in the toolbar (dialog). Select **one** row below to edit name, role, and active status."
+        )
 
         if len(sel) != 1:
-            st.info("Select **exactly one** user in the table to edit name, role, and active status.")
+            st.info("Select **exactly one** user in the table to edit.")
             return
 
         uid = str(sel[0]).strip()
@@ -399,7 +350,6 @@ def _render_users_right_panel(
         if not row:
             st.warning("User not found (it may have been removed).")
             clear_selected_ids(TABLE_KEY_USERS)
-            st.session_state.pop(USERS_EDIT_ID_KEY, None)
             st.rerun()
             return
 
@@ -484,9 +434,6 @@ def render_body(*, compact: bool = False) -> None:
         st.error("Admin only")
         return
 
-    if st.session_state.get(_USERS_PANEL_MODE) == "add":
-        st.session_state.pop(_USERS_PANEL_MODE, None)
-
     try:
         users = fetch_table("profiles", limit=1000, order_by="email")
     except Exception as exc:
@@ -499,7 +446,7 @@ def render_body(*, compact: bool = False) -> None:
     existing_emails = {_normalize_email(str(u.get("email", ""))) for u in users if u.get("email")}
     if not compact:
         render_crud_list_subtitle(
-            "User list on the left; **Add user** and **Selected user** on the right. Select one row to edit."
+            "User list on the left; **Add User** opens a dialog from the toolbar. Select one row to edit on the right."
         )
 
     if df.empty:

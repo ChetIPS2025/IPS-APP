@@ -405,16 +405,6 @@ def _best_preview_inner_html_from_docx_bytes(docx_bytes: bytes) -> str:
     return pc_inner.strip()
 
 
-def filled_proposal_docx_to_preview_html(docx_bytes: bytes) -> str:
-    """
-    Build a readable HTML preview from the **filled** proposal .docx (same bytes as download).
-
-    Uses OOXML (``word/document.xml``) first, then ``python-docx``, whichever yields more text.
-    """
-    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
-    return _wrap_docx_preview(inner)
-
-
 def proposal_values_preview_html(vals: dict[str, str]) -> str:
     """Field-based preview (same placeholder map as the DOCX / :func:`proposal_values`). All rows always render."""
     # Same keys as ``proposal_values`` — always show a row (empty → em dash) so preview matches Word placeholders.
@@ -876,21 +866,28 @@ def build_proposal_docx(
     customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
+    placeholder_values: dict[str, str] | None = None,
 ) -> bytes:
     """
     Build the proposal .docx from **assets/estimate_template_autofill_logo_updated.docx** only
     (no template overrides), replace text placeholders, then apply standard **company_logo** /
     ``{{COMPANY_LOGO}}`` branding from ``assets/`` per :data:`COMPANY_LOGO_CANDIDATE_FILENAMES`.
+
+    Pass ``placeholder_values`` from a single :func:`proposal_values` call when the caller already
+    computed it (avoids duplicate work and guarantees preview/download use the same map).
     """
-    vals = proposal_values(
-        est,
-        totals,
-        customer_name=customer_name,
-        job_name=job_name,
-        customer_location=customer_location,
-        contact_name=contact_name,
-        prepared_by_phone=prepared_by_phone,
-    )
+    if placeholder_values is not None:
+        vals = placeholder_values
+    else:
+        vals = proposal_values(
+            est,
+            totals,
+            customer_name=customer_name,
+            job_name=job_name,
+            customer_location=customer_location,
+            contact_name=contact_name,
+            prepared_by_phone=prepared_by_phone,
+        )
     raw = _load_standard_proposal_template_bytes()
     return _fill_proposal_docx_from_bytes(raw, vals)
 

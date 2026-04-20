@@ -58,6 +58,9 @@ except ImportError:
 
 _LABOR_DELETE_CONFIRM_PREFIX = "labor_delete"
 
+# Main grid: business columns only (id kept in dataframe for selection, not shown).
+LABOR_TABLE_COLUMNS: tuple[str, ...] = ("classification", "st_rate", "ot_rate")
+
 
 def make_unique_classification(base_value: str, rows) -> str:
     existing = {str(r.get("classification", "")).strip().upper() for r in rows}
@@ -91,6 +94,51 @@ def _migrate_legacy_labor_session() -> None:
 def _clear_labor_panel() -> None:
     st.session_state.pop("labor_panel_mode", None)
     st.session_state.pop("labor_panel_id", None)
+
+
+def _labor_display_columns(df: pd.DataFrame) -> list[str]:
+    return [c for c in LABOR_TABLE_COLUMNS if c in df.columns]
+
+
+def _render_labor_filter_row(*, df: pd.DataFrame) -> None:
+    """Single filter strip (matches Materials: above the main / side split)."""
+    if df.empty:
+        return
+    f1, f2 = st.columns([2, 1], gap="small")
+    with f1:
+        st.markdown(
+            '<span class="ips-crud-filter-row-start" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.text_input(
+            "Search",
+            placeholder="Classification, rates",
+            key="labor_f_search",
+        )
+    active_options = ["All", "Active Only", "Inactive Only"]
+    with f2:
+        st.selectbox("Status", active_options, key="labor_f_active")
+
+
+def _filtered_labor_df(df: pd.DataFrame) -> pd.DataFrame:
+    filtered = df.copy()
+    selected_active = st.session_state.get("labor_f_active", "All")
+    if "is_active" in filtered.columns:
+        if selected_active == "Active Only":
+            filtered = filtered[filtered["is_active"] == True]  # noqa: E712
+        elif selected_active == "Inactive Only":
+            filtered = filtered[filtered["is_active"] == False]  # noqa: E712
+
+    search = str(st.session_state.get("labor_f_search", "") or "")
+    if search.strip():
+        s = search.strip().lower()
+        search_cols = [c for c in LABOR_TABLE_COLUMNS if c in filtered.columns]
+        if search_cols:
+            mask = filtered[search_cols].astype(str).apply(
+                lambda col: col.str.lower().str.contains(s, na=False, regex=False),
+            )
+            filtered = filtered[mask.any(axis=1)]
+    return filtered
 
 
 def _render_labor_action_buttons(*, sel: list[str], can_add: bool) -> None:
@@ -302,7 +350,11 @@ def _render_labor_side_panel(*, mode: str, rows_for_uniq: list) -> None:
                 _render_view_panel(vr)
 
 
-def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
+def _render_labor_table_block(*, filtered: pd.DataFrame, df: pd.DataFrame, can_add: bool) -> None:
+    """Catalog grid only — filters run above this block."""
+    inject_table_action_styles()
+    show_cols = _labor_display_columns(filtered)
+
     if df.empty:
         st.info("No labor rates found.")
         if can_add:
@@ -313,42 +365,6 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
                 st.rerun()
         return
 
-    f1, f2 = st.columns([2, 1], gap="small")
-    with f1:
-        st.markdown(
-            '<span class="ips-crud-filter-row-start" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        search = st.text_input(
-            "Search",
-            placeholder="Search classification, rates, status",
-        )
-    active_options = ["All", "Active only", "Inactive only"]
-    selected_active = f2.selectbox("Status", active_options)
-
-    filtered = df.copy()
-    if "is_active" in filtered.columns:
-        if selected_active == "Active only":
-            filtered = filtered[filtered["is_active"] == True]
-        elif selected_active == "Inactive only":
-            filtered = filtered[filtered["is_active"] == False]
-
-    if search.strip():
-        s = search.strip().lower()
-        mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-        filtered = filtered[mask.any(axis=1)]
-
-    # Main grid: business fields only — never show id / is_active (still in ``filtered`` for filters & selection).
-    show_cols = [
-        c
-        for c in [
-            "classification",
-            "st_rate",
-            "ot_rate",
-        ]
-        if c in filtered.columns and c not in ("id", "is_active")
-    ]
-
     st.caption(
         "Checkbox column on the **left**; selection is stored as **selected_labor_ids**."
     )
@@ -356,27 +372,33 @@ def _render_labor_main(*, df: pd.DataFrame, can_add: bool) -> None:
     if filtered.empty:
         st.warning("No labor rates match your filters.")
         if can_add:
-            inject_table_action_styles()
             if st.button(
                 "Add Labor Rate", type="primary", use_container_width=True, key="labor_filtered_empty_add"
             ):
                 st.session_state["labor_panel_mode"] = "add"
                 st.session_state.pop("labor_panel_id", None)
                 st.rerun()
-    elif "id" not in filtered.columns:
+        return
+
+    if not show_cols:
+        st.warning("Labor rows have no display columns configured.")
+        return
+
+    if "id" not in filtered.columns:
         st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
-    else:
-        bar_ph = st.empty()
-        _, sel = render_selectable_dataframe(
-            filtered,
-            table_key=TABLE_KEY_LABOR,
-            id_column="id",
-            columns=show_cols,
-            editor_key="labor_sel_editor",
-            hide_id_column=True,
-        )
-        with bar_ph.container():
-            _render_labor_action_buttons(sel=sel, can_add=can_add)
+        return
+
+    bar_ph = st.empty()
+    _, sel = render_selectable_dataframe(
+        filtered,
+        table_key=TABLE_KEY_LABOR,
+        id_column="id",
+        columns=show_cols,
+        editor_key="labor_sel_editor",
+        hide_id_column=True,
+    )
+    with bar_ph.container():
+        _render_labor_action_buttons(sel=sel, can_add=can_add)
 
 
 def render() -> None:
@@ -467,16 +489,19 @@ def render() -> None:
             st.success("Selected labor rates deactivated.")
             st.rerun()
 
+    _render_labor_filter_row(df=df)
+    filtered = _filtered_labor_df(df)
+
     panel_open = bool(mode in ("add", "edit", "view"))
 
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
         with main_col:
-            _render_labor_main(df=df, can_add=can_add)
+            _render_labor_table_block(filtered=filtered, df=df, can_add=can_add)
         with side_col:
             _render_labor_side_panel(mode=str(mode), rows_for_uniq=rows)
     else:
-        _render_labor_main(df=df, can_add=can_add)
+        _render_labor_table_block(filtered=filtered, df=df, can_add=can_add)
 
     if not can_add:
         st.info("Only admin users can add or edit labor rates.")

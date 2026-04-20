@@ -28,7 +28,7 @@ try:
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
-        render_table_action_bar,
+        render_selection_action_bar,
         set_selected_ids,
     )
 except ImportError:
@@ -38,7 +38,7 @@ except ImportError:
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
-        render_table_action_bar,
+        render_selection_action_bar,
         set_selected_ids,
     )
 
@@ -523,7 +523,7 @@ def _render_estimate_list() -> None:
         if _mc in df_export.columns:
             df_export[_mc] = df_export[_mc].map(_estimate_money_csv)
 
-    actions = render_table_action_bar(
+    actions = render_selection_action_bar(
         TABLE_KEY_ESTIMATES,
         sel,
         can_view=True,

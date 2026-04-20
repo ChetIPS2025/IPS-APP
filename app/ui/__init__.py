@@ -13,12 +13,21 @@ except ImportError:
     from pwa import render_install_app_sidebar_block  # type: ignore
 
 
+def _repo_root() -> Path:
+    """Resolve repository root whether this module is ``app/ui/__init__.py`` or legacy ``app/ui.py``."""
+    p = Path(__file__).resolve()
+    if p.parent.name == "ui":
+        return p.parents[2]
+    return p.parents[1]
+
+
 def _find_round_logo() -> Path | None:
+    root = _repo_root()
     search_paths = [
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo_round.png",
-        Path(__file__).resolve().parents[1] / "assets" / "IPS LOGO ROUND.png",
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo.png",
-        Path(__file__).resolve().parents[1] / "assets" / "logo.png",
+        root / "assets" / "ips_logo_round.png",
+        root / "assets" / "IPS LOGO ROUND.png",
+        root / "assets" / "ips_logo.png",
+        root / "assets" / "logo.png",
     ]
     for path in search_paths:
         if path.exists():

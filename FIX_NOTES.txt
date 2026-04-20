@@ -1,7 +1,7 @@
-Clean fix applied:
-- pages/__init__.py emptied to stop circular imports
-- po_exspenses.py copied to po_expenses.py to match imports
-- main.py rebuilt with direct page imports and a stable page map
+Project notes:
+- pages/__init__.py is minimal to avoid circular imports; pages are imported directly from app/main.py.
+- PO / Expenses UI lives in pages/po_expenses.py only (typo duplicate po_exspenses removed).
+- Table selection UI: use table_actions.render_selection_action_bar (alias of render_table_action_bar).
 
 Run from project root:
 .venv\Scripts\activate

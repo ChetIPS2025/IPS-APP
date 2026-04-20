@@ -32,7 +32,7 @@ try:
         clear_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
-        render_table_action_bar,
+        render_selection_action_bar,
     )
 except ImportError:
     from table_actions import (  # type: ignore
@@ -41,7 +41,7 @@ except ImportError:
         clear_selected_ids,
         inject_table_action_styles,
         render_selectable_dataframe,
-        render_table_action_bar,
+        render_selection_action_bar,
     )
 
 try:
@@ -798,7 +798,7 @@ def render() -> None:
             editor_key="asset_db_sel_editor",
             hide_id_column=True,
         )
-        actions = render_table_action_bar(
+        actions = render_selection_action_bar(
             TABLE_KEY_ASSETS,
             sel,
             can_view=True,

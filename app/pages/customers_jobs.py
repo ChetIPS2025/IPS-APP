@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
 from db import (
     delete_rows_admin,
     fetch_by_match,
@@ -32,56 +31,30 @@ except ImportError:
         set_primary_contact,
     )
 
-try:
-    from table_actions import (
-        TABLE_KEY_CUSTOMERS,
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-        set_selected_ids,
-    )
-except ImportError:
-    from app.table_actions import (  # type: ignore
-        TABLE_KEY_CUSTOMERS,
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-        set_selected_ids,
-    )
-
-try:
-    from app.confirm_delete import (
-        close_destructive_confirmation,
-        destructive_confirm_open_key,
-        open_destructive_confirmation,
-        render_destructive_confirmation,
-    )
-except ImportError:
-    from confirm_delete import (  # type: ignore
-        close_destructive_confirmation,
-        destructive_confirm_open_key,
-        open_destructive_confirmation,
-        render_destructive_confirmation,
-    )
-
-try:
-    from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-        inject_ips_modal_styles,
-        render_crud_list_subtitle,
-    )
-except ImportError:
-    from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-        inject_ips_modal_styles,
-        render_crud_list_subtitle,
-    )
+from app.confirm_delete import (
+    close_destructive_confirmation,
+    destructive_confirm_open_key,
+    open_destructive_confirmation,
+)
+from app.ips_crud_list_styles import inject_ips_modal_styles
+from app.table_actions import (
+    TABLE_KEY_CUSTOMERS,
+    clear_selected_ids,
+    get_selected_ids,
+    inject_table_action_styles,
+    set_selected_ids,
+)
+from app.ui.crud_actions import render_standard_toolbar
+from app.ui.crud_confirm import render_delete_confirm
+from app.ui.crud_detail import render_side_detail_panel
+from app.ui.crud_filters import (
+    apply_boolean_status_filter,
+    apply_text_search,
+    render_search_box,
+    render_status_filter,
+)
+from app.ui.crud_framework import render_crud_page
+from app.ui.crud_table import render_crud_table
 
 _CUST_DELETE_CONFIRM_PREFIX = "customers_delete"
 _CONTACT_DELETE_PREFIX = "customer_contact_delete"
@@ -588,76 +561,6 @@ def _contact_row_by_id(contacts: list[dict[str, Any]], ctid: str) -> dict[str, A
     return None
 
 
-def _render_action_buttons(
-    *,
-    sel: list[str],
-    can_add: bool,
-    existing_customer_names: set[str],
-    resolved: dict[str, str],
-    available: set[str],
-) -> None:
-    inject_ips_crud_list_styles()
-    inject_table_action_styles()
-    n = len(sel)
-    one = n == 1
-    none = n == 0
-
-    with st.container(border=True):
-        st.markdown('<div class="ips-crud-toolbar-root"></div>', unsafe_allow_html=True)
-        left, b0, b1, b2, b3 = st.columns([1.1, 1, 1, 1, 1], gap="small")
-        with left:
-            st.markdown(
-                f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
-                unsafe_allow_html=True,
-            )
-        with b0:
-            if st.button(
-                "Add Customer",
-                type="primary",
-                use_container_width=True,
-                disabled=not can_add,
-                key="cust_btn_add",
-            ):
-                _add_customer_dialog(
-                    existing_customer_names=existing_customer_names,
-                    resolved=resolved,
-                    available=available,
-                )
-        with b1:
-            if st.button(
-                "Edit",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_add or not one,
-                key="cust_btn_edit",
-            ):
-                st.session_state["customer_mode"] = "edit"
-                st.session_state["customer_edit_id"] = str(sel[0])
-                _clear_contact_subpanel()
-                st.rerun()
-        with b2:
-            if st.button(
-                "Deactivate",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_add or none,
-                key="cust_btn_deactivate",
-            ):
-                st.session_state["_cust_do_deactivate"] = True
-                st.rerun()
-        with b3:
-            if st.button(
-                "Delete",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_add or none,
-                key="cust_btn_delete",
-            ):
-                open_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
-                st.session_state["customers_pending_delete_ids"] = [str(x) for x in sel]
-                st.rerun()
-
-
 def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
     cid = str(customer_row.get("id") or "")
     if not cid:
@@ -1014,30 +917,42 @@ def _render_edit_form(
     _render_contacts_section(customer_row=row, can_edit=can_edit, admin_read=admin_read)
 
 
+def _render_customer_side_panel_body(
+    *,
+    resolved: dict[str, str],
+    available: set[str],
+    admin_read: bool,
+) -> None:
+    eid = st.session_state.get("customer_edit_id")
+    er = _fetch_one_row("customers", {"id": eid}, admin_read=admin_read) if eid else None
+    if not er:
+        st.warning("Customer not found.")
+        _clear_customer_mode()
+    else:
+        can_edit = current_role() in {"admin", "estimator"}
+        _render_edit_form(
+            er,
+            can_edit=can_edit,
+            resolved=resolved,
+            available=available,
+            admin_read=admin_read,
+        )
+
+
 def _render_customer_side_panel(
     *,
     resolved: dict[str, str],
     available: set[str],
     admin_read: bool,
 ) -> None:
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Customer detail")
-        eid = st.session_state.get("customer_edit_id")
-        er = _fetch_one_row("customers", {"id": eid}, admin_read=admin_read) if eid else None
-        if not er:
-            st.warning("Customer not found.")
-            _clear_customer_mode()
-        else:
-            can_edit = current_role() in {"admin", "estimator"}
-            _render_edit_form(
-                er,
-                can_edit=can_edit,
-                resolved=resolved,
-                available=available,
-                admin_read=admin_read,
-            )
+    render_side_detail_panel(
+        title="Customer detail",
+        body=lambda: _render_customer_side_panel_body(
+            resolved=resolved,
+            available=available,
+            admin_read=admin_read,
+        ),
+    )
 
 
 def _visible_customer_columns(filtered: pd.DataFrame, resolved: dict[str, str]) -> list[str]:
@@ -1060,6 +975,7 @@ def _render_customers_main(
     resolved: dict[str, str],
     available: set[str],
     existing_customer_names: set[str],
+    show_contacts_preview: bool = True,
 ) -> None:
     if df.empty:
         st.info("No customers found.")
@@ -1078,27 +994,22 @@ def _render_customers_main(
             '<span class="ips-crud-filter-row-start" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        search = st.text_input(
-            "Search",
+        search = render_search_box(
+            key="cust_search",
             placeholder="Customer name, address, city, state, ZIP",
         )
     active_options = ["All", "Active only", "Inactive only"]
-    selected_active = f2.selectbox("Status", active_options)
+    selected_active = render_status_filter(key="cust_status", options=active_options)
 
     filtered = df.copy()
     is_active_col = resolved.get("is_active")
     if is_active_col and is_active_col in filtered.columns:
-        if selected_active == "Active only":
-            filtered = filtered[filtered[is_active_col] == True]  # noqa: E712
-        elif selected_active == "Inactive only":
-            filtered = filtered[filtered[is_active_col] == False]  # noqa: E712
-
-    if search.strip():
-        s = search.strip().lower()
-        mask = filtered.astype(str).apply(
-            lambda col: col.str.lower().str.contains(s, na=False, regex=False)
+        filtered = apply_boolean_status_filter(
+            filtered,
+            column=is_active_col,
+            selected=selected_active,
         )
-        filtered = filtered[mask.any(axis=1)]
+    filtered = apply_text_search(filtered, search)
 
     show_cols = _visible_customer_columns(filtered, resolved)
 
@@ -1119,25 +1030,53 @@ def _render_customers_main(
     elif "id" not in filtered.columns:
         st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
     else:
-        bar_ph = st.empty()
-        _, sel = render_selectable_dataframe(
+
+        def _on_add_customer() -> None:
+            _add_customer_dialog(
+                existing_customer_names=existing_customer_names,
+                resolved=resolved,
+                available=available,
+            )
+
+        def _on_edit_customer(cid: str) -> None:
+            st.session_state["customer_mode"] = "edit"
+            st.session_state["customer_edit_id"] = cid
+            _clear_contact_subpanel()
+            st.rerun()
+
+        def _on_deactivate_customers(_ids: list[str]) -> None:
+            st.session_state["_cust_do_deactivate"] = True
+            st.rerun()
+
+        def _on_delete_customers(s: list[str]) -> None:
+            open_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
+            st.session_state["customers_pending_delete_ids"] = [str(x) for x in s]
+            st.rerun()
+
+        def _toolbar(sel: list[str]) -> None:
+            render_standard_toolbar(
+                selected_ids=sel,
+                can_add=can_add,
+                add_label="Add Customer",
+                on_add=_on_add_customer,
+                on_edit=_on_edit_customer,
+                on_deactivate=_on_deactivate_customers,
+                on_delete=_on_delete_customers,
+                key_prefix="cust_btn",
+            )
+
+        sel = render_crud_table(
             filtered,
             table_key=TABLE_KEY_CUSTOMERS,
             id_column="id",
             columns=show_cols,
             editor_key="cust_sel_editor",
             hide_id_column=True,
+            toolbar_above=True,
+            action_bar=_toolbar,
         )
-        with bar_ph.container():
-            _render_action_buttons(
-                sel=sel,
-                can_add=can_add,
-                existing_customer_names=existing_customer_names,
-                resolved=resolved,
-                available=available,
-            )
 
-        if len(sel) == 1:
+        if show_contacts_preview and len(sel) == 1:
             one_cid = str(sel[0]).strip()
             name_col = resolved.get("customer_name") or "customer_name"
             row_match = filtered.loc[filtered["id"].astype(str) == one_cid] if "id" in filtered.columns else None
@@ -1159,9 +1098,6 @@ def _render_customers_main(
 
 
 def render_customers() -> None:
-    render_header("Customers")
-    render_crud_list_subtitle("Manage customer companies and billing addresses. Contacts are stored per company.")
-
     can_add = current_role() in {"admin", "estimator"}
     if st.session_state.get("customer_mode") == "add":
         st.session_state.pop("customer_mode", None)
@@ -1174,134 +1110,9 @@ def render_customers() -> None:
         load_error = exc
         rows = []
 
-    if load_error is not None:
-        st.error("Could not load customers from the database. The list below may be empty.")
-        with st.expander("Technical details"):
-            st.code(repr(load_error), language="text")
-
     df = pd.DataFrame(rows)
     available = _infer_available_columns(df, rows)
     resolved = _resolve_customer_columns(available)
-
-    _cust_del_open = destructive_confirm_open_key(_CUST_DELETE_CONFIRM_PREFIX)
-    if st.session_state.get(_cust_del_open) and not can_add:
-        close_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
-        st.session_state.pop("customers_pending_delete_ids", None)
-    elif st.session_state.get(_cust_del_open) and can_add:
-        pending = list(st.session_state.get("customers_pending_delete_ids") or [])
-        if not pending:
-            close_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
-            st.session_state.pop("customers_pending_delete_ids", None)
-            st.rerun()
-        id_to_name: dict[str, str] = {}
-        name_col = resolved["customer_name"]
-        if not df.empty and "id" in df.columns and name_col in df.columns:
-            for _, r in df.iterrows():
-                rid = str(r["id"])
-                id_to_name[rid] = str(r.get(name_col) or "").strip() or rid
-        name_lines: list[str] = []
-        for pid in pending:
-            nm = id_to_name.get(pid)
-            if nm:
-                name_lines.append(nm)
-            else:
-                short = pid[:10] + "…" if len(pid) > 10 else pid
-                name_lines.append(f"(unknown id) {short}")
-        n_pending = len(pending)
-        msg = (
-            "Are you sure you want to delete this customer?"
-            if n_pending == 1
-            else f"Are you sure you want to delete these {n_pending} customers?"
-        )
-
-        def _on_confirm_delete() -> None:
-            for cid in pending:
-                try:
-                    delete_rows_admin("customers", {"id": cid})
-                except Exception as exc:
-                    st.error(f"Could not delete this customer ({cid[:8]}…). {_friendly_customer_db_message(exc)}")
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-            st.session_state.pop("customers_pending_delete_ids", None)
-            clear_selected_ids(TABLE_KEY_CUSTOMERS)
-            edit_id = st.session_state.get("customer_edit_id")
-            if edit_id and str(edit_id) in {str(x) for x in pending}:
-                _clear_customer_mode()
-            st.success("Customer(s) deleted where permitted.")
-
-        def _on_cancel_delete() -> None:
-            st.session_state.pop("customers_pending_delete_ids", None)
-
-        render_destructive_confirmation(
-            key_prefix=_CUST_DELETE_CONFIRM_PREFIX,
-            title="Confirm Delete",
-            message=msg,
-            confirm_label="Confirm Delete",
-            cancel_label="Cancel",
-            on_confirm=_on_confirm_delete,
-            on_cancel=_on_cancel_delete,
-            name_lines=name_lines,
-        )
-
-    _ct_del_open = destructive_confirm_open_key(_CONTACT_DELETE_PREFIX)
-    if st.session_state.get(_ct_del_open) and not can_add:
-        close_destructive_confirmation(_CONTACT_DELETE_PREFIX)
-        st.session_state.pop("customer_contact_pending_delete_ids", None)
-    elif st.session_state.get(_ct_del_open) and can_add:
-        pending_ct = list(st.session_state.get("customer_contact_pending_delete_ids") or [])
-        if not pending_ct:
-            close_destructive_confirmation(_CONTACT_DELETE_PREFIX)
-            st.session_state.pop("customer_contact_pending_delete_ids", None)
-            st.rerun()
-
-        def _on_confirm_ct_delete() -> None:
-            for x in pending_ct:
-                try:
-                    delete_contact(str(x))
-                except Exception as exc:
-                    st.error(f"Could not delete contact {x}: {exc}")
-            st.session_state.pop("customer_contact_pending_delete_ids", None)
-            _clear_contact_subpanel()
-            st.success("Contact(s) deleted where permitted.")
-
-        def _on_cancel_ct_delete() -> None:
-            st.session_state.pop("customer_contact_pending_delete_ids", None)
-
-        render_destructive_confirmation(
-            key_prefix=_CONTACT_DELETE_PREFIX,
-            title="Confirm Delete",
-            message="Delete this contact? Estimates/jobs referencing it will clear the contact link.",
-            confirm_label="Confirm Delete",
-            cancel_label="Cancel",
-            on_confirm=_on_confirm_ct_delete,
-            on_cancel=_on_cancel_ct_delete,
-            name_lines=[str(x)[:12] + "…" for x in pending_ct],
-        )
-
-    if st.session_state.pop("_cust_do_deactivate", False) and can_add:
-        if resolved["is_active"] not in available:
-            st.warning("Deactivation is not available: the database has no `is_active` column on customers.")
-        else:
-            sel_ids = get_selected_ids(TABLE_KEY_CUSTOMERS)
-            if sel_ids:
-                failures: list[BaseException] = []
-                for cid in sel_ids:
-                    try:
-                        update_rows_admin("customers", {resolved["is_active"]: False}, {"id": cid})
-                    except Exception as exc:
-                        failures.append(exc)
-                        st.error(
-                            f"Could not deactivate customer `{str(cid)[:8]}…`. "
-                            f"{_friendly_customer_db_message(exc)}"
-                        )
-                        with st.expander("Technical details"):
-                            st.code(repr(exc), language="text")
-                clear_selected_ids(TABLE_KEY_CUSTOMERS)
-                if not failures:
-                    st.success("Selected customers deactivated.")
-                    st.rerun()
-
-    panel_open = bool(can_add and mode == "edit")
 
     existing_names: set[str] = set()
     name_col = resolved["customer_name"]
@@ -1311,30 +1122,153 @@ def render_customers() -> None:
             if nm:
                 existing_names.add(nm)
 
-    if panel_open:
-        main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        with main_col:
-            _render_customers_main(
-                df=df,
-                can_add=can_add,
-                resolved=resolved,
-                available=available,
-                existing_customer_names=existing_names,
+    panel_open = bool(can_add and mode == "edit")
+
+    def _before_main() -> None:
+        if load_error is not None:
+            st.error("Could not load customers from the database. The list below may be empty.")
+            with st.expander("Technical details"):
+                st.code(repr(load_error), language="text")
+
+        _cust_del_open = destructive_confirm_open_key(_CUST_DELETE_CONFIRM_PREFIX)
+        if st.session_state.get(_cust_del_open) and not can_add:
+            close_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
+            st.session_state.pop("customers_pending_delete_ids", None)
+        elif st.session_state.get(_cust_del_open) and can_add:
+            pending = list(st.session_state.get("customers_pending_delete_ids") or [])
+            if not pending:
+                close_destructive_confirmation(_CUST_DELETE_CONFIRM_PREFIX)
+                st.session_state.pop("customers_pending_delete_ids", None)
+                st.rerun()
+            id_to_name: dict[str, str] = {}
+            name_col2 = resolved["customer_name"]
+            if not df.empty and "id" in df.columns and name_col2 in df.columns:
+                for _, r in df.iterrows():
+                    rid = str(r["id"])
+                    id_to_name[rid] = str(r.get(name_col2) or "").strip() or rid
+            name_lines: list[str] = []
+            for pid in pending:
+                nm = id_to_name.get(pid)
+                if nm:
+                    name_lines.append(nm)
+                else:
+                    short = pid[:10] + "…" if len(pid) > 10 else pid
+                    name_lines.append(f"(unknown id) {short}")
+            n_pending = len(pending)
+            msg = (
+                "Are you sure you want to delete this customer?"
+                if n_pending == 1
+                else f"Are you sure you want to delete these {n_pending} customers?"
             )
-        with side_col:
-            _render_customer_side_panel(
-                resolved=resolved,
-                available=available,
-                admin_read=can_add,
+
+            def _on_confirm_delete() -> None:
+                for cid in pending:
+                    try:
+                        delete_rows_admin("customers", {"id": cid})
+                    except Exception as exc:
+                        st.error(f"Could not delete this customer ({cid[:8]}…). {_friendly_customer_db_message(exc)}")
+                        with st.expander("Technical details"):
+                            st.code(repr(exc), language="text")
+                st.session_state.pop("customers_pending_delete_ids", None)
+                clear_selected_ids(TABLE_KEY_CUSTOMERS)
+                edit_id = st.session_state.get("customer_edit_id")
+                if edit_id and str(edit_id) in {str(x) for x in pending}:
+                    _clear_customer_mode()
+                st.success("Customer(s) deleted where permitted.")
+
+            def _on_cancel_delete() -> None:
+                st.session_state.pop("customers_pending_delete_ids", None)
+
+            render_delete_confirm(
+                key_prefix=_CUST_DELETE_CONFIRM_PREFIX,
+                title="Confirm Delete",
+                message=msg,
+                on_confirm=_on_confirm_delete,
+                on_cancel=_on_cancel_delete,
+                name_lines=name_lines,
             )
-    else:
+
+        _ct_del_open = destructive_confirm_open_key(_CONTACT_DELETE_PREFIX)
+        if st.session_state.get(_ct_del_open) and not can_add:
+            close_destructive_confirmation(_CONTACT_DELETE_PREFIX)
+            st.session_state.pop("customer_contact_pending_delete_ids", None)
+        elif st.session_state.get(_ct_del_open) and can_add:
+            pending_ct = list(st.session_state.get("customer_contact_pending_delete_ids") or [])
+            if not pending_ct:
+                close_destructive_confirmation(_CONTACT_DELETE_PREFIX)
+                st.session_state.pop("customer_contact_pending_delete_ids", None)
+                st.rerun()
+
+            def _on_confirm_ct_delete() -> None:
+                for x in pending_ct:
+                    try:
+                        delete_contact(str(x))
+                    except Exception as exc:
+                        st.error(f"Could not delete contact {x}: {exc}")
+                st.session_state.pop("customer_contact_pending_delete_ids", None)
+                _clear_contact_subpanel()
+                st.success("Contact(s) deleted where permitted.")
+
+            def _on_cancel_ct_delete() -> None:
+                st.session_state.pop("customer_contact_pending_delete_ids", None)
+
+            render_delete_confirm(
+                key_prefix=_CONTACT_DELETE_PREFIX,
+                title="Confirm Delete",
+                message="Delete this contact? Estimates/jobs referencing it will clear the contact link.",
+                on_confirm=_on_confirm_ct_delete,
+                on_cancel=_on_cancel_ct_delete,
+                name_lines=[str(x)[:12] + "…" for x in pending_ct],
+            )
+
+        if st.session_state.pop("_cust_do_deactivate", False) and can_add:
+            if resolved["is_active"] not in available:
+                st.warning("Deactivation is not available: the database has no `is_active` column on customers.")
+            else:
+                sel_ids = get_selected_ids(TABLE_KEY_CUSTOMERS)
+                if sel_ids:
+                    failures: list[BaseException] = []
+                    for cid in sel_ids:
+                        try:
+                            update_rows_admin("customers", {resolved["is_active"]: False}, {"id": cid})
+                        except Exception as exc:
+                            failures.append(exc)
+                            st.error(
+                                f"Could not deactivate customer `{str(cid)[:8]}…`. "
+                                f"{_friendly_customer_db_message(exc)}"
+                            )
+                            with st.expander("Technical details"):
+                                st.code(repr(exc), language="text")
+                    clear_selected_ids(TABLE_KEY_CUSTOMERS)
+                    if not failures:
+                        st.success("Selected customers deactivated.")
+                        st.rerun()
+
+    def _main() -> None:
         _render_customers_main(
             df=df,
             can_add=can_add,
             resolved=resolved,
             available=available,
             existing_customer_names=existing_names,
+            show_contacts_preview=not panel_open,
         )
+
+    def _side() -> None:
+        _render_customer_side_panel(
+            resolved=resolved,
+            available=available,
+            admin_read=can_add,
+        )
+
+    render_crud_page(
+        title="Customers",
+        subtitle="Manage customer companies and billing addresses. Contacts are stored per company.",
+        panel_open=panel_open,
+        before_main=_before_main,
+        main_body=_main,
+        side_body=_side if panel_open else None,
+    )
 
     if not can_add:
         st.info("Only admin or estimator users can manage customers.")

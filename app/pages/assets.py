@@ -13,17 +13,17 @@ try:
     from table_actions import (
         IPS_PENDING_DELETE,
         TABLE_KEY_ASSET_MANAGER,
-        render_selectable_dataframe,
-        render_table_action_bar,
         clear_selected_ids,
+        render_selectable_dataframe,
+        render_selection_action_bar,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
         IPS_PENDING_DELETE,
         TABLE_KEY_ASSET_MANAGER,
-        render_selectable_dataframe,
-        render_table_action_bar,
         clear_selected_ids,
+        render_selectable_dataframe,
+        render_selection_action_bar,
     )
 
 try:
@@ -198,7 +198,7 @@ def render() -> None:
                 columns=show_cols,
                 editor_key="asset_mgr_sel_editor",
             )
-            actions = render_table_action_bar(
+            actions = render_selection_action_bar(
                 TABLE_KEY_ASSET_MANAGER,
                 sel,
                 can_view=True,

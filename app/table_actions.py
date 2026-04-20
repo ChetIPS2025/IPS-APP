@@ -10,7 +10,7 @@ Examples: ``selected_assets_ids``, ``selected_jobs_ids``, ``selected_estimates_i
 
 Helpers: :func:`get_selected_ids`, :func:`set_selected_ids`, :func:`clear_selected_ids`.
 Main UI: :func:`render_selectable_dataframe` (checkbox column first) and
-:func:`render_table_action_bar` (alias :func:`render_selection_action_bar`).
+:func:`render_selection_action_bar` (same implementation as :func:`render_table_action_bar`).
 
 **Placement:** Render the data editor first, then the action bar, so the bar shows an
 accurate selection count for the current run.

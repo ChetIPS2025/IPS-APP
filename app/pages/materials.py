@@ -64,9 +64,13 @@ except ImportError:
 MARKUP_PCT = 0.25
 _MAT_DELETE_CONFIRM_PREFIX = "materials_delete"
 
-# Hidden from the main catalog grid only (still in DB, selection, add/edit, filters, and search).
-_MATERIAL_LIST_HIDDEN_COLS: frozenset[str] = frozenset(
-    {"id", "is_active", "inventory_id", "item_key", "stock_length", "subgroup"}
+# Main catalog grid: these columns only (DB may carry more fields for forms / imports).
+MATERIAL_TABLE_COLUMNS: tuple[str, ...] = (
+    "description",
+    "category",
+    "unit",
+    "purchase_price",
+    "sell_price",
 )
 
 
@@ -123,17 +127,8 @@ def _category_subgroup_options(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     return category_options, subgroup_options
 
 
-def _visible_material_list_columns(filtered: pd.DataFrame) -> list[str]:
-    """Columns shown in the main selectable grid — user-facing fields only; never id / is_active / internal keys."""
-    preferred_order = [
-        "description",
-        "category",
-        "unit",
-        "purchase_price",
-        "sell_price",
-    ]
-    out = [c for c in preferred_order if c in filtered.columns and c not in _MATERIAL_LIST_HIDDEN_COLS]
-    return [c for c in out if c not in ("id", "is_active")]
+def _material_display_columns(df: pd.DataFrame) -> list[str]:
+    return [c for c in MATERIAL_TABLE_COLUMNS if c in df.columns]
 
 
 def _render_material_filter_row(*, df: pd.DataFrame, can_import: bool) -> None:
@@ -148,7 +143,7 @@ def _render_material_filter_row(*, df: pd.DataFrame, can_import: bool) -> None:
         )
         st.text_input(
             "Search",
-            placeholder="Description, category, unit, pricing (includes hidden fields)",
+            placeholder="Description, category, unit, pricing",
             key="mat_f_search",
         )
     active_options = ["All", "Active Only", "Inactive Only"]
@@ -193,10 +188,12 @@ def _filtered_materials_df(df: pd.DataFrame) -> pd.DataFrame:
         filtered = filtered[filtered["is_active"] == False]  # noqa: E712
     if search.strip():
         s = search.strip().lower()
-        mask = filtered.astype(str).apply(
-            lambda col: col.str.lower().str.contains(s, na=False, regex=False),
-        )
-        filtered = filtered[mask.any(axis=1)]
+        search_cols = [c for c in MATERIAL_TABLE_COLUMNS if c in filtered.columns]
+        if search_cols:
+            mask = filtered[search_cols].astype(str).apply(
+                lambda col: col.str.lower().str.contains(s, na=False, regex=False),
+            )
+            filtered = filtered[mask.any(axis=1)]
     return filtered
 
 
@@ -516,6 +513,7 @@ def _render_materials_table_main(
 ) -> None:
     """Left column: caption + table only (filters live above the page split)."""
     inject_table_action_styles()
+    show_cols = _material_display_columns(filtered)
 
     if df.empty:
         st.info("No materials found.")
@@ -529,8 +527,6 @@ def _render_materials_table_main(
             st.session_state.pop("material_panel_id", None)
             st.rerun()
         return
-
-    show_cols = _visible_material_list_columns(filtered)
 
     st.caption(
         "Checkbox column on the **left**; selection is stored as **selected_materials_ids**."
@@ -547,6 +543,10 @@ def _render_materials_table_main(
             st.session_state["material_panel_mode"] = "add"
             st.session_state.pop("material_panel_id", None)
             st.rerun()
+        return
+
+    if not show_cols:
+        st.warning("Catalog rows have no display columns configured.")
         return
 
     if "id" not in filtered.columns:
