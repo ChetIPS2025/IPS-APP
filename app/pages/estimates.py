@@ -245,6 +245,7 @@ def _load_estimate_into_session(selected_id: str) -> None:
         "customer_contact_id": row.get("customer_contact_id"),
         "job_id": row.get("job_id"),
         "status": row.get("status", "draft"),
+        "estimate_description": row.get("estimate_description", loaded.get("estimate_description", "")),
         "scope_of_work": row.get("scope_of_work", ""),
         "exclusions": row.get("exclusions", ""),
         "additional_charges": row.get("additional_charges", ""),
@@ -356,25 +357,23 @@ def _render_estimate_list() -> None:
     def _estimate_description_display(est_row: pd.Series) -> str:
         """
         Row-level description shown in the Estimates list.
-        Prefer explicit estimate text fields; fall back to the first line of scope.
+        Prefer explicit short estimate description; fall back to older compatibility keys.
+        Avoid using Scope of Work unless nothing else exists.
         """
         desc = est_row.get("estimate_description")
         if desc is None or (isinstance(desc, float) and pd.isna(desc)):
             desc = ""
         if not str(desc).strip():
-            # Common persisted field in estimates.
-            desc = est_row.get("scope_of_work") or ""
-        if not str(desc).strip():
-            # Fallbacks from nested JSON (shape varies across imports/older saves).
             ej = est_row.get("estimate_json")
             if isinstance(ej, dict):
-                desc = (
-                    ej.get("estimate_description")
-                    or ej.get("job")
-                    or ej.get("job_name")
-                    or ej.get("scope_of_work")
-                    or ""
-                )
+                desc = ej.get("estimate_description") or ""
+        if not str(desc).strip():
+            ej = est_row.get("estimate_json")
+            if isinstance(ej, dict):
+                desc = ej.get("job") or ej.get("job_name") or ""
+        if not str(desc).strip():
+            # Absolute last resort: first line of Scope of Work (can be long proposal text).
+            desc = est_row.get("scope_of_work") or ""
         s = str(desc or "").strip()
         if not s:
             return ""

@@ -19,6 +19,7 @@ def blank_estimate() -> dict:
         "customer_id": None,
         "customer_contact_id": None,
         "contact_name": "",
+        "estimate_description": "",
         "job_id": None,
         "status": "draft",
         "controls": {
@@ -156,6 +157,9 @@ def _normalize_prepared_by_id_value(raw: str) -> str:
 
 def merge_estimate_row_scalar_fields_into_editor(row: dict, loaded: dict) -> None:
     """Overlay denormalized estimate row columns after ``estimate_json`` is merged."""
+    if "estimate_description" in row:
+        v = row.get("estimate_description")
+        loaded["estimate_description"] = "" if v is None else str(v).strip()
     if "prepared_by_name" in row:
         v = row.get("prepared_by_name")
         loaded["prepared_by_name"] = "" if v is None else str(v).strip()

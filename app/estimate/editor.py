@@ -729,7 +729,11 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 (linked_job_row_for_field or {}).get("job_name"),
             )
 
-        typed_job_text = str(st.session_state.get("est_job_query") or "")
+        typed_job_text = str(
+            st.session_state.get("est_job_query")
+            or est.get("estimate_description")
+            or ""
+        )
         job_initial = linked_job_label or typed_job_text
         job_query = st.text_input(
             "Estimate Description",
@@ -744,6 +748,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             ),
         )
         job_norm = _norm_name_key(job_query)
+        # Persist the short description in estimate JSON (separate from Scope of Work).
+        est["estimate_description"] = str(job_query or "").strip()
         job_exact_id = job_id_by_norm.get(job_norm) if job_norm else None
         if job_exact_id:
             est["job_id"] = job_exact_id
@@ -1989,6 +1995,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": est.get("status", "draft"),
+                    # Store short description when the DB has a dedicated column (also preserved in estimate_json).
                     "proposal_total": money_db(totals["proposal_total"]),
                     "final_bid": money_db(totals["final_bid"]),
                     "material_sell_basis": money_db(totals["material_sell_basis"]),
@@ -2010,6 +2017,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "estimate_json": est,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
+                _cols = _estimate_table_column_names()
+                if "estimate_description" in _cols:
+                    _ed = str(est.get("estimate_description") or "").strip()
+                    payload["estimate_description"] = _ed[:500] if _ed else None
                 estimate_id = persist_estimate(payload, est, str(st.session_state.get("est_revision_note") or ""))
                 attach_pending_pdf_import_source(estimate_id)
                 pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
@@ -2075,6 +2086,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": "submitted",
+                    # Store short description when the DB has a dedicated column (also preserved in estimate_json).
                     "proposal_total": money_db(totals["proposal_total"]),
                     "final_bid": money_db(totals["final_bid"]),
                     "material_sell_basis": money_db(totals["material_sell_basis"]),
@@ -2096,6 +2108,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "estimate_json": est,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
+                _cols = _estimate_table_column_names()
+                if "estimate_description" in _cols:
+                    _ed = str(est.get("estimate_description") or "").strip()
+                    payload["estimate_description"] = _ed[:500] if _ed else None
                 est["status"] = "submitted"
                 eid = persist_estimate(payload, est, "Submitted for approval")
                 attach_pending_pdf_import_source(eid)
@@ -2162,6 +2178,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "job_id": est.get("job_id"),
                     "estimator_user_id": current_profile().get("id"),
                     "status": "approved",
+                    # Store short description when the DB has a dedicated column (also preserved in estimate_json).
                     "proposal_total": money_db(totals["proposal_total"]),
                     "final_bid": money_db(totals["final_bid"]),
                     "material_sell_basis": money_db(totals["material_sell_basis"]),
@@ -2183,6 +2200,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "estimate_json": est,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
+                _cols = _estimate_table_column_names()
+                if "estimate_description" in _cols:
+                    _ed = str(est.get("estimate_description") or "").strip()
+                    payload["estimate_description"] = _ed[:500] if _ed else None
                 est["status"] = "approved"
                 eid = persist_estimate(payload, est, "Approved")
                 attach_pending_pdf_import_source(eid)
@@ -2270,6 +2291,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "estimate_json": est,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
+                _cols = _estimate_table_column_names()
+                if "estimate_description" in _cols:
+                    _ed = str(est.get("estimate_description") or "").strip()
+                    payload["estimate_description"] = _ed[:500] if _ed else None
                 est["status"] = "awarded"
                 est["job_received"] = True
                 eid = persist_estimate(payload, est, "Marked awarded")
