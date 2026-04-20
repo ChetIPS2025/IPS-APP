@@ -60,6 +60,9 @@ ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION: FrozenSet[str] | None = frozenset(
     }
 )
 
+# Only for :func:`create_job_from_estimate` — standalone jobs use the Job Database form default/status.
+JOB_STATUS_AFTER_ESTIMATE_CONVERSION = "Awarded"
+
 
 def estimate_status_allows_job_creation(status: str | None) -> bool:
     """Return whether an estimate ``status`` may use **Create Job from Estimate**."""
@@ -260,6 +263,9 @@ def create_job_from_estimate(
 
     When ``mark_job_received`` is True, also sets ``estimates.job_received`` to True (Estimates
     list **Job Received** action).
+
+    The inserted job row uses ``status`` = :data:`JOB_STATUS_AFTER_ESTIMATE_CONVERSION` so it is
+    immediately valid for costing / PO workflows (standalone creates are unchanged).
     """
     eid = str(estimate_id or "").strip()
     if not eid:
@@ -341,7 +347,8 @@ def create_job_from_estimate(
         "customer_id": customer_id,
         "job_name": job_name,
         "location": _safe_location(ej),
-        "status": "Awarded",
+        # Estimate-converted jobs start as Awarded so they are ready for costing (not Draft).
+        "status": JOB_STATUS_AFTER_ESTIMATE_CONVERSION,
         "estimate_id": eid,
         "source_type": JOB_SOURCE_TYPE_ESTIMATE,
         "project_manager": "",

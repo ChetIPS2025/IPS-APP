@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
-from auth import current_profile
+from auth import current_profile, current_role
 from branding import render_header
 from data_cache import fetch_table_for_session
 
@@ -29,6 +29,13 @@ _BIDDING_STATUS_TOKENS = {
     "estimating",
     "proposal",
     "quoted",
+    # Job Database lifecycle (pre-award / in-flight work) — title-cased in DB, matched case-insensitively
+    "draft",
+    "submitted",
+    "approved",
+    "scheduled",
+    "in progress",
+    "on hold",
 }
 
 
@@ -136,20 +143,30 @@ def render() -> None:
     )
 
     sk = str(current_profile().get("id") or "anonymous")
+    use_admin = current_role() in {"admin", "estimator"}
+    _lim = 5000
     try:
-        customers = fetch_table_for_session("customers", session_key=sk)
+        customers = fetch_table_for_session(
+            "customers", session_key=sk, limit=_lim, order_by="customer_name", use_admin=use_admin
+        )
     except Exception:
         customers = []
     try:
-        jobs = fetch_table_for_session("jobs", session_key=sk, order_by="job_number")
+        jobs = fetch_table_for_session(
+            "jobs", session_key=sk, limit=_lim, order_by="job_number", use_admin=use_admin
+        )
     except Exception:
         jobs = []
     try:
-        estimates = fetch_table_for_session("estimates", session_key=sk)
+        estimates = fetch_table_for_session(
+            "estimates", session_key=sk, limit=_lim, order_by="quote_number", use_admin=use_admin
+        )
     except Exception:
         estimates = []
     try:
-        employees = fetch_table_for_session("employees", session_key=sk, order_by="name")
+        employees = fetch_table_for_session(
+            "employees", session_key=sk, limit=_lim, order_by="name", use_admin=use_admin
+        )
     except Exception:
         employees = []
 

@@ -10,13 +10,14 @@ remain on the Estimates page; the job is the costing / work record.
 import pandas as pd
 import streamlit as st
 
+from auth import current_role
 from branding import render_header
 
 try:
     from app.ips_crud_list_styles import render_crud_list_subtitle
 except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
-from db import fetch_table
+from db import fetch_table, fetch_table_admin
 
 try:
     from services.job_service import job_display_primary
@@ -34,6 +35,11 @@ except ImportError:
     from app.services.time_grid_service import grid_labor_cost_dollars  # type: ignore
 
 
+def _job_costing_admin_read() -> bool:
+    """Match Job Database / Estimates: service-role reads so ``jobs`` rows are visible under RLS."""
+    return current_role() in {"admin", "estimator"}
+
+
 def render() -> None:
     render_header("Job Costing")
     render_crud_list_subtitle(
@@ -42,8 +48,20 @@ def render() -> None:
     )
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")
-    jobs = fetch_table("jobs", limit=5000, order_by="job_number")
-    estimates = fetch_table("estimates", limit=5000, order_by="quote_number")
+    jobs: list[dict] = []
+    estimates: list[dict] = []
+    if _job_costing_admin_read():
+        try:
+            jobs = fetch_table_admin("jobs", limit=5000, order_by="job_number")
+            estimates = fetch_table_admin("estimates", limit=5000, order_by="quote_number")
+        except Exception:
+            jobs = fetch_table("jobs", limit=5000, order_by="job_number")
+            estimates = fetch_table("estimates", limit=5000, order_by="quote_number")
+    else:
+        jobs = fetch_table("jobs", limit=5000, order_by="job_number")
+        estimates = fetch_table("estimates", limit=5000, order_by="quote_number")
+    # Costing is keyed by job id; keep any row with a primary key (all statuses — e.g. Awarded from conversion).
+    jobs = [j for j in (jobs or []) if j.get("id")]
     labor_rates = fetch_table("labor_rates", limit=5000, order_by="classification")
     time_entries = fetch_table("employee_time_entries", limit=10000, order_by="entry_date")
     try:

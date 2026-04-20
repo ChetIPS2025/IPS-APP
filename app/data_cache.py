@@ -26,6 +26,23 @@ def _fetch_table_cached(
     return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
 
 
+@st.cache_data(ttl=_ttl, show_spinner="Loading…")
+def _fetch_table_cached_admin(
+    table_name: str,
+    columns: str,
+    limit: int,
+    order_by: str | None,
+    _session_key: str,
+) -> list[dict[str, Any]]:
+    """Service-role read for internal roles (Dashboard, etc.); falls back to anon if admin key missing."""
+    from db import fetch_table, fetch_table_admin
+
+    try:
+        return fetch_table_admin(table_name, columns=columns, limit=limit, order_by=order_by)
+    except Exception:
+        return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
+
+
 def fetch_table_for_session(
     table_name: str,
     *,
@@ -33,6 +50,15 @@ def fetch_table_for_session(
     columns: str = "*",
     limit: int = 1000,
     order_by: str | None = None,
+    use_admin: bool = False,
 ) -> list[dict[str, Any]]:
-    """Read-through cache for list reads; pass session_key=current user id (str)."""
-    return _fetch_table_cached(table_name, columns, limit, order_by, session_key)
+    """
+    Read-through cache for list reads; pass ``session_key=`` current user id (str).
+
+    Set ``use_admin=True`` for admin/estimator so rows hidden by RLS (e.g. ``jobs``, ``estimates``)
+    still appear on the Dashboard.
+    """
+    cache_key = f"{session_key}:svc" if use_admin else session_key
+    if use_admin:
+        return _fetch_table_cached_admin(table_name, columns, limit, order_by, cache_key)
+    return _fetch_table_cached(table_name, columns, limit, order_by, cache_key)
