@@ -70,6 +70,8 @@ try:
         fetch_jobs_for_job_database,
     )
     from services.job_service import (
+        job_display_label,
+        job_number_display,
         job_row_select_label,
         next_job_number,
         sort_jobs_by_name,
@@ -82,6 +84,8 @@ except ImportError:
         fetch_jobs_for_job_database,
     )
     from app.services.job_service import (  # type: ignore
+        job_display_label,
+        job_number_display,
         job_row_select_label,
         next_job_number,
         sort_jobs_by_name,
@@ -275,18 +279,25 @@ def _render_job_form_panel(
             ).strip()
             _est = estimate_detail or {}
             _st = str(_est.get("status") or "").strip()
+            _cust = _customer_display_name_for_id(
+                _est.get("customer_id"),
+                customers,
+                customer_name_by_id,
+            )
             _scope = _text_snippet(str(_est.get("scope_of_work") or ""))
             with st.container(border=True):
                 st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
                 line_parts: list[str] = []
                 if _eq:
-                    line_parts.append(f"Quote **{_eq}**")
+                    line_parts.append(f"Source estimate **{_eq}**")
                 else:
-                    line_parts.append(f"Estimate id `{_eid[:8]}…`")
+                    line_parts.append(f"Source estimate id `{_eid[:8]}…`")
                 if _st:
                     line_parts.append(f"estimate status **{_st}**")
-                st.markdown("**Linked estimate** · " + " · ".join(line_parts), unsafe_allow_html=True)
-                st.caption("Job is tied to this estimate (`estimate_id` on the job row).")
+                if _cust:
+                    line_parts.append(f"customer **{_cust}**")
+                st.markdown("**Source** · " + " · ".join(line_parts), unsafe_allow_html=True)
+                st.caption("This job originated from an estimate (jobs.estimate_id is set).")
                 if _scope:
                     st.caption("Scope (from estimate)")
                     st.markdown(
@@ -560,6 +571,7 @@ def _render_job_form_panel(
 def render() -> None:
     render_header("Job Database")
     render_crud_list_subtitle("Search and maintain jobs, link estimates, and keep customer contacts aligned.")
+    st.caption("**Jobs are approved work records**, and may originate from an **estimate (quote/proposal)**.")
 
     can_edit = current_role() in {"admin", "estimator"}
     st.session_state.setdefault("job_db_bypass_filters", True)
@@ -773,7 +785,8 @@ def render() -> None:
                 def _quote_for_estimate_cell(v) -> str:
                     if v is None or str(v).strip() == "":
                         return ""
-                    return estimate_quote_by_id.get(str(v), "")
+                    q = estimate_quote_by_id.get(str(v), "")
+                    return f"Estimate {q}" if q else ""
     
                 jobs_df["Quote (estimate)"] = jobs_df["estimate_id"].map(_quote_for_estimate_cell)
     
@@ -785,7 +798,11 @@ def render() -> None:
                             return "—"
                     except Exception:
                         pass
-                    return "Estimate" if str(v).strip() else "—"
+                    eid = str(v).strip()
+                    if not eid:
+                        return "—"
+                    q = estimate_quote_by_id.get(eid, "")
+                    return f"From estimate: {q}" if q else "From estimate"
     
                 jobs_df["Source"] = jobs_df["estimate_id"].map(_source_cell)
             else:

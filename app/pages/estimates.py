@@ -46,6 +46,10 @@ try:
     from services.job_service import job_number_display
 except ImportError:
     from app.services.job_service import job_number_display  # type: ignore
+    try:
+        from services.job_service import job_display_label
+    except ImportError:
+        from app.services.job_service import job_display_label  # type: ignore
 
 try:
     from services.estimate_import_customer_match import (
@@ -299,16 +303,12 @@ def _render_estimate_list() -> None:
             sj = str(jid)
             if sj in job_by_id:
                 job = job_by_id[sj]
-                job_number = job_number_display(job.get("job_number"))
-                job_name = str(job.get("job_name") or "").strip()
-                return f"{job_number} – {job_name}" if job_name else job_number
+                return job_display_label(job.get("job_number"), job.get("job_name"))
         if eid is not None and pd.notna(eid):
             se = str(eid)
             if se in job_by_estimate_id:
                 job = job_by_estimate_id[se]
-                job_number = job_number_display(job.get("job_number"))
-                job_name = str(job.get("job_name") or "").strip()
-                return f"{job_number} – {job_name}" if job_name else job_number
+                return job_display_label(job.get("job_number"), job.get("job_name"))
         return ""
 
     def _linked_job_id_for_row(row: pd.Series) -> str | None:
@@ -438,6 +438,10 @@ def _render_estimate_list() -> None:
             )
         return ""
 
+    st.caption(
+        "**Estimate = quote/proposal** (stays here until accepted by the customer). "
+        "**Job = approved work** (created from an accepted estimate)."
+    )
     st.caption(
         "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "
         "Use the **action bar** below for view, edit, delete, and export."
@@ -570,9 +574,11 @@ def _render_estimate_list() -> None:
         open_jid: str | None = None
         linked_jn = ""
         linked_jnm = ""
+        qn = ""
         if not row_one.empty:
             r0 = row_one.iloc[0]
             open_jid = _linked_job_id_for_row(r0)
+            qn = str(r0.get("quote_number") or "").strip()
             if open_jid and str(open_jid) in job_by_id:
                 job_row = job_by_id[str(open_jid)]
                 linked_jn = job_number_display(job_row.get("job_number"))
@@ -580,13 +586,16 @@ def _render_estimate_list() -> None:
         with st.container(border=True):
             st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
             if open_jid:
-                if linked_jn:
-                    if linked_jnm:
-                        st.markdown(f"**Linked job** · **{linked_jn} – {linked_jnm}**", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"**Linked job** · **{linked_jn}**", unsafe_allow_html=True)
+                jdisp = job_display_label(linked_jn, linked_jnm)
+                if jdisp:
+                    st.markdown(f"**Linked job** · **{jdisp}**", unsafe_allow_html=True)
                 else:
-                    st.markdown("**Linked job** · _Open in Job Database to view details._", unsafe_allow_html=True)
+                    st.markdown(
+                        "**Linked job** · _This estimate is linked to a job, but the job details could not be loaded._",
+                        unsafe_allow_html=True,
+                    )
+                if qn:
+                    st.caption(f"Source estimate quote · {qn}")
                 if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
                     st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
                     st.session_state["job_mode"] = "edit"
@@ -607,7 +616,7 @@ def _render_estimate_list() -> None:
                         key="est_list_create_job_open_db",
                     )
                 with lc3:
-                    st.caption("Creates a **J#####** job when customer and status rules pass.")
+                    st.caption("Creates a **J#####** job once the estimate is customer-approved (approved/accepted/awarded/po_received).")
                 if run_cj:
                     res = create_job_from_estimate(str(sel[0]))
                     if res.ok and res.job:

@@ -29,6 +29,22 @@ def job_number_display(value: str | None) -> str:
     return s
 
 
+def job_display_label(job_number: str | None, job_name: str | None) -> str:
+    """
+    Human label for a job relationship: ``J00001 – Job name``.
+
+    Falls back gracefully so linked records are never blank:
+    - if both exist: ``J##### – name``
+    - if only number: ``J#####``
+    - if only name: ``name``
+    """
+    num = job_number_display(job_number)
+    name = str(job_name or "").strip()
+    if num and name:
+        return f"{num} – {name}"
+    return num or name
+
+
 def job_display_primary(j: dict[str, Any] | None) -> str:
     """Prefer formatted ``job_number``; fall back to ``job_name`` if missing."""
     if not j:
