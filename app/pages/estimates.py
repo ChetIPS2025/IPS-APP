@@ -292,17 +292,23 @@ def _render_estimate_list() -> None:
     job_by_id = {str(r["id"]): r for r in job_rows if r.get("id")}
     job_by_estimate_id = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
 
-    def _linked_job_number_cell(row: pd.Series) -> str:
+    def _linked_job_display_cell(row: pd.Series) -> str:
         jid = row.get("job_id")
         eid = row.get("id")
         if jid is not None and pd.notna(jid) and str(jid).strip():
             sj = str(jid)
             if sj in job_by_id:
-                return job_number_display(job_by_id[sj].get("job_number"))
+                job = job_by_id[sj]
+                job_number = job_number_display(job.get("job_number"))
+                job_name = str(job.get("job_name") or "").strip()
+                return f"{job_number} – {job_name}" if job_name else job_number
         if eid is not None and pd.notna(eid):
             se = str(eid)
             if se in job_by_estimate_id:
-                return job_number_display(job_by_estimate_id[se].get("job_number"))
+                job = job_by_estimate_id[se]
+                job_number = job_number_display(job.get("job_number"))
+                job_name = str(job.get("job_name") or "").strip()
+                return f"{job_number} – {job_name}" if job_name else job_number
         return ""
 
     def _linked_job_id_for_row(row: pd.Series) -> str | None:
@@ -383,7 +389,7 @@ def _render_estimate_list() -> None:
             df = df[mask.any(axis=1)]
 
         df = df.copy()
-        df["Linked job"] = df.apply(_linked_job_number_cell, axis=1)
+        df["Linked job"] = df.apply(_linked_job_display_cell, axis=1)
 
     if df.empty:
         st.info("No estimates found.")
@@ -561,15 +567,22 @@ def _render_estimate_list() -> None:
         row_one = df[df["id"].astype(str) == str(sel[0])]
         open_jid: str | None = None
         linked_jn = ""
+        linked_jnm = ""
         if not row_one.empty:
             r0 = row_one.iloc[0]
             open_jid = _linked_job_id_for_row(r0)
-            linked_jn = str(r0.get("Linked job") or "").strip()
+            if open_jid and str(open_jid) in job_by_id:
+                job_row = job_by_id[str(open_jid)]
+                linked_jn = job_number_display(job_row.get("job_number"))
+                linked_jnm = str(job_row.get("job_name") or "").strip()
         with st.container(border=True):
             st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
             if open_jid:
                 if linked_jn:
-                    st.markdown(f"**Linked job** · **{linked_jn}**", unsafe_allow_html=True)
+                    if linked_jnm:
+                        st.markdown(f"**Linked job** · **{linked_jn} – {linked_jnm}**", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"**Linked job** · **{linked_jn}**", unsafe_allow_html=True)
                 else:
                     st.markdown("**Linked job** · _Open in Job Database to view details._", unsafe_allow_html=True)
                 if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
