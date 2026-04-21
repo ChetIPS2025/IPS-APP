@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 from datetime import date, datetime, timedelta, timezone
+from collections.abc import Callable
 from typing import NamedTuple
 
 import pandas as pd
@@ -98,10 +99,19 @@ def _tt_fast_entry() -> bool:
 
 
 def _week_grid_column_ratios(*, fast: bool) -> list[float]:
-    """9 columns: narrow employee + Mon–Sun + Σ (week row must not nest columns in col 1)."""
+    """9 columns: wider employee name column + Mon–Sun + Σ (ratios are relative weights)."""
     if fast:
-        return [0.38] + [1.82] * 7 + [0.3]
-    return [0.46] + [1.56] * 7 + [0.32]
+        return [2.35] + [1.12] * 7 + [0.32]
+    return [2.55] + [1.05] * 7 + [0.34]
+
+
+def no_wrap_text(text: str) -> str:
+    """Single-line label with ellipsis (HTML-escaped). For employee names in the grid."""
+    esc = html.escape(text)
+    return (
+        '<div class="ips-tt-nw-inner" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+        f"{esc}</div>"
+    )
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -553,20 +563,95 @@ def _inject_tt_styles() -> None:
         .ips-tt-wh-dow { display: block; color: #e2e8f0 !important; font-size: 11px !important; }
         .ips-tt-wh-date { display: block; font-size: 10px !important; font-weight: 600 !important; opacity: 0.9; }
         .ips-tt-emp-cell {
-            padding: 2px 2px 4px 0;
+            padding: 4px 4px 6px 2px;
             line-height: 1.25;
+            min-width: 0;
         }
         .ips-tt-emp-name {
-            font-size: 0.88rem !important;
-            font-weight: 650 !important;
+            font-size: 0.92rem !important;
+            font-weight: 700 !important;
             color: #f1f5f9 !important;
-            margin: 0 0 2px 0 !important;
-            line-height: 1.2 !important;
+            margin: 0 0 4px 0 !important;
+            line-height: 1.25 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
         }
         .ips-tt-emp-total {
-            font-size: 0.76rem !important;
-            font-weight: 600 !important;
+            font-size: 0.72rem !important;
+            font-weight: 500 !important;
             color: #94a3b8 !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }
+        /* Employee header: name column + quick-actions column (scoped — do not target the 9-col week row) */
+        div[data-testid="column"]:has(span.ips-tt-emp-header-scope) {
+            min-width: 0 !important;
+        }
+        div[data-testid="column"]:has(span.ips-tt-quick-actions-col) {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: flex-start !important;
+            padding-top: 2px !important;
+            min-width: 0 !important;
+        }
+        div[data-testid="column"]:has(span.ips-tt-quick-actions-col) button[data-testid="stBaseButton-popover"] {
+            min-height: 2rem !important;
+            min-width: 2rem !important;
+        }
+
+        /* Full-width employee cards (narrow / stacked layout) */
+        .ips-time-card {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .ips-time-row {
+            display: block;
+            width: 100%;
+        }
+        .ips-time-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .ips-time-row,
+            .ips-time-card {
+                width: 100%;
+                display: block;
+            }
+            .ips-tt-sheet-narrow .ips-tt-emp-name,
+            .ips-time-name {
+                font-size: 16px !important;
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: clip !important;
+                word-break: break-word !important;
+            }
+            .ips-tt-sheet-narrow .ips-tt-nw-inner {
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: unset !important;
+            }
+            div[data-testid="column"]:has(span.ips-tt-quick-actions-col) {
+                justify-content: flex-start !important;
+                margin-top: 4px;
+                padding-top: 0 !important;
+            }
+            [data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) .stButton > button,
+            [data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-empty) .stButton > button {
+                min-height: 44px !important;
+                padding: 0.4rem 0.65rem !important;
+                font-size: 0.85rem !important;
+            }
+            [data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) [data-testid="stNumberInput"] input,
+            [data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-cell) [data-testid="stTextInput"] input {
+                min-height: 44px !important;
+            }
         }
 
         /* —— Spreadsheet / Excel-like weekly grid (IPS dark theme) —— */
@@ -730,6 +815,12 @@ def _inject_tt_styles() -> None:
             border: 1px solid rgba(71, 85, 105, 0.5) !important;
             border-radius: 3px !important;
         }
+        /* Spacing between full-width employee week rows (desktop sheet) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-sheet-emp-card) {
+            margin-bottom: 10px !important;
+            padding: 8px 10px 10px 10px !important;
+            border-radius: 8px !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -769,6 +860,43 @@ def _tt_flat_entry_rows(
             }
         )
     return out
+
+
+def _render_employee_name_cell(*, nm: str, tot_s: str, over: bool, ot_threshold: float) -> None:
+    """Bold employee name (single line + ellipsis on desktop) and muted weekly hours."""
+    title_attr = html.escape(nm, quote=True)
+    over_cls = " ips-tt-row-over" if over else ""
+    name_inner = no_wrap_text(nm)
+    if over:
+        tot_line = html.escape(f"{tot_s} · over {ot_threshold:g} h")
+    else:
+        tot_line = html.escape(tot_s)
+    st.markdown(
+        f'<div class="ips-tt-emp-cell">'
+        f'<div class="ips-tt-emp-name ips-time-name{over_cls}" title="{title_attr}">{name_inner}</div>'
+        f'<p class="ips-tt-emp-total">{tot_line}</p></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_employee_time_header(
+    *,
+    nm: str,
+    tot_s: str,
+    over: bool,
+    ot_threshold: float,
+    actions_fn: Callable[[], None],
+) -> None:
+    """Name + weekly hours (left) and quick actions (right); used for narrow cards and desktop sheet first column."""
+    c1, c2 = st.columns([1, 0.22], gap="small")
+    with c1:
+        st.markdown(
+            '<span class="ips-tt-emp-header-scope" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        _render_employee_name_cell(nm=nm, tot_s=tot_s, over=over, ot_threshold=ot_threshold)
+    with c2:
+        actions_fn()
 
 
 def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> None:
@@ -1171,38 +1299,27 @@ def _tt_render_grid_section(
         tot_s = f"{row_h:.1f} h" if fast else f"{row_h:.1f} h / week"
         zebra = ri % 2
 
-        def _emp_name_block() -> None:
-            if over:
-                st.markdown(
-                    f'<div class="ips-tt-emp-cell">'
-                    f'<p class="ips-tt-emp-name ips-tt-row-over">{nm}</p>'
-                    f'<p class="ips-tt-emp-total">{tot_s} · over {filt.ot_threshold:g} h</p></div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f'<div class="ips-tt-emp-cell">'
-                    f'<p class="ips-tt-emp-name">{nm}</p>'
-                    f'<p class="ips-tt-emp-total">{tot_s}</p></div>',
-                    unsafe_allow_html=True,
-                )
-
         if is_narrow:
             with st.container(border=True):
                 st.markdown(
-                    f'<span class="ips-tt-sheet-narrow ips-tt-zebra-{zebra}" aria-hidden="true"></span>',
+                    f'<span class="ips-tt-sheet-narrow ips-tt-zebra-{zebra} ips-time-card" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                _emp_name_block()
-                _render_quick_actions(
-                    eid=eid,
-                    days=days,
-                    week_start=week_start,
-                    week_end=week_end,
-                    job_labels_sorted=filt.job_labels_sorted,
-                    job_label_to_id=filt.job_label_to_id,
-                    user_id=uid,
-                    ts_iso=ts_now,
+                _render_employee_time_header(
+                    nm=nm,
+                    tot_s=tot_s,
+                    over=over,
+                    ot_threshold=filt.ot_threshold,
+                    actions_fn=lambda: _render_quick_actions(
+                        eid=eid,
+                        days=days,
+                        week_start=week_start,
+                        week_end=week_end,
+                        job_labels_sorted=filt.job_labels_sorted,
+                        job_label_to_id=filt.job_label_to_id,
+                        user_id=uid,
+                        ts_iso=ts_now,
+                    ),
                 )
                 for di, d in enumerate(days):
                     ds = _render_day_column_body(
@@ -1224,22 +1341,31 @@ def _tt_render_grid_section(
         else:
             row_container = st.container(border=True)
             with row_container:
+                st.markdown(
+                    '<span class="ips-tt-sheet-emp-card ips-time-card" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 h0, *hday, hlast = st.columns(grid_ratios)
                 with h0:
                     st.markdown(
                         f'<span class="ips-tt-sheet-row ips-tt-zebra-{zebra}" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    _emp_name_block()
-                    _render_quick_actions(
-                        eid=eid,
-                        days=days,
-                        week_start=week_start,
-                        week_end=week_end,
-                        job_labels_sorted=filt.job_labels_sorted,
-                        job_label_to_id=filt.job_label_to_id,
-                        user_id=uid,
-                        ts_iso=ts_now,
+                    _render_employee_time_header(
+                        nm=nm,
+                        tot_s=tot_s,
+                        over=over,
+                        ot_threshold=filt.ot_threshold,
+                        actions_fn=lambda: _render_quick_actions(
+                            eid=eid,
+                            days=days,
+                            week_start=week_start,
+                            week_end=week_end,
+                            job_labels_sorted=filt.job_labels_sorted,
+                            job_label_to_id=filt.job_label_to_id,
+                            user_id=uid,
+                            ts_iso=ts_now,
+                        ),
                     )
                 for di, d in enumerate(days):
                     with hday[di]:
@@ -1263,8 +1389,20 @@ def _tt_render_grid_section(
 
 
 def _tt_render_footer_section(day_col_totals: list[float], days: list[date], grid_ratios: list[float]) -> None:
-    """Week totals row aligned to the grid."""
+    """Week totals row aligned to the grid (compact on narrow viewport)."""
     st.caption("Week totals")
+    narrow = bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY))
+    total_h = sum(day_col_totals)
+    if narrow:
+        st.markdown(
+            f'<p class="ips-tt-metric" style="margin:0 0 0.35rem 0;">Week <strong>{total_h:.1f}</strong> h</p>',
+            unsafe_allow_html=True,
+        )
+        with st.expander("Day totals (Mon–Sun)", expanded=False):
+            for di, d in enumerate(days):
+                st.markdown(f"**{d.strftime('%a %m/%d')}:** {day_col_totals[di]:.1f} h")
+        return
+
     f0, *fday, fl = st.columns(grid_ratios)
     with f0:
         st.markdown('<span class="ips-tt-sheet-footer-row" aria-hidden="true"></span>', unsafe_allow_html=True)
@@ -1273,7 +1411,7 @@ def _tt_render_footer_section(day_col_totals: list[float], days: list[date], gri
         with fday[di]:
             st.markdown(f'<p class="ips-tt-metric">{day_col_totals[di]:.1f} h</p>', unsafe_allow_html=True)
     with fl:
-        st.markdown(f'<p class="ips-tt-metric">{sum(day_col_totals):.1f}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="ips-tt-metric">{total_h:.1f}</p>', unsafe_allow_html=True)
 
 
 def render() -> None:
@@ -1309,6 +1447,10 @@ def _render_quick_actions(
     user_id,
     ts_iso: str,
 ) -> None:
+    st.markdown(
+        '<span class="ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     day_labels = [d.strftime("%a %m/%d") for d in days]
     with st.popover(
         "⚡",

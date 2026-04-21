@@ -85,8 +85,9 @@ def _people_col_norm_token(name: str) -> str:
     return "".join(ch.lower() for ch in str(name) if ch.isalnum())
 
 
-# Always hidden from the directory table by exact column name (row id stays in ``df`` for selection).
-HIDDEN_FIELDS: frozenset[str] = frozenset({"unified_id"})
+# Never show ``unified_id`` in the grid; it must stay on the dataframe for ``id_column`` / selection.
+HIDDEN_COLUMNS: frozenset[str] = frozenset({"unified_id"})
+HIDDEN_FIELDS = HIDDEN_COLUMNS  # alias: visible-column filter + docs
 
 # Also hidden by normalized header token (spellings like ``Acct active`` / ``Unified ID``).
 _PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
@@ -525,6 +526,7 @@ def render() -> None:
                 id_column="unified_id",
                 columns=show_cols,
                 editor_key="people_unified_editor",
+                hide_id_column=True,
             )
             with bar_ph.container():
                 _render_people_toolbar(sel=sel, can_edit=True, profiles=profiles)

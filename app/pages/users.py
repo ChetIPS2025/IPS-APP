@@ -435,6 +435,9 @@ def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[s
         return []
 
     disp_tab, show_cols = _users_table_display_df(filtered)
+    # Display copy only: never show unified_id if present (selection uses ``id`` on ``disp_tab``).
+    disp_tab = disp_tab.drop(columns=[c for c in _USERS_TABLE_HIDDEN_FIELDS if c in disp_tab.columns], errors="ignore")
+    show_cols = [c for c in show_cols if c not in _USERS_TABLE_HIDDEN_FIELDS]
 
     st.caption("Use the **checkbox** column to select a user — the **User panel** updates immediately.")
 
@@ -449,6 +452,7 @@ def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[s
         id_column="id",
         columns=show_cols,
         editor_key="users_sel_editor",
+        hide_id_column=True,
     )
     with bar_ph.container():
         _render_users_toolbar(sel=sel, existing_emails=existing_emails)
