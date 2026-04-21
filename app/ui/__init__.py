@@ -6,10 +6,10 @@ import streamlit as st
 from auth import current_profile, current_role, sign_out
 
 try:
-    from app.mobile_ui import inject_ips_global_mobile_css
+    from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
     from app.pwa import render_install_app_sidebar_block
 except ImportError:
-    from mobile_ui import inject_ips_global_mobile_css  # type: ignore
+    from mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once  # type: ignore
     from pwa import render_install_app_sidebar_block  # type: ignore
 
 def _repo_root() -> Path:
@@ -333,6 +333,7 @@ def render_sidebar() -> str:
     _ensure_valid_nav_page()
     _inject_sidebar_nav_css()
     inject_ips_global_mobile_css()
+    inject_sidebar_mobile_auto_collapse_once()
 
     current = st.session_state[IPS_NAV_PAGE_KEY]
     role = current_role()

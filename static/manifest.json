@@ -1,10 +1,10 @@
 {
-  "name": "IPS Estimating",
+  "name": "IPS App",
   "short_name": "IPS",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b1f3a",
-  "theme_color": "#0b1f3a",
+  "background_color": "#031633",
+  "theme_color": "#0b2247",
   "icons": [
     {
       "src": "/static/icon-192.png",

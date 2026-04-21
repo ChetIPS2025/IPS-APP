@@ -1,7 +1,7 @@
 /* Minimal service worker: caches only PWA static assets.
    Intentionally does NOT cache Streamlit pages/API to avoid stale app updates. */
 
-const CACHE = "ips-pwa-static-v2";
+const CACHE = "ips-pwa-static-v3";
 const ASSETS = [
   "/.streamlit/static/manifest.json",
   "/.streamlit/static/icon-192.png",

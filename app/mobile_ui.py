@@ -57,6 +57,14 @@ def ensure_narrow_viewport_detected() -> None:
 # Main content only — sidebar nav styling stays in ui.py
 _IPS_GLOBAL_MOBILE_CSS = """
 <style>
+/* Sidebar width (matches Streamlit + legacy .stSidebar hook) */
+[data-testid="stSidebar"],
+section[data-testid="stSidebar"],
+.stSidebar {
+  width: 260px !important;
+  min-width: 260px !important;
+}
+
 @media (max-width: 900px) {
   [data-testid="stMain"] div[data-testid="stHorizontalBlock"],
   [data-testid="stMain"] main div[data-testid="stHorizontalBlock"] {
@@ -208,8 +216,140 @@ _IPS_GLOBAL_MOBILE_CSS = """
     min-height: 240px !important;
   }
 }
+
+/* Phones: overlay sidebar, wider tap targets, full-width form rows */
+@media (max-width: 768px) {
+  .stSidebar,
+  [data-testid="stSidebar"],
+  section[data-testid="stSidebar"] {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 100002 !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: min(260px, 92vw) !important;
+    transition: transform 0.2s ease-out !important;
+    box-shadow: 4px 0 22px rgba(0, 0, 0, 0.45) !important;
+  }
+  [data-testid="stSidebar"][aria-expanded="false"],
+  section[data-testid="stSidebar"][aria-expanded="false"] {
+    transform: translateX(-100%) !important;
+  }
+  [data-testid="stSidebar"][aria-expanded="true"],
+  section[data-testid="stSidebar"][aria-expanded="true"] {
+    transform: translateX(0) !important;
+  }
+
+  section[data-testid="stMain"] .block-container,
+  [data-testid="stMain"] .block-container {
+    padding-left: max(1rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+  }
+
+  .stApp .stButton > button,
+  .stApp [data-testid="stDownloadButton"] button,
+  .stApp [data-testid="stFormSubmitButton"] button {
+    padding: 14px 16px !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+  }
+
+  .ips-resource-grid,
+  [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-resource-tile-grid-marker) {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem !important;
+  }
+  .ips-resource-grid > div,
+  [data-testid="stMain"] div[data-testid="stHorizontalBlock"]:has(.ips-resource-tile-grid-marker) > div[data-testid="column"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  [data-testid="stMain"] div[data-testid="stTextInput"],
+  [data-testid="stMain"] div[data-testid="stNumberInput"],
+  [data-testid="stMain"] div[data-testid="stTextArea"],
+  [data-testid="stMain"] div[data-testid="stSelectbox"],
+  [data-testid="stMain"] div[data-testid="stMultiSelect"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  [data-testid="stMain"] div[data-testid="stTextInput"] input,
+  [data-testid="stMain"] div[data-testid="stNumberInput"] input,
+  [data-testid="stMain"] div[data-testid="stTextArea"] textarea {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
 </style>
 """
+
+IPS_SIDEBAR_MOBILE_COLLAPSE_KEY = "_ips_sidebar_mobile_collapse_script"
+
+
+def inject_sidebar_mobile_auto_collapse_once() -> None:
+    """
+    First load on narrow viewports: collapse the Streamlit sidebar so main content is visible.
+    User can still open it via the header control (collapsedControl).
+    """
+    if st.session_state.get(IPS_SIDEBAR_MOBILE_COLLAPSE_KEY):
+        return
+    st.session_state[IPS_SIDEBAR_MOBILE_COLLAPSE_KEY] = True
+    components.html(
+        """
+<script>
+(function () {
+  function rootDoc() {
+    try {
+      return window.parent && window.parent.document ? window.parent.document : document;
+    } catch (e) {
+      return document;
+    }
+  }
+  function vpW() {
+    try {
+      var t = window.top || window.parent || window;
+      return t.innerWidth || 1200;
+    } catch (e2) {
+      return window.innerWidth || 1200;
+    }
+  }
+  function run() {
+    if (vpW() > 768) return;
+    if (sessionStorage.getItem("ips_mobile_sidebar_init") === "1") return;
+    var d = rootDoc();
+    var side = d.querySelector('[data-testid="stSidebar"]');
+    if (!side) {
+      sessionStorage.setItem("ips_mobile_sidebar_init", "1");
+      return;
+    }
+    if (side.getAttribute("aria-expanded") !== "true") {
+      sessionStorage.setItem("ips_mobile_sidebar_init", "1");
+      return;
+    }
+    var btn = d.querySelector('button[data-testid="collapsedControl"]');
+    if (btn) {
+      try {
+        btn.click();
+      } catch (e3) {}
+    }
+    sessionStorage.setItem("ips_mobile_sidebar_init", "1");
+  }
+  setTimeout(run, 60);
+  setTimeout(run, 320);
+  setTimeout(run, 800);
+})();
+</script>
+        """,
+        height=0,
+    )
 
 
 def inject_ips_global_mobile_css() -> None:
