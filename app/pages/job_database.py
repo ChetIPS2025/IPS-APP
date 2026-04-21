@@ -76,8 +76,6 @@ except ImportError:
 try:
     from services.job_from_estimate import create_job_from_estimate
     from services.job_schema import (
-        JOB_SOURCE_TYPE_ESTIMATE,
-        JOB_SOURCE_TYPE_STANDALONE,
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
     )
@@ -91,8 +89,6 @@ try:
 except ImportError:
     from app.services.job_from_estimate import create_job_from_estimate  # type: ignore
     from app.services.job_schema import (  # type: ignore
-        JOB_SOURCE_TYPE_ESTIMATE,
-        JOB_SOURCE_TYPE_STANDALONE,
         JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER,
         fetch_jobs_for_job_database,
     )
@@ -656,6 +652,7 @@ def _render_job_form_panel(
                     st.error("Job Name required")
                     st.stop()
                 linked_eid = _job_form_linked_estimate_id(estimate_options, linked_estimate)
+                # source_type omitted until jobs schema includes that column (sql/022); linkage is estimate_id.
                 payload = {
                     "customer_id": customer_options[customer_name],
                     "customer_contact_id": selected_contact_id,
@@ -663,7 +660,6 @@ def _render_job_form_panel(
                     "location": location.strip(),
                     "status": status,
                     "estimate_id": linked_eid,
-                    "source_type": JOB_SOURCE_TYPE_ESTIMATE if linked_eid else JOB_SOURCE_TYPE_STANDALONE,
                     "project_manager": project_manager.strip(),
                     "supervisor": supervisor.strip(),
                     "start_date": _safe_date_value(start_date.strip()),
@@ -692,6 +688,7 @@ def _render_job_form_panel(
                     st.error("Job Name required")
                     st.stop()
                 linked_eid = _job_form_linked_estimate_id(estimate_options, linked_estimate)
+                # source_type omitted until jobs schema includes that column (sql/022); linkage is estimate_id.
                 payload = {
                     "customer_id": customer_options[customer_name],
                     "customer_contact_id": selected_contact_id,
@@ -699,7 +696,6 @@ def _render_job_form_panel(
                     "location": location.strip(),
                     "status": status,
                     "estimate_id": linked_eid,
-                    "source_type": JOB_SOURCE_TYPE_ESTIMATE if linked_eid else JOB_SOURCE_TYPE_STANDALONE,
                     "project_manager": project_manager.strip(),
                     "supervisor": supervisor.strip(),
                     "start_date": _safe_date_value(start_date.strip()),
@@ -729,7 +725,7 @@ def _build_jobs_overview_dataframe(
     contact_label_by_id: dict[str, str],
     location_by_id: dict[str, dict[str, Any]],
 ) -> pd.DataFrame:
-    """Augment jobs rows for overview (customer name, ``source_type``, estimate labels, linked-quote copy)."""
+    """Augment jobs rows for overview (customer name, estimate labels, Source from ``estimate_id``, linked-quote copy)."""
     if jobs_df.empty:
         return jobs_df
     out = jobs_df.copy()

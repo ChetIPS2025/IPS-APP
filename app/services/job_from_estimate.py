@@ -35,16 +35,10 @@ except ImportError:
     )
 
 try:
-    from services.job_schema import (
-        JOB_SOURCE_TYPE_ESTIMATE,
-        fetch_jobs_for_job_database,
-    )
+    from services.job_schema import fetch_jobs_for_job_database
     from services.job_service import job_number_display, next_job_number
 except ImportError:
-    from app.services.job_schema import (  # type: ignore
-        JOB_SOURCE_TYPE_ESTIMATE,
-        fetch_jobs_for_job_database,
-    )
+    from app.services.job_schema import fetch_jobs_for_job_database  # type: ignore
     from app.services.job_service import job_number_display, next_job_number  # type: ignore
 
 
@@ -372,6 +366,7 @@ def create_job_from_estimate(
     site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
     merged_location = site_loc or _safe_location(ej)
 
+    # source_type omitted until jobs schema includes that column (sql/022); estimate_id marks estimate-linked jobs.
     payload: dict[str, Any] = {
         "customer_id": customer_id,
         "job_name": job_name,
@@ -379,7 +374,6 @@ def create_job_from_estimate(
         # Estimate-converted jobs start as Awarded so they are ready for costing (not Draft).
         "status": JOB_STATUS_AFTER_ESTIMATE_CONVERSION,
         "estimate_id": eid,
-        "source_type": JOB_SOURCE_TYPE_ESTIMATE,
         "project_manager": "",
         "supervisor": "",
         "start_date": None,
