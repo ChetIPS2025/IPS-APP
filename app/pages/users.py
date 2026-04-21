@@ -53,6 +53,27 @@ _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "estimator", "admin")
 _MIN_PASSWORD_LENGTH = 8
 _MAX_EMAIL_LENGTH = 320
 
+# Table display labels (underlying ``profiles`` columns unchanged in the database).
+_USERS_TABLE_DISPLAY_RENAME: dict[str, str] = {
+    "email": "Email",
+    "full_name": "Name",
+    "role": "Role",
+    "is_active": "Active",
+}
+
+
+def _users_table_display_df(filtered: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Rename columns for a compact table; ``Email`` first. Returns (df for editor, visible column names)."""
+    base = [c for c in ("email", "full_name", "role", "is_active") if c in filtered.columns]
+    rename = {k: v for k, v in _USERS_TABLE_DISPLAY_RENAME.items() if k in base}
+    show = [rename[k] for k in base if k in rename]
+    if "id" in filtered.columns:
+        out = filtered[base + ["id"]].copy()
+    else:
+        out = filtered[base].copy()
+    out.rename(columns=rename, inplace=True)
+    return out, show
+
 # Legacy: People page may pop this key on navigation (harmless if unused).
 USERS_PANEL_MODE = "users_panel_mode"
 
@@ -400,23 +421,23 @@ def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[s
         )
         filtered = filtered[mask.any(axis=1)]
 
-    show_cols = [c for c in ["email", "full_name", "role", "is_active"] if c in filtered.columns]
-
     if filtered.empty:
         st.warning("No users match your filters.")
         if st.button("Add User", type="primary", use_container_width=True, key="users_filtered_empty_add"):
             add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=TABLE_KEY_USERS)
         return []
 
+    disp_tab, show_cols = _users_table_display_df(filtered)
+
     st.caption("Use the **checkbox** column to select a user — the **User panel** updates immediately.")
 
     if "id" not in filtered.columns:
-        st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
+        st.dataframe(disp_tab[show_cols], use_container_width=True, hide_index=True)
         return []
 
     bar_ph = st.empty()
     _, sel = render_selectable_dataframe(
-        filtered,
+        disp_tab,
         table_key=TABLE_KEY_USERS,
         id_column="id",
         columns=show_cols,

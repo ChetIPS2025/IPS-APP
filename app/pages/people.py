@@ -80,6 +80,33 @@ def _norm_join(s: str) -> str:
     return " ".join(str(s or "").strip().lower().split())
 
 
+def _people_col_norm_token(name: str) -> str:
+    """Normalize header for matching raw vs display spellings (e.g. ``Acct active`` vs ``Acct Active``)."""
+    return "".join(ch.lower() for ch in str(name) if ch.isalnum())
+
+
+# Hidden from the People / Users directory table only (still in ``filtered`` / ``disp`` for filters & panels).
+_PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
+    {
+        "unifiedid",
+        "acctactive",
+        "empactive",
+        "approle",
+        "trade",
+    }
+)
+
+
+def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
+    """Columns shown in the selectable table: preferred order, excluding internal / noisy fields."""
+    col_list = [str(c) for c in columns]
+    kept = [c for c in col_list if _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS]
+    preferred = ["Kind", "Name", "Email", "Job role", "Hourly"]
+    ordered = [c for c in preferred if c in kept]
+    tail = [c for c in kept if c not in ordered]
+    return ordered + tail
+
+
 def _parse_unified_id(uid: str) -> tuple[str | None, str | None]:
     """Return (employee_id, profile_id) from unified row id."""
     u = str(uid or "").strip()
@@ -166,7 +193,7 @@ def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[st
                 "unified_id": f"e:{eid}",
                 "Kind": "Employee",
                 "Name": str(e.get("name") or "").strip(),
-                "Email": "",
+                "Email": str(e.get("email") or "").strip(),
                 "Job role": str(e.get("role") or "").strip(),
                 "Trade": str(e.get("trade") or "").strip(),
                 "Hourly": e.get("hourly_rate"),
@@ -482,8 +509,8 @@ def render() -> None:
                         clear_selection_table_key=TABLE_KEY_PEOPLE,
                     )
         else:
-            show_cols = [c for c in filtered.columns if c != "unified_id"]
             disp = _display_df_for_editor(filtered)
+            show_cols = _people_visible_table_columns(disp.columns)
             bar_ph = st.empty()
             _, sel = render_selectable_dataframe(
                 disp,

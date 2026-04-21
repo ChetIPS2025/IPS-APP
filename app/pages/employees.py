@@ -80,6 +80,7 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
     new_name = n1.text_input("Name", key="dlg_emp_add_name")
     new_role = n2.text_input("Role", key="dlg_emp_add_role", placeholder="e.g. Foreman, Welder")
     new_trade = st.text_input("Trade (optional)", key="dlg_emp_add_trade")
+    new_email = st.text_input("Email (optional)", key="dlg_emp_add_email")
     r1, r2 = st.columns(2)
     new_hr = r1.number_input("Hourly rate", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="dlg_emp_add_hr")
     new_ot = r2.number_input(
@@ -103,6 +104,10 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
             if not str(new_name).strip():
                 st.error("Name is required.")
                 st.stop()
+            add_email = str(new_email).strip()
+            if add_email and "@" not in add_email:
+                st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
+                st.stop()
             payload = {
                 "name": str(new_name).strip(),
                 "role": str(new_role).strip(),
@@ -111,6 +116,7 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
                 "overtime_rate": float(new_ot) if float(new_ot or 0) > 0 else None,
                 "is_active": True,
                 "notes": str(new_notes).strip(),
+                "email": add_email or None,
             }
             row = insert_row("employees", payload)
             new_id = str((row or {}).get("id") or "").strip()
@@ -187,8 +193,14 @@ def _render_edit_form(row: dict) -> None:
     st.caption(f"ID `{eid[:8]}…`")
 
     pk = f"emp_ed_{eid}"
-    e1, e2, e3 = st.columns(3)
-    ed_name = e1.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
+    ed_name = st.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
+    ed_email = st.text_input(
+        "Email",
+        value=str(row.get("email") or ""),
+        key=f"user_email_{eid}",
+        help="Stored on ``employees.email`` (add column via sql/026_employees_email.sql if needed).",
+    )
+    e2, e3 = st.columns(2)
     ed_role = e2.text_input("Role", value=str(row.get("role") or ""), key=f"{pk}_role")
     ed_trade = e3.text_input("Trade", value=str(row.get("trade") or ""), key=f"{pk}_trade")
 
@@ -228,6 +240,10 @@ def _render_edit_form(row: dict) -> None:
             if not str(ed_name).strip():
                 st.error("Name is required.")
                 st.stop()
+            email_val = str(ed_email).strip()
+            if email_val and "@" not in email_val:
+                st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
+                st.stop()
             payload = {
                 "name": str(ed_name).strip(),
                 "role": str(ed_role).strip(),
@@ -236,6 +252,7 @@ def _render_edit_form(row: dict) -> None:
                 "overtime_rate": float(ed_ot) if float(ed_ot or 0) > 0 else None,
                 "notes": str(ed_notes).strip(),
                 "is_active": bool(ed_active),
+                "email": email_val or None,
             }
             update_rows("employees", payload, {"id": row["id"]})
             _clear_employee_mode()
@@ -302,6 +319,7 @@ def _render_employees_main(
         c
         for c in [
             "name",
+            "email",
             "role",
             "trade",
             "hourly_rate",
