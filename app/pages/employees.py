@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 import pandas as pd
 import streamlit as st
 
@@ -61,6 +63,26 @@ except ImportError:
 _EMP_DELETE_CONFIRM_PREFIX = "employees_delete"
 
 
+@lru_cache(maxsize=1)
+def employees_table_has_email_column() -> bool:
+    """True only when ``public.employees.email`` exists (PostgREST schema); cached per process."""
+    try:
+        fetch_table("employees", columns="id,email", limit=1)
+        return True
+    except Exception:
+        return False
+
+
+def _employees_email_input_help() -> str:
+    if employees_table_has_email_column():
+        return "Saved on the **employees** row as ``email``."
+    # Email is shown in UI but not stored on employees; linked login email lives on **profiles** / Auth.
+    return (
+        "Shown for reference only — **employees** has no ``email`` column yet, so this value is not saved here. "
+        "For linked accounts, use the **User account** section on the People page to view profile email."
+    )
+
+
 def _money(v) -> str:
     try:
         return f"${float(v or 0):,.2f}"
@@ -105,9 +127,10 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
                 st.error("Name is required.")
                 st.stop()
             add_email = str(new_email).strip()
-            if add_email and "@" not in add_email:
-                st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
-                st.stop()
+            if employees_table_has_email_column():
+                if add_email and "@" not in add_email:
+                    st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
+                    st.stop()
             payload = {
                 "name": str(new_name).strip(),
                 "role": str(new_role).strip(),
@@ -116,8 +139,9 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
                 "overtime_rate": float(new_ot) if float(new_ot or 0) > 0 else None,
                 "is_active": True,
                 "notes": str(new_notes).strip(),
-                "email": add_email or None,
             }
+            if employees_table_has_email_column():
+                payload["email"] = add_email or None
             row = insert_row("employees", payload)
             new_id = str((row or {}).get("id") or "").strip()
             if new_id:
@@ -198,7 +222,7 @@ def _render_edit_form(row: dict) -> None:
         "Email",
         value=str(row.get("email") or ""),
         key=f"user_email_{eid}",
-        help="Stored on ``employees.email`` (add column via sql/026_employees_email.sql if needed).",
+        help=_employees_email_input_help(),
     )
     e2, e3 = st.columns(2)
     ed_role = e2.text_input("Role", value=str(row.get("role") or ""), key=f"{pk}_role")
@@ -241,9 +265,10 @@ def _render_edit_form(row: dict) -> None:
                 st.error("Name is required.")
                 st.stop()
             email_val = str(ed_email).strip()
-            if email_val and "@" not in email_val:
-                st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
-                st.stop()
+            if employees_table_has_email_column():
+                if email_val and "@" not in email_val:
+                    st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
+                    st.stop()
             payload = {
                 "name": str(ed_name).strip(),
                 "role": str(ed_role).strip(),
@@ -252,8 +277,9 @@ def _render_edit_form(row: dict) -> None:
                 "overtime_rate": float(ed_ot) if float(ed_ot or 0) > 0 else None,
                 "notes": str(ed_notes).strip(),
                 "is_active": bool(ed_active),
-                "email": email_val or None,
             }
+            if employees_table_has_email_column():
+                payload["email"] = email_val or None
             update_rows("employees", payload, {"id": row["id"]})
             _clear_employee_mode()
             st.success("Employee updated.")
