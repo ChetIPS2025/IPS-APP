@@ -85,7 +85,10 @@ def _people_col_norm_token(name: str) -> str:
     return "".join(ch.lower() for ch in str(name) if ch.isalnum())
 
 
-# Hidden from the People / Users directory table only (still in ``filtered`` / ``disp`` for filters & panels).
+# Always hidden from the directory table by exact column name (row id stays in ``df`` for selection).
+HIDDEN_FIELDS: frozenset[str] = frozenset({"unified_id"})
+
+# Also hidden by normalized header token (spellings like ``Acct active`` / ``Unified ID``).
 _PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
     {
         "unifiedid",
@@ -100,7 +103,11 @@ _PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
 def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
     """Columns shown in the selectable table: preferred order, excluding internal / noisy fields."""
     col_list = [str(c) for c in columns]
-    kept = [c for c in col_list if _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS]
+    kept = [
+        c
+        for c in col_list
+        if c not in HIDDEN_FIELDS and _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS
+    ]
     preferred = ["Kind", "Name", "Email", "Job role", "Hourly"]
     ordered = [c for c in preferred if c in kept]
     tail = [c for c in kept if c not in ordered]

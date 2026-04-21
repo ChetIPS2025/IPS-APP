@@ -53,6 +53,9 @@ _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "estimator", "admin")
 _MIN_PASSWORD_LENGTH = 8
 _MAX_EMAIL_LENGTH = 320
 
+# Profiles table does not use ``unified_id``; kept for consistency if a merged frame ever appears.
+_USERS_TABLE_HIDDEN_FIELDS: frozenset[str] = frozenset({"unified_id"})
+
 # Table display labels (underlying ``profiles`` columns unchanged in the database).
 _USERS_TABLE_DISPLAY_RENAME: dict[str, str] = {
     "email": "Email",
@@ -64,7 +67,11 @@ _USERS_TABLE_DISPLAY_RENAME: dict[str, str] = {
 
 def _users_table_display_df(filtered: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """Rename columns for a compact table; ``Email`` first. Returns (df for editor, visible column names)."""
-    base = [c for c in ("email", "full_name", "role", "is_active") if c in filtered.columns]
+    base = [
+        c
+        for c in ("email", "full_name", "role", "is_active")
+        if c in filtered.columns and c not in _USERS_TABLE_HIDDEN_FIELDS
+    ]
     rename = {k: v for k, v in _USERS_TABLE_DISPLAY_RENAME.items() if k in base}
     show = [rename[k] for k in base if k in rename]
     if "id" in filtered.columns:
