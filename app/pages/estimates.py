@@ -14,7 +14,6 @@ except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
 from auth import current_role
 from db import (
-    delete_rows_admin,
     fetch_by_match_admin,
     fetch_one,
     fetch_table,
@@ -42,6 +41,11 @@ except ImportError:
         render_selection_action_bar,
         set_selected_ids,
     )
+
+try:
+    from services.delete_safety import delete_estimate_unlink_first
+except ImportError:
+    from app.services.delete_safety import delete_estimate_unlink_first  # type: ignore
 
 try:
     from services.job_service import job_number_display
@@ -393,6 +397,7 @@ def _render_estimate_list() -> None:
                 "po_number",
                 "scope_of_work",
                 "estimate_json",
+                "customer_location_id",
             ]
             if c in df.columns
         ]
@@ -420,6 +425,38 @@ def _render_estimate_list() -> None:
     if df.empty:
         st.info("No estimates found.")
         return
+
+    location_by_id: dict[str, dict[str, Any]] = {}
+
+    def _site_line_for_estimate(est_row: pd.Series) -> str:
+        if "customer_location_id" not in est_row.index:
+            return ""
+        raw = est_row.get("customer_location_id")
+        if raw is None:
+            return ""
+        try:
+            if pd.isna(raw):
+                return ""
+        except Exception:
+            pass
+        lid = str(raw).strip()
+        if not lid:
+            return ""
+        try:
+            from services.customer_locations import location_display_name_city_state
+        except ImportError:
+            from app.services.customer_locations import location_display_name_city_state  # type: ignore
+
+        row = location_by_id.get(lid)
+        return location_display_name_city_state(row) if row else ""
+
+    if "customer_location_id" in df.columns:
+        try:
+            from services.customer_locations import fetch_all_locations_indexed
+        except ImportError:
+            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
+
+        location_by_id = fetch_all_locations_indexed(admin_read=_estimates_page_admin_read())
 
     # Visible columns: fixed order handled explicitly in the row layout below.
     if "id" not in df.columns:
@@ -574,6 +611,9 @@ def _render_estimate_list() -> None:
             st.text(_estimate_list_cell_text(est_row.get("quote_number"), col="quote_number"))
         with rc[3]:
             st.text(_estimate_description_display(est_row))
+            site_ln = _site_line_for_estimate(est_row)
+            if site_ln:
+                st.caption(f"Site: {site_ln}")
         with rc[4]:
             st.text(_estimate_list_cell_text(est_row.get("proposal_total"), col="proposal_total"))
         with rc[5]:
@@ -609,13 +649,13 @@ def _render_estimate_list() -> None:
                 except Exception as exc:
                     st.error(f"Could not approve: {exc}")
         with rc[9]:
-            del_enabled = bool(can_edit and row_status == "draft")
+            del_enabled = bool(can_edit)
             if not can_edit:
                 del_help = "Only admin or estimator can delete estimates."
-            elif row_status != "draft":
-                del_help = "Only draft estimates can be deleted"
             else:
-                del_help = "Delete this draft estimate."
+                del_help = (
+                    "Delete this estimate (quote). Linked jobs are kept; the job is unlinked from this quote."
+                )
             if st.button(
                 "🗑",
                 key=f"est_row_del_{eid}",
@@ -640,6 +680,7 @@ def _render_estimate_list() -> None:
         sel,
         can_view=True,
         can_edit=can_edit,
+        can_delete=can_edit,
         export_df=df_export,
         visible_df=df,
         id_column="id",
@@ -716,9 +757,10 @@ def _render_estimate_list() -> None:
         st.rerun()
     pend = st.session_state.get(IPS_PENDING_DELETE) or {}
     if actions.get("confirm_delete") and pend.get(TABLE_KEY_ESTIMATES):
+        _est_admin_read = _estimates_page_admin_read()
         for eid in pend[TABLE_KEY_ESTIMATES]:
             try:
-                delete_rows_admin("estimates", {"id": eid})
+                delete_estimate_unlink_first(str(eid), admin_read=_est_admin_read)
             except Exception as exc:
                 st.error(f"Could not delete {eid}: {exc}")
         pend.pop(TABLE_KEY_ESTIMATES, None)

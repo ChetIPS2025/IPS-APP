@@ -98,29 +98,27 @@ def _fetch_customer_row_for_proposal(cid: str) -> dict | None:
         return None
 
 
-def _fetch_contacts_for_estimate_editor(customer_id: str) -> list[dict]:
-    """Contacts for the selected customer only; same read pattern as the Customers tab (RLS-aware)."""
+def _fetch_contacts_for_estimate_editor(
+    customer_id: str,
+    customer_location_id: str | None = None,
+) -> list[dict]:
+    """Contacts for the customer, scoped by job site when a location is selected (RLS-aware)."""
+    try:
+        from services.customer_contacts import fetch_contacts_for_customer_scope
+    except ImportError:
+        from app.services.customer_contacts import fetch_contacts_for_customer_scope  # type: ignore
+
     admin_read = current_role() in {"admin", "estimator"}
     cid = str(customer_id or "").strip()
     if not cid:
         return []
-    try:
-        if admin_read:
-            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
-        else:
-            rows = fetch_by_match("customer_contacts", {"customer_id": cid}, limit=500)
-    except Exception:
-        return []
-    rows = list(rows or [])
-    rows = [r for r in rows if bool(r.get("is_active", True))]
-
-    def _sort_key(r: dict) -> tuple:
-        prim = 0 if r.get("is_primary") else 1
-        name = str(r.get("contact_name") or "").strip().lower()
-        return (prim, name)
-
-    rows.sort(key=_sort_key)
-    return rows
+    loc = str(customer_location_id or "").strip() or None
+    return fetch_contacts_for_customer_scope(
+        cid,
+        loc,
+        admin_read=admin_read,
+        include_inactive=False,
+    )
 
 
 def _customer_dropdown_labels(rows: list[dict]) -> tuple[list[str], dict[str, str]]:

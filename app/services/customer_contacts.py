@@ -52,6 +52,66 @@ def fetch_contacts_for_customer(customer_id: str, *, include_inactive: bool = Fa
     return rows
 
 
+def _contact_row_location_id(r: dict[str, Any]) -> str:
+    return str(r.get("customer_location_id") or "").strip()
+
+
+def fetch_contacts_for_customer_scope(
+    customer_id: str,
+    customer_location_id: str | None,
+    *,
+    admin_read: bool = False,
+    include_inactive: bool = False,
+) -> list[dict[str, Any]]:
+    """
+    Contacts for Estimates / Jobs.
+
+    - **No location selected:** all contacts for the customer (backward compatible).
+    - **Location selected:** contacts for that site plus company-wide rows
+      (``customer_location_id`` is null), sorted with site-specific first.
+    """
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    fn = fetch_by_match_admin if admin_read else fetch_by_match
+    try:
+        rows = fn("customer_contacts", {"customer_id": cid}, limit=500)
+    except Exception:
+        try:
+            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
+        except Exception:
+            return []
+    rows = list(rows or [])
+    if not include_inactive:
+        rows = [r for r in rows if bool(r.get("is_active", True))]
+
+    loc = str(customer_location_id or "").strip()
+    if not loc:
+        def _sort_key_all(r: dict) -> tuple:
+            prim = 0 if r.get("is_primary") else 1
+            name = str(r.get("contact_name") or "").strip().lower()
+            return (prim, name)
+
+        rows.sort(key=_sort_key_all)
+        return rows
+
+    scoped: list[dict] = []
+    for r in rows:
+        rl = _contact_row_location_id(r)
+        if rl == loc or not rl:
+            scoped.append(r)
+
+    def _sort_key_scoped(r: dict) -> tuple:
+        rl = _contact_row_location_id(r)
+        site_first = 0 if rl == loc else 1
+        prim = 0 if r.get("is_primary") else 1
+        name = str(r.get("contact_name") or "").strip().lower()
+        return (site_first, prim, name)
+
+    scoped.sort(key=_sort_key_scoped)
+    return scoped
+
+
 _CONTACT_PICKER_STYLE_KEY = "ips_contact_picker_styles_injected"
 
 
@@ -175,12 +235,13 @@ def render_contact_quick_add_when_empty(
     customer_id: str,
     key_prefix: str,
     disabled: bool,
+    customer_location_id: str | None = None,
 ) -> None:
-    """Compact add form when a customer has no active contacts."""
+    """Compact add form when a customer has no active contacts for the current scope."""
     if disabled or not str(customer_id or "").strip():
         return
     inject_contact_picker_styles()
-    suf = _contact_key_suffix(customer_id)
+    suf = _contact_key_suffix(customer_id) + _contact_key_suffix(str(customer_location_id or ""))
     with st.container(border=True):
         st.markdown('<span class="ips-contact-quick-add"></span>', unsafe_allow_html=True)
         st.markdown(
@@ -212,12 +273,19 @@ def render_contact_quick_add_when_empty(
                 "is_primary": False,
                 "is_active": True,
             }
+            loc = str(customer_location_id or "").strip()
+            if loc:
+                payload["customer_location_id"] = loc
             try:
                 inserted = insert_contact_row(payload)
             except Exception:
-                payload.pop("title", None)
-                payload.pop("mobile", None)
-                inserted = insert_contact_row(payload)
+                payload.pop("customer_location_id", None)
+                try:
+                    inserted = insert_contact_row(payload)
+                except Exception:
+                    payload.pop("title", None)
+                    payload.pop("mobile", None)
+                    inserted = insert_contact_row(payload)
             new_id = str((inserted or {}).get("id") or "")
             if prim and new_id:
                 set_primary_contact(customer_id=str(customer_id).strip(), contact_id=new_id)

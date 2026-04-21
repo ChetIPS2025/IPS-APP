@@ -339,6 +339,15 @@ def render() -> None:
     if loc_hdr:
         st.caption(f"Location: {loc_hdr}")
 
+    try:
+        from app.services.delete_safety import job_costing_block_reason
+    except ImportError:
+        from services.delete_safety import job_costing_block_reason  # type: ignore
+
+    _del_block = job_costing_block_reason(str(job_id), admin_read=admin)
+    if _del_block:
+        st.caption(f"⚠ {_del_block} — this job cannot be removed from Job Database until costing rows are cleared.")
+
     if time_err and not grid_rows:
         st.warning(f"Could not load **time_entries** for labor: {time_err}")
 

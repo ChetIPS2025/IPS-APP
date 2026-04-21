@@ -675,6 +675,13 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         est["customer_location_id"] = None
     st.session_state["_est_prev_customer_id"] = cur_cust
 
+    prev_loc = st.session_state.get("_est_prev_customer_location_id")
+    cur_loc_id = est.get("customer_location_id")
+    if prev_loc is not None and cur_loc_id != prev_loc:
+        est["customer_contact_id"] = None
+        est["contact_name"] = ""
+    st.session_state["_est_prev_customer_location_id"] = cur_loc_id
+
     matching_jobs = jobs_by_customer.get(est.get("customer_id"), []) if est.get("customer_id") else jobs
     job_names = [str(j.get("job_name") or "").strip() for j in matching_jobs if str(j.get("job_name") or "").strip()]
     job_id_by_norm: dict[str, str] = {}
@@ -708,17 +715,19 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
             inject_contact_picker_styles()
             cid_key = str(est.get("customer_id") or "").strip()
-            contacts = _fetch_contacts_for_estimate_editor(cid_key)
+            loc_scope = str(est.get("customer_location_id") or "").strip() or None
+            loc_key = loc_scope or "none"
+            contacts = _fetch_contacts_for_estimate_editor(cid_key, loc_scope)
             if not contacts:
-                st.caption("No contacts found for this customer.")
+                st.caption("No contacts for this customer / site.")
                 st.selectbox(
                     "Contact",
                     options=[0],
                     index=0,
                     format_func=lambda _: contact_none_option_label(),
                     disabled=is_locked,
-                    key=f"est_contact_sel_empty_{cid_key}",
-                    help="Optional: add contacts for this customer on the Customers tab.",
+                    key=f"est_contact_sel_empty_{cid_key}_{loc_key}",
+                    help="Add company-wide or site contacts on the Customers tab.",
                 )
                 est["customer_contact_id"] = None
                 est["contact_name"] = ""
@@ -726,6 +735,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     customer_id=cid_key,
                     key_prefix="est",
                     disabled=is_locked,
+                    customer_location_id=loc_scope,
                 )
             else:
                 cur = str(est.get("customer_contact_id") or "").strip()
@@ -751,8 +761,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     index=idx,
                     format_func=lambda i: labels[i],
                     disabled=is_locked,
-                    key=f"est_contact_sel_{cid_key}",
-                    help="Only contacts linked to the selected customer. Optional for this quote.",
+                    key=f"est_contact_sel_{cid_key}_{loc_key}",
+                    help="Site-specific contacts first; company-wide rows included as fallback when a site is selected.",
                 )
                 est["customer_contact_id"] = ids[int(ci)]
                 _sel_cid = est["customer_contact_id"]

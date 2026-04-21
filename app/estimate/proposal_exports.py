@@ -291,7 +291,8 @@ def _proposal_contact_name_for_export(est: dict) -> str:
     if not ccid or not cid:
         return ""
     try:
-        for r in _fetch_contacts_for_estimate_editor(cid):
+        loc = str(est.get("customer_location_id") or "").strip() or None
+        for r in _fetch_contacts_for_estimate_editor(cid, loc):
             if str(r.get("id") or "").strip() == ccid:
                 return _normalize_contact_placeholder_text(r.get("contact_name"))
     except Exception:

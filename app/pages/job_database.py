@@ -12,7 +12,6 @@ import streamlit as st
 from auth import current_role
 from branding import render_header
 from db import (
-    delete_rows_admin,
     fetch_by_match,
     fetch_by_match_admin,
     fetch_jobs_with_order_fallback,
@@ -30,7 +29,7 @@ try:
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
+        set_selected_ids,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
@@ -39,7 +38,7 @@ except ImportError:
         clear_selected_ids,
         get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
+        set_selected_ids,
     )
 
 try:
@@ -106,6 +105,25 @@ except ImportError:
     )
 
 from app.utils.formatters import job_display_label
+
+try:
+    from services.delete_safety import delete_job_row_if_no_costing
+except ImportError:
+    from app.services.delete_safety import delete_job_row_if_no_costing  # type: ignore
+
+
+def _job_db_cell_str(val: Any) -> str:
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    s = str(val).strip()
+    if s.lower() == "nan":
+        return ""
+    return s
 
 
 JOB_STATUSES = [
@@ -181,29 +199,27 @@ def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
     return fetch_table("estimates", limit=5000, order_by="quote_number")
 
 
-def _fetch_contacts_for_job_database(customer_id: str) -> list[dict[str, Any]]:
-    """Same pattern as Estimates editor: admin read for internal roles (RLS)."""
+def _fetch_contacts_for_job_database(
+    customer_id: str,
+    customer_location_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Contacts for job form; scoped by job site when set (matches Estimates editor)."""
+    try:
+        from services.customer_contacts import fetch_contacts_for_customer_scope
+    except ImportError:
+        from app.services.customer_contacts import fetch_contacts_for_customer_scope  # type: ignore
+
     admin_read = current_role() in {"admin", "estimator"}
     cid = str(customer_id or "").strip()
     if not cid:
         return []
-    try:
-        if admin_read:
-            rows = fetch_by_match_admin("customer_contacts", {"customer_id": cid}, limit=500)
-        else:
-            rows = fetch_by_match("customer_contacts", {"customer_id": cid}, limit=500)
-    except Exception:
-        return []
-    rows = list(rows or [])
-    rows = [r for r in rows if bool(r.get("is_active", True))]
-
-    def _sort_key(r: dict) -> tuple:
-        prim = 0 if r.get("is_primary") else 1
-        name = str(r.get("contact_name") or "").strip().lower()
-        return (prim, name)
-
-    rows.sort(key=_sort_key)
-    return rows
+    loc = str(customer_location_id or "").strip() or None
+    return fetch_contacts_for_customer_scope(
+        cid,
+        loc,
+        admin_read=admin_read,
+        include_inactive=False,
+    )
 
 
 def _fetch_estimate_row_by_id(estimate_id: str) -> dict[str, Any] | None:
@@ -422,56 +438,6 @@ def _render_job_form_panel(
         selected_contact_id: str | None = None
         selected_customer_location_id: str | None = None
         cust_uuid = customer_options.get(customer_name) if customer_name else None
-        if cust_uuid:
-            inject_contact_picker_styles()
-            contacts = _fetch_contacts_for_job_database(str(cust_uuid))
-            cur_ct = str(current_value("customer_contact_id") or "").strip()
-            if cur_ct:
-                cids = {str(c.get("id") or "") for c in contacts}
-                if cur_ct not in cids:
-                    orphan = _contact_row_by_id(cur_ct)
-                    if orphan:
-                        contacts = [orphan] + contacts
-            if not contacts:
-                st.caption("No contacts found for this customer.")
-                render_contact_quick_add_when_empty(
-                    customer_id=str(cust_uuid),
-                    key_prefix="job",
-                    disabled=_ro,
-                )
-                selected_contact_id = None
-            else:
-                cur_ct = str(current_value("customer_contact_id") or "").strip()
-                by_id = {str(c.get("id") or ""): c for c in contacts}
-                chosen_id: str | None = cur_ct if cur_ct in by_id else None
-                if chosen_id is None:
-                    primary = next((c for c in contacts if c.get("is_primary")), None)
-                    if primary and primary.get("id"):
-                        chosen_id = str(primary["id"])
-                    elif len(contacts) == 1 and contacts[0].get("id"):
-                        chosen_id = str(contacts[0]["id"])
-
-                labels = ["(none)"] + [contact_option_label(c) for c in contacts]
-                ct_ids: list[str | None] = [None] + [str(c["id"]) for c in contacts]
-                try:
-                    ct_idx = ct_ids.index(str(chosen_id)) if chosen_id else 0
-                except ValueError:
-                    ct_idx = 0
-                    chosen_id = None
-                ct_idx = min(max(ct_idx, 0), len(labels) - 1)
-                ct_sel = st.selectbox(
-                    "Contact",
-                    options=list(range(len(labels))),
-                    index=ct_idx,
-                    format_func=lambda i: labels[i],
-                    disabled=_ro,
-                    key=f"job_form_contact_{cust_uuid}",
-                    help="Optional: primary contact for this job.",
-                )
-                selected_contact_id = ct_ids[int(ct_sel)]
-                render_contact_detail_preview(by_id.get(str(selected_contact_id or "")))
-        else:
-            st.caption("Select a customer to choose a contact.")
 
         if has_customer_location_column:
             try:
@@ -506,11 +472,65 @@ def _render_job_form_panel(
                     format_func=lambda i: labels[i],
                     disabled=_ro,
                     key=f"job_form_custloc_{cust_uuid}",
-                    help="Optional: saved customer site from the Customers tab.",
+                    help="Optional: saved customer site from the Customers tab. Contacts are filtered by site.",
                 )
                 selected_customer_location_id = lids[int(loc_pick)]
             else:
                 st.caption("Select a customer to choose a job site.")
+
+        if cust_uuid:
+            inject_contact_picker_styles()
+            loc_scope = str(selected_customer_location_id or "").strip() or None
+            contacts = _fetch_contacts_for_job_database(str(cust_uuid), loc_scope)
+            cur_ct = str(current_value("customer_contact_id") or "").strip()
+            if cur_ct:
+                cids = {str(c.get("id") or "") for c in contacts}
+                if cur_ct not in cids:
+                    orphan = _contact_row_by_id(cur_ct)
+                    if orphan:
+                        contacts = [orphan] + contacts
+            if not contacts:
+                st.caption("No contacts found for this customer / site.")
+                render_contact_quick_add_when_empty(
+                    customer_id=str(cust_uuid),
+                    key_prefix="job",
+                    disabled=_ro,
+                    customer_location_id=loc_scope,
+                )
+                selected_contact_id = None
+            else:
+                cur_ct = str(current_value("customer_contact_id") or "").strip()
+                by_id = {str(c.get("id") or ""): c for c in contacts}
+                chosen_id: str | None = cur_ct if cur_ct in by_id else None
+                if chosen_id is None:
+                    primary = next((c for c in contacts if c.get("is_primary")), None)
+                    if primary and primary.get("id"):
+                        chosen_id = str(primary["id"])
+                    elif len(contacts) == 1 and contacts[0].get("id"):
+                        chosen_id = str(contacts[0]["id"])
+
+                labels = ["(none)"] + [contact_option_label(c) for c in contacts]
+                ct_ids: list[str | None] = [None] + [str(c["id"]) for c in contacts]
+                try:
+                    ct_idx = ct_ids.index(str(chosen_id)) if chosen_id else 0
+                except ValueError:
+                    ct_idx = 0
+                    chosen_id = None
+                ct_idx = min(max(ct_idx, 0), len(labels) - 1)
+                loc_key = loc_scope or "none"
+                ct_sel = st.selectbox(
+                    "Contact",
+                    options=list(range(len(labels))),
+                    index=ct_idx,
+                    format_func=lambda i: labels[i],
+                    disabled=_ro,
+                    key=f"job_form_contact_{cust_uuid}_{loc_key}",
+                    help="Optional: primary contact for this job (site + company-wide contacts).",
+                )
+                selected_contact_id = ct_ids[int(ct_sel)]
+                render_contact_detail_preview(by_id.get(str(selected_contact_id or "")))
+        else:
+            st.caption("Select a customer to choose a contact.")
 
         st.markdown("#### Job number & location")
         if has_job_number_column and selected_job:
@@ -1143,22 +1163,59 @@ def render() -> None:
             )
             visible_cols = _job_db_visible_table_columns(show_cols)
 
+            picked: list[str] = []
             with st.container(border=True):
                 st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
                 st.markdown("##### Job list")
-                st.caption("Checkbox on the **left**. Select rows, then use **Actions** below the table.")
+                st.caption(
+                    "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
+                    "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
+                )
                 if "id" not in filtered.columns:
                     st.dataframe(filtered[visible_cols], use_container_width=True, hide_index=True)
                 else:
-                    render_selectable_dataframe(
-                        filtered,
-                        table_key=TABLE_KEY_JOBS,
-                        id_column="id",
-                        columns=visible_cols,
-                        editor_key="job_db_sel_editor",
-                    )
+                    inject_table_action_styles()
+                    n_vis = len(visible_cols)
+                    col_weights = [0.38] + [1.0] * n_vis + [0.42]
+                    head = st.columns(col_weights)
+                    head[0].caption(" ")
+                    for hi, cname in enumerate(visible_cols):
+                        short = cname if len(cname) <= 26 else cname[:25] + "…"
+                        head[hi + 1].caption(short)
+                    head[-1].caption("Del")
+                    for _, row in filtered.iterrows():
+                        jid = str(row.get("id") or "").strip()
+                        if not jid:
+                            continue
+                        rc = st.columns(col_weights)
+                        ck = f"job_list_pick_{jid}"
+                        if ck not in st.session_state:
+                            st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
+                        if rc[0].checkbox("", key=ck, label_visibility="collapsed"):
+                            picked.append(jid)
+                        for j, cname in enumerate(visible_cols):
+                            rc[j + 1].text(_job_db_cell_str(row.get(cname)))
+                        del_help = (
+                            "Only admin or estimator can delete jobs."
+                            if not can_edit
+                            else "Delete this job (blocked if costing data exists)."
+                        )
+                        if rc[-1].button(
+                            "🗑",
+                            key=f"job_row_del_{jid}",
+                            disabled=not can_edit,
+                            use_container_width=True,
+                            help=del_help,
+                        ):
+                            pending = st.session_state.get(IPS_PENDING_DELETE)
+                            if not isinstance(pending, dict):
+                                pending = {}
+                                st.session_state[IPS_PENDING_DELETE] = pending
+                            pending[TABLE_KEY_JOBS] = [jid]
+                            st.rerun()
+                    set_selected_ids(TABLE_KEY_JOBS, picked)
 
-            sel_ids = get_selected_ids(TABLE_KEY_JOBS)
+            sel_ids = picked if "id" in filtered.columns else []
             n_sel = len(sel_ids)
             one = n_sel == 1
             none = n_sel == 0
@@ -1202,7 +1259,10 @@ def render() -> None:
                 pend_ids = [str(x) for x in pend.get(TABLE_KEY_JOBS) or [] if str(x).strip()]
                 if pend_ids:
                     with st.container(border=True):
-                        st.warning(f"Delete **{len(pend_ids)}** job(s)? This cannot be undone.")
+                        st.warning(
+                            f"Delete **{len(pend_ids)}** job(s)? This cannot be undone. "
+                            "Jobs with **costing data** (time, materials, equipment, or PO expenses) cannot be deleted."
+                        )
                         dc1, dc2 = st.columns(2, gap="small")
                         with dc1:
                             if st.button(
@@ -1211,15 +1271,20 @@ def render() -> None:
                                 use_container_width=True,
                                 key="job_db_confirm_delete",
                             ):
+                                n_ok = 0
                                 for jid in pend_ids:
                                     try:
-                                        delete_rows_admin("jobs", {"id": jid})
+                                        delete_job_row_if_no_costing(str(jid), admin_read=admin_read)
+                                        n_ok += 1
+                                    except RuntimeError as re:
+                                        st.error(f"{str(jid)[:8]}… — {re!s}")
                                     except Exception as exc:
                                         st.error(f"Could not delete job {jid}: {exc}")
                                 pend.pop(TABLE_KEY_JOBS, None)
                                 clear_selected_ids(TABLE_KEY_JOBS)
                                 _clear_job_mode()
-                                st.success("Delete completed where permitted.")
+                                if n_ok:
+                                    st.success(f"Deleted {n_ok} job(s).")
                                 st.rerun()
                         with dc2:
                             if st.button("Cancel", use_container_width=True, key="job_db_cancel_delete"):

@@ -164,6 +164,8 @@ def _build_contact_write_pair(
     is_primary: bool,
     customer_id: str | None,
     schema_keys: set[str],
+    customer_location_id: str | None = None,
+    set_customer_location_id: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     tt = str(title_text or "").strip()
     mob = str(mobile or "").strip()
@@ -183,14 +185,34 @@ def _build_contact_write_pair(
         full["title"] = tt
     if "mobile" in schema_keys:
         full["mobile"] = mob
+    if set_customer_location_id:
+        loc = str(customer_location_id or "").strip()
+        full["customer_location_id"] = loc if loc else None
+        minimal["customer_location_id"] = loc if loc else None
     return full, minimal
+
+
+def _contacts_filtered_by_scope(
+    rows: list[dict[str, Any]],
+    scope_location_id: str | None,
+) -> list[dict[str, Any]]:
+    """``scope_location_id`` ``None`` = company-wide only (no site). Else match that site."""
+    if scope_location_id is None:
+        return [r for r in rows if not str(r.get("customer_location_id") or "").strip()]
+    lid = str(scope_location_id).strip()
+    return [r for r in rows if str(r.get("customer_location_id") or "").strip() == lid]
 
 
 def _insert_contact_pair(full: dict[str, Any], minimal: dict[str, Any]) -> dict[str, Any]:
     try:
         return insert_contact_row(full)
     except Exception:
-        return insert_contact_row(minimal)
+        try:
+            ff = {k: v for k, v in full.items() if k != "customer_location_id"}
+            mm = {k: v for k, v in minimal.items() if k != "customer_location_id"}
+            return insert_contact_row(ff)
+        except Exception:
+            return insert_contact_row(minimal)
 
 
 def _update_contact_pair(contact_id: str, full: dict[str, Any], minimal: dict[str, Any]) -> None:
@@ -441,15 +463,29 @@ def _add_customer_dialog(
 
 
 @st.dialog("Add Contact", width="small")
-def _add_contact_dialog(cid: str, admin_read: bool) -> None:
+def _add_contact_dialog(
+    cid: str,
+    admin_read: bool,
+    *,
+    customer_location_id: str | None = None,
+    set_customer_location_id: bool = False,
+) -> None:
+    loc_part = str(customer_location_id or "cw")
     key_show_inact = f"cust_ct_show_inactive_{cid}"
     load_inactive = bool(st.session_state.get(key_show_inact, False))
     contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
     schema_keys = _contact_schema_keys(contacts, None)
-    pk = f"dlg_ct_{cid}"
+    if set_customer_location_id:
+        schema_keys = set(schema_keys) | {"customer_location_id"}
+    pk = f"dlg_ct_{cid}_{loc_part}"
 
     # --- header: @st.dialog title + subtitle ---
-    _ips_modal_header(subtitle="New row in customer_contacts · primary and active optional")
+    sub = (
+        "New contact for this job site (saved with location link)."
+        if customer_location_id
+        else "New row in customer_contacts · company-wide · primary and active optional"
+    )
+    _ips_modal_header(subtitle=sub)
 
     # --- body: compact groups (2 columns) ---
     r1a, r1b = st.columns(2, gap="small")
@@ -507,6 +543,8 @@ def _add_contact_dialog(cid: str, admin_read: bool) -> None:
                 is_primary=False,
                 customer_id=cid,
                 schema_keys=schema_keys,
+                customer_location_id=str(customer_location_id).strip() if customer_location_id else None,
+                set_customer_location_id=set_customer_location_id,
             )
             try:
                 inserted = _insert_contact_pair(full, minimal)
@@ -765,9 +803,25 @@ def _render_locations_section(*, customer_row: dict, can_edit: bool, admin_read:
                 with body_col:
                     with st.container(border=True):
                         st.markdown(full_line, unsafe_allow_html=True)
+                        if lid:
+                            _render_location_contacts_block(
+                                customer_id=cid,
+                                location_id=lid,
+                                location_name=nm,
+                                can_edit=can_edit,
+                                admin_read=admin_read,
+                            )
             else:
                 with st.container(border=True):
                     st.markdown(full_line, unsafe_allow_html=True)
+                    if lid:
+                        _render_location_contacts_block(
+                            customer_id=cid,
+                            location_id=lid,
+                            location_name=nm,
+                            can_edit=False,
+                            admin_read=admin_read,
+                        )
 
         if can_edit and locs:
             pick = str(st.session_state.get(sel_key) or "").strip()
@@ -865,9 +919,9 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
 
     sel_key = "customer_contact_selected_id"
 
-    st.markdown("##### Contacts")
+    st.markdown("##### Company-wide contacts")
     st.caption(
-        "Multiple contacts per company — stored in **customer_contacts** (separate from the company row)."
+        "People for the account when no job site applies (or as fallback). Site-specific contacts live under **Locations** below."
     )
 
     mode = st.session_state.get("customer_contact_mode")
@@ -888,8 +942,10 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
     st.checkbox("Show inactive contacts", key=key_show_inact)
 
     load_inactive = bool(st.session_state.get(key_show_inact, False) or (mode == "edit" and bool(edit_ct)))
-    contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
-    schema_keys = _contact_schema_keys(contacts, edit_row)
+    all_contacts = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
+    contacts = _contacts_filtered_by_scope(all_contacts, None)
+    schema_keys = _contact_schema_keys(all_contacts, edit_row)
+    schema_keys = set(schema_keys) | {"customer_location_id"}
 
     sid = str(st.session_state.get(sel_key) or "").strip()
     if sid and not any(str(c.get("id") or "") == sid for c in contacts):
@@ -900,7 +956,12 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
 
     if can_edit:
         if st.button("Add Contact", type="primary", use_container_width=True, key=f"cust_ct_add_{cid}"):
-            _add_contact_dialog(cid, admin_read)
+            _add_contact_dialog(
+                cid,
+                admin_read,
+                customer_location_id=None,
+                set_customer_location_id=True,
+            )
 
     if not contacts:
         st.caption("No contacts yet. Use **Add Contact** (editors) or add from the list once this company is saved.")
@@ -1093,6 +1154,8 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                     is_primary=pr_b,
                     customer_id=None,
                     schema_keys=schema_keys,
+                    customer_location_id=str(er.get("customer_location_id") or "").strip() or None,
+                    set_customer_location_id=True,
                 )
                 try:
                     _update_contact_pair(str(er["id"]), full, minimal)
@@ -1109,6 +1172,250 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
         with s2:
             if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
                 _clear_contact_subpanel()
+                st.rerun()
+
+
+def _on_loc_contact_pick_changed(cid: str, lid: str, ctid: str, wkey: str) -> None:
+    sel_key = f"lc_sel_{cid}_{lid}"
+    prefix = f"lc_pick_{cid}_{lid}_"
+    if st.session_state.get(wkey):
+        st.session_state[sel_key] = ctid
+        for k in list(st.session_state.keys()):
+            if isinstance(k, str) and k.startswith(prefix) and k != wkey:
+                st.session_state[k] = False
+    else:
+        if str(st.session_state.get(sel_key) or "") == ctid:
+            st.session_state[sel_key] = None
+
+
+def _render_location_contacts_block(
+    *,
+    customer_id: str,
+    location_id: str,
+    location_name: str,
+    can_edit: bool,
+    admin_read: bool,
+) -> None:
+    """Contacts scoped to one job site (under Locations)."""
+    cid = str(customer_id or "").strip()
+    lid = str(location_id or "").strip()
+    if not cid or not lid:
+        return
+
+    st.caption(f"**Contacts · {html.escape(location_name or 'Site')}**")
+    mode = st.session_state.get(f"lc_mode_{cid}_{lid}")
+    edit_ct = str(st.session_state.get(f"lc_edit_{cid}_{lid}") or "").strip() or None
+    sel_key = f"lc_sel_{cid}_{lid}"
+
+    key_show_inact = f"lc_show_inact_{cid}_{lid}"
+    st.session_state.setdefault(key_show_inact, False)
+    st.checkbox("Show inactive", key=key_show_inact)
+
+    load_inactive = bool(st.session_state.get(key_show_inact, False) or (mode == "edit" and bool(edit_ct)))
+    all_c = _fetch_contacts_for_customer_row(cid, admin_read=admin_read, include_inactive=load_inactive)
+    loc_contacts = _contacts_filtered_by_scope(all_c, lid)
+    edit_row: dict[str, Any] | None = None
+    if mode == "edit" and edit_ct:
+        edit_row = _contact_row_by_id(loc_contacts, edit_ct)
+        if not edit_row:
+            er = _fetch_one_row("customer_contacts", {"id": edit_ct}, admin_read=admin_read)
+            if er and str(er.get("customer_id") or "") == cid and str(er.get("customer_location_id") or "") == lid:
+                edit_row = er
+                loc_contacts = [er] + [x for x in loc_contacts if str(x.get("id")) != edit_ct]
+            else:
+                st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
+                st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
+                st.warning("That contact is not on this site.")
+                st.rerun()
+                return
+
+    schema_keys = _contact_schema_keys(loc_contacts, edit_row)
+    schema_keys = set(schema_keys) | {"customer_location_id"}
+
+    sid = str(st.session_state.get(sel_key) or "").strip()
+    if sid and not any(str(c.get("id") or "") == sid for c in loc_contacts):
+        st.session_state.pop(sel_key, None)
+        sid = ""
+    if mode == "edit" and edit_ct:
+        st.session_state[sel_key] = str(edit_ct)
+
+    if can_edit:
+        if st.button(
+            "Add Contact",
+            type="primary",
+            use_container_width=True,
+            key=f"lc_add_{cid}_{lid}",
+        ):
+            _add_contact_dialog(
+                cid,
+                admin_read,
+                customer_location_id=lid,
+                set_customer_location_id=True,
+            )
+
+    if not loc_contacts:
+        st.caption("No contacts at this site yet.")
+    else:
+        for ct in loc_contacts:
+            ctid = str(ct.get("id") or "")
+            nm = str(ct.get("contact_name") or "").strip() or "—"
+            title = _contact_title_display(ct)
+            em = str(ct.get("email") or "").strip()
+            ph = str(ct.get("phone") or "").strip()
+            mob = str(ct.get("mobile") or "").strip()
+            prim = bool(ct.get("is_primary"))
+            active = bool(ct.get("is_active", True))
+            line = f"**{html.escape(nm)}**"
+            if title:
+                line += f" · *{html.escape(title)}*"
+            if em:
+                line += f" · {html.escape(em)}"
+            if ph:
+                line += f" · {html.escape(ph)}"
+            if mob:
+                line += f" · M {html.escape(mob)}"
+            badges: list[str] = []
+            if prim:
+                badges.append("Primary")
+            if not active:
+                badges.append("Inactive")
+            badge_s = " · ".join(badges)
+            full_line = line + (f" · *{badge_s}*" if badge_s else "")
+
+            if can_edit and ctid:
+                wkey = f"lc_pick_{cid}_{lid}_{ctid}"
+                sel_now = str(st.session_state.get(sel_key) or "")
+                st.session_state[wkey] = sel_now == ctid
+                chk_col, body_col = st.columns([0.055, 0.945], gap="small")
+                with chk_col:
+                    st.checkbox(
+                        "Select",
+                        key=wkey,
+                        on_change=_on_loc_contact_pick_changed,
+                        args=(cid, lid, ctid, wkey),
+                        label_visibility="collapsed",
+                    )
+                with body_col:
+                    with st.container(border=True):
+                        st.markdown(full_line, unsafe_allow_html=True)
+            else:
+                with st.container(border=True):
+                    st.markdown(full_line, unsafe_allow_html=True)
+
+        if can_edit and loc_contacts:
+            pick = str(st.session_state.get(sel_key) or "").strip()
+            if pick and _contact_row_by_id(loc_contacts, pick) is None:
+                st.session_state.pop(sel_key, None)
+                pick = ""
+            p1, p2, p3 = st.columns(3, gap="small")
+            with p1:
+                if st.button(
+                    "Edit",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not pick,
+                    key=f"lc_tool_edit_{cid}_{lid}",
+                ):
+                    if not pick:
+                        st.error("Select a contact first.")
+                        st.stop()
+                    st.session_state[f"lc_mode_{cid}_{lid}"] = "edit"
+                    st.session_state[f"lc_edit_{cid}_{lid}"] = pick
+                    st.rerun()
+            with p2:
+                if st.button(
+                    "Set primary",
+                    use_container_width=True,
+                    disabled=not pick,
+                    key=f"lc_tool_pri_{cid}_{lid}",
+                ):
+                    if not pick:
+                        st.error("Select a contact first.")
+                        st.stop()
+                    set_primary_contact(customer_id=cid, contact_id=pick)
+                    st.success("Primary updated.")
+                    st.rerun()
+            with p3:
+                if st.button(
+                    "Delete",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not pick,
+                    key=f"lc_tool_del_{cid}_{lid}",
+                ):
+                    if not pick:
+                        st.error("Select a contact first.")
+                        st.stop()
+                    open_destructive_confirmation(_CONTACT_DELETE_PREFIX)
+                    st.session_state["customer_contact_pending_delete_ids"] = [pick]
+                    st.rerun()
+
+    if not can_edit:
+        return
+
+    if mode == "edit" and edit_ct and edit_row:
+        st.markdown("**Edit site contact**")
+        pk = f"lc_ed_{cid}_{lid}_{edit_ct}"
+        er = edit_row
+        cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
+        tl = st.text_input(
+            "Title",
+            value=_contact_title_display(er),
+            key=f"{pk}_title",
+            help="Job title or role",
+        )
+        em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
+        cph1, cph2 = st.columns(2)
+        with cph1:
+            ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
+        with cph2:
+            mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
+        nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
+        pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
+        act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
+        s1, s2 = st.columns(2)
+        with s1:
+            if st.button("Update contact", type="primary", use_container_width=True, key=f"{pk}_save"):
+                t = str(cn or "").strip()
+                if not t:
+                    st.error("Contact name is required.")
+                    st.stop()
+                pr_b = bool(pr)
+                act_b = bool(act)
+                if pr_b and not act_b:
+                    st.warning("Inactive contacts cannot be primary — clearing primary flag.")
+                    pr_b = False
+                full, minimal = _build_contact_write_pair(
+                    contact_name=t,
+                    title_text=str(tl or ""),
+                    email=str(em or ""),
+                    phone=str(ph or ""),
+                    mobile=str(mob or ""),
+                    notes=str(nt or ""),
+                    is_active=act_b,
+                    is_primary=pr_b,
+                    customer_id=None,
+                    schema_keys=schema_keys,
+                    customer_location_id=lid,
+                    set_customer_location_id=True,
+                )
+                try:
+                    _update_contact_pair(str(er["id"]), full, minimal)
+                except Exception as exc:
+                    st.error("Could not update the contact.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
+                    st.stop()
+                if pr_b:
+                    set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
+                st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
+                st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
+                st.success("Contact updated.")
+                st.rerun()
+        with s2:
+            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+                st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
+                st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
                 st.rerun()
 
 
