@@ -126,6 +126,26 @@ def _job_db_cell_str(val: Any) -> str:
     return s
 
 
+def short_text(val: Any, max_len: int = 40) -> str:
+    txt = str(val or "").strip()
+    return txt[:max_len] + ("…" if len(txt) > max_len else "")
+
+
+def _render_job_db_job_name_cell(container: Any, raw: Any, *, max_len: int = 40) -> None:
+    """Truncate long job names for the overview table; full value in tooltip (display only)."""
+    full = _job_db_cell_str(raw)
+    display = short_text(full, max_len=max_len)
+    if not full:
+        container.text("")
+    elif len(full) > max_len:
+        container.markdown(
+            f'<span title="{html.escape(full, quote=True)}">{html.escape(display)}</span>',
+            unsafe_allow_html=True,
+        )
+    else:
+        container.text(display)
+
+
 JOB_STATUSES = [
     "Draft",
     "Quoted",
@@ -1194,7 +1214,11 @@ def render() -> None:
                         if rc[0].checkbox("", key=ck, label_visibility="collapsed"):
                             picked.append(jid)
                         for j, cname in enumerate(visible_cols):
-                            rc[j + 1].text(_job_db_cell_str(row.get(cname)))
+                            cell = rc[j + 1]
+                            if cname == "job_name":
+                                _render_job_db_job_name_cell(cell, row.get("job_name"))
+                            else:
+                                cell.text(_job_db_cell_str(row.get(cname)))
                         del_help = (
                             "Only admin or estimator can delete jobs."
                             if not can_edit

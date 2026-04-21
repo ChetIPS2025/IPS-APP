@@ -178,24 +178,22 @@ def estimate_quote_to_job_number(quote_number: str) -> str:
     return ("J" + q)[:120]
 
 
-def estimate_description_value(estimate_row: dict[str, Any]) -> str:
+def get_estimate_description(est: dict[str, Any]) -> str:
     """
-    Short label for an estimate (same field as **Estimate Description** in the editor).
+    Short label for job naming (same sources as **Estimate Description** in the editor).
 
-    Prefer DB column, then ``estimate_json`` scalars, then legacy ``job`` / ``job_name`` keys.
-    Does not read ``scope_of_work`` (long proposal text).
+    Does not use ``scope_of_work`` or other long proposal text.
     """
-    est_json = estimate_row.get("estimate_json") or {}
-    est_json = est_json if isinstance(est_json, dict) else {}
-    return str(
-        estimate_row.get("estimate_description")
+    raw = est.get("estimate_json")
+    est_json = raw if isinstance(raw, dict) else {}
+    v = (
+        est.get("estimate_description")
         or est_json.get("estimate_description")
-        or estimate_row.get("job")
-        or est_json.get("job")
-        or estimate_row.get("job_name")
-        or est_json.get("job_name")
+        or est.get("job")
+        or est.get("job_name")
         or ""
-    ).strip()
+    )
+    return str(v).strip()
 
 
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
@@ -222,10 +220,10 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
 
 def _fallback_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: str) -> str:
     """
-    Job name when no short **Estimate Description** (or legacy job/job_name) is set.
+    Job name when :func:`get_estimate_description` is empty.
 
-    Prefers import title, then customer + quote / quote alone. Uses first line of
-    ``scope_of_work`` only when nothing else is available.
+    Prefers import title, then customer + quote, then quote alone. Does not use
+    ``scope_of_work``.
     """
     meta = _as_json_dict(ej.get("import_meta"))
     vendor_title = str(meta.get("title") or meta.get("project_name") or "").strip()
@@ -238,10 +236,6 @@ def _fallback_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: s
         return " — ".join(parts)[:500]
     if quote:
         return quote[:500]
-    scope = str(row.get("scope_of_work") or ej.get("scope_of_work") or "").strip()
-    first_line = scope.split("\n")[0].strip() if scope else ""
-    if len(first_line) >= 8:
-        return first_line[:500]
     return "Awarded job"
 
 
@@ -359,7 +353,7 @@ def create_job_from_estimate(
         cust_row = fetch_one("customers", {"id": customer_id}, columns="customer_name")
     customer_name = str((cust_row or {}).get("customer_name") or "").strip()
 
-    short_name = estimate_description_value(row)
+    short_name = get_estimate_description(row)
     if short_name:
         job_name = short_name[:500]
     else:
