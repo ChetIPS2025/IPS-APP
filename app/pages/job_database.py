@@ -107,6 +107,13 @@ try:
 except ImportError:
     from app.services.delete_safety import delete_job_row_if_no_costing  # type: ignore
 
+try:
+    from app.db import create_signed_url
+    from app.services.job_weekly_timesheets import generate_unsigned_timesheet_for_job_week
+except ImportError:
+    from db import create_signed_url  # type: ignore
+    from services.job_weekly_timesheets import generate_unsigned_timesheet_for_job_week  # type: ignore
+
 
 def _job_db_cell_str(val: Any) -> str:
     if val is None:
@@ -747,6 +754,106 @@ def _render_job_form_panel(
         if b2.button("Cancel", use_container_width=True, key="job_form_cancel"):
             _clear_job_mode()
             st.rerun()
+
+        # --- Weekly Timesheets (customer signature workflow) ---
+        if mode == "edit" and selected_job:
+            with st.expander("Weekly Timesheets", expanded=False):
+                st.caption("Generate a customer-facing weekly timesheet PDF and share a secure signing link.")
+                jid = str(selected_job.get("id") or "").strip()
+                if not jid:
+                    st.caption("Select a job.")
+                else:
+                    # Week picker (Monday start)
+                    from datetime import date as _date, timedelta as _td
+
+                    today = _date.today()
+                    default_ws = today - _td(days=today.weekday() + 7)  # last week Monday
+                    week_start = st.date_input("Week start (Mon)", value=default_ws, key=f"jwt_week_{jid}")
+                    summary = st.text_area(
+                        "Work summary / notes (optional)",
+                        key=f"jwt_summary_{jid}",
+                        height=72,
+                        placeholder="Optional summary shown on the PDF.",
+                    )
+                    if st.button(
+                        "Generate unsigned PDF",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not can_edit,
+                        key=f"jwt_gen_{jid}",
+                    ):
+                        try:
+                            row = generate_unsigned_timesheet_for_job_week(
+                                job_id=jid,
+                                week_start=week_start,
+                                work_summary=str(summary or "").strip(),
+                            )
+                        except Exception as exc:
+                            st.error(f"Could not generate: {exc}")
+                            st.stop()
+                        st.success("Generated.")
+                        st.session_state[f"jwt_last_row_{jid}"] = row
+                        st.rerun()
+
+                    try:
+                        rows = fetch_by_match_admin(
+                            "job_weekly_timesheets",
+                            {"job_id": jid},
+                            columns="id,week_start,week_end,status,unsigned_pdf_url,signed_pdf_url,sent_at,signed_at,sign_token,sign_token_expires_at",
+                            limit=200,
+                        )
+                    except Exception:
+                        rows = []
+
+                    if not rows:
+                        st.caption("No weekly timesheets yet. Run migration `sql/031_job_weekly_timesheets.sql`.")
+                    else:
+                        rows = sorted(rows, key=lambda r: str(r.get("week_start") or ""), reverse=True)
+                        latest = rows[0]
+                        st.markdown("**Latest**")
+                        up = str(latest.get("unsigned_pdf_url") or "").strip()
+                        sp = str(latest.get("signed_pdf_url") or "").strip()
+                        token = str(latest.get("sign_token") or "").strip()
+                        unsigned_link = create_signed_url(up, expires_in=3600) if up else ""
+                        signed_link = create_signed_url(sp, expires_in=3600) if sp else ""
+                        sign_link = f"?tsign={token}" if token else ""
+                        st.caption(
+                            f"Week {str(latest.get('week_start') or '')} → {str(latest.get('week_end') or '')} · "
+                            f"Status **{str(latest.get('status') or '')}**"
+                        )
+                        a1, a2, a3 = st.columns(3, gap="small")
+                        with a1:
+                            if unsigned_link:
+                                st.link_button("Open unsigned", unsigned_link, use_container_width=True)
+                            else:
+                                st.button("Open unsigned", use_container_width=True, disabled=True)
+                        with a2:
+                            if sign_link:
+                                st.link_button("Open sign page", sign_link, use_container_width=True)
+                            else:
+                                st.button("Open sign page", use_container_width=True, disabled=True)
+                        with a3:
+                            if signed_link:
+                                st.link_button("Open signed", signed_link, use_container_width=True)
+                            else:
+                                st.button("Open signed", use_container_width=True, disabled=True)
+
+                        st.markdown("**History**")
+                        table = []
+                        for r in rows[:30]:
+                            token = str(r.get("sign_token") or "").strip()
+                            table.append(
+                                {
+                                    "Week": f"{str(r.get('week_start') or '')} → {str(r.get('week_end') or '')}",
+                                    "Status": str(r.get("status") or ""),
+                                    "Sent": str(r.get("sent_at") or "")[:19],
+                                    "Signed": str(r.get("signed_at") or "")[:19],
+                                    "Sign link": (f"?tsign={token}" if token else "—"),
+                                    "Token expires": str(r.get("sign_token_expires_at") or "")[:19],
+                                }
+                            )
+                        st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+                        st.caption("Use **Open sign page** above, or copy any **Sign link** into an email.")
 
 
 def _build_jobs_overview_dataframe(

@@ -33,6 +33,7 @@ from pages import tool_dashboard
 from pages import asset_detail
 from pages import assets as assets_page
 from pages import asset_scanner
+from pages import sign_timesheet
 from pages import materials
 from pages import labor
 from pages import equipment
@@ -98,6 +99,23 @@ def main() -> None:
     apply_branding()
     inject_ips_app_shell_styles()
     inject_pwa_support()
+
+    # Public customer signing flow (no login): `?tsign=<uuid>`
+    try:
+        tok = st.query_params.get("tsign")
+    except Exception:
+        tok = None
+    token = None
+    if isinstance(tok, list):
+        token = str(tok[0]) if tok else None
+    elif tok is not None:
+        token = str(tok)
+    if token and str(token).strip():
+        try:
+            sign_timesheet.render_public(str(token).strip())
+        except Exception as exc:
+            show_page_error(exc, context="page:sign_timesheet_public")
+        return
 
     if not require_login():
         render_header("Login")
