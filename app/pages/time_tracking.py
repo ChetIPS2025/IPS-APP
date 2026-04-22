@@ -437,9 +437,16 @@ def _inject_tt_styles() -> None:
             margin: 0.1rem 0 0.4rem 0 !important;
             color: #e2e8f0 !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-selected) {
-            border-color: rgba(56, 189, 248, 0.65) !important;
-            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28);
+        .ips-tt-day-block-selected {
+            margin-top: 2px !important;
+            padding: 2px 4px 4px 4px !important;
+            border-radius: 6px !important;
+            outline: 1px solid rgba(56, 189, 248, 0.55) !important;
+            background: rgba(56, 189, 248, 0.06) !important;
+        }
+        .ips-tt-day-block {
+            margin-top: 2px !important;
+            min-height: 0 !important;
         }
         /* Quick Actions — compact popup (desktop max width; mobile full width) */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
@@ -458,6 +465,31 @@ def _inject_tt_styles() -> None:
             div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
                 max-width: 100% !important;
             }
+        }
+        /* Table “Edit Entry” — compact strip above grid */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-edit-mini-popup) {
+            max-width: 280px !important;
+            width: 100% !important;
+            padding: 8px 10px 10px 10px !important;
+            margin: 0 0 8px 0 !important;
+            border-radius: 8px !important;
+        }
+        @media (max-width: 768px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-edit-mini-popup) {
+                max-width: 100% !important;
+            }
+        }
+        p.ips-tt-edit-mini-title {
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            margin: 0 0 0.15rem 0 !important;
+            color: #e2e8f0 !important;
+        }
+        p.ips-tt-edit-mini-sub {
+            font-size: 0.72rem !important;
+            margin: 0 0 0.45rem 0 !important;
+            color: #94a3b8 !important;
+            line-height: 1.25 !important;
         }
         /* Top nav row — span lives in first column of same horizontal block */
         div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
@@ -1276,14 +1308,6 @@ def _tt_render_grid_section(
             st.session_state.pop(TT_EDIT_ID_KEY, None)
             st.rerun()
         if actions.get("edit") and sel and len(sel) == 1 and can_edit:
-            er = fetch_one("time_entries", {"id": str(sel[0])})
-            if er:
-                eid_e = str(er.get("employee_id") or "")
-                wd_e = str(er.get("work_date") or "")[:10]
-                if eid_e and wd_e:
-                    st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid_e
-                    st.session_state[_tt_qa_day_key(eid_e)] = wd_e
-                    st.session_state.pop(f"tt_qa_dpick_{eid_e}", None)
             st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
             st.session_state.pop("tt_entry_view_id", None)
             st.rerun()
@@ -1298,6 +1322,22 @@ def _tt_render_grid_section(
             clear_selected_ids(TABLE_KEY_TIME_ENTRIES)
             st.success("Delete completed where permitted.")
             st.rerun()
+
+    if can_edit:
+        te_tbl = st.session_state.get(TT_EDIT_ID_KEY)
+        if te_tbl:
+            erw = fetch_one("time_entries", {"id": str(te_tbl)})
+            if not erw:
+                st.session_state.pop(TT_EDIT_ID_KEY, None)
+            else:
+                _render_minimal_table_edit_popup(
+                    erw,
+                    job_labels_sorted=filt.job_labels_sorted,
+                    job_label_to_id=filt.job_label_to_id,
+                    job_id_to_label=filt.job_id_to_label,
+                    emp_id_to_name=week_data.emp_id_to_name,
+                    fast=fast,
+                )
 
     if not can_edit:
         st.info("View-only mode. Sign in as admin, estimator, or project manager to log time.")
@@ -1513,7 +1553,7 @@ def _render_quick_actions_popup(
             '<span class="ips-quick-popup ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        st.caption("**Quick Actions** — grid **Use this day** or pick below.")
+        st.caption("**Quick Actions** — pick the working day below.")
         picked_ix = st.selectbox(
             "Day",
             list(range(len(days))),
@@ -1629,13 +1669,17 @@ def _render_quick_actions_popup(
         ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
         if not ents_show:
             st.caption("No lines yet for this day — add below.")
+        edit_tid = str(st.session_state.get(TT_EDIT_ID_KEY) or "")
         for ent in ents_show:
+            if str(ent.get("id") or "") == edit_tid:
+                st.caption("This line is open in the small **Edit** box above the grid.")
+                continue
             _render_entry_editor(
                 ent,
                 job_labels_sorted,
                 job_label_to_id,
                 fast=fast,
-                from_table_panel=True,
+                from_table_panel=False,
             )
             st.markdown('<div class="ips-tt-entry-gap"></div>', unsafe_allow_html=True)
         st.markdown('<p class="ips-tt-field-label">Add line</p>', unsafe_allow_html=True)
@@ -1648,6 +1692,105 @@ def _render_quick_actions_popup(
             ents_show,
             fast=fast,
         )
+
+
+def _render_minimal_table_edit_popup(
+    ent: dict,
+    *,
+    job_labels_sorted: list[str],
+    job_label_to_id: dict[str, str],
+    job_id_to_label: dict[str, str],
+    emp_id_to_name: dict[str, str],
+    fast: bool,
+) -> None:
+    """Tiny editor for table Edit action: hours + notes only; job/non-job fixed to current row."""
+    te_id = str(ent.get("id"))
+    cur_jid = str(ent.get("job_id") or "").strip()
+    cur_nj = str(ent.get("non_job_code") or "").strip()
+    if cur_nj and not cur_jid:
+        job_label_snap = TT_NON_JOB_SENTINEL
+    elif cur_jid:
+        job_label_snap = next(
+            (lb for lb, j in job_label_to_id.items() if j == cur_jid),
+            job_labels_sorted[0] if job_labels_sorted else "",
+        )
+    else:
+        job_label_snap = TT_NON_JOB_SENTINEL
+    _init_row_snap_from_ent(te_id, ent, job_label_snap, cur_nj)
+
+    jk = f"tt_job_{te_id}"
+    njk = f"tt_nj_{te_id}"
+    st.session_state.setdefault(jk, job_label_snap)
+    st.session_state.setdefault(njk, cur_nj if cur_nj in NON_JOB_CATEGORY_OPTIONS else "")
+
+    autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
+    acb = _autosave_callback_factory(te_id)
+    ch_as = {"on_change": acb} if autosave else {}
+    hstep = _hours_step(fast=fast)
+
+    wd = str(ent.get("work_date") or "")[:10]
+    eid = str(ent.get("employee_id") or "")
+    enm = str(emp_id_to_name.get(eid, "") or "").strip() or (eid[:8] + "…" if len(eid) > 8 else eid)
+    if cur_jid:
+        jl = str(job_id_to_label.get(cur_jid, "") or "?").strip()
+        sub_line = f"{html.escape(wd)} · {html.escape(enm)} · {html.escape(jl[:48])}"
+    else:
+        njd = html.escape(cur_nj or "—")
+        sub_line = f"{html.escape(wd)} · {html.escape(enm)} · {njd}"
+
+    with st.container(border=True):
+        st.markdown(
+            '<span class="ips-tt-edit-mini-popup" aria-hidden="true"></span>'
+            '<p class="ips-tt-edit-mini-title">Edit entry</p>'
+            f'<p class="ips-tt-edit-mini-sub">{sub_line}</p>',
+            unsafe_allow_html=True,
+        )
+        h1, h2 = st.columns(2, gap="small")
+        with h1:
+            st.number_input(
+                "Hrs",
+                min_value=0.0,
+                max_value=24.0,
+                value=float(ent.get("hours", 0) or 0),
+                step=hstep,
+                format="%.2f",
+                key=f"tt_h_{te_id}",
+                label_visibility="collapsed",
+                **ch_as,
+            )
+        with h2:
+            st.text_input(
+                "Notes",
+                value=str(ent.get("notes") or ""),
+                key=f"tt_n_{te_id}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+                **ch_as,
+            )
+        b1, b2 = st.columns(2, gap="small")
+        with b1:
+            if st.button(
+                "Save",
+                key=f"tt_mini_sv_{te_id}",
+                use_container_width=True,
+            ):
+                ok, err = _persist_time_entry_row(te_id, job_label_to_id)
+                if ok:
+                    st.session_state.pop(TT_EDIT_ID_KEY, None)
+                    st.rerun()
+                elif err:
+                    if err.startswith("Pick a job"):
+                        st.warning(err)
+                    else:
+                        st.error(err)
+        with b2:
+            if st.button(
+                "Close",
+                key=f"tt_mini_close_{te_id}",
+                use_container_width=True,
+            ):
+                st.session_state.pop(TT_EDIT_ID_KEY, None)
+                st.rerun()
 
 
 def _render_entry_editor(
@@ -1993,7 +2136,7 @@ def _render_day_column_body(
     job_id_to_label: dict[str, str],
     show_day_heading: bool,
 ) -> float:
-    """Day cell: hours subtotal, compact job summary, and control to set Quick Actions day context."""
+    """Day cell: hours subtotal, compact job summary; selected day (Quick Actions) shown via light outline."""
     wd = d.isoformat()
     ents_all = idx.get((eid, wd), [])
     ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
@@ -2028,23 +2171,13 @@ def _render_day_column_body(
     if summary:
         st.caption(summary[:260] + ("…" if len(summary) > 260 else ""))
 
-    span_cls = "ips-tt-day-cell ips-tt-day-summary"
+    block_cls = "ips-tt-day-block"
     if is_sel:
-        span_cls += " ips-tt-day-selected"
-
-    with st.container(border=True):
-        st.markdown(f'<span class="{span_cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
-        btn_label = "Selected for Quick Actions" if is_sel else "Use this day"
-        if st.button(
-            btn_label,
-            key=f"tt_selday_{eid}_{wd}",
-            use_container_width=True,
-            type="primary" if is_sel else "secondary",
-        ):
-            st.session_state[sel_k] = wd
-            st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid
-            st.session_state.pop(f"tt_qa_dpick_{eid}", None)
-            st.rerun()
+        block_cls += " ips-tt-day-block-selected"
+    st.markdown(
+        f'<div class="{block_cls}"><span class="ips-tt-day-cell ips-tt-day-summary" aria-hidden="true"></span></div>',
+        unsafe_allow_html=True,
+    )
 
     return day_sum
 
