@@ -73,8 +73,8 @@ TT_DEFAULT_HOURS_KEY = "tt_default_hours_for_new_rows"
 TT_JOB_LABEL_TO_ID_KEY = "_tt_job_label_to_id_for_callbacks"
 TT_EDIT_ID_KEY = "tt_entry_edit_id"
 TT_FAST_ENTRY_KEY = "tt_fast_entry_mode"
-# Single Quick Actions surface per page: which employee row has the panel expanded
-TT_OPEN_EMP_PANEL_KEY = "tt_open_employee_panel"
+# Single Quick Actions popup: which employee id has it open (None = closed)
+TT_OPEN_EMPLOYEE_KEY = "tt_open_employee"
 
 # Non-job time (no job_id): category list + selectbox sentinel
 TT_NON_JOB_SENTINEL = "(Non-job — category below)"
@@ -140,19 +140,18 @@ def _render_qa_toggle_button(eid: str) -> None:
         '<span class="ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    open_e = st.session_state.get(TT_OPEN_EMP_PANEL_KEY)
-    label = "▼ Actions" if open_e == eid else "⚡ Quick Actions"
+    open_e = st.session_state.get(TT_OPEN_EMPLOYEE_KEY)
     if st.button(
-        label,
+        "⚡",
         key=f"tt_qa_toggle_{eid}",
         use_container_width=True,
         type="secondary",
-        help="Open or close Quick Actions for this employee",
+        help="Quick Actions: copy day/week, fill week, edit lines for the selected day",
     ):
         if open_e == eid:
-            st.session_state.pop(TT_OPEN_EMP_PANEL_KEY, None)
+            st.session_state[TT_OPEN_EMPLOYEE_KEY] = None
         else:
-            st.session_state[TT_OPEN_EMP_PANEL_KEY] = eid
+            st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid
         st.rerun()
 
 
@@ -434,21 +433,31 @@ def _inject_tt_styles() -> None:
             font-variant-numeric: tabular-nums !important;
         }
         .ips-tt-qa-context {
-            font-size: 0.95rem !important;
-            margin: 0.15rem 0 0.65rem 0 !important;
+            font-size: 0.82rem !important;
+            margin: 0.1rem 0 0.4rem 0 !important;
             color: #e2e8f0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-selected) {
             border-color: rgba(56, 189, 248, 0.65) !important;
             box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28);
         }
-        /* Quick Actions panel — comfortable spacing for job + non-job editors */
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-qa-panel) {
+        /* Quick Actions — compact popup (desktop max width; mobile full width) */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
+            max-width: 360px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
             padding: 10px 12px 12px 12px !important;
+            border-radius: 10px !important;
+            margin: 0 0 0.35rem 0 !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-qa-panel) [data-testid="stHorizontalBlock"] {
-            gap: 0.5rem !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) [data-testid="stHorizontalBlock"] {
+            gap: 0.35rem !important;
             flex-wrap: wrap !important;
+        }
+        @media (max-width: 768px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
+                max-width: 100% !important;
+            }
         }
         /* Top nav row — span lives in first column of same horizontal block */
         div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
@@ -917,8 +926,8 @@ def _render_employee_time_header(
     ot_threshold: float,
     eid: str,
 ) -> None:
-    """Name + weekly hours (left) and Quick Actions toggle (right); used for narrow cards and desktop sheet first column."""
-    c1, c2 = st.columns([1, 0.34], gap="small")
+    """Name + weekly hours (left) and Quick Actions lightning (right); used for narrow cards and desktop sheet first column."""
+    c1, c2 = st.columns([1, 0.22], gap="small")
     with c1:
         st.markdown(
             '<span class="ips-tt-emp-header-scope" aria-hidden="true"></span>',
@@ -1272,7 +1281,7 @@ def _tt_render_grid_section(
                 eid_e = str(er.get("employee_id") or "")
                 wd_e = str(er.get("work_date") or "")[:10]
                 if eid_e and wd_e:
-                    st.session_state[TT_OPEN_EMP_PANEL_KEY] = eid_e
+                    st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid_e
                     st.session_state[_tt_qa_day_key(eid_e)] = wd_e
                     st.session_state.pop(f"tt_qa_dpick_{eid_e}", None)
             st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
@@ -1296,6 +1305,9 @@ def _tt_render_grid_section(
         return None
 
     # —— Editable grid —— weekly timesheet: header + employee rows (wide) or stacked days (narrow)
+    if TT_OPEN_EMPLOYEE_KEY not in st.session_state:
+        st.session_state[TT_OPEN_EMPLOYEE_KEY] = None
+    st.session_state.pop("tt_open_employee_panel", None)
     day_col_totals = [0.0] * 7
     uid = current_profile().get("id")
     ts_now = datetime.now(timezone.utc).isoformat()
@@ -1326,22 +1338,8 @@ def _tt_render_grid_section(
                     ot_threshold=filt.ot_threshold,
                     eid=eid,
                 )
-                for di, d in enumerate(days):
-                    ds = _render_day_column_body(
-                        d=d,
-                        eid=eid,
-                        idx=week_data.idx,
-                        fj_id=fj_id,
-                        job_id_to_label=filt.job_id_to_label,
-                        show_day_heading=True,
-                    )
-                    day_col_totals[di] += ds
-                st.markdown(
-                    f'<p class="ips-tt-metric" style="text-align:right;margin-top:0.35rem;">Week Σ · {row_h:.1f} h</p>',
-                    unsafe_allow_html=True,
-                )
-                if st.session_state.get(TT_OPEN_EMP_PANEL_KEY) == eid:
-                    _render_quick_actions_panel(
+                if st.session_state.get(TT_OPEN_EMPLOYEE_KEY) == eid:
+                    _render_quick_actions_popup(
                         eid=eid,
                         emp_name=nm,
                         days=days,
@@ -1357,6 +1355,20 @@ def _tt_render_grid_section(
                         user_id=uid,
                         ts_iso=ts_now,
                     )
+                for di, d in enumerate(days):
+                    ds = _render_day_column_body(
+                        d=d,
+                        eid=eid,
+                        idx=week_data.idx,
+                        fj_id=fj_id,
+                        job_id_to_label=filt.job_id_to_label,
+                        show_day_heading=True,
+                    )
+                    day_col_totals[di] += ds
+                st.markdown(
+                    f'<p class="ips-tt-metric" style="text-align:right;margin-top:0.35rem;">Week Σ · {row_h:.1f} h</p>',
+                    unsafe_allow_html=True,
+                )
         else:
             row_container = st.container(border=True)
             with row_container:
@@ -1377,6 +1389,23 @@ def _tt_render_grid_section(
                         ot_threshold=filt.ot_threshold,
                         eid=eid,
                     )
+                    if st.session_state.get(TT_OPEN_EMPLOYEE_KEY) == eid:
+                        _render_quick_actions_popup(
+                            eid=eid,
+                            emp_name=nm,
+                            days=days,
+                            week_start=week_start,
+                            week_end=week_end,
+                            today=today,
+                            idx=week_data.idx,
+                            fj_id=fj_id,
+                            job_labels_sorted=filt.job_labels_sorted,
+                            job_label_to_id=filt.job_label_to_id,
+                            default_job_label=filt.default_job_label,
+                            fast=fast,
+                            user_id=uid,
+                            ts_iso=ts_now,
+                        )
                 for di, d in enumerate(days):
                     with hday[di]:
                         ds = _render_day_column_body(
@@ -1391,23 +1420,6 @@ def _tt_render_grid_section(
                 with hlast:
                     st.caption("Σ")
                     st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
-                if st.session_state.get(TT_OPEN_EMP_PANEL_KEY) == eid:
-                    _render_quick_actions_panel(
-                        eid=eid,
-                        emp_name=nm,
-                        days=days,
-                        week_start=week_start,
-                        week_end=week_end,
-                        today=today,
-                        idx=week_data.idx,
-                        fj_id=fj_id,
-                        job_labels_sorted=filt.job_labels_sorted,
-                        job_label_to_id=filt.job_label_to_id,
-                        default_job_label=filt.default_job_label,
-                        fast=fast,
-                        user_id=uid,
-                        ts_iso=ts_now,
-                    )
 
     return day_col_totals, grid_ratios
 
@@ -1461,7 +1473,7 @@ def render() -> None:
         _tt_render_footer_section(day_col_totals, days, grid_ratios)
 
 
-def _render_quick_actions_panel(
+def _render_quick_actions_popup(
     *,
     eid: str,
     emp_name: str,
@@ -1478,7 +1490,7 @@ def _render_quick_actions_panel(
     user_id,
     ts_iso: str,
 ) -> None:
-    """Single editing surface per employee: day context, bulk actions, and per-day entry editors."""
+    """Compact Quick Actions popup: day, bulk copy/fill/clear, entries and add for selected day."""
     _tt_init_qa_day(eid, days, today)
     wd_key = _tt_qa_day_key(eid)
     try:
@@ -1498,18 +1510,17 @@ def _render_quick_actions_panel(
 
     with st.container(border=True):
         st.markdown(
-            '<span class="ips-tt-qa-panel ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
+            '<span class="ips-quick-popup ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        st.markdown("#### Quick Actions")
-        st.caption("Pick a day on the grid with **Use this day**, or choose the working day below.")
+        st.caption("**Quick Actions** — grid **Use this day** or pick below.")
         picked_ix = st.selectbox(
-            "Working day",
+            "Day",
             list(range(len(days))),
             index=ix,
             format_func=_fmt_di,
             key=f"tt_qa_dpick_{eid}",
-            help="Entries and Add below apply to this day.",
+            help="Entries and Add apply to this day.",
         )
         cur_d = days[int(picked_ix)]
         st.session_state[wd_key] = cur_d.isoformat()
@@ -1517,12 +1528,11 @@ def _render_quick_actions_panel(
         _tt_render_qa_context_heading(emp_name, cur_d, today)
 
         st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-        st.caption("Copy the previous calendar day into the working day selected above.")
         if st.button(
-            "Copy previous day → working day",
+            "Copy prev → day",
             key=f"tt_cpday_{eid}",
             use_container_width=True,
-            help="Copy previous calendar day into the selected working day",
+            help="Copy previous calendar day into the day selected above",
         ):
             dest_date = cur_d
             from_date = dest_date - timedelta(days=1)
@@ -1614,7 +1624,7 @@ def _render_quick_actions_panel(
                 st.error(str(exc))
 
         st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-        st.subheader("Entries for this day")
+        st.markdown('<p class="ips-tt-field-label">Lines this day</p>', unsafe_allow_html=True)
         ents_all = idx.get((eid, wd_work), [])
         ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
         if not ents_show:
@@ -1991,7 +2001,7 @@ def _render_day_column_body(
 
     sel_k = _tt_qa_day_key(eid)
     sel_wd = str(st.session_state.get(sel_k) or "")[:10]
-    is_sel = sel_wd == wd and str(st.session_state.get(TT_OPEN_EMP_PANEL_KEY) or "") == eid
+    is_sel = sel_wd == wd and str(st.session_state.get(TT_OPEN_EMPLOYEE_KEY) or "") == eid
 
     if show_day_heading:
         st.markdown(
@@ -2032,7 +2042,7 @@ def _render_day_column_body(
             type="primary" if is_sel else "secondary",
         ):
             st.session_state[sel_k] = wd
-            st.session_state[TT_OPEN_EMP_PANEL_KEY] = eid
+            st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid
             st.session_state.pop(f"tt_qa_dpick_{eid}", None)
             st.rerun()
 
