@@ -7,7 +7,7 @@ try:
 except ImportError:
     from config import settings  # type: ignore
 
-from auth import init_session, sign_in, require_login, current_role
+from auth import init_session, must_reset_password, require_login, sign_in, update_password, current_role
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
 from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
@@ -131,6 +131,27 @@ def main() -> None:
                 st.rerun()
             except Exception as exc:
                 show_auth_error(exc)
+
+        st.stop()
+
+    if must_reset_password():
+        render_header("Set New Password")
+        st.caption("Your account requires a password reset before continuing.")
+
+        p1 = st.text_input("New password", type="password")
+        p2 = st.text_input("Confirm new password", type="password")
+
+        if st.button("Update password", type="primary", use_container_width=True):
+            if str(p1 or "").strip() != str(p2 or "").strip():
+                st.error("Passwords do not match.")
+                st.stop()
+            try:
+                update_password(str(p1 or ""))
+                st.success("Password updated.")
+                st.rerun()
+            except Exception as exc:
+                show_auth_error(exc)
+                st.stop()
 
         st.stop()
 

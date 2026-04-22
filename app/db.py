@@ -601,3 +601,73 @@ def create_auth_user(
         "role": role,
         "full_name": full_name,
     }
+
+
+def invite_auth_user(
+    *,
+    email: str,
+    role: str = "employee",
+) -> dict[str, Any]:
+    """
+    Invite a user by email (magic link) using Supabase Admin API.
+
+    Also ensures a `public.profiles` row exists with `must_reset_password=true`.
+    """
+    em = str(email or "").strip().lower()
+    if not em:
+        raise RuntimeError("Email is required.")
+
+    admin = get_admin_client()
+    try:
+        # supabase-py versions differ slightly; support both call shapes.
+        fn = getattr(admin.auth.admin, "invite_user_by_email", None)
+        if fn is None:
+            raise AttributeError("auth.admin.invite_user_by_email is not available in this Supabase client.")
+        try:
+            result = fn(em)
+        except TypeError:
+            result = fn({"email": em})
+    except Exception as exc:
+        raise RuntimeError(f"Could not send invite for {em!r}: {exc!r}") from exc
+
+    user = getattr(result, "user", None)
+    if user is None and isinstance(result, dict):
+        user = result.get("user")
+    if user is None:
+        raise RuntimeError(f"Supabase did not return an invited user. raw_result={result!r}")
+
+    user_id = getattr(user, "id", None) or (user.get("id") if isinstance(user, dict) else None)
+    user_email = getattr(user, "email", None) or (user.get("email") if isinstance(user, dict) else None) or em
+    if not user_id:
+        raise RuntimeError(f"Invite succeeded but Supabase did not return a user id. raw_user={user!r}")
+
+    profile_payload: dict[str, Any] = {
+        "id": user_id,
+        "email": user_email,
+        "role": role,
+        "is_active": True,
+        "must_reset_password": True,
+    }
+
+    # Upsert profile with service role (bypass RLS).
+    try:
+        existing = fetch_one("profiles", {"id": user_id})
+        if existing:
+            update_rows_admin("profiles", profile_payload, {"id": user_id})
+        else:
+            admin.table("profiles").insert(profile_payload).execute()
+    except Exception as exc:
+        raise RuntimeError(f"Invite sent, but creating the profile row failed: {exc!r}") from exc
+
+    return {"id": str(user_id), "email": str(user_email), "role": str(role)}
+
+
+def resend_invite_by_email(*, email: str) -> None:
+    """
+    Re-send an invite (magic link) to an existing email.
+    Supabase treats this as another invite operation.
+    """
+    em = str(email or "").strip().lower()
+    if not em:
+        raise RuntimeError("Email is required.")
+    _ = invite_auth_user(email=em, role="employee")

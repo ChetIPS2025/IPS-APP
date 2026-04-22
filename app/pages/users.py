@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import re
-from typing import Any
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -9,552 +8,138 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.branding import render_header
-    from app.db import create_auth_user, fetch_one, fetch_table, update_rows
+    from app.db import fetch_table_admin, invite_auth_user, resend_invite_by_email, update_rows_admin
 except ImportError:
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
-    from db import create_auth_user, fetch_one, fetch_table, update_rows  # type: ignore
+    from db import fetch_table_admin, invite_auth_user, resend_invite_by_email, update_rows_admin  # type: ignore
 
 try:
-    from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle
 except ImportError:
-    from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle  # type: ignore
 
-try:
-    from app.table_actions import (
-        TABLE_KEY_PEOPLE,
-        TABLE_KEY_USERS,
-        clear_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-        set_selected_ids,
-    )
-except ImportError:
-    from table_actions import (  # type: ignore
-        TABLE_KEY_PEOPLE,
-        TABLE_KEY_USERS,
-        clear_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-        set_selected_ids,
-    )
-
-_ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "pm", "admin")
-_MIN_PASSWORD_LENGTH = 8
-_MAX_EMAIL_LENGTH = 320
-
-# Profiles table does not use ``unified_id``; kept for consistency if a merged frame ever appears.
-_USERS_TABLE_HIDDEN_FIELDS: frozenset[str] = frozenset({"unified_id"})
-
-# Table display labels (underlying ``profiles`` columns unchanged in the database).
-_USERS_TABLE_DISPLAY_RENAME: dict[str, str] = {
-    "email": "Email",
-    "full_name": "Name",
-    "role": "Role",
-    "is_active": "Active",
-}
+_ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "manager", "admin")
 
 
-def _users_table_display_df(filtered: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    """Rename columns for a compact table; ``Email`` first. Returns (df for editor, visible column names)."""
-    base = [
-        c
-        for c in ("email", "full_name", "role", "is_active")
-        if c in filtered.columns and c not in _USERS_TABLE_HIDDEN_FIELDS
-    ]
-    rename = {k: v for k, v in _USERS_TABLE_DISPLAY_RENAME.items() if k in base}
-    show = [rename[k] for k in base if k in rename]
-    if "id" in filtered.columns:
-        out = filtered[base + ["id"]].copy()
-    else:
-        out = filtered[base].copy()
-    out.rename(columns=rename, inplace=True)
-    return out, show
-
-# Legacy: People page may pop this key on navigation (harmless if unused).
-USERS_PANEL_MODE = "users_panel_mode"
-
-
-def _normalize_email(raw: str) -> str:
-    return " ".join(str(raw or "").strip().split()).lower()
-
-
-def _email_looks_valid(email: str) -> bool:
-    """Lightweight check; Supabase still validates on create."""
-    s = email.strip()
-    if not s or len(s) > _MAX_EMAIL_LENGTH:
-        return False
-    return bool(re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", s))
-
-
-def _password_meets_policy(raw: str) -> bool:
-    return len(str(raw or "").strip()) >= _MIN_PASSWORD_LENGTH
-
-
-def _friendly_create_user_message(exc: BaseException) -> str:
-    """Map Supabase/db errors to operator-readable messages (no secrets)."""
-    chain: list[str] = []
-    cur: BaseException | None = exc
-    depth = 0
-    while cur is not None and depth < 8:
-        chain.append(str(cur).lower())
-        cur = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
-        depth += 1
-    blob = " ".join(chain)
-
-    if any(
-        x in blob
-        for x in (
-            "already registered",
-            "already exists",
-            "duplicate",
-            "user already",
-            "email address",
-            "unique constraint",
-        )
-    ):
-        return (
-            "That email is already in use (Supabase Auth or profiles). "
-            "Choose another email, or remove/reconcile the user in the Supabase dashboard."
-        )
-    if "password" in blob and any(
-        x in blob for x in ("short", "least", "weak", "invalid", "characters", "length")
-    ):
-        return (
-            f"Password was rejected. Use at least {_MIN_PASSWORD_LENGTH} characters "
-            "(consider letters, numbers, and symbols)."
-        )
-    if "invalid" in blob and "email" in blob:
-        return "Email format was rejected by Supabase. Check for typos and try again."
-    if "profiles upsert failed" in blob or ("profiles" in blob and "failed" in blob):
-        return (
-            "The auth user may have been created, but saving the profile row failed. "
-            "Check Supabase logs and the `profiles` table (RLS, triggers, constraints)."
-        )
-    return (
-        "Could not create the user. See **Technical details** below for the exact error, "
-        "or check Supabase Auth settings and network connectivity."
-    )
-
-
-def _run_create_user(
-    *,
-    email_norm: str,
-    pw: str,
-    fn: str,
-    new_role: str,
-    existing_emails: set[str],
-    clear_selection_table_key: str,
-    employee_id: str | None = None,
-) -> bool:
-    """Returns True if created successfully (caller reruns)."""
-    if not email_norm:
-        st.error("Email is required.")
-        return False
-    if not _email_looks_valid(email_norm):
-        st.error("Enter a valid email address (e.g. name@company.com).")
-        return False
-    if not _password_meets_policy(pw):
-        st.error(f"Temporary password must be at least {_MIN_PASSWORD_LENGTH} characters.")
-        return False
-    if new_role not in _ROLE_OPTIONS:
-        st.error("Invalid role selected.")
-        return False
-    if email_norm in existing_emails:
-        st.error(
-            "A profile with that email already exists. Use another email or edit the existing user."
-        )
-        return False
-
-    try:
-        created = create_auth_user(
-            email=email_norm,
-            password=pw,
-            role=new_role,
-            full_name=fn,
-        )
-    except Exception as exc:
-        st.error(_friendly_create_user_message(exc))
-        with st.expander("Technical details"):
-            st.code(repr(exc), language="text")
-        return False
-
-    new_id = str((created or {}).get("id") or "").strip()
-    if new_id:
-        # Optional link to employees (best-effort; profiles may not have employee_id yet).
-        if employee_id:
-            try:
-                update_rows("profiles", {"employee_id": str(employee_id)}, {"id": new_id})
-            except Exception:
-                pass
-        tkey = clear_selection_table_key
-        sel_val = f"p:{new_id}" if tkey == TABLE_KEY_PEOPLE else new_id
-        set_selected_ids(tkey, [sel_val])
-    em = str((created or {}).get("email") or email_norm)
-    st.toast(f"User created · {em}", icon="✅")
-    return True
-
-
-@st.dialog("Add User")
-def add_user_dialog(
-    *,
-    existing_emails: set[str],
-    clear_selection_table_key: str | None = None,
-) -> None:
-    """Modal entry path (empty list, People page); same validation as inline Add user."""
-    st.caption(f"Temporary password · min {_MIN_PASSWORD_LENGTH} characters")
-    c1, c2 = st.columns(2, gap="small")
-    new_email = c1.text_input("Email", key="dlg_users_add_email", max_chars=_MAX_EMAIL_LENGTH)
-    new_password = c2.text_input("Temporary password", type="password", key="dlg_users_add_password")
-    c3, c4 = st.columns(2, gap="small")
-    new_full_name = c3.text_input("Full name", key="dlg_users_add_full_name")
-    new_role = c4.selectbox("Role", list(_ROLE_OPTIONS), key="dlg_users_add_role")
-
-    emp_id: str | None = None
-    try:
-        emps = fetch_table("employees", columns="id,name,email", limit=5000, order_by="name")
-    except Exception:
-        emps = []
-    if emps:
-        labels = ["— Not linked —"] + [
-            f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
-            for e in emps
-            if e.get("id")
-        ]
-        pick = st.selectbox("Link to employee (optional)", labels, key="dlg_users_add_emp")
-        if pick and not pick.startswith("—"):
-            ix = labels.index(pick) - 1
-            try:
-                emp_id = str(emps[ix].get("id") or "").strip() or None
-            except Exception:
-                emp_id = None
-
-    st.divider()
-    bc, bs = st.columns(2, gap="small")
-    with bc:
-        if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_users_add_cancel"):
-            st.rerun()
-    with bs:
-        if st.button("Save", type="primary", use_container_width=True, key="dlg_users_add_save"):
-            email_norm = _normalize_email(new_email)
-            pw = str(new_password or "").strip()
-            fn = str(new_full_name or "").strip()
-            tkey = clear_selection_table_key or TABLE_KEY_USERS
-            if _run_create_user(
-                email_norm=email_norm,
-                pw=pw,
-                fn=fn,
-                new_role=new_role,
-                existing_emails=existing_emails,
-                clear_selection_table_key=tkey,
-                employee_id=emp_id,
-            ):
-                st.rerun()
-
-
-def _fetch_profile_row(profile_id: str) -> dict[str, Any] | None:
-    pid = str(profile_id or "").strip()
-    if not pid:
-        return None
-    try:
-        return fetch_one("profiles", {"id": pid})
-    except Exception:
-        return None
-
-
-def _render_users_toolbar(*, sel: list[str], existing_emails: set[str]) -> None:
-    """Customers-style bar: selection summary, Add User, Clear selection."""
-    inject_ips_crud_list_styles()
-    inject_table_action_styles()
-    n = len(sel)
-
-    with st.container(border=True):
-        st.markdown('<div class="ips-crud-toolbar-root"></div>', unsafe_allow_html=True)
-        left, b_add, b_clear = st.columns([1.15, 1, 1], gap="small")
-        with left:
-            st.markdown(
-                f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
-                unsafe_allow_html=True,
-            )
-        with b_add:
-            if st.button("Add User", type="primary", use_container_width=True, key="users_btn_add"):
-                add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=TABLE_KEY_USERS)
-        with b_clear:
-            if n and st.button("Clear selection", type="secondary", use_container_width=True, key="users_btn_clear_sel"):
-                clear_selected_ids(TABLE_KEY_USERS)
-                st.rerun()
-
-
-def _render_edit_user_panel(
-    *,
-    profile_row: dict[str, Any],
-    clear_selection_table_key: str | None = None,
-    embedded_in_people: bool = False,
-    show_outer_heading: bool = True,
-) -> None:
-    """Editable fields for one profile; keys include user id so switching rows remounts widgets."""
-    inject_ips_crud_list_styles()
-    uid = str(profile_row.get("id") or "")
-    pk = f"users_ed_{uid}"
-
-    role_options = list(_ROLE_OPTIONS)
-    cur_role = str(profile_row.get("role") or "viewer")
-    if cur_role not in role_options:
-        cur_role = "viewer"
-
-    email_display = str(profile_row.get("email") or "").strip()
-
-    if show_outer_heading and not embedded_in_people:
-        st.markdown("##### Details")
-    if not embedded_in_people:
-        st.caption(
-            "Updates **profiles**. Login email is changed in **Supabase Auth**, not here."
-        )
-    else:
-        st.caption(
-            "Profile fields · login email is managed in **Supabase Auth** if you need to change it."
-        )
-
-    st.text_input(
-        "Email",
-        value=email_display or "—",
-        disabled=True,
-        key=f"{pk}_email_ro",
-    )
-    fn = st.text_input(
-        "Full name",
-        value=str(profile_row.get("full_name") or ""),
-        key=f"{pk}_full_name",
-    )
-    r1, r2 = st.columns(2, gap="small")
-    with r1:
-        edit_role = st.selectbox(
-            "Role",
-            role_options,
-            index=role_options.index(cur_role),
-            key=f"{pk}_role",
-        )
-    with r2:
-        edit_active = st.checkbox(
-            "Active",
-            value=bool(profile_row.get("is_active", True)),
-            key=f"{pk}_active",
-            help="Inactive users cannot sign in.",
-        )
-
-    # Optional employee link (best-effort; profiles may not have employee_id yet).
-    emp_id: str | None = None
-    try:
-        cur_emp = str(profile_row.get("employee_id") or "").strip() or None
-    except Exception:
-        cur_emp = None
-    try:
-        emps = fetch_table("employees", columns="id,name,email", limit=5000, order_by="name")
-    except Exception:
-        emps = []
-    if emps:
-        labels = ["— Not linked —"] + [
-            f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
-            for e in emps
-            if e.get("id")
-        ]
-        default = "— Not linked —"
-        if cur_emp:
-            for e in emps:
-                if str(e.get("id")) == cur_emp:
-                    default = f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
-                    if default not in labels:
-                        labels.append(default)
-                    break
-        pick = st.selectbox(
-            "Linked employee (optional)",
-            labels,
-            index=labels.index(default) if default in labels else 0,
-            key=f"{pk}_emp_link",
-        )
-        if pick and not pick.startswith("—"):
-            ix = labels.index(pick) - 1
-            try:
-                emp_id = str(emps[ix].get("id") or "").strip() or None
-            except Exception:
-                emp_id = None
-
-    u1, u2 = st.columns(2, gap="small")
-    with u1:
-        if st.button("Update User", type="primary", use_container_width=True, key=f"{pk}_update"):
-            try:
-                payload = {
-                    "full_name": str(fn or "").strip(),
-                    "role": edit_role,
-                    "is_active": bool(edit_active),
-                }
-                if emp_id is not None:
-                    payload["employee_id"] = emp_id
-                update_rows("profiles", payload, {"id": profile_row["id"]})
-            except Exception as exc:
-                st.error(
-                    "Could not save profile changes. Check RLS policies and database connectivity."
-                )
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
-                st.stop()
-
-            st.success("User updated.")
-            clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
-            st.rerun()
-    with u2:
-        if st.button("Clear selection", use_container_width=True, key=f"{pk}_clear_sel"):
-            clear_selected_ids(clear_selection_table_key or TABLE_KEY_USERS)
-            st.rerun()
-
-
-def _render_users_right_panel(
-    *,
-    sel: list[str],
-    existing_emails: set[str],
-) -> None:
-    """Right column: selected user only — **Add User** uses the toolbar dialog (single create path)."""
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Selected user")
-        st.caption(
-            "**Add User** is in the toolbar (dialog). Select **one** row below to edit name, role, and active status."
-        )
-
-        if len(sel) != 1:
-            st.info("Select **exactly one** user in the table to edit.")
-            return
-
-        uid = str(sel[0]).strip()
-        row = _fetch_profile_row(uid)
-        if not row:
-            st.warning("User not found (it may have been removed).")
-            clear_selected_ids(TABLE_KEY_USERS)
-            st.rerun()
-            return
-
-        _render_edit_user_panel(
-            profile_row=row,
-            clear_selection_table_key=TABLE_KEY_USERS,
-            embedded_in_people=False,
-            show_outer_heading=False,
-        )
-
-
-def _render_users_main(*, df: pd.DataFrame, existing_emails: set[str]) -> list[str]:
-    """Filters + table + toolbar. Returns current selection ids."""
-    if df.empty:
-        st.info("No users found.")
-        if st.button("Add User", type="primary", use_container_width=True, key="users_empty_add"):
-            add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=TABLE_KEY_USERS)
-        return []
-
-    f1, f2 = st.columns([2, 1], gap="small")
-    with f1:
-        st.markdown(
-            '<span class="ips-crud-filter-row-start" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        st.text_input(
-            "Search",
-            placeholder="Email, name, role",
-            key="users_list_search",
-        )
-    active_options = ["All", "Active only", "Inactive only"]
-    f2.selectbox("Status", active_options, key="users_list_status_filter")
-
-    search = str(st.session_state.get("users_list_search", "") or "")
-    selected_active = str(st.session_state.get("users_list_status_filter", "All") or "All")
-
-    filtered = df.copy()
-    if "is_active" in filtered.columns:
-        if selected_active == "Active only":
-            filtered = filtered[filtered["is_active"] == True]  # noqa: E712
-        elif selected_active == "Inactive only":
-            filtered = filtered[filtered["is_active"] == False]  # noqa: E712
-
-    if search.strip():
-        s = search.strip().lower()
-        mask = filtered.astype(str).apply(
-            lambda col: col.str.lower().str.contains(s, na=False, regex=False)
-        )
-        filtered = filtered[mask.any(axis=1)]
-
-    if filtered.empty:
-        st.warning("No users match your filters.")
-        if st.button("Add User", type="primary", use_container_width=True, key="users_filtered_empty_add"):
-            add_user_dialog(existing_emails=existing_emails, clear_selection_table_key=TABLE_KEY_USERS)
-        return []
-
-    disp_tab, show_cols = _users_table_display_df(filtered)
-    # Display copy only: never show unified_id if present (selection uses ``id`` on ``disp_tab``).
-    disp_tab = disp_tab.drop(columns=[c for c in _USERS_TABLE_HIDDEN_FIELDS if c in disp_tab.columns], errors="ignore")
-    show_cols = [c for c in show_cols if c not in _USERS_TABLE_HIDDEN_FIELDS]
-
-    st.caption("Use the **checkbox** column to select a user — the **User panel** updates immediately.")
-
-    if "id" not in filtered.columns:
-        st.dataframe(disp_tab[show_cols], use_container_width=True, hide_index=True)
-        return []
-
-    bar_ph = st.empty()
-    _, sel = render_selectable_dataframe(
-        disp_tab,
-        table_key=TABLE_KEY_USERS,
-        id_column="id",
-        columns=show_cols,
-        editor_key="users_sel_editor",
-        hide_id_column=True,
-    )
-    with bar_ph.container():
-        _render_users_toolbar(sel=sel, existing_emails=existing_emails)
-
-    return sel
-
-
-def render_body(*, compact: bool = False) -> None:
-    """Profiles / auth UI without page header (used by the ``Users`` combined page)."""
-    if current_role() != "admin":
-        st.error("Admin only")
-        return
-
-    try:
-        users = fetch_table("profiles", limit=1000, order_by="email")
-    except Exception as exc:
-        st.error("Could not load user profiles from the database.")
-        with st.expander("Technical details"):
-            st.code(repr(exc), language="text")
-        return
-
-    df = pd.DataFrame(users)
-    existing_emails = {_normalize_email(str(u.get("email", ""))) for u in users if u.get("email")}
-    if not compact:
-        render_crud_list_subtitle(
-            "User list on the left; **Add User** opens a dialog from the toolbar. Select one row to edit on the right."
-        )
-
-    if df.empty:
-        _render_users_main(df=df, existing_emails=existing_emails)
-        return
-
-    main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-    with main_col:
-        sel = _render_users_main(df=df, existing_emails=existing_emails)
-    with side_col:
-        _render_users_right_panel(sel=sel, existing_emails=existing_emails)
+def _fmt_ts(v: object) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.isoformat(sep=" ", timespec="seconds")
+    return str(v)
 
 
 def render() -> None:
     render_header("Users")
-    render_body(compact=False)
+
+    if current_role() != "admin":
+        st.error("Unauthorized. Admin access required.")
+        return
+
+    inject_ips_crud_list_styles()
+    render_crud_list_subtitle("Invite users, manage roles, deactivate accounts, and resend invites.")
+
+    with st.container(border=True):
+        c1, c2 = st.columns([2, 1], gap="small")
+        invite_email = c1.text_input("Email", placeholder="name@company.com", key="users_invite_email")
+        default_role = c2.selectbox("Default role", list(_ROLE_OPTIONS), index=_ROLE_OPTIONS.index("employee"))
+        if st.button("Send Invite", type="primary", use_container_width=True, key="users_send_invite_btn"):
+            try:
+                invited = invite_auth_user(email=invite_email, role=str(default_role))
+                st.success(f"Invite sent to {invited.get('email')}.")
+                st.rerun()
+            except Exception as exc:
+                st.error("Could not send invite.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+
+    try:
+        rows = fetch_table_admin(
+            "profiles",
+            columns="id,email,role,created_at,must_reset_password,is_active",
+            limit=2000,
+            order_by="email",
+        )
+    except Exception as exc:
+        st.error("Could not load profiles. Check SUPABASE_SERVICE_ROLE_KEY and database permissions.")
+        with st.expander("Technical details"):
+            st.code(repr(exc), language="text")
+        return
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        st.info("No users found.")
+        return
+
+    # Display table per spec: email, role, created_at
+    view = df.copy()
+    if "created_at" in view.columns:
+        view["created_at"] = view["created_at"].map(_fmt_ts)
+    for col in ("email", "role", "created_at"):
+        if col not in view.columns:
+            view[col] = ""
+
+    st.caption("Edit role/active status below and click **Save changes**.")
+    edited = st.data_editor(
+        view[["email", "role", "created_at", "must_reset_password", "is_active", "id"]],
+        hide_index=True,
+        use_container_width=True,
+        disabled=["email", "created_at", "id"],
+        column_config={
+            "role": st.column_config.SelectboxColumn("role", options=list(_ROLE_OPTIONS), required=True),
+            "must_reset_password": st.column_config.CheckboxColumn("must_reset_password"),
+            "is_active": st.column_config.CheckboxColumn("is_active"),
+            "id": st.column_config.TextColumn("id", disabled=True),
+        },
+        key="users_profiles_editor",
+    )
+
+    b1, b2 = st.columns([1, 1], gap="small")
+    with b1:
+        if st.button("Save changes", type="primary", use_container_width=True, key="users_save_changes"):
+            try:
+                # Compare row-by-row by id; apply only changed fields.
+                base_by_id = {str(r.get("id")): r for r in rows if r.get("id")}
+                changed = 0
+                for _, erow in edited.iterrows():
+                    uid = str(erow.get("id") or "").strip()
+                    if not uid or uid not in base_by_id:
+                        continue
+                    before = base_by_id[uid]
+                    new_role = str(erow.get("role") or "viewer").strip().lower()
+                    if new_role in {"pm", "estimator"}:
+                        new_role = "manager"
+                    if new_role not in _ROLE_OPTIONS:
+                        new_role = "viewer"
+                    new_active = bool(erow.get("is_active", True))
+                    new_mrpw = bool(erow.get("must_reset_password", False))
+                    payload = {}
+                    if str(before.get("role") or "").strip().lower() != new_role:
+                        payload["role"] = new_role
+                    if bool(before.get("is_active", True)) != new_active:
+                        payload["is_active"] = new_active
+                    if bool(before.get("must_reset_password", False)) != new_mrpw:
+                        payload["must_reset_password"] = new_mrpw
+                    if payload:
+                        update_rows_admin("profiles", payload, {"id": uid})
+                        changed += 1
+                if changed:
+                    st.success(f"Saved {changed} update(s).")
+                else:
+                    st.info("No changes to save.")
+                st.rerun()
+            except Exception as exc:
+                st.error("Could not save changes.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+    with b2:
+        sel_email = st.text_input("Resend invite to email", placeholder="name@company.com", key="users_resend_email")
+        if st.button("Resend invite", use_container_width=True, key="users_resend_invite_btn"):
+            try:
+                resend_invite_by_email(email=sel_email)
+                st.success("Invite sent.")
+            except Exception as exc:
+                st.error("Could not resend invite.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")

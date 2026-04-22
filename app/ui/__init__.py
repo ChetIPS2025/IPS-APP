@@ -75,7 +75,7 @@ _NAV_RESOURCES: tuple[str, ...] = (
 )
 
 # Role-based page access (UI hiding + routing validation; main.py enforces too).
-# Supported roles: admin, pm, employee, viewer. Legacy estimator is normalized to pm in auth.current_role().
+# Supported roles: admin, manager, employee, viewer.
 _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "admin": frozenset(
         {
@@ -90,30 +90,21 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Asset Manager",
         }
     ),
-    "pm": frozenset(
+    "manager": frozenset(
         {
             "Dashboard",
             "Job Database",
             "Estimates",
             "Customers",
             "Job Costing",
-            "Time Tracking",
-            "Inventory",
-            "Scan Inventory",
-            "Inventory Usage",
-            "Asset Database",
-            "Tool Checkout",
-            "Who Has What",
-            "Asset Scanner",
-            "Weekly Timesheet",
-            "PM Matrix Time Entry",
-            "Employee Toolbox",
+            # Add reporting pages here when present
         }
     ),
     "employee": frozenset(
         {
             "Dashboard",
             "Time Tracking",
+            "Asset Database",
             "Scan Inventory",
             "Inventory Usage",
             "Tool Checkout",
@@ -127,6 +118,8 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
 
 def role_can_open_page(role: str, page: str) -> bool:
     r = str(role or "viewer").strip().lower()
+    if r in {"pm", "estimator"}:
+        r = "manager"
     allowed = _ROLE_ALLOWED_PAGES.get(r)
     if allowed is None:
         allowed = _ROLE_ALLOWED_PAGES.get("viewer", frozenset())
@@ -392,7 +385,7 @@ def render_sidebar() -> str:
     _sidebar_brand()
 
     profile = current_profile()
-    st.sidebar.caption(profile.get("email", "Not signed in"))
+    st.sidebar.caption(f"Logged in as: {profile.get('email', '—')}")
     st.sidebar.caption(f"Role: {profile.get('role', 'viewer')}")
 
     render_install_app_sidebar_block()
@@ -459,5 +452,5 @@ def render_sidebar() -> str:
                 st.rerun()
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
-    st.sidebar.button("Sign out", on_click=sign_out, use_container_width=True)
+    st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)
     return current
