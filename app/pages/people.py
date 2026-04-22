@@ -7,12 +7,13 @@ import streamlit as st
 
 from auth import current_role
 from branding import render_header
+from datetime import datetime
 
 try:
     from app.ips_crud_list_styles import render_crud_list_subtitle
 except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
-from db import delete_rows_admin, fetch_one, fetch_table, update_rows
+from db import delete_rows_admin, fetch_one, fetch_table, fetch_table_admin, update_rows, update_rows_admin
 
 try:
     from ui import IPS_NAV_PAGE_KEY
@@ -95,7 +96,6 @@ _PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
         "unifiedid",
         "acctactive",
         "empactive",
-        "approle",
         "trade",
     }
 )
@@ -109,7 +109,7 @@ def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
         for c in col_list
         if c not in HIDDEN_FIELDS and _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS
     ]
-    preferred = ["Kind", "Name", "Email", "Job role", "Hourly"]
+    preferred = ["Kind", "Name", "Email", "Employee Job Role", "Access Role", "Hourly rate"]
     ordered = [c for c in preferred if c in kept]
     tail = [c for c in kept if c not in ordered]
     return ordered + tail
@@ -142,12 +142,15 @@ def _employee_ids_from_selection(sel: list[str]) -> list[str]:
 
 
 def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[str, Any]]) -> pd.DataFrame:
-    """Merge rows where ``profiles.full_name`` matches ``employees.name`` (case-insensitive)."""
-    emp_by_name: dict[str, dict[str, Any]] = {}
+    """Merge employees and profiles by email (case-insensitive)."""
+    def _norm_email(v: object) -> str:
+        return " ".join(str(v or "").strip().lower().split())
+
+    emp_by_email: dict[str, dict[str, Any]] = {}
     for e in employees or []:
-        k = _norm_join(str(e.get("name") or ""))
-        if k and k not in emp_by_name:
-            emp_by_name[k] = e
+        em = _norm_email(e.get("email"))
+        if em and em not in emp_by_email:
+            emp_by_email[em] = e
 
     matched_emp: set[str] = set()
     rows: list[dict[str, Any]] = []
@@ -156,9 +159,13 @@ def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[st
         pid = str(p.get("id") or "").strip()
         if not pid:
             continue
-        fn_key = _norm_join(str(p.get("full_name") or ""))
-        em = emp_by_name.get(fn_key) if fn_key else None
+        p_email_norm = _norm_email(p.get("email"))
+        em = emp_by_email.get(p_email_norm) if p_email_norm else None
         eid = str(em.get("id") or "").strip() if isinstance(em, dict) else ""
+
+        raw_role = p.get("role")
+        role_norm = str(raw_role or "").strip().lower()
+        access_role = "employee" if not role_norm else role_norm
 
         if em and eid and eid not in matched_emp:
             matched_emp.add(eid)
@@ -166,29 +173,34 @@ def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[st
                 {
                     "unified_id": f"m:{eid}:{pid}",
                     "Kind": "Linked",
-                    "Name": str(p.get("full_name") or em.get("name") or "").strip(),
-                    "Email": str(p.get("email") or "").strip(),
-                    "Job role": str(em.get("role") or "").strip(),
-                    "Trade": str(em.get("trade") or "").strip(),
-                    "Hourly": em.get("hourly_rate"),
-                    "App role": str(p.get("role") or "").strip(),
-                    "Emp active": bool(em.get("is_active", True)),
-                    "Acct active": bool(p.get("is_active", True)),
+                    # Employee/job fields (source of truth: public.employees)
+                    "name": str(em.get("name") or p.get("full_name") or "").strip(),
+                    "email": str(em.get("email") or p.get("email") or "").strip(),
+                    "employee_job_role": str(em.get("role") or "").strip(),
+                    "hourly_rate": em.get("hourly_rate"),
+                    # Auth/profile fields (source of truth: public.profiles)
+                    "access_role": access_role,
+                    "must_reset_password": bool(p.get("must_reset_password", False)),
+                    "is_active": bool(p.get("is_active", True)),
+                    "created_at": p.get("created_at"),
+                    # Employee active is still useful for roster ops; keep it but hide by default.
+                    "emp_is_active": bool(em.get("is_active", True)),
                 }
             )
         else:
             rows.append(
                 {
                     "unified_id": f"p:{pid}",
-                    "Kind": "Account",
-                    "Name": str(p.get("full_name") or "").strip(),
-                    "Email": str(p.get("email") or "").strip(),
-                    "Job role": "",
-                    "Trade": "",
-                    "Hourly": None,
-                    "App role": str(p.get("role") or "").strip(),
-                    "Emp active": "",
-                    "Acct active": bool(p.get("is_active", True)),
+                    "Kind": "Login",
+                    "name": str(p.get("full_name") or "").strip(),
+                    "email": str(p.get("email") or "").strip(),
+                    "employee_job_role": "",
+                    "hourly_rate": None,
+                    "access_role": access_role,
+                    "must_reset_password": bool(p.get("must_reset_password", False)),
+                    "is_active": bool(p.get("is_active", True)),
+                    "created_at": p.get("created_at"),
+                    "emp_is_active": "",
                 }
             )
 
@@ -200,14 +212,15 @@ def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[st
             {
                 "unified_id": f"e:{eid}",
                 "Kind": "Employee",
-                "Name": str(e.get("name") or "").strip(),
-                "Email": str(e.get("email") or "").strip(),
-                "Job role": str(e.get("role") or "").strip(),
-                "Trade": str(e.get("trade") or "").strip(),
-                "Hourly": e.get("hourly_rate"),
-                "App role": "",
-                "Emp active": bool(e.get("is_active", True)),
-                "Acct active": "",
+                "name": str(e.get("name") or "").strip(),
+                "email": str(e.get("email") or "").strip(),
+                "employee_job_role": str(e.get("role") or "").strip(),
+                "hourly_rate": e.get("hourly_rate"),
+                "access_role": "No login profile",
+                "must_reset_password": "",
+                "is_active": "",
+                "created_at": "",
+                "emp_is_active": bool(e.get("is_active", True)),
             }
         )
 
@@ -222,7 +235,7 @@ def _apply_people_filters(df: pd.DataFrame, *, search: str, status: str) -> pd.D
         out = out[blob.any(axis=1)]
     if status == "Active only":
         def _row_active(r: pd.Series) -> bool:
-            ea, aa = r.get("Emp active"), r.get("Acct active")
+            ea, aa = r.get("emp_is_active"), r.get("is_active")
             ok_e = ea == "" or ea is True or ea is None
             ok_a = aa == "" or aa is True or aa is None
             if isinstance(ea, bool) and isinstance(aa, bool):
@@ -237,7 +250,7 @@ def _apply_people_filters(df: pd.DataFrame, *, search: str, status: str) -> pd.D
     elif status == "Inactive only":
 
         def _row_inactive(r: pd.Series) -> bool:
-            ea, aa = r.get("Emp active"), r.get("Acct active")
+            ea, aa = r.get("emp_is_active"), r.get("is_active")
             if isinstance(ea, bool) and ea is False:
                 return True
             if isinstance(aa, bool) and aa is False:
@@ -250,10 +263,28 @@ def _apply_people_filters(df: pd.DataFrame, *, search: str, status: str) -> pd.D
 
 def _display_df_for_editor(filtered: pd.DataFrame) -> pd.DataFrame:
     disp = filtered.copy()
-    if "Hourly" in disp.columns:
-        disp["Hourly"] = disp["Hourly"].map(
+    if "hourly_rate" in disp.columns:
+        disp["hourly_rate"] = disp["hourly_rate"].map(
             lambda v: emp_mod._money(v) if v is not None and str(v).strip() != "" else "—"
         )
+    if "created_at" in disp.columns:
+        def _fmt(v: object) -> str:
+            if v is None or v == "":
+                return ""
+            if isinstance(v, datetime):
+                return v.isoformat(sep=" ", timespec="seconds")
+            return str(v)
+        disp["created_at"] = disp["created_at"].map(_fmt)
+
+    # Presentation-only column labels (keep internal keys stable for selection + filters).
+    rename = {
+        "name": "Name",
+        "email": "Email",
+        "employee_job_role": "Employee Job Role",
+        "access_role": "Access Role",
+        "hourly_rate": "Hourly rate",
+    }
+    disp.rename(columns={k: v for k, v in rename.items() if k in disp.columns}, inplace=True)
     return disp
 
 
@@ -442,11 +473,45 @@ def _render_right_panel(
             prow = usr_mod._fetch_profile_row(pid)
             if prow:
                 st.markdown("##### User account")
-                usr_mod._render_edit_user_panel(
-                    profile_row=prow,
-                    clear_selection_table_key=TABLE_KEY_PEOPLE,
-                    embedded_in_people=True,
+                # Access role editor (source of truth: public.profiles.role)
+                role_opts = ["admin", "manager", "employee", "viewer"]
+                cur = str(prow.get("role") or "").strip().lower() or "employee"
+                if cur not in role_opts:
+                    cur = "employee"
+                access_role = st.selectbox(
+                    "access_role",
+                    role_opts,
+                    index=role_opts.index(cur),
+                    key=f"people_access_role_{pid}",
+                    help="Access Role controls app permissions (not payroll/work role).",
                 )
+                must_reset = st.checkbox(
+                    "must_reset_password",
+                    value=bool(prow.get("must_reset_password", False)),
+                    key=f"people_mrpw_{pid}",
+                )
+                acct_active = st.checkbox(
+                    "is_active",
+                    value=bool(prow.get("is_active", True)),
+                    key=f"people_acct_active_{pid}",
+                )
+                if st.button("Save access settings", type="primary", use_container_width=True, key=f"people_save_access_{pid}"):
+                    try:
+                        update_rows_admin(
+                            "profiles",
+                            {
+                                "role": str(access_role),
+                                "must_reset_password": bool(must_reset),
+                                "is_active": bool(acct_active),
+                            },
+                            {"id": pid},
+                        )
+                        st.success("Access settings updated.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("Could not update access settings.")
+                        with st.expander("Technical details"):
+                            st.code(repr(exc), language="text")
             else:
                 st.warning("Profile not found.")
 
@@ -480,12 +545,23 @@ def render() -> None:
         employees = []
 
     try:
-        profiles = list(fetch_table("profiles", limit=1000, order_by="email") or [])
+        profiles = list(
+            fetch_table_admin(
+                "profiles",
+                columns="id,email,role,must_reset_password,created_at,is_active,full_name",
+                limit=2000,
+                order_by="email",
+            )
+            or []
+        )
     except Exception as exc:
         st.error(f"Could not load profiles: {exc}")
         profiles = []
 
     unified = _build_unified_frame(employees, profiles)
+
+    st.caption("Employee Job Role = payroll/work role")
+    st.caption("Access Role = app permissions")
 
     _render_delete_confirm(df=unified)
 
