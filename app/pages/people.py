@@ -433,9 +433,11 @@ def _render_right_panel(
             )
             return
 
+        edit_mode = str(panel or "list") == "detail"
+
         uid = sel[0]
         eid, _ = _parse_unified_id(uid)
-        st.markdown("### Edit selected")
+        st.markdown("### Edit selected" if edit_mode else "### Details")
         st.caption(f"Row `{uid[:18]}…`" if len(uid) > 18 else f"Row `{uid}`")
 
         if not eid:
@@ -455,11 +457,16 @@ def _render_right_panel(
             employees_has_email = False
 
         pk = f"people_emp_{eid}"
-        ed_name = st.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
+        ed_name = st.text_input(
+            "Name",
+            value=str(row.get("name") or ""),
+            disabled=not edit_mode,
+            key=f"{pk}_name",
+        )
         ed_email = st.text_input(
             "Email",
             value=str(row.get("email") or ""),
-            disabled=not employees_has_email,
+            disabled=(not edit_mode) or (not employees_has_email),
             help=(
                 "Changing email affects login linkage (match is by email). "
                 "If employees.email is not enabled in the database yet, this field cannot be saved."
@@ -467,13 +474,19 @@ def _render_right_panel(
             key=f"{pk}_email",
         )
         c1, c2 = st.columns(2, gap="small")
-        ed_job_role = c1.text_input("Employee Job Role", value=str(row.get("role") or ""), key=f"{pk}_job_role")
+        ed_job_role = c1.text_input(
+            "Employee Job Role",
+            value=str(row.get("role") or ""),
+            disabled=not edit_mode,
+            key=f"{pk}_job_role",
+        )
         ed_hr = c2.number_input(
             "Hourly rate",
             min_value=0.0,
             value=float(row.get("hourly_rate", 0) or 0),
             step=0.5,
             format="%.2f",
+            disabled=not edit_mode,
             key=f"{pk}_hr",
         )
 
@@ -517,7 +530,12 @@ def _render_right_panel(
             )
             b0, b1 = st.columns(2, gap="small")
             with b0:
-                if st.button("Resend Invite", use_container_width=True, key=f"{pk}_resend"):
+                if st.button(
+                    "Resend Invite",
+                    use_container_width=True,
+                    disabled=not edit_mode,
+                    key=f"{pk}_resend",
+                ):
                     try:
                         resend_invite_by_email(email=prof_email)
                         st.success("Invite sent.")
@@ -526,7 +544,13 @@ def _render_right_panel(
                         with st.expander("Technical details"):
                             st.code(repr(exc), language="text")
             with b1:
-                if st.button("Save changes", type="primary", use_container_width=True, key=f"{pk}_save"):
+                if st.button(
+                    "Save changes",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not edit_mode,
+                    key=f"{pk}_save",
+                ):
                     try:
                         emp_payload = {
                             "name": str(ed_name or "").strip(),
@@ -537,16 +561,14 @@ def _render_right_panel(
                             emp_payload["email"] = str(ed_email or "").strip() or None
                         update_rows("employees", emp_payload, {"id": eid})
                         if prof_id:
-                            update_rows_admin(
-                                "profiles",
-                                {
-                                    "role": str(access_role),
-                                    "must_reset_password": bool(must_reset),
-                                    "is_active": bool(acct_active),
-                                    "email": (str(ed_email or "").strip() or None) if employees_has_email else None,
-                                },
-                                {"id": prof_id},
-                            )
+                            prof_payload: dict[str, Any] = {
+                                "role": str(access_role),
+                                "must_reset_password": bool(must_reset),
+                                "is_active": bool(acct_active),
+                            }
+                            if employees_has_email:
+                                prof_payload["email"] = str(ed_email or "").strip() or None
+                            update_rows_admin("profiles", prof_payload, {"id": prof_id})
                         st.success("Saved.")
                         st.rerun()
                     except Exception as exc:
@@ -556,7 +578,13 @@ def _render_right_panel(
         else:
             st.text_input("Access Role", value="No login", disabled=True, key=f"{pk}_no_login_role")
             st.checkbox("Login enabled", value=False, disabled=True, key=f"{pk}_no_login_enabled")
-            if st.button("Enable Login / Send Invite", type="primary", use_container_width=True, key=f"{pk}_enable_login"):
+            if st.button(
+                "Enable Login / Send Invite",
+                type="primary",
+                use_container_width=True,
+                disabled=not edit_mode,
+                key=f"{pk}_enable_login",
+            ):
                 if not employees_has_email:
                     st.error("Cannot invite: `employees.email` column is not enabled in this database yet.")
                     return
