@@ -149,6 +149,20 @@ def _render_job_db_job_name_cell(container: Any, raw: Any, *, max_len: int = 40)
         container.text(display)
 
 
+def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 20) -> None:
+    txt = str(value or "").strip()
+    short = txt[:max_len] + ("…" if len(txt) > max_len else "")
+    if not txt:
+        container.text("")
+        return
+    container.markdown(
+        f"<span title='{html.escape(txt, quote=True)}' "
+        "style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+        f"{html.escape(short)}</span>",
+        unsafe_allow_html=True,
+    )
+
+
 JOB_STATUSES = [
     "Draft",
     "Quoted",
