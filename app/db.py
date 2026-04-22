@@ -671,3 +671,30 @@ def resend_invite_by_email(*, email: str) -> None:
     if not em:
         raise RuntimeError("Email is required.")
     _ = invite_auth_user(email=em, role="employee")
+
+
+def update_auth_user_email_admin(*, user_id: str, new_email: str) -> None:
+    """
+    Update the Supabase Auth user's email via Admin API (service role).
+
+    Uses the admin client created with SUPABASE_SERVICE_ROLE_KEY (preferred).
+    """
+    uid = str(user_id or "").strip()
+    em = str(new_email or "").strip().lower()
+    if not uid:
+        raise RuntimeError("Auth user id is required.")
+    if not em or "@" not in em:
+        raise RuntimeError("A valid email is required.")
+
+    admin = get_admin_client()
+    try:
+        fn = getattr(admin.auth.admin, "update_user_by_id", None)
+        if fn is None:
+            raise AttributeError("auth.admin.update_user_by_id is not available in this Supabase client.")
+        try:
+            fn(uid, {"email": em})
+        except TypeError:
+            # Some versions accept a single dict payload.
+            fn({"uid": uid, "attributes": {"email": em}})
+    except Exception as exc:
+        raise RuntimeError(f"Could not update auth email for user_id={uid!r}: {exc!r}") from exc

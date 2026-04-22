@@ -20,6 +20,7 @@ from db import (
     fetch_table_admin,
     invite_auth_user,
     resend_invite_by_email,
+    update_auth_user_email_admin,
     update_rows,
     update_rows_admin,
 )
@@ -526,7 +527,7 @@ def _render_right_panel(
             )
             st.info(
                 "Changing email for a login user may require updating **Supabase Auth** email too. "
-                "This screen updates `profiles.email`; update Auth email via admin Auth flow if needed."
+                "This screen will update authentication email and may require re-login."
             )
             b0, b1 = st.columns(2, gap="small")
             with b0:
@@ -552,6 +553,16 @@ def _render_right_panel(
                     key=f"{pk}_save",
                 ):
                     try:
+                        old_emp_email = str(row.get("email") or "").strip()
+                        old_prof_email = str(prof_email or "").strip()
+                        new_email = str(ed_email or "").strip()
+                        email_changed = bool(employees_has_email) and (new_email.lower() != old_emp_email.lower())
+
+                        # If linked login exists and email changes, update Auth email first to avoid partial DB updates
+                        # when Auth update fails.
+                        if email_changed and prof_id:
+                            update_auth_user_email_admin(user_id=str(prof_id), new_email=new_email)
+
                         emp_payload = {
                             "name": str(ed_name or "").strip(),
                             "role": str(ed_job_role or "").strip(),
@@ -572,6 +583,13 @@ def _render_right_panel(
                         st.success("Saved.")
                         st.rerun()
                     except Exception as exc:
+                        # Best-effort rollback if Auth email was updated but later DB update failed.
+                        try:
+                            if "email_changed" in locals() and email_changed and "prof_id" in locals() and prof_id:
+                                if "old_prof_email" in locals() and old_prof_email and ("update_rows" in str(exc) or "profiles" in str(exc) or "employees" in str(exc)):
+                                    update_auth_user_email_admin(user_id=str(prof_id), new_email=old_prof_email)
+                        except Exception:
+                            pass
                         st.error("Could not save changes.")
                         with st.expander("Technical details"):
                             st.code(repr(exc), language="text")
