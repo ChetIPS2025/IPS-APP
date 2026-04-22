@@ -194,9 +194,6 @@ def _inject_tt_fast_compact_css() -> None:
         }
         .ips-tt-new-row { padding: 2px 4px 4px 4px !important; margin-top: 1px !important; margin-bottom: 1px !important; }
         .ips-tt-entry-gap { height: 2px !important; min-height: 2px !important; }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] input {
-            min-height: 1.15rem !important;
-        }
         .ips-tt-day-head { font-size: 10px !important; margin-bottom: 1px !important; }
         </style>
         """,
@@ -445,90 +442,13 @@ def _inject_tt_styles() -> None:
             border-color: rgba(56, 189, 248, 0.65) !important;
             box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28);
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) {
-            padding: 4px 5px 5px 5px !important;
+        /* Quick Actions panel — comfortable spacing for job + non-job editors */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-qa-panel) {
+            padding: 10px 12px 12px 12px !important;
         }
-        /* Day cell row actions — compact, single-line labels */
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button {
-            min-height: 1.35rem !important;
-            max-height: 1.75rem !important;
-            padding: 0.08rem 0.35rem !important;
-            font-size: 0.72rem !important;
-            border-radius: 5px !important;
-            line-height: 1.1 !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) button p {
-            white-space: nowrap !important;
-            font-size: 0.72rem !important;
-            line-height: 1.1 !important;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) p {
-            word-break: break-word;
-        }
-        /* Dense inputs: Job / Hours / Notes inside day cards */
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stSelectbox"] label,
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] label,
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stTextInput"] label {
-            min-height: 0 !important;
-            padding-bottom: 0 !important;
-            margin-bottom: 0 !important;
-            font-size: 0.68rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-            min-height: 1.35rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stNumberInput"] input {
-            min-height: 1.32rem !important;
-            height: 1.32rem !important;
-            padding: 0.06rem 0.28rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stTextInput"] input {
-            min-height: 1.32rem !important;
-            padding: 0.06rem 0.28rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stVerticalBlock"] > div {
-            gap: 0.1rem 0 !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-card) [data-testid="stHorizontalBlock"] {
-            gap: 0.2rem !important;
-            flex-wrap: nowrap !important;
-        }
-        /* Flat edit panel — same density */
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) {
-            padding: 6px 8px 8px 8px !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-            min-height: 1.35rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stNumberInput"] input {
-            min-height: 1.32rem !important;
-            padding: 0.06rem 0.28rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stTextInput"] input {
-            min-height: 1.32rem !important;
-            padding: 0.06rem 0.28rem !important;
-            font-size: 0.78rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button {
-            min-height: 1.35rem !important;
-            max-height: 1.75rem !important;
-            padding: 0.08rem 0.35rem !important;
-            font-size: 0.72rem !important;
-            border-radius: 5px !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) button p {
-            white-space: nowrap !important;
-            font-size: 0.72rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-flat-panel) [data-testid="stHorizontalBlock"] {
-            gap: 0.25rem !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-qa-panel) [data-testid="stHorizontalBlock"] {
+            gap: 0.5rem !important;
+            flex-wrap: wrap !important;
         }
         /* Top nav row — span lives in first column of same horizontal block */
         div[data-testid="stHorizontalBlock"]:has(span.ips-tt-nav-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
@@ -559,12 +479,6 @@ def _inject_tt_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-fast-toolbar-scope) [data-testid="stHorizontalBlock"] {
             gap: 0.2rem !important;
-        }
-        .ips-tt-flat-title {
-            font-size: 0.92rem !important;
-            font-weight: 600 !important;
-            margin: 0 0 0.2rem 0 !important;
-            color: #e2e8f0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-ot-scope) [data-testid="stNumberInput"] input,
         div[data-testid="stVerticalBlock"]:has(span.ips-tt-ot-scope) [data-testid="stNumberInput"] input {
@@ -1565,10 +1479,6 @@ def _render_quick_actions_panel(
     ts_iso: str,
 ) -> None:
     """Single editing surface per employee: day context, bulk actions, and per-day entry editors."""
-    st.markdown(
-        '<span class="ips-tt-qa-panel ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
     _tt_init_qa_day(eid, days, today)
     wd_key = _tt_qa_day_key(eid)
     try:
@@ -1587,6 +1497,10 @@ def _render_quick_actions_panel(
         return dd.strftime("%a %m/%d")
 
     with st.container(border=True):
+        st.markdown(
+            '<span class="ips-tt-qa-panel ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         st.markdown("#### Quick Actions")
         st.caption("Pick a day on the grid with **Use this day**, or choose the working day below.")
         picked_ix = st.selectbox(
