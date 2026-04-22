@@ -75,8 +75,8 @@ def inject_delete_confirm_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-del-anchor) .stButton > button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
         </style>

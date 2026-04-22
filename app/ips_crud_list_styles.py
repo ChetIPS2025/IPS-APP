@@ -134,8 +134,8 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] .stButton > button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
         div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled) {
@@ -186,7 +186,7 @@ def inject_ips_crud_list_styles() -> None:
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] {
             align-items: stretch;
-            gap: 0.35rem;
+            gap: 0.55rem;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             min-width: 0 !important;
@@ -203,16 +203,19 @@ def inject_ips_crud_list_styles() -> None:
         /* All action buttons: same min-height (Materials-style) */
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] .stButton > button {
             min-height: 2.25rem !important;
+            min-width: 100px !important;
+            width: auto !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.35rem 0.75rem !important;
+            padding: 10px 16px !important;
             box-sizing: border-box !important;
+            white-space: nowrap !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] .stButton > button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) button:not(:disabled) {
@@ -254,16 +257,17 @@ def inject_ips_crud_list_styles() -> None:
         /* Side panel: Save / Cancel / Close — match toolbar button height and radius */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) button {
             min-height: 2.25rem !important;
+            min-width: 100px !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.35rem 0.75rem !important;
+            padding: 10px 16px !important;
             box-sizing: border-box !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) .stButton > button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor)

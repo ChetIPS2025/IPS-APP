@@ -103,8 +103,8 @@ section[data-testid="stSidebar"],
   [data-testid="stMain"] [data-testid="stDownloadButton"] button p,
   [data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
     white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
     margin: 0 !important;
   }
   [data-testid="stMain"] .stLinkButton > a,

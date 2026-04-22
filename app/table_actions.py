@@ -162,7 +162,7 @@ def inject_table_action_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="stHorizontalBlock"] {
-            gap: 0.4rem !important;
+            gap: 0.55rem !important;
             align-items: stretch !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
@@ -173,19 +173,22 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             [data-testid="stDownloadButton"] button {
             min-height: 2.25rem !important;
+            min-width: 100px !important;
+            width: auto !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.35rem 0.75rem !important;
+            padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
+            white-space: nowrap !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) .stButton > button p,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             [data-testid="stDownloadButton"] button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
@@ -208,7 +211,7 @@ def inject_table_action_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             div[data-testid="stHorizontalBlock"] {
-            gap: 0.35rem !important;
+            gap: 0.55rem !important;
             align-items: stretch !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
@@ -219,19 +222,22 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             [data-testid="stDownloadButton"] button {
             min-height: 2.25rem !important;
+            min-width: 100px !important;
+            width: auto !important;
             border-radius: 8px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0.35rem 0.75rem !important;
+            padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
+            white-space: nowrap !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) .stButton > button p,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             [data-testid="stDownloadButton"] button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
         }
 
@@ -451,14 +457,14 @@ def render_table_action_bar(
 
         with right:
             if bulk:
-                b1, b2, b3, b4 = st.columns([1, 1, 1, 1])
+                b1, b2, b3, b4 = st.columns([1.2, 1.2, 1.2, 1.2], gap="small")
                 with b1:
                     del_multi_dis = not (n >= 1 and can_delete)
                     if st.button(
                         delete_selected_label,
                         disabled=del_multi_dis,
                         type="secondary",
-                        use_container_width=True,
+                        use_container_width=False,
                         key=f"ips_ta_del_multi_{table_key}",
                     ):
                         pending[table_key] = list(selected_ids)
@@ -469,7 +475,7 @@ def render_table_action_bar(
                         data=data,
                         file_name=export_filename,
                         mime="text/csv",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=not exp_ok,
                         key=f"ips_export_{table_key}",
                     )
@@ -477,7 +483,7 @@ def render_table_action_bar(
                     with b3:
                         if st.button(
                             "Select All Visible",
-                            use_container_width=True,
+                            use_container_width=False,
                             disabled=all_visible_selected,
                             key=f"ips_sel_all_{table_key}",
                         ):
@@ -486,7 +492,7 @@ def render_table_action_bar(
                                 on_bulk_selection_change()
                             st.rerun()
                     with b4:
-                        if st.button("Clear selection", use_container_width=True, key=f"ips_ta_clr_{table_key}"):
+                        if st.button("Clear selection", use_container_width=False, key=f"ips_ta_clr_{table_key}"):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
                             if on_bulk_selection_change:
@@ -494,31 +500,31 @@ def render_table_action_bar(
                             st.rerun()
                 else:
                     with b3:
-                        if st.button("Clear selection", use_container_width=True, key=f"ips_ta_clr_{table_key}"):
+                        if st.button("Clear selection", use_container_width=False, key=f"ips_ta_clr_{table_key}"):
                             clear_selected_ids(table_key)
                             pending.pop(table_key, None)
                             if on_bulk_selection_change:
                                 on_bulk_selection_change()
                             st.rerun()
             else:
-                b1, b2, b3, b4, b5, b6 = st.columns([1, 1, 1, 1, 1, 1])
+                b1, b2, b3, b4, b5, b6 = st.columns([1.2, 1.2, 1.2, 1.2, 1.2, 1.2], gap="small")
                 view_dis = not (n == 1 and can_view)
                 edit_dis = not (n == 1 and can_edit)
                 del_dis = not (n == 1 and can_delete)
                 exp_single_ok = exp_ok and n == 1
 
                 with b1:
-                    if st.button(view_label, disabled=view_dis, use_container_width=True, key=f"ips_ta_view_{table_key}"):
+                    if st.button(view_label, disabled=view_dis, use_container_width=False, key=f"ips_ta_view_{table_key}"):
                         out["view"] = True
                 with b2:
-                    if st.button(edit_label, disabled=edit_dis, use_container_width=True, key=f"ips_ta_edit_{table_key}"):
+                    if st.button(edit_label, disabled=edit_dis, use_container_width=False, key=f"ips_ta_edit_{table_key}"):
                         out["edit"] = True
                 with b3:
                     if st.button(
                         delete_label,
                         disabled=del_dis,
                         type="secondary",
-                        use_container_width=True,
+                        use_container_width=False,
                         key=f"ips_ta_del_{table_key}",
                     ):
                         pending[table_key] = list(selected_ids)
@@ -529,7 +535,7 @@ def render_table_action_bar(
                         data=data,
                         file_name=export_filename,
                         mime="text/csv",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=not exp_single_ok,
                         key=f"ips_export_{table_key}",
                     )
@@ -537,7 +543,7 @@ def render_table_action_bar(
                     with b5:
                         if st.button(
                             "Select All Visible",
-                            use_container_width=True,
+                            use_container_width=False,
                             disabled=all_visible_selected,
                             key=f"ips_sel_all_{table_key}",
                         ):
@@ -550,7 +556,7 @@ def render_table_action_bar(
                         if st.button(
                             "Clear selection",
                             disabled=clr_dis,
-                            use_container_width=True,
+                            use_container_width=False,
                             key=f"ips_ta_clr_{table_key}",
                         ):
                             clear_selected_ids(table_key)
@@ -564,7 +570,7 @@ def render_table_action_bar(
                         if st.button(
                             "Clear selection",
                             disabled=clr_dis,
-                            use_container_width=True,
+                            use_container_width=False,
                             key=f"ips_ta_clr_{table_key}",
                         ):
                             clear_selected_ids(table_key)
@@ -581,12 +587,12 @@ def render_table_action_bar(
             if st.button(
                 "Confirm delete",
                 type="primary",
-                use_container_width=True,
+                use_container_width=False,
                 key=f"ips_ta_del_y_{table_key}",
             ):
                 out["confirm_delete"] = True
         with dc2:
-            if st.button("Cancel", use_container_width=True, key=f"ips_ta_del_n_{table_key}"):
+            if st.button("Cancel", use_container_width=False, key=f"ips_ta_del_n_{table_key}"):
                 pending.pop(table_key, None)
                 out["cancel_delete"] = True
                 st.rerun()

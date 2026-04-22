@@ -548,7 +548,7 @@ def _render_job_form_panel(
         else:
             st.caption("Select a customer to choose a contact.")
 
-        st.markdown("#### Job number & location")
+        st.markdown("#### Job Number")
         if has_job_number_column and selected_job:
             st.text_input(
                 "Job Number",
@@ -560,7 +560,8 @@ def _render_job_form_panel(
         elif has_job_number_column and mode == "add":
             st.caption(f"Next job number: **{next_job_number()}** (saved when you create the job).")
 
-        location = st.text_input("Location", value=current_value("location"), disabled=_ro, key="job_form_location")
+        # Site/address: use Job site above (customer_location_id). Preserve legacy jobs.location on edit only.
+        location = str(current_value("location") or "").strip()
 
         st.markdown("#### Status & linked estimate")
         if mode == "add":

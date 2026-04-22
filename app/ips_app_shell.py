@@ -35,8 +35,8 @@ def inject_ips_app_shell_styles() -> None:
             --ips-surface: rgba(15, 23, 42, 0.35);
             /* Button system (main content) — dense pages override with more specific rules */
             --ips-btn-height: 2.125rem;
-            --ips-btn-pad-y: 0.32rem;
-            --ips-btn-pad-x: 0.7rem;
+            --ips-btn-pad-y: 0.625rem;
+            --ips-btn-pad-x: 1rem;
             --ips-btn-fs: 0.875rem;
             --ips-btn-fw: 500;
             --ips-btn-fw-strong: 600;
@@ -139,18 +139,21 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button {
             border-radius: var(--ips-btn-radius) !important;
             min-height: var(--ips-btn-height) !important;
+            min-width: 100px !important;
+            width: auto !important;
             height: auto !important;
             font-size: var(--ips-btn-fs) !important;
             font-weight: var(--ips-btn-fw) !important;
-            padding: var(--ips-btn-pad-y) var(--ips-btn-pad-x) !important;
+            padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stMain"] .stButton > button p,
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
             line-height: 1.25 !important;
         }
@@ -188,17 +191,20 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button {
             border-radius: var(--ips-btn-radius) !important;
             min-height: var(--ips-btn-height) !important;
+            min-width: 100px !important;
+            width: auto !important;
             height: auto !important;
             font-size: var(--ips-btn-fs) !important;
             font-weight: var(--ips-btn-fw) !important;
-            padding: var(--ips-btn-pad-y) var(--ips-btn-pad-x) !important;
+            padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             margin: 0 !important;
             line-height: 1.25 !important;
         }

@@ -1026,12 +1026,12 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                 "Use the checkbox to select **one** contact. Actions below apply **only** to that selection."
             )
             with st.container(border=True):
-                r1a, r1b, r1c, r1d = st.columns(4, gap="small")
+                r1a, r1b, r1c, r1d = st.columns([1.2, 1.2, 1.2, 1.2], gap="small")
                 with r1a:
                     if st.button(
                         "Edit Contact",
                         type="primary",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=not pick,
                         key=f"cust_ct_tool_edit_{cid}",
                     ):
@@ -1044,7 +1044,7 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                 with r1b:
                     if st.button(
                         "Set Primary",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=(not pick or not active_p or prim_p),
                         key=f"cust_ct_tool_pri_{cid}",
                     ):
@@ -1057,7 +1057,7 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                 with r1c:
                     if st.button(
                         "Deactivate",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=(not pick or not active_p),
                         key=f"cust_ct_tool_deact_{cid}",
                     ):
@@ -1080,7 +1080,7 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
                     if st.button(
                         "Delete",
                         type="secondary",
-                        use_container_width=True,
+                        use_container_width=False,
                         disabled=not pick,
                         key=f"cust_ct_tool_del_{cid}",
                     ):
