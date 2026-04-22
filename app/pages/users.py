@@ -21,6 +21,18 @@ except ImportError:
 
 _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "manager", "admin")
 
+def _fetch_profile_row(profile_id):
+    from app.db import get_client
+    supabase = get_client()
+
+    res = supabase.table("profiles") \
+        .select("*") \
+        .eq("id", profile_id) \
+        .single() \
+        .execute()
+
+    return res.data if res.data else None
+
 
 def _fmt_ts(v: object) -> str:
     if v is None:
