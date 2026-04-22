@@ -13,7 +13,16 @@ try:
     from app.ips_crud_list_styles import render_crud_list_subtitle
 except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
-from db import delete_rows_admin, fetch_one, fetch_table, fetch_table_admin, update_rows, update_rows_admin
+from db import (
+    delete_rows_admin,
+    fetch_one,
+    fetch_table,
+    fetch_table_admin,
+    invite_auth_user,
+    resend_invite_by_email,
+    update_rows,
+    update_rows_admin,
+)
 
 try:
     from ui import IPS_NAV_PAGE_KEY
@@ -109,7 +118,17 @@ def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
         for c in col_list
         if c not in HIDDEN_FIELDS and _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS
     ]
-    preferred = ["Kind", "Name", "Email", "Employee Job Role", "Access Role", "Hourly rate"]
+    preferred = [
+        "Kind",
+        "Name",
+        "Email",
+        "Employee Job Role",
+        "Hourly rate",
+        "Access Role",
+        "Login enabled",
+        "Must reset password",
+        "Is active",
+    ]
     ordered = [c for c in preferred if c in kept]
     tail = [c for c in kept if c not in ordered]
     return ordered + tail
@@ -142,84 +161,51 @@ def _employee_ids_from_selection(sel: list[str]) -> list[str]:
 
 
 def _build_unified_frame(employees: list[dict[str, Any]], profiles: list[dict[str, Any]]) -> pd.DataFrame:
-    """Merge employees and profiles by email (case-insensitive)."""
+    """Build an employee-primary directory with attached login/access fields by email."""
+
     def _norm_email(v: object) -> str:
         return " ".join(str(v or "").strip().lower().split())
 
-    emp_by_email: dict[str, dict[str, Any]] = {}
-    for e in employees or []:
-        em = _norm_email(e.get("email"))
-        if em and em not in emp_by_email:
-            emp_by_email[em] = e
-
-    matched_emp: set[str] = set()
-    rows: list[dict[str, Any]] = []
-
+    prof_by_email: dict[str, dict[str, Any]] = {}
     for p in profiles or []:
-        pid = str(p.get("id") or "").strip()
-        if not pid:
-            continue
-        p_email_norm = _norm_email(p.get("email"))
-        em = emp_by_email.get(p_email_norm) if p_email_norm else None
-        eid = str(em.get("id") or "").strip() if isinstance(em, dict) else ""
+        em = _norm_email(p.get("email"))
+        if em and em not in prof_by_email:
+            prof_by_email[em] = p
 
-        raw_role = p.get("role")
-        role_norm = str(raw_role or "").strip().lower()
-        access_role = "employee" if not role_norm else role_norm
-
-        if em and eid and eid not in matched_emp:
-            matched_emp.add(eid)
-            rows.append(
-                {
-                    "unified_id": f"m:{eid}:{pid}",
-                    "Kind": "Linked",
-                    # Employee/job fields (source of truth: public.employees)
-                    "name": str(em.get("name") or p.get("full_name") or "").strip(),
-                    "email": str(em.get("email") or p.get("email") or "").strip(),
-                    "employee_job_role": str(em.get("role") or "").strip(),
-                    "hourly_rate": em.get("hourly_rate"),
-                    # Auth/profile fields (source of truth: public.profiles)
-                    "access_role": access_role,
-                    "must_reset_password": bool(p.get("must_reset_password", False)),
-                    "is_active": bool(p.get("is_active", True)),
-                    "created_at": p.get("created_at"),
-                    # Employee active is still useful for roster ops; keep it but hide by default.
-                    "emp_is_active": bool(em.get("is_active", True)),
-                }
-            )
-        else:
-            rows.append(
-                {
-                    "unified_id": f"p:{pid}",
-                    "Kind": "Login",
-                    "name": str(p.get("full_name") or "").strip(),
-                    "email": str(p.get("email") or "").strip(),
-                    "employee_job_role": "",
-                    "hourly_rate": None,
-                    "access_role": access_role,
-                    "must_reset_password": bool(p.get("must_reset_password", False)),
-                    "is_active": bool(p.get("is_active", True)),
-                    "created_at": p.get("created_at"),
-                    "emp_is_active": "",
-                }
-            )
-
+    rows: list[dict[str, Any]] = []
     for e in employees or []:
         eid = str(e.get("id") or "").strip()
-        if not eid or eid in matched_emp:
+        if not eid:
             continue
+        e_email = str(e.get("email") or "").strip()
+        e_email_norm = _norm_email(e_email)
+
+        prof = prof_by_email.get(e_email_norm) if e_email_norm else None
+        if prof:
+            raw_role = prof.get("role")
+            role_norm = str(raw_role or "").strip().lower()
+            access_role = "employee" if not role_norm else role_norm
+            login_enabled = True
+            must_reset_password = bool(prof.get("must_reset_password", False))
+            acct_active = bool(prof.get("is_active", True))
+        else:
+            access_role = "No login"
+            login_enabled = False
+            must_reset_password = False
+            acct_active = bool(e.get("is_active", True))
+
         rows.append(
             {
                 "unified_id": f"e:{eid}",
-                "Kind": "Employee",
+                "kind": "Employee",
                 "name": str(e.get("name") or "").strip(),
-                "email": str(e.get("email") or "").strip(),
+                "email": e_email,
                 "employee_job_role": str(e.get("role") or "").strip(),
                 "hourly_rate": e.get("hourly_rate"),
-                "access_role": "No login profile",
-                "must_reset_password": "",
-                "is_active": "",
-                "created_at": "",
+                "access_role": access_role,
+                "login_enabled": bool(login_enabled),
+                "must_reset_password": bool(must_reset_password),
+                "is_active": bool(acct_active),
                 "emp_is_active": bool(e.get("is_active", True)),
             }
         )
@@ -278,11 +264,15 @@ def _display_df_for_editor(filtered: pd.DataFrame) -> pd.DataFrame:
 
     # Presentation-only column labels (keep internal keys stable for selection + filters).
     rename = {
+        "kind": "Kind",
         "name": "Name",
         "email": "Email",
         "employee_job_role": "Employee Job Role",
         "access_role": "Access Role",
         "hourly_rate": "Hourly rate",
+        "login_enabled": "Login enabled",
+        "must_reset_password": "Must reset password",
+        "is_active": "Is active",
     }
     disp.rename(columns={k: v for k, v in rename.items() if k in disp.columns}, inplace=True)
     return disp
@@ -304,7 +294,7 @@ def _render_people_toolbar(
 
     with st.container(border=True):
         st.markdown('<div class="ips-crud-toolbar-root"></div>', unsafe_allow_html=True)
-        left, b0, b1, b2 = st.columns([1.05, 1, 1, 1], gap="small")
+        left, b0, b2 = st.columns([1.2, 1, 1], gap="small")
         with left:
             st.markdown(
                 f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
@@ -319,19 +309,6 @@ def _render_people_toolbar(
                 key="people_btn_add_emp",
             ):
                 emp_mod.add_employee_dialog(selection_table_key=TABLE_KEY_PEOPLE)
-        with b1:
-            if st.button(
-                "Add user",
-                type="primary",
-                use_container_width=True,
-                disabled=not can_edit,
-                key="people_btn_add_user",
-            ):
-                emails = {usr_mod._normalize_email(str(u.get("email", ""))) for u in profiles if u.get("email")}
-                usr_mod.add_user_dialog(
-                    existing_emails=emails,
-                    clear_selection_table_key=TABLE_KEY_PEOPLE,
-                )
         with b2:
             if st.button(
                 "Edit details",
@@ -457,77 +434,155 @@ def _render_right_panel(
             return
 
         uid = sel[0]
-        eid, pid = _parse_unified_id(uid)
+        eid, _ = _parse_unified_id(uid)
         st.markdown("### Edit selected")
         st.caption(f"Row `{uid[:18]}…`" if len(uid) > 18 else f"Row `{uid}`")
 
-        if eid:
-            row = fetch_one("employees", {"id": eid})
-            if row:
-                st.markdown("##### Employee")
-                emp_mod._render_edit_form(row)
-            else:
-                st.warning("Employee record not found.")
+        if not eid:
+            st.warning("Employee record not found.")
+            return
 
-        if pid:
-            prow = usr_mod._fetch_profile_row(pid)
-            if prow:
-                st.markdown("##### User account")
-                # Access role editor (source of truth: public.profiles.role)
-                role_opts = ["admin", "manager", "employee", "viewer"]
-                cur = str(prow.get("role") or "").strip().lower() or "employee"
-                if cur not in role_opts:
-                    cur = "employee"
-                access_role = st.selectbox(
-                    "access_role",
-                    role_opts,
-                    index=role_opts.index(cur),
-                    key=f"people_access_role_{pid}",
-                    help="Access Role controls app permissions (not payroll/work role).",
-                )
-                must_reset = st.checkbox(
-                    "must_reset_password",
-                    value=bool(prow.get("must_reset_password", False)),
-                    key=f"people_mrpw_{pid}",
-                )
-                acct_active = st.checkbox(
-                    "is_active",
-                    value=bool(prow.get("is_active", True)),
-                    key=f"people_acct_active_{pid}",
-                )
-                if st.button("Save access settings", type="primary", use_container_width=True, key=f"people_save_access_{pid}"):
+        row = fetch_one("employees", {"id": eid})
+        if not row:
+            st.warning("Employee record not found.")
+            return
+
+        st.markdown("##### Employee")
+        employees_has_email = False
+        try:
+            employees_has_email = bool(emp_mod.employees_table_has_email_column())
+        except Exception:
+            employees_has_email = False
+
+        pk = f"people_emp_{eid}"
+        ed_name = st.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
+        ed_email = st.text_input(
+            "Email",
+            value=str(row.get("email") or ""),
+            disabled=not employees_has_email,
+            help=(
+                "Changing email affects login linkage (match is by email). "
+                "If employees.email is not enabled in the database yet, this field cannot be saved."
+            ),
+            key=f"{pk}_email",
+        )
+        c1, c2 = st.columns(2, gap="small")
+        ed_job_role = c1.text_input("Employee Job Role", value=str(row.get("role") or ""), key=f"{pk}_job_role")
+        ed_hr = c2.number_input(
+            "Hourly rate",
+            min_value=0.0,
+            value=float(row.get("hourly_rate", 0) or 0),
+            step=0.5,
+            format="%.2f",
+            key=f"{pk}_hr",
+        )
+
+        # Linked login/profile (by email, case-insensitive)
+        prof: dict[str, Any] | None = None
+        prof_id: str | None = None
+        prof_email: str = ""
+        emp_email_norm = " ".join(str(ed_email or "").strip().lower().split())
+        if emp_email_norm:
+            for p in profiles or []:
+                p_em = " ".join(str(p.get("email") or "").strip().lower().split())
+                if p_em and p_em == emp_email_norm:
+                    prof = p
+                    prof_id = str(p.get("id") or "").strip() or None
+                    prof_email = str(p.get("email") or "").strip()
+                    break
+
+        st.divider()
+        st.markdown("##### Access / Login")
+        st.caption("Employee Job Role = payroll/work role · Access Role = app permissions")
+
+        role_opts = ["admin", "manager", "employee", "viewer"]
+        if prof:
+            cur_role = str(prof.get("role") or "").strip().lower() or "employee"
+            if cur_role not in role_opts:
+                cur_role = "employee"
+            access_role = st.selectbox("Access Role", role_opts, index=role_opts.index(cur_role), key=f"{pk}_access_role")
+            must_reset = st.checkbox(
+                "Must reset password",
+                value=bool(prof.get("must_reset_password", False)),
+                key=f"{pk}_mrpw",
+            )
+            acct_active = st.checkbox(
+                "Is active",
+                value=bool(prof.get("is_active", True)),
+                key=f"{pk}_acct_active",
+            )
+            st.info(
+                "Changing email for a login user may require updating **Supabase Auth** email too. "
+                "This screen updates `profiles.email`; update Auth email via admin Auth flow if needed."
+            )
+            b0, b1 = st.columns(2, gap="small")
+            with b0:
+                if st.button("Resend Invite", use_container_width=True, key=f"{pk}_resend"):
                     try:
-                        update_rows_admin(
-                            "profiles",
-                            {
-                                "role": str(access_role),
-                                "must_reset_password": bool(must_reset),
-                                "is_active": bool(acct_active),
-                            },
-                            {"id": pid},
-                        )
-                        st.success("Access settings updated.")
-                        st.rerun()
+                        resend_invite_by_email(email=prof_email)
+                        st.success("Invite sent.")
                     except Exception as exc:
-                        st.error("Could not update access settings.")
+                        st.error("Could not resend invite.")
                         with st.expander("Technical details"):
                             st.code(repr(exc), language="text")
-            else:
-                st.warning("Profile not found.")
+            with b1:
+                if st.button("Save changes", type="primary", use_container_width=True, key=f"{pk}_save"):
+                    try:
+                        emp_payload = {
+                            "name": str(ed_name or "").strip(),
+                            "role": str(ed_job_role or "").strip(),
+                            "hourly_rate": float(ed_hr or 0),
+                        }
+                        if employees_has_email:
+                            emp_payload["email"] = str(ed_email or "").strip() or None
+                        update_rows("employees", emp_payload, {"id": eid})
+                        if prof_id:
+                            update_rows_admin(
+                                "profiles",
+                                {
+                                    "role": str(access_role),
+                                    "must_reset_password": bool(must_reset),
+                                    "is_active": bool(acct_active),
+                                    "email": (str(ed_email or "").strip() or None) if employees_has_email else None,
+                                },
+                                {"id": prof_id},
+                            )
+                        st.success("Saved.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("Could not save changes.")
+                        with st.expander("Technical details"):
+                            st.code(repr(exc), language="text")
+        else:
+            st.text_input("Access Role", value="No login", disabled=True, key=f"{pk}_no_login_role")
+            st.checkbox("Login enabled", value=False, disabled=True, key=f"{pk}_no_login_enabled")
+            if st.button("Enable Login / Send Invite", type="primary", use_container_width=True, key=f"{pk}_enable_login"):
+                if not employees_has_email:
+                    st.error("Cannot invite: `employees.email` column is not enabled in this database yet.")
+                    return
+                em = str(ed_email or "").strip()
+                if not em or "@" not in em:
+                    st.error("Enter a valid employee email before inviting.")
+                    return
+                try:
+                    invite_auth_user(email=em, role="employee")
+                    st.success("Invite sent and profile created.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error("Could not enable login for this employee.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
 
 
 def render() -> None:
-    """Unified roster: employees + login profiles, with shared filters and a single detail panel."""
+    """Employee directory with attached login access (profiles matched by email)."""
     render_header("Users")
 
     if current_role() != "admin":
         st.error("Admin access required.")
         return
 
-    render_crud_list_subtitle(
-        "One directory: employee records (time tracking), login accounts, and linked rows when profile "
-        "full name matches employee name (case-insensitive)."
-    )
+    render_crud_list_subtitle("Employees are the primary rows. Login/access settings come from profiles by email.")
 
     if st.session_state.get(_PEOPLE_PANEL_KEY) in ("add_emp", "add_user"):
         st.session_state[_PEOPLE_PANEL_KEY] = "list"
@@ -579,19 +634,10 @@ def render() -> None:
 
     with main_col:
         if filtered.empty:
-            st.info("No people match your filters (or the directory is empty).")
+            st.info("No employees match your filters (or the directory is empty).")
             inject_table_action_styles()
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Add employee", type="primary", use_container_width=True, key="people_empty_add_emp"):
-                    emp_mod.add_employee_dialog(selection_table_key=TABLE_KEY_PEOPLE)
-            with c2:
-                if st.button("Add user", type="primary", use_container_width=True, key="people_empty_add_user"):
-                    emails = {usr_mod._normalize_email(str(u.get("email", ""))) for u in profiles if u.get("email")}
-                    usr_mod.add_user_dialog(
-                        existing_emails=emails,
-                        clear_selection_table_key=TABLE_KEY_PEOPLE,
-                    )
+            if st.button("Add employee", type="primary", use_container_width=True, key="people_empty_add_emp"):
+                emp_mod.add_employee_dialog(selection_table_key=TABLE_KEY_PEOPLE)
         else:
             disp = _display_df_for_editor(filtered)
             show_cols = _people_visible_table_columns(disp.columns)
@@ -617,6 +663,66 @@ def render() -> None:
         _render_right_panel(panel=eff_panel, sel=sel_ids, profiles=profiles)
 
     st.divider()
+
+    # --- Unlinked Login Accounts (profiles with no employee email match) ---
+    st.markdown("### Unlinked Login Accounts")
+    st.caption("Login accounts in `public.profiles` that do not match any employee email.")
+    def _norm_email(v: object) -> str:
+        return " ".join(str(v or "").strip().lower().split())
+    emp_emails = {_norm_email(e.get("email")) for e in employees or [] if _norm_email(e.get("email"))}
+    unlinked = [p for p in profiles or [] if _norm_email(p.get("email")) and _norm_email(p.get("email")) not in emp_emails]
+    if not unlinked:
+        st.info("No unlinked login accounts.")
+    else:
+        udf = pd.DataFrame(unlinked)
+        show_cols = [c for c in ["email", "role", "created_at", "must_reset_password", "is_active", "id"] if c in udf.columns]
+        st.dataframe(udf[show_cols], use_container_width=True, hide_index=True)
+
+        employees_has_email = False
+        try:
+            employees_has_email = bool(emp_mod.employees_table_has_email_column())
+        except Exception:
+            employees_has_email = False
+
+        st.caption("To link an unlinked login to an employee, their emails must match.")
+        if not employees_has_email:
+            st.warning("Cannot link by email because `employees.email` is not enabled in this database.")
+        else:
+            c1, c2, c3 = st.columns([2, 2, 1], gap="small")
+            prof_email = c1.selectbox(
+                "Login email",
+                options=[str(p.get("email") or "").strip() for p in unlinked if p.get("email")],
+                key="people_unlinked_pick_email",
+            )
+            emp_opts = [e for e in employees or [] if e.get("id")]
+            emp_labels = [
+                f"{str(e.get('name') or '—').strip()} ({str(e.get('email') or '').strip() or 'no email'})"
+                for e in emp_opts
+            ]
+            pick = c2.selectbox("Employee", options=emp_labels, key="people_unlinked_pick_emp")
+            with c3:
+                if st.button("Link", type="primary", use_container_width=True, key="people_unlinked_link_btn"):
+                    try:
+                        ix = emp_labels.index(pick)
+                        emp = emp_opts[ix]
+                        eid = str(emp.get("id") or "").strip()
+                        e_email = str(emp.get("email") or "").strip()
+                        if not e_email:
+                            # Set employee email to login email (link direction: employee -> profile)
+                            update_rows("employees", {"email": str(prof_email).strip()}, {"id": eid})
+                        else:
+                            # Update profile email to employee email
+                            p_row = next((p for p in unlinked if str(p.get("email") or "").strip() == str(prof_email).strip()), None)
+                            pid = str((p_row or {}).get("id") or "").strip()
+                            if pid:
+                                update_rows_admin("profiles", {"email": e_email}, {"id": pid})
+                        st.success("Linked by email.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("Could not link account.")
+                        with st.expander("Technical details"):
+                            st.code(repr(exc), language="text")
+
     with st.expander("Database overview (legacy Admin)", expanded=False):
         st.caption("Profiles, attachments, and estimate revisions.")
         if st.button("Open Admin overview", key="people_nav_to_admin"):
