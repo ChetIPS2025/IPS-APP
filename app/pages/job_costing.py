@@ -197,6 +197,8 @@ def _labor_rows_time_entries(
     """Read-only labor lines from ``time_entries`` only (Phase 1)."""
     out: list[dict[str, Any]] = []
     for te in grid_rows:
+        if not te.get("job_id"):
+            continue
         if str(te.get("job_id")) != str(job_id):
             continue
         eid = str(te.get("employee_id") or "")

@@ -116,45 +116,68 @@ def delete_employee_week(employee_id: str, week_start: date, week_end: date) -> 
 def upsert_time_entry(
     *,
     employee_id: str,
-    job_id: str,
+    job_id: str | None,
     work_date: date,
     hours: float,
     notes: str,
     created_by,
     updated_at_iso: str,
+    non_job_code: str | None = None,
 ) -> None:
-    """Insert or update one (employee, job, day) row."""
+    """Insert or update one row: either (employee, job, day) or (employee, non_job_code, day)."""
     try:
-        from db import fetch_by_match, insert_row, update_rows
+        from db import insert_row, update_rows
     except ImportError:
-        from app.db import fetch_by_match, insert_row, update_rows  # type: ignore
+        from app.db import insert_row, update_rows  # type: ignore
 
     wd = work_date.isoformat()[:10]
-    existing = fetch_by_match(
-        "time_entries",
-        {"employee_id": employee_id, "job_id": job_id, "work_date": wd},
-        limit=1,
+    client = get_client()
+    r = (
+        client.table("time_entries")
+        .select("id,job_id,non_job_code")
+        .eq("employee_id", employee_id)
+        .eq("work_date", wd)
+        .limit(500)
+        .execute()
     )
-    payload_update = {
+    rows = r.data or []
+    row0 = None
+    if job_id:
+        for row in rows:
+            if str(row.get("job_id") or "") == str(job_id):
+                row0 = row
+                break
+    else:
+        nj = (non_job_code or "").strip()
+        if not nj:
+            raise ValueError("non_job_code is required when job_id is null")
+        for row in rows:
+            if not row.get("job_id") and str(row.get("non_job_code") or "").strip() == nj:
+                row0 = row
+                break
+    payload_update: dict[str, Any] = {
         "hours": float(hours or 0),
         "notes": (notes or "").strip(),
         "updated_at": updated_at_iso,
     }
-    if existing:
-        update_rows("time_entries", payload_update, {"id": existing[0]["id"]})
+    if row0:
+        update_rows("time_entries", payload_update, {"id": row0["id"]})
+        return
+    ins: dict[str, Any] = {
+        "employee_id": employee_id,
+        "work_date": wd,
+        "hours": float(hours or 0),
+        "notes": (notes or "").strip(),
+        "created_by": created_by,
+        "updated_at": updated_at_iso,
+    }
+    if job_id:
+        ins["job_id"] = job_id
+        ins["non_job_code"] = None
     else:
-        insert_row(
-            "time_entries",
-            {
-                "employee_id": employee_id,
-                "job_id": job_id,
-                "work_date": wd,
-                "hours": float(hours or 0),
-                "notes": (notes or "").strip(),
-                "created_by": created_by,
-                "updated_at": updated_at_iso,
-            },
-        )
+        ins["job_id"] = None
+        ins["non_job_code"] = (non_job_code or "").strip()
+    insert_row("time_entries", ins)
 
 
 def copy_employee_day_to_day(
@@ -169,15 +192,30 @@ def copy_employee_day_to_day(
     src = fetch_entries_employee_between(employee_id, from_date, from_date)
     delete_employee_work_date(employee_id, to_date)
     for row in src:
-        upsert_time_entry(
-            employee_id=employee_id,
-            job_id=str(row.get("job_id")),
-            work_date=to_date,
-            hours=float(row.get("hours", 0) or 0),
-            notes=str(row.get("notes") or ""),
-            created_by=created_by,
-            updated_at_iso=updated_at_iso,
-        )
+        jid = row.get("job_id")
+        nj = str(row.get("non_job_code") or "").strip()
+        if jid:
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=str(jid),
+                work_date=to_date,
+                hours=float(row.get("hours", 0) or 0),
+                notes=str(row.get("notes") or ""),
+                created_by=created_by,
+                updated_at_iso=updated_at_iso,
+                non_job_code=None,
+            )
+        elif nj:
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=None,
+                work_date=to_date,
+                hours=float(row.get("hours", 0) or 0),
+                notes=str(row.get("notes") or ""),
+                created_by=created_by,
+                updated_at_iso=updated_at_iso,
+                non_job_code=nj,
+            )
 
 
 def copy_employee_previous_week_to_current(
@@ -205,15 +243,30 @@ def copy_employee_previous_week_to_current(
         dest_date = sd + timedelta(days=7)
         if dest_date < dest_week_start or dest_date > dest_end:
             continue
-        upsert_time_entry(
-            employee_id=employee_id,
-            job_id=str(row.get("job_id")),
-            work_date=dest_date,
-            hours=float(row.get("hours", 0) or 0),
-            notes=str(row.get("notes") or ""),
-            created_by=created_by,
-            updated_at_iso=updated_at_iso,
-        )
+        jid = row.get("job_id")
+        nj = str(row.get("non_job_code") or "").strip()
+        if jid:
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=str(jid),
+                work_date=dest_date,
+                hours=float(row.get("hours", 0) or 0),
+                notes=str(row.get("notes") or ""),
+                created_by=created_by,
+                updated_at_iso=updated_at_iso,
+                non_job_code=None,
+            )
+        elif nj:
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=None,
+                work_date=dest_date,
+                hours=float(row.get("hours", 0) or 0),
+                notes=str(row.get("notes") or ""),
+                created_by=created_by,
+                updated_at_iso=updated_at_iso,
+                non_job_code=nj,
+            )
 
 
 def fill_employee_job_across_week(

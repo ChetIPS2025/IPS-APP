@@ -120,6 +120,8 @@ def build_labor_slice_for_job(
         )
 
     for te in all_grid_te:
+        if not te.get("job_id"):
+            continue
         if str(te.get("job_id")) != str(job_id):
             continue
         hours = float(te.get("hours", 0) or 0)

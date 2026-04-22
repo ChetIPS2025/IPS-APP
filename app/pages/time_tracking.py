@@ -75,6 +75,19 @@ TT_JOB_LABEL_TO_ID_KEY = "_tt_job_label_to_id_for_callbacks"
 TT_EDIT_ID_KEY = "tt_entry_edit_id"
 TT_FAST_ENTRY_KEY = "tt_fast_entry_mode"
 
+# Non-job time (no job_id): category list + selectbox sentinel
+TT_NON_JOB_SENTINEL = "(Non-job — category below)"
+NON_JOB_CATEGORY_OPTIONS = ["", "SHOP", "ADMIN", "TRAINING", "SAFETY", "PTO", "HOLIDAY", "TRAVEL"]
+NON_JOB_CODE_COLORS: dict[str, str] = {
+    "SHOP": "#64748b",
+    "ADMIN": "#2563eb",
+    "TRAINING": "#9333ea",
+    "SAFETY": "#ea580c",
+    "PTO": "#16a34a",
+    "HOLIDAY": "#0d9488",
+    "TRAVEL": "#ca8a04",
+}
+
 
 class _TTFiltersResult(NamedTuple):
     show_emp_ids: set[str]
@@ -101,17 +114,23 @@ def _tt_fast_entry() -> bool:
 def _week_grid_column_ratios(*, fast: bool) -> list[float]:
     """9 columns: wider employee name column + Mon–Sun + Σ (ratios are relative weights)."""
     if fast:
-        return [2.35] + [1.12] * 7 + [0.32]
-    return [2.55] + [1.05] * 7 + [0.34]
+        return [2.6] + [1.1] * 7 + [0.32]
+    return [2.6] + [1.05] * 7 + [0.34]
 
 
-def no_wrap_text(text: str) -> str:
-    """Single-line label with ellipsis (HTML-escaped). For employee names in the grid."""
-    esc = html.escape(text)
-    return (
-        '<div class="ips-tt-nw-inner" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-        f"{esc}</div>"
-    )
+def _employee_name_display_html(nm: str) -> str:
+    """First line / second line at first space; no mid-word breaks (CSS keep-all). HTML-escaped."""
+    raw = str(nm or "").strip()
+    if not raw:
+        return ""
+    parts = raw.split(" ", 1)
+    esc = html.escape
+    if len(parts) == 2:
+        a, b = parts[0].strip(), parts[1].strip()
+        body = f"{esc(a)}<br>{esc(b)}"
+    else:
+        body = esc(raw)
+    return f'<div class="ips-tt-emp-name-inner">{body}</div>'
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -159,29 +178,42 @@ def _job_label_for_id(job_label_to_id: dict[str, str], job_id: str) -> str | Non
 
 def _persist_time_entry_row(te_id: str, job_label_to_id: dict[str, str]) -> tuple[bool, str | None]:
     """Read widget state for one entry and update DB. Returns (ok, error_message)."""
-    jk, hk, nk = f"tt_job_{te_id}", f"tt_h_{te_id}", f"tt_n_{te_id}"
+    jk, hk, nk, njk = f"tt_job_{te_id}", f"tt_h_{te_id}", f"tt_n_{te_id}", f"tt_nj_{te_id}"
     if jk not in st.session_state:
         return False, None
     job_label = st.session_state.get(jk)
     if not isinstance(job_label, str):
         return False, "Invalid job selection."
-    new_jid = job_label_to_id.get(job_label)
-    if not new_jid:
-        return False, "Pick a valid job."
+    nj = str(st.session_state.get(njk) or "").strip()
     hrs = float(st.session_state.get(hk) or 0)
     note = str(st.session_state.get(nk) or "").strip()
-    payload = {
-        "job_id": new_jid,
-        "hours": hrs,
-        "notes": note,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
+    if job_label and job_label != TT_NON_JOB_SENTINEL:
+        new_jid = job_label_to_id.get(job_label)
+        if not new_jid:
+            return False, "Pick a valid job."
+        payload = {
+            "job_id": new_jid,
+            "non_job_code": None,
+            "hours": hrs,
+            "notes": note,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        if not nj:
+            return False, "Pick a job or select a non-job category."
+        payload = {
+            "job_id": None,
+            "non_job_code": nj,
+            "hours": hrs,
+            "notes": note,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
     try:
         update_rows("time_entries", payload, {"id": te_id})
     except Exception as exc:
         return False, str(exc)
     snap_k = f"tt_row_snap_{te_id}"
-    st.session_state[snap_k] = (job_label, hrs, note)
+    st.session_state[snap_k] = (job_label, nj, hrs, note)
     return True, None
 
 
@@ -194,14 +226,16 @@ def _maybe_autosave_entry(te_id: str) -> None:
     jk = f"tt_job_{te_id}"
     hk = f"tt_h_{te_id}"
     nk = f"tt_n_{te_id}"
+    njk = f"tt_nj_{te_id}"
     if jk not in st.session_state:
         return
     job_label = st.session_state.get(jk)
     hrs = float(st.session_state.get(hk) or 0)
     note = str(st.session_state.get(nk) or "").strip()
+    nj = str(st.session_state.get(njk) or "").strip()
     if not isinstance(job_label, str):
         return
-    candidate = (job_label, hrs, note)
+    candidate = (job_label, nj, hrs, note)
     snap_k = f"tt_row_snap_{te_id}"
     if st.session_state.get(snap_k) == candidate:
         return
@@ -225,11 +259,17 @@ def _autosave_callback_factory(te_id: str):
     return _cb
 
 
-def _init_row_snap_from_ent(te_id: str, ent: dict, cur_label: str) -> None:
+def _init_row_snap_from_ent(
+    te_id: str,
+    ent: dict,
+    job_label_snap: str,
+    non_job_snap: str,
+) -> None:
     snap_k = f"tt_row_snap_{te_id}"
     if snap_k not in st.session_state:
         st.session_state[snap_k] = (
-            cur_label,
+            job_label_snap,
+            str(non_job_snap or "").strip(),
             float(ent.get("hours", 0) or 0),
             str(ent.get("notes") or "").strip(),
         )
@@ -270,6 +310,12 @@ def _job_badge_color(job_id: str, ordered_ids: list[str]) -> str:
 def _job_badge_html(job_label: str, job_id: str, ordered_ids: list[str]) -> str:
     c = _job_badge_color(job_id, ordered_ids)
     lab = html.escape(job_label[:42] + ("…" if len(job_label) > 42 else ""))
+    return f'<span class="ips-tt-job-badge" style="background:{c};border-color:{c}">{lab}</span>'
+
+
+def _non_job_badge_html(code: str) -> str:
+    c = NON_JOB_CODE_COLORS.get(str(code).strip(), "#64748b")
+    lab = html.escape(str(code).strip()[:24])
     return f'<span class="ips-tt-job-badge" style="background:{c};border-color:{c}">{lab}</span>'
 
 
@@ -543,6 +589,13 @@ def _inject_tt_styles() -> None:
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .ips-tt-nj-sep {
+            color: #64748b !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            margin: 0.2rem 0 0.3rem 0 !important;
+            letter-spacing: 0.08em;
+        }
         .ips-tt-legend {
             display: flex;
             flex-wrap: wrap;
@@ -572,11 +625,15 @@ def _inject_tt_styles() -> None:
             font-weight: 700 !important;
             color: #f1f5f9 !important;
             margin: 0 0 4px 0 !important;
-            line-height: 1.25 !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            line-height: 1.2 !important;
             max-width: 100% !important;
+        }
+        .ips-tt-emp-name .ips-tt-emp-name-inner {
+            max-width: 100%;
+            white-space: normal;
+            word-break: keep-all;
+            overflow-wrap: normal;
+            line-height: 1.2;
         }
         .ips-tt-emp-total {
             font-size: 0.72rem !important;
@@ -630,12 +687,10 @@ def _inject_tt_styles() -> None:
                 white-space: normal !important;
                 overflow: visible !important;
                 text-overflow: clip !important;
-                word-break: break-word !important;
             }
-            .ips-tt-sheet-narrow .ips-tt-nw-inner {
-                white-space: normal !important;
-                overflow: visible !important;
-                text-overflow: unset !important;
+            .ips-tt-sheet-narrow .ips-tt-emp-name .ips-tt-emp-name-inner {
+                word-break: keep-all !important;
+                overflow-wrap: normal !important;
             }
             div[data-testid="column"]:has(span.ips-tt-quick-actions-col) {
                 justify-content: flex-start !important;
@@ -843,18 +898,25 @@ def _tt_flat_entry_rows(
         eid = str(e.get("employee_id") or "")
         if show_emp_ids and eid not in show_emp_ids:
             continue
-        jid = str(e.get("job_id") or "")
+        jid = str(e.get("job_id") or "").strip()
+        nj = str(e.get("non_job_code") or "").strip()
         if fj_id and jid != fj_id:
             continue
         tid = e.get("id")
         if not tid:
             continue
+        if jid:
+            job_disp = job_id_to_label.get(jid, jid[:8] + "…" if len(jid) > 8 else jid)
+        elif nj:
+            job_disp = nj
+        else:
+            job_disp = "—"
         out.append(
             {
                 "id": tid,
                 "employee": emp_id_to_name.get(eid, eid[:8] + "…" if len(eid) > 8 else eid),
                 "work_date": str(e.get("work_date") or "")[:10],
-                "job": job_id_to_label.get(jid, jid[:8] + "…" if len(jid) > 8 else (jid or "—")),
+                "job": job_disp,
                 "hours": float(e.get("hours") or 0),
                 "notes": str(e.get("notes") or ""),
             }
@@ -863,10 +925,10 @@ def _tt_flat_entry_rows(
 
 
 def _render_employee_name_cell(*, nm: str, tot_s: str, over: bool, ot_threshold: float) -> None:
-    """Bold employee name (single line + ellipsis on desktop) and muted weekly hours."""
+    """Employee name (first line / remainder at first space; no mid-word breaks) and muted weekly hours."""
     title_attr = html.escape(nm, quote=True)
     over_cls = " ips-tt-row-over" if over else ""
-    name_inner = no_wrap_text(nm)
+    name_inner = _employee_name_display_html(nm)
     if over:
         tot_line = html.escape(f"{tot_s} · over {ot_threshold:g} h")
     else:
@@ -1578,13 +1640,25 @@ def _render_entry_editor(
     from_table_panel: bool = False,
 ) -> None:
     te_id = str(ent.get("id"))
-    cur_jid = str(ent.get("job_id") or "")
-    cur_label = next(
-        (lb for lb, j in job_label_to_id.items() if j == cur_jid),
-        job_labels_sorted[0] if job_labels_sorted else "",
-    )
-    j_ix = job_labels_sorted.index(cur_label) if cur_label in job_labels_sorted else 0
-    _init_row_snap_from_ent(te_id, ent, cur_label)
+    cur_jid = str(ent.get("job_id") or "").strip()
+    cur_nj = str(ent.get("non_job_code") or "").strip()
+    job_options = [TT_NON_JOB_SENTINEL] + list(job_labels_sorted)
+    if cur_nj and not cur_jid:
+        j_ix = 0
+        job_label_snap = TT_NON_JOB_SENTINEL
+    elif cur_jid:
+        cur_label = next(
+            (lb for lb, j in job_label_to_id.items() if j == cur_jid),
+            job_labels_sorted[0] if job_labels_sorted else "",
+        )
+        j_ix = 1 + job_labels_sorted.index(cur_label) if cur_label in job_labels_sorted else 1
+        job_label_snap = cur_label
+    else:
+        j_ix = 0
+        job_label_snap = TT_NON_JOB_SENTINEL
+    j_ix = min(max(j_ix, 0), len(job_options) - 1)
+    nj_ix = NON_JOB_CATEGORY_OPTIONS.index(cur_nj) if cur_nj in NON_JOB_CATEGORY_OPTIONS else 0
+    _init_row_snap_from_ent(te_id, ent, job_label_snap, cur_nj)
 
     autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
     acb = _autosave_callback_factory(te_id)
@@ -1611,7 +1685,10 @@ def _render_entry_editor(
                         st.session_state.pop(TT_EDIT_ID_KEY, None)
                     st.rerun()
                 elif err:
-                    st.error(err)
+                    if err.startswith("Pick a job"):
+                        st.warning(err)
+                    else:
+                        st.error(err)
         with cols[1]:
             if st.button(
                 del_label,
@@ -1641,12 +1718,27 @@ def _render_entry_editor(
     st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
     st.selectbox(
         "Job",
-        job_labels_sorted,
+        job_options,
         index=j_ix,
         key=f"tt_job_{te_id}",
         label_visibility="collapsed",
         **ch_as,
     )
+    st.markdown(
+        '<p class="ips-tt-nj-sep">— or —</p><p class="ips-tt-field-label">Non-job category</p>',
+        unsafe_allow_html=True,
+    )
+    st.selectbox(
+        "Non-job category",
+        NON_JOB_CATEGORY_OPTIONS,
+        index=nj_ix,
+        key=f"tt_nj_{te_id}",
+        label_visibility="collapsed",
+        **ch_as,
+    )
+    _nj = str(st.session_state.get(f"tt_nj_{te_id}") or "").strip()
+    if _nj:
+        st.markdown(_non_job_badge_html(_nj), unsafe_allow_html=True)
     ch, cn = st.columns([0.45, 1.0], gap="small")
     with ch:
         st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
@@ -1684,89 +1776,151 @@ def _render_new_entry_form(
     *,
     fast: bool,
 ) -> None:
-    if not job_labels_sorted:
-        return
+    job_options = [TT_NON_JOB_SENTINEL] + list(job_labels_sorted)
     d0 = 0
     if default_job_label and default_job_label in job_labels_sorted:
-        d0 = job_labels_sorted.index(default_job_label)
+        d0 = 1 + job_labels_sorted.index(default_job_label)
+    d0 = min(max(d0, 0), len(job_options) - 1)
 
     def_h = _tt_default_hours()
     hstep = _hours_step(fast=fast)
     dup_label = "Dup" if fast else "Duplicate"
+    _k_j = f"tt_newj_{employee_id}_{work_date_iso}"
+    _k_nj = f"tt_newnj_{employee_id}_{work_date_iso}"
+    _k_h = f"tt_newh_{employee_id}_{work_date_iso}"
+    _k_n = f"tt_newn_{employee_id}_{work_date_iso}"
 
     def _on_add() -> None:
-        job_pick = st.session_state.get(f"tt_newj_{employee_id}_{work_date_iso}")
-        hrs = float(st.session_state.get(f"tt_newh_{employee_id}_{work_date_iso}") or 0)
-        note = str(st.session_state.get(f"tt_newn_{employee_id}_{work_date_iso}") or "").strip()
-        jid = job_label_to_id.get(job_pick) if isinstance(job_pick, str) else None
-        if not jid:
-            st.error("Invalid job.")
+        job_pick = st.session_state.get(_k_j)
+        nj = str(st.session_state.get(_k_nj) or "").strip()
+        hrs = float(st.session_state.get(_k_h) or 0)
+        note = str(st.session_state.get(_k_n) or "").strip()
+        if not isinstance(job_pick, str):
+            st.error("Invalid job selection.")
             st.stop()
+        if job_pick and job_pick != TT_NON_JOB_SENTINEL:
+            jid = job_label_to_id.get(job_pick)
+            if not jid:
+                st.error("Invalid job.")
+                st.stop()
+            payload = {
+                "employee_id": employee_id,
+                "job_id": jid,
+                "non_job_code": None,
+                "work_date": work_date_iso[:10],
+                "hours": float(hrs),
+                "notes": note,
+                "created_by": current_profile().get("id"),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        else:
+            if not nj:
+                st.warning("Pick a job or select a non-job category.")
+                st.stop()
+            payload = {
+                "employee_id": employee_id,
+                "job_id": None,
+                "non_job_code": nj,
+                "work_date": work_date_iso[:10],
+                "hours": float(hrs),
+                "notes": note,
+                "created_by": current_profile().get("id"),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
         if hrs <= 0:
             st.error("Enter hours greater than zero.")
             st.stop()
-        payload = {
-            "employee_id": employee_id,
-            "job_id": jid,
-            "work_date": work_date_iso[:10],
-            "hours": float(hrs),
-            "notes": note,
-            "created_by": current_profile().get("id"),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
         try:
             insert_row("time_entries", payload)
             st.rerun()
         except Exception as exc:
-            st.error(f"Could not add (duplicate job for this day?): {exc}")
+            st.error(f"Could not add (duplicate for this day?): {exc}")
 
     def _on_dup() -> None:
         src = entries_for_day[-1] if entries_for_day else None
         if src:
-            sjid = str(src.get("job_id") or "")
-            slabel = _job_label_for_id(job_label_to_id, sjid)
-            if not slabel:
-                st.error("Could not resolve job for duplicate.")
-                st.stop()
+            sjid = str(src.get("job_id") or "").strip()
+            snj = str(src.get("non_job_code") or "").strip()
             hrs = float(src.get("hours") or 0) or def_h
             note = str(src.get("notes") or "").strip()
-            jid = job_label_to_id.get(slabel)
-            if not jid:
-                st.error("Invalid job on source row.")
+            if sjid:
+                slabel = _job_label_for_id(job_label_to_id, sjid)
+                if not slabel:
+                    st.error("Could not resolve job for duplicate.")
+                    st.stop()
+                jid = job_label_to_id.get(slabel)
+                if not jid:
+                    st.error("Invalid job on source row.")
+                    st.stop()
+                payload = {
+                    "employee_id": employee_id,
+                    "job_id": jid,
+                    "non_job_code": None,
+                    "work_date": work_date_iso[:10],
+                    "hours": float(hrs),
+                    "notes": note,
+                    "created_by": current_profile().get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            elif snj:
+                payload = {
+                    "employee_id": employee_id,
+                    "job_id": None,
+                    "non_job_code": snj,
+                    "work_date": work_date_iso[:10],
+                    "hours": float(hrs),
+                    "notes": note,
+                    "created_by": current_profile().get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            else:
+                st.error("Invalid source row.")
                 st.stop()
         else:
-            if not default_job_label or default_job_label not in job_label_to_id:
-                st.error("No line to copy — pick a filter job or add a row first.")
+            if default_job_label and default_job_label in job_label_to_id:
+                jid = job_label_to_id[default_job_label]
+                hrs = float(def_h)
+                note = ""
+                payload = {
+                    "employee_id": employee_id,
+                    "job_id": jid,
+                    "non_job_code": None,
+                    "work_date": work_date_iso[:10],
+                    "hours": float(hrs),
+                    "notes": note,
+                    "created_by": current_profile().get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            else:
+                st.error("No line to copy — pick a filter job, add a row, or use non-job category.")
                 st.stop()
-            slabel = default_job_label
-            jid = job_label_to_id[slabel]
-            hrs = float(def_h)
-            note = ""
         if hrs <= 0:
             st.error("Hours must be greater than zero.")
             st.stop()
-        payload = {
-            "employee_id": employee_id,
-            "job_id": jid,
-            "work_date": work_date_iso[:10],
-            "hours": float(hrs),
-            "notes": note,
-            "created_by": current_profile().get("id"),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
         try:
             insert_row("time_entries", payload)
             st.rerun()
         except Exception as exc:
-            st.error(f"Duplicate not added (same job this day?): {exc}")
+            st.error(f"Duplicate not added (same line this day?): {exc}")
 
     st.markdown('<div class="ips-tt-new-block">', unsafe_allow_html=True)
     st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
     st.selectbox(
         "Job",
-        job_labels_sorted,
+        job_options,
         index=d0,
-        key=f"tt_newj_{employee_id}_{work_date_iso}",
+        key=_k_j,
+        label_visibility="collapsed",
+    )
+    st.markdown(
+        '<p class="ips-tt-nj-sep">— or —</p><p class="ips-tt-field-label">Non-job category</p>',
+        unsafe_allow_html=True,
+    )
+    st.selectbox(
+        "Non-job category",
+        NON_JOB_CATEGORY_OPTIONS,
+        index=0,
+        key=_k_nj,
         label_visibility="collapsed",
     )
     r1, r2 = st.columns([0.45, 1.0], gap="small")
@@ -1778,7 +1932,7 @@ def _render_new_entry_form(
             max_value=24.0,
             value=float(def_h),
             step=hstep,
-            key=f"tt_newh_{employee_id}_{work_date_iso}",
+            key=_k_h,
             label_visibility="collapsed",
         )
     with r2:
@@ -1786,7 +1940,7 @@ def _render_new_entry_form(
         st.text_input(
             "Notes",
             value="",
-            key=f"tt_newn_{employee_id}_{work_date_iso}",
+            key=_k_n,
             label_visibility="collapsed",
             placeholder="Notes",
         )
@@ -1844,9 +1998,7 @@ def _render_day_column_body(
     )
 
     with st.container(border=True):
-        if not ents_show and not job_labels_sorted:
-            st.caption("—")
-        elif not ents_show and job_labels_sorted and not add_open:
+        if not ents_show and not add_open:
             st.markdown(
                 '<span class="ips-tt-day-cell ips-tt-day-empty" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
@@ -1859,7 +2011,7 @@ def _render_day_column_body(
             ):
                 st.session_state[expand_key] = True
                 st.rerun()
-        elif not ents_show and job_labels_sorted and add_open:
+        elif not ents_show and add_open:
             st.markdown(
                 '<span class="ips-tt-day-cell ips-tt-day-card" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
@@ -1900,17 +2052,16 @@ def _render_day_column_body(
                     st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
                 _render_entry_editor(ent, job_labels_sorted, job_label_to_id, fast=fast)
                 prev_shown = True
-            if job_labels_sorted:
-                st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
-                _render_new_entry_form(
-                    eid,
-                    wd,
-                    job_labels_sorted,
-                    job_label_to_id,
-                    default_job_label,
-                    ents_show,
-                    fast=fast,
-                )
+            st.markdown('<hr class="ips-tt-entry-sep"/>', unsafe_allow_html=True)
+            _render_new_entry_form(
+                eid,
+                wd,
+                job_labels_sorted,
+                job_label_to_id,
+                default_job_label,
+                ents_show,
+                fast=fast,
+            )
     return day_sum
 
 
@@ -1929,9 +2080,16 @@ def _render_readonly_pivot(
             wd = d.isoformat()
             ents = idx.get((eid, wd), [])
             h = sum(float(e.get("hours", 0) or 0) for e in ents)
-            jobs = ", ".join(
-                sorted({job_id_to_label.get(str(e.get("job_id")), "?") for e in ents if e.get("job_id")})
-            )
+            _labels: set[str] = set()
+            for e in ents:
+                jid = str(e.get("job_id") or "").strip()
+                if jid:
+                    _labels.add(job_id_to_label.get(jid, "?"))
+                else:
+                    nj = str(e.get("non_job_code") or "").strip()
+                    if nj:
+                        _labels.add(nj)
+            jobs = ", ".join(sorted(_labels))
             r[d.strftime("%a %m/%d")] = f"{h:.1f} h" + (f" ({jobs})" if jobs else "")
             total += h
         r["Σ Week"] = f"{total:.1f}"

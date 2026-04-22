@@ -305,6 +305,7 @@ def _safe_date_value(value):
 def _clear_job_mode() -> None:
     st.session_state.pop("job_mode", None)
     st.session_state.pop("job_edit_id", None)
+    st.session_state.pop("job_number_manual_input", None)
 
 
 def _jobs_table_has_customer_location_column() -> bool:
@@ -554,11 +555,21 @@ def _render_job_form_panel(
                 "Job Number",
                 value=str(current_value("job_number") or ""),
                 disabled=True,
-                help="Assigned automatically when the job is created.",
+                help="Assigned when the job was created.",
                 key="job_form_job_number",
             )
         elif has_job_number_column and mode == "add":
-            st.caption(f"Next job number: **{next_job_number()}** (saved when you create the job).")
+            suggested_jn = next_job_number()
+            st.caption("Suggested job number is prefilled. You can override it.")
+            st.caption(f"Suggested: **{suggested_jn}**")
+            if "job_number_manual_input" not in st.session_state:
+                st.session_state["job_number_manual_input"] = suggested_jn
+            st.text_input(
+                "Job Number",
+                key="job_number_manual_input",
+                help="Leave the suggested value or type a custom job number.",
+                label_visibility="collapsed",
+            )
 
         # Site/address: use Job site above (customer_location_id). Preserve legacy jobs.location on edit only.
         location = str(current_value("location") or "").strip()
@@ -672,7 +683,28 @@ def _render_job_form_panel(
                 if has_customer_location_column:
                     payload["customer_location_id"] = selected_customer_location_id
                 if has_job_number_column:
-                    payload["job_number"] = next_job_number()
+                    final_job_number = str(st.session_state.get("job_number_manual_input") or "").strip()
+                    if not final_job_number:
+                        st.error("Enter a job number.")
+                        st.stop()
+                    try:
+                        dup = fetch_by_match_admin(
+                            "jobs",
+                            {"job_number": final_job_number},
+                            columns="id,job_number",
+                            limit=1,
+                        )
+                    except Exception:
+                        dup = fetch_by_match(
+                            "jobs",
+                            {"job_number": final_job_number},
+                            columns="id,job_number",
+                            limit=1,
+                        )
+                    if dup:
+                        st.error("Job number already exists.")
+                        st.stop()
+                    payload["job_number"] = final_job_number
                 insert_row_admin("jobs", payload)
                 _clear_job_mode()
                 st.success("Job created.")
@@ -896,6 +928,7 @@ def _render_job_db_top_bar(
             ):
                 st.session_state["job_mode"] = "add"
                 st.session_state.pop("job_edit_id", None)
+                st.session_state.pop("job_number_manual_input", None)
                 st.rerun()
         with c2:
             if st.button("Refresh", type="secondary", use_container_width=True, key="job_top_refresh"):
@@ -1093,6 +1126,7 @@ def render() -> None:
                     ):
                         st.session_state["job_mode"] = "add"
                         st.session_state.pop("job_edit_id", None)
+                        st.session_state.pop("job_number_manual_input", None)
                         st.rerun()
                 return
             if not panel_open:
@@ -1259,6 +1293,7 @@ def render() -> None:
                     ):
                         st.session_state["job_mode"] = "edit"
                         st.session_state["job_edit_id"] = str(sel_ids[0])
+                        st.session_state.pop("job_number_manual_input", None)
                         st.rerun()
                 with b2:
                     if st.button(
