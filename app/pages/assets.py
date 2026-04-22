@@ -27,19 +27,13 @@ except ImportError:
     )
 
 try:
+    from services.asset_constants import ASSET_STATUSES
     from services.asset_service import optional_numeric
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
+    from app.services.asset_constants import ASSET_STATUSES  # type: ignore
     from app.services.asset_service import optional_numeric  # type: ignore
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-
-ASSET_STATUSES = [
-    "Available",
-    "Assigned",
-    "In Shop",
-    "Out for Repair",
-    "Retired",
-]
 
 ASSET_TYPES = [
     "Truck",

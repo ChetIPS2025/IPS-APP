@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import html
+import urllib.parse
+import uuid
 import pandas as pd
 import streamlit as st
 
@@ -60,6 +63,15 @@ except ImportError:
 
 _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
+
+
+def _inv_qr_img_html(data: str, *, size: int = 180) -> str:
+    enc = urllib.parse.quote(str(data or "").strip(), safe="")
+    url = f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={enc}"
+    return (
+        f'<div class="ips-inv-qr-wrap"><img src="{html.escape(url, quote=True)}" '
+        f'width="{size}" height="{size}" alt="QR code"/></div>'
+    )
 
 
 def _money(v) -> str:
@@ -193,6 +205,7 @@ def _render_add_panel() -> None:
         st.markdown("### Add inventory item")
 
         name = st.text_input("Item Name", key="inv_add_name")
+        sku_add = st.text_input("SKU (optional)", key="inv_add_sku", help="Alternate lookup on **Scan Inventory** if QR is not used.")
         c1, c2 = st.columns(2, gap="small")
         category = c1.text_input("Category", key="inv_add_cat")
         unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
@@ -218,6 +231,11 @@ def _render_add_panel() -> None:
         storage_location = v2.text_input("Storage Location", key="inv_add_loc")
 
         notes = st.text_area("Notes", key="inv_add_notes", height=72)
+        qr_scan = st.text_input(
+            "QR scan code (optional)",
+            key="inv_add_qr",
+            help="Unique value for **Scan Inventory**; leave blank to auto-assign after save.",
+        )
         is_active = st.checkbox("Active", value=True, key="inv_add_active")
 
         u1, u2 = st.columns(2, gap="small")
@@ -227,6 +245,7 @@ def _render_add_panel() -> None:
                 if not t:
                     st.error("Item Name is required.")
                     st.stop()
+                qr_t = str(qr_scan or "").strip()
                 payload = {
                     "item_name": t,
                     "category": str(category or "").strip(),
@@ -239,11 +258,26 @@ def _render_add_panel() -> None:
                     "notes": str(notes or "").strip(),
                     "is_active": bool(is_active),
                 }
+                if qr_t:
+                    payload["qr_code_value"] = qr_t
+                sku_t = str(sku_add or "").strip()
+                if sku_t:
+                    payload["sku"] = sku_t
                 try:
-                    insert_row_admin(_TABLE, payload)
+                    row = insert_row_admin(_TABLE, payload)
                 except Exception as exc:
-                    st.error(f"Could not save: {exc}")
+                    if "sku" in str(exc).lower():
+                        st.error(f"Could not save: {exc} — run migration **`sql/028_inventory_sku_txn_created_by.sql`** if SKU column is missing.")
+                    else:
+                        st.error(f"Could not save: {exc}")
                     st.stop()
+                rid = str(row.get("id") or "")
+                if rid and not str(row.get("qr_code_value") or "").strip():
+                    slug = rid.replace("-", "")[:8].upper()
+                    try:
+                        update_rows_admin(_TABLE, {"qr_code_value": f"INV-{slug}"}, {"id": rid})
+                    except Exception:
+                        pass
                 _clear_panel()
                 st.success("Inventory item added.")
                 st.rerun()
@@ -263,6 +297,12 @@ def _render_edit_panel(row: dict) -> None:
         st.caption(f"ID `{rid[:8]}…`")
 
         name = st.text_input("Item Name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
+        sku_ed = st.text_input(
+            "SKU (optional)",
+            value=str(row.get("sku") or ""),
+            key=f"{pk}_sku",
+            help="Alternate lookup on **Scan Inventory**.",
+        )
         c1, c2 = st.columns(2, gap="small")
         category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
         unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
@@ -305,7 +345,40 @@ def _render_edit_panel(row: dict) -> None:
         )
 
         notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
+        qr_cur = str(row.get("qr_code_value") or "").strip()
+        qr_in = st.text_input(
+            "QR scan code",
+            value=qr_cur,
+            key=f"{pk}_qr",
+            help="Printed / scanned value for **Scan Inventory**.",
+        )
         is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
+
+        if qr_cur:
+            st.caption("Label preview")
+            st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
+            html_doc = (
+                "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inventory label</title></head>"
+                f"<body><h2>{html.escape(str(row.get('item_name') or ''))}</h2>"
+                f"<p><strong>Scan:</strong> {html.escape(qr_cur)}</p>"
+                f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data={urllib.parse.quote(qr_cur, safe="")}" '
+                "width='240' height='240' alt='QR'/></body></html>"
+            )
+            st.download_button(
+                "Download printable label (HTML)",
+                data=html_doc.encode("utf-8"),
+                file_name=f"inventory_label_{rid[:8]}.html",
+                mime="text/html",
+                key=f"{pk}_dl_lbl",
+            )
+        if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new random scan code"):
+            nv = f"INV-{uuid.uuid4().hex[:8].upper()}"
+            try:
+                update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
+            except Exception as exc:
+                st.error(f"Could not update QR: {exc}")
+                st.stop()
+            st.rerun()
 
         u1, u2 = st.columns(2, gap="small")
         with u1:
@@ -314,6 +387,7 @@ def _render_edit_panel(row: dict) -> None:
                 if not t:
                     st.error("Item Name is required.")
                     st.stop()
+                qr_t = str(qr_in or "").strip()
                 payload = {
                     "item_name": t,
                     "category": str(category or "").strip(),
@@ -325,11 +399,16 @@ def _render_edit_panel(row: dict) -> None:
                     "storage_location": str(storage_location or "").strip(),
                     "notes": str(notes or "").strip(),
                     "is_active": bool(is_active),
+                    "qr_code_value": qr_t or None,
+                    "sku": str(sku_ed or "").strip() or None,
                 }
                 try:
                     update_rows_admin(_TABLE, payload, {"id": row["id"]})
                 except Exception as exc:
-                    st.error(f"Could not update: {exc}")
+                    if "sku" in str(exc).lower():
+                        st.error(f"Could not update: {exc} — apply **`sql/028_inventory_sku_txn_created_by.sql`** for SKU support.")
+                    else:
+                        st.error(f"Could not update: {exc}")
                     st.stop()
                 _clear_panel()
                 st.success("Inventory item updated.")
@@ -344,6 +423,10 @@ def render() -> None:
     render_header("Inventory")
     render_crud_list_subtitle(
         "Stocked supplies and consumables — managed separately from individually tracked assets."
+    )
+    st.caption(
+        "Consumables: issue via **Scan Inventory** (QR / SKU); usage: **Inventory Usage**. "
+        "Reusable tools (torque wrenches, meters, etc.) use **Tool Checkout** — they do **not** reduce quantity here."
     )
 
     can_edit = current_role() == "admin"
@@ -482,7 +565,7 @@ def render() -> None:
         filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
         filter_cols[1].text_input(
             "Search Inventory",
-            placeholder="Search item name, category, vendor, location, notes",
+            placeholder="Name, SKU, QR, category, vendor, location, notes",
             key="inv_f_search",
         )
         active_options = ["All", "Active Only", "Inactive Only"]
@@ -504,21 +587,27 @@ def render() -> None:
             mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
             filtered = filtered[mask.any(axis=1)]
 
-        show_cols = [
-            c
-            for c in [
-                "item_name",
-                "category",
-                "unit",
-                "quantity_on_hand",
-                "reorder_point",
-                "unit_cost",
-                "vendor",
-                "storage_location",
-                "is_active",
-            ]
-            if c in filtered.columns
-        ]
+        qoh_s = pd.to_numeric(filtered.get("quantity_on_hand", 0), errors="coerce").fillna(0)
+        if "reorder_point" in filtered.columns:
+            rp_s = pd.to_numeric(filtered["reorder_point"], errors="coerce").fillna(0)
+        else:
+            rp_s = pd.Series(0.0, index=filtered.index)
+        low_mask = qoh_s <= rp_s
+        n_low = int(low_mask.sum()) if len(filtered) else 0
+        if n_low > 0:
+            st.warning(f"**Low stock:** {n_low} visible row(s) at or below reorder point.")
+            with st.expander("Low stock detail (visible filters)", expanded=False):
+                cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
+                if cols_show:
+                    sub = filtered.loc[low_mask, cols_show].copy()
+                    if "quantity_on_hand" in sub.columns and "reorder_point" in sub.columns:
+                        qv = pd.to_numeric(sub["quantity_on_hand"], errors="coerce").fillna(0)
+                        rv = pd.to_numeric(sub["reorder_point"], errors="coerce").fillna(0)
+                        gap = (rv - qv).clip(lower=0)
+                        sub["suggest_qty"] = gap
+                        sub.loc[sub["suggest_qty"] <= 0, "suggest_qty"] = pd.NA
+                    st.dataframe(sub, use_container_width=True, hide_index=True)
+                    st.caption("**Suggest qty** = shortfall to reorder point (informational).")
 
         if filtered.empty:
             st.warning("No inventory items match your filters.")
@@ -532,6 +621,27 @@ def render() -> None:
 
         # Display formatting (mirrors Materials-style minimal formatting)
         display_df = filtered.copy()
+        if "sku" not in display_df.columns:
+            display_df["sku"] = ""
+        display_df["stock_alert"] = low_mask.map(lambda ok: "Low Stock" if ok else "")
+
+        show_cols = [
+            c
+            for c in [
+                "item_name",
+                "sku",
+                "stock_alert",
+                "category",
+                "unit",
+                "quantity_on_hand",
+                "reorder_point",
+                "unit_cost",
+                "vendor",
+                "storage_location",
+                "is_active",
+            ]
+            if c in display_df.columns
+        ]
         if "unit_cost" in display_df.columns:
             display_df["unit_cost"] = display_df["unit_cost"].apply(_money)
 

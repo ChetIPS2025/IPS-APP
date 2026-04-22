@@ -627,6 +627,10 @@ def _render_asset_facts_panel(
     _kv("Serial number", _disp(asset.get("serial_number")))
     _kv("Asset / tool ID", _disp(asset.get("asset_id")))
     _kv("Status", _disp(asset.get("status")))
+    if bool(asset.get("is_checkout_item")):
+        st.caption("Checkout tool — possession is logged on **Tool Checkout** (not consumable inventory).")
+        _kv("Last checkout", _disp(asset.get("last_checkout_at")))
+        _kv("Last check-in", _disp(asset.get("last_checkin_at")))
 
     if not quick_edit and str(asset.get("category") or "").strip():
         _kv("Category", _disp(asset.get("category")))

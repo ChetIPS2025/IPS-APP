@@ -12,8 +12,11 @@ ASSET_TYPES = [
 
 ASSET_STATUSES = [
     "Available",
+    "Checked Out",
     "Assigned",
     "In Shop",
+    "Maintenance",
+    "Lost",
     "Out for Repair",
     "Retired",
 ]

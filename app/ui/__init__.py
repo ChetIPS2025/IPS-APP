@@ -62,10 +62,17 @@ _SECONDARY_ADMIN_ONLY: frozenset[str] = frozenset(
 
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
-_NAV_ASSETS: tuple[str, ...] = ("Asset Database",)
+_NAV_ASSETS: tuple[str, ...] = ("Asset Database", "Tool Checkout", "Who Has What")
 # Materials / labor catalogs + equipment filtered view (see equipment.py).
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
-_NAV_RESOURCES: tuple[str, ...] = ("Materials", "Labor", "Equipment", "Inventory")
+_NAV_RESOURCES: tuple[str, ...] = (
+    "Materials",
+    "Labor",
+    "Equipment",
+    "Inventory",
+    "Scan Inventory",
+    "Inventory Usage",
+)
 
 # Who can open Resources & Inventory in the sidebar (read-only; each page gates writes).
 _NAV_RESOURCES_ROLES: frozenset[str] = frozenset({"admin", "estimator", "viewer"})
@@ -288,6 +295,8 @@ def _ensure_valid_nav_page() -> None:
     elif cur0 == "Employees":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "Employees"
+    elif cur0 == "Inventory scan":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))

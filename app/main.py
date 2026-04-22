@@ -28,6 +28,8 @@ from pages import customers_jobs
 from pages import job_database
 from pages import job_costing
 from pages import asset_database
+from pages import tool_checkout
+from pages import tool_dashboard
 from pages import asset_detail
 from pages import assets as assets_page
 from pages import asset_scanner
@@ -35,6 +37,8 @@ from pages import materials
 from pages import labor
 from pages import equipment
 from pages import inventory
+from pages import inventory_dashboard
+from pages import inventory_scan
 from pages import time_tracking
 from pages import pm_matrix_entry
 from pages import weekly_timesheet
@@ -57,6 +61,8 @@ PAGES = {
     "Labor": labor.render,
     "Equipment": equipment.render,
     "Inventory": inventory.render,
+    "Scan Inventory": inventory_scan.render,
+    "Inventory Usage": inventory_dashboard.render,
     "Time Tracking": time_tracking.render,
     "PM Matrix Time Entry": pm_matrix_entry.render,
     "Weekly Timesheet": weekly_timesheet.render,
@@ -65,6 +71,8 @@ PAGES = {
     "Employee Toolbox": employee_toolbox.render,
     "PO / Expenses": po_expenses.render,
     "Asset Database": asset_database.render,
+    "Tool Checkout": tool_checkout.render,
+    "Who Has What": tool_dashboard.render,
     "Asset Scanner": asset_scanner.render,
     "Admin": admin.render,
     "Users": users.render,

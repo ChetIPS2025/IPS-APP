@@ -11,6 +11,7 @@ try:
     from app.branding import render_header
     from app.db import create_signed_url, delete_rows_admin, fetch_one, fetch_table, update_rows_admin
     from app.pages.asset_intake import render_asset_intake_form
+    from app.services.asset_constants import ASSET_STATUSES
     from app.services.asset_service import optional_numeric
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
     from app.ui import IPS_NAV_PENDING_KEY
@@ -21,6 +22,7 @@ except ImportError:
     from branding import render_header  # type: ignore
     from db import create_signed_url, delete_rows_admin, fetch_one, fetch_table, update_rows_admin  # type: ignore
     from pages.asset_intake import render_asset_intake_form  # type: ignore
+    from services.asset_constants import ASSET_STATUSES  # type: ignore
     from services.asset_service import optional_numeric  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
@@ -222,14 +224,6 @@ def _render_asset_db_top_action_row(*, vm: str, can_add: bool) -> None:
                 st.rerun()
 
 
-ASSET_STATUSES = [
-    "Available",
-    "Assigned",
-    "In Shop",
-    "Out for Repair",
-    "Retired",
-]
-
 ASSET_TYPES = [
     "Truck",
     "Trailer",
@@ -300,6 +294,10 @@ def _render_asset_panel_view(row: dict) -> None:
                 f"Serial {_disp(row.get('serial_number'))}"
             )
             st.markdown(f"**Status:** {_disp(row.get('status'))}")
+            if _is_checkout_tool_flag(row.get("is_checkout_item")):
+                st.caption("Checkout tool — scan in sidebar **Tool Checkout** (QR / asset tag).")
+                st.markdown(f"**Last checkout:** {_disp(row.get('last_checkout_at'))}")
+                st.markdown(f"**Last check-in:** {_disp(row.get('last_checkin_at'))}")
             st.markdown(f"**Category:** {_disp(row.get('category'))}")
             st.markdown(f"**Location:** {_disp(row.get('location'))}")
             if str(row.get("notes") or "").strip():
@@ -339,8 +337,9 @@ def _render_asset_panel_edit(
         return "" if v is None else v
 
     selected_job_label_default = ""
-    if row.get("assigned_job_id") in job_label_by_id:
-        selected_job_label_default = job_label_by_id[row.get("assigned_job_id")]
+    _jid = str(row.get("assigned_job_id") or "").strip()
+    if _jid and _jid in job_label_by_id:
+        selected_job_label_default = job_label_by_id[_jid]
 
     def pk(s: str) -> str:
         return f"adb_p_{rid}_{s}"
@@ -429,6 +428,13 @@ def _render_asset_panel_edit(
             )
             rental_notes_val = st.text_area("Rental notes", value=rental_notes_val, height=72, key=pk("rnotes"))
 
+        is_checkout_item = st.checkbox(
+            "Checkout tool (possession / Tool Checkout page)",
+            value=_is_checkout_tool_flag(row.get("is_checkout_item")),
+            key=pk("co_tool"),
+            help="Reusable tools tracked via **Tool Checkout** — does not use consumable inventory.",
+        )
+
         notes = st.text_area("Notes", value=str(cv("notes")), height=88, key=pk("notes"))
 
         u1, u2 = st.columns(2)
@@ -457,6 +463,7 @@ def _render_asset_panel_edit(
                     "is_active": bool(is_active),
                     "is_rental": bool(is_rental),
                     "rental_notes": str(rental_notes_val).strip(),
+                    "is_checkout_item": bool(is_checkout_item),
                 }
                 if is_rental:
                     payload["rental_daily_rate"] = optional_numeric(rental_daily)
@@ -468,7 +475,13 @@ def _render_asset_panel_edit(
                     st.success("Asset updated.")
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Could not update: {exc}")
+                    low = str(exc).lower()
+                    if "is_checkout_item" in low or "current_holder" in low or "last_checkout" in low:
+                        st.error(
+                            f"Could not update: {exc} — apply migration **`sql/029_tool_checkout.sql`** for checkout fields."
+                        )
+                    else:
+                        st.error(f"Could not update: {exc}")
         with u2:
             if st.button("Close", use_container_width=True, key=pk("close")):
                 _clear_asset_panel()
@@ -519,6 +532,25 @@ _ASSET_DB_LIST_CSS = """
   border: 1px solid rgba(56, 189, 248, 0.5);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
+.ips-badge-tool {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: middle;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fef3c7;
+  background: rgba(245, 158, 11, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+}
+.ips-badge-tool-out {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(248, 113, 113, 0.45);
+}
 </style>
 """
 
@@ -551,6 +583,7 @@ ASSET_TABLE_COLS = [
     "serial_number",
     "status",
     "category",
+    "qr_code_value",
 ]
 
 
@@ -570,6 +603,74 @@ def _is_rental_row(val) -> bool:
         return val
     s = str(val).strip().lower()
     return s in ("true", "1", "yes", "t")
+
+
+def _is_checkout_tool_flag(val) -> bool:
+    if val is None or val is pd.NA:
+        return False
+    try:
+        if isinstance(val, (float, int)) and pd.isna(val):
+            return False
+    except (TypeError, ValueError):
+        pass
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().lower()
+    return s in ("true", "1", "yes", "t")
+
+
+def _tool_status_badge_class(status: str) -> str:
+    stt = str(status or "").strip()
+    if stt == "Checked Out":
+        return "ips-badge-tool ips-badge-tool-out"
+    return "ips-badge-tool"
+
+
+def _checkout_tool_title_badge(rec: dict) -> str:
+    if not _is_checkout_tool_flag(rec.get("is_checkout_item")):
+        return ""
+    stt = str(rec.get("status") or "").strip() or "—"
+    cls = _tool_status_badge_class(stt)
+    label = html.escape(stt)
+    return f'<span class="{cls}" title="Checkout tool · status">{label}</span>'
+
+
+def _enrich_asset_table_for_checkout(
+    filtered: pd.DataFrame,
+    *,
+    job_label_by_id: dict,
+    emp_by_id: dict[str, str],
+) -> pd.DataFrame:
+    """Display-only columns for checkout tools (does not mutate persisted rows)."""
+    if filtered.empty:
+        return filtered
+    out = filtered.copy()
+    if "is_checkout_item" not in out.columns:
+        out["is_checkout_item"] = False
+    if "current_holder_employee_id" not in out.columns:
+        out["current_holder_employee_id"] = pd.NA
+    if "assigned_job_id" not in out.columns:
+        out["assigned_job_id"] = pd.NA
+    if "assigned_employee" not in out.columns:
+        out["assigned_employee"] = ""
+
+    def holder_label(row: pd.Series) -> str:
+        eid = str(row.get("current_holder_employee_id") or "").strip()
+        if eid and eid in emp_by_id:
+            return emp_by_id[eid]
+        ae = str(row.get("assigned_employee") or "").strip()
+        return ae or "—"
+
+    def job_label(row: pd.Series) -> str:
+        jid = row.get("assigned_job_id")
+        if jid is None or (isinstance(jid, float) and pd.isna(jid)):
+            return "—"
+        return str(job_label_by_id.get(str(jid), "—"))
+
+    out["Checkout tool"] = out["is_checkout_item"].map(lambda v: "Yes" if _is_checkout_tool_flag(v) else "")
+    out["Held by"] = out.apply(holder_label, axis=1)
+    out["On job"] = out.apply(job_label, axis=1)
+    return out
 
 
 def _disp(val) -> str:
@@ -598,6 +699,16 @@ def prepare_assets_dataframe(rows: list) -> pd.DataFrame:
         df["photo_path"] = pd.NA
     if "is_rental" not in df.columns:
         df["is_rental"] = False
+    if "is_checkout_item" not in df.columns:
+        df["is_checkout_item"] = False
+    if "current_holder_employee_id" not in df.columns:
+        df["current_holder_employee_id"] = pd.NA
+    if "last_checkout_at" not in df.columns:
+        df["last_checkout_at"] = pd.NA
+    if "last_checkin_at" not in df.columns:
+        df["last_checkin_at"] = pd.NA
+    if "qr_code_value" not in df.columns:
+        df["qr_code_value"] = ""
     return df
 
 
@@ -608,6 +719,8 @@ def render_asset_database_card_list(
     show_category_in_caption: bool = True,
     mobile_layout: bool = False,
     can_quick_edit: bool = False,
+    emp_by_id: dict[str, str] | None = None,
+    job_label_by_id: dict | None = None,
 ) -> None:
     """
     Shared card list: thumbnail, title, Rental badge, caption, Open profile.
@@ -624,11 +737,23 @@ def render_asset_database_card_list(
             if _is_rental_row(rec.get("is_rental"))
             else ""
         )
+        tool_badge = _checkout_tool_title_badge(rec) if _is_checkout_tool_flag(rec.get("is_checkout_item")) else ""
         meta_lines: list[str] = []
         if show_category_in_caption and str(rec.get("category") or "").strip():
             meta_lines.append(f"Category: {_disp(rec.get('category'))}")
         meta_lines.append(f"Status: {_disp(rec.get('status'))}")
         meta_lines.append(f"Serial: {_disp(rec.get('serial_number'))}")
+        if _is_checkout_tool_flag(rec.get("is_checkout_item")):
+            meta_lines.append("Checkout tool (use **Tool Checkout**)")
+            if emp_by_id:
+                eid = str(rec.get("current_holder_employee_id") or "").strip()
+                hn = emp_by_id.get(eid) or str(rec.get("assigned_employee") or "").strip()
+                if hn:
+                    meta_lines.append(f"Holder: {hn}")
+            if job_label_by_id and rec.get("assigned_job_id"):
+                jl = job_label_by_id.get(str(rec.get("assigned_job_id")), "")
+                if jl and jl != "—":
+                    meta_lines.append(f"Job: {jl}")
         mm = _disp(rec.get("manufacturer"))
         md = _disp(rec.get("model"))
         if mm != "—" or md != "—":
@@ -647,7 +772,7 @@ def render_asset_database_card_list(
                     st.markdown(
                         '<p class="ips-adb-card-title-line">'
                         f'<span class="ips-adb-card-name">{html.escape(_disp(rec.get("asset_name")))}</span>'
-                        f"{rental_badge}</p>",
+                        f"{rental_badge}{tool_badge}</p>",
                         unsafe_allow_html=True,
                     )
                     st.markdown(
@@ -683,7 +808,7 @@ def render_asset_database_card_list(
             st.markdown(
                 '<p class="ips-adb-card-title-line">'
                 f'<span class="ips-adb-card-name">{html.escape(_disp(rec.get("asset_name")))}</span>'
-                f"{rental_badge}</p>",
+                f"{rental_badge}{tool_badge}</p>",
                 unsafe_allow_html=True,
             )
             cat_suffix = ""
@@ -730,12 +855,17 @@ def render() -> None:
     rows = fetch_table("assets", limit=5000, order_by="asset_name")
     jobs_raw = fetch_table("jobs", limit=5000, order_by="job_number")
     jobs = sort_jobs_by_number_then_name(jobs_raw)
-    job_label_by_id = {j.get("id"): job_row_select_label(j) for j in jobs}
+    job_label_by_id = {str(j.get("id")): job_row_select_label(j) for j in jobs if j.get("id")}
     job_options = {
         job_row_select_label(j): j.get("id")
         for j in jobs
         if job_row_select_label(j) and job_row_select_label(j) != "—"
     }
+    try:
+        emp_rows = fetch_table("employees", columns="id,name", limit=4000, order_by="name")
+    except Exception:
+        emp_rows = []
+    emp_by_id: dict[str, str] = {str(e["id"]): str(e.get("name") or "").strip() for e in emp_rows if e.get("id")}
 
     panel_mode = st.session_state.get("asset_panel_mode")
     panel_id = st.session_state.get("asset_panel_id")
@@ -751,7 +881,7 @@ def render() -> None:
 
     df = prepare_assets_dataframe(rows)
 
-    def _render_list_block(*, filtered: pd.DataFrame, view_mode: str) -> None:
+    def _render_list_block(*, filtered: pd.DataFrame, view_mode: str, emp_by_id: dict[str, str]) -> None:
         is_narrow = st.session_state.get("ips_viewport_narrow") is True
         if view_mode == "Cards":
             st.caption(
@@ -764,6 +894,8 @@ def render() -> None:
                 show_category_in_caption=True,
                 mobile_layout=is_narrow,
                 can_quick_edit=can_add,
+                emp_by_id=emp_by_id,
+                job_label_by_id=job_label_by_id,
             )
             return
 
@@ -773,25 +905,30 @@ def render() -> None:
                 "use **Table** when you need checkboxes, export, or bulk delete."
             )
         st.caption("Checkbox column on the left — action bar sits directly under the grid.")
+        disp = _enrich_asset_table_for_checkout(filtered, job_label_by_id=job_label_by_id, emp_by_id=emp_by_id)
         table_cols = [
             c
             for c in [
                 "asset_name",
-                "manufacturer",
-                "model",
+                "asset_id",
                 "serial_number",
                 "status",
+                "Checkout tool",
+                "Held by",
+                "On job",
+                "manufacturer",
+                "model",
                 "category",
                 "is_rental",
             ]
-            if c in filtered.columns
+            if c in disp.columns
         ]
-        if "id" not in filtered.columns:
-            st.dataframe(filtered[table_cols], use_container_width=True, hide_index=True)
+        if "id" not in disp.columns:
+            st.dataframe(disp[table_cols], use_container_width=True, hide_index=True)
             return
 
         _, sel = render_selectable_dataframe(
-            filtered,
+            disp,
             table_key=TABLE_KEY_ASSETS,
             id_column="id",
             columns=table_cols,
@@ -804,8 +941,8 @@ def render() -> None:
             can_view=True,
             can_edit=can_add,
             can_delete=can_add,
-            export_df=filtered,
-            visible_df=filtered,
+            export_df=disp,
+            visible_df=disp,
             id_column="id",
             export_filename="asset_database_export.csv",
             view_label="View Asset",
@@ -883,7 +1020,7 @@ def render() -> None:
                 ]
             )
             st.selectbox("Filter Status", ["All"] + statuses, key="asset_db_f_status")
-            scope_options = ["All", "Rental Only", "Equipment Only"]
+            scope_options = ["All", "Rental Only", "Equipment Only", "Checkout tools only"]
             st.selectbox("Show", scope_options, key="asset_db_f_scope")
             serial_options = ["All", "Has serial", "No serial"]
             st.selectbox("Serial #", serial_options, key="asset_db_f_serial")
@@ -927,7 +1064,7 @@ def render() -> None:
             filter_cols[2].selectbox("Serial #", serial_options, key="asset_db_f_serial")
 
             filter_cols2 = st.columns([1, 3])
-            scope_options = ["All", "Rental Only", "Equipment Only"]
+            scope_options = ["All", "Rental Only", "Equipment Only", "Checkout tools only"]
             with filter_cols2[0]:
                 st.markdown('<span class="ips-adb-filter-row2"></span>', unsafe_allow_html=True)
                 st.selectbox("Show", scope_options, key="asset_db_f_scope")
@@ -953,6 +1090,8 @@ def render() -> None:
             filtered = filtered[filtered["is_rental"].map(_is_rental_row)]
         elif selected_scope == "Equipment Only" and "category" in filtered.columns:
             filtered = filtered[filtered["category"].map(_is_equipment_row_cat)]
+        elif selected_scope == "Checkout tools only" and "is_checkout_item" in filtered.columns:
+            filtered = filtered[filtered["is_checkout_item"].map(_is_checkout_tool_flag)]
         if search.strip():
             s = search.strip().lower()
             search_cols = [c for c in ASSET_TABLE_COLS if c in filtered.columns]
@@ -966,6 +1105,7 @@ def render() -> None:
             _render_list_block(
                 filtered=filtered,
                 view_mode=str(st.session_state.get("asset_db_view_mode", "Cards")),
+                emp_by_id=emp_by_id,
             )
 
     if panel_open and panel_row is not None:
