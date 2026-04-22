@@ -32,8 +32,8 @@ def render() -> None:
             st.info("No asset documents found.")
 
     with tab2:
-        if current_role() not in {"admin", "estimator"}:
-            st.info("Only admin or estimator users can upload documents.")
+        if current_role() not in {"admin", "pm"}:
+            st.info("Only admin or pm users can upload documents.")
             return
 
         asset_options = {f"{a.get('asset_id')} - {a.get('asset_name')}": a for a in assets}

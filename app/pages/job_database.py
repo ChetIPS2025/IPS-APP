@@ -199,8 +199,8 @@ def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
 
 
 def _job_db_admin_read() -> bool:
-    """Admin/estimator use service-role reads so linked estimate/customer rows stay visible under RLS."""
-    return current_role() in {"admin", "estimator"}
+    """Admin/pm use service-role reads so linked estimate/customer rows stay visible under RLS."""
+    return current_role() in {"admin", "pm"}
 
 
 def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
@@ -258,7 +258,7 @@ def _fetch_contacts_for_job_database(
     except ImportError:
         from app.services.customer_contacts import fetch_contacts_for_customer_scope  # type: ignore
 
-    admin_read = current_role() in {"admin", "estimator"}
+    admin_read = current_role() in {"admin", "pm"}
     cid = str(customer_id or "").strip()
     if not cid:
         return []
@@ -665,7 +665,7 @@ def _render_job_form_panel(
         )
 
         if not can_edit:
-            st.info("Only admin or estimator users can add or update jobs.")
+            st.info("Only admin or pm users can add or update jobs.")
             return
 
         b1, b2 = st.columns(2, gap="small")
@@ -1095,7 +1095,7 @@ def _render_job_db_debug_expander(*, jobs: list[dict[str, Any]], admin_read: boo
 
         st.caption(
             "If the count is zero but Supabase shows rows: check RLS policies for `authenticated`, "
-            "or ensure `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` is set for admin/estimator reads."
+            "or ensure `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` is set for admin/pm reads."
         )
 
 
@@ -1111,7 +1111,7 @@ def render() -> None:
         "or **Job Received** on the Estimates list once the quote is customer-approved."
     )
 
-    can_edit = current_role() in {"admin", "estimator"}
+    can_edit = current_role() in {"admin", "pm"}
     st.session_state.setdefault("job_db_bypass_filters", True)
 
     customers: list[dict[str, Any]] = []
@@ -1420,7 +1420,7 @@ def render() -> None:
                             rc[9].text(_money_cell(row.get("awarded_amount")))
 
                         del_help = (
-                            "Only admin or estimator can delete jobs."
+                            "Only admin or pm can delete jobs."
                             if not can_edit
                             else "Delete this job (blocked if costing data exists)."
                         )

@@ -82,7 +82,7 @@ _MAX_ADDRESS_FIELD_LEN = 2000
 
 
 def _fetch_customers_list_rows(*, admin_read: bool) -> list[dict[str, Any]]:
-    """Admin/estimator uses service-role reads so rows written with admin policies stay visible (RLS)."""
+    """Admin/pm uses service-role reads so rows written with admin policies stay visible (RLS)."""
     if admin_read:
         try:
             return fetch_table_admin("customers", limit=5000, order_by="customer_name")
@@ -1535,7 +1535,7 @@ def _render_customer_side_panel_body(
         st.warning("Customer not found.")
         _clear_customer_mode()
     else:
-        can_edit = current_role() in {"admin", "estimator"}
+        can_edit = current_role() in {"admin", "pm"}
         _render_edit_form(
             er,
             can_edit=can_edit,
@@ -1705,7 +1705,7 @@ def _render_customers_main(
 
 
 def render_customers() -> None:
-    can_add = current_role() in {"admin", "estimator"}
+    can_add = current_role() in {"admin", "pm"}
     if st.session_state.get("customer_mode") == "add":
         st.session_state.pop("customer_mode", None)
     mode = st.session_state.get("customer_mode")
@@ -1878,4 +1878,4 @@ def render_customers() -> None:
     )
 
     if not can_add:
-        st.info("Only admin or estimator users can manage customers.")
+        st.info("Only admin or pm users can manage customers.")

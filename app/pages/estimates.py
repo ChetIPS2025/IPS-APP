@@ -84,7 +84,7 @@ from pages.estimate_editor import (
 
 def _estimates_page_admin_read() -> bool:
     """Internal roles use service-role reads so admin-written rows stay visible under RLS."""
-    return current_role() in {"admin", "estimator"}
+    return current_role() in {"admin", "pm"}
 
 
 def _fetch_one_estimate_row(estimate_id: str) -> dict[str, Any] | None:
@@ -275,7 +275,7 @@ def _load_estimate_into_session(selected_id: str) -> None:
 
 
 def _render_estimate_list() -> None:
-    can_edit = current_role() in {"admin", "estimator"}
+    can_edit = current_role() in {"admin", "pm"}
     rows = _fetch_estimates_list_rows()
     df = pd.DataFrame(rows)
 
@@ -482,7 +482,7 @@ def _render_estimate_list() -> None:
     def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
         """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
         if not can_edit:
-            return "Only admin or estimator can run this action."
+            return "Only admin or pm can run this action."
         if _series_truthy_job_received(est_row):
             return "This estimate is already marked as job received."
         if not cust_id:
@@ -651,7 +651,7 @@ def _render_estimate_list() -> None:
         with rc[9]:
             del_enabled = bool(can_edit)
             if not can_edit:
-                del_help = "Only admin or estimator can delete estimates."
+                del_help = "Only admin or pm can delete estimates."
             else:
                 del_help = (
                     "Delete this estimate (quote). Linked jobs are kept; the job is unlinked from this quote."

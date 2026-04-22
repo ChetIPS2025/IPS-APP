@@ -388,8 +388,8 @@ def render_asset_intake_form() -> None:
 def render() -> None:
     render_header("Asset Intake")
 
-    if current_role() not in {"admin", "estimator"}:
-        st.info("Only admin or estimator users can add assets.")
+    if current_role() not in {"admin", "pm"}:
+        st.info("Only admin or pm users can add assets.")
         return
 
     render_asset_intake_form()

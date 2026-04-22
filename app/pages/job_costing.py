@@ -58,7 +58,7 @@ def _money_str(value: float) -> str:
 
 
 def _job_costing_admin_read() -> bool:
-    return current_role() in {"admin", "estimator"}
+    return current_role() in {"admin", "pm"}
 
 
 def _sort_jobs(jobs: list[dict]) -> list[dict]:
@@ -405,7 +405,7 @@ def render() -> None:
             st.info("No **time_entries** rows for this job yet.")
         st.markdown(f"**Labor total:** {_money_str(labor_total)}")
 
-    can_edit = current_role() in {"admin", "estimator"}
+    can_edit = current_role() in {"admin", "pm"}
 
     # --- Materials ---
     mat_c = _render_bordered_section("Materials")
@@ -439,7 +439,7 @@ def render() -> None:
                         except Exception as exc:
                             st.error(f"Insert failed: {exc!r}")
         else:
-            st.caption("Read-only: admin or estimator can add materials.")
+            st.caption("Read-only: admin or pm can add materials.")
 
         if mats_job:
             view = pd.DataFrame(
@@ -508,7 +508,7 @@ def render() -> None:
                         except Exception as exc:
                             st.error(f"Insert failed: {exc!r}")
         else:
-            st.caption("Read-only: admin or estimator can add equipment.")
+            st.caption("Read-only: admin or pm can add equipment.")
 
         if equip_job:
             view = pd.DataFrame(

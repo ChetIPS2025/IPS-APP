@@ -235,8 +235,8 @@ def render() -> None:
         subtitle="Dense grid — same labor pool as Time Tracking",
     )
 
-    if current_role() not in {"admin", "estimator", "project_manager"}:
-        st.info("Only admin, estimator, or project manager users can use the weekly timesheet.")
+    if current_role() not in {"admin", "pm"}:
+        st.info("Only admin or pm users can use the weekly timesheet.")
         return
 
     render_crud_list_subtitle(

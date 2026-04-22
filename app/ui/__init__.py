@@ -74,8 +74,63 @@ _NAV_RESOURCES: tuple[str, ...] = (
     "Inventory Usage",
 )
 
-# Who can open Resources & Inventory in the sidebar (read-only; each page gates writes).
-_NAV_RESOURCES_ROLES: frozenset[str] = frozenset({"admin", "estimator", "viewer"})
+# Role-based page access (UI hiding + routing validation; main.py enforces too).
+# Supported roles: admin, pm, employee, viewer. Legacy estimator is normalized to pm in auth.current_role().
+_ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
+    "admin": frozenset(
+        {
+            *_NAV_PRIMARY,
+            *_NAV_JOBS,
+            *_NAV_ASSETS,
+            *_NAV_RESOURCES,
+            *_NAV_SECONDARY,
+            "Admin",
+            "Users",
+            "Asset Detail",
+            "Asset Manager",
+        }
+    ),
+    "pm": frozenset(
+        {
+            "Dashboard",
+            "Job Database",
+            "Estimates",
+            "Customers",
+            "Job Costing",
+            "Time Tracking",
+            "Inventory",
+            "Scan Inventory",
+            "Inventory Usage",
+            "Asset Database",
+            "Tool Checkout",
+            "Who Has What",
+            "Asset Scanner",
+            "Weekly Timesheet",
+            "PM Matrix Time Entry",
+            "Employee Toolbox",
+        }
+    ),
+    "employee": frozenset(
+        {
+            "Dashboard",
+            "Time Tracking",
+            "Scan Inventory",
+            "Inventory Usage",
+            "Tool Checkout",
+            "Who Has What",
+            "Employee Toolbox",
+        }
+    ),
+    "viewer": frozenset({"Dashboard", "Inventory Usage", "Who Has What"}),
+}
+
+
+def role_can_open_page(role: str, page: str) -> bool:
+    r = str(role or "viewer").strip().lower()
+    allowed = _ROLE_ALLOWED_PAGES.get(r)
+    if allowed is None:
+        allowed = _ROLE_ALLOWED_PAGES.get("viewer", frozenset())
+    return str(page or "").strip() in allowed
 
 IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSETS + _NAV_RESOURCES + _NAV_SECONDARY
 
@@ -300,8 +355,11 @@ def _ensure_valid_nav_page() -> None:
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
-    visible_resources = set(_NAV_RESOURCES) if role in _NAV_RESOURCES_ROLES else set()
-    visible: set[str] = set(_NAV_PRIMARY) | set(_NAV_JOBS) | set(_NAV_ASSETS) | visible_resources | visible_secondary
+    visible_all = set(
+        p
+        for p in (set(_NAV_PRIMARY) | set(_NAV_JOBS) | set(_NAV_ASSETS) | set(_NAV_RESOURCES) | visible_secondary)
+        if role_can_open_page(role, p)
+    )
 
     cur = st.session_state.get(IPS_NAV_PAGE_KEY)
     routable = frozenset(IPS_SIDEBAR_PAGES) | {"Admin"}
@@ -310,7 +368,7 @@ def _ensure_valid_nav_page() -> None:
         return
 
     admin_only_routes = {"Admin"} if role == "admin" else frozenset()
-    if cur not in visible and cur not in admin_only_routes:
+    if cur not in visible_all and cur not in admin_only_routes:
         st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
 
 
@@ -361,7 +419,8 @@ def render_sidebar() -> str:
         unsafe_allow_html=True,
     )
     for p in _NAV_JOBS:
-        _render_nav_button(p, current=current, indent=True)
+        if role_can_open_page(role, p):
+            _render_nav_button(p, current=current, indent=True)
 
     # --- PRIMARY: Asset Dashboard ---
     st.sidebar.markdown(
@@ -369,18 +428,17 @@ def render_sidebar() -> str:
         unsafe_allow_html=True,
     )
     for p in _NAV_ASSETS:
-        _render_nav_button(p, current=current, indent=True)
+        if role_can_open_page(role, p):
+            _render_nav_button(p, current=current, indent=True)
 
     # --- PRIMARY: Resources & Inventory ---
     st.sidebar.markdown(
         '<div class="ips-nav-section-title ips-nav-group-spaced">Resources &amp; Inventory</div>',
         unsafe_allow_html=True,
     )
-    if role in _NAV_RESOURCES_ROLES:
-        for p in _NAV_RESOURCES:
+    for p in _NAV_RESOURCES:
+        if role_can_open_page(role, p):
             _render_nav_button(p, current=current, indent=True)
-    else:
-        st.sidebar.caption("Sign in with a valid role to open catalogs.")
 
     # --- SECONDARY: TOOLS ---
     st.sidebar.markdown(
@@ -390,6 +448,8 @@ def render_sidebar() -> str:
 
     with st.sidebar.expander("TOOLS", expanded=True):
         for p in secondary_visible:
+            if not role_can_open_page(role, p):
+                continue
             active = current == p
             btn_type = "primary" if active else "secondary"
             key = _nav_btn_key(p)

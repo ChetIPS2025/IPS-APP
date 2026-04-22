@@ -11,6 +11,7 @@ from auth import init_session, sign_in, require_login, current_role
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
 from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
+from ui import role_can_open_page
 from branding import apply_branding, render_header
 
 try:
@@ -144,6 +145,11 @@ def main() -> None:
 
     if page in _ADMIN_ONLY_PAGES and current_role() != "admin":
         st.error("Admin access required.")
+        return
+
+    # Hard enforcement: do not rely only on sidebar hiding.
+    if not role_can_open_page(current_role(), str(page or "")):
+        st.error("You do not have access to this page.")
         return
 
     render_fn = PAGES.get(page)

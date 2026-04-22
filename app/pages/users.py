@@ -49,7 +49,7 @@ except ImportError:
         set_selected_ids,
     )
 
-_ROLE_OPTIONS: tuple[str, ...] = ("viewer", "estimator", "admin")
+_ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "pm", "admin")
 _MIN_PASSWORD_LENGTH = 8
 _MAX_EMAIL_LENGTH = 320
 
@@ -155,6 +155,7 @@ def _run_create_user(
     new_role: str,
     existing_emails: set[str],
     clear_selection_table_key: str,
+    employee_id: str | None = None,
 ) -> bool:
     """Returns True if created successfully (caller reruns)."""
     if not email_norm:
@@ -190,6 +191,12 @@ def _run_create_user(
 
     new_id = str((created or {}).get("id") or "").strip()
     if new_id:
+        # Optional link to employees (best-effort; profiles may not have employee_id yet).
+        if employee_id:
+            try:
+                update_rows("profiles", {"employee_id": str(employee_id)}, {"id": new_id})
+            except Exception:
+                pass
         tkey = clear_selection_table_key
         sel_val = f"p:{new_id}" if tkey == TABLE_KEY_PEOPLE else new_id
         set_selected_ids(tkey, [sel_val])
@@ -213,6 +220,25 @@ def add_user_dialog(
     new_full_name = c3.text_input("Full name", key="dlg_users_add_full_name")
     new_role = c4.selectbox("Role", list(_ROLE_OPTIONS), key="dlg_users_add_role")
 
+    emp_id: str | None = None
+    try:
+        emps = fetch_table("employees", columns="id,name,email", limit=5000, order_by="name")
+    except Exception:
+        emps = []
+    if emps:
+        labels = ["— Not linked —"] + [
+            f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
+            for e in emps
+            if e.get("id")
+        ]
+        pick = st.selectbox("Link to employee (optional)", labels, key="dlg_users_add_emp")
+        if pick and not pick.startswith("—"):
+            ix = labels.index(pick) - 1
+            try:
+                emp_id = str(emps[ix].get("id") or "").strip() or None
+            except Exception:
+                emp_id = None
+
     st.divider()
     bc, bs = st.columns(2, gap="small")
     with bc:
@@ -231,6 +257,7 @@ def add_user_dialog(
                 new_role=new_role,
                 existing_emails=existing_emails,
                 clear_selection_table_key=tkey,
+                employee_id=emp_id,
             ):
                 st.rerun()
 
@@ -325,19 +352,55 @@ def _render_edit_user_panel(
             help="Inactive users cannot sign in.",
         )
 
+    # Optional employee link (best-effort; profiles may not have employee_id yet).
+    emp_id: str | None = None
+    try:
+        cur_emp = str(profile_row.get("employee_id") or "").strip() or None
+    except Exception:
+        cur_emp = None
+    try:
+        emps = fetch_table("employees", columns="id,name,email", limit=5000, order_by="name")
+    except Exception:
+        emps = []
+    if emps:
+        labels = ["— Not linked —"] + [
+            f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
+            for e in emps
+            if e.get("id")
+        ]
+        default = "— Not linked —"
+        if cur_emp:
+            for e in emps:
+                if str(e.get("id")) == cur_emp:
+                    default = f"{str(e.get('name') or '—')} ({str(e.get('email') or '').strip() or str(e.get('id'))[:8] + '…'})"
+                    if default not in labels:
+                        labels.append(default)
+                    break
+        pick = st.selectbox(
+            "Linked employee (optional)",
+            labels,
+            index=labels.index(default) if default in labels else 0,
+            key=f"{pk}_emp_link",
+        )
+        if pick and not pick.startswith("—"):
+            ix = labels.index(pick) - 1
+            try:
+                emp_id = str(emps[ix].get("id") or "").strip() or None
+            except Exception:
+                emp_id = None
+
     u1, u2 = st.columns(2, gap="small")
     with u1:
         if st.button("Update User", type="primary", use_container_width=True, key=f"{pk}_update"):
             try:
-                update_rows(
-                    "profiles",
-                    {
-                        "full_name": str(fn or "").strip(),
-                        "role": edit_role,
-                        "is_active": bool(edit_active),
-                    },
-                    {"id": profile_row["id"]},
-                )
+                payload = {
+                    "full_name": str(fn or "").strip(),
+                    "role": edit_role,
+                    "is_active": bool(edit_active),
+                }
+                if emp_id is not None:
+                    payload["employee_id"] = emp_id
+                update_rows("profiles", payload, {"id": profile_row["id"]})
             except Exception as exc:
                 st.error(
                     "Could not save profile changes. Check RLS policies and database connectivity."

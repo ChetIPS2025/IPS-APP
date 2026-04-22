@@ -68,7 +68,7 @@ def render() -> None:
         "Expenses and PO lines tied to **jobs** (``job_id``) — the work/costing record; pick a job, then add or edit."
     )
 
-    can_add = current_role() in {"admin", "estimator"}
+    can_add = current_role() in {"admin", "pm"}
     can_approve = current_role() == "admin"
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")

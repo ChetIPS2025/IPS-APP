@@ -839,7 +839,7 @@ def render() -> None:
         "Filter and browse assets. Use Table for checkboxes, export, and bulk delete; Cards when you want photo-first browsing."
     )
 
-    can_add = current_role() in {"admin", "estimator"}
+    can_add = current_role() in {"admin", "pm"}
     if "asset_db_add_mode" not in st.session_state:
         st.session_state["asset_db_add_mode"] = False
 

@@ -143,7 +143,7 @@ def render() -> None:
     )
 
     sk = str(current_profile().get("id") or "anonymous")
-    use_admin = current_role() in {"admin", "estimator"}
+    use_admin = current_role() in {"admin", "pm"}
     _lim = 5000
     try:
         customers = fetch_table_for_session(

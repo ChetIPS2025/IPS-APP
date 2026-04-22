@@ -228,9 +228,9 @@ def render() -> None:
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-    can_use = current_role() in {"admin", "estimator"}
+    can_use = current_role() in {"admin", "pm", "employee"}
     if not can_use:
-        st.info("Sign in as **admin** or **estimator** to issue inventory.")
+        st.info("Sign in as **admin**, **pm**, or **employee** to issue inventory.")
         return
 
     try:

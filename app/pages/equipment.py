@@ -64,7 +64,7 @@ def render() -> None:
         "Filtered Asset Database view (Equipment category only). Open a card for rental rates and details."
     )
 
-    can_add = current_role() in {"admin", "estimator"}
+    can_add = current_role() in {"admin", "pm"}
 
     inject_table_action_styles()
     with st.container(border=True):
@@ -103,7 +103,7 @@ def render() -> None:
     if df.empty:
         st.info("No assets found. Add assets from **Asset Database** or use **Add Equipment** above.")
         if not can_add:
-            st.caption("Admin or estimator role required to add equipment.")
+            st.caption("Admin or pm role required to add equipment.")
         return
 
     if "category" not in df.columns:
@@ -117,7 +117,7 @@ def render() -> None:
             'No equipment assets yet. Set **Category** to `Equipment` on an asset, or click **Add Equipment**.'
         )
         if not can_add:
-            st.caption("Admin or estimator role required to add equipment.")
+            st.caption("Admin or pm role required to add equipment.")
         return
 
     filter_cols = st.columns([1, 2, 1])

@@ -388,8 +388,8 @@ def render() -> None:
     render_header("Material Quote Import")
     st.caption("Import vendor quotes from images, PDFs, CSV, or Excel.")
 
-    if current_role() not in {"admin", "estimator"}:
-        st.info("Only admin or estimator users can use material quote import.")
+    if current_role() not in {"admin", "pm"}:
+        st.info("Only admin or pm users can use material quote import.")
         return
 
     render_material_quote_import_form(return_to_materials=False)

@@ -68,4 +68,21 @@ def current_profile() -> dict:
 
 
 def current_role() -> str:
-    return current_profile().get("role", "viewer")
+    """
+    Normalized app role.
+
+    Supported roles:
+    - admin
+    - pm
+    - employee
+    - viewer
+
+    Legacy compatibility:
+    - estimator -> pm
+    """
+    raw = str(current_profile().get("role", "viewer") or "viewer").strip().lower()
+    if raw == "estimator":
+        return "pm"
+    if raw in {"admin", "pm", "employee", "viewer"}:
+        return raw
+    return "viewer"

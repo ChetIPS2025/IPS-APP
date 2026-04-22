@@ -81,7 +81,7 @@ def _open_estimate_in_editor(estimate_id: str) -> None:
 def _dashboard_admin_read() -> bool:
     """Service-role reads when RLS would hide rows from the anon client."""
     try:
-        return current_role() in {"admin", "estimator"}
+        return current_role() in {"admin", "pm"}
     except Exception:
         return False
 

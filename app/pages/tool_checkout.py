@@ -124,9 +124,9 @@ def render() -> None:
     _inject_tool_co_mobile_css()
     st.markdown('<span class="ips-tool-co-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-    can_use = current_role() in {"admin", "estimator"}
+    can_use = current_role() in {"admin", "pm", "employee"}
     if not can_use:
-        st.info("Sign in as **admin** or **estimator** to check tools in or out.")
+        st.info("Sign in as **admin**, **pm**, or **employee** to check tools in or out.")
         return
 
     try:

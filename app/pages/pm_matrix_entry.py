@@ -61,7 +61,7 @@ except ImportError:
     )
     from app.services.time_grid_service import monday_of_week, week_dates  # type: ignore
 
-PM_EDIT_ROLES = frozenset({"admin", "estimator", "project_manager"})
+PM_EDIT_ROLES = frozenset({"admin", "pm"})
 _OT_DEFAULT = 40.0
 _INTENSITY_CAP_HOURS = 12.0  # scale color intensity up to this many hours per cell
 
@@ -868,7 +868,7 @@ def render_pm_matrix(*, can_edit: bool) -> None:
                     st.rerun()
 
     if not can_edit:
-        st.info("View-only. Sign in as admin, estimator, or project manager to edit.")
+        st.info("View-only. Sign in as admin or pm to edit.")
 
 
 def render() -> None:

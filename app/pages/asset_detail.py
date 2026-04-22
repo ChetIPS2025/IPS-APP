@@ -866,7 +866,7 @@ def render() -> None:
     st.markdown(_PROFILE_CARD_CSS, unsafe_allow_html=True)
     _inject_asset_detail_sections_css()
 
-    can_edit = current_role() in {"admin", "estimator"}
+    can_edit = current_role() in {"admin", "pm"}
 
     assets_all = fetch_table("assets", limit=5000, order_by="asset_name")
     if not assets_all:
@@ -1099,7 +1099,7 @@ def render() -> None:
     st.markdown("---")
 
     if not can_edit:
-        st.info("You can view this profile. Admin or estimator role is required for check-out and other actions.")
+        st.info("You can view this profile. Admin or pm role is required for check-out and other actions.")
     else:
         # Full rental form + uploads + AI only while Quick Edit (✏️) is active — same session keys as before.
         if quick_edit:

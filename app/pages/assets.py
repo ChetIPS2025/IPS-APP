@@ -91,7 +91,7 @@ def _safe_date_value(value):
 def render() -> None:
     render_header("Asset Manager")
 
-    can_edit = current_role() in {"admin", "estimator"}
+    can_edit = current_role() in {"admin", "pm"}
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
@@ -442,7 +442,7 @@ def render() -> None:
     )
 
     if not can_edit:
-        st.info("Only admin or estimator users can add or update assets.")
+        st.info("Only admin or pm users can add or update assets.")
         return
 
     if selected_mode == "Add New Asset" and not editing_session:

@@ -190,11 +190,11 @@ def render() -> None:
         "For scan workflow use **Tool Checkout**."
     )
 
-    if current_role() not in {"admin", "estimator", "viewer"}:
+    if current_role() not in {"admin", "pm", "employee", "viewer"}:
         st.error("You do not have access to this page.")
         return
 
-    can_write = current_role() in {"admin", "estimator"}
+    can_write = current_role() in {"admin", "pm"}
 
     try:
         all_assets = fetch_table(_ASSETS, limit=8000, order_by="asset_name")

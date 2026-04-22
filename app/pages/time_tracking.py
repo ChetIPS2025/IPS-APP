@@ -63,7 +63,7 @@ except ImportError:
         week_dates,
     )
 
-TT_EDIT_ROLES = frozenset({"admin", "estimator", "project_manager"})
+TT_EDIT_ROLES = frozenset({"admin", "pm", "employee"})
 
 _OT_THRESHOLD_DEFAULT = 40.0
 
@@ -74,7 +74,7 @@ TT_JOB_LABEL_TO_ID_KEY = "_tt_job_label_to_id_for_callbacks"
 TT_EDIT_ID_KEY = "tt_entry_edit_id"
 TT_FAST_ENTRY_KEY = "tt_fast_entry_mode"
 # Single Quick Actions popup: which employee id has it open (None = closed)
-TT_OPEN_EMPLOYEE_KEY = "tt_open_employee"
+TT_OPEN_EMPLOYEE_POPUP_KEY = "tt_open_employee_popup"
 
 # Non-job time (no job_id): category list + selectbox sentinel
 TT_NON_JOB_SENTINEL = "(Non-job — category below)"
@@ -88,6 +88,56 @@ NON_JOB_CODE_COLORS: dict[str, str] = {
     "HOLIDAY": "#0d9488",
     "TRAVEL": "#ca8a04",
 }
+
+
+def _build_work_item_options(
+    *,
+    job_labels_sorted: list[str],
+    job_label_to_id: dict[str, str],
+) -> list[dict[str, str]]:
+    """
+    Combined Work Item dropdown options:
+    - {"type":"job","id":<job_id>,"label":<job_label>}
+    - {"type":"non_job","code":<code>,"label":"NON-JOB — <code>"}
+    """
+    out: list[dict[str, str]] = []
+    for lb in job_labels_sorted:
+        jid = str(job_label_to_id.get(lb) or "").strip()
+        if not jid:
+            continue
+        out.append({"type": "job", "id": jid, "label": str(lb)})
+    for code in NON_JOB_CATEGORY_OPTIONS:
+        c = str(code or "").strip()
+        if not c:
+            continue
+        out.append({"type": "non_job", "code": c, "label": f"NON-JOB — {c}"})
+    return out
+
+
+def _work_item_index_for_entry(work_item_options: list[dict[str, str]], *, ent: dict) -> int:
+    jid = str(ent.get("job_id") or "").strip()
+    nj = str(ent.get("non_job_code") or "").strip()
+    if jid:
+        for i, opt in enumerate(work_item_options):
+            if opt.get("type") == "job" and str(opt.get("id") or "") == jid:
+                return i
+        return 0
+    if nj:
+        for i, opt in enumerate(work_item_options):
+            if opt.get("type") == "non_job" and str(opt.get("code") or "") == nj:
+                return i
+        return 0
+    return 0
+
+
+def _work_item_display(*, job_id: str, non_job_code: str, job_id_to_label: dict[str, str]) -> str:
+    jid = str(job_id or "").strip()
+    nj = str(non_job_code or "").strip()
+    if jid:
+        return str(job_id_to_label.get(jid) or "?").strip() or "?"
+    if nj:
+        return f"NON-JOB — {nj}"
+    return "—"
 
 
 class _TTFiltersResult(NamedTuple):
@@ -140,7 +190,7 @@ def _render_qa_toggle_button(eid: str) -> None:
         '<span class="ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    open_e = st.session_state.get(TT_OPEN_EMPLOYEE_KEY)
+    open_e = st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY)
     if st.button(
         "⚡",
         key=f"tt_qa_toggle_{eid}",
@@ -149,9 +199,9 @@ def _render_qa_toggle_button(eid: str) -> None:
         help="Quick Actions: copy day/week, fill week, edit lines for the selected day",
     ):
         if open_e == eid:
-            st.session_state[TT_OPEN_EMPLOYEE_KEY] = None
+            st.session_state[TT_OPEN_EMPLOYEE_POPUP_KEY] = None
         else:
-            st.session_state[TT_OPEN_EMPLOYEE_KEY] = eid
+            st.session_state[TT_OPEN_EMPLOYEE_POPUP_KEY] = eid
         st.rerun()
 
 
@@ -219,42 +269,42 @@ def _job_label_for_id(job_label_to_id: dict[str, str], job_id: str) -> str | Non
 
 def _persist_time_entry_row(te_id: str, job_label_to_id: dict[str, str]) -> tuple[bool, str | None]:
     """Read widget state for one entry and update DB. Returns (ok, error_message)."""
-    jk, hk, nk, njk = f"tt_job_{te_id}", f"tt_h_{te_id}", f"tt_n_{te_id}", f"tt_nj_{te_id}"
-    if jk not in st.session_state:
+    wk, hk, nk = f"work_item_{te_id}", f"tt_h_{te_id}", f"tt_n_{te_id}"
+    if wk not in st.session_state:
         return False, None
-    job_label = st.session_state.get(jk)
-    if not isinstance(job_label, str):
-        return False, "Invalid job selection."
-    nj = str(st.session_state.get(njk) or "").strip()
+    wi = st.session_state.get(wk)
+    if not isinstance(wi, dict):
+        return False, "Invalid work item selection."
     hrs = float(st.session_state.get(hk) or 0)
     note = str(st.session_state.get(nk) or "").strip()
-    if job_label and job_label != TT_NON_JOB_SENTINEL:
-        new_jid = job_label_to_id.get(job_label)
+    wi_type = str(wi.get("type") or "").strip()
+    if wi_type == "job":
+        new_jid = str(wi.get("id") or "").strip()
         if not new_jid:
-            return False, "Pick a valid job."
-        payload = {
-            "job_id": new_jid,
-            "non_job_code": None,
-            "hours": hrs,
-            "notes": note,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
+            return False, "Pick a valid work item."
+        payload = {"job_id": new_jid, "non_job_code": None}
+        snap_work = ("job", new_jid)
+    elif wi_type == "non_job":
+        code = str(wi.get("code") or "").strip()
+        if not code:
+            return False, "Pick a valid work item."
+        payload = {"job_id": None, "non_job_code": code}
+        snap_work = ("non_job", code)
     else:
-        if not nj:
-            return False, "Pick a job or select a non-job category."
-        payload = {
-            "job_id": None,
-            "non_job_code": nj,
+        return False, "Pick a valid work item."
+    payload.update(
+        {
             "hours": hrs,
             "notes": note,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+    )
     try:
         update_rows("time_entries", payload, {"id": te_id})
     except Exception as exc:
         return False, str(exc)
     snap_k = f"tt_row_snap_{te_id}"
-    st.session_state[snap_k] = (job_label, nj, hrs, note)
+    st.session_state[snap_k] = (snap_work, hrs, note)
     return True, None
 
 
@@ -264,19 +314,24 @@ def _maybe_autosave_entry(te_id: str) -> None:
     jm = st.session_state.get(TT_JOB_LABEL_TO_ID_KEY)
     if not isinstance(jm, dict):
         return
-    jk = f"tt_job_{te_id}"
+    wk = f"work_item_{te_id}"
     hk = f"tt_h_{te_id}"
     nk = f"tt_n_{te_id}"
-    njk = f"tt_nj_{te_id}"
-    if jk not in st.session_state:
+    if wk not in st.session_state:
         return
-    job_label = st.session_state.get(jk)
+    wi = st.session_state.get(wk)
     hrs = float(st.session_state.get(hk) or 0)
     note = str(st.session_state.get(nk) or "").strip()
-    nj = str(st.session_state.get(njk) or "").strip()
-    if not isinstance(job_label, str):
+    if not isinstance(wi, dict):
         return
-    candidate = (job_label, nj, hrs, note)
+    wi_type = str(wi.get("type") or "").strip()
+    if wi_type == "job":
+        candidate_work = ("job", str(wi.get("id") or "").strip())
+    elif wi_type == "non_job":
+        candidate_work = ("non_job", str(wi.get("code") or "").strip())
+    else:
+        return
+    candidate = (candidate_work, hrs, note)
     snap_k = f"tt_row_snap_{te_id}"
     if st.session_state.get(snap_k) == candidate:
         return
@@ -303,14 +358,12 @@ def _autosave_callback_factory(te_id: str):
 def _init_row_snap_from_ent(
     te_id: str,
     ent: dict,
-    job_label_snap: str,
-    non_job_snap: str,
+    work_item_snap: tuple[str, str],
 ) -> None:
     snap_k = f"tt_row_snap_{te_id}"
     if snap_k not in st.session_state:
         st.session_state[snap_k] = (
-            job_label_snap,
-            str(non_job_snap or "").strip(),
+            work_item_snap,
             float(ent.get("hours", 0) or 0),
             str(ent.get("notes") or "").strip(),
         )
@@ -448,13 +501,13 @@ def _inject_tt_styles() -> None:
             margin-top: 2px !important;
             min-height: 0 !important;
         }
-        /* Quick Actions — compact popup (desktop max width; mobile full width) */
+        /* Quick Actions — compact popup (desktop max width; mobile near-full width) */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
-            max-width: 360px !important;
-            width: 100% !important;
+            max-width: 380px !important;
+            width: min(92vw, 420px) !important;
             box-sizing: border-box !important;
-            padding: 10px 12px 12px 12px !important;
-            border-radius: 10px !important;
+            padding: 12px !important;
+            border-radius: 12px !important;
             margin: 0 0 0.35rem 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) [data-testid="stHorizontalBlock"] {
@@ -463,7 +516,7 @@ def _inject_tt_styles() -> None:
         }
         @media (max-width: 768px) {
             div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
-                max-width: 100% !important;
+                max-width: 420px !important;
             }
         }
         /* Table “Edit Entry” — compact strip above grid */
@@ -1340,14 +1393,13 @@ def _tt_render_grid_section(
                 )
 
     if not can_edit:
-        st.info("View-only mode. Sign in as admin, estimator, or project manager to log time.")
+        st.info("View-only mode. Sign in as admin, pm, or employee to log time.")
         _render_readonly_pivot(week_data.visible_emps, days, week_data.idx, filt.job_id_to_label)
         return None
 
     # —— Editable grid —— weekly timesheet: header + employee rows (wide) or stacked days (narrow)
-    if TT_OPEN_EMPLOYEE_KEY not in st.session_state:
-        st.session_state[TT_OPEN_EMPLOYEE_KEY] = None
-    st.session_state.pop("tt_open_employee_panel", None)
+    if TT_OPEN_EMPLOYEE_POPUP_KEY not in st.session_state:
+        st.session_state[TT_OPEN_EMPLOYEE_POPUP_KEY] = None
     day_col_totals = [0.0] * 7
     uid = current_profile().get("id")
     ts_now = datetime.now(timezone.utc).isoformat()
@@ -1378,7 +1430,7 @@ def _tt_render_grid_section(
                     ot_threshold=filt.ot_threshold,
                     eid=eid,
                 )
-                if st.session_state.get(TT_OPEN_EMPLOYEE_KEY) == eid:
+                if st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) == eid:
                     _render_quick_actions_popup(
                         eid=eid,
                         emp_name=nm,
@@ -1429,7 +1481,7 @@ def _tt_render_grid_section(
                         ot_threshold=filt.ot_threshold,
                         eid=eid,
                     )
-                    if st.session_state.get(TT_OPEN_EMPLOYEE_KEY) == eid:
+                    if st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) == eid:
                         _render_quick_actions_popup(
                             eid=eid,
                             emp_name=nm,
@@ -1553,6 +1605,14 @@ def _render_quick_actions_popup(
             '<span class="ips-quick-popup ips-tt-quick-actions-col ips-time-controls" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
+        if st.button(
+            "Close",
+            key=f"tt_qa_close_{eid}",
+            use_container_width=True,
+            type="secondary",
+        ):
+            st.session_state[TT_OPEN_EMPLOYEE_POPUP_KEY] = None
+            st.rerun()
         st.caption("**Quick Actions** — pick the working day below.")
         picked_ix = st.selectbox(
             "Day",
@@ -1707,21 +1767,11 @@ def _render_minimal_table_edit_popup(
     te_id = str(ent.get("id"))
     cur_jid = str(ent.get("job_id") or "").strip()
     cur_nj = str(ent.get("non_job_code") or "").strip()
-    if cur_nj and not cur_jid:
-        job_label_snap = TT_NON_JOB_SENTINEL
-    elif cur_jid:
-        job_label_snap = next(
-            (lb for lb, j in job_label_to_id.items() if j == cur_jid),
-            job_labels_sorted[0] if job_labels_sorted else "",
-        )
+    if cur_jid:
+        wi_snap = ("job", cur_jid)
     else:
-        job_label_snap = TT_NON_JOB_SENTINEL
-    _init_row_snap_from_ent(te_id, ent, job_label_snap, cur_nj)
-
-    jk = f"tt_job_{te_id}"
-    njk = f"tt_nj_{te_id}"
-    st.session_state.setdefault(jk, job_label_snap)
-    st.session_state.setdefault(njk, cur_nj if cur_nj in NON_JOB_CATEGORY_OPTIONS else "")
+        wi_snap = ("non_job", cur_nj)
+    _init_row_snap_from_ent(te_id, ent, wi_snap)
 
     autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
     acb = _autosave_callback_factory(te_id)
@@ -1731,12 +1781,10 @@ def _render_minimal_table_edit_popup(
     wd = str(ent.get("work_date") or "")[:10]
     eid = str(ent.get("employee_id") or "")
     enm = str(emp_id_to_name.get(eid, "") or "").strip() or (eid[:8] + "…" if len(eid) > 8 else eid)
-    if cur_jid:
-        jl = str(job_id_to_label.get(cur_jid, "") or "?").strip()
-        sub_line = f"{html.escape(wd)} · {html.escape(enm)} · {html.escape(jl[:48])}"
-    else:
-        njd = html.escape(cur_nj or "—")
-        sub_line = f"{html.escape(wd)} · {html.escape(enm)} · {njd}"
+    sub_line = (
+        f"{html.escape(wd)} · {html.escape(enm)} · "
+        f"{html.escape(_work_item_display(job_id=cur_jid, non_job_code=cur_nj, job_id_to_label=job_id_to_label)[:60])}"
+    )
 
     with st.container(border=True):
         st.markdown(
@@ -1804,23 +1852,17 @@ def _render_entry_editor(
     te_id = str(ent.get("id"))
     cur_jid = str(ent.get("job_id") or "").strip()
     cur_nj = str(ent.get("non_job_code") or "").strip()
-    job_options = [TT_NON_JOB_SENTINEL] + list(job_labels_sorted)
-    if cur_nj and not cur_jid:
-        j_ix = 0
-        job_label_snap = TT_NON_JOB_SENTINEL
-    elif cur_jid:
-        cur_label = next(
-            (lb for lb, j in job_label_to_id.items() if j == cur_jid),
-            job_labels_sorted[0] if job_labels_sorted else "",
-        )
-        j_ix = 1 + job_labels_sorted.index(cur_label) if cur_label in job_labels_sorted else 1
-        job_label_snap = cur_label
+    work_item_options = _build_work_item_options(
+        job_labels_sorted=job_labels_sorted,
+        job_label_to_id=job_label_to_id,
+    )
+    wi_ix = _work_item_index_for_entry(work_item_options, ent=ent)
+    wi_ix = min(max(wi_ix, 0), len(work_item_options) - 1) if work_item_options else 0
+    if cur_jid:
+        wi_snap = ("job", cur_jid)
     else:
-        j_ix = 0
-        job_label_snap = TT_NON_JOB_SENTINEL
-    j_ix = min(max(j_ix, 0), len(job_options) - 1)
-    nj_ix = NON_JOB_CATEGORY_OPTIONS.index(cur_nj) if cur_nj in NON_JOB_CATEGORY_OPTIONS else 0
-    _init_row_snap_from_ent(te_id, ent, job_label_snap, cur_nj)
+        wi_snap = ("non_job", cur_nj)
+    _init_row_snap_from_ent(te_id, ent, wi_snap)
 
     autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
     acb = _autosave_callback_factory(te_id)
@@ -1877,30 +1919,21 @@ def _render_entry_editor(
                     st.session_state.pop(TT_EDIT_ID_KEY, None)
                     st.rerun()
 
-    st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ips-tt-field-label">Work Item</p>', unsafe_allow_html=True)
     st.selectbox(
-        "Job",
-        job_options,
-        index=j_ix,
-        key=f"tt_job_{te_id}",
+        "Work Item",
+        work_item_options,
+        index=wi_ix,
+        key=f"work_item_{te_id}",
         label_visibility="collapsed",
+        format_func=lambda o: str((o or {}).get("label") or "—"),
         **ch_as,
     )
-    st.markdown(
-        '<p class="ips-tt-nj-sep">— or —</p><p class="ips-tt-field-label">Non-job category</p>',
-        unsafe_allow_html=True,
-    )
-    st.selectbox(
-        "Non-job category",
-        NON_JOB_CATEGORY_OPTIONS,
-        index=nj_ix,
-        key=f"tt_nj_{te_id}",
-        label_visibility="collapsed",
-        **ch_as,
-    )
-    _nj = str(st.session_state.get(f"tt_nj_{te_id}") or "").strip()
-    if _nj:
-        st.markdown(_non_job_badge_html(_nj), unsafe_allow_html=True)
+    _wi = st.session_state.get(f"work_item_{te_id}")
+    if isinstance(_wi, dict) and str(_wi.get("type") or "").strip() == "non_job":
+        _nj = str(_wi.get("code") or "").strip()
+        if _nj:
+            st.markdown(_non_job_badge_html(_nj), unsafe_allow_html=True)
     ch, cn = st.columns([0.45, 1.0], gap="small")
     with ch:
         st.markdown('<p class="ips-tt-field-label">Hrs</p>', unsafe_allow_html=True)
@@ -1938,57 +1971,59 @@ def _render_new_entry_form(
     *,
     fast: bool,
 ) -> None:
-    job_options = [TT_NON_JOB_SENTINEL] + list(job_labels_sorted)
+    work_item_options = _build_work_item_options(
+        job_labels_sorted=job_labels_sorted,
+        job_label_to_id=job_label_to_id,
+    )
     d0 = 0
-    if default_job_label and default_job_label in job_labels_sorted:
-        d0 = 1 + job_labels_sorted.index(default_job_label)
-    d0 = min(max(d0, 0), len(job_options) - 1)
+    if default_job_label and default_job_label in job_label_to_id:
+        djid = str(job_label_to_id.get(default_job_label) or "").strip()
+        for i, opt in enumerate(work_item_options):
+            if opt.get("type") == "job" and str(opt.get("id") or "") == djid:
+                d0 = i
+                break
+    d0 = min(max(d0, 0), len(work_item_options) - 1) if work_item_options else 0
 
     def_h = _tt_default_hours()
     hstep = _hours_step(fast=fast)
     dup_label = "Dup" if fast else "Duplicate"
-    _k_j = f"tt_newj_{employee_id}_{work_date_iso}"
-    _k_nj = f"tt_newnj_{employee_id}_{work_date_iso}"
+    _k_wi = f"work_item_new_{employee_id}_{work_date_iso}"
     _k_h = f"tt_newh_{employee_id}_{work_date_iso}"
     _k_n = f"tt_newn_{employee_id}_{work_date_iso}"
 
     def _on_add() -> None:
-        job_pick = st.session_state.get(_k_j)
-        nj = str(st.session_state.get(_k_nj) or "").strip()
+        wi = st.session_state.get(_k_wi)
         hrs = float(st.session_state.get(_k_h) or 0)
         note = str(st.session_state.get(_k_n) or "").strip()
-        if not isinstance(job_pick, str):
-            st.error("Invalid job selection.")
+        if not isinstance(wi, dict):
+            st.error("Invalid work item selection.")
             st.stop()
-        if job_pick and job_pick != TT_NON_JOB_SENTINEL:
-            jid = job_label_to_id.get(job_pick)
+        wi_type = str(wi.get("type") or "").strip()
+        if wi_type == "job":
+            jid = str(wi.get("id") or "").strip()
             if not jid:
-                st.error("Invalid job.")
+                st.error("Invalid work item.")
                 st.stop()
-            payload = {
-                "employee_id": employee_id,
-                "job_id": jid,
-                "non_job_code": None,
-                "work_date": work_date_iso[:10],
-                "hours": float(hrs),
-                "notes": note,
-                "created_by": current_profile().get("id"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        else:
+            payload = {"job_id": jid, "non_job_code": None}
+        elif wi_type == "non_job":
+            nj = str(wi.get("code") or "").strip()
             if not nj:
-                st.warning("Pick a job or select a non-job category.")
+                st.warning("Pick a work item.")
                 st.stop()
-            payload = {
+            payload = {"job_id": None, "non_job_code": nj}
+        else:
+            st.warning("Pick a work item.")
+            st.stop()
+        payload.update(
+            {
                 "employee_id": employee_id,
-                "job_id": None,
-                "non_job_code": nj,
                 "work_date": work_date_iso[:10],
                 "hours": float(hrs),
                 "notes": note,
                 "created_by": current_profile().get("id"),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
+        )
         if hrs <= 0:
             st.error("Enter hours greater than zero.")
             st.stop()
@@ -2054,7 +2089,7 @@ def _render_new_entry_form(
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
             else:
-                st.error("No line to copy — pick a filter job, add a row, or use non-job category.")
+                st.error("No line to copy — pick a filter job or add a row.")
                 st.stop()
         if hrs <= 0:
             st.error("Hours must be greater than zero.")
@@ -2066,24 +2101,14 @@ def _render_new_entry_form(
             st.error(f"Duplicate not added (same line this day?): {exc}")
 
     st.markdown('<div class="ips-tt-new-block">', unsafe_allow_html=True)
-    st.markdown('<p class="ips-tt-field-label">Job</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ips-tt-field-label">Work Item</p>', unsafe_allow_html=True)
     st.selectbox(
-        "Job",
-        job_options,
+        "Work Item",
+        work_item_options,
         index=d0,
-        key=_k_j,
+        key=_k_wi,
         label_visibility="collapsed",
-    )
-    st.markdown(
-        '<p class="ips-tt-nj-sep">— or —</p><p class="ips-tt-field-label">Non-job category</p>',
-        unsafe_allow_html=True,
-    )
-    st.selectbox(
-        "Non-job category",
-        NON_JOB_CATEGORY_OPTIONS,
-        index=0,
-        key=_k_nj,
-        label_visibility="collapsed",
+        format_func=lambda o: str((o or {}).get("label") or "—"),
     )
     r1, r2 = st.columns([0.45, 1.0], gap="small")
     with r1:
@@ -2144,7 +2169,7 @@ def _render_day_column_body(
 
     sel_k = _tt_qa_day_key(eid)
     sel_wd = str(st.session_state.get(sel_k) or "")[:10]
-    is_sel = sel_wd == wd and str(st.session_state.get(TT_OPEN_EMPLOYEE_KEY) or "") == eid
+    is_sel = sel_wd == wd and str(st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) or "") == eid
 
     if show_day_heading:
         st.markdown(
@@ -2166,7 +2191,7 @@ def _render_day_column_body(
             short = lab[:18] + ("…" if len(lab) > 18 else "")
             parts.append(f"{short} {h:.1f}h")
         elif nj:
-            parts.append(f"{nj} {h:.1f}h")
+            parts.append(f"NON-JOB — {nj} {h:.1f}h")
     summary = " · ".join(parts) if parts else ""
     if summary:
         st.caption(summary[:260] + ("…" if len(summary) > 260 else ""))
@@ -2205,7 +2230,7 @@ def _render_readonly_pivot(
                 else:
                     nj = str(e.get("non_job_code") or "").strip()
                     if nj:
-                        _labels.add(nj)
+                        _labels.add(f"NON-JOB — {nj}")
             jobs = ", ".join(sorted(_labels))
             r[d.strftime("%a %m/%d")] = f"{h:.1f} h" + (f" ({jobs})" if jobs else "")
             total += h

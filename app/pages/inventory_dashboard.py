@@ -99,7 +99,7 @@ def render() -> None:
     render_header("Inventory Usage")
     st.caption("On-hand value, recent issues, and **low stock** visibility.")
 
-    if current_role() not in {"admin", "estimator", "viewer"}:
+    if current_role() not in {"admin", "pm", "employee", "viewer"}:
         st.error("You do not have access to this page.")
         return
 

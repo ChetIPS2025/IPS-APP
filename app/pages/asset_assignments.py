@@ -20,8 +20,8 @@ except ImportError:
 def render() -> None:
     render_header("Asset Assignments")
 
-    if current_role() not in {"admin", "estimator"}:
-        st.info("Only admin or estimator users can manage assignments.")
+    if current_role() not in {"admin", "pm"}:
+        st.info("Only admin or pm users can manage assignments.")
         return
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
