@@ -162,10 +162,22 @@ JOB_STATUSES = [
     "Closed",
 ]
 
+HIDDEN_COLUMNS: frozenset[str] = frozenset(
+    {
+        "source_type",
+        "project_manager",
+        "supervisor",
+        "start_date",
+        "target_completion_date",
+        "completed_date",
+        "notes",
+    }
+)
+
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
     {"customer_id", "estimate_label", "Source"}
-)
+) | HIDDEN_COLUMNS
 
 
 def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
@@ -618,11 +630,8 @@ def _render_job_form_panel(
             help="Leave blank for a standalone job. Pick a row only when this job should reference an estimate.",
         )
 
-        st.markdown("#### Team & awarded amount")
-        c7, c8, c9 = st.columns(3, gap="small")
-        project_manager = c7.text_input("Project Manager", value=current_value("project_manager"), disabled=_ro, key="job_form_pm")
-        supervisor = c8.text_input("Supervisor", value=current_value("supervisor"), disabled=_ro, key="job_form_supervisor")
-        awarded_amount = c9.number_input(
+        st.markdown("#### Awarded amount")
+        awarded_amount = st.number_input(
             "Awarded Amount",
             min_value=0.0,
             value=float(current_value("awarded_amount", 0) or 0),
@@ -630,22 +639,6 @@ def _render_job_form_panel(
             format="%.2f",
             disabled=_ro,
             key="job_form_awarded_amount",
-        )
-
-        st.markdown("#### Dates")
-        c10, c11, c12 = st.columns(3, gap="small")
-        start_date = c10.text_input("Start Date (YYYY-MM-DD)", value=str(current_value("start_date")), disabled=_ro, key="job_form_start")
-        target_completion_date = c11.text_input(
-            "Target Completion (YYYY-MM-DD)",
-            value=str(current_value("target_completion_date")),
-            disabled=_ro,
-            key="job_form_target",
-        )
-        completed_date = c12.text_input(
-            "Completed Date (YYYY-MM-DD)",
-            value=str(current_value("completed_date")),
-            disabled=_ro,
-            key="job_form_completed",
         )
 
         st.markdown("#### Notes")
@@ -679,11 +672,6 @@ def _render_job_form_panel(
                     "location": location.strip(),
                     "status": status,
                     "estimate_id": linked_eid,
-                    "project_manager": project_manager.strip(),
-                    "supervisor": supervisor.strip(),
-                    "start_date": _safe_date_value(start_date.strip()),
-                    "target_completion_date": _safe_date_value(target_completion_date.strip()),
-                    "completed_date": _safe_date_value(completed_date.strip()),
                     "awarded_amount": float(awarded_amount or 0),
                     "notes": notes.strip(),
                 }
@@ -736,11 +724,6 @@ def _render_job_form_panel(
                     "location": location.strip(),
                     "status": status,
                     "estimate_id": linked_eid,
-                    "project_manager": project_manager.strip(),
-                    "supervisor": supervisor.strip(),
-                    "start_date": _safe_date_value(start_date.strip()),
-                    "target_completion_date": _safe_date_value(target_completion_date.strip()),
-                    "completed_date": _safe_date_value(completed_date.strip()),
                     "awarded_amount": float(awarded_amount or 0),
                     "notes": notes.strip(),
                 }
@@ -1319,7 +1302,9 @@ def render() -> None:
             show_cols.extend(
                 [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
             )
-            visible_cols = _job_db_visible_table_columns(show_cols)
+            df_display = filtered.copy()
+            df_display = df_display.drop(columns=[c for c in HIDDEN_COLUMNS if c in df_display.columns], errors="ignore")
+            visible_cols = _job_db_visible_table_columns([c for c in show_cols if c in df_display.columns])
 
             picked: list[str] = []
             with st.container(border=True):
@@ -1329,52 +1314,116 @@ def render() -> None:
                     "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
                     "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
                 )
-                if "id" not in filtered.columns:
-                    st.dataframe(filtered[visible_cols], use_container_width=True, hide_index=True)
+                if "id" not in df_display.columns:
+                    st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)
                 else:
                     inject_table_action_styles()
-                    n_vis = len(visible_cols)
-                    col_weights = [0.38] + [1.0] * n_vis + [0.42]
+                    # Match Estimates table rhythm: fixed columns + explicit weights.
+                    job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
+                    if job_num_col not in df_display.columns:
+                        job_num_col = "id"
+
+                    # Visible order (exact):
+                    # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
+                    col_weights = [
+                        0.40,  # checkbox
+                        1.00,  # job number
+                        2.30,  # job name
+                        1.70,  # customer
+                        1.25,  # location
+                        1.25,  # contact
+                        0.95,  # status
+                        1.10,  # linked estimate
+                        1.00,  # quote/po
+                        1.05,  # awarded amount
+                        0.50,  # delete
+                    ]
+
                     head = st.columns(col_weights)
-                    head[0].caption(" ")
-                    for hi, cname in enumerate(visible_cols):
-                        short = cname if len(cname) <= 26 else cname[:25] + "…"
-                        head[hi + 1].caption(short)
-                    head[-1].caption("Del")
-                    for _, row in filtered.iterrows():
+                    with head[0]:
+                        st.caption(" ")
+                    with head[1]:
+                        st.caption("Job Number")
+                    with head[2]:
+                        st.caption("Job Name")
+                    with head[3]:
+                        st.caption("Customer")
+                    with head[4]:
+                        st.caption("Location")
+                    with head[5]:
+                        st.caption("Contact")
+                    with head[6]:
+                        st.caption("Status")
+                    with head[7]:
+                        st.caption("Linked Estimate")
+                    with head[8]:
+                        st.caption("Quote / PO")
+                    with head[9]:
+                        st.caption("Awarded")
+                    with head[10]:
+                        st.caption("Del")
+
+                    def _money_cell(v: Any) -> str:
+                        try:
+                            if v is None or str(v).strip() == "":
+                                return ""
+                            fv = float(v)
+                            if fv == 0:
+                                return ""
+                            return f"${fv:,.0f}"
+                        except Exception:
+                            return ""
+
+                    for _, row in df_display.iterrows():
                         jid = str(row.get("id") or "").strip()
                         if not jid:
                             continue
                         rc = st.columns(col_weights)
-                        ck = f"job_list_pick_{jid}"
-                        if ck not in st.session_state:
-                            st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
-                        if rc[0].checkbox("", key=ck, label_visibility="collapsed"):
-                            picked.append(jid)
-                        for j, cname in enumerate(visible_cols):
-                            cell = rc[j + 1]
-                            if cname == "job_name":
-                                _render_job_db_job_name_cell(cell, row.get("job_name"))
-                            else:
-                                cell.text(_job_db_cell_str(row.get(cname)))
+                        with rc[0]:
+                            ck = f"job_list_pick_{jid}"
+                            if ck not in st.session_state:
+                                st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
+                            if st.checkbox("", key=ck, label_visibility="collapsed"):
+                                picked.append(jid)
+                        with rc[1]:
+                            _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
+                        with rc[2]:
+                            _render_job_db_job_name_cell(rc[2], row.get("job_name"))
+                        with rc[3]:
+                            _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
+                        with rc[4]:
+                            _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
+                        with rc[5]:
+                            _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
+                        with rc[6]:
+                            _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
+                        with rc[7]:
+                            _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
+                        with rc[8]:
+                            # Quote (estimate) is the current visible “quote/po” signal in this UI.
+                            _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
+                        with rc[9]:
+                            rc[9].text(_money_cell(row.get("awarded_amount")))
+
                         del_help = (
                             "Only admin or estimator can delete jobs."
                             if not can_edit
                             else "Delete this job (blocked if costing data exists)."
                         )
-                        if rc[-1].button(
-                            "🗑",
-                            key=f"job_row_del_{jid}",
-                            disabled=not can_edit,
-                            use_container_width=True,
-                            help=del_help,
-                        ):
-                            pending = st.session_state.get(IPS_PENDING_DELETE)
-                            if not isinstance(pending, dict):
-                                pending = {}
-                                st.session_state[IPS_PENDING_DELETE] = pending
-                            pending[TABLE_KEY_JOBS] = [jid]
-                            st.rerun()
+                        with rc[10]:
+                            if st.button(
+                                "🗑",
+                                key=f"job_row_del_{jid}",
+                                disabled=not can_edit,
+                                use_container_width=True,
+                                help=del_help,
+                            ):
+                                pending = st.session_state.get(IPS_PENDING_DELETE)
+                                if not isinstance(pending, dict):
+                                    pending = {}
+                                    st.session_state[IPS_PENDING_DELETE] = pending
+                                pending[TABLE_KEY_JOBS] = [jid]
+                                st.rerun()
                     set_selected_ids(TABLE_KEY_JOBS, picked)
 
             sel_ids = picked if "id" in filtered.columns else []
