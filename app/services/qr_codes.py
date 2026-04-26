@@ -12,15 +12,21 @@ _TABLE = "inventory_items"
 
 def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str) -> str:
     """
-    Full URL encoded in inventory QR labels (opens Scan Inventory with ``?code=``).
+    Full URL for inventory QR labels.
 
-    If ``app_base_url`` is empty, returns the raw ``qr_code_value`` (legacy QR behavior).
+    Uses the **root** Streamlit URL with query params (``main.py`` reads ``page`` + ``code``).
+    Path-style ``/inventory_scan?code=`` is not used because a single ``main.py`` entrypoint
+    does not serve arbitrary paths unless the host rewrites them.
+
+    Format: ``{base}/?page=Scan%20Inventory&code=INV-…``
     """
     b = str(app_base_url or "").strip().rstrip("/")
     v = str(qr_code_value or "").strip()
     if not b or not v:
         return v
-    return f"{b}/inventory_scan?code={quote(v, safe='')}"
+    page_q = quote("Scan Inventory", safe="")
+    code_q = quote(v, safe="")
+    return f"{b}/?page={page_q}&code={code_q}"
 
 
 def generate_qr_png_bytes(value: str) -> bytes:

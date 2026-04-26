@@ -7,7 +7,16 @@ try:
 except ImportError:
     from config import settings  # type: ignore
 
-from auth import init_session, must_reset_password, require_login, sign_in, update_password, current_role
+from auth import (
+    current_role,
+    init_session,
+    must_reset_password,
+    require_login,
+    run_auth_browser_cookie_effects,
+    sign_in,
+    try_restore_supabase_session_from_cookies,
+    update_password,
+)
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
 from ui import IPS_ACTIVE_PAGE_KEY, IPS_NAV_PAGE_KEY, apply_pending_navigation, render_sidebar
@@ -97,6 +106,9 @@ def main() -> None:
     )
 
     init_session()
+    # Persisted Supabase tokens (browser cookies): clear after sign-out, write after sign-in (reloads once).
+    run_auth_browser_cookie_effects()
+    try_restore_supabase_session_from_cookies()
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
     try:
         inventory_scan.merge_inventory_scan_deeplink_from_query()
@@ -126,13 +138,25 @@ def main() -> None:
     if not require_login():
         render_header("Login")
         st.caption("Supabase-backed multi-user estimator for Industrial Plant Solutions, LLC")
+        _pend = str(
+            st.session_state.get("pending_scan_code")
+            or st.session_state.get("_ips_inv_scan_deeplink_code")
+            or ""
+        ).strip()
+        if _pend:
+            st.info("You opened an **inventory scan** link. Sign in below, then we will take you to **Scan Inventory** for that code.")
 
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
+        remember_device = st.checkbox(
+            "Remember this device",
+            value=True,
+            help="Keeps you signed in on this phone or browser after refresh (uses secure cookies).",
+        )
 
         if st.button("Sign in", use_container_width=True):
             try:
-                sign_in(email, password)
+                sign_in(email, password, remember_device=remember_device)
                 st.rerun()
             except Exception as exc:
                 show_auth_error(exc)
@@ -161,10 +185,11 @@ def main() -> None:
         st.stop()
 
     apply_pending_navigation()
-    # After auth, open Scan Inventory when a deferred inventory link is waiting.
+    # After auth: ``?page=Scan%20Inventory`` and/or ``?code=INV-…`` from QR / camera links.
+    _want_scan = bool(st.session_state.get("_ips_query_wants_scan_inventory"))
     _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
     if (
-        _inv_deeplink
+        (_want_scan or _inv_deeplink)
         and not st.session_state.get(IPS_ACTIVE_PAGE_KEY)
         and role_can_open_page(current_role(), "Scan Inventory")
     ):

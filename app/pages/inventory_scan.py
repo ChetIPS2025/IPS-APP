@@ -45,6 +45,7 @@ except ImportError:
 try:
     from app.auth import current_profile, current_role
     from app.branding import render_header
+    from app.ui import role_can_open_page
     from app.db import (
         create_signed_url,
         delete_rows_admin,
@@ -57,6 +58,7 @@ try:
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from branding import render_header  # type: ignore
+    from ui import role_can_open_page  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
         delete_rows_admin,
@@ -252,13 +254,24 @@ def _lookup_qr_case_insensitive(raw: str) -> list[dict]:
     return [r for r in rows if str(r.get("qr_code_value") or "").strip().lower() == raw_l]
 
 
+def _first_query_param(name: str) -> str:
+    """Return the first string value for a query param (Streamlit may return str or list)."""
+    try:
+        v = st.query_params.get(name)
+    except Exception:
+        return ""
+    if isinstance(v, list):
+        return str(v[0]).strip() if v else ""
+    return str(v or "").strip()
+
+
 def _normalize_scan_input(raw: str) -> str:
-    """Accept raw ``INV-*``, ``?code=``, or a pasted full ``/inventory_scan?code=`` URL."""
+    """Accept raw ``INV-*``, ``?code=``, or a pasted app URL with ``page=`` + ``code=``."""
     s = str(raw or "").strip()
     if not s:
         return ""
     low = s.lower()
-    if "code=" in low and ("inventory_scan" in low or "://" in s or s.startswith("/")):
+    if "code=" in low and ("://" in s or s.startswith("/") or s.startswith("?")):
         try:
             u = urlparse(s if "://" in s else f"https://placeholder.local{s if s.startswith('/') else '/' + s}")
             vals = parse_qs(u.query).get("code") or []
@@ -269,27 +282,32 @@ def _normalize_scan_input(raw: str) -> str:
     return s
 
 
+def _capture_scan_page_from_query() -> None:
+    """If ``?page=Scan%20Inventory`` (or similar) is present, flag navigation in ``main``."""
+    pg = _first_query_param("page")
+    if not pg:
+        return
+    decoded = urllib.parse.unquote_plus(pg).strip().lower()
+    if decoded == "scan inventory":
+        st.session_state["_ips_query_wants_scan_inventory"] = True
+
+
 def _merge_inv_scan_code_from_query() -> None:
     """Persist ``?code=`` from the URL so login / navigation can resume the scan."""
-    try:
-        v = st.query_params.get("code")
-    except Exception:
-        v = None
-    if isinstance(v, list):
-        raw = str(v[0]) if v else ""
-    else:
-        raw = str(v or "")
-    raw = raw.strip()
+    raw = _first_query_param("code")
     if not raw:
         return
     extracted = _normalize_scan_input(raw)
-    if extracted:
-        st.session_state["_ips_inv_scan_deeplink_code"] = extracted
+    if not extracted:
+        return
+    st.session_state["_ips_inv_scan_deeplink_code"] = extracted
+    st.session_state["pending_scan_code"] = extracted
 
 
 def merge_inventory_scan_deeplink_from_query() -> None:
-    """Public entry so ``main`` can capture ``?code=`` before the scan page renders."""
+    """Public entry so ``main`` can capture ``?page=`` / ``?code=`` before the scan page renders."""
     _merge_inv_scan_code_from_query()
+    _capture_scan_page_from_query()
 
 
 def _lookup_inventory(code: str) -> tuple[list[dict], str]:
@@ -322,37 +340,53 @@ def _lookup_inventory(code: str) -> tuple[list[dict], str]:
 
 
 def render() -> None:
+    st.title("Inventory Scan")
+    try:
+        _render_inventory_scan_inner()
+    except Exception as exc:
+        st.error(f"Inventory scan could not load: {exc!s}")
+        st.exception(exc)
+
+
+def _render_inventory_scan_inner() -> None:
     ensure_narrow_viewport_detected()
-    render_header("Scan Inventory")
+    render_header("", subtitle="Industrial Plant Solutions, LLC")
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     _merge_inv_scan_code_from_query()
 
-    can_use = current_role() in {"admin", "pm", "employee"}
+    can_use = role_can_open_page(current_role(), "Scan Inventory")
     if not can_use:
-        st.info("Sign in as **admin**, **pm**, or **employee** to issue inventory.")
+        st.info("You do not have access to issue inventory from this account. Ask an admin to enable **Scan Inventory**.")
         return
 
     try:
         fetch_table_admin(_INV, columns="id,item_name,quantity_on_hand", limit=1)
-    except Exception:
+    except Exception as exc:
         st.warning("Inventory table is unavailable.")
+        st.caption(str(exc))
         return
 
     # Deep link / camera: open item immediately when ``?code=`` or session resume is present.
-    _dl = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
+    _dl = (
+        str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
+        or str(st.session_state.get("pending_scan_code") or "").strip()
+    )
     if _dl and not st.session_state.get("inv_scan_loaded"):
         rows_dl, reason_dl = _lookup_inventory(_dl)
         if reason_dl == "":
             st.session_state["inv_scan_loaded"] = rows_dl[0]
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
         elif reason_dl == "ambiguous":
             st.session_state["inv_scan_loaded"] = {"_choices": rows_dl}
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
         elif reason_dl == "none":
-            st.warning("Linked scan code not found — check **Inventory** QR or try manual entry below.")
+            st.error(f"Item not found: `{html.escape(_dl)}` — try manual entry below or check the **Inventory** list.")
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
 
     ensure_inventory_device_suffix_initialized()
     ua = request_user_agent()
@@ -393,9 +427,12 @@ def render() -> None:
         st.session_state.pop("inv_scan_loaded", None)
         st.session_state.pop("inv_scan_pick_ix", None)
         st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+        st.session_state.pop("pending_scan_code", None)
+        st.session_state.pop("_ips_query_wants_scan_inventory", None)
         try:
-            if "code" in st.query_params:
-                del st.query_params["code"]
+            for k in ("code", "page"):
+                if k in st.query_params:
+                    del st.query_params[k]
         except Exception:
             pass
         st.rerun()
@@ -407,7 +444,8 @@ def render() -> None:
         if reason == "empty":
             st.warning("Enter a scan code.")
         elif reason == "none":
-            st.error("Item not found.")
+            shown = _normalize_scan_input(str(scan_code or "")) or str(scan_code or "").strip() or "—"
+            st.error(f"Item not found: `{html.escape(shown)}`")
             st.session_state.pop("inv_scan_loaded", None)
             st.session_state.pop("inv_scan_pick_ix", None)
             st.rerun()
@@ -463,7 +501,7 @@ def render() -> None:
 
     st.subheader("Item")
     with st.container(border=True):
-        col1, col2 = st.columns([1, 3], gap="small")
+        col1, col2 = st.columns([1, 2], gap="small")
         with col1:
             _inv_item_thumb_display(item)
         with col2:
