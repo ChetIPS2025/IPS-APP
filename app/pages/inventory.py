@@ -16,6 +16,7 @@ try:
         render_destructive_confirmation,
     )
     from app.db import (
+        create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
         fetch_table_admin,
@@ -47,6 +48,7 @@ except ImportError:
         render_destructive_confirmation,
     )
     from db import (  # type: ignore
+        create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
         fetch_table_admin,
@@ -73,15 +75,34 @@ _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
 
 
-def _qr_png_bytes_or_none(value: str) -> bytes | None:
+def _inventory_qr_embed_subject(qr_code_value: str) -> str:
+    """String encoded inside printed QR (full app URL when ``APP_BASE_URL`` is set)."""
+    try:
+        from app.config import settings
+        from app.services.qr_codes import inventory_scan_link_url
+    except ImportError:
+        from config import settings  # type: ignore
+        from services.qr_codes import inventory_scan_link_url  # type: ignore
+    return inventory_scan_link_url(
+        qr_code_value=qr_code_value,
+        app_base_url=getattr(settings, "app_base_url", "") or "",
+    )
+
+
+def _qr_png_bytes_or_none(qr_code_value: str) -> bytes | None:
     try:
         from app.services.qr_codes import generate_qr_png_bytes
     except ImportError:
         from services.qr_codes import generate_qr_png_bytes  # type: ignore
-    try:
-        return generate_qr_png_bytes(str(value or "").strip())
-    except Exception:
-        return None
+    subj = _inventory_qr_embed_subject(qr_code_value)
+    for cand in (subj, str(qr_code_value or "").strip()):
+        if not cand:
+            continue
+        try:
+            return generate_qr_png_bytes(cand)
+        except Exception:
+            continue
+    return None
 
 
 def _inv_qr_img_html(data: str, *, size: int = 180) -> str:
@@ -93,7 +114,7 @@ def _inv_qr_img_html(data: str, *, size: int = 180) -> str:
         b64 = base64.b64encode(png).decode("ascii")
         src = f"data:image/png;base64,{b64}"
     else:
-        enc = urllib.parse.quote(raw, safe="")
+        enc = urllib.parse.quote(_inventory_qr_embed_subject(raw), safe="")
         src = html.escape(f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={enc}", quote=True)
     return (
         f'<div class="ips-inv-qr-wrap"><img src="{src}" '
@@ -102,26 +123,26 @@ def _inv_qr_img_html(data: str, *, size: int = 180) -> str:
 
 
 def _inventory_label_html(*, item_name: str, sku: str, qr_value: str, item_id: str) -> str:
-    """Simple printable label (HTML) with name, SKU, QR image, and scan value."""
+    """Printable label: item name, QR (full scan URL), human-readable ``INV-*`` code."""
+    _ = sku  # signature kept for callers; label layout uses name + QR + scan code only.
     nm = html.escape(str(item_name or "").strip() or "—")
-    sk = html.escape(str(sku or "").strip() or "—")
     qv = html.escape(str(qr_value or "").strip() or "—")
     qr_block = _inv_qr_img_html(str(qr_value or "").strip(), size=240)
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inventory label</title>"
         "<style>body{font-family:system-ui,sans-serif;padding:16px;color:#111;} "
-        ".meta{margin:8px 0;} h1{font-size:1.1rem;}</style></head><body>"
+        ".code{font-size:1.25rem;font-weight:700;letter-spacing:0.02em;margin-top:8px;} "
+        "h1{font-size:1.1rem;}</style></head><body>"
         f"<h1>{nm}</h1>"
-        f'<p class="meta"><strong>SKU:</strong> {sk}</p>'
-        f'<p class="meta"><strong>QR value:</strong> {qv}</p>'
         f"{qr_block}"
-        f"<p class='meta'><small>Item id: {html.escape(str(item_id or '')[:36])}</small></p>"
+        f'<p class="code">{qv}</p>'
+        f"<p style='font-size:0.75rem;color:#555;margin-top:16px;'>Item id: {html.escape(str(item_id or '')[:36])}</p>"
         "</body></html>"
     )
 
 
 def _sync_qr_image_to_storage(item_id: str, qr_value: str) -> None:
-    """Upload PNG for ``qr_value`` to storage and set ``qr_code_image_url`` when possible."""
+    """Upload PNG for scan deep-link (or raw code) to storage and set ``qr_code_image_url`` when possible."""
     rid = str(item_id or "").strip()
     qv = str(qr_value or "").strip()
     if not rid or not qv:
@@ -164,6 +185,50 @@ def _allocate_unique_qr(*, item_id: str, preferred: str | None, exclude_item_id:
         preferred=preferred,
         exclude_item_id=exclude_item_id,
     )
+
+
+_PLACEHOLDER_THUMB = (
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+def _signed_url_for_inventory_image(image_url: str | None) -> str | None:
+    """Return a URL ``st.image`` can load: HTTPS as-is, else storage path → signed URL."""
+    s = str(image_url or "").strip()
+    if not s:
+        return None
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    try:
+        u = create_signed_url(s, expires_in=3600)
+        return u or None
+    except Exception:
+        return None
+
+
+def _thumb_display_url(image_url: str | None) -> str:
+    """URL for dataframe ImageColumn (never empty — use tiny placeholder)."""
+    return _signed_url_for_inventory_image(image_url) or _PLACEHOLDER_THUMB
+
+
+def _upload_item_image_from_upload(item_id: str, uploaded) -> str | None:
+    """Resize upload, push to storage, return storage path for ``image_url``."""
+    if uploaded is None:
+        return None
+    raw = uploaded.getvalue()
+    if not raw:
+        return None
+    try:
+        from app.services.inventory_images import inventory_item_image_storage_path, resize_inventory_image_bytes
+    except ImportError:
+        from services.inventory_images import (  # type: ignore
+            inventory_item_image_storage_path,
+            resize_inventory_image_bytes,
+        )
+    jpeg, ctype = resize_inventory_image_bytes(raw)
+    path = inventory_item_image_storage_path(item_id)
+    upload_bytes_admin(path, jpeg, content_type=ctype)
+    return path
 
 
 def _backfill_missing_qr_codes() -> int:
@@ -361,6 +426,12 @@ def _render_add_panel() -> None:
         storage_location = v2.text_input("Storage Location", key="inv_add_loc")
 
         notes = st.text_area("Notes", key="inv_add_notes", height=72)
+        img_add = st.file_uploader(
+            "Item Image",
+            type=["png", "jpg", "jpeg"],
+            key="inv_img_add",
+            help="Optional thumbnail (resized on upload). PNG or JPEG.",
+        )
         qr_scan = st.text_input(
             "QR scan code (optional)",
             key="inv_add_qr",
@@ -421,6 +492,19 @@ def _render_add_panel() -> None:
                     else:
                         qv = str(row.get("qr_code_value") or "").strip()
                     _sync_qr_image_to_storage(rid, qv)
+                if rid and img_add is not None:
+                    try:
+                        pth = _upload_item_image_from_upload(rid, img_add)
+                        if pth:
+                            update_rows_admin(_TABLE, {"image_url": pth}, {"id": rid})
+                    except Exception as exc:
+                        if "image_url" in str(exc).lower() or "column" in str(exc).lower():
+                            st.warning(
+                                "Image was not saved — run migration **`sql/035_inventory_image_url.sql`** "
+                                f"then try again. ({exc})"
+                            )
+                        else:
+                            st.warning(f"Image upload skipped: {exc}")
                 _clear_panel()
                 st.success("Inventory item added.")
                 st.rerun()
@@ -488,6 +572,18 @@ def _render_edit_panel(row: dict) -> None:
         )
 
         notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
+        st.caption("Item photo")
+        img_existing = _signed_url_for_inventory_image(str(row.get("image_url") or "").strip())
+        if img_existing:
+            st.image(img_existing, width=120)
+        else:
+            st.markdown('<p style="font-size:2rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+        img_ed = st.file_uploader(
+            "Item Image",
+            type=["png", "jpg", "jpeg"],
+            key=f"inv_img_{rid}",
+            help="Upload a new image to replace the thumbnail (resized on save).",
+        )
         qr_cur = str(row.get("qr_code_value") or "").strip()
         qr_in = st.text_input(
             "QR scan code",
@@ -579,6 +675,19 @@ def _render_edit_panel(row: dict) -> None:
                     )
                     update_rows_admin(_TABLE, {"qr_code_value": final_qr}, {"id": row["id"]})
                 _sync_qr_image_to_storage(str(row.get("id") or ""), final_qr)
+                if img_ed is not None:
+                    try:
+                        pth = _upload_item_image_from_upload(str(row.get("id") or ""), img_ed)
+                        if pth:
+                            update_rows_admin(_TABLE, {"image_url": pth}, {"id": row["id"]})
+                    except Exception as exc:
+                        if "image_url" in str(exc).lower() or "column" in str(exc).lower():
+                            st.warning(
+                                "Image was not saved — run **`sql/035_inventory_image_url.sql`**. "
+                                f"({exc})"
+                            )
+                        else:
+                            st.warning(f"Image upload skipped: {exc}")
                 _clear_panel()
                 st.success("Inventory item updated.")
                 st.rerun()
@@ -775,7 +884,19 @@ def render() -> None:
                         gap = (rv - qv).clip(lower=0)
                         sub["suggest_qty"] = gap
                         sub.loc[sub["suggest_qty"] <= 0, "suggest_qty"] = pd.NA
-                    st.dataframe(sub, use_container_width=True, hide_index=True)
+                    if "image_url" in filtered.columns:
+                        sub["Photo"] = filtered.loc[low_mask, "image_url"].map(_thumb_display_url).values
+                    else:
+                        sub["Photo"] = _PLACEHOLDER_THUMB
+                    show_low = ["Photo"] + [c for c in cols_show if c in sub.columns]
+                    st.dataframe(
+                        sub[show_low],
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Photo": st.column_config.ImageColumn("Photo", width="small"),
+                        },
+                    )
                     st.caption("**Suggest qty** = shortfall to reorder point (informational).")
 
         if filtered.empty:
@@ -792,11 +913,15 @@ def render() -> None:
         display_df = filtered.copy()
         if "sku" not in display_df.columns:
             display_df["sku"] = ""
+        if "image_url" not in display_df.columns:
+            display_df["image_url"] = ""
         display_df["stock_alert"] = low_mask.map(lambda ok: "Low Stock" if ok else "")
+        display_df["Photo"] = display_df["image_url"].map(_thumb_display_url)
 
         show_cols = [
             c
             for c in [
+                "Photo",
                 "item_name",
                 "sku",
                 "stock_alert",
@@ -821,6 +946,9 @@ def render() -> None:
             id_column="id",
             columns=show_cols,
             editor_key="inv_sel_editor",
+            extra_column_config={
+                "Photo": st.column_config.ImageColumn("Photo", width="small"),
+            },
         )
         with bar_ph.container():
             _render_inventory_action_bar(df_all=df, visible_df=filtered, can_edit=can_edit)

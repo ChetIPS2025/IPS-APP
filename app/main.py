@@ -10,7 +10,7 @@ except ImportError:
 from auth import init_session, must_reset_password, require_login, sign_in, update_password, current_role
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
-from ui import IPS_ACTIVE_PAGE_KEY, apply_pending_navigation, render_sidebar
+from ui import IPS_ACTIVE_PAGE_KEY, IPS_NAV_PAGE_KEY, apply_pending_navigation, render_sidebar
 from ui import role_can_open_page
 from branding import apply_branding, render_header
 
@@ -97,6 +97,11 @@ def main() -> None:
     )
 
     init_session()
+    # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
+    try:
+        inventory_scan.merge_inventory_scan_deeplink_from_query()
+    except Exception:
+        pass
     apply_branding()
     inject_ips_app_shell_styles()
     inject_pwa_support()
@@ -156,6 +161,14 @@ def main() -> None:
         st.stop()
 
     apply_pending_navigation()
+    # After auth, open Scan Inventory when a deferred inventory link is waiting.
+    _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
+    if (
+        _inv_deeplink
+        and not st.session_state.get(IPS_ACTIVE_PAGE_KEY)
+        and role_can_open_page(current_role(), "Scan Inventory")
+    ):
+        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
     sidebar_page = render_sidebar()
     if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
         prev = st.session_state.get("_ips_last_nav_page")

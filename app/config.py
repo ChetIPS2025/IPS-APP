@@ -112,6 +112,8 @@ class Settings:
 
     app_env: str = field(default_factory=lambda: _strip_env("APP_ENV", "development"))
     app_name: str = field(default_factory=lambda: _strip_env("APP_NAME", "IPS Estimating"))
+    # Public base URL for deep links (no trailing slash), e.g. https://ips-app.onrender.com
+    app_base_url: str = field(default_factory=lambda: _strip_env("APP_BASE_URL"))
     storage_bucket: str = field(default_factory=lambda: _strip_env("STORAGE_BUCKET", "ips-storage"))
     # File storage: "supabase" (default) uploads to Supabase Storage; "local" writes under LOCAL_STORAGE_ROOT.
     storage_backend: str = field(default_factory=_storage_backend)

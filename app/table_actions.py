@@ -335,6 +335,7 @@ def render_selectable_dataframe(
     editor_key: str,
     num_rows: str = "fixed",
     hide_id_column: bool = False,
+    extra_column_config: dict | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Renders a ``data_editor`` with first-column checkboxes. Persists selection under
@@ -351,15 +352,18 @@ def render_selectable_dataframe(
     column_order = None
     if hide_id_column and id_column in ed_base.columns:
         column_order = [c for c in ed_base.columns if c != id_column]
+    column_config: dict = {
+        "__select__": st.column_config.CheckboxColumn(" ", default=False, width="small"),
+    }
+    if extra_column_config:
+        column_config = {**column_config, **extra_column_config}
     editor_kw: dict = dict(
         key=editor_key,
         num_rows=num_rows,
         use_container_width=True,
         hide_index=True,
         disabled=disabled,
-        column_config={
-            "__select__": st.column_config.CheckboxColumn(" ", default=False, width="small"),
-        },
+        column_config=column_config,
     )
     if column_order is not None:
         editor_kw["column_order"] = column_order

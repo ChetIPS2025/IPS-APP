@@ -12,8 +12,10 @@ Schema assumptions (see sql/015, 027, 028):
 from __future__ import annotations
 
 import html
+import io
 import urllib.parse
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 from typing import Any
 
 import streamlit as st
@@ -44,6 +46,7 @@ try:
     from app.auth import current_profile, current_role
     from app.branding import render_header
     from app.db import (
+        create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
         fetch_table_admin,
@@ -55,6 +58,7 @@ except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from branding import render_header  # type: ignore
     from db import (  # type: ignore
+        create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
         fetch_table_admin,
@@ -185,15 +189,42 @@ def _scan_audit_fields(*, device_label: str, manual_actor: str) -> dict[str, Any
     return out
 
 
+def _inv_item_thumb_display(item: dict) -> None:
+    """Small item photo or 📦 placeholder (scan screen)."""
+    raw = str(item.get("image_url") or "").strip()
+    if not raw:
+        st.markdown('<p style="font-size:2.5rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+        return
+    if raw.startswith("http://") or raw.startswith("https://"):
+        st.image(raw, width=80)
+        return
+    try:
+        url = create_signed_url(raw, expires_in=3600)
+    except Exception:
+        url = ""
+    if url:
+        st.image(url, width=80)
+    else:
+        st.markdown('<p style="font-size:2.5rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+
+
 def _lookup_sku_case_insensitive(raw: str) -> list[dict]:
     raw_l = str(raw or "").strip().lower()
     if not raw_l:
         return []
     try:
-        rows = fetch_table_admin(_INV, columns="id,item_name,sku,qr_code_value,quantity_on_hand,is_active", limit=8000)
+        rows = fetch_table_admin(
+            _INV,
+            columns="id,item_name,sku,qr_code_value,quantity_on_hand,is_active,image_url",
+            limit=8000,
+        )
     except Exception:
         try:
-            rows = fetch_table_admin(_INV, columns="id,item_name,qr_code_value,quantity_on_hand,is_active", limit=8000)
+            rows = fetch_table_admin(
+                _INV,
+                columns="id,item_name,qr_code_value,quantity_on_hand,is_active,image_url",
+                limit=8000,
+            )
         except Exception:
             return []
     return [r for r in rows if str(r.get("sku") or "").strip().lower() == raw_l]
@@ -204,18 +235,66 @@ def _lookup_qr_case_insensitive(raw: str) -> list[dict]:
     if not raw_l:
         return []
     try:
-        rows = fetch_table_admin(_INV, columns="id,item_name,sku,qr_code_value,quantity_on_hand,is_active", limit=8000)
+        rows = fetch_table_admin(
+            _INV,
+            columns="id,item_name,sku,qr_code_value,quantity_on_hand,is_active,image_url",
+            limit=8000,
+        )
     except Exception:
         try:
-            rows = fetch_table_admin(_INV, columns="id,item_name,qr_code_value,quantity_on_hand,is_active", limit=8000)
+            rows = fetch_table_admin(
+                _INV,
+                columns="id,item_name,qr_code_value,quantity_on_hand,is_active,image_url",
+                limit=8000,
+            )
         except Exception:
             return []
     return [r for r in rows if str(r.get("qr_code_value") or "").strip().lower() == raw_l]
 
 
+def _normalize_scan_input(raw: str) -> str:
+    """Accept raw ``INV-*``, ``?code=``, or a pasted full ``/inventory_scan?code=`` URL."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    low = s.lower()
+    if "code=" in low and ("inventory_scan" in low or "://" in s or s.startswith("/")):
+        try:
+            u = urlparse(s if "://" in s else f"https://placeholder.local{s if s.startswith('/') else '/' + s}")
+            vals = parse_qs(u.query).get("code") or []
+            if vals:
+                return str(vals[0]).strip()
+        except Exception:
+            return s
+    return s
+
+
+def _merge_inv_scan_code_from_query() -> None:
+    """Persist ``?code=`` from the URL so login / navigation can resume the scan."""
+    try:
+        v = st.query_params.get("code")
+    except Exception:
+        v = None
+    if isinstance(v, list):
+        raw = str(v[0]) if v else ""
+    else:
+        raw = str(v or "")
+    raw = raw.strip()
+    if not raw:
+        return
+    extracted = _normalize_scan_input(raw)
+    if extracted:
+        st.session_state["_ips_inv_scan_deeplink_code"] = extracted
+
+
+def merge_inventory_scan_deeplink_from_query() -> None:
+    """Public entry so ``main`` can capture ``?code=`` before the scan page renders."""
+    _merge_inv_scan_code_from_query()
+
+
 def _lookup_inventory(code: str) -> tuple[list[dict], str]:
     """Returns (rows, reason). reason empty if ok; 'none' or 'ambiguous'."""
-    raw = str(code or "").strip()
+    raw = _normalize_scan_input(str(code or "").strip())
     if not raw:
         return [], "empty"
     by_qr = fetch_by_match_admin(_INV, {"qr_code_value": raw}, limit=5)
@@ -248,6 +327,8 @@ def render() -> None:
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
+    _merge_inv_scan_code_from_query()
+
     can_use = current_role() in {"admin", "pm", "employee"}
     if not can_use:
         st.info("Sign in as **admin**, **pm**, or **employee** to issue inventory.")
@@ -258,6 +339,20 @@ def render() -> None:
     except Exception:
         st.warning("Inventory table is unavailable.")
         return
+
+    # Deep link / camera: open item immediately when ``?code=`` or session resume is present.
+    _dl = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
+    if _dl and not st.session_state.get("inv_scan_loaded"):
+        rows_dl, reason_dl = _lookup_inventory(_dl)
+        if reason_dl == "":
+            st.session_state["inv_scan_loaded"] = rows_dl[0]
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+        elif reason_dl == "ambiguous":
+            st.session_state["inv_scan_loaded"] = {"_choices": rows_dl}
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+        elif reason_dl == "none":
+            st.warning("Linked scan code not found — check **Inventory** QR or try manual entry below.")
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
 
     ensure_inventory_device_suffix_initialized()
     ua = request_user_agent()
@@ -297,12 +392,18 @@ def render() -> None:
         st.session_state.pop("inv_scan_code_input", None)
         st.session_state.pop("inv_scan_loaded", None)
         st.session_state.pop("inv_scan_pick_ix", None)
+        st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+        try:
+            if "code" in st.query_params:
+                del st.query_params["code"]
+        except Exception:
+            pass
         st.rerun()
 
     loaded: dict[str, Any] | None = st.session_state.get("inv_scan_loaded")
 
     if find:
-        rows, reason = _lookup_inventory(str(scan_code or ""))
+        rows, reason = _lookup_inventory(_normalize_scan_input(str(scan_code or "")))
         if reason == "empty":
             st.warning("Enter a scan code.")
         elif reason == "none":
@@ -362,28 +463,43 @@ def render() -> None:
 
     st.subheader("Item")
     with st.container(border=True):
-        st.markdown(f"**{html.escape(name)}**")
-        st.markdown(f"SKU: `{html.escape(sku)}`")
-        qrv = str(item.get("qr_code_value") or "").strip()
-        if qrv:
-            st.markdown(f"QR value: `{html.escape(qrv)}`")
-            try:
-                from app.services.qr_codes import generate_qr_png_bytes
-            except ImportError:
-                from services.qr_codes import generate_qr_png_bytes  # type: ignore
-            try:
-                import io
-
-                st.image(io.BytesIO(generate_qr_png_bytes(qrv)), width=200)
-            except Exception:
-                enc = urllib.parse.quote(qrv, safe="")
-                st.markdown(
-                    f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={enc}" width="200" height="200" alt="QR"/>',
-                    unsafe_allow_html=True,
-                )
-        st.markdown(f"**Qty on hand:** {qoh:g}")
-        st.markdown(f"**Unit cost:** {_fmt_money(unit_cost)}")
-        st.caption(f"Location: {html.escape(loc)} · Vendor: {html.escape(vendor)}")
+        col1, col2 = st.columns([1, 3], gap="small")
+        with col1:
+            _inv_item_thumb_display(item)
+        with col2:
+            st.markdown(f"**{html.escape(name)}**")
+            st.caption(f"Qty on hand: **{qoh:g}**")
+            st.markdown(f"SKU: `{html.escape(sku)}`")
+            qrv = str(item.get("qr_code_value") or "").strip()
+            if qrv:
+                st.markdown(f"QR value: `{html.escape(qrv)}`")
+                try:
+                    from app.config import settings
+                    from app.services.qr_codes import generate_qr_png_bytes, inventory_scan_link_url
+                except ImportError:
+                    from config import settings  # type: ignore
+                    from services.qr_codes import generate_qr_png_bytes, inventory_scan_link_url  # type: ignore
+                try:
+                    subj = inventory_scan_link_url(
+                        qr_code_value=qrv,
+                        app_base_url=getattr(settings, "app_base_url", "") or "",
+                    )
+                    st.image(io.BytesIO(generate_qr_png_bytes(subj)), width=160)
+                except Exception:
+                    try:
+                        subj = inventory_scan_link_url(
+                            qr_code_value=qrv,
+                            app_base_url=getattr(settings, "app_base_url", "") or "",
+                        )
+                        enc = urllib.parse.quote(subj, safe="")
+                    except Exception:
+                        enc = urllib.parse.quote(qrv, safe="")
+                    st.markdown(
+                        f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={enc}" width="160" height="160" alt="QR"/>',
+                        unsafe_allow_html=True,
+                    )
+            st.markdown(f"**Unit cost:** {_fmt_money(unit_cost)}")
+            st.caption(f"Location: {html.escape(loc)} · Vendor: {html.escape(vendor)}")
 
     st.subheader("Issue")
     prof = current_profile()

@@ -5,8 +5,22 @@ from __future__ import annotations
 import io
 import uuid
 from typing import Any, Callable
+from urllib.parse import quote
 
 _TABLE = "inventory_items"
+
+
+def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str) -> str:
+    """
+    Full URL encoded in inventory QR labels (opens Scan Inventory with ``?code=``).
+
+    If ``app_base_url`` is empty, returns the raw ``qr_code_value`` (legacy QR behavior).
+    """
+    b = str(app_base_url or "").strip().rstrip("/")
+    v = str(qr_code_value or "").strip()
+    if not b or not v:
+        return v
+    return f"{b}/inventory_scan?code={quote(v, safe='')}"
 
 
 def generate_qr_png_bytes(value: str) -> bytes:

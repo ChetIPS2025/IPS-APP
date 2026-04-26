@@ -10,3 +10,6 @@ services:
         value: "1"
       - key: PYTHON_VERSION
         value: "3.12.11"
+      # Inventory QR labels / deep links: https://<host>/inventory_scan?code=INV-…
+      - key: APP_BASE_URL
+        value: https://ips-app.onrender.com

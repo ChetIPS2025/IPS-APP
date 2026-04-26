@@ -14,16 +14,33 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.branding import render_header
-    from app.db import fetch_table_admin
+    from app.db import create_signed_url, fetch_table_admin
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
-    from db import fetch_table_admin  # type: ignore
+    from db import create_signed_url, fetch_table_admin  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
 _INV = "inventory_items"
 _TXN = "inventory_transactions"
+
+_PLACEHOLDER_THUMB = (
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+def _dash_thumb_url(row: dict) -> str:
+    s = str(row.get("image_url") or "").strip()
+    if not s:
+        return _PLACEHOLDER_THUMB
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    try:
+        u = create_signed_url(s, expires_in=3600)
+        return u or _PLACEHOLDER_THUMB
+    except Exception:
+        return _PLACEHOLDER_THUMB
 
 
 def _is_low(r: dict) -> bool:
@@ -177,6 +194,7 @@ def render() -> None:
         for r in sorted(low_items, key=lambda x: str(x.get("item_name") or "").lower())[:200]:
             low_rows.append(
                 {
+                    "Photo": _dash_thumb_url(r),
                     "Item": str(r.get("item_name") or ""),
                     "Qty": float(r.get("quantity_on_hand") or 0),
                     "Reorder at": float(r.get("reorder_point") or 0),
@@ -184,7 +202,12 @@ def render() -> None:
                     "SKU": str(r.get("sku") or ""),
                 }
             )
-        st.dataframe(pd.DataFrame(low_rows), use_container_width=True, hide_index=True)
+        st.dataframe(
+            pd.DataFrame(low_rows),
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Photo": st.column_config.ImageColumn("Photo", width="small")},
+        )
 
     # --- Usage by item (from filtered tx) ---
     usage_by_item: dict[str, float] = {}
@@ -209,9 +232,15 @@ def render() -> None:
     if top_qty:
         rows = []
         for iid, u in top_qty:
-            nm = str(item_by_id.get(iid, {}).get("item_name") or iid[:8])
-            rows.append({"Item": nm, "Qty issued": u})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            ir = item_by_id.get(iid, {})
+            nm = str(ir.get("item_name") or iid[:8])
+            rows.append({"Photo": _dash_thumb_url(ir), "Item": nm, "Qty issued": u})
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Photo": st.column_config.ImageColumn("Photo", width="small")},
+        )
     else:
         st.caption("No outbound transactions in this range.")
 
@@ -219,9 +248,15 @@ def render() -> None:
     if top_val:
         rows = []
         for iid, v in top_val:
-            nm = str(item_by_id.get(iid, {}).get("item_name") or iid[:8])
-            rows.append({"Item": nm, "Value issued": _money(v)})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            ir = item_by_id.get(iid, {})
+            nm = str(ir.get("item_name") or iid[:8])
+            rows.append({"Photo": _dash_thumb_url(ir), "Item": nm, "Value issued": _money(v)})
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Photo": st.column_config.ImageColumn("Photo", width="small")},
+        )
     else:
         st.caption("No valued issues in this range.")
 
@@ -240,10 +275,12 @@ def render() -> None:
                 jlab = f"{job_row_select_label(jr)}"
             else:
                 jlab = "—"
-            nm = str(item_by_id.get(iid, {}).get("item_name") or iid[:8])
+            ir = item_by_id.get(iid, {})
+            nm = str(ir.get("item_name") or iid[:8])
             rows.append(
                 {
                     "When": str(t.get("created_at") or "")[:19],
+                    "Photo": _dash_thumb_url(ir),
                     "Item": nm,
                     "Qty": float(t.get("qty") or 0),
                     "Type": str(t.get("txn_type") or ""),
@@ -254,7 +291,12 @@ def render() -> None:
                     "Activity": _txn_activity_line(t, item_by_id=item_by_id, job_by_id=job_by_id),
                 }
             )
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Photo": st.column_config.ImageColumn("Photo", width="small")},
+        )
 
     st.subheader("Issued by job (range)")
     by_job: dict[str, float] = {}
