@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import base64
 import html
 import urllib.parse
-import uuid
 import pandas as pd
 import streamlit as st
 
@@ -15,7 +15,14 @@ try:
         open_destructive_confirmation,
         render_destructive_confirmation,
     )
-    from app.db import delete_rows_admin, fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin
+    from app.db import (
+        delete_rows_admin,
+        fetch_by_match_admin,
+        fetch_table_admin,
+        insert_row_admin,
+        update_rows_admin,
+        upload_bytes_admin,
+    )
     from app.ips_crud_list_styles import (
         IPS_CRUD_LIST_PAGE_GAP,
         IPS_CRUD_LIST_PAGE_SPLIT,
@@ -45,6 +52,7 @@ except ImportError:
         fetch_table_admin,
         insert_row_admin,
         update_rows_admin,
+        upload_bytes_admin,
     )
     from ips_crud_list_styles import (  # type: ignore
         IPS_CRUD_LIST_PAGE_GAP,
@@ -65,13 +73,122 @@ _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
 
 
+def _qr_png_bytes_or_none(value: str) -> bytes | None:
+    try:
+        from app.services.qr_codes import generate_qr_png_bytes
+    except ImportError:
+        from services.qr_codes import generate_qr_png_bytes  # type: ignore
+    try:
+        return generate_qr_png_bytes(str(value or "").strip())
+    except Exception:
+        return None
+
+
 def _inv_qr_img_html(data: str, *, size: int = 180) -> str:
-    enc = urllib.parse.quote(str(data or "").strip(), safe="")
-    url = f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={enc}"
+    raw = str(data or "").strip()
+    if not raw:
+        return ""
+    png = _qr_png_bytes_or_none(raw)
+    if png:
+        b64 = base64.b64encode(png).decode("ascii")
+        src = f"data:image/png;base64,{b64}"
+    else:
+        enc = urllib.parse.quote(raw, safe="")
+        src = html.escape(f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={enc}", quote=True)
     return (
-        f'<div class="ips-inv-qr-wrap"><img src="{html.escape(url, quote=True)}" '
+        f'<div class="ips-inv-qr-wrap"><img src="{src}" '
         f'width="{size}" height="{size}" alt="QR code"/></div>'
     )
+
+
+def _inventory_label_html(*, item_name: str, sku: str, qr_value: str, item_id: str) -> str:
+    """Simple printable label (HTML) with name, SKU, QR image, and scan value."""
+    nm = html.escape(str(item_name or "").strip() or "—")
+    sk = html.escape(str(sku or "").strip() or "—")
+    qv = html.escape(str(qr_value or "").strip() or "—")
+    qr_block = _inv_qr_img_html(str(qr_value or "").strip(), size=240)
+    return (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inventory label</title>"
+        "<style>body{font-family:system-ui,sans-serif;padding:16px;color:#111;} "
+        ".meta{margin:8px 0;} h1{font-size:1.1rem;}</style></head><body>"
+        f"<h1>{nm}</h1>"
+        f'<p class="meta"><strong>SKU:</strong> {sk}</p>'
+        f'<p class="meta"><strong>QR value:</strong> {qv}</p>'
+        f"{qr_block}"
+        f"<p class='meta'><small>Item id: {html.escape(str(item_id or '')[:36])}</small></p>"
+        "</body></html>"
+    )
+
+
+def _sync_qr_image_to_storage(item_id: str, qr_value: str) -> None:
+    """Upload PNG for ``qr_value`` to storage and set ``qr_code_image_url`` when possible."""
+    rid = str(item_id or "").strip()
+    qv = str(qr_value or "").strip()
+    if not rid or not qv:
+        return
+    png = _qr_png_bytes_or_none(qv)
+    if not png:
+        return
+    path = f"inventory/qr/{rid}.png"
+    try:
+        upload_bytes_admin(path, png, content_type="image/png")
+        update_rows_admin(_TABLE, {"qr_code_image_url": path}, {"id": rid})
+    except Exception:
+        pass
+
+
+def _qr_value_in_use(*, value: str, exclude_item_id: str | None) -> bool:
+    v = str(value or "").strip()
+    if not v:
+        return False
+    rows = fetch_by_match_admin(_TABLE, {"qr_code_value": v}, limit=5)
+    if not rows:
+        return False
+    if exclude_item_id is None:
+        return True
+    ex = str(exclude_item_id).strip()
+    for r in rows:
+        if str(r.get("id") or "").strip() != ex:
+            return True
+    return False
+
+
+def _allocate_unique_qr(*, item_id: str, preferred: str | None, exclude_item_id: str | None) -> str:
+    try:
+        from app.services.qr_codes import allocate_unique_inventory_qr_value
+    except ImportError:
+        from services.qr_codes import allocate_unique_inventory_qr_value  # type: ignore
+    return allocate_unique_inventory_qr_value(
+        fetch_by_match_admin=fetch_by_match_admin,
+        item_id=item_id,
+        preferred=preferred,
+        exclude_item_id=exclude_item_id,
+    )
+
+
+def _backfill_missing_qr_codes() -> int:
+    """Assign ``qr_code_value`` (+ optional PNG) for rows missing a QR value."""
+    rows = fetch_table_admin(_TABLE, columns="id,qr_code_value", limit=20000, order_by="item_name")
+    n = 0
+    for r in rows or []:
+        if str(r.get("qr_code_value") or "").strip():
+            continue
+        rid = str(r.get("id") or "").strip()
+        if not rid:
+            continue
+        try:
+            from app.services.qr_codes import inventory_qr_from_item_id
+        except ImportError:
+            from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+        qv = _allocate_unique_qr(
+            item_id=rid,
+            preferred=inventory_qr_from_item_id(rid),
+            exclude_item_id=rid,
+        )
+        update_rows_admin(_TABLE, {"qr_code_value": qv}, {"id": rid})
+        _sync_qr_image_to_storage(rid, qv)
+        n += 1
+    return n
 
 
 def _money(v) -> str:
@@ -196,6 +313,19 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 clear_selected_ids(TABLE_KEY_INVENTORY)
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.rerun()
+        if can_edit:
+            if st.button(
+                "Generate missing QR codes",
+                use_container_width=True,
+                key="inv_btn_backfill_qr",
+                help="Assigns a unique INV-* QR to every item missing qr_code_value, then uploads a PNG when storage is available.",
+            ):
+                try:
+                    n = _backfill_missing_qr_codes()
+                    st.success(f"Generated QR codes for {n} item(s).")
+                except Exception as exc:
+                    st.error(f"Backfill failed: {exc}")
+                st.rerun()
 
 
 def _render_add_panel() -> None:
@@ -259,6 +389,9 @@ def _render_add_panel() -> None:
                     "is_active": bool(is_active),
                 }
                 if qr_t:
+                    if _qr_value_in_use(value=qr_t, exclude_item_id=None):
+                        st.error("That QR code value is already in use. Choose another or leave blank to auto-generate.")
+                        st.stop()
                     payload["qr_code_value"] = qr_t
                 sku_t = str(sku_add or "").strip()
                 if sku_t:
@@ -272,12 +405,22 @@ def _render_add_panel() -> None:
                         st.error(f"Could not save: {exc}")
                     st.stop()
                 rid = str(row.get("id") or "")
-                if rid and not str(row.get("qr_code_value") or "").strip():
-                    slug = rid.replace("-", "")[:8].upper()
-                    try:
-                        update_rows_admin(_TABLE, {"qr_code_value": f"INV-{slug}"}, {"id": rid})
-                    except Exception:
-                        pass
+                if rid:
+                    qv = str(row.get("qr_code_value") or "").strip()
+                    if not qv:
+                        try:
+                            from app.services.qr_codes import inventory_qr_from_item_id
+                        except ImportError:
+                            from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+                        qv = _allocate_unique_qr(
+                            item_id=rid,
+                            preferred=inventory_qr_from_item_id(rid),
+                            exclude_item_id=rid,
+                        )
+                        update_rows_admin(_TABLE, {"qr_code_value": qv}, {"id": rid})
+                    else:
+                        qv = str(row.get("qr_code_value") or "").strip()
+                    _sync_qr_image_to_storage(rid, qv)
                 _clear_panel()
                 st.success("Inventory item added.")
                 st.rerun()
@@ -357,24 +500,33 @@ def _render_edit_panel(row: dict) -> None:
         if qr_cur:
             st.caption("Label preview")
             st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
-            html_doc = (
-                "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inventory label</title></head>"
-                f"<body><h2>{html.escape(str(row.get('item_name') or ''))}</h2>"
-                f"<p><strong>Scan:</strong> {html.escape(qr_cur)}</p>"
-                f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data={urllib.parse.quote(qr_cur, safe="")}" '
-                "width='240' height='240' alt='QR'/></body></html>"
+            html_doc = _inventory_label_html(
+                item_name=str(row.get("item_name") or ""),
+                sku=str(row.get("sku") or ""),
+                qr_value=qr_cur,
+                item_id=rid,
             )
             st.download_button(
-                "Download printable label (HTML)",
+                "Print QR label (HTML)",
                 data=html_doc.encode("utf-8"),
                 file_name=f"inventory_label_{rid[:8]}.html",
                 mime="text/html",
                 key=f"{pk}_dl_lbl",
             )
-        if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new random scan code"):
-            nv = f"INV-{uuid.uuid4().hex[:8].upper()}"
+            png = _qr_png_bytes_or_none(qr_cur)
+            if png:
+                st.download_button(
+                    "Download QR (PNG)",
+                    data=png,
+                    file_name=f"inventory_qr_{rid[:8]}.png",
+                    mime="image/png",
+                    key=f"{pk}_dl_png",
+                )
+        if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new unique scan code"):
             try:
+                nv = _allocate_unique_qr(item_id=str(row.get("id") or ""), preferred=None, exclude_item_id=str(row.get("id") or ""))
                 update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
+                _sync_qr_image_to_storage(str(row.get("id") or ""), nv)
             except Exception as exc:
                 st.error(f"Could not update QR: {exc}")
                 st.stop()
@@ -388,6 +540,10 @@ def _render_edit_panel(row: dict) -> None:
                     st.error("Item Name is required.")
                     st.stop()
                 qr_t = str(qr_in or "").strip()
+                old_qr = str(row.get("qr_code_value") or "").strip()
+                if qr_t and qr_t != old_qr and _qr_value_in_use(value=qr_t, exclude_item_id=str(row.get("id") or "")):
+                    st.error("That QR code value is already used by another item.")
+                    st.stop()
                 payload = {
                     "item_name": t,
                     "category": str(category or "").strip(),
@@ -410,6 +566,19 @@ def _render_edit_panel(row: dict) -> None:
                     else:
                         st.error(f"Could not update: {exc}")
                     st.stop()
+                final_qr = str(qr_t or old_qr or "").strip()
+                if not final_qr:
+                    try:
+                        from app.services.qr_codes import inventory_qr_from_item_id
+                    except ImportError:
+                        from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+                    final_qr = _allocate_unique_qr(
+                        item_id=str(row.get("id") or ""),
+                        preferred=inventory_qr_from_item_id(str(row.get("id") or "")),
+                        exclude_item_id=str(row.get("id") or ""),
+                    )
+                    update_rows_admin(_TABLE, {"qr_code_value": final_qr}, {"id": row["id"]})
+                _sync_qr_image_to_storage(str(row.get("id") or ""), final_qr)
                 _clear_panel()
                 st.success("Inventory item updated.")
                 st.rerun()

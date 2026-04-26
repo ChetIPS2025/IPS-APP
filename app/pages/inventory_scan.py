@@ -12,6 +12,7 @@ Schema assumptions (see sql/015, 027, 028):
 from __future__ import annotations
 
 import html
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
 
@@ -198,6 +199,20 @@ def _lookup_sku_case_insensitive(raw: str) -> list[dict]:
     return [r for r in rows if str(r.get("sku") or "").strip().lower() == raw_l]
 
 
+def _lookup_qr_case_insensitive(raw: str) -> list[dict]:
+    raw_l = str(raw or "").strip().lower()
+    if not raw_l:
+        return []
+    try:
+        rows = fetch_table_admin(_INV, columns="id,item_name,sku,qr_code_value,quantity_on_hand,is_active", limit=8000)
+    except Exception:
+        try:
+            rows = fetch_table_admin(_INV, columns="id,item_name,qr_code_value,quantity_on_hand,is_active", limit=8000)
+        except Exception:
+            return []
+    return [r for r in rows if str(r.get("qr_code_value") or "").strip().lower() == raw_l]
+
+
 def _lookup_inventory(code: str) -> tuple[list[dict], str]:
     """Returns (rows, reason). reason empty if ok; 'none' or 'ambiguous'."""
     raw = str(code or "").strip()
@@ -208,6 +223,11 @@ def _lookup_inventory(code: str) -> tuple[list[dict], str]:
         return by_qr, ""
     if len(by_qr) > 1:
         return by_qr, "ambiguous"
+    ci_qr = _lookup_qr_case_insensitive(raw)
+    if len(ci_qr) == 1:
+        return ci_qr, ""
+    if len(ci_qr) > 1:
+        return ci_qr, "ambiguous"
     # SKU fallback (exact match)
     by_sku = fetch_by_match_admin(_INV, {"sku": raw}, limit=5)
     if len(by_sku) == 1:
@@ -344,6 +364,23 @@ def render() -> None:
     with st.container(border=True):
         st.markdown(f"**{html.escape(name)}**")
         st.markdown(f"SKU: `{html.escape(sku)}`")
+        qrv = str(item.get("qr_code_value") or "").strip()
+        if qrv:
+            st.markdown(f"QR value: `{html.escape(qrv)}`")
+            try:
+                from app.services.qr_codes import generate_qr_png_bytes
+            except ImportError:
+                from services.qr_codes import generate_qr_png_bytes  # type: ignore
+            try:
+                import io
+
+                st.image(io.BytesIO(generate_qr_png_bytes(qrv)), width=200)
+            except Exception:
+                enc = urllib.parse.quote(qrv, safe="")
+                st.markdown(
+                    f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={enc}" width="200" height="200" alt="QR"/>',
+                    unsafe_allow_html=True,
+                )
         st.markdown(f"**Qty on hand:** {qoh:g}")
         st.markdown(f"**Unit cost:** {_fmt_money(unit_cost)}")
         st.caption(f"Location: {html.escape(loc)} · Vendor: {html.escape(vendor)}")
