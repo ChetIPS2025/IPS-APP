@@ -30,6 +30,7 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-lg: 0.9rem;
             --ips-radius: 8px;
             --ips-radius-lg: 10px;
+            --ips-radius-xl: 14px;
             --ips-main-bg: #0F2A4A;
             --ips-card-bg: #122F52;
             --ips-alt-bg: #14365C;
@@ -38,6 +39,8 @@ def inject_ips_app_shell_styles() -> None:
             --ips-text-muted: #9FB0C7;
             --ips-text-secondary: #C0CAD8;
             --ips-surface: #122F52;
+            --ips-card-shadow: 0 14px 34px rgba(3, 12, 28, 0.22);
+            --ips-card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.045);
             /* Button system (main content) — dense pages override with more specific rules */
             --ips-btn-height: 2.125rem;
             --ips-btn-pad-y: 0.625rem;
@@ -62,6 +65,7 @@ def inject_ips_app_shell_styles() -> None:
         }
 
         body {
+            background: linear-gradient(180deg, #0F2A4A 0%, #0C2345 100%);
             background-color: #0F2A4A;
         }
 
@@ -75,10 +79,17 @@ def inject_ips_app_shell_styles() -> None:
             padding-top: 0.4rem !important;
             padding-bottom: 1rem !important;
         }
+        section[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] {
+            background: var(--ips-card-bg) !important;
+            border: 1px solid var(--ips-border) !important;
+            border-radius: var(--ips-radius-xl) !important;
+            box-shadow: var(--ips-card-shadow), var(--ips-card-inset) !important;
+            padding: 12px 14px !important;
+        }
 
         /* ----- Typography hierarchy (Streamlit markdown + headers) ----- */
         section[data-testid="stMain"] h1 {
-            color: #f8fafc !important;
+            color: #FFFFFF !important;
             font-size: 1.55rem !important;
             font-weight: 750 !important;
             letter-spacing: -0.02em;
@@ -86,7 +97,7 @@ def inject_ips_app_shell_styles() -> None:
         }
         section[data-testid="stMain"] h2,
         section[data-testid="stMain"] h3 {
-            color: #e2e8f0 !important;
+            color: #FFFFFF !important;
             font-size: 1.05rem !important;
             font-weight: 650 !important;
             margin: 0.45rem 0 0.28rem 0 !important;
@@ -135,12 +146,14 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Expanders ----- */
         section[data-testid="stMain"] [data-testid="stExpander"] details {
             border: 1px solid var(--ips-border) !important;
-            border-radius: var(--ips-radius-lg) !important;
-            background: var(--ips-surface) !important;
+            border-radius: var(--ips-radius-xl) !important;
+            background: var(--ips-card-bg) !important;
+            box-shadow: var(--ips-card-inset) !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] summary {
             font-weight: 600 !important;
             font-size: 0.9rem !important;
+            color: #FFFFFF !important;
         }
 
         /* ----- IPS button system (main): primary / secondary / tertiary + downloads + link buttons ----- */
@@ -157,6 +170,7 @@ def inject_ips_app_shell_styles() -> None:
             line-height: 1.25 !important;
             box-sizing: border-box !important;
             white-space: nowrap !important;
+            transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
         }
         section[data-testid="stMain"] .stButton > button p,
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button p {
@@ -190,6 +204,7 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
             background: #1E4A7D !important;
             border-color: rgba(120, 150, 200, 0.5) !important;
+            box-shadow: 0 8px 18px rgba(3, 12, 28, 0.22) !important;
             color: #ffffff !important;
         }
         section[data-testid="stMain"] .stLinkButton > a {
@@ -217,6 +232,7 @@ def inject_ips_app_shell_styles() -> None:
             line-height: 1.25 !important;
             box-sizing: border-box !important;
             white-space: nowrap !important;
+            transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
         }
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
             white-space: nowrap !important;
@@ -229,9 +245,10 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Data tables / editors: calmer chrome ----- */
         section[data-testid="stMain"] [data-testid="stDataFrame"],
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
-            border-radius: var(--ips-radius-lg) !important;
+            border-radius: var(--ips-radius-xl) !important;
             border: 1px solid rgba(120, 150, 200, 0.25) !important;
             overflow: hidden;
+            box-shadow: 0 10px 26px rgba(3, 12, 28, 0.18) !important;
         }
         /* Force softer table surfaces (avoid mixed light tables on some machines) */
         .stDataFrame, .stTable,
@@ -247,6 +264,16 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDataEditor"] div {
             background-color: #122F52 !important;
             color: #ffffff !important;
+        }
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [role="columnheader"] div,
+        section[data-testid="stMain"] [data-testid="stDataEditor"] [role="columnheader"] div {
+            background-color: #14365C !important;
+            color: #FFFFFF !important;
+            font-weight: 650 !important;
+        }
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [role="gridcell"],
+        section[data-testid="stMain"] [data-testid="stDataEditor"] [role="gridcell"] {
+            border-color: rgba(120, 150, 200, 0.18) !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [role="row"]:hover div,
         section[data-testid="stMain"] [data-testid="stDataEditor"] [role="row"]:hover div {
@@ -278,6 +305,12 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid var(--ips-ctrl-border) !important;
             color: var(--ips-ctrl-fg) !important;
             box-sizing: border-box !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) input::placeholder,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) textarea::placeholder {
+            color: #9FB0C7 !important;
+            opacity: 1 !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea {
@@ -290,6 +323,7 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid var(--ips-ctrl-border) !important;
             color: var(--ips-ctrl-fg) !important;
             box-sizing: border-box !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stNumberInput"] input {
@@ -301,6 +335,7 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid var(--ips-ctrl-border) !important;
             color: var(--ips-ctrl-fg) !important;
             box-sizing: border-box !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stSelectbox"] [data-baseweb="select"] > div {
@@ -311,6 +346,7 @@ def inject_ips_app_shell_styles() -> None:
             background: var(--ips-ctrl-bg) !important;
             border-color: var(--ips-ctrl-border) !important;
             color: var(--ips-ctrl-fg) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
         }
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
             min-height: var(--ips-ctrl-h) !important;
@@ -318,6 +354,7 @@ def inject_ips_app_shell_styles() -> None:
             border-radius: var(--ips-ctrl-radius) !important;
             background: var(--ips-ctrl-bg) !important;
             border-color: var(--ips-ctrl-border) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] input,
@@ -330,6 +367,7 @@ def inject_ips_app_shell_styles() -> None:
             color: var(--ips-ctrl-fg) !important;
             padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
             box-sizing: border-box !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stCheckbox"] label,
@@ -363,10 +401,11 @@ def inject_ips_app_shell_styles() -> None:
         }
 
         section[data-testid="stMain"] .stMetric {
-            background: #122F52;
+            background: #14365C;
             border: 1px solid rgba(120, 150, 200, 0.25);
-            border-radius: var(--ips-radius-lg);
-            padding: 0.45rem 0.55rem !important;
+            border-radius: var(--ips-radius-xl);
+            box-shadow: var(--ips-card-shadow), var(--ips-card-inset);
+            padding: 0.65rem 0.75rem !important;
         }
         section[data-testid="stMain"] [data-testid="stMetricLabel"] {
             font-size: 0.72rem !important;
@@ -377,18 +416,20 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Dashboard / summary strips ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
-            padding: 6px 8px 8px 8px !important;
+            padding: 10px 12px 12px 12px !important;
             margin-bottom: 8px !important;
-            background: #122F52 !important;
+            background: #14365C !important;
             border-color: rgba(120, 150, 200, 0.25) !important;
+            box-shadow: var(--ips-card-shadow), var(--ips-card-inset) !important;
         }
 
         /* ----- Estimate editor: totals strip + document-style proposal surface ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
-            padding: 6px 8px 8px 8px !important;
+            padding: 10px 12px 12px 12px !important;
             margin-bottom: 0.45rem !important;
-            background: #122F52 !important;
+            background: #14365C !important;
             border-color: rgba(120, 150, 200, 0.25) !important;
+            box-shadow: var(--ips-card-shadow), var(--ips-card-inset) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
             background: rgba(248, 250, 252, 0.04) !important;

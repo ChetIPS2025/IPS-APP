@@ -181,8 +181,12 @@ def inject_ips_crud_list_styles() -> None:
 
         /* ----- Action toolbar (Add / Edit / Deactivate / Delete) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-toolbar-root) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 8px !important;
+            padding: 10px 12px !important;
+            margin-bottom: 10px !important;
+            background: #122F52 !important;
+            border-color: rgba(120, 150, 200, 0.25) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 12px 28px rgba(3, 12, 28, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] {
             align-items: stretch;
@@ -241,10 +245,10 @@ def inject_ips_crud_list_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) {
             background: #122F52 !important;
             border-color: rgba(120, 150, 200, 0.25) !important;
-            border-radius: 10px !important;
-            padding: 8px 10px 10px 10px !important;
-            margin-bottom: 6px !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            border-radius: 14px !important;
+            padding: 12px 14px !important;
+            margin-bottom: 8px !important;
+            box-shadow: 0 12px 28px rgba(3, 12, 28, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.045);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) h3 {
             color: #e2e8f0 !important;

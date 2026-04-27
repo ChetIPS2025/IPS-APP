@@ -211,11 +211,12 @@ def inject_table_action_styles() -> None:
         <style>
         /* ----- List-page top actions (aligned with ips-crud-toolbar-root rhythm) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 8px !important;
+            padding: 10px 12px 12px 12px !important;
+            margin-bottom: 10px !important;
             background: #122F52 !important;
             border-color: rgba(120, 150, 200, 0.25) !important;
-            border-radius: 10px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 14px 34px rgba(3, 12, 28, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="stHorizontalBlock"] {
@@ -259,12 +260,13 @@ def inject_table_action_styles() -> None:
 
         /* ----- Table action bar (under data_editor) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 8px !important;
+            padding: 10px 12px 12px 12px !important;
+            margin-bottom: 10px !important;
             margin-top: 2px !important;
             background: #122F52 !important;
             border-color: rgba(120, 150, 200, 0.25) !important;
-            border-radius: 10px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 14px 34px rgba(3, 12, 28, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             div[data-testid="stHorizontalBlock"] {
@@ -299,11 +301,12 @@ def inject_table_action_styles() -> None:
         }
 
         .ips-table-actions-bar {
-            padding: 10px 12px;
+            padding: 12px 14px;
             margin-bottom: 10px;
             background: #122F52;
             border: 1px solid rgba(120, 150, 200, 0.25);
-            border-radius: 8px;
+            border-radius: 14px;
+            box-shadow: 0 14px 34px rgba(3, 12, 28, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.045);
         }
         .ips-ta-summary {
             color: #C0CAD8;

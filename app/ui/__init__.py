@@ -203,8 +203,8 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
   line-height: 1.3;
 }
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
-  margin-top: 16px !important;
-  padding-top: 14px !important;
+  margin-top: 18px !important;
+  padding-top: 16px !important;
   border-top: 1px solid rgba(120, 150, 200, 0.25);
 }
 /* Divider + air gap: primary vs TOOLS */
@@ -222,9 +222,10 @@ section[data-testid="stSidebar"] div.stButton > button {
   font-weight: 600 !important;
   min-height: 2.25rem !important;
   padding: 0.35rem 0.75rem !important;
-  border-radius: 8px !important;
+  border-radius: 10px !important;
   line-height: 1.25 !important;
   box-sizing: border-box !important;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
 }
 section[data-testid="stSidebar"] div.stButton > button p {
   white-space: nowrap !important;
@@ -237,7 +238,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   font-weight: 500 !important;
   min-height: 2.25rem !important;
   padding: 0.35rem 0.65rem !important;
-  border-radius: 8px !important;
+  border-radius: 10px !important;
   margin-left: 2px !important;
   border-left: 3px solid rgba(120, 150, 200, 0.25) !important;
   padding-left: 10px !important;
@@ -250,7 +251,7 @@ section[data-testid="stSidebar"] button[kind="primary"] {
   background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;
   color: #f8fafc !important;
   border: 1px solid #3b82f6 !important;
-  box-shadow: inset 3px 0 0 0 #60a5fa !important;
+  box-shadow: inset 3px 0 0 0 #60a5fa, 0 8px 18px rgba(29, 78, 216, 0.24) !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"] {
   background: #14365C !important;
@@ -317,7 +318,7 @@ section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
 }
 section[data-testid="stSidebar"] .ips-install-section-title {
-  color: #e5e7eb;
+  color: #ffffff;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;

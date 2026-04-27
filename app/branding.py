@@ -27,7 +27,7 @@ def apply_branding() -> None:
         }
 
         .stApp {
-            background: #0F2A4A;
+            background: linear-gradient(180deg, #0F2A4A 0%, #0C2345 100%);
             color: #ffffff;
         }
 
