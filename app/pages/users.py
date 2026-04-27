@@ -11,6 +11,7 @@ try:
     from app.branding import render_header
     from app.db import (
         delete_rows_admin,
+        fetch_by_match_admin,
         fetch_one,
         fetch_table,
         fetch_table_admin,
@@ -27,6 +28,7 @@ except ImportError:
     from branding import render_header  # type: ignore
     from db import (  # type: ignore
         delete_rows_admin,
+        fetch_by_match_admin,
         fetch_one,
         fetch_table,
         fetch_table_admin,
@@ -158,10 +160,16 @@ def render() -> None:
         emp_labels = ["— Select employee —"] + [l for _, l in emp_opts]
         emp_id_by_label = {l: eid for eid, l in emp_opts}
 
-        c1, c2, c3 = st.columns([2, 1, 1], gap="small")
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 1.2], gap="small")
         picked_emp = c1.selectbox("Employee (recommended)", emp_labels, key="users_invite_emp_pick")
         invite_email = c2.text_input("Email (optional)", placeholder="name@company.com", key="users_invite_email")
         default_role = c3.selectbox("Default role", list(_ROLE_OPTIONS), index=_ROLE_OPTIONS.index("employee"))
+        create_for_emp_clicked = c4.button(
+            "Create Login for Employee",
+            type="secondary",
+            use_container_width=True,
+            key="users_create_login_for_employee_btn",
+        )
 
         allow_unlinked = st.checkbox(
             "Admin override: allow standalone login (no employee link)",
@@ -169,6 +177,54 @@ def render() -> None:
             help="Prefer linking to an employee to prevent unlinked accounts. Use only for admin/viewer or exceptional cases.",
             key="users_invite_allow_unlinked",
         )
+
+        if create_for_emp_clicked:
+            if not picked_emp or picked_emp.startswith("—"):
+                st.error("Select an employee first.")
+                st.stop()
+            eid = emp_id_by_label.get(picked_emp)
+            emp_row = next((e for e in emp_rows if str(e.get("id") or "").strip() == str(eid)), None) or {}
+            raw_email = str(emp_row.get("email") or "").strip().lower()
+            if not raw_email or "@" not in raw_email:
+                st.error("Employee must have an email to create login")
+                st.stop()
+            email = raw_email.strip().lower()
+            name = str(emp_row.get("name") or "").strip()
+            emp_role = str(emp_row.get("role") or "employee").strip().lower() or "employee"
+            if emp_role in {"pm", "estimator"}:
+                emp_role = "manager"
+            if emp_role not in _ROLE_OPTIONS:
+                emp_role = "employee"
+
+            existing = []
+            try:
+                existing = fetch_by_match_admin("profiles", {"email": email}, columns="id,email", limit=1)
+            except Exception:
+                existing = []
+            if existing:
+                st.warning("Login already exists for this employee")
+                st.stop()
+
+            try:
+                invited = invite_auth_user(
+                    email=email,
+                    role=emp_role,
+                    employee_id=str(eid),
+                    require_employee_link=False,
+                )
+            except Exception as exc:
+                st.error(f"Could not create login: {exc}")
+                st.stop()
+
+            # Ensure employee email is set (source of truth for linking)
+            try:
+                update_rows_admin("employees", {"email": email}, {"id": str(eid)})
+            except Exception:
+                pass
+
+            st.success("Login created and invite sent")
+            st.rerun()
+
         if st.button("Send Invite", type="primary", use_container_width=True, key="users_send_invite_btn"):
             try:
                 role_norm = str(default_role or "employee").strip().lower()
