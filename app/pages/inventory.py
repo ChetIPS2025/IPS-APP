@@ -279,7 +279,8 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
     inject_ips_crud_list_styles()
     inject_table_action_styles()
 
-    sel = get_selected_ids(TABLE_KEY_INVENTORY)
+    # Selection is stored in session under ``inventory_selected_ids``; we also mirror it into table_actions for exports.
+    sel = [str(x) for x in (st.session_state.get("inventory_selected_ids") or []) if str(x).strip()]
     n = len(sel)
     one = n == 1
     none = n == 0
@@ -366,6 +367,9 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=not vis_ids or all_visible_selected,
                 key="inv_btn_sel_all",
             ):
+                st.session_state["inventory_selected_ids"] = list(vis_ids)
+                for vid in vis_ids:
+                    st.session_state[f"inv_select_{vid}"] = True
                 set_selected_ids(TABLE_KEY_INVENTORY, list(vis_ids))
                 st.rerun()
         with b6:
@@ -375,6 +379,10 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=none,
                 key="inv_btn_clear",
             ):
+                st.session_state["inventory_selected_ids"] = []
+                for k in list(st.session_state.keys()):
+                    if str(k).startswith("inv_select_"):
+                        del st.session_state[k]
                 clear_selected_ids(TABLE_KEY_INVENTORY)
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.rerun()
@@ -709,6 +717,12 @@ def render() -> None:
 
     can_edit = current_role() == "admin"
 
+    # Inventory selection state (explicit, independent of data_editor quirks)
+    INVENTORY_TABLE_KEY = "inventory"
+    selected_key = "inventory_selected_ids"
+    if selected_key not in st.session_state or not isinstance(st.session_state.get(selected_key), list):
+        st.session_state[selected_key] = []
+
     # Ensure required session keys exist (explicitly requested by spec)
     st.session_state.setdefault("inventory_panel_mode", None)
     st.session_state.setdefault("inventory_panel_id", None)
@@ -755,7 +769,10 @@ def render() -> None:
                 except Exception as exc:
                     st.error(f"Could not delete {iid}: {exc}")
             st.session_state.pop("inventory_pending_delete_ids", None)
-            clear_selected_ids(TABLE_KEY_INVENTORY)
+            st.session_state[selected_key] = []
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("inv_select_"):
+                    del st.session_state[k]
             pid = st.session_state.get("inventory_panel_id")
             if pid and str(pid) in {str(x) for x in pending}:
                 _clear_panel()
@@ -777,14 +794,17 @@ def render() -> None:
 
     # --- Deactivate (matches Materials pattern) ---
     if st.session_state.pop("_inv_do_deactivate", False) and can_edit:
-        sel_ids = get_selected_ids(TABLE_KEY_INVENTORY)
+        sel_ids = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
         if sel_ids:
             for iid in sel_ids:
                 try:
                     update_rows_admin(_TABLE, {"is_active": False}, {"id": iid})
                 except Exception as exc:
                     st.error(f"Could not deactivate {iid}: {exc}")
-            clear_selected_ids(TABLE_KEY_INVENTORY)
+            st.session_state[selected_key] = []
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("inv_select_"):
+                    del st.session_state[k]
             _clear_panel()
             st.success("Selected inventory items deactivated.")
             st.rerun()
@@ -816,7 +836,8 @@ def render() -> None:
     def _render_main() -> None:
         inject_table_action_styles()
 
-        st.caption("Checkbox column on the **left**; selection is stored as **selected_inventory_ids**.")
+        # Temporary debug caption (remove after selection is verified in production)
+        st.caption(f"Selected inventory IDs: {[str(x) for x in (st.session_state.get(selected_key) or [])]}")
 
         if df.empty:
             st.info("No inventory items found.")
@@ -939,22 +960,61 @@ def render() -> None:
         if "unit_cost" in display_df.columns:
             display_df["unit_cost"] = display_df["unit_cost"].apply(_money)
 
-        bar_ph = st.empty()
-        _, _sel = render_selectable_dataframe(
-            display_df,
-            table_key=TABLE_KEY_INVENTORY,
-            id_column="id",
-            columns=show_cols,
-            editor_key="inv_sel_editor",
-            extra_column_config={
-                "Photo": st.column_config.ImageColumn("Photo", width="small"),
-            },
-        )
-        with bar_ph.container():
+        # --- Explicit checkbox selection per visible row ---
+        vis_ids = [str(x) for x in filtered["id"].astype(str).tolist()] if "id" in filtered.columns else []
+        cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
+        sel_set = set(cur_selected)
+
+        # Render a compact “table-like” list with real Streamlit checkboxes.
+        # (Avoids data_editor selection not persisting on some mobile/browser combos.)
+        header = st.columns([0.35, 2.2, 1.0, 0.9, 1.1, 1.0], gap="small")
+        header[0].markdown("**Sel**")
+        header[1].markdown("**Item**")
+        header[2].markdown("**SKU**")
+        header[3].markdown("**QOH**")
+        header[4].markdown("**Reorder**")
+        header[5].markdown("**Status**")
+
+        # Limit to avoid rendering thousands of widgets
+        max_rows = 350
+        for _, row in filtered.head(max_rows).iterrows():
+            item_id = str(row.get("id") or "").strip()
+            if not item_id:
+                continue
+            checked = item_id in sel_set
+            cols = st.columns([0.35, 2.2, 1.0, 0.9, 1.1, 1.0], gap="small")
+            with cols[0]:
+                new_checked = st.checkbox(
+                    "",
+                    value=checked,
+                    key=f"inv_select_{item_id}",
+                    label_visibility="collapsed",
+                )
+            if new_checked and item_id not in sel_set:
+                sel_set.add(item_id)
+            if (not new_checked) and item_id in sel_set:
+                sel_set.remove(item_id)
+            cols[1].write(str(row.get("item_name") or "—"))
+            cols[2].write(str(row.get("sku") or "—"))
+            cols[3].write(str(row.get("quantity_on_hand") or "0"))
+            cols[4].write(str(row.get("reorder_point") or "0"))
+            cols[5].write("Active" if bool(row.get("is_active", True)) else "Inactive")
+
+        if len(filtered) > max_rows:
+            st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")
+
+        # Persist selection
+        st.session_state[selected_key] = list(sel_set)
+        selected_ids = list(st.session_state[selected_key])
+
+        # Action bar uses the same selected_ids list
+        with st.container():
+            # Reuse existing toolbar but ensure it reads from our selection list by syncing table_actions key.
+            set_selected_ids(TABLE_KEY_INVENTORY, selected_ids)
             _render_inventory_action_bar(df_all=df, visible_df=filtered, can_edit=can_edit)
 
-        # Auto-load details panel when exactly one row is selected (checkbox selection should feel immediate).
-        sel_ids = get_selected_ids(TABLE_KEY_INVENTORY)
+        # Auto-load details panel when exactly one row is selected
+        sel_ids = selected_ids
         cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
         if len(sel_ids) == 1:
             if cur_mode not in {"add", "edit"}:
