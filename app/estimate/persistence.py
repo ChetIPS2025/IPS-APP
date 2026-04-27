@@ -25,6 +25,7 @@ from app.estimate.defaults import (
     _payload_prepared_by_for_db,
 )
 from app.estimate.equipment import load_estimate_equipment_from_assets
+from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
 
 
 def save_revision(estimate_id: str, revision_number: int, snapshot_json: dict, note: str = "") -> None:
@@ -147,7 +148,7 @@ def insert_imported_estimate(
     Returns (estimate_id, note_suffix) where note_suffix describes quote# reassignment if any.
     """
     est = dict(est)
-    materials_catalog = fetch_table("materials_catalog", limit=3000, order_by="item_key")
+    materials_catalog = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
     totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)

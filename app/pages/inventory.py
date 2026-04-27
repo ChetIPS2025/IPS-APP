@@ -248,6 +248,29 @@ def _backfill_missing_qr_codes() -> int:
     return n
 
 
+def _regenerate_qr_pngs_current_app_url() -> int:
+    """Re-upload QR PNGs in storage using the current ``APP_BASE_URL`` (scan URL in the image updates)."""
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    base = str(getattr(settings, "app_base_url", "") or "").strip()
+    if not base:
+        raise RuntimeError(
+            "APP_BASE_URL is not set. Set it to your live app URL (no trailing slash), then retry."
+        )
+    rows = fetch_table_admin(_TABLE, columns="id,qr_code_value", limit=20000, order_by="item_name")
+    n = 0
+    for r in rows or []:
+        rid = str(r.get("id") or "").strip()
+        qv = str(r.get("qr_code_value") or "").strip()
+        if not rid or not qv:
+            continue
+        _sync_qr_image_to_storage(rid, qv)
+        n += 1
+    return n
+
+
 def _clear_panel() -> None:
     st.session_state.pop("inventory_panel_mode", None)
     st.session_state.pop("inventory_panel_id", None)
@@ -371,18 +394,33 @@ def _render_inventory_action_bar(
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.rerun()
         if can_edit:
-            if st.button(
-                "Generate missing QR codes",
-                use_container_width=True,
-                key="inv_btn_backfill_qr",
-                help="Assigns a unique INV-* QR to every item missing qr_code_value, then uploads a PNG when storage is available.",
-            ):
-                try:
-                    n = _backfill_missing_qr_codes()
-                    st.success(f"Generated QR codes for {n} item(s).")
-                except Exception as exc:
-                    st.error(f"Backfill failed: {exc}")
-                st.rerun()
+            q1, q2 = st.columns(2, gap="small")
+            with q1:
+                if st.button(
+                    "Generate missing QR codes",
+                    use_container_width=True,
+                    key="inv_btn_backfill_qr",
+                    help="Assigns a unique INV-* QR to every item missing qr_code_value, then uploads a PNG when storage is available.",
+                ):
+                    try:
+                        n = _backfill_missing_qr_codes()
+                        st.success(f"Generated QR codes for {n} item(s).")
+                    except Exception as exc:
+                        st.error(f"Backfill failed: {exc}")
+                    st.rerun()
+            with q2:
+                if st.button(
+                    "Regenerate QR codes (current app URL)",
+                    use_container_width=True,
+                    key="inv_btn_regen_qr_png",
+                    help="Re-uploads QR PNGs using APP_BASE_URL so scans open the live app. Reprint labels after running.",
+                ):
+                    try:
+                        n = _regenerate_qr_pngs_current_app_url()
+                        st.success(f"Regenerated {n} QR image(s). Reprint any physical labels.")
+                    except Exception as exc:
+                        st.error(f"Regenerate failed: {exc}")
+                    st.rerun()
 
 
 def _render_add_panel() -> None:
@@ -390,6 +428,9 @@ def _render_add_panel() -> None:
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
         st.markdown("### Add inventory item")
+
+        if str(st.session_state.get("inv_f_cat") or "").strip().lower() == "materials":
+            st.session_state.setdefault("inv_add_cat", "Materials")
 
         name = st.text_input("Item Name", key="inv_add_name")
         sku_add = st.text_input("SKU (optional)", key="inv_add_sku", help="Alternate lookup on **Scan Inventory** if QR is not used.")
@@ -716,6 +757,7 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     st.caption(f"Selected IDs: {st.session_state.get(selected_key)}")
 
     if df.empty:
+        st.selectbox("Filter Category", ["All", "Materials"], key="inv_f_cat")
         st.info("No inventory items found.")
         if can_edit and st.button(
             "Add Inventory Item", type="primary", use_container_width=True, key="inv_empty_add"
@@ -727,15 +769,18 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
 
     filter_cols = st.columns([1, 2, 1], gap="small")
     categories = sorted(
-        [
-            c
-            for c in df.get("category", pd.Series(dtype=str))
-            .dropna()
-            .astype(str)
-            .unique()
-            .tolist()
-            if c.strip()
-        ]
+        set(
+            ["Materials"]
+            + [
+                c
+                for c in df.get("category", pd.Series(dtype=str))
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+                if str(c).strip()
+            ]
+        )
     )
     filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
     filter_cols[1].text_input(
@@ -752,7 +797,10 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
 
     filtered = df.copy()
     if selected_category != "All" and "category" in filtered.columns:
-        filtered = filtered[filtered["category"].astype(str) == selected_category]
+        sc = str(selected_category).strip().lower()
+        filtered = filtered[
+            filtered["category"].astype(str).str.strip().str.lower() == sc
+        ]
     if selected_active == "Active Only" and "is_active" in filtered.columns:
         filtered = filtered[filtered["is_active"] == True]  # noqa: E712
     elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
@@ -888,11 +936,13 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
 def render() -> None:
     render_header("Inventory")
     render_crud_list_subtitle(
-        "Stocked supplies and consumables — managed separately from individually tracked assets."
+        "Stocked supplies and consumables — use **category** (e.g. **Materials**) to organize items. "
+        "Same module for all consumables; tools on **Tool Checkout** do not reduce quantity here."
     )
     st.caption(
-        "Consumables: issue via **Scan Inventory** (QR / SKU); usage: **Inventory Usage**. "
-        "Reusable tools (torque wrenches, meters, etc.) use **Tool Checkout** — they do **not** reduce quantity here."
+        "**Materials** are inventory rows with category **Materials** (sidebar shortcut). "
+        "Issue via **Scan Inventory** (QR / SKU); usage: **Inventory Usage**. "
+        "Reusable tools use **Tool Checkout**."
     )
 
     msg = st.session_state.pop("inventory_success", None)
@@ -921,6 +971,26 @@ def render() -> None:
         return
 
     df = pd.DataFrame(rows)
+
+    if df.empty:
+        _fc = str(st.session_state.get("inv_f_cat") or "All").strip()
+        if _fc not in ("All", "Materials"):
+            st.session_state["inv_f_cat"] = "All"
+
+    if not df.empty and "category" in df.columns:
+        _raw_cats = [
+            c
+            for c in df.get("category", pd.Series(dtype=str))
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+            if str(c).strip()
+        ]
+        _cat_opts = sorted(set(["Materials"] + _raw_cats))
+        _cur_fc = str(st.session_state.get("inv_f_cat") or "All").strip()
+        if _cur_fc != "All" and _cur_fc not in _cat_opts:
+            st.session_state["inv_f_cat"] = "All"
 
     # --- Delete confirmation (matches Materials pattern) ---
     _del_open = destructive_confirm_open_key(_DELETE_CONFIRM_PREFIX)
@@ -993,6 +1063,17 @@ def render() -> None:
             _clear_panel()
             st.success("Selected inventory items deactivated.")
             st.rerun()
+
+    if current_role() in {"admin", "pm"}:
+        with st.expander("Import vendor quote (adds Inventory · Materials)", expanded=False):
+            st.caption(
+                "Vendor quotes create **inventory_items** with category **Materials** (and still save quote rows)."
+            )
+            try:
+                from app.pages.material_quote_import import render_material_quote_import_form
+            except ImportError:
+                from pages.material_quote_import import render_material_quote_import_form  # type: ignore
+            render_material_quote_import_form(return_to_materials=False)
 
     # --- Panel routing ---
     panel_mode = st.session_state.get("inventory_panel_mode")

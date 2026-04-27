@@ -986,8 +986,15 @@ def _asset_delete_dependency_state(asset_id: str) -> tuple[bool, bool]:
     return False, has_history
 
 
-def _is_equipment_row_cat(val) -> bool:
-    return str(val or "").strip().lower() == "equipment"
+# Primary asset categories (``assets.category``); list + filter in the UI.
+_ASSET_DB_CATEGORY_FILTER_LABELS: tuple[str, ...] = ("All", "Equipment", "Trailer", "Vehicle", "Tool")
+
+
+def _row_matches_asset_category_filter(val, selected: str) -> bool:
+    sel = str(selected or "All").strip()
+    if not sel or sel.lower() == "all":
+        return True
+    return str(val or "").strip().lower() == sel.lower()
 
 
 def _is_rental_row(val) -> bool:
@@ -1122,8 +1129,8 @@ def render_asset_database_card_list(
     job_label_by_id: dict | None = None,
 ) -> None:
     """
-    Shared card list: thumbnail, title, Rental badge, caption, Open profile.
-    Used by Asset Database and the Equipment filtered view.
+    Shared card list: thumbnail, title, Rental badge, caption, View Asset.
+    Used by Asset Database (including category-filtered views).
     """
     st.markdown(_ASSET_DB_LIST_CSS, unsafe_allow_html=True)
     thumb_px = 92 if mobile_layout else 88
@@ -1179,22 +1186,13 @@ def render_asset_database_card_list(
                         unsafe_allow_html=True,
                     )
                 if st.button(
-                    "Open profile",
-                    key=f"{key_prefix}_open_{i}_{aid}",
+                    "View Asset",
+                    key=f"{key_prefix}_view_{i}_{aid}",
                     type="primary",
                     use_container_width=True,
                 ):
                     st.session_state["asset_detail_id"] = aid
                     st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
-                    st.rerun()
-                if st.button(
-                    "View Asset",
-                    key=f"{key_prefix}_view_{i}_{aid}",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["asset_panel_mode"] = "view"
-                    st.session_state["asset_panel_id"] = aid
                     st.rerun()
                 if can_quick_edit and st.button(
                     "Quick edit",
@@ -1228,17 +1226,13 @@ def render_asset_database_card_list(
                 + cat_suffix
             )
         with cb:
-            if st.button("Open profile", key=f"{key_prefix}_open_{i}_{aid}", use_container_width=True):
+            if st.button("View Asset", key=f"{key_prefix}_view_{i}_{aid}", type="primary", use_container_width=True):
                 st.session_state["asset_detail_id"] = aid
                 st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                 st.rerun()
-            if st.button("View Asset", key=f"{key_prefix}_view_{i}_{aid}", use_container_width=True):
-                st.session_state["asset_panel_mode"] = "view"
-                st.session_state["asset_panel_id"] = aid
-                st.rerun()
     st.caption(
         "Thumbnails use each asset’s **primary image** (`photo_path`). "
-        "Use **Open profile** to view details, rental rates, and the image gallery."
+        "Use **View Asset** to view details, rental rates, and the image gallery."
     )
 
 
@@ -1429,6 +1423,16 @@ def render() -> None:
     def _render_main_column() -> None:
         inject_table_action_styles()
         is_narrow = st.session_state.get("ips_viewport_narrow") is True
+        st.session_state.setdefault("asset_db_f_asset_category", "All")
+        if st.session_state.get("asset_db_f_scope") == "Equipment Only":
+            st.session_state["asset_db_f_scope"] = "All"
+            st.session_state["asset_db_f_asset_category"] = "Equipment"
+        _allowed_scope = {"All", "Rental Only", "Checkout tools only"}
+        if str(st.session_state.get("asset_db_f_scope") or "") not in _allowed_scope:
+            st.session_state["asset_db_f_scope"] = "All"
+        _ac = str(st.session_state.get("asset_db_f_asset_category") or "All").strip()
+        if _ac not in _ASSET_DB_CATEGORY_FILTER_LABELS:
+            st.session_state["asset_db_f_asset_category"] = "All"
 
         if not st.session_state.get("asset_db_view_user_chose"):
             vn = st.session_state.get("ips_viewport_narrow")
@@ -1472,13 +1476,14 @@ def render() -> None:
                 ]
             )
             st.selectbox("Filter Status", ["All"] + statuses, key="asset_db_f_status")
-            scope_options = ["All", "Rental Only", "Equipment Only", "Checkout tools only"]
+            scope_options = ["All", "Rental Only", "Checkout tools only"]
             st.selectbox("Show", scope_options, key="asset_db_f_scope")
+            st.selectbox("Category", list(_ASSET_DB_CATEGORY_FILTER_LABELS), key="asset_db_f_asset_category")
             serial_options = ["All", "Has serial", "No serial"]
             st.selectbox("Serial #", serial_options, key="asset_db_f_serial")
             st.caption(
-                "**Show** filters rentable assets or **Equipment** category. "
-                "View mode switches are in the top row above."
+                "**Category** filters ``assets.category`` (Equipment, Trailer, Vehicle, Tool). "
+                "**Show** filters rental or checkout tools. View mode is in the top row."
             )
 
         else:
@@ -1515,19 +1520,23 @@ def render() -> None:
             serial_options = ["All", "Has serial", "No serial"]
             filter_cols[2].selectbox("Serial #", serial_options, key="asset_db_f_serial")
 
-            filter_cols2 = st.columns([1, 3])
-            scope_options = ["All", "Rental Only", "Equipment Only", "Checkout tools only"]
+            filter_cols2 = st.columns([1, 1, 2])
+            scope_options = ["All", "Rental Only", "Checkout tools only"]
             with filter_cols2[0]:
                 st.markdown('<span class="ips-adb-filter-row2"></span>', unsafe_allow_html=True)
                 st.selectbox("Show", scope_options, key="asset_db_f_scope")
-            filter_cols2[1].caption(
-                "Filter by rentable assets or **Equipment** category. **Cards** / **Table** is in the bar above."
+            with filter_cols2[1]:
+                st.selectbox("Category", list(_ASSET_DB_CATEGORY_FILTER_LABELS), key="asset_db_f_asset_category")
+            filter_cols2[2].caption(
+                "**Category** = ``assets.category``. **Show** = rental / checkout tools. "
+                "**Cards** / **Table** is in the bar above."
             )
 
         selected_status = st.session_state.get("asset_db_f_status", "All")
         search = st.session_state.get("asset_db_f_search", "")
         selected_serial = st.session_state.get("asset_db_f_serial", "All")
         selected_scope = st.session_state.get("asset_db_f_scope", "All")
+        selected_asset_cat = str(st.session_state.get("asset_db_f_asset_category", "All") or "All").strip()
 
         filtered = df.copy()
         if selected_status != "All" and "status" in filtered.columns:
@@ -1540,10 +1549,12 @@ def render() -> None:
             filtered = filtered[filtered["serial_number"].isna() | sn.eq("") | sn.eq("nan")]
         if selected_scope == "Rental Only" and "is_rental" in filtered.columns:
             filtered = filtered[filtered["is_rental"].map(_is_rental_row)]
-        elif selected_scope == "Equipment Only" and "category" in filtered.columns:
-            filtered = filtered[filtered["category"].map(_is_equipment_row_cat)]
         elif selected_scope == "Checkout tools only" and "is_checkout_item" in filtered.columns:
             filtered = filtered[filtered["is_checkout_item"].map(_is_checkout_tool_flag)]
+        if selected_asset_cat and selected_asset_cat.lower() != "all" and "category" in filtered.columns:
+            filtered = filtered[
+                filtered["category"].map(lambda v: _row_matches_asset_category_filter(v, selected_asset_cat))
+            ]
         if search.strip():
             s = search.strip().lower()
             search_cols = [c for c in ASSET_TABLE_COLS if c in filtered.columns]

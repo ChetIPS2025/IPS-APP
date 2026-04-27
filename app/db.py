@@ -736,10 +736,24 @@ def invite_auth_user(
         fn = getattr(admin.auth.admin, "invite_user_by_email", None)
         if fn is None:
             raise AttributeError("auth.admin.invite_user_by_email is not available in this Supabase client.")
+        base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
+        redirect_to = f"{base}/" if base else None
         try:
-            result = fn(em)
+            if redirect_to:
+                result = fn(em, {"redirect_to": redirect_to})
+            else:
+                result = fn(em)
         except TypeError:
-            result = fn({"email": em})
+            try:
+                if redirect_to:
+                    result = fn({"email": em, "options": {"redirect_to": redirect_to}})
+                else:
+                    result = fn({"email": em})
+            except TypeError:
+                try:
+                    result = fn(em)
+                except TypeError:
+                    result = fn({"email": em})
     except Exception as exc:
         raise RuntimeError(f"Could not send invite for {em!r}: {exc!r}") from exc
 

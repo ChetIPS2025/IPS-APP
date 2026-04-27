@@ -47,9 +47,7 @@ from pages import assets as assets_page
 from pages import asset_scanner
 from pages import tool_trailer_audits
 from pages import sign_timesheet
-from pages import materials
 from pages import labor
-from pages import equipment
 from pages import inventory
 from pages import inventory_dashboard
 from pages import inventory_scan
@@ -71,9 +69,7 @@ PAGES = {
     "Job Database": job_database.render,
     "Customers": customers_jobs.render_customers,
     "Job Costing": job_costing.render,
-    "Materials": materials.render,
     "Labor": labor.render,
-    "Equipment": equipment.render,
     "Inventory": inventory.render,
     "Scan Inventory": inventory_scan.render,
     "Inventory Usage": inventory_dashboard.render,
@@ -95,7 +91,7 @@ PAGES = {
     "Asset Manager": assets_page.render,
 }
 
-# Catalog pages (Materials, Labor, Equipment, Inventory) gate writes inside each page;
+# Catalog pages (Labor, Inventory) gate writes inside each page;
 # non-admins may browse lists read-only.
 _ADMIN_ONLY_PAGES = frozenset({"People", "Employees", "Admin", "Users"})
 

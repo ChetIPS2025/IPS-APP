@@ -18,7 +18,7 @@ def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str) -> str:
     Path-style ``/inventory_scan?code=`` is not used because a single ``main.py`` entrypoint
     does not serve arbitrary paths unless the host rewrites them.
 
-    Format: ``{base}/?page=Scan%20Inventory&code=INV-…``
+    Format: ``{APP_BASE_URL}/?page=Scan%20Inventory&code=<qr_code_value>`` (``APP_BASE_URL`` from env / settings).
     """
     b = str(app_base_url or "").strip().rstrip("/")
     v = str(qr_code_value or "").strip()

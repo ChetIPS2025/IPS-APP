@@ -71,6 +71,7 @@ from app.estimate.equipment import (
     _equipment_core_with_picker_labels,
     _equipment_rows_core_for_editor,
 )
+from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
 from app.estimate.persistence import (
     _duplicate_quote_message,
     attach_pending_pdf_import_source,
@@ -314,7 +315,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             ] + list(customers)
 
     jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=1000, order_by="job_number")
-    materials_catalog = fetch_table("materials_catalog", limit=3000, order_by="item_key")
+    materials_catalog = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
     existing_estimates = fetch_table("estimates", columns="id,quote_number,status,updated_at,revision_number", limit=1000, order_by="updated_at")

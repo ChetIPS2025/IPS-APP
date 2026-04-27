@@ -57,7 +57,7 @@ def compute_totals(est: dict, materials_catalog: list[dict], labor_rates: list[d
     from app.estimate.defaults import ensure_numeric_defaults
 
     ensure_numeric_defaults(est)
-    material_map = {m["item_key"]: m for m in materials_catalog}
+    material_map = {m["item_key"]: m for m in materials_catalog if m.get("item_key")}
     labor_map = {r["classification"]: r for r in labor_rates}
     equipment_map = {e["equipment_item"]: e for e in equipment_pricing}
 

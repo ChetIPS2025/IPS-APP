@@ -98,6 +98,21 @@ def _storage_backend() -> str:
     return v if v else "supabase"
 
 
+# Canonical public app origin (QR scan links, cookie Secure hint, etc.). Override with ``APP_BASE_URL``.
+_CANONICAL_APP_BASE_URL = "https://ips-app-ajy0.onrender.com"
+
+
+def _resolve_app_base_url() -> str:
+    """
+    Public origin, no trailing slash — from ``APP_BASE_URL`` or ``_CANONICAL_APP_BASE_URL``.
+
+    Scan links: ``{app_base_url}/?page=Scan%20Inventory&code=…`` (see ``app.services.qr_codes``).
+    Set ``APP_BASE_URL`` in the environment for local dev (e.g. ``http://127.0.0.1:8501``).
+    """
+    raw = _strip_env("APP_BASE_URL")
+    return raw.strip().rstrip("/") if raw else _CANONICAL_APP_BASE_URL
+
+
 @dataclass(frozen=True)
 class Settings:
     supabase_url: str = field(default_factory=lambda: _strip_env("SUPABASE_URL"))
@@ -112,8 +127,8 @@ class Settings:
 
     app_env: str = field(default_factory=lambda: _strip_env("APP_ENV", "development"))
     app_name: str = field(default_factory=lambda: _strip_env("APP_NAME", "IPS Estimating"))
-    # Public base URL for deep links (no trailing slash), e.g. https://ips-app.onrender.com
-    app_base_url: str = field(default_factory=lambda: _strip_env("APP_BASE_URL"))
+    # Public base URL for deep links (no trailing slash). Defaults to live Render; override with APP_BASE_URL.
+    app_base_url: str = field(default_factory=_resolve_app_base_url)
     storage_bucket: str = field(default_factory=lambda: _strip_env("STORAGE_BUCKET", "ips-storage"))
     # File storage: "supabase" (default) uploads to Supabase Storage; "local" writes under LOCAL_STORAGE_ROOT.
     storage_backend: str = field(default_factory=_storage_backend)

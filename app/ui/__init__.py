@@ -57,22 +57,29 @@ _NAV_SECONDARY: tuple[str, ...] = (
 )
 
 _SECONDARY_ADMIN_ONLY: frozenset[str] = frozenset(
-    {"Materials", "Labor", "Equipment", "People"}
+    {"Labor", "People"}
 )
 
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
 _NAV_ASSETS: tuple[str, ...] = ("Asset Database", "Tool Checkout", "Who Has What")
-# Materials / labor catalogs + equipment filtered view (see equipment.py).
+# Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
+_NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
+    ("All assets", "All"),
+    ("Equipment", "Equipment"),
+    ("Trailer", "Trailer"),
+    ("Vehicle", "Vehicle"),
+    ("Tool", "Tool"),
+)
+# Labor catalog. Materials are **inventory_items** with ``category`` = Materials (see Inventory).
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
 _NAV_RESOURCES: tuple[str, ...] = (
-    "Materials",
     "Labor",
-    "Equipment",
     "Inventory",
-    "Scan Inventory",
-    "Inventory Usage",
 )
+
+# Inventory sub-pages (kept routable, but nested under Inventory in the sidebar UI).
+_NAV_INVENTORY_SUBPAGES: tuple[str, ...] = ("Scan Inventory", "Inventory Usage")
 
 # Role-based page access (UI hiding + routing validation; main.py enforces too).
 # Supported roles: admin, manager, employee, viewer.
@@ -127,6 +134,9 @@ def role_can_open_page(role: str, page: str) -> bool:
 
 IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSETS + _NAV_RESOURCES + _NAV_SECONDARY
 
+# Keep Inventory sub-pages routable even though they are nested under "Inventory" in the sidebar.
+IPS_SIDEBAR_PAGES = IPS_SIDEBAR_PAGES + _NAV_INVENTORY_SUBPAGES
+
 
 def _nav_btn_key(page: str) -> str:
     return "ips_nav__" + page.replace(" ", "_").replace("/", "_")
@@ -158,6 +168,11 @@ def apply_pending_navigation() -> None:
     if pending == "Employees":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "Employees"
+        st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+        return
+    if pending == "Materials":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+        st.session_state["inv_f_cat"] = "Materials"
         st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
         return
     if pending == "Asset Detail":
@@ -345,12 +360,26 @@ def _ensure_valid_nav_page() -> None:
         st.session_state["people_section_radio"] = "Employees"
     elif cur0 == "Inventory scan":
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+    elif cur0 == "Materials":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+        st.session_state["inv_f_cat"] = "Materials"
+    elif cur0 == "Equipment":
+        # Legacy standalone route; equipment is managed in Asset Database (category = Equipment).
+        st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
+        st.session_state["asset_db_f_asset_category"] = "Equipment"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
     visible_all = set(
         p
-        for p in (set(_NAV_PRIMARY) | set(_NAV_JOBS) | set(_NAV_ASSETS) | set(_NAV_RESOURCES) | visible_secondary)
+        for p in (
+            set(_NAV_PRIMARY)
+            | set(_NAV_JOBS)
+            | set(_NAV_ASSETS)
+            | set(_NAV_RESOURCES)
+            | set(_NAV_INVENTORY_SUBPAGES)
+            | visible_secondary
+        )
         if role_can_open_page(role, p)
     )
 
@@ -379,6 +408,58 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
         if st.sidebar.button(page, key=key, type=btn_type, use_container_width=True):
             st.session_state[IPS_NAV_PAGE_KEY] = page
             st.rerun()
+
+
+def _render_nav_button_route(*, label: str, route: str, current: str, indent: bool, key_suffix: str) -> None:
+    """Render a nav button whose label differs from its route key."""
+    active = current == route
+    btn_type = "primary" if active else "secondary"
+    key = _nav_btn_key(route + "__" + key_suffix)
+    if indent:
+        _, c2 = st.sidebar.columns([0.06, 0.94])
+        with c2:
+            if st.button(label, key=key, type=btn_type, use_container_width=True):
+                st.session_state[IPS_NAV_PAGE_KEY] = route
+                st.rerun()
+    else:
+        if st.sidebar.button(label, key=key, type=btn_type, use_container_width=True):
+            st.session_state[IPS_NAV_PAGE_KEY] = route
+            st.rerun()
+
+
+def _sidebar_asset_category_focus_norm() -> str:
+    v = str(st.session_state.get("asset_db_f_asset_category") or "All").strip()
+    if not v or v.lower() == "all":
+        return "All"
+    return v
+
+
+def _sidebar_inventory_category_focus_norm() -> str:
+    v = str(st.session_state.get("inv_f_cat") or "All").strip()
+    if not v or v.lower() == "all":
+        return "All"
+    return v
+
+
+def _render_assets_sidebar_group(*, current: str, role: str) -> None:
+    """Asset Database + category lenses (same ``assets`` table as the main list)."""
+    if not role_can_open_page(role, "Asset Database"):
+        return
+    focus = _sidebar_asset_category_focus_norm()
+    assets_expanded = current == "Asset Database"
+    with st.sidebar.expander("Assets", expanded=assets_expanded):
+        for nav_label, cat in _NAV_ASSET_CATEGORY_FOCUS:
+            cat_norm = "All" if cat == "All" else cat
+            active = current == "Asset Database" and (
+                (cat_norm == "All" and focus == "All")
+                or (cat_norm != "All" and focus.lower() == cat_norm.lower())
+            )
+            btn_type = "primary" if active else "secondary"
+            key = _nav_btn_key(f"Asset_Database__focus_{cat_norm}")
+            if st.button(nav_label, key=key, type=btn_type, use_container_width=True):
+                st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
+                st.session_state["asset_db_f_asset_category"] = "All" if cat_norm == "All" else cat_norm
+                st.rerun()
 
 
 def render_sidebar() -> str:
@@ -420,7 +501,10 @@ def render_sidebar() -> str:
         '<div class="ips-nav-section-title ips-nav-group-spaced">Asset Dashboard</div>',
         unsafe_allow_html=True,
     )
+    _render_assets_sidebar_group(current=current, role=role)
     for p in _NAV_ASSETS:
+        if p == "Asset Database":
+            continue
         if role_can_open_page(role, p):
             _render_nav_button(p, current=current, indent=True)
 
@@ -429,9 +513,40 @@ def render_sidebar() -> str:
         '<div class="ips-nav-section-title ips-nav-group-spaced">Resources &amp; Inventory</div>',
         unsafe_allow_html=True,
     )
-    for p in _NAV_RESOURCES:
+    for p in ("Labor",):
         if role_can_open_page(role, p):
             _render_nav_button(p, current=current, indent=True)
+
+    inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
+    if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
+        with st.sidebar.expander("Inventory", expanded=inv_expanded):
+            _inv_focus = _sidebar_inventory_category_focus_norm()
+            inv_list_active = current == "Inventory" and _inv_focus == "All"
+            if st.button(
+                "Inventory List",
+                key=_nav_btn_key("Inventory__list_all"),
+                type="primary" if inv_list_active else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+                st.session_state["inv_f_cat"] = "All"
+                st.rerun()
+            if role_can_open_page(role, "Inventory"):
+                if st.button(
+                    "Materials",
+                    key=_nav_btn_key("Inventory__lens_Materials"),
+                    type="primary"
+                    if current == "Inventory" and _inv_focus == "Materials"
+                    else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+                    st.session_state["inv_f_cat"] = "Materials"
+                    st.rerun()
+            if role_can_open_page(role, "Scan Inventory"):
+                _render_nav_button("Scan Inventory", current=current, indent=False)
+            if role_can_open_page(role, "Inventory Usage"):
+                _render_nav_button("Inventory Usage", current=current, indent=False)
 
     # --- SECONDARY: TOOLS ---
     st.sidebar.markdown(

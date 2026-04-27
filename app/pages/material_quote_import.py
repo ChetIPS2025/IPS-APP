@@ -9,32 +9,94 @@ import streamlit as st
 try:
     from auth import current_profile, current_role
     from branding import render_header
-    from db import fetch_table, insert_row_admin, upload_bytes
+    from db import fetch_by_match_admin, fetch_table, insert_row_admin, update_rows_admin, upload_bytes
     from services.material_quote_import import DEFAULT_MARKUP_PCT, compute_sell_price, extract_material_quote
+    from services.materials_catalog_merge import (
+        INVENTORY_MATERIALS_CATEGORY,
+        fetch_merged_materials_catalog_rows,
+        inventory_row_to_material_catalog_shape,
+    )
+    from services.qr_codes import allocate_unique_inventory_qr_value, inventory_qr_from_item_id
 except ImportError:
     from app.auth import current_profile, current_role  # type: ignore
     from app.branding import render_header  # type: ignore
-    from app.db import fetch_table, insert_row_admin, upload_bytes  # type: ignore
+    from app.db import fetch_by_match_admin, fetch_table, insert_row_admin, update_rows_admin, upload_bytes  # type: ignore
     from app.services.material_quote_import import DEFAULT_MARKUP_PCT, compute_sell_price, extract_material_quote  # type: ignore
-
-
-def next_inventory_id(rows) -> str:
-    nums = []
-    for row in rows:
-        inv = str(row.get("inventory_id", "")).strip().upper()
-        if inv.startswith("INV-"):
-            try:
-                nums.append(int(inv.replace("INV-", "")))
-            except Exception:
-                pass
-    next_num = max(nums) + 1 if nums else 1
-    return f"INV-{next_num:03d}"
+    from app.services.materials_catalog_merge import (  # type: ignore
+        INVENTORY_MATERIALS_CATEGORY,
+        fetch_merged_materials_catalog_rows,
+        inventory_row_to_material_catalog_shape,
+    )
+    from app.services.qr_codes import allocate_unique_inventory_qr_value, inventory_qr_from_item_id  # type: ignore
 
 
 def clean_item_key(text: str) -> str:
     text = str(text).strip().upper()
     text = re.sub(r"[^A-Z0-9]+", "_", text)
     return text.strip("_")
+
+
+def _finalize_inventory_qr_code(*, item_id: str) -> None:
+    rid = str(item_id or "").strip()
+    if not rid:
+        return
+    qv = allocate_unique_inventory_qr_value(
+        fetch_by_match_admin=fetch_by_match_admin,
+        item_id=rid,
+        preferred=inventory_qr_from_item_id(rid),
+        exclude_item_id=rid,
+    )
+    update_rows_admin("inventory_items", {"qr_code_value": qv}, {"id": rid})
+
+
+def _insert_inventory_from_quote_line(
+    *,
+    description: str,
+    subgroup: str,
+    unit: str,
+    unit_cost: float,
+    final_item_key: str,
+    vendor_item_number: str,
+) -> dict[str, object]:
+    """Insert ``inventory_items`` row (Materials) and return catalog-shaped dict for duplicate-key tracking."""
+    notes_parts: list[str] = []
+    if str(subgroup or "").strip():
+        notes_parts.append(f"Subgroup: {str(subgroup).strip()}")
+    if str(vendor_item_number or "").strip():
+        notes_parts.append(f"Vendor #: {str(vendor_item_number).strip()}")
+    notes = "\n".join(notes_parts).strip()
+
+    payload: dict[str, object] = {
+        "item_name": str(description or "").strip()[:2000],
+        "category": INVENTORY_MATERIALS_CATEGORY,
+        "unit": str(unit or "EA").strip() or "EA",
+        "quantity_on_hand": 0.0,
+        "reorder_point": 0.0,
+        "unit_cost": float(unit_cost or 0) if float(unit_cost or 0) > 0 else None,
+        "vendor": "",
+        "storage_location": "",
+        "notes": notes[:8000] if notes else "",
+        "is_active": True,
+    }
+    fk = str(final_item_key or "").strip()
+    if fk:
+        payload["sku"] = fk[:500]
+
+    row = insert_row_admin("inventory_items", payload)
+    rid = str(row.get("id") or "").strip()
+    if rid and not str(row.get("qr_code_value") or "").strip():
+        _finalize_inventory_qr_code(item_id=rid)
+    fresh = fetch_by_match_admin("inventory_items", {"id": rid}, limit=1) if rid else []
+    if fresh:
+        return inventory_row_to_material_catalog_shape(fresh[0])
+    return {
+        "item_key": fk,
+        "description": str(description or "").strip(),
+        "category": INVENTORY_MATERIALS_CATEGORY,
+        "inventory_id": "",
+        "vendor_item_number": str(vendor_item_number or "").strip(),
+        "_source": "inventory_items",
+    }
 
 
 def make_unique_item_key(base_key: str, rows) -> str:
@@ -127,9 +189,9 @@ def _format_material_suggestion(row: dict | None) -> str:
 def render_material_quote_import_form(*, return_to_materials: bool = False) -> None:
     """
     Vendor quote upload, AI extraction, editable grid, save to material_quotes /
-    material_quote_items / materials_catalog. Caller handles page chrome and access control.
+    material_quote_items / ``inventory_items`` (category Materials). Caller handles page chrome and access control.
     """
-    materials = fetch_table("materials_catalog", limit=5000, order_by="item_key")
+    materials = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
 
     if "material_quote_result" not in st.session_state:
         st.session_state["material_quote_result"] = None
@@ -262,7 +324,7 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
         column_config={
             "suggested_match": st.column_config.TextColumn(
                 "Suggested catalog match",
-                help="Existing materials_catalog row that looks like this line.",
+                help="Existing inventory (Materials) or legacy catalog row that looks like this line.",
                 disabled=True,
                 width="large",
             ),
@@ -274,7 +336,11 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
     )
 
     save_quote_only = st.checkbox("Save quote record only", value=False)
-    import_to_materials = st.checkbox("Import selected items into Materials Catalog", value=True)
+    import_to_inventory = st.checkbox(
+        "Import selected items into Inventory (category: Materials)",
+        value=True,
+        key="mq_import_to_inventory",
+    )
     save_source_file = st.checkbox("Upload original file to storage", value=True)
 
     if st.button("Save Quote Import", use_container_width=True):
@@ -338,7 +404,7 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
 
         imported_count = 0
         linked_existing_count = 0
-        if import_to_materials and not save_quote_only:
+        if import_to_inventory and not save_quote_only:
             for row in selected_rows:
                 description = str(row.get("item_description", "")).strip()
                 if not description:
@@ -354,28 +420,22 @@ def render_material_quote_import_form(*, return_to_materials: bool = False) -> N
 
                 base_item_key = clean_item_key(description)
                 final_item_key = make_unique_item_key(base_item_key, materials)
-                final_inventory_id = next_inventory_id(materials)
 
-                material_payload = {
-                    "inventory_id": final_inventory_id,
-                    "item_key": final_item_key,
-                    "description": description,
-                    "category": str(row.get("category", "")).strip(),
-                    "subgroup": str(row.get("subgroup", "")).strip(),
-                    "unit": str(row.get("unit", "")).strip() or "EA",
-                    "purchase_price": float(row.get("unit_cost", 0) or 0),
-                    "sell_price": float(row.get("unit_sell", 0) or 0),
-                    "vendor_item_number": str(row.get("vendor_item_number", "")).strip(),
-                    "is_active": True,
-                }
-                insert_row_admin("materials_catalog", material_payload)
-                materials.append(material_payload)
+                new_row = _insert_inventory_from_quote_line(
+                    description=description,
+                    subgroup=str(row.get("subgroup", "")).strip(),
+                    unit=str(row.get("unit", "")).strip() or "EA",
+                    unit_cost=float(row.get("unit_cost", 0) or 0),
+                    final_item_key=final_item_key,
+                    vendor_item_number=str(row.get("vendor_item_number", "")).strip(),
+                )
+                materials.append(new_row)
                 imported_count += 1
 
         st.success(
             f"Material quote imported successfully. "
             f"Quote lines saved: {len(cleaned_rows)}. "
-            f"Catalog: {imported_count} new, {linked_existing_count} linked to existing (no duplicate SKU)."
+            f"Inventory: {imported_count} new, {linked_existing_count} linked to existing (no duplicate SKU)."
         )
         st.session_state["material_quote_result"] = None
         st.session_state["material_quote_file_meta"] = None
