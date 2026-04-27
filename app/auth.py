@@ -468,11 +468,11 @@ def update_password(new_password: str) -> None:
     pid = str(prof.get("id") or "").strip()
     if pid:
         try:
-            from app.db import update_rows
+            from app.db import update_rows_admin
         except ImportError:
-            from db import update_rows  # type: ignore
+            from db import update_rows_admin  # type: ignore
         try:
-            update_rows("profiles", {"must_reset_password": False}, {"id": pid})
+            update_rows_admin("profiles", {"must_reset_password": False}, {"id": pid})
             st.session_state["auth_profile"] = {**prof, "must_reset_password": False}
         except Exception:
             # If RLS blocks it, user can still proceed; admin can clear later.
