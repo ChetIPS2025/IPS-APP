@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from datetime import datetime, date
 import pandas as pd
 import streamlit as st
 
@@ -15,6 +16,7 @@ try:
         fetch_by_match_admin,
         fetch_one,
         fetch_table,
+        insert_row_admin,
         update_rows_admin,
     )
     from app.pages.asset_intake import render_asset_intake_form
@@ -33,6 +35,7 @@ except ImportError:
         fetch_by_match_admin,
         fetch_one,
         fetch_table,
+        insert_row_admin,
         update_rows_admin,
     )
     from pages.asset_intake import render_asset_intake_form  # type: ignore
@@ -339,6 +342,383 @@ def _render_asset_panel_view(row: dict) -> None:
                 # Pass context for creation page
                 st.session_state["tta_create_asset_id"] = str(row.get("id") or "").strip()
                 st.rerun()
+
+            # --- Tool Kits (quick manage inside Asset Database view panel) ---
+            st.markdown("-----")
+            st.subheader("Tool Kits")
+            asset_id = str(row.get("id") or "").strip()
+            if not asset_id:
+                return
+
+            def _as_float(v, default: float = 0.0) -> float:
+                try:
+                    if v is None:
+                        return default
+                    s = str(v).strip()
+                    if not s:
+                        return default
+                    return float(s)
+                except Exception:
+                    return default
+
+            def _money(v) -> str:
+                try:
+                    return f"${float(_as_float(v, 0.0)):,.2f}"
+                except Exception:
+                    return "$0.00"
+
+            def _today() -> date:
+                return datetime.utcnow().date()
+
+            show_add_key = f"show_add_kit_{asset_id}"
+            if show_add_key not in st.session_state:
+                st.session_state[show_add_key] = False
+
+            can_edit = current_role() in {"admin", "pm"}
+            if can_edit and st.button("Add Kit", use_container_width=True, key=f"adb_add_kit_btn_{asset_id}"):
+                st.session_state[show_add_key] = True
+                st.rerun()
+
+            if st.session_state.get(show_add_key):
+                kit_name = st.text_input("Kit Name", key=f"adb_kit_name_{asset_id}")
+                description = st.text_area("Description", key=f"adb_kit_desc_{asset_id}", height=72)
+                b1, b2 = st.columns(2, gap="small")
+                with b1:
+                    if st.button("Create Kit", type="primary", use_container_width=True, key=f"adb_kit_create_{asset_id}"):
+                        t = str(kit_name or "").strip()
+                        if not t:
+                            st.error("Kit Name is required.")
+                            st.stop()
+                        try:
+                            insert_row_admin(
+                                "asset_kits",
+                                {
+                                    "asset_id": asset_id,
+                                    "kit_name": t,
+                                    "description": str(description or "").strip(),
+                                    "is_active": True,
+                                },
+                            )
+                            st.success("Kit created")
+                            st.session_state[show_add_key] = False
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Could not create kit: {exc}")
+                            st.stop()
+                with b2:
+                    if st.button("Cancel", use_container_width=True, key=f"adb_kit_cancel_{asset_id}"):
+                        st.session_state[show_add_key] = False
+                        st.rerun()
+
+            kits = []
+            try:
+                kits = fetch_by_match_admin("asset_kits", {"asset_id": asset_id}, limit=5000)
+            except Exception:
+                kits = []
+            kits = [k for k in (kits or []) if bool((k or {}).get("is_active", True))]
+
+            items = []
+            try:
+                items = fetch_by_match_admin("asset_kit_items", {"parent_asset_id": asset_id}, limit=10000)
+            except Exception:
+                items = []
+            items = [it for it in (items or []) if bool((it or {}).get("is_active", True))]
+
+            # Replacement history (optional module)
+            replacements = []
+            try:
+                replacements = fetch_by_match_admin("asset_kit_replacements", {"parent_asset_id": asset_id}, limit=20000)
+            except Exception:
+                replacements = []
+
+            if not kits:
+                st.caption("No kits yet.")
+                return
+
+            # Pending/overdue audits quick summary (optional module)
+            try:
+                audits = fetch_by_match_admin("tool_trailer_audits", {"asset_id": asset_id}, limit=2000)
+            except Exception:
+                audits = []
+            pending_audits = [a for a in audits if str(a.get("status") or "").strip().lower() != "complete"]
+            overdue_audits = []
+            for a in pending_audits:
+                try:
+                    ds = str(a.get("due_date") or "").strip()
+                    if ds and date.fromisoformat(ds) < _today():
+                        overdue_audits.append(a)
+                except Exception:
+                    continue
+
+            # Totals across kits
+            total_small_tool_value = 0.0
+            total_replacement_value = 0.0
+            for it in items:
+                q = _as_float(it.get("quantity"), 0.0)
+                uv = _as_float(it.get("unit_value"), 0.0)
+                rc = _as_float(it.get("replacement_cost"), 0.0)
+                total_small_tool_value += q * uv
+                total_replacement_value += q * rc
+            lifetime_repl_cost = sum(_as_float(r.get("total_cost"), 0.0) for r in replacements or [])
+
+            s1, s2, s3, s4 = st.columns(4, gap="small")
+            s1.metric("Small Tool Value", _money(total_small_tool_value))
+            s2.metric("Replacement Value", _money(total_replacement_value))
+            s3.metric("Item Count", len(items))
+            s4.metric("Lifetime Replacement Cost", _money(lifetime_repl_cost))
+
+            if pending_audits:
+                st.warning(f"Pending audits: {len(pending_audits)}" + (f" · Overdue: {len(overdue_audits)}" if overdue_audits else ""))
+
+            for kit in kits:
+                kid = str((kit or {}).get("id") or "").strip()
+                kn = str((kit or {}).get("kit_name") or "").strip() or "Kit"
+                st.markdown(f"### {html.escape(kn)}")
+                if str((kit or {}).get("description") or "").strip():
+                    st.caption(str(kit.get("description") or "").strip())
+
+                add_item_key = f"show_add_item_{kid}"
+                if add_item_key not in st.session_state:
+                    st.session_state[add_item_key] = False
+                if can_edit and st.button(
+                    f"Add Item to {kn}",
+                    use_container_width=True,
+                    key=f"adb_add_item_btn_{kid}",
+                ):
+                    st.session_state[add_item_key] = True
+                    st.rerun()
+
+                if st.session_state.get(add_item_key):
+                    iname = st.text_input("Item name", key=f"adb_item_name_{kid}")
+                    c1, c2, c3, c4 = st.columns(4, gap="small")
+                    qty = c1.number_input("Quantity", min_value=0.0, value=1.0, step=1.0, format="%.2f", key=f"adb_item_qty_{kid}")
+                    unit_value = c2.number_input("Unit value", min_value=0.0, value=0.0, step=0.5, format="%.2f", key=f"adb_item_uv_{kid}")
+                    repl_cost = c3.number_input(
+                        "Replacement cost", min_value=0.0, value=0.0, step=0.5, format="%.2f", key=f"adb_item_rc_{kid}"
+                    )
+                    _ = c4  # reserved for future fields
+                    b1, b2 = st.columns(2, gap="small")
+                    with b1:
+                        if st.button("Save item", type="primary", use_container_width=True, key=f"adb_item_save_{kid}"):
+                            t = str(iname or "").strip()
+                            if not t:
+                                st.error("Item name is required.")
+                                st.stop()
+                            payload = {
+                                "parent_asset_id": asset_id,
+                                "kit_id": kid or None,
+                                "item_name": t,
+                                "quantity": float(qty or 0),
+                                "unit_value": float(unit_value or 0),
+                                "replacement_cost": float(repl_cost or 0),
+                                "is_active": True,
+                            }
+                            try:
+                                insert_row_admin("asset_kit_items", payload)
+                            except Exception as exc:
+                                if "kit_id" in str(exc).lower() and "column" in str(exc).lower():
+                                    payload.pop("kit_id", None)
+                                    insert_row_admin("asset_kit_items", payload)
+                                else:
+                                    raise
+                            st.success("Item saved.")
+                            st.session_state[add_item_key] = False
+                            st.rerun()
+                    with b2:
+                        if st.button("Cancel", use_container_width=True, key=f"adb_item_cancel_{kid}"):
+                            st.session_state[add_item_key] = False
+                            st.rerun()
+
+                kit_items = items
+                if kid:
+                    kit_items = [it for it in items if str(it.get("kit_id") or "").strip() == kid] or []
+
+                if not kit_items:
+                    st.caption("No items in this kit yet.")
+                    continue
+
+                # Per-kit totals
+                kit_value = sum(_as_float(it.get("quantity"), 0.0) * _as_float(it.get("unit_value"), 0.0) for it in kit_items)
+                kit_repl_value = sum(_as_float(it.get("quantity"), 0.0) * _as_float(it.get("replacement_cost"), 0.0) for it in kit_items)
+                k1, k2, k3 = st.columns(3, gap="small")
+                k1.metric("Kit Value", _money(kit_value))
+                k2.metric("Replacement Value", _money(kit_repl_value))
+                k3.metric("Items", len(kit_items))
+
+                for it in kit_items:
+                    item_id = str(it.get("id") or "").strip()
+                    nm = str(it.get("item_name") or "").strip() or "—"
+                    qty = _as_float(it.get("quantity"), 0.0)
+                    uv = _as_float(it.get("unit_value"), 0.0)
+                    rc = _as_float(it.get("replacement_cost"), 0.0)
+                    tv = qty * uv
+                    a, b, c, d, e = st.columns([2.1, 0.75, 0.9, 0.9, 1.2], gap="small")
+                    a.write(nm)
+                    b.write(f"Qty: {qty:g}")
+                    c.write(f"Value: {_money(uv)}")
+                    d.write(f"Total: {_money(tv)}")
+                    with d:
+                        pass
+                    with e:
+                        if not can_edit:
+                            st.button("Replace Item", use_container_width=True, key=f"adb_rep_ro_{item_id}", disabled=True)
+                        else:
+                            rep_key = f"adb_rep_open_{item_id}"
+                            if rep_key not in st.session_state:
+                                st.session_state[rep_key] = False
+                            if st.button("Replace Item", use_container_width=True, key=f"adb_rep_btn_{item_id}"):
+                                st.session_state[rep_key] = True
+                                st.rerun()
+
+                            if st.session_state.get(rep_key):
+                                def _rep_form() -> None:
+                                    st.markdown(f"#### Replace · {html.escape(nm)}")
+                                    r1, r2, r3 = st.columns(3, gap="small")
+                                    qrep = r1.number_input(
+                                        "Qty replaced",
+                                        min_value=0.0,
+                                        value=1.0,
+                                        step=1.0,
+                                        format="%.2f",
+                                        key=f"adb_rep_qty_{item_id}",
+                                    )
+                                    ucost = r2.number_input(
+                                        "Unit cost",
+                                        min_value=0.0,
+                                        value=float(rc) if rc else 0.0,
+                                        step=0.5,
+                                        format="%.2f",
+                                        key=f"adb_rep_uc_{item_id}",
+                                    )
+                                    update_value = r3.checkbox(
+                                        "Update item value to unit cost",
+                                        value=True,
+                                        key=f"adb_rep_updval_{item_id}",
+                                    )
+                                    reason = st.text_input("Reason", key=f"adb_rep_reason_{item_id}")
+
+                                    # Optional job_id
+                                    job_id = None
+                                    try:
+                                        jobs = fetch_table("jobs", columns="id,job_name", limit=5000, order_by="job_name") or []
+                                    except Exception:
+                                        jobs = []
+                                    if jobs:
+                                        labels = ["— No job —"] + [str(j.get("job_name") or "").strip() for j in jobs if str(j.get("job_name") or "").strip()]
+                                        pick = st.selectbox("Job (optional)", labels, key=f"adb_rep_job_{item_id}")
+                                        if pick and not pick.startswith("—"):
+                                            for j in jobs:
+                                                if str(j.get("job_name") or "").strip() == pick:
+                                                    job_id = str(j.get("id") or "").strip() or None
+                                                    break
+
+                                    notes = st.text_area("Notes", height=72, key=f"adb_rep_notes_{item_id}")
+                                    b1, b2 = st.columns(2, gap="small")
+                                    with b1:
+                                        if st.button("Record replacement", type="primary", use_container_width=True, key=f"adb_rep_go_{item_id}"):
+                                            q = float(qrep or 0)
+                                            if q <= 0:
+                                                st.error("Qty replaced must be greater than zero.")
+                                                st.stop()
+                                            u = float(ucost or 0)
+                                            rep_payload = {
+                                                "parent_asset_id": asset_id,
+                                                "kit_item_id": item_id,
+                                                "replacement_date": _today().isoformat(),
+                                                "quantity_replaced": q,
+                                                "unit_cost": u,
+                                                "reason": str(reason or "").strip(),
+                                                "replaced_by": None,
+                                                "job_id": job_id,
+                                                "notes": str(notes or "").strip(),
+                                                "created_at": datetime.utcnow().isoformat(),
+                                            }
+                                            try:
+                                                insert_row_admin("asset_kit_replacements", rep_payload)
+                                            except Exception as exc:
+                                                st.error(f"Could not record replacement: {exc} — run **`sql/039_asset_kit_replacements.sql`**.")
+                                                st.stop()
+
+                                            # Update kit item: replacement_count, last_replaced_at, replacement_cost (+ optional unit_value)
+                                            new_unit_val = u if bool(update_value) else uv
+                                            upd = {
+                                                "replacement_cost": u,
+                                                "last_replaced_at": datetime.utcnow().isoformat(),
+                                                "unit_value": float(new_unit_val),
+                                                "total_value": float(qty * float(new_unit_val)),
+                                            }
+                                            # Replacement count may be stored as numeric; increment by qty replaced per spec.
+                                            cur_cnt = _as_float(it.get("replacement_count"), 0.0)
+                                            upd["replacement_count"] = float(cur_cnt + q)
+                                            try:
+                                                update_rows_admin("asset_kit_items", upd, {"id": item_id})
+                                            except Exception:
+                                                # Back-compat: total_value/last_replaced_at/replacement_count columns might not exist.
+                                                slim = {"replacement_cost": u}
+                                                if update_value:
+                                                    slim["unit_value"] = float(u)
+                                                update_rows_admin("asset_kit_items", slim, {"id": item_id})
+
+                                            st.success("Replacement recorded.")
+                                            st.session_state[rep_key] = False
+                                            st.rerun()
+                                    with b2:
+                                        if st.button("Cancel", use_container_width=True, key=f"adb_rep_cancel_{item_id}"):
+                                            st.session_state[rep_key] = False
+                                            st.rerun()
+
+                                if hasattr(st, "dialog"):
+                                    with st.dialog("Replace Item"):
+                                        _rep_form()
+                                else:
+                                    with st.expander("Replace Item", expanded=True):
+                                        _rep_form()
+
+                # Replacement history table (per kit)
+                if replacements:
+                    st.markdown("##### Replacement History")
+                    filt = st.selectbox(
+                        "Range",
+                        ["This Month", "Last 90 Days", "All Time"],
+                        key=f"adb_rep_range_{kid}",
+                    )
+                    end = _today()
+                    if filt == "This Month":
+                        start = end - timedelta(days=31)
+                    elif filt == "Last 90 Days":
+                        start = end - timedelta(days=90)
+                    else:
+                        start = None
+
+                    item_name_by_id = {str(x.get("id") or "").strip(): str(x.get("item_name") or "").strip() for x in kit_items}
+                    show_rows = []
+                    for r in replacements or []:
+                        if str(r.get("kit_item_id") or "").strip() not in item_name_by_id:
+                            continue
+                        ds = str(r.get("replacement_date") or "").strip()
+                        if start:
+                            try:
+                                if ds and date.fromisoformat(ds) < start:
+                                    continue
+                            except Exception:
+                                pass
+                        show_rows.append(
+                            {
+                                "date": ds or "—",
+                                "item": item_name_by_id.get(str(r.get("kit_item_id") or "").strip(), "—"),
+                                "qty": _as_float(r.get("quantity_replaced"), 0.0),
+                                "unit_cost": _money(r.get("unit_cost")),
+                                "total_cost": _money(r.get("total_cost")),
+                                "reason": str(r.get("reason") or "").strip(),
+                                "replaced_by": str(r.get("replaced_by") or "").strip()[:8] + "…" if r.get("replaced_by") else "",
+                                "job_id": str(r.get("job_id") or "").strip()[:8] + "…" if r.get("job_id") else "",
+                                "notes": str(r.get("notes") or "").strip(),
+                            }
+                        )
+                    if show_rows:
+                        st.dataframe(pd.DataFrame(show_rows), use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("No replacements in this range.")
 
 
 def _render_asset_panel_edit(

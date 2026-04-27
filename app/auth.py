@@ -30,6 +30,7 @@ def init_session() -> None:
     # Back-compat keys used throughout existing code
     st.session_state.setdefault("auth_user", None)
     st.session_state.setdefault("auth_profile", None)
+    st.session_state.setdefault("auth_employee", None)
 
 
 def _cookie_secure_flag() -> bool:
@@ -124,6 +125,17 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     st.session_state["user_email"] = (
         str(user_email or profile.get("email") or email_hint or "").strip() or None
     )
+
+    # Optional employee link (does not gate login)
+    st.session_state["auth_employee"] = None
+    emp_id = str(profile.get("employee_id") or "").strip() if isinstance(profile, dict) else ""
+    if emp_id:
+        try:
+            emp = fetch_one("employees", {"id": emp_id})
+            if emp:
+                st.session_state["auth_employee"] = emp
+        except Exception:
+            st.session_state["auth_employee"] = None
 
 
 def try_restore_supabase_session_from_cookies() -> None:
