@@ -25,17 +25,13 @@ try:
         upload_bytes_admin,
     )
     from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
     from app.table_actions import (
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
-        get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
         set_selected_ids,
     )
 except ImportError:
@@ -57,22 +53,19 @@ except ImportError:
         upload_bytes_admin,
     )
     from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
     from table_actions import (  # type: ignore
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
-        get_selected_ids,
         inject_table_action_styles,
-        render_selectable_dataframe,
         set_selected_ids,
     )
 
 _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
+INVENTORY_SELECTION_KEY = "selected_inventory_ids"
 
 
 def _inventory_qr_embed_subject(qr_code_value: str) -> str:
@@ -256,31 +249,23 @@ def _backfill_missing_qr_codes() -> int:
     return n
 
 
-def _money(v) -> str:
-    try:
-        if v is None or str(v).strip() == "":
-            return "—"
-        return f"${float(v):,.2f}"
-    except (TypeError, ValueError):
-        return "—"
-
-
 def _clear_panel() -> None:
     st.session_state.pop("inventory_panel_mode", None)
     st.session_state.pop("inventory_panel_id", None)
 
 
-def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFrame, can_edit: bool) -> None:
+def _render_inventory_action_bar(
+    *, df_all: pd.DataFrame, visible_df: pd.DataFrame, can_edit: bool, selected_key: str
+) -> None:
     """
     Materials-style bar (same sizing/spacing), extended with export/select-all/clear.
 
-    Selection storage is handled by table_actions via TABLE_KEY_INVENTORY → selected_inventory_ids.
+    Selection is stored in ``session_state[selected_key]`` and mirrored via ``TABLE_KEY_INVENTORY``.
     """
     inject_ips_crud_list_styles()
     inject_table_action_styles()
 
-    # Selection is stored in session under ``selected_inventory_ids``; we also mirror it into table_actions for exports.
-    sel = [str(x) for x in (st.session_state.get("selected_inventory_ids") or []) if str(x).strip()]
+    sel = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
     n = len(sel)
     one = n == 1
     none = n == 0
@@ -367,7 +352,7 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=not vis_ids or all_visible_selected,
                 key="inv_btn_sel_all",
             ):
-                st.session_state["selected_inventory_ids"] = list(vis_ids)
+                st.session_state[selected_key] = list(vis_ids)
                 for vid in vis_ids:
                     st.session_state[f"inv_select_{vid}"] = True
                 set_selected_ids(TABLE_KEY_INVENTORY, list(vis_ids))
@@ -379,7 +364,7 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=none,
                 key="inv_btn_clear",
             ):
-                st.session_state["selected_inventory_ids"] = []
+                st.session_state[selected_key] = []
                 for k in list(st.session_state.keys()):
                     if str(k).startswith("inv_select_"):
                         del st.session_state[k]
@@ -705,6 +690,175 @@ def _render_edit_panel(row: dict) -> None:
                 st.rerun()
 
 
+def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
+    """Filters → low stock banner → main table → action bar. Called once per page run."""
+    inject_table_action_styles()
+
+    if df.empty:
+        st.info("No inventory items found.")
+        if can_edit and st.button(
+            "Add Inventory Item", type="primary", use_container_width=True, key="inv_empty_add"
+        ):
+            st.session_state["inventory_panel_mode"] = "add"
+            st.session_state["inventory_panel_id"] = None
+            st.rerun()
+        return
+
+    filter_cols = st.columns([1, 2, 1], gap="small")
+    categories = sorted(
+        [
+            c
+            for c in df.get("category", pd.Series(dtype=str))
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+            if c.strip()
+        ]
+    )
+    filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
+    filter_cols[1].text_input(
+        "Search Inventory",
+        placeholder="Name, SKU, QR, category, vendor, location, notes",
+        key="inv_f_search",
+    )
+    active_options = ["All", "Active Only", "Inactive Only"]
+    filter_cols[2].selectbox("Status", active_options, key="inv_f_active")
+
+    selected_category = st.session_state.get("inv_f_cat", "All")
+    search = st.session_state.get("inv_f_search", "")
+    selected_active = st.session_state.get("inv_f_active", "All")
+
+    filtered = df.copy()
+    if selected_category != "All" and "category" in filtered.columns:
+        filtered = filtered[filtered["category"].astype(str) == selected_category]
+    if selected_active == "Active Only" and "is_active" in filtered.columns:
+        filtered = filtered[filtered["is_active"] == True]  # noqa: E712
+    elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
+        filtered = filtered[filtered["is_active"] == False]  # noqa: E712
+    if search.strip():
+        s = search.strip().lower()
+        mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
+        filtered = filtered[mask.any(axis=1)]
+
+    qoh_s = pd.to_numeric(filtered.get("quantity_on_hand", 0), errors="coerce").fillna(0)
+    if "reorder_point" in filtered.columns:
+        rp_s = pd.to_numeric(filtered["reorder_point"], errors="coerce").fillna(0)
+    else:
+        rp_s = pd.Series(0.0, index=filtered.index)
+    low_mask = qoh_s <= rp_s
+    n_low = int(low_mask.sum()) if len(filtered) else 0
+    if n_low > 0:
+        st.warning(f"**Low stock:** {n_low} visible row(s) at or below reorder point.")
+        with st.expander("Low stock detail (visible filters)", expanded=False):
+            cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
+            if cols_show:
+                sub = filtered.loc[low_mask, cols_show].copy()
+                if "quantity_on_hand" in sub.columns and "reorder_point" in sub.columns:
+                    qv = pd.to_numeric(sub["quantity_on_hand"], errors="coerce").fillna(0)
+                    rv = pd.to_numeric(sub["reorder_point"], errors="coerce").fillna(0)
+                    gap = (rv - qv).clip(lower=0)
+                    sub["suggest_qty"] = gap
+                    sub.loc[sub["suggest_qty"] <= 0, "suggest_qty"] = pd.NA
+                if "image_url" in filtered.columns:
+                    sub["Photo"] = filtered.loc[low_mask, "image_url"].map(_thumb_display_url).values
+                else:
+                    sub["Photo"] = _PLACEHOLDER_THUMB
+                show_low = ["Photo"] + [c for c in cols_show if c in sub.columns]
+                st.dataframe(
+                    sub[show_low],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Photo": st.column_config.ImageColumn("Photo", width="small"),
+                    },
+                )
+                st.caption("**Suggest qty** = shortfall to reorder point (informational).")
+
+    if filtered.empty:
+        st.warning("No inventory items match your filters.")
+        if can_edit and st.button(
+            "Add Inventory Item", type="primary", use_container_width=True, key="inv_filtered_empty_add"
+        ):
+            st.session_state["inventory_panel_mode"] = "add"
+            st.session_state["inventory_panel_id"] = None
+            st.rerun()
+        return
+
+    cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
+    sel_set = set(cur_selected)
+
+    # Sel | Photo | Item | SKU | QOH | Reorder | Status
+    header = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
+    header[0].markdown("**Sel**")
+    header[1].markdown("**Photo**")
+    header[2].markdown("**Item**")
+    header[3].markdown("**SKU**")
+    header[4].markdown("**QOH**")
+    header[5].markdown("**Reorder**")
+    header[6].markdown("**Status**")
+
+    max_rows = 350
+    for _, row in filtered.head(max_rows).iterrows():
+        item_id = str(row.get("id") or "").strip()
+        if not item_id:
+            continue
+        checked = item_id in sel_set
+        cols = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
+        with cols[0]:
+            new_checked = st.checkbox(
+                "",
+                value=checked,
+                key=f"inv_select_{item_id}",
+                label_visibility="collapsed",
+            )
+        if new_checked and item_id not in sel_set:
+            sel_set.add(item_id)
+        if (not new_checked) and item_id in sel_set:
+            sel_set.remove(item_id)
+        with cols[1]:
+            raw_img = str(row.get("image_url") or "").strip()
+            img_url = _signed_url_for_inventory_image(raw_img) if raw_img else None
+            if img_url:
+                try:
+                    st.image(img_url, width=36)
+                except Exception:
+                    st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+            else:
+                st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+        cols[2].write(str(row.get("item_name") or "—"))
+        cols[3].write(str(row.get("sku") or "—"))
+        cols[4].write(str(row.get("quantity_on_hand") or "0"))
+        cols[5].write(str(row.get("reorder_point") or "0"))
+        cols[6].write("Active" if bool(row.get("is_active", True)) else "Inactive")
+
+    if len(filtered) > max_rows:
+        st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")
+
+    st.session_state[selected_key] = list(sel_set)
+    selected_ids = list(st.session_state[selected_key])
+
+    with st.container():
+        set_selected_ids(TABLE_KEY_INVENTORY, selected_ids)
+        _render_inventory_action_bar(
+            df_all=df, visible_df=filtered, can_edit=can_edit, selected_key=selected_key
+        )
+
+    sel_ids = selected_ids
+    cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
+    if len(sel_ids) == 1:
+        if cur_mode not in {"add", "edit"}:
+            if str(st.session_state.get("inventory_panel_id") or "") != str(sel_ids[0]):
+                st.session_state["inventory_panel_id"] = str(sel_ids[0])
+            if cur_mode != "view":
+                st.session_state["inventory_panel_mode"] = "view"
+            st.rerun()
+    else:
+        if cur_mode == "view":
+            _clear_panel()
+            st.rerun()
+
+
 def render() -> None:
     render_header("Inventory")
     render_crud_list_subtitle(
@@ -717,9 +871,8 @@ def render() -> None:
 
     can_edit = current_role() == "admin"
 
-    # Inventory selection state (explicit, independent of data_editor quirks)
-    INVENTORY_TABLE_KEY = "inventory"
-    selected_key = "selected_inventory_ids"
+    # Selection key used only here and passed into ``_render_inventory_list`` / action bar.
+    selected_key = INVENTORY_SELECTION_KEY
     if selected_key not in st.session_state or not isinstance(st.session_state.get(selected_key), list):
         st.session_state[selected_key] = []
 
@@ -832,225 +985,12 @@ def render() -> None:
         or (panel_mode in ("edit", "view") and panel_row is not None)
     )
 
-    # --- Main list (Materials layout) ---
-    def _render_main() -> None:
-        inject_table_action_styles()
-
-        # Temporary debug caption (remove after selection is verified in production)
-        st.caption(f"Selected inventory IDs: {[str(x) for x in (st.session_state.get(selected_key) or [])]}")
-
-        if df.empty:
-            st.info("No inventory items found.")
-            if can_edit and st.button(
-                "Add Inventory Item", type="primary", use_container_width=True, key="inv_empty_add"
-            ):
-                st.session_state["inventory_panel_mode"] = "add"
-                st.session_state["inventory_panel_id"] = None
-                st.rerun()
-            return
-
-        filter_cols = st.columns([1, 2, 1], gap="small")
-        categories = sorted(
-            [
-                c
-                for c in df.get("category", pd.Series(dtype=str))
-                .dropna()
-                .astype(str)
-                .unique()
-                .tolist()
-                if c.strip()
-            ]
-        )
-        filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
-        filter_cols[1].text_input(
-            "Search Inventory",
-            placeholder="Name, SKU, QR, category, vendor, location, notes",
-            key="inv_f_search",
-        )
-        active_options = ["All", "Active Only", "Inactive Only"]
-        filter_cols[2].selectbox("Status", active_options, key="inv_f_active")
-
-        selected_category = st.session_state.get("inv_f_cat", "All")
-        search = st.session_state.get("inv_f_search", "")
-        selected_active = st.session_state.get("inv_f_active", "All")
-
-        filtered = df.copy()
-        if selected_category != "All" and "category" in filtered.columns:
-            filtered = filtered[filtered["category"].astype(str) == selected_category]
-        if selected_active == "Active Only" and "is_active" in filtered.columns:
-            filtered = filtered[filtered["is_active"] == True]  # noqa: E712
-        elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
-            filtered = filtered[filtered["is_active"] == False]  # noqa: E712
-        if search.strip():
-            s = search.strip().lower()
-            mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            filtered = filtered[mask.any(axis=1)]
-
-        qoh_s = pd.to_numeric(filtered.get("quantity_on_hand", 0), errors="coerce").fillna(0)
-        if "reorder_point" in filtered.columns:
-            rp_s = pd.to_numeric(filtered["reorder_point"], errors="coerce").fillna(0)
-        else:
-            rp_s = pd.Series(0.0, index=filtered.index)
-        low_mask = qoh_s <= rp_s
-        n_low = int(low_mask.sum()) if len(filtered) else 0
-        if n_low > 0:
-            st.warning(f"**Low stock:** {n_low} visible row(s) at or below reorder point.")
-            with st.expander("Low stock detail (visible filters)", expanded=False):
-                cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
-                if cols_show:
-                    sub = filtered.loc[low_mask, cols_show].copy()
-                    if "quantity_on_hand" in sub.columns and "reorder_point" in sub.columns:
-                        qv = pd.to_numeric(sub["quantity_on_hand"], errors="coerce").fillna(0)
-                        rv = pd.to_numeric(sub["reorder_point"], errors="coerce").fillna(0)
-                        gap = (rv - qv).clip(lower=0)
-                        sub["suggest_qty"] = gap
-                        sub.loc[sub["suggest_qty"] <= 0, "suggest_qty"] = pd.NA
-                    if "image_url" in filtered.columns:
-                        sub["Photo"] = filtered.loc[low_mask, "image_url"].map(_thumb_display_url).values
-                    else:
-                        sub["Photo"] = _PLACEHOLDER_THUMB
-                    show_low = ["Photo"] + [c for c in cols_show if c in sub.columns]
-                    st.dataframe(
-                        sub[show_low],
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            "Photo": st.column_config.ImageColumn("Photo", width="small"),
-                        },
-                    )
-                    st.caption("**Suggest qty** = shortfall to reorder point (informational).")
-
-        if filtered.empty:
-            st.warning("No inventory items match your filters.")
-            if can_edit and st.button(
-                "Add Inventory Item", type="primary", use_container_width=True, key="inv_filtered_empty_add"
-            ):
-                st.session_state["inventory_panel_mode"] = "add"
-                st.session_state["inventory_panel_id"] = None
-                st.rerun()
-            return
-
-        # Display formatting (mirrors Materials-style minimal formatting)
-        display_df = filtered.copy()
-        if "sku" not in display_df.columns:
-            display_df["sku"] = ""
-        if "image_url" not in display_df.columns:
-            display_df["image_url"] = ""
-        display_df["stock_alert"] = low_mask.map(lambda ok: "Low Stock" if ok else "")
-        display_df["Photo"] = display_df["image_url"].map(_thumb_display_url)
-
-        show_cols = [
-            c
-            for c in [
-                "Photo",
-                "item_name",
-                "sku",
-                "stock_alert",
-                "category",
-                "unit",
-                "quantity_on_hand",
-                "reorder_point",
-                "unit_cost",
-                "vendor",
-                "storage_location",
-                "is_active",
-            ]
-            if c in display_df.columns
-        ]
-        if "unit_cost" in display_df.columns:
-            display_df["unit_cost"] = display_df["unit_cost"].apply(_money)
-
-        # --- Explicit checkbox selection per visible row ---
-        vis_ids = [str(x) for x in filtered["id"].astype(str).tolist()] if "id" in filtered.columns else []
-        cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
-        sel_set = set(cur_selected)
-
-        # Render a compact “table-like” list with real Streamlit checkboxes.
-        # (Avoids data_editor selection not persisting on some mobile/browser combos.)
-        # Sel | Photo | Item | SKU | QOH | Reorder | Status
-        header = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
-        header[0].markdown("**Sel**")
-        header[1].markdown("**Photo**")
-        header[2].markdown("**Item**")
-        header[3].markdown("**SKU**")
-        header[4].markdown("**QOH**")
-        header[5].markdown("**Reorder**")
-        header[6].markdown("**Status**")
-
-        # Limit to avoid rendering thousands of widgets
-        max_rows = 350
-        for _, row in filtered.head(max_rows).iterrows():
-            item_id = str(row.get("id") or "").strip()
-            if not item_id:
-                continue
-            checked = item_id in sel_set
-            cols = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
-            with cols[0]:
-                new_checked = st.checkbox(
-                    "",
-                    value=checked,
-                    key=f"inv_select_{item_id}",
-                    label_visibility="collapsed",
-                )
-            if new_checked and item_id not in sel_set:
-                sel_set.add(item_id)
-            if (not new_checked) and item_id in sel_set:
-                sel_set.remove(item_id)
-            with cols[1]:
-                raw_img = str(row.get("image_url") or "").strip()
-                img_url = _signed_url_for_inventory_image(raw_img) if raw_img else None
-                if img_url:
-                    try:
-                        st.image(img_url, width=36)
-                    except Exception:
-                        st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
-                else:
-                    st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
-            cols[2].write(str(row.get("item_name") or "—"))
-            cols[3].write(str(row.get("sku") or "—"))
-            cols[4].write(str(row.get("quantity_on_hand") or "0"))
-            cols[5].write(str(row.get("reorder_point") or "0"))
-            cols[6].write("Active" if bool(row.get("is_active", True)) else "Inactive")
-
-        if len(filtered) > max_rows:
-            st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")
-
-        # Persist selection
-        st.session_state[selected_key] = list(sel_set)
-        selected_ids = list(st.session_state[selected_key])
-
-        # Action bar uses the same selected_ids list
-        with st.container():
-            # Reuse existing toolbar but ensure it reads from our selection list by syncing table_actions key.
-            set_selected_ids(TABLE_KEY_INVENTORY, selected_ids)
-            _render_inventory_action_bar(df_all=df, visible_df=filtered, can_edit=can_edit)
-
-        # Auto-load details panel when exactly one row is selected
-        sel_ids = selected_ids
-        cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
-        if len(sel_ids) == 1:
-            if cur_mode not in {"add", "edit"}:
-                if str(st.session_state.get("inventory_panel_id") or "") != str(sel_ids[0]):
-                    st.session_state["inventory_panel_id"] = str(sel_ids[0])
-                if cur_mode != "view":
-                    st.session_state["inventory_panel_mode"] = "view"
-                st.rerun()
-        else:
-            # If the user is just browsing (view mode), collapse details when selection is cleared or multi-select.
-            if cur_mode == "view":
-                _clear_panel()
-                st.rerun()
-
+    # Filters → low stock → table → action bar (single call). Details render below when open.
+    _render_inventory_list(df=df, can_edit=can_edit, selected_key=selected_key)
     if panel_open:
-        main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        with main_col:
-            _render_main()
-        with side_col:
-            if panel_mode == "add":
-                _render_add_panel()
-            elif panel_mode == "edit" and panel_row:
-                _render_edit_panel(panel_row)
-            elif panel_mode == "view" and panel_row:
-                _render_edit_panel(panel_row)
-    else:
-        _render_main()
+        if panel_mode == "add":
+            _render_add_panel()
+        elif panel_mode == "edit" and panel_row:
+            _render_edit_panel(panel_row)
+        elif panel_mode == "view" and panel_row:
+            _render_edit_panel(panel_row)
