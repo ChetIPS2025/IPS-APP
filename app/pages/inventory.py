@@ -65,7 +65,6 @@ except ImportError:
 
 _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
-INVENTORY_SELECTION_KEY = "selected_inventory_ids"
 
 
 def _inventory_qr_embed_subject(qr_code_value: str) -> str:
@@ -693,6 +692,7 @@ def _render_edit_panel(row: dict) -> None:
 def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
     """Filters → low stock banner → main table → action bar. Called once per page run."""
     inject_table_action_styles()
+    st.caption(f"Selected IDs: {st.session_state.get(selected_key)}")
 
     if df.empty:
         st.info("No inventory items found.")
@@ -848,15 +848,18 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
     if len(sel_ids) == 1:
         if cur_mode not in {"add", "edit"}:
+            need_rerun = False
             if str(st.session_state.get("inventory_panel_id") or "") != str(sel_ids[0]):
                 st.session_state["inventory_panel_id"] = str(sel_ids[0])
+                need_rerun = True
             if cur_mode != "view":
                 st.session_state["inventory_panel_mode"] = "view"
-            st.rerun()
-    else:
-        if cur_mode == "view":
-            _clear_panel()
-            st.rerun()
+                need_rerun = True
+            if need_rerun:
+                st.rerun()
+    elif cur_mode == "view":
+        _clear_panel()
+        st.rerun()
 
 
 def render() -> None:
@@ -871,8 +874,7 @@ def render() -> None:
 
     can_edit = current_role() == "admin"
 
-    # Selection key used only here and passed into ``_render_inventory_list`` / action bar.
-    selected_key = INVENTORY_SELECTION_KEY
+    selected_key = "selected_inventory_ids"
     if selected_key not in st.session_state or not isinstance(st.session_state.get(selected_key), list):
         st.session_state[selected_key] = []
 
@@ -944,6 +946,7 @@ def render() -> None:
             on_cancel=_on_cancel_delete,
             name_lines=name_lines,
         )
+        return
 
     # --- Deactivate (matches Materials pattern) ---
     if st.session_state.pop("_inv_do_deactivate", False) and can_edit:
