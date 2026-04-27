@@ -523,33 +523,39 @@ def render_sidebar() -> str:
     inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
     if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
         with st.sidebar.expander("Inventory", expanded=inv_expanded):
-            _inv_focus = _sidebar_inventory_category_focus_norm()
-            inv_list_active = current == "Inventory" and _inv_focus == "All"
-            if st.button(
-                "Inventory List",
-                key=_nav_btn_key("Inventory__list_all"),
-                type="primary" if inv_list_active else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
-                st.session_state["inv_f_cat"] = "All"
-                st.rerun()
-            if role_can_open_page(role, "Inventory"):
-                if st.button(
-                    "Materials",
-                    key=_nav_btn_key("Inventory__lens_Materials"),
-                    type="primary"
-                    if current == "Inventory" and _inv_focus == "Materials"
-                    else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
-                    st.session_state["inv_f_cat"] = "Materials"
-                    st.rerun()
-            if role_can_open_page(role, "Scan Inventory"):
-                _render_nav_button("Scan Inventory", current=current, indent=False)
-            if role_can_open_page(role, "Inventory Usage"):
-                _render_nav_button("Inventory Usage", current=current, indent=False)
+            # Nested links only under this expander (no standalone Scan / Usage in the sidebar).
+            _, inv_inner = st.columns([0.06, 0.94])
+            with inv_inner:
+                _inv_focus = _sidebar_inventory_category_focus_norm()
+                inv_list_active = current == "Inventory" and _inv_focus == "All"
+                if role_can_open_page(role, "Inventory"):
+                    if st.button(
+                        "Inventory List",
+                        key=_nav_btn_key("Inventory__list_all"),
+                        type="primary" if inv_list_active else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+                        st.session_state["inv_f_cat"] = "All"
+                        st.rerun()
+                if role_can_open_page(role, "Scan Inventory"):
+                    if st.button(
+                        "Scan Inventory",
+                        key=_nav_btn_key("Scan Inventory"),
+                        type="primary" if current == "Scan Inventory" else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+                        st.rerun()
+                if role_can_open_page(role, "Inventory Usage"):
+                    if st.button(
+                        "Inventory Usage",
+                        key=_nav_btn_key("Inventory Usage"),
+                        type="primary" if current == "Inventory Usage" else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
+                        st.rerun()
 
     # --- SECONDARY: TOOLS ---
     st.sidebar.markdown(
