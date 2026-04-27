@@ -36,15 +36,16 @@ def apply_branding() -> None:
         }
 
         .ips-topbar {
-            padding: 8px 0 14px 0;
-            margin-bottom: 6px;
+            padding: 4px 0 10px 0;
+            margin-bottom: 4px;
         }
 
         .ips-topbar img {
             width: 100%;
-            max-width: 1600px;
+            max-width: 360px;
             height: auto;
             display: block;
+            opacity: 0.96;
         }
 
         .ips-page-title {

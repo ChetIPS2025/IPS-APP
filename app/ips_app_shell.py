@@ -80,7 +80,7 @@ def inject_ips_app_shell_styles() -> None:
             padding-bottom: 1rem !important;
         }
         section[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] {
-            background: var(--ips-card-bg) !important;
+            background: linear-gradient(180deg, rgba(20, 54, 92, 0.98), rgba(18, 47, 82, 0.98)) !important;
             border: 1px solid var(--ips-border) !important;
             border-radius: var(--ips-radius-xl) !important;
             box-shadow: var(--ips-card-shadow), var(--ips-card-inset) !important;
@@ -257,6 +257,7 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
             background-color: #122F52 !important;
             color: #ffffff !important;
+            opacity: 1 !important;
         }
         .stDataFrame div, .stTable div,
         section[data-testid="stMain"] [data-testid="stDataFrame"] div,
@@ -264,6 +265,7 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDataEditor"] div {
             background-color: #122F52 !important;
             color: #ffffff !important;
+            opacity: 1 !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [role="columnheader"] div,
         section[data-testid="stMain"] [data-testid="stDataEditor"] [role="columnheader"] div {
