@@ -832,6 +832,14 @@ def update_auth_user_email_admin(*, user_id: str, new_email: str) -> None:
         raise RuntimeError(f"Could not update auth email for user_id={uid!r}: {exc!r}") from exc
 
 
+def update_profile_admin(profile_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    try:
+        resp = get_admin_client().table("profiles").update(payload).eq("id", profile_id).execute()
+        return resp.data or []
+    except Exception as exc:
+        raise RuntimeError(f"update_profile_admin failed: {exc}") from exc
+
+
 def list_auth_users_admin(*, page: int = 1, per_page: int = 200) -> list[dict[str, Any]]:
     """
     Return Supabase Auth users (auth.users) via Admin API.

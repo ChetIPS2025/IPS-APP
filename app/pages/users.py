@@ -28,6 +28,7 @@ try:
         list_auth_users_admin,
         resend_invite_by_email,
         update_auth_user_email_admin,
+        update_profile_admin,
         update_rows,
         update_rows_admin,
     )
@@ -45,6 +46,7 @@ except ImportError:
         list_auth_users_admin,
         resend_invite_by_email,
         update_auth_user_email_admin,
+        update_profile_admin,
         update_rows,
         update_rows_admin,
     )
@@ -466,7 +468,7 @@ def render() -> None:
                         st.code(repr(exc), language="text")
                 st.stop()
             try:
-                update_rows_admin("profiles", {"email": em}, {"id": uid})
+                update_profile_admin(uid, {"email": em})
             except Exception as exc:
                 st.warning("Auth email updated, but syncing profiles.email failed.")
                 with st.expander("Technical details"):
@@ -773,7 +775,13 @@ def render() -> None:
                         st.write("Updating profile:", payload)
                         st.write("User ID:", uid)
                         try:
-                            update_rows_admin("profiles", payload, {"id": uid})
+                            clean = {
+                                "role": str(payload.get("role") or "").strip() or None,
+                                "must_reset_password": bool(payload.get("must_reset_password", False)),
+                                "is_active": bool(payload.get("is_active", True)),
+                            }
+                            clean = {k: v for k, v in clean.items() if v is not None}
+                            update_profile_admin(uid, clean)
                         except Exception as exc:
                             if "phone" in str(exc).lower() and ("column" in str(exc).lower() or "does not exist" in str(exc).lower()):
                                 st.error("Could not save phone number — database is missing `profiles.phone_number`.")
@@ -782,7 +790,7 @@ def render() -> None:
                             st.stop()
                         changed += 1
                 if changed:
-                    st.success("User updated")
+                    st.success("Access/Login updated.")
                 else:
                     st.info("No changes to save.")
                 st.rerun()
