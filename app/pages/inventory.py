@@ -567,7 +567,7 @@ def _render_edit_panel(row: dict) -> None:
         st.caption("Item photo")
         img_existing = _signed_url_for_inventory_image(str(row.get("image_url") or "").strip())
         if img_existing:
-            st.image(img_existing, width=120)
+            st.image(img_existing, width=80)
         else:
             st.markdown('<p style="font-size:2rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
         img_ed = st.file_uploader(
@@ -585,40 +585,45 @@ def _render_edit_panel(row: dict) -> None:
         )
         is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
 
-        if qr_cur:
-            st.caption("Label preview")
-            st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
-            html_doc = _inventory_label_html(
-                item_name=str(row.get("item_name") or ""),
-                sku=str(row.get("sku") or ""),
-                qr_value=qr_cur,
-                item_id=rid,
-            )
-            st.download_button(
-                "Print QR label (HTML)",
-                data=html_doc.encode("utf-8"),
-                file_name=f"inventory_label_{rid[:8]}.html",
-                mime="text/html",
-                key=f"{pk}_dl_lbl",
-            )
-            png = _qr_png_bytes_or_none(qr_cur)
-            if png:
-                st.download_button(
-                    "Download QR (PNG)",
-                    data=png,
-                    file_name=f"inventory_qr_{rid[:8]}.png",
-                    mime="image/png",
-                    key=f"{pk}_dl_png",
+        with st.expander("QR Label / Code", expanded=False):
+            if qr_cur:
+                st.caption("Label preview")
+                st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
+                html_doc = _inventory_label_html(
+                    item_name=str(row.get("item_name") or ""),
+                    sku=str(row.get("sku") or ""),
+                    qr_value=qr_cur,
+                    item_id=rid,
                 )
-        if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new unique scan code"):
-            try:
-                nv = _allocate_unique_qr(item_id=str(row.get("id") or ""), preferred=None, exclude_item_id=str(row.get("id") or ""))
-                update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
-                _sync_qr_image_to_storage(str(row.get("id") or ""), nv)
-            except Exception as exc:
-                st.error(f"Could not update QR: {exc}")
-                st.stop()
-            st.rerun()
+                st.download_button(
+                    "Print QR label (HTML)",
+                    data=html_doc.encode("utf-8"),
+                    file_name=f"inventory_label_{rid[:8]}.html",
+                    mime="text/html",
+                    key=f"{pk}_dl_lbl",
+                )
+                png = _qr_png_bytes_or_none(qr_cur)
+                if png:
+                    st.download_button(
+                        "Download QR (PNG)",
+                        data=png,
+                        file_name=f"inventory_qr_{rid[:8]}.png",
+                        mime="image/png",
+                        key=f"{pk}_dl_png",
+                    )
+            if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new unique scan code"):
+                try:
+                    nv = _allocate_unique_qr(
+                        item_id=str(row.get("id") or ""),
+                        preferred=None,
+                        exclude_item_id=str(row.get("id") or ""),
+                    )
+                    update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
+                    _sync_qr_image_to_storage(str(row.get("id") or ""), nv)
+                except Exception as exc:
+                    st.error(f"Could not update QR: {exc}")
+                    st.stop()
+                st.rerun()
 
         u1, u2 = st.columns(2, gap="small")
         with u1:
@@ -1018,6 +1023,25 @@ def render() -> None:
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
             st.rerun()
-        st.markdown("### Edit Inventory Item")
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.inventory-edit-popup-anchor) {
+              max-width: 520px !important;
+              width: 100% !important;
+              margin: 12px auto !important;
+              border: 1px solid rgba(120,150,200,.35) !important;
+              border-radius: 14px !important;
+              background: rgba(8,22,55,.96) !important;
+              box-shadow: 0 18px 50px rgba(0,0,0,.45) !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.inventory-edit-popup-anchor) h3 {
+              margin-top: 0 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         with st.container(border=True):
+            st.markdown('<span class="inventory-edit-popup-anchor"></span>', unsafe_allow_html=True)
             _render_edit_panel(panel_row)

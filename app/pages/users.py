@@ -7,6 +7,14 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.config import settings
+except ImportError:
+    try:
+        from config import settings  # type: ignore
+    except Exception:
+        settings = None  # type: ignore
+
+try:
     from app.auth import current_role
     from app.branding import render_header
     from app.db import (
@@ -53,6 +61,105 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _norm_email(v: object) -> str:
     return " ".join(str(v or "").strip().lower().split())
+
+
+def _email_domain_allowed(email: str) -> bool:
+    em = _norm_email(email)
+    if not em or "@" not in em:
+        return False
+    dom = em.split("@", 1)[1]
+    allow = ""
+    try:
+        allow = str(getattr(settings, "allowed_email_domain", "") or getattr(settings, "company_email_domain", "") or "").strip().lower()  # type: ignore[attr-defined]
+    except Exception:
+        allow = ""
+    if not allow:
+        return True
+    return dom == allow
+
+
+def _repair_user_links() -> dict[str, int]:
+    """
+    Best-effort repair:
+    - ensure there is a profiles row for every auth user id
+    - if a profile exists by email with wrong id, re-link id to auth id (when possible)
+    - normalize profiles.email to lower(email)
+    """
+    admin = get_admin_client()
+    auth_users = list_auth_users_admin(page=1, per_page=500)
+    # Index profiles by email + id
+    prof_rows = fetch_table_admin(
+        "profiles",
+        columns="id,email,role,is_active,must_reset_password,created_at,full_name,employee_id",
+        limit=5000,
+        order_by="email",
+    )
+    by_id = {str(p.get("id") or "").strip(): p for p in (prof_rows or []) if str(p.get("id") or "").strip()}
+    by_email: dict[str, dict] = {}
+    for p in prof_rows or []:
+        em = _norm_email(p.get("email"))
+        if em and em not in by_email:
+            by_email[em] = p
+
+    repaired = 0
+    created = 0
+    normalized = 0
+    skipped = 0
+    failed = 0
+
+    for u in auth_users or []:
+        uid = str(u.get("id") or "").strip()
+        em = _norm_email(u.get("email"))
+        if not uid or not em:
+            continue
+
+        prof = by_id.get(uid)
+        if prof:
+            # Normalize email casing
+            if _norm_email(prof.get("email")) != em:
+                try:
+                    update_rows_admin("profiles", {"email": em}, {"id": uid})
+                    normalized += 1
+                except Exception:
+                    failed += 1
+            continue
+
+        # Profile missing by id: attempt link by email
+        cand = by_email.get(em)
+        if cand:
+            old_id = str(cand.get("id") or "").strip()
+            if not old_id:
+                failed += 1
+                continue
+            # Try updating primary key id -> auth id (works only if DB allows)
+            try:
+                admin.table("profiles").update({"id": uid, "email": em}).eq("id", old_id).execute()
+                repaired += 1
+            except Exception:
+                failed += 1
+            continue
+
+        # Create missing profile for this auth user
+        payload = {
+            "id": uid,
+            "email": em,
+            "role": "employee",
+            "is_active": True,
+            "must_reset_password": True,
+        }
+        try:
+            admin.table("profiles").insert(payload).execute()
+            created += 1
+        except Exception:
+            failed += 1
+
+    return {
+        "repaired": repaired,
+        "created": created,
+        "normalized": normalized,
+        "skipped": skipped,
+        "failed": failed,
+    }
 
 
 def _employees_has_email_column() -> bool:
@@ -189,6 +296,10 @@ def render() -> None:
                 st.error("Employee must have an email to create login")
                 st.stop()
             email = raw_email.strip().lower()
+            if "indfustrial" in email:
+                st.warning("Check spelling of company domain (found 'indfustrial').")
+            if not _email_domain_allowed(email):
+                st.warning("Check spelling of company domain / allowed domains.")
             name = str(emp_row.get("name") or "").strip()
             emp_role = str(emp_row.get("role") or "employee").strip().lower() or "employee"
             if emp_role in {"pm", "estimator"}:
@@ -202,7 +313,7 @@ def render() -> None:
             except Exception:
                 existing = []
             if existing:
-                st.warning("Login already exists for this employee")
+                st.warning("Email already exists")
                 st.stop()
 
             try:
@@ -241,6 +352,10 @@ def render() -> None:
                 if not email:
                     st.error("Email is required (or select an employee with an email).")
                     st.stop()
+                if "indfustrial" in email:
+                    st.warning("Check spelling of company domain (found 'indfustrial').")
+                if not _email_domain_allowed(email):
+                    st.warning("Check spelling of company domain / allowed domains.")
                 require_emp = not (allow_unlinked or role_norm in {"admin", "viewer"})
                 invited = invite_auth_user(
                     email=email,
@@ -401,6 +516,19 @@ def render() -> None:
                 st.rerun()
             except Exception as e:
                 st.error(f"Delete failed: {e}")
+
+    with st.expander("Repair User Links", expanded=False):
+        st.caption("Best-effort tool to fix mismatches between **auth.users** and **public.profiles** by email.")
+        if st.button("Repair User Links", type="primary", use_container_width=True, key="users_repair_links_go"):
+            try:
+                res = _repair_user_links()
+                st.success(
+                    f"Repaired: {res.get('repaired', 0)} · Created: {res.get('created', 0)} · "
+                    f"Normalized: {res.get('normalized', 0)} · Failed: {res.get('failed', 0)}"
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Repair failed: {exc}")
 
     with st.expander("Link login accounts to employees", expanded=False):
         st.caption("Links `public.profiles` login accounts to `public.employees` safely (prevents mismatches).")
@@ -641,23 +769,25 @@ def render() -> None:
                     if "phone_number" in before and str(before.get("phone_number") or "").strip() != str(new_phone or ""):
                         payload["phone_number"] = new_phone
                     if payload:
+                        # Temporary debug (requested)
+                        st.write("Updating profile:", payload)
+                        st.write("User ID:", uid)
                         try:
                             update_rows_admin("profiles", payload, {"id": uid})
                         except Exception as exc:
                             if "phone" in str(exc).lower() and ("column" in str(exc).lower() or "does not exist" in str(exc).lower()):
                                 st.error("Could not save phone number — database is missing `profiles.phone_number`.")
                                 st.stop()
-                            raise
+                            st.error(f"Update failed: {exc}")
+                            st.stop()
                         changed += 1
                 if changed:
-                    st.success(f"Saved {changed} update(s).")
+                    st.success("User updated")
                 else:
                     st.info("No changes to save.")
                 st.rerun()
             except Exception as exc:
-                st.error("Could not save changes.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+                st.error(f"Update failed: {exc}")
     with b2:
         sel_email = st.text_input("Resend invite to email", placeholder="name@company.com", key="users_resend_email")
         if st.button("Resend invite", use_container_width=True, key="users_resend_invite_btn"):

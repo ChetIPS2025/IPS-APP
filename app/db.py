@@ -554,11 +554,27 @@ def create_auth_user(
     role: str = "viewer",
     full_name: str = "",
 ) -> dict[str, Any]:
+    em_norm = str(email or "").strip().lower()
+    if not em_norm:
+        raise RuntimeError("Email is required.")
+    if "@" not in em_norm:
+        raise RuntimeError("A valid email is required.")
+    if "indfustrial" in em_norm:
+        raise RuntimeError("Check spelling of company domain (found 'indfustrial').")
+    allowed_domain = (
+        str(getattr(settings, "allowed_email_domain", "") or getattr(settings, "company_email_domain", "") or "").strip().lower()
+        or "industrialplantsolution.com"
+    )
+    if allowed_domain:
+        dom = em_norm.split("@", 1)[1]
+        if dom != allowed_domain:
+            raise RuntimeError("Email domain not allowed.")
+
     admin = get_admin_client()
     try:
         result = admin.auth.admin.create_user(
             {
-                "email": email,
+                "email": em_norm,
                 "password": password,
                 "email_confirm": True,
                 "user_metadata": {"full_name": full_name, "role": role},
@@ -574,11 +590,11 @@ def create_auth_user(
         raise RuntimeError(f"Supabase did not return a created user. raw_result={result!r}")
 
     user_id = getattr(user, "id", None) or user.get("id")
-    user_email = getattr(user, "email", None) or user.get("email") or email
+    user_email = getattr(user, "email", None) or user.get("email") or em_norm
 
     profile_payload = {
         "id": user_id,
-        "email": user_email,
+        "email": str(user_email or "").strip().lower() or em_norm,
         "full_name": full_name,
         "role": role,
         "is_active": True,
@@ -594,6 +610,29 @@ def create_auth_user(
         raise RuntimeError(
             f"profiles upsert failed after auth user creation (user_id={user_id!r}): {exc!r}"
         ) from exc
+
+    # Best-effort: auto-link employee by email when possible (prevents "unlinked" accounts)
+    try:
+        emp_rows = fetch_table_admin("employees", columns="id,email,profile_id,auth_user_id,name", limit=5000, order_by="name")
+    except Exception:
+        emp_rows = []
+    try:
+        matches = [e for e in (emp_rows or []) if str(e.get("email") or "").strip().lower() == str(profile_payload.get("email") or "").strip().lower()]
+        if len(matches) == 1:
+            eid = str(matches[0].get("id") or "").strip()
+            if eid:
+                try:
+                    update_rows_admin("profiles", {"employee_id": eid}, {"id": user_id})
+                except Exception:
+                    pass
+                for col in ("auth_user_id", "profile_id"):
+                    try:
+                        update_rows_admin("employees", {col: str(user_id)}, {"id": eid})
+                        break
+                    except Exception:
+                        continue
+    except Exception:
+        pass
 
     return {
         "id": user_id,
@@ -618,6 +657,18 @@ def invite_auth_user(
     em = str(email or "").strip().lower()
     if not em:
         raise RuntimeError("Email is required.")
+    if "indfustrial" in em:
+        raise RuntimeError("Check spelling of company domain (found 'indfustrial').")
+    if "@" not in em:
+        raise RuntimeError("A valid email is required.")
+    allowed_domain = (
+        str(getattr(settings, "allowed_email_domain", "") or getattr(settings, "company_email_domain", "") or "").strip().lower()
+        or "industrialplantsolution.com"
+    )
+    if allowed_domain:
+        dom = em.split("@", 1)[1]
+        if dom != allowed_domain:
+            raise RuntimeError("Email domain not allowed.")
 
     # Duplicate prevention: block invites when a profile already uses this email.
     try:
@@ -653,6 +704,24 @@ def invite_auth_user(
 
     if employee_id:
         matched_emp_id = str(employee_id or "").strip() or None
+        # Block mismatch: selected employee must match the email (when employees.email exists)
+        try:
+            cur_emp = next((e for e in emp_rows if str(e.get("id") or "").strip() == matched_emp_id), None) or {}
+            emp_email = str(cur_emp.get("email") or "").strip().lower()
+            if emp_email and emp_email != em:
+                raise RuntimeError("Employee email does not match invite email.")
+        except RuntimeError:
+            raise
+        except Exception:
+            pass
+
+    # Prevent linking an employee that already has a different login
+    if matched_emp_id:
+        cur_emp = next((e for e in emp_rows if str(e.get("id") or "").strip() == matched_emp_id), None) or {}
+        cur_auth = str(cur_emp.get("auth_user_id") or "").strip()
+        cur_prof = str(cur_emp.get("profile_id") or "").strip()
+        if cur_auth or cur_prof:
+            raise RuntimeError("Employee already has login.")
 
     # Enforce: no standalone login accounts for work roles (preferred behavior).
     role_norm = str(role or "employee").strip().lower() or "employee"
