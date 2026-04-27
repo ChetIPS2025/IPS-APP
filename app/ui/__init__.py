@@ -193,7 +193,7 @@ def _inject_sidebar_nav_css() -> None:
 <style>
 /* Primary: section titles */
 section[data-testid="stSidebar"] .ips-nav-section-title {
-  color: #e5e7eb;
+  color: #ffffff;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -205,7 +205,7 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 16px !important;
   padding-top: 14px !important;
-  border-top: 1px solid rgba(55, 65, 81, 0.9);
+  border-top: 1px solid rgba(120, 150, 200, 0.25);
 }
 /* Divider + air gap: primary vs TOOLS */
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
@@ -239,7 +239,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.35rem 0.65rem !important;
   border-radius: 8px !important;
   margin-left: 2px !important;
-  border-left: 3px solid rgba(75, 85, 99, 0.65) !important;
+  border-left: 3px solid rgba(120, 150, 200, 0.25) !important;
   padding-left: 10px !important;
   box-sizing: border-box !important;
 }
@@ -253,19 +253,20 @@ section[data-testid="stSidebar"] button[kind="primary"] {
   box-shadow: inset 3px 0 0 0 #60a5fa !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"] {
-  background: rgba(17, 24, 39, 0.45) !important;
-  color: #d1d5db !important;
-  border: 1px solid rgba(55, 65, 81, 0.95) !important;
+  background: #14365C !important;
+  color: #C0CAD8 !important;
+  border: 1px solid rgba(120, 150, 200, 0.25) !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-  border-color: #6b7280 !important;
-  color: #f3f4f6 !important;
+  background: #1A3F6B !important;
+  border-color: rgba(120, 150, 200, 0.45) !important;
+  color: #ffffff !important;
 }
 /* TOOLS expander: muted label + chrome */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid rgba(55, 65, 81, 0.65) !important;
+  border: 1px solid rgba(120, 150, 200, 0.25) !important;
   border-radius: 6px !important;
-  background: rgba(17, 24, 39, 0.28) !important;
+  background: #122F52 !important;
   margin-top: 2px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -273,7 +274,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
-  color: #71717a !important;
+  color: #9FB0C7 !important;
   opacity: 0.88 !important;
   padding: 8px 10px !important;
 }
@@ -288,14 +289,15 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   padding: 0.28rem 0.6rem !important;
   border-radius: 8px !important;
   opacity: 0.92 !important;
-  color: #a1a1aa !important;
-  background: rgba(17, 24, 39, 0.25) !important;
-  border: 1px solid rgba(55, 65, 81, 0.65) !important;
+  color: #C0CAD8 !important;
+  background: #14365C !important;
+  border: 1px solid rgba(120, 150, 200, 0.25) !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover {
-  color: #d4d4d8 !important;
-  border-color: #6b7280 !important;
+  color: #ffffff !important;
+  background: #1A3F6B !important;
+  border-color: rgba(120, 150, 200, 0.45) !important;
   opacity: 1 !important;
 }
 /* Active tool: same treatment as primary nav buttons */

@@ -213,8 +213,8 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(15, 23, 42, 0.55) !important;
-            border-color: rgba(100, 116, 139, 0.4) !important;
+            background: #122F52 !important;
+            border-color: rgba(120, 150, 200, 0.25) !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
@@ -262,8 +262,8 @@ def inject_table_action_styles() -> None:
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
             margin-top: 2px !important;
-            background: rgba(15, 23, 42, 0.72) !important;
-            border-color: rgba(100, 116, 139, 0.42) !important;
+            background: #122F52 !important;
+            border-color: rgba(120, 150, 200, 0.25) !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
@@ -301,12 +301,12 @@ def inject_table_action_styles() -> None:
         .ips-table-actions-bar {
             padding: 10px 12px;
             margin-bottom: 10px;
-            background: rgba(15, 23, 42, 0.78);
-            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: #122F52;
+            border: 1px solid rgba(120, 150, 200, 0.25);
             border-radius: 8px;
         }
         .ips-ta-summary {
-            color: #94a3b8;
+            color: #C0CAD8;
             font-size: 12px;
             font-weight: 500;
             letter-spacing: 0.02em;

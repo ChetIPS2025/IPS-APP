@@ -164,7 +164,7 @@ def inject_ips_crud_list_styles() -> None:
         <style>
         /* ----- Page subtitle (under render_header) ----- */
         p.ips-crud-page-subtitle {
-            color: #94a3b8;
+            color: #C0CAD8;
             font-size: 0.8125rem;
             line-height: 1.45;
             margin: 0 0 0.55rem 0;
@@ -239,8 +239,8 @@ def inject_ips_crud_list_styles() -> None:
 
         /* ----- Side panel (add / edit) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) {
-            background: rgba(15, 23, 42, 0.72) !important;
-            border-color: rgba(71, 85, 105, 0.55) !important;
+            background: #122F52 !important;
+            border-color: rgba(120, 150, 200, 0.25) !important;
             border-radius: 10px !important;
             padding: 8px 10px 10px 10px !important;
             margin-bottom: 6px !important;
