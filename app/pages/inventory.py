@@ -937,12 +937,12 @@ def render() -> None:
     render_header("Inventory")
     render_crud_list_subtitle(
         "Stocked supplies and consumables — use **category** (e.g. **Materials**) to organize items. "
-        "Same module for all consumables; tools on **Tool Checkout** do not reduce quantity here."
+        "Same module for all consumables; tools on **Scan Inventory** do not reduce quantity here."
     )
     st.caption(
         "**Materials** are inventory rows with category **Materials** (sidebar shortcut). "
         "Issue via **Scan Inventory** (QR / SKU); usage: **Inventory Usage**. "
-        "Reusable tools use **Tool Checkout**."
+        "Reusable tools use **Scan Inventory**."
     )
 
     msg = st.session_state.pop("inventory_success", None)

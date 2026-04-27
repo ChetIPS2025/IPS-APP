@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -14,9 +16,14 @@ except ImportError:
     from db import delete_rows_admin, fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
 
 try:
-    from app.services.job_service import job_number_display
+    from app.services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
-    from services.job_service import job_number_display  # type: ignore
+    from services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+
+try:
+    from app.ui import IPS_NAV_PENDING_KEY, role_can_open_page
+except ImportError:
+    from ui import IPS_NAV_PENDING_KEY, role_can_open_page  # type: ignore
 
 
 def _norm_status(v) -> str:
@@ -116,6 +123,200 @@ def _jobs_display_df(rows: list[dict]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(out)
+
+
+# Days out for dashboard "Who Has What" (match tool_dashboard overdue rule).
+_DASH_OUT_OVERDUE_DAYS = 7
+_KIT_REPL_WINDOW_DAYS = 90
+_KIT_REPL_HOT_THRESHOLD = 3
+
+
+def _dash_kf(v: Any, default: float = 0.0) -> float:
+    try:
+        if v is None:
+            return default
+        s = str(v).strip()
+        if not s:
+            return default
+        return float(s)
+    except Exception:
+        return default
+
+
+def _kit_line_short_qty(it: dict) -> float:
+    exp = _dash_kf((it or {}).get("quantity"))
+    qoh = (it or {}).get("quantity_on_hand")
+    if qoh is not None and str(qoh).strip() != "":
+        return max(0.0, exp - _dash_kf(qoh))
+    return max(0.0, _dash_kf((it or {}).get("missing_count")))
+
+
+def _render_kit_theft_alerts_dashboard(
+    assets: list[dict],
+    kit_items: list[dict],
+    replacements: list[dict],
+    *,
+    role: str,
+) -> None:
+    """Tool trailer kit lines: shortages, replacement churn, estimated missing value."""
+    if not role_can_open_page(role, "Asset Database"):
+        return
+    trailers = {
+        str(a.get("id") or "").strip(): a
+        for a in (assets or [])
+        if isinstance(a, dict) and str(a.get("asset_type") or "").strip().lower() == "tool trailer"
+    }
+    if not trailers:
+        return
+    tids = set(trailers.keys())
+    lines = [
+        it
+        for it in (kit_items or [])
+        if isinstance(it, dict)
+        and str(it.get("parent_asset_id") or "").strip() in tids
+        and bool((it or {}).get("is_active", True))
+    ]
+    now = datetime.now(timezone.utc).date()
+    start = now - timedelta(days=_KIT_REPL_WINDOW_DAYS)
+    repl_90: list[dict] = []
+    for r in replacements or []:
+        if not isinstance(r, dict):
+            continue
+        ds = str(r.get("replacement_date") or "").strip()[:10]
+        if not ds:
+            continue
+        try:
+            d = datetime.fromisoformat(ds).date()
+        except ValueError:
+            continue
+        if d >= start:
+            repl_90.append(r)
+    n_repl_90 = len(repl_90)
+    c_item = Counter(str(r.get("kit_item_id") or "").strip() for r in repl_90 if str(r.get("kit_item_id") or "").strip())
+    n_hot = sum(1 for _k, v in c_item.items() if v >= _KIT_REPL_HOT_THRESHOLD)
+    n_short_lines = sum(1 for it in lines if _kit_line_short_qty(it) > 0.0001)
+    miss_val = sum(_kit_line_short_qty(it) * _dash_kf(it.get("replacement_cost")) for it in lines)
+
+    with st.container(border=True):
+        st.markdown("##### Kit theft / audit signals")
+        st.caption(
+            f"Tool trailer kit lines only. **Hot items** = ≥{_KIT_REPL_HOT_THRESHOLD} replacement rows in the last "
+            f"{_KIT_REPL_WINDOW_DAYS} days. Missing value uses shortage × replacement cost."
+        )
+        m1, m2, m3, m4 = st.columns(4, gap="small")
+        m1.metric("Kit lines with shortage", f"{n_short_lines:,}")
+        m2.metric(f"Replacements ({_KIT_REPL_WINDOW_DAYS}d)", f"{n_repl_90:,}")
+        m3.metric("Hot kit items (90d)", f"{n_hot:,}")
+        m4.metric("Est. missing value", f"${miss_val:,.0f}")
+        if n_short_lines or n_hot:
+            st.warning("Review **Asset Database** → open a **Tool Trailer** → **Tool Kits** → **Count / Audit Kit**.")
+        if role_can_open_page(role, "Asset Database"):
+            if st.button("Open Asset Database", key="dash_kit_open_adb", help="Manage trailers and kit audits"):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+                st.rerun()
+
+
+def _parse_co_ts(v: Any) -> datetime | None:
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        return None
+
+
+def _days_out_value(last_co: Any) -> float | None:
+    dt = _parse_co_ts(last_co)
+    if not dt:
+        return None
+    now = datetime.now(timezone.utc)
+    return max(0.0, (now - dt).total_seconds() / 86400.0)
+
+
+def _asset_is_out(row: dict) -> bool:
+    stt = str((row or {}).get("status") or "").strip()
+    holder = str((row or {}).get("current_holder_employee_id") or "").strip()
+    return stt == "Checked Out" or bool(holder)
+
+
+def _render_who_has_what_dashboard(
+    assets: list[dict],
+    jobs: list[dict],
+    employees: list[dict],
+    *,
+    role: str,
+) -> None:
+    """Summary of assets that are checked out or have a holder (see assets table)."""
+    rows = [a for a in (assets or []) if isinstance(a, dict) and _asset_is_out(a)]
+    jobs_sorted = sort_jobs_by_number_then_name(list(jobs or []))
+    job_by_id = {str(j.get("id")): j for j in jobs_sorted if j.get("id")}
+    emp_id_to_name = {
+        str(e["id"]): str(e.get("name") or "").strip() or "—"
+        for e in (employees or [])
+        if isinstance(e, dict) and e.get("id")
+    }
+
+    n_out = len(rows)
+    n_overdue = 0
+    n_on_job = 0
+    for r in rows:
+        if str(r.get("assigned_job_id") or "").strip():
+            n_on_job += 1
+        dv = _days_out_value(r.get("last_checkout_at"))
+        if dv is not None and dv > _DASH_OUT_OVERDUE_DAYS:
+            n_overdue += 1
+
+    with st.container(border=True):
+        st.markdown("##### Who Has What")
+        st.caption("Tools and assets with **Checked Out** status or an assigned holder.")
+
+        m1, m2, m3 = st.columns(3, gap="small")
+        m1.metric("Checked out tools", f"{n_out:,}")
+        m2.metric("Overdue tools", f"{n_overdue:,}")
+        m3.metric("Assigned to jobs", f"{n_on_job:,}")
+
+        if not rows:
+            st.caption("Nothing checked out or held right now.")
+        else:
+            disp: list[dict] = []
+            for r in rows:
+                eid = str(r.get("current_holder_employee_id") or "").strip()
+                holder = emp_id_to_name.get(eid) or str(r.get("assigned_employee") or "").strip() or "—"
+                jid = r.get("assigned_job_id")
+                jl = "—"
+                if jid and str(jid).strip() in job_by_id:
+                    jl = job_row_select_label(job_by_id[str(jid).strip()])
+                co = _parse_co_ts(r.get("last_checkout_at"))
+                co_s = co.strftime("%Y-%m-%d %H:%M") if co else "—"
+                dv = _days_out_value(r.get("last_checkout_at"))
+                days_s = f"{int(dv)} d" if dv is not None and dv >= 1.0 else (f"{dv:.1f} d" if dv is not None else "—")
+                disp.append(
+                    {
+                        "Tool / asset": str(r.get("asset_name") or "—").strip() or "—",
+                        "Holder": holder,
+                        "Job": jl,
+                        "Checked out": co_s,
+                        "Days out": days_s,
+                        "Status": str(r.get("status") or "").strip() or "—",
+                    }
+                )
+            df = pd.DataFrame(disp)
+            df["_sort"] = [_days_out_value(x.get("last_checkout_at")) for x in rows]
+            df = df.sort_values(by="_sort", ascending=False, na_position="last").drop(
+                columns=["_sort"], errors="ignore"
+            )
+            st.dataframe(df, use_container_width=True, hide_index=True, height=min(420, 44 + 36 * len(df)))
+
+        if role_can_open_page(role, "Who Has What"):
+            if st.button("View all", key="dash_whw_view_all", help="Open the full Who Has What page"):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Who Has What"
+                st.rerun()
 
 
 def _estimates_display_df(rows: list[dict]) -> pd.DataFrame:
@@ -386,6 +587,35 @@ def render() -> None:
         )
     except Exception:
         employees = []
+    try:
+        assets = fetch_table_for_session(
+            "assets", session_key=sk, limit=_lim, order_by="asset_name", use_admin=use_admin
+        )
+    except Exception:
+        assets = []
+    kit_items_d: list[dict] = []
+    repl_d: list[dict] = []
+    if role_can_open_page(current_role(), "Asset Database"):
+        try:
+            kit_items_d = fetch_table_for_session(
+                "asset_kit_items",
+                session_key=sk,
+                limit=15000,
+                order_by="parent_asset_id",
+                use_admin=use_admin,
+            )
+        except Exception:
+            kit_items_d = []
+        try:
+            repl_d = fetch_table_for_session(
+                "asset_kit_replacements",
+                session_key=sk,
+                limit=25000,
+                order_by="replacement_date",
+                use_admin=use_admin,
+            )
+        except Exception:
+            repl_d = []
 
     with st.container(border=True):
         st.markdown('<span class="ips-dash-metrics"></span>', unsafe_allow_html=True)
@@ -394,6 +624,19 @@ def render() -> None:
         c2.metric("Jobs awarded", count_awarded_jobs(jobs))
         c3.metric("Jobs bidding", count_bidding_jobs(jobs))
         c4.metric("Active employees", count_active_employees(employees))
+
+    _render_who_has_what_dashboard(
+        list(assets or []),
+        list(jobs or []),
+        list(employees or []),
+        role=current_role(),
+    )
+    _render_kit_theft_alerts_dashboard(
+        list(assets or []),
+        list(kit_items_d or []),
+        list(repl_d or []),
+        role=current_role(),
+    )
 
     _render_todo_list(session_key=sk, use_admin=use_admin)
 

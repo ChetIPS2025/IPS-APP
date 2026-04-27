@@ -187,7 +187,7 @@ def render() -> None:
 
     st.caption(
         "Checkout tools only — possession on **assets** / **tool_transactions**. "
-        "For scan workflow use **Tool Checkout**."
+        "For scan workflow use **Scan Inventory**."
     )
 
     if current_role() not in {"admin", "pm", "employee", "viewer"}:
@@ -421,8 +421,13 @@ def render() -> None:
                         st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                         st.rerun()
                 with b3:
-                    if st.button("Tool checkout", key=f"td_m_tc_{rec.get('id')}_{i}", use_container_width=True):
-                        st.session_state[IPS_NAV_PENDING_KEY] = "Tool Checkout"
+                    if st.button("Open in scan", key=f"td_m_tc_{rec.get('id')}_{i}", use_container_width=True):
+                        raw = rec.get("_raw") or {}
+                        code = str(raw.get("qr_code_value") or raw.get("asset_id") or "").strip()
+                        if code:
+                            st.session_state["_ips_inv_scan_deeplink_code"] = code
+                            st.session_state["pending_scan_code"] = code
+                        st.session_state[IPS_NAV_PENDING_KEY] = "Scan Inventory"
                         st.rerun()
     else:
         disp = df.drop(columns=["_raw"], errors="ignore").copy()

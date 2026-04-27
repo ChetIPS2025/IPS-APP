@@ -62,7 +62,8 @@ _SECONDARY_ADMIN_ONLY: frozenset[str] = frozenset(
 
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
-_NAV_ASSETS: tuple[str, ...] = ("Asset Database", "Tool Checkout", "Who Has What")
+# Routable asset-area pages (Who Has What is not duplicated in the sidebar — summary on Dashboard).
+_NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What")
 # Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
 _NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
     ("All assets", "All"),
@@ -88,13 +89,15 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             *_NAV_PRIMARY,
             *_NAV_JOBS,
-            *_NAV_ASSETS,
+            *_NAV_ASSET_ROUTES,
             *_NAV_RESOURCES,
             *_NAV_SECONDARY,
             "Admin",
             "Users",
             "Asset Detail",
             "Asset Manager",
+            "Scan Inventory",
+            "Inventory Usage",
         }
     ),
     "manager": frozenset(
@@ -104,6 +107,8 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Estimates",
             "Customers",
             "Job Costing",
+            "Scan Inventory",
+            "Who Has What",
             # Add reporting pages here when present
         }
     ),
@@ -114,7 +119,6 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Asset Database",
             "Scan Inventory",
             "Inventory Usage",
-            "Tool Checkout",
             "Who Has What",
             "Employee Toolbox",
         }
@@ -132,7 +136,7 @@ def role_can_open_page(role: str, page: str) -> bool:
         allowed = _ROLE_ALLOWED_PAGES.get("viewer", frozenset())
     return str(page or "").strip() in allowed
 
-IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSETS + _NAV_RESOURCES + _NAV_SECONDARY
+IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSET_ROUTES + _NAV_RESOURCES + _NAV_SECONDARY
 
 # Keep Inventory sub-pages routable even though they are nested under "Inventory" in the sidebar.
 IPS_SIDEBAR_PAGES = IPS_SIDEBAR_PAGES + _NAV_INVENTORY_SUBPAGES
@@ -158,6 +162,8 @@ def _visible_secondary_pages(role: str) -> tuple[str, ...]:
 def apply_pending_navigation() -> None:
     """Apply a deferred sidebar selection change before the sidebar nav is rendered."""
     pending = st.session_state.pop(IPS_NAV_PENDING_KEY, None)
+    if pending == "Tool Checkout":
+        pending = "Scan Inventory"
     if not pending:
         return
     if pending == "Users":
@@ -367,6 +373,8 @@ def _ensure_valid_nav_page() -> None:
         # Legacy standalone route; equipment is managed in Asset Database (category = Equipment).
         st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
         st.session_state["asset_db_f_asset_category"] = "Equipment"
+    elif cur0 == "Tool Checkout":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
@@ -375,7 +383,7 @@ def _ensure_valid_nav_page() -> None:
         for p in (
             set(_NAV_PRIMARY)
             | set(_NAV_JOBS)
-            | set(_NAV_ASSETS)
+            | set(_NAV_ASSET_ROUTES)
             | set(_NAV_RESOURCES)
             | set(_NAV_INVENTORY_SUBPAGES)
             | visible_secondary
@@ -502,11 +510,6 @@ def render_sidebar() -> str:
         unsafe_allow_html=True,
     )
     _render_assets_sidebar_group(current=current, role=role)
-    for p in _NAV_ASSETS:
-        if p == "Asset Database":
-            continue
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
 
     # --- PRIMARY: Resources & Inventory ---
     st.sidebar.markdown(

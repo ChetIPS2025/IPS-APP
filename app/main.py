@@ -40,7 +40,6 @@ from pages import customers_jobs
 from pages import job_database
 from pages import job_costing
 from pages import asset_database
-from pages import tool_checkout
 from pages import tool_dashboard
 from pages import asset_detail
 from pages import assets as assets_page
@@ -81,7 +80,6 @@ PAGES = {
     "Employee Toolbox": employee_toolbox.render,
     "PO / Expenses": po_expenses.render,
     "Asset Database": asset_database.render,
-    "Tool Checkout": tool_checkout.render,
     "Who Has What": tool_dashboard.render,
     "Asset Scanner": asset_scanner.render,
     "Tool Trailer Audits": tool_trailer_audits.render,

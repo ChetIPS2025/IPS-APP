@@ -1,5 +1,5 @@
 """
-Mobile-first field issue flow for inventory_items + inventory_transactions.
+Mobile-first field scan: inventory_items (issue) + reusable tools on public.assets (checkout).
 
 Schema assumptions (see sql/015, 027, 028):
 - inventory_items: id, item_name, sku, qr_code_value, quantity_on_hand, reorder_point,
@@ -8,6 +8,7 @@ Schema assumptions (see sql/015, 027, 028):
   job_id, employee_id, profile_id, created_by, notes, created_at,
   scanned_by_user_id, scanned_by_name, device_label (sql/030_inventory_txn_scan_audit.sql)
 - job_materials: job_id, inventory_item_id, item_name, quantity, unit_cost, line_total, notes
+- assets / tool_transactions: reusable tool checkout (sql/029_tool_checkout.sql)
 """
 from __future__ import annotations
 
@@ -50,6 +51,7 @@ try:
         create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
+        fetch_table,
         fetch_table_admin,
         insert_row_admin,
         update_rows_admin,
@@ -63,6 +65,7 @@ except ImportError:
         create_signed_url,
         delete_rows_admin,
         fetch_by_match_admin,
+        fetch_table,
         fetch_table_admin,
         insert_row_admin,
         update_rows_admin,
@@ -72,6 +75,8 @@ except ImportError:
 _INV = "inventory_items"
 _TXN = "inventory_transactions"
 _JM = "job_materials"
+_ASSETS = "assets"
+_TOOL_TXN = "tool_transactions"
 
 _ISSUE_TYPES = ("To Job", "Stock Adjustment", "Shop Use")
 _TXN_MAP = {"To Job": "TO_JOB", "Stock Adjustment": "ADJUST", "Shop Use": "SHOP"}
@@ -105,6 +110,15 @@ def _inject_inv_scan_mobile_css() -> None:
             padding: 10px 12px;
             margin: 8px 0;
             color: #fcd34d;
+            font-weight: 600;
+        }
+        .ips-tool-scan-banner {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 8px 0;
+            color: #7dd3fc;
             font-weight: 600;
         }
         </style>
@@ -339,12 +353,326 @@ def _lookup_inventory(code: str) -> tuple[list[dict], str]:
     return [], "none"
 
 
+def _parse_tool_ts(v: Any) -> datetime | None:
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _fmt_tool_ts(v: Any) -> str:
+    dt = _parse_tool_ts(v)
+    if not dt:
+        return "—"
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _is_truthy(v: Any) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    s = str(v).strip().lower()
+    return s in ("true", "1", "t", "yes")
+
+
+def _lookup_asset_tool(code: str) -> tuple[list[dict], str]:
+    raw = _normalize_scan_input(str(code or "").strip())
+    if not raw:
+        return [], "empty"
+    try:
+        by_qr = fetch_by_match_admin(_ASSETS, {"qr_code_value": raw}, limit=5)
+    except Exception:
+        return [], "none"
+    if len(by_qr) == 1:
+        return by_qr, ""
+    if len(by_qr) > 1:
+        return by_qr, "ambiguous"
+    try:
+        by_tag = fetch_by_match_admin(_ASSETS, {"asset_id": raw}, limit=5)
+    except Exception:
+        return [], "none"
+    if len(by_tag) == 1:
+        return by_tag, ""
+    if len(by_tag) > 1:
+        return by_tag, "ambiguous"
+    return [], "none"
+
+
+def _resolve_unified_scan(norm: str) -> tuple[str, list[dict]]:
+    """After inventory lookup, fall back to assets. Outcomes: empty|none|inv_one|inv_amb|asset_one|asset_amb."""
+    n0 = str(norm or "").strip()
+    n = _normalize_scan_input(n0) or n0
+    if not n.strip():
+        return "empty", []
+    inv_rows, inv_reason = _lookup_inventory(n)
+    if inv_reason == "":
+        return "inv_one", inv_rows
+    if inv_reason == "ambiguous":
+        return "inv_amb", inv_rows
+    if inv_reason == "empty":
+        return "empty", []
+    a_rows, a_reason = _lookup_asset_tool(n)
+    if a_reason == "":
+        return "asset_one", a_rows
+    if a_reason == "ambiguous":
+        return "asset_amb", a_rows
+    if a_reason == "empty":
+        return "empty", []
+    return "none", []
+
+
+def _render_inv_scan_asset_panel(
+    tool: dict[str, Any],
+    *,
+    jobs: list[dict],
+    job_labels: list[str],
+    job_label_to_id: dict[str, str],
+    emps: list[dict],
+    txn_ok: bool,
+) -> None:
+    emp_labels = [f"{e.get('name') or '—'} ({str(e.get('id'))[:8]}…)" for e in emps if e.get("id")]
+    emp_label_to_id = {
+        f"{e.get('name') or '—'} ({str(e.get('id'))[:8]}…)": str(e["id"])
+        for e in emps
+        if e.get("id")
+    }
+    emp_id_to_name = {str(e["id"]): str(e.get("name") or "").strip() or "—" for e in emps if e.get("id")}
+
+    if not _is_truthy(tool.get("is_checkout_item")):
+        st.error(
+            "This asset is not flagged as a **checkout tool**. Enable **Checkout tool** in **Asset Database**."
+        )
+        if st.button("Clear", use_container_width=True, key="inv_scan_asset_clear_non"):
+            st.session_state.pop("inv_scan_asset", None)
+            st.rerun()
+        return
+
+    name = str(tool.get("asset_name") or "—").strip()
+    tag = str(tool.get("asset_id") or "—").strip()
+    sn = str(tool.get("serial_number") or "").strip() or "—"
+    qr = str(tool.get("qr_code_value") or "").strip() or "—"
+    status = str(tool.get("status") or "").strip() or "—"
+    holder_id = str(tool.get("current_holder_employee_id") or "").strip()
+    holder = emp_id_to_name.get(holder_id, str(tool.get("assigned_employee") or "").strip() or "—")
+    jid = tool.get("assigned_job_id")
+    job_disp = "—"
+    if jid and jobs:
+        m = {str(j.get("id")): job_row_select_label(j) for j in jobs}
+        job_disp = m.get(str(jid), "—")
+
+    st.markdown(
+        f'<div class="ips-tool-scan-banner">{html.escape(name)}</div>',
+        unsafe_allow_html=True,
+    )
+    st.subheader("Tool / asset")
+    with st.container(border=True):
+        st.markdown(f"**Asset tag:** `{html.escape(tag)}`")
+        st.markdown(f"**Serial:** {html.escape(sn)}")
+        st.markdown(f"**QR:** `{html.escape(qr)}`")
+        st.markdown(f"**Status:** {html.escape(status)}")
+        st.markdown(f"**Current holder:** {html.escape(holder)}")
+        st.markdown(f"**Current job:** {html.escape(job_disp)}")
+        st.caption(
+            f"Last checkout: {_fmt_tool_ts(tool.get('last_checkout_at'))} · "
+            f"Last check-in: {_fmt_tool_ts(tool.get('last_checkin_at'))}"
+        )
+
+    tid = str(tool.get("id") or "")
+    ts = datetime.now(timezone.utc).isoformat()
+
+    if status == "Available":
+        if not emp_labels:
+            st.error("No **employees** loaded — add employees first.")
+        else:
+            with st.form("inv_scan_tool_out", clear_on_submit=False):
+                emp_pick = st.selectbox("Employee (required)", emp_labels, key="inv_scan_tool_out_emp")
+                job_opts = ["— No job —"] + job_labels
+                job_pick = st.selectbox("Job (optional)", job_opts, key="inv_scan_tool_out_job")
+                notes = st.text_area("Notes", key="inv_scan_tool_out_notes", height=72)
+                go = st.form_submit_button("Check Out", type="primary", use_container_width=True)
+            if go:
+                fresh = fetch_by_match_admin(_ASSETS, {"id": tid}, limit=1)
+                if not fresh or str(fresh[0].get("status") or "").strip() != "Available":
+                    st.error("This tool is no longer **Available** — scan again.")
+                    st.session_state.pop("inv_scan_asset", None)
+                    st.stop()
+                eid = emp_label_to_id.get(str(emp_pick or ""))
+                if not eid:
+                    st.error("Select an employee.")
+                    st.stop()
+                raw_job = str(job_pick or "").strip()
+                new_jid: str | None = None
+                if raw_job and not raw_job.startswith("—"):
+                    new_jid = job_label_to_id.get(raw_job)
+                ename = emp_id_to_name.get(eid, "")
+                payload = {
+                    "status": "Checked Out",
+                    "current_holder_employee_id": eid,
+                    "assigned_job_id": new_jid,
+                    "assigned_employee": ename[:500] if ename else None,
+                    "last_checkout_at": ts,
+                    "updated_at": ts,
+                }
+                try:
+                    update_rows_admin(_ASSETS, payload, {"id": tid})
+                except Exception as exc:
+                    st.error(f"Could not check out: {exc}")
+                    st.stop()
+                if txn_ok:
+                    try:
+                        insert_row_admin(
+                            _TOOL_TXN,
+                            {
+                                "tool_id": tid,
+                                "transaction_type": "CHECK_OUT",
+                                "employee_id": eid,
+                                "job_id": new_jid,
+                                "notes": str(notes or "").strip()[:2000],
+                            },
+                        )
+                    except Exception as exc:
+                        st.warning(f"Checked out but log failed: {exc}")
+                st.session_state.pop("inv_scan_asset", None)
+                st.success("Tool checked out.")
+                st.rerun()
+
+    elif status == "Checked Out":
+        st.info("This tool is **checked out** — check it in when it returns to the shop.")
+        with st.form("inv_scan_tool_in", clear_on_submit=False):
+            ret_labels = ["— Same as holder —"] + [lbl for lbl in emp_labels if emp_label_to_id.get(lbl) != holder_id]
+            ret_pick = st.selectbox("Returned by (optional)", ret_labels, key="inv_scan_tool_in_ret")
+            notes = st.text_area("Notes", key="inv_scan_tool_in_notes", height=72)
+            gin = st.form_submit_button("Check In", type="primary", use_container_width=True)
+        if gin:
+            fresh = fetch_by_match_admin(_ASSETS, {"id": tid}, limit=1)
+            if not fresh or str(fresh[0].get("status") or "").strip() != "Checked Out":
+                st.error("This tool is not **Checked Out** anymore — scan again.")
+                st.session_state.pop("inv_scan_asset", None)
+                st.stop()
+            ret_eid: str | None = holder_id or None
+            if str(ret_pick or "").startswith("—"):
+                ret_eid = holder_id or None
+            else:
+                ret_eid = emp_label_to_id.get(str(ret_pick or "")) or holder_id
+            payload = {
+                "status": "Available",
+                "current_holder_employee_id": None,
+                "assigned_job_id": None,
+                "assigned_employee": None,
+                "last_checkin_at": ts,
+                "updated_at": ts,
+            }
+            try:
+                update_rows_admin(_ASSETS, payload, {"id": tid})
+            except Exception as exc:
+                st.error(f"Could not check in: {exc}")
+                st.stop()
+            if txn_ok:
+                try:
+                    insert_row_admin(
+                        _TOOL_TXN,
+                        {
+                            "tool_id": tid,
+                            "transaction_type": "CHECK_IN",
+                            "employee_id": ret_eid,
+                            "job_id": None,
+                            "notes": str(notes or "").strip()[:2000],
+                        },
+                    )
+                except Exception as exc:
+                    st.warning(f"Checked in but log failed: {exc}")
+            st.session_state.pop("inv_scan_asset", None)
+            st.success("Tool checked in.")
+            st.rerun()
+
+        with st.expander("Assign to Job", expanded=False):
+            with st.form("inv_scan_tool_assign_job", clear_on_submit=True):
+                job_opts2 = ["— No job —"] + job_labels
+                cur_lbl = job_disp if job_disp != "—" else "— No job —"
+                try:
+                    ix0 = job_opts2.index(cur_lbl)
+                except ValueError:
+                    ix0 = 0
+                jp = st.selectbox("Job", job_opts2, index=min(ix0, len(job_opts2) - 1), key="inv_scan_tool_aj_job")
+                sj = st.form_submit_button("Save job assignment", type="primary", use_container_width=True)
+            if sj:
+                raw_j = str(jp or "").strip()
+                new_jid2: str | None = None
+                if raw_j and not raw_j.startswith("—"):
+                    new_jid2 = job_label_to_id.get(raw_j)
+                try:
+                    update_rows_admin(
+                        _ASSETS,
+                        {"assigned_job_id": new_jid2, "updated_at": ts},
+                        {"id": tid},
+                    )
+                except Exception as exc:
+                    st.error(f"Could not update job: {exc}")
+                    st.stop()
+                st.success("Job assignment updated.")
+                st.session_state.pop("inv_scan_asset", None)
+                st.rerun()
+
+        if emp_labels:
+            with st.expander("Assign to Employee", expanded=False):
+                with st.form("inv_scan_tool_assign_emp", clear_on_submit=True):
+                    def_ix = 0
+                    if holder_id:
+                        holder_lbl = next(
+                            (lbl for lbl, eid in emp_label_to_id.items() if eid == holder_id),
+                            None,
+                        )
+                        if holder_lbl and holder_lbl in emp_labels:
+                            def_ix = emp_labels.index(holder_lbl)
+                    ep = st.selectbox("Employee", emp_labels, index=def_ix, key="inv_scan_tool_ae_emp")
+                    se = st.form_submit_button("Save holder", type="primary", use_container_width=True)
+                if se:
+                    neid = emp_label_to_id.get(str(ep or ""))
+                    if not neid:
+                        st.error("Select an employee.")
+                        st.stop()
+                    ename2 = emp_id_to_name.get(neid, "")
+                    try:
+                        update_rows_admin(
+                            _ASSETS,
+                            {
+                                "current_holder_employee_id": neid,
+                                "assigned_employee": ename2[:500] if ename2 else None,
+                                "updated_at": ts,
+                            },
+                            {"id": tid},
+                        )
+                    except Exception as exc:
+                        st.error(f"Could not update holder: {exc}")
+                        st.stop()
+                    st.success("Holder updated.")
+                    st.session_state.pop("inv_scan_asset", None)
+                    st.rerun()
+        else:
+            st.caption("Add employees to reassign the holder from this screen.")
+
+    else:
+        st.warning(
+            f"Status is **{html.escape(status)}** — use **Asset Database** to move to **Available** before checkout, "
+            "or check in only when status is **Checked Out**."
+        )
+        if st.button("Clear", use_container_width=True, key="inv_scan_asset_clear_stat"):
+            st.session_state.pop("inv_scan_asset", None)
+            st.rerun()
+
+
 def render() -> None:
-    st.title("Inventory Scan")
+    st.title("Scan")
     try:
         _render_inventory_scan_inner()
     except Exception as exc:
-        st.error(f"Inventory scan could not load: {exc!s}")
+        st.error(f"Scan page could not load: {exc!s}")
         st.exception(exc)
 
 
@@ -358,7 +686,10 @@ def _render_inventory_scan_inner() -> None:
 
     can_use = role_can_open_page(current_role(), "Scan Inventory")
     if not can_use:
-        st.info("You do not have access to issue inventory from this account. Ask an admin to enable **Scan Inventory**.")
+        st.info(
+            "You do not have access to this page. Ask an admin to enable **Scan Inventory** "
+            "(inventory issue + tool checkout)."
+        )
         return
 
     try:
@@ -368,23 +699,55 @@ def _render_inventory_scan_inner() -> None:
         st.caption(str(exc))
         return
 
-    # Deep link / camera: open item immediately when ``?code=`` or session resume is present.
+    txn_ok = True
+    try:
+        fetch_table_admin(_TOOL_TXN, columns="id", limit=1)
+    except Exception:
+        txn_ok = False
+        st.warning("Run migration **`sql/029_tool_checkout.sql`** to enable **tool_transactions** logging for tools.")
+
+    assets_scan_ok = True
+    try:
+        fetch_table_admin(_ASSETS, columns="id,asset_name,qr_code_value,is_checkout_item", limit=1)
+    except Exception:
+        assets_scan_ok = False
+
+    # Deep link / camera: resolve inventory first, then checkout tools on ``assets``.
     _dl = (
         str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
         or str(st.session_state.get("pending_scan_code") or "").strip()
     )
-    if _dl and not st.session_state.get("inv_scan_loaded"):
-        rows_dl, reason_dl = _lookup_inventory(_dl)
-        if reason_dl == "":
+    if _dl and not st.session_state.get("inv_scan_loaded") and not st.session_state.get("inv_scan_asset"):
+        out_dl, rows_dl = _resolve_unified_scan(_normalize_scan_input(_dl))
+        if out_dl == "inv_one":
             st.session_state["inv_scan_loaded"] = rows_dl[0]
+            st.session_state.pop("inv_scan_asset", None)
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
             st.session_state.pop("pending_scan_code", None)
-        elif reason_dl == "ambiguous":
+        elif out_dl == "inv_amb":
             st.session_state["inv_scan_loaded"] = {"_choices": rows_dl}
+            st.session_state.pop("inv_scan_asset", None)
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
             st.session_state.pop("pending_scan_code", None)
-        elif reason_dl == "none":
-            st.error(f"Item not found: `{html.escape(_dl)}` — try manual entry below or check the **Inventory** list.")
+        elif out_dl == "asset_one" and assets_scan_ok:
+            st.session_state["inv_scan_asset"] = rows_dl[0]
+            st.session_state.pop("inv_scan_loaded", None)
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
+        elif out_dl == "asset_amb" and assets_scan_ok:
+            st.session_state["inv_scan_asset"] = {"_choices": rows_dl}
+            st.session_state.pop("inv_scan_loaded", None)
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
+        elif out_dl == "none":
+            st.error(
+                f"Nothing found for `{html.escape(_dl)}` — try **Inventory** list, **Asset Database**, "
+                "or manual entry below."
+            )
+            st.session_state.pop("_ips_inv_scan_deeplink_code", None)
+            st.session_state.pop("pending_scan_code", None)
+        elif out_dl in ("asset_one", "asset_amb") and not assets_scan_ok:
+            st.error("**assets** table unavailable — cannot load tools from this link.")
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
             st.session_state.pop("pending_scan_code", None)
 
@@ -407,7 +770,15 @@ def _render_inventory_scan_inner() -> None:
     job_labels = [job_row_select_label(j) for j in jobs if j.get("id") and job_row_select_label(j) != "—"]
     job_label_to_id = {job_row_select_label(j): str(j["id"]) for j in jobs if j.get("id")}
 
-    st.caption("Paste a **QR code** or **SKU**, then **Find** (or press **Enter** in the scan field).")
+    try:
+        emps = fetch_table("employees", columns="id,name", limit=4000, order_by="name")
+    except Exception:
+        emps = []
+
+    st.caption(
+        "Paste **inventory** QR / SKU or **tool** QR / asset tag, then **Find**. "
+        "Checkout tools are also in **Who Has What**."
+    )
 
     with st.form("inv_scan_lookup_form", clear_on_submit=False):
         scan_code = st.text_input(
@@ -425,7 +796,9 @@ def _render_inventory_scan_inner() -> None:
     if reset:
         st.session_state.pop("inv_scan_code_input", None)
         st.session_state.pop("inv_scan_loaded", None)
+        st.session_state.pop("inv_scan_asset", None)
         st.session_state.pop("inv_scan_pick_ix", None)
+        st.session_state.pop("inv_scan_asset_pick_ix", None)
         st.session_state.pop("_ips_inv_scan_deeplink_code", None)
         st.session_state.pop("pending_scan_code", None)
         st.session_state.pop("_ips_query_wants_scan_inventory", None)
@@ -438,25 +811,81 @@ def _render_inventory_scan_inner() -> None:
         st.rerun()
 
     loaded: dict[str, Any] | None = st.session_state.get("inv_scan_loaded")
+    asset_loaded: dict[str, Any] | None = st.session_state.get("inv_scan_asset")
 
     if find:
-        rows, reason = _lookup_inventory(_normalize_scan_input(str(scan_code or "")))
-        if reason == "empty":
+        norm = _normalize_scan_input(str(scan_code or ""))
+        outcome, rows = _resolve_unified_scan(norm)
+        if outcome == "empty":
             st.warning("Enter a scan code.")
-        elif reason == "none":
-            shown = _normalize_scan_input(str(scan_code or "")) or str(scan_code or "").strip() or "—"
-            st.error(f"Item not found: `{html.escape(shown)}`")
+        elif outcome == "none":
+            shown = norm or str(scan_code or "").strip() or "—"
+            st.error(f"Nothing found: `{html.escape(shown)}`")
+            st.session_state.pop("inv_scan_loaded", None)
+            st.session_state.pop("inv_scan_asset", None)
+            st.session_state.pop("inv_scan_pick_ix", None)
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
+            st.rerun()
+        elif outcome == "inv_amb":
+            st.session_state["inv_scan_loaded"] = {"_choices": rows}
+            st.session_state.pop("inv_scan_asset", None)
+            st.session_state.pop("inv_scan_pick_ix", None)
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
+            st.rerun()
+        elif outcome == "inv_one":
+            st.session_state["inv_scan_loaded"] = rows[0]
+            st.session_state.pop("inv_scan_asset", None)
+            st.session_state.pop("inv_scan_pick_ix", None)
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
+            st.rerun()
+        elif outcome in ("asset_one", "asset_amb") and not assets_scan_ok:
+            st.error("**assets** table unavailable — cannot look up tools.")
+            st.session_state.pop("inv_scan_asset", None)
+            st.session_state.pop("inv_scan_loaded", None)
+            st.rerun()
+        elif outcome == "asset_amb":
+            st.session_state["inv_scan_asset"] = {"_choices": rows}
             st.session_state.pop("inv_scan_loaded", None)
             st.session_state.pop("inv_scan_pick_ix", None)
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
             st.rerun()
-        elif reason == "ambiguous":
-            st.session_state["inv_scan_loaded"] = {"_choices": rows}
+        elif outcome == "asset_one":
+            st.session_state["inv_scan_asset"] = rows[0]
+            st.session_state.pop("inv_scan_loaded", None)
             st.session_state.pop("inv_scan_pick_ix", None)
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
             st.rerun()
-        else:
-            st.session_state["inv_scan_loaded"] = rows[0]
-            st.session_state.pop("inv_scan_pick_ix", None)
+
+    # Re-resolve asset choices UI
+    if isinstance(asset_loaded, dict) and asset_loaded.get("_choices"):
+        choices_a: list[dict] = asset_loaded["_choices"]
+        st.warning("Multiple tools matched — pick one.")
+        labels_a = [
+            f"{html.escape(str(c.get('asset_name') or '?'))} · tag `{html.escape(str(c.get('asset_id') or '—'))}`"
+            for c in choices_a
+        ]
+        ix_a = st.selectbox(
+            "Pick tool",
+            range(len(labels_a)),
+            format_func=lambda i: labels_a[i],
+            key="inv_scan_asset_pick_ix",
+        )
+        if st.button("Use selected tool", type="primary", key="inv_scan_asset_use_choice", use_container_width=True):
+            st.session_state["inv_scan_asset"] = choices_a[int(ix_a)]
+            st.session_state.pop("inv_scan_asset_pick_ix", None)
             st.rerun()
+        return
+
+    if isinstance(asset_loaded, dict) and asset_loaded and not asset_loaded.get("_choices"):
+        _render_inv_scan_asset_panel(
+            asset_loaded,
+            jobs=jobs,
+            job_labels=job_labels,
+            job_label_to_id=job_label_to_id,
+            emps=emps,
+            txn_ok=txn_ok,
+        )
+        return
 
     # Re-resolve choices UI
     if isinstance(loaded, dict) and loaded.get("_choices"):

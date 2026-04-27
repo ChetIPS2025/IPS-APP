@@ -628,7 +628,7 @@ def _render_asset_facts_panel(
     _kv("Asset / tool ID", _disp(asset.get("asset_id")))
     _kv("Status", _disp(asset.get("status")))
     if bool(asset.get("is_checkout_item")):
-        st.caption("Checkout tool — possession is logged on **Tool Checkout** (not consumable inventory).")
+        st.caption("Checkout tool — possession is logged on **Scan Inventory** (not consumable inventory).")
         _kv("Last checkout", _disp(asset.get("last_checkout_at")))
         _kv("Last check-in", _disp(asset.get("last_checkin_at")))
 
@@ -1103,6 +1103,8 @@ def _render_tool_trailer_kit(
                     "quantity": float(qty or 0),
                     "unit_value": float(uv or 0),
                     "replacement_cost": float(rc or 0),
+                    "quantity_on_hand": float(qty or 0),
+                    "missing_count": 0.0,
                     "expected_life_days": int(exp_days) if int(exp_days or 0) > 0 else None,
                     "inventory_item_id": str(inv_link or "").strip() or None,
                     "qr_code_value": str(qr_val or "").strip(),
@@ -1112,9 +1114,14 @@ def _render_tool_trailer_kit(
                 try:
                     insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
                 except Exception as exc:
-                    if "kit_id" in str(exc).lower() and "column" in str(exc).lower():
+                    low = str(exc).lower()
+                    if "kit_id" in low and "column" in low:
                         st.warning("Kit linking not enabled yet — run **`sql/041_asset_kit_items_kits.sql`**.")
                         payload.pop("kit_id", None)
+                        insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
+                    elif ("quantity_on_hand" in low or "missing_count" in low) and "column" in low:
+                        payload.pop("quantity_on_hand", None)
+                        payload.pop("missing_count", None)
                         insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
                     else:
                         raise

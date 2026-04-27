@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import uuid
 from datetime import datetime, date
 from datetime import timedelta
 import pandas as pd
@@ -9,7 +10,7 @@ import streamlit as st
 try:
     from app.asset_responsive import inject_asset_workflow_mobile_css
     from app.mobile_ui import ensure_narrow_viewport_detected
-    from app.auth import current_role
+    from app.auth import current_profile, current_role
     from app.branding import render_header
     from app.db import (
         create_signed_url,
@@ -19,6 +20,7 @@ try:
         fetch_table,
         insert_row_admin,
         update_rows_admin,
+        upload_bytes_admin,
     )
     from app.pages.asset_intake import render_asset_intake_form
     from app.services.asset_constants import ASSET_STATUSES
@@ -28,7 +30,7 @@ try:
 except ImportError:
     from asset_responsive import inject_asset_workflow_mobile_css  # type: ignore
     from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
-    from auth import current_role  # type: ignore
+    from auth import current_profile, current_role  # type: ignore
     from branding import render_header  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
@@ -38,6 +40,7 @@ except ImportError:
         fetch_table,
         insert_row_admin,
         update_rows_admin,
+        upload_bytes_admin,
     )
     from pages.asset_intake import render_asset_intake_form  # type: ignore
     from services.asset_constants import ASSET_STATUSES  # type: ignore
@@ -72,6 +75,7 @@ except ImportError:
 _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
 _ADB_TOP_ACTIONS_CSS_KEY = "ips_asset_db_top_actions_css_injected"
 _ADB_MOBILE_CSS_KEY = "ips_asset_db_mobile_css_injected_v2"
+_KIT_AUDIT_LOGS = "kit_item_audit_logs"
 
 
 def _inject_asset_database_mobile_css() -> None:
@@ -314,7 +318,7 @@ def _render_asset_panel_view(row: dict) -> None:
             )
             st.markdown(f"**Status:** {_disp(row.get('status'))}")
             if _is_checkout_tool_flag(row.get("is_checkout_item")):
-                st.caption("Checkout tool — scan in sidebar **Tool Checkout** (QR / asset tag).")
+                st.caption("Checkout tool — scan from **Scan Inventory** (QR / asset tag).")
                 st.markdown(f"**Last checkout:** {_disp(row.get('last_checkout_at'))}")
                 st.markdown(f"**Last check-in:** {_disp(row.get('last_checkin_at'))}")
             st.markdown(f"**Category:** {_disp(row.get('category'))}")
@@ -348,8 +352,195 @@ def _render_asset_panel_view(row: dict) -> None:
         render_tool_kits_section(row, can_edit=can_edit)
 
 
+def _adb_kit_audit_counted_by() -> str:
+    try:
+        p = current_profile()
+        return (
+            str(p.get("email") or "").strip()
+            or str(p.get("full_name") or "").strip()
+            or str(p.get("id") or "").strip()
+        )[:500]
+    except Exception:
+        return ""
+
+
+def _adb_upload_kit_audit_photo(*, asset_id: str, kit_item_id: str, uploaded) -> str | None:
+    if uploaded is None:
+        return None
+    data = uploaded.getvalue()
+    if not data:
+        return None
+    ctype = str(getattr(uploaded, "type", "") or "").strip() or "image/jpeg"
+    ext = "jpg"
+    if "png" in ctype.lower():
+        ext = "png"
+    path = f"kit_item_audits/{asset_id}/{kit_item_id}_{uuid.uuid4().hex[:12]}.{ext}"
+    try:
+        upload_bytes_admin(path, data, content_type=ctype)
+        return path
+    except Exception:
+        return None
+
+
+def _adb_render_kit_count_audit_screen(
+    *,
+    asset: dict,
+    kit: dict,
+    kit_items: list[dict],
+    kit_id: str,
+    kit_name: str,
+    asset_id: str,
+    can_edit: bool,
+    _as_float,
+    _money,
+    _today,
+) -> None:
+    _ = kit
+    if not can_edit:
+        st.info("Count / audit requires **admin** or **PM** access.")
+        return
+    if not kit_items:
+        st.info("No kit lines to audit.")
+        return
+    st.caption(
+        "Record **actual** counted quantity per line. **Missing qty** = expected − actual (when actual is lower). "
+        "Optional photos are stored like other asset uploads. Run **`sql/044_kit_item_audit_logs.sql`** if logging fails."
+    )
+    tag = str(asset.get("asset_id") or "").strip() or asset_id[:8] + "…"
+    st.caption(f"Trailer / asset: **{html.escape(tag)}** · **{html.escape(kit_name)}**")
+    if st.button("Close audit", key=f"adb_kit_audit_close_top_{kit_id}", use_container_width=True):
+        st.session_state.pop("adb_kit_audit_asset", None)
+        st.session_state.pop("adb_kit_audit_kit", None)
+        st.rerun()
+
+    with st.form(f"adb_kit_audit_form_{kit_id}", clear_on_submit=False):
+        pack: list[tuple[dict, str, float, float, str, str, object]] = []
+        for it in kit_items:
+            item_id = str((it or {}).get("id") or "").strip()
+            if not item_id:
+                continue
+            nm = str((it or {}).get("item_name") or "").strip() or "—"
+            exp = _as_float((it or {}).get("quantity"), 0.0)
+            qoh_raw = (it or {}).get("quantity_on_hand")
+            default_actual = (
+                _as_float(qoh_raw, exp)
+                if qoh_raw is not None and str(qoh_raw).strip() != ""
+                else exp
+            )
+            st.markdown(f"**{html.escape(nm)}** — expected **{exp:g}** · repl. {_money((it or {}).get('replacement_cost'))}")
+            c1, c2 = st.columns(2, gap="small")
+            with c1:
+                act = st.number_input(
+                    "Actual qty counted",
+                    min_value=0.0,
+                    value=float(default_actual),
+                    step=0.25,
+                    format="%.2f",
+                    key=f"ka_act_{kit_id}_{item_id}",
+                )
+                cond = st.selectbox(
+                    "Condition",
+                    ("OK", "Missing", "Damaged"),
+                    index=1 if _as_float((it or {}).get("missing_count"), 0) > 0 else 0,
+                    key=f"ka_cond_{kit_id}_{item_id}",
+                )
+            with c2:
+                up = st.file_uploader("Photo (optional)", type=["jpg", "jpeg", "png"], key=f"ka_up_{kit_id}_{item_id}")
+                notes = st.text_area("Notes", key=f"ka_notes_{kit_id}_{item_id}", height=64)
+            pack.append((it, item_id, exp, act, cond, notes, up))
+        go = st.form_submit_button("Submit audit", type="primary", use_container_width=True)
+
+    if not go:
+        return
+
+    counted_by = _adb_kit_audit_counted_by()
+    audit_date_s = _today().isoformat()
+    ts_iso = datetime.utcnow().isoformat()
+    any_short = False
+    total_missing = 0.0
+    n_short_lines = 0
+    errs: list[str] = []
+
+    for it, item_id, exp, act, cond, notes, up in pack:
+        try:
+            act_f = float(act or 0)
+        except (TypeError, ValueError):
+            act_f = 0.0
+        miss = max(0.0, float(exp) - act_f)
+        if miss > 0:
+            any_short = True
+            n_short_lines += 1
+            total_missing += miss
+        photo_url = ""
+        if up is not None:
+            pth = _adb_upload_kit_audit_photo(asset_id=asset_id, kit_item_id=item_id, uploaded=up)
+            if pth:
+                photo_url = pth
+        log_payload = {
+            "kit_item_id": item_id,
+            "asset_id": asset_id,
+            "kit_id": kit_id or None,
+            "audit_date": audit_date_s,
+            "expected_qty": float(exp),
+            "actual_qty": act_f,
+            "missing_qty": float(miss),
+            "audit_condition": str(cond or "OK")[:50],
+            "photo_url": str(photo_url or "")[:2000],
+            "notes": str(notes or "").strip()[:2000],
+            "counted_by": counted_by,
+        }
+        try:
+            insert_row_admin(_KIT_AUDIT_LOGS, log_payload)
+        except Exception as exc:
+            low = str(exc).lower()
+            if "kit_item_audit" in low or "relation" in low or "does not exist" in low:
+                errs.append("kit_item_audit_logs table missing — run sql/044_kit_item_audit_logs.sql")
+            else:
+                errs.append(f"{item_id[:8]}… log: {str(exc)[:200]}")
+            continue
+        upd_body = {
+            "quantity_on_hand": act_f,
+            "missing_count": float(miss),
+            "last_counted_at": ts_iso,
+        }
+        try:
+            update_rows_admin("asset_kit_items", upd_body, {"id": item_id})
+        except Exception:
+            try:
+                update_rows_admin(
+                    "asset_kit_items",
+                    {"quantity_on_hand": act_f, "missing_count": float(miss)},
+                    {"id": item_id},
+                )
+            except Exception:
+                pass
+
+    if errs:
+        st.error(" ; ".join(errs))
+        return
+
+    if any_short:
+        st.session_state["adb_kit_audit_flash"] = (
+            f"Audit saved: **{n_short_lines}** line(s) short — missing total qty **{total_missing:g}**. "
+            "Review replacements / restock."
+        )
+        st.warning(
+            f"**Short count:** {n_short_lines} kit line(s) below expected — **{total_missing:g}** units missing "
+            "(see replacement history and restock)."
+        )
+    else:
+        st.session_state["adb_kit_audit_flash"] = "Kit audit saved — quantities match expected counts (or over)."
+
+    st.session_state.pop("adb_kit_audit_asset", None)
+    st.session_state.pop("adb_kit_audit_kit", None)
+    st.rerun()
+
+
 def render_tool_kits_section(asset: dict, *, can_edit: bool) -> None:
     """Shared Tool Kits section for any asset (Table + Cards view)."""
+    flash_audit = st.session_state.pop("adb_kit_audit_flash", None)
+    if flash_audit:
+        st.success(flash_audit)
     st.markdown("-----")
     st.markdown("## Tool Kits")
     at = str(asset.get("asset_type") or "").strip().lower()
@@ -503,6 +694,8 @@ def render_tool_kits_section(asset: dict, *, can_edit: bool) -> None:
                             "unit_value": uv,
                             "total_value": float(qv * uv),
                             "replacement_cost": float(repl_cost or 0),
+                            "quantity_on_hand": float(qv),
+                            "missing_count": 0.0,
                             "is_active": True,
                             "notes": str(notes or "").strip(),
                         }
@@ -510,7 +703,15 @@ def render_tool_kits_section(asset: dict, *, can_edit: bool) -> None:
                             insert_row_admin("asset_kit_items", payload)
                         except Exception as exc:
                             low = str(exc).lower()
-                            for col in ("asset_id", "total_value", "notes", "category", "kit_id"):
+                            for col in (
+                                "asset_id",
+                                "total_value",
+                                "notes",
+                                "category",
+                                "kit_id",
+                                "quantity_on_hand",
+                                "missing_count",
+                            ):
                                 if col in payload and col in low and "column" in low:
                                     payload.pop(col, None)
                             insert_row_admin("asset_kit_items", payload)
@@ -535,15 +736,35 @@ def render_tool_kits_section(asset: dict, *, can_edit: bool) -> None:
         k2.metric("Replacement Value", _money(kit_repl_value))
         k3.metric("Items", len(kit_items))
 
-        header = st.columns([1.8, 1.0, 0.6, 0.9, 0.9, 1.0, 1.0, 0.9], gap="small")
-        header[0].markdown("**Item**")
-        header[1].markdown("**Category**")
-        header[2].markdown("**Qty**")
-        header[3].markdown("**Unit**")
-        header[4].markdown("**Total**")
-        header[5].markdown("**Repl**")
-        header[6].markdown("**Last**")
-        header[7].markdown("**Count**")
+        audit_open = (
+            str(st.session_state.get("adb_kit_audit_asset") or "") == asset_id
+            and str(st.session_state.get("adb_kit_audit_kit") or "") == kid
+        )
+        if can_edit and not audit_open:
+            if st.button("Count / Audit Kit", key=f"adb_kit_audit_btn_{kid}", use_container_width=True):
+                st.session_state["adb_kit_audit_asset"] = asset_id
+                st.session_state["adb_kit_audit_kit"] = kid
+                st.rerun()
+        if audit_open:
+            _adb_render_kit_count_audit_screen(
+                asset=asset,
+                kit=kit,
+                kit_items=kit_items,
+                kit_id=kid,
+                kit_name=kn,
+                asset_id=asset_id,
+                can_edit=can_edit,
+                _as_float=_as_float,
+                _money=_money,
+                _today=_today,
+            )
+            st.divider()
+
+        _cw = [1.45, 0.72, 0.42, 0.42, 0.42, 0.62, 0.68, 0.62, 0.72, 0.42]
+        header = st.columns(_cw, gap="small")
+        hdr_labels = ("Item", "Cat", "Exp", "On hand", "Miss", "Unit", "Total", "Repl", "Last", "#")
+        for hi, lab in enumerate(hdr_labels):
+            header[hi].markdown(f"**{lab}**")
 
         for it in kit_items:
             item_id = str(it.get("id") or "").strip()
@@ -555,15 +776,24 @@ def render_tool_kits_section(asset: dict, *, can_edit: bool) -> None:
             tv = qty * uv
             lr = str(it.get("last_replaced_at") or "").strip() or "—"
             rcount = _as_float(it.get("replacement_count"), 0.0)
-            cols = st.columns([1.8, 1.0, 0.6, 0.9, 0.9, 1.0, 1.0, 0.9], gap="small")
+            qoh_raw = it.get("quantity_on_hand")
+            onh = (
+                f"{_as_float(qoh_raw, qty):g}"
+                if qoh_raw is not None and str(qoh_raw).strip() != ""
+                else "—"
+            )
+            miss_disp = f"{_as_float(it.get('missing_count'), 0):g}"
+            cols = st.columns(_cw, gap="small")
             cols[0].write(nm)
             cols[1].write(cat)
             cols[2].write(f"{qty:g}")
-            cols[3].write(_money(uv))
-            cols[4].write(_money(tv))
-            cols[5].write(_money(rc))
-            cols[6].write(lr)
-            cols[7].write(f"{rcount:g}")
+            cols[3].write(onh)
+            cols[4].write(miss_disp)
+            cols[5].write(_money(uv))
+            cols[6].write(_money(tv))
+            cols[7].write(_money(rc))
+            cols[8].write(lr)
+            cols[9].write(f"{rcount:g}")
 
             if not can_edit or not item_id:
                 continue
@@ -794,10 +1024,10 @@ def _render_asset_panel_edit(
             rental_notes_val = st.text_area("Rental notes", value=rental_notes_val, height=72, key=pk("rnotes"))
 
         is_checkout_item = st.checkbox(
-            "Checkout tool (possession / Tool Checkout page)",
+            "Checkout tool (possession / Scan Inventory)",
             value=_is_checkout_tool_flag(row.get("is_checkout_item")),
             key=pk("co_tool"),
-            help="Reusable tools tracked via **Tool Checkout** — does not use consumable inventory.",
+            help="Reusable tools tracked via **Scan Inventory** — does not use consumable inventory.",
         )
 
         notes = st.text_area("Notes", value=str(cv("notes")), height=88, key=pk("notes"))
@@ -1150,7 +1380,7 @@ def render_asset_database_card_list(
         meta_lines.append(f"Status: {_disp(rec.get('status'))}")
         meta_lines.append(f"Serial: {_disp(rec.get('serial_number'))}")
         if _is_checkout_tool_flag(rec.get("is_checkout_item")):
-            meta_lines.append("Checkout tool (use **Tool Checkout**)")
+            meta_lines.append("Checkout tool (use **Scan Inventory**)")
             if emp_by_id:
                 eid = str(rec.get("current_holder_employee_id") or "").strip()
                 hn = emp_by_id.get(eid) or str(rec.get("assigned_employee") or "").strip()
