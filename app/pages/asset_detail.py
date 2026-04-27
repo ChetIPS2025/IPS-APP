@@ -978,6 +978,7 @@ def _render_asset_expenses(
 def _render_tool_trailer_kit(
     *,
     asset_row: dict,
+    kits: list[dict],
     kit_items: list[dict],
     replacements: list[dict],
     jobs: list[dict],
@@ -987,33 +988,88 @@ def _render_tool_trailer_kit(
     if not aid:
         return
 
-    active = [r for r in kit_items if bool((r or {}).get("is_active", True))]
-    kit_value = sum(_as_float(r.get("total_value")) for r in active)
-    trailer_value = _as_float(asset_row.get("current_value") or asset_row.get("purchase_cost") or 0)
-    total_value = kit_value + trailer_value
+    active_kits = [k for k in (kits or []) if bool((k or {}).get("is_active", True))]
+    active_items = [r for r in kit_items if bool((r or {}).get("is_active", True))]
+    total_small_tool_value = sum(_as_float(r.get("total_value")) for r in active_items)
 
-    # Replacement summaries
+    # Replacement summaries (31 days + lifetime totals)
     now = datetime.utcnow().date()
     repl_this_month = 0
+    repl_cost_month = 0.0
     repl_cost_life = 0.0
     for r in replacements or []:
-        repl_cost_life += _as_float(r.get("total_cost"))
+        tc = _as_float(r.get("total_cost"))
+        repl_cost_life += tc
         try:
             ds = str(r.get("replacement_date") or "").strip()
             if ds and (now - datetime.fromisoformat(ds).date()).days <= _KIT_FREQ_MONTH_DAYS:
                 repl_this_month += 1
+                repl_cost_month += tc
         except Exception:
             pass
 
-    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-    c1.metric("Trailer value", _money(trailer_value))
-    c2.metric("Kit value", _money(kit_value))
-    c3.metric("Total value", _money(total_value))
-    c4.metric("Replacements (31d)", repl_this_month)
-    c5.metric("Lifetime repl. cost", _money(repl_cost_life))
+    # Most replaced item (by replacement_count, then replacement_cost)
+    most = None
+    if active_items:
+        most = sorted(
+            active_items,
+            key=lambda r: (-_as_int(r.get("replacement_count")), -_as_float(r.get("replacement_cost"))),
+        )[0]
+    most_name = str((most or {}).get("item_name") or "").strip() or "—"
+
+    c1, c2, c3, c4 = st.columns(4, gap="small")
+    c1.metric("Number of kits", len(active_kits))
+    c2.metric("Total small tool value", _money(total_small_tool_value))
+    c3.metric("Replacement cost (31d)", _money(repl_cost_month))
+    c4.metric("Most replaced item", most_name)
+
+    # Kit selection + CRUD
+    kit_options: list[tuple[str, str]] = []
+    for k in active_kits:
+        kid = str(k.get("id") or "").strip()
+        if not kid:
+            continue
+        nm = str(k.get("kit_name") or "").strip() or "Kit"
+        kit_options.append((kid, nm))
+    kit_options.sort(key=lambda x: x[1].lower())
+    kit_labels = ["All kits"] + [nm for _, nm in kit_options]
+    kit_ids_by_label = {nm: kid for kid, nm in kit_options}
+    kit_pick = st.selectbox("Tool Kits", kit_labels, key=f"tk_pick_{aid}")
+    selected_kit_id = kit_ids_by_label.get(kit_pick) if kit_pick and kit_pick != "All kits" else None
 
     if can_edit:
-        with st.expander("Add kit item", expanded=False):
+        with st.expander("Add kit", expanded=False):
+            kn = st.text_input("Kit name", key=f"tk_add_name_{aid}")
+            kd = st.text_area("Description", height=72, key=f"tk_add_desc_{aid}")
+            if st.button("Save kit", type="primary", use_container_width=True, key=f"tk_add_go_{aid}"):
+                t = str(kn or "").strip()
+                if not t:
+                    st.error("Kit name is required.")
+                    st.stop()
+                payload = {
+                    "asset_id": aid,
+                    "kit_name": t,
+                    "description": str(kd or "").strip(),
+                    "created_by": str(current_profile().get("id") or "").strip() or None,
+                    "is_active": True,
+                }
+                try:
+                    insert_row_admin("asset_kits", payload)  # type: ignore[name-defined]
+                except Exception as exc:
+                    st.error(f"Could not save kit: {exc} — run **`sql/040_asset_kits.sql`**.")
+                    st.stop()
+                st.success("Kit saved.")
+                st.rerun()
+
+    if can_edit:
+        with st.expander("Add item to kit", expanded=False):
+            if not active_kits:
+                st.info("Add a kit first.")
+                st.stop()
+            add_labels = [nm for _, nm in kit_options]
+            default_label = kit_pick if kit_pick in add_labels else (add_labels[0] if add_labels else "")
+            add_kit_label = st.selectbox("Kit", add_labels, index=add_labels.index(default_label) if default_label in add_labels else 0, key=f"kit_add_pick_{aid}")
+            add_kit_id = kit_ids_by_label.get(add_kit_label)
             nm = st.text_input("Item name", key=f"kit_add_name_{aid}")
             cat = st.text_input("Category", key=f"kit_add_cat_{aid}")
             c1, c2, c3 = st.columns(3, gap="small")
@@ -1041,6 +1097,7 @@ def _render_tool_trailer_kit(
                     st.stop()
                 payload = {
                     "parent_asset_id": aid,
+                    "kit_id": add_kit_id,
                     "item_name": t,
                     "category": str(cat or "").strip(),
                     "quantity": float(qty or 0),
@@ -1054,6 +1111,13 @@ def _render_tool_trailer_kit(
                 }
                 try:
                     insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
+                except Exception as exc:
+                    if "kit_id" in str(exc).lower() and "column" in str(exc).lower():
+                        st.warning("Kit linking not enabled yet — run **`sql/041_asset_kit_items_kits.sql`**.")
+                        payload.pop("kit_id", None)
+                        insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
+                    else:
+                        raise
                 except Exception:
                     try:
                         from app.db import insert_row
@@ -1066,6 +1130,10 @@ def _render_tool_trailer_kit(
     if not kit_items:
         st.caption("No kit items yet.")
         return
+
+    # Filter view by selected kit when kit_id is available.
+    if selected_kit_id:
+        kit_items = [r for r in kit_items if str((r or {}).get("kit_id") or "").strip() == str(selected_kit_id)]
 
     # Quick insights
     by_repl = sorted(active, key=lambda r: (-_as_int(r.get("replacement_count")), -_as_float(r.get("replacement_cost"))))
@@ -1342,6 +1410,7 @@ def render() -> None:
 
     # Optional modules (migrations may not be applied yet)
     asset_expenses = _safe_fetch_by_match("asset_expenses", {"asset_id": asset["id"]}, limit=1000)
+    kits = _safe_fetch_by_match("asset_kits", {"asset_id": asset["id"]}, limit=2000)
     kit_items = _safe_fetch_by_match("asset_kit_items", {"parent_asset_id": asset["id"]}, limit=2000)
     kit_replacements = _safe_fetch_by_match("asset_kit_replacements", {"parent_asset_id": asset["id"]}, limit=5000)
 
@@ -1350,6 +1419,7 @@ def render() -> None:
     assignments.sort(key=lambda r: str(r.get("created_at") or r.get("check_out_at") or ""), reverse=True)
     inspections.sort(key=lambda r: str(r.get("inspection_date") or ""), reverse=True)
     asset_expenses.sort(key=lambda r: str(r.get("expense_date") or r.get("created_at") or ""), reverse=True)
+    kits.sort(key=lambda r: str(r.get("kit_name") or ""), reverse=False)
     kit_items.sort(key=lambda r: str(r.get("created_at") or ""), reverse=False)
     kit_replacements.sort(key=lambda r: str(r.get("replacement_date") or r.get("created_at") or ""), reverse=True)
 
@@ -1895,12 +1965,13 @@ def render() -> None:
     if _is_tool_trailer(asset):
         st.markdown("### Tool trailer")
         tab_ov, tab_kit, tab_rep, tab_hist = st.tabs(
-            ["Overview", "Kit Items", "Repairs / Expenses", "Replacement History"]
+            ["Overview", "Tool Kits", "Repairs / Expenses", "Replacement History"]
         )
         with tab_ov:
             st.caption("Tool trailer summary (asset + kit value).")
             _render_tool_trailer_kit(
                 asset_row=asset,
+                kits=kits,
                 kit_items=kit_items,
                 replacements=kit_replacements,
                 jobs=jobs,
@@ -1909,6 +1980,7 @@ def render() -> None:
         with tab_kit:
             _render_tool_trailer_kit(
                 asset_row=asset,
+                kits=kits,
                 kit_items=kit_items,
                 replacements=kit_replacements,
                 jobs=jobs,

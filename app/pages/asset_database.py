@@ -9,7 +9,14 @@ try:
     from app.mobile_ui import ensure_narrow_viewport_detected
     from app.auth import current_role
     from app.branding import render_header
-    from app.db import create_signed_url, delete_rows_admin, fetch_one, fetch_table, update_rows_admin
+    from app.db import (
+        create_signed_url,
+        delete_rows_admin,
+        fetch_by_match_admin,
+        fetch_one,
+        fetch_table,
+        update_rows_admin,
+    )
     from app.pages.asset_intake import render_asset_intake_form
     from app.services.asset_constants import ASSET_STATUSES
     from app.services.asset_service import optional_numeric
@@ -20,7 +27,14 @@ except ImportError:
     from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
-    from db import create_signed_url, delete_rows_admin, fetch_one, fetch_table, update_rows_admin  # type: ignore
+    from db import (  # type: ignore
+        create_signed_url,
+        delete_rows_admin,
+        fetch_by_match_admin,
+        fetch_one,
+        fetch_table,
+        update_rows_admin,
+    )
     from pages.asset_intake import render_asset_intake_form  # type: ignore
     from services.asset_constants import ASSET_STATUSES  # type: ignore
     from services.asset_service import optional_numeric  # type: ignore
@@ -314,6 +328,18 @@ def _render_asset_panel_view(row: dict) -> None:
                 _clear_asset_panel()
                 st.rerun()
 
+        # Tool Trailer audits (quick entry point)
+        at = str(row.get("asset_type") or "").strip()
+        if at.lower() == "tool trailer":
+            st.markdown("-----")
+            st.caption("Audits: random photo verification of kit items.")
+            if st.button("Open Tool Trailer Audits", use_container_width=True, key="adb_open_tta"):
+                _clear_asset_panel()
+                st.session_state[IPS_NAV_PENDING_KEY] = "Tool Trailer Audits"
+                # Pass context for creation page
+                st.session_state["tta_create_asset_id"] = str(row.get("id") or "").strip()
+                st.rerun()
+
 
 def _render_asset_panel_edit(
     row: dict,
@@ -585,6 +611,40 @@ ASSET_TABLE_COLS = [
     "category",
     "qr_code_value",
 ]
+
+
+def _asset_delete_dependency_state(asset_id: str) -> tuple[bool, bool]:
+    """
+    Returns (blocked_checked_out, has_history).
+
+    - blocked_checked_out: checkout tool is currently checked out (do not delete/deactivate).
+    - has_history: row is referenced by history tables; deactivate instead of hard delete.
+    """
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return False, False
+    recs = fetch_by_match_admin("assets", {"id": aid}, limit=1)
+    asset = recs[0] if recs else {}
+
+    is_tool = _is_checkout_tool_flag(asset.get("is_checkout_item"))
+    stt = str(asset.get("status") or "").strip()
+    holder = str(asset.get("current_holder_employee_id") or "").strip()
+    if is_tool and (stt == "Checked Out" or bool(holder)):
+        return True, True
+
+    def _has(table: str, match: dict) -> bool:
+        try:
+            return bool(fetch_by_match_admin(table, match, columns="id", limit=1))
+        except Exception:
+            # If a dependency table is missing (migration not applied), treat it as no dependency.
+            return False
+
+    has_history = False
+    has_history = has_history or _has("tool_transactions", {"tool_id": aid})
+    has_history = has_history or _has("asset_expenses", {"asset_id": aid})
+    has_history = has_history or _has("asset_kit_items", {"parent_asset_id": aid})
+    has_history = has_history or _has("asset_kit_replacements", {"parent_asset_id": aid})
+    return False, has_history
 
 
 def _is_equipment_row_cat(val) -> bool:
@@ -961,17 +1021,57 @@ def render() -> None:
         pend = st.session_state.get(IPS_PENDING_DELETE) or {}
         if actions.get("confirm_delete") and pend.get(TABLE_KEY_ASSETS) and can_add:
             deleted = list(pend[TABLE_KEY_ASSETS])
+            n_deleted = 0
+            n_deactivated = 0
+            n_blocked = 0
             for aid in deleted:
+                blocked, has_history = _asset_delete_dependency_state(str(aid))
+                if blocked:
+                    n_blocked += 1
+                    st.error("Cannot delete asset while checked out.")
+                    continue
+                if has_history:
+                    # Keep history rows; mark inactive instead of hard delete.
+                    payload: dict = {}
+                    try:
+                        asset_row = fetch_by_match_admin("assets", {"id": str(aid)}, limit=1)
+                        asset = asset_row[0] if asset_row else {}
+                    except Exception:
+                        asset = {}
+                    if "is_active" in asset:
+                        payload["is_active"] = False
+                    if "status" in asset:
+                        payload["status"] = "Inactive"
+                    # ``deleted_at`` is optional; if present, best-effort set (safe to omit).
+                    if not payload:
+                        payload = {"status": "Inactive"}
+                    try:
+                        update_rows_admin("assets", payload, {"id": str(aid)})
+                        n_deactivated += 1
+                        st.warning("Asset has history and was deactivated instead.")
+                    except Exception as exc:
+                        st.error(f"Could not deactivate {aid}: {exc}")
+                    continue
                 try:
-                    delete_rows_admin("assets", {"id": aid})
+                    delete_rows_admin("assets", {"id": str(aid)})
+                    n_deleted += 1
                 except Exception as exc:
                     st.error(f"Could not delete {aid}: {exc}")
             pend.pop(TABLE_KEY_ASSETS, None)
             clear_selected_ids(TABLE_KEY_ASSETS)
+            # Clear editor widget state so checkboxes reset immediately.
+            st.session_state.pop("asset_db_sel_editor", None)
             pid = st.session_state.get("asset_panel_id")
             if pid and str(pid) in {str(x) for x in deleted}:
                 _clear_asset_panel()
-            st.success("Delete completed where permitted.")
+            if n_deleted:
+                st.success("Asset deleted.")
+            elif n_deactivated:
+                st.success("Asset has history and was deactivated instead.")
+            elif n_blocked:
+                st.info("Cannot delete asset while checked out.")
+            else:
+                st.success("Delete completed where permitted.")
             st.rerun()
 
     def _render_main_column() -> None:

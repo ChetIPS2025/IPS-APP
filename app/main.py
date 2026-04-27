@@ -43,6 +43,7 @@ from pages import tool_dashboard
 from pages import asset_detail
 from pages import assets as assets_page
 from pages import asset_scanner
+from pages import tool_trailer_audits
 from pages import sign_timesheet
 from pages import materials
 from pages import labor
@@ -85,6 +86,7 @@ PAGES = {
     "Tool Checkout": tool_checkout.render,
     "Who Has What": tool_dashboard.render,
     "Asset Scanner": asset_scanner.render,
+    "Tool Trailer Audits": tool_trailer_audits.render,
     "Admin": admin.render,
     "Users": users.render,
     "Asset Detail": asset_detail.render,

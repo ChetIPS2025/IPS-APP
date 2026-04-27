@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 
 import pandas as pd
 import streamlit as st
@@ -8,11 +9,23 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.branding import render_header
-    from app.db import fetch_table_admin, invite_auth_user, resend_invite_by_email, update_rows_admin
+    from app.db import (
+        fetch_table_admin,
+        invite_auth_user,
+        resend_invite_by_email,
+        update_auth_user_email_admin,
+        update_rows_admin,
+    )
 except ImportError:
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
-    from db import fetch_table_admin, invite_auth_user, resend_invite_by_email, update_rows_admin  # type: ignore
+    from db import (  # type: ignore
+        fetch_table_admin,
+        invite_auth_user,
+        resend_invite_by_email,
+        update_auth_user_email_admin,
+        update_rows_admin,
+    )
 
 try:
     from app.ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle
@@ -20,6 +33,8 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle  # type: ignore
 
 _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "manager", "admin")
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _fetch_profile_row(profile_id):
     from app.db import get_client
@@ -106,6 +121,57 @@ def render() -> None:
         },
         key="users_profiles_editor",
     )
+
+    with st.expander("Edit login email (Supabase Auth)", expanded=False):
+        st.caption("This updates **Auth** first, then syncs `public.profiles.email`.")
+        id_to_email = {str(r.get("id") or ""): str(r.get("email") or "").strip().lower() for r in rows if r.get("id")}
+        user_ids = [uid for uid in id_to_email.keys() if uid]
+        user_ids.sort(key=lambda uid: id_to_email.get(uid, ""))
+        pick_labels = [f"{id_to_email.get(uid, '')} · {uid[:8]}…" for uid in user_ids]
+        picked = st.selectbox("User", pick_labels, key="users_edit_email_pick")
+        picked_id = ""
+        if picked:
+            idx = pick_labels.index(picked)
+            picked_id = user_ids[idx]
+        cur_em = id_to_email.get(picked_id, "")
+        new_em = st.text_input("New email", value=cur_em, key="users_edit_email_new")
+
+        if st.button("Update email", type="primary", use_container_width=True, key="users_edit_email_go"):
+            if current_role() != "admin":
+                st.error("Unauthorized. Admin access required.")
+                st.stop()
+            uid = str(picked_id or "").strip()
+            if not uid:
+                st.error("Select a user.")
+                st.stop()
+            em = str(new_em or "").strip().lower()
+            if not _EMAIL_RE.match(em):
+                st.error("Enter a valid email address.")
+                st.stop()
+            # Uniqueness check (profiles mirror auth emails in this app)
+            for pid, pemail in id_to_email.items():
+                if pid != uid and str(pemail or "").strip().lower() == em:
+                    st.error("That email is already used.")
+                    st.stop()
+            try:
+                update_auth_user_email_admin(user_id=uid, new_email=em)
+            except Exception as exc:
+                msg = str(exc)
+                if "already" in msg.lower() and "email" in msg.lower():
+                    st.error("That email is already used.")
+                else:
+                    st.error("Could not update auth email.")
+                    with st.expander("Technical details"):
+                        st.code(repr(exc), language="text")
+                st.stop()
+            try:
+                update_rows_admin("profiles", {"email": em}, {"id": uid})
+            except Exception as exc:
+                st.warning("Auth email updated, but syncing profiles.email failed.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+            st.success("Email updated.")
+            st.rerun()
 
     b1, b2 = st.columns([1, 1], gap="small")
     with b1:
