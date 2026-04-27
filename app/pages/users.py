@@ -10,8 +10,12 @@ try:
     from app.auth import current_role
     from app.branding import render_header
     from app.db import (
+        delete_auth_user_admin,
+        delete_rows_admin,
+        fetch_one,
         fetch_table_admin,
         invite_auth_user,
+        list_auth_users_admin,
         resend_invite_by_email,
         update_auth_user_email_admin,
         update_rows_admin,
@@ -20,8 +24,12 @@ except ImportError:
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
     from db import (  # type: ignore
+        delete_auth_user_admin,
+        delete_rows_admin,
+        fetch_one,
         fetch_table_admin,
         invite_auth_user,
+        list_auth_users_admin,
         resend_invite_by_email,
         update_auth_user_email_admin,
         update_rows_admin,
@@ -183,6 +191,62 @@ def render() -> None:
                 with st.expander("Technical details"):
                     st.code(repr(exc), language="text")
             st.success("Email updated.")
+            st.rerun()
+
+    with st.expander("Delete Login Account (Supabase Auth)", expanded=False):
+        st.caption("Deletes the user from **Supabase Auth** (`auth.users`). This cannot be undone.")
+        try:
+            auth_users = list_auth_users_admin(page=1, per_page=500)
+        except Exception as exc:
+            st.error(f"Could not load auth users: {exc}")
+            auth_users = []
+        auth_users = [u for u in auth_users if str(u.get("id") or "").strip()]
+        auth_users.sort(key=lambda u: str(u.get("email") or u.get("phone") or "").lower())
+
+        labels: list[str] = []
+        id_by_label: dict[str, str] = {}
+        for u in auth_users:
+            uid = str(u.get("id") or "").strip()
+            em = str(u.get("email") or "").strip()
+            ph = str(u.get("phone") or "").strip()
+            label = f"{em or ph or '—'} · {uid[:8]}…"
+            labels.append(label)
+            id_by_label[label] = uid
+
+        picked = st.selectbox("Login account", options=["(select)"] + labels, key="selected_login_id")
+        user_id = ""
+        if picked and picked != "(select)":
+            user_id = id_by_label.get(picked, "")
+
+        if st.button(
+            "Delete Login Account",
+            type="secondary",
+            use_container_width=True,
+            disabled=current_role() != "admin" or not user_id,
+            key="users_delete_login_go",
+        ):
+            # Temporary debug safety (requested)
+            st.write(f"Deleting user: {user_id}")
+            try:
+                # Must use auth.users.id (not profiles.id / employee id)
+                delete_auth_user_admin(user_id=user_id)
+                st.success("Login account deleted")
+            except Exception as e:
+                st.error(f"Failed to delete user: {e}")
+                st.stop()
+
+            # Clean up profile row if it exists
+            try:
+                prof = fetch_one("profiles", {"id": user_id})
+            except Exception:
+                prof = None
+            if prof:
+                try:
+                    delete_rows_admin("profiles", {"id": user_id})
+                except Exception:
+                    pass
+
+            st.session_state.pop("selected_login_id", None)
             st.rerun()
 
     b1, b2 = st.columns([1, 1], gap="small")

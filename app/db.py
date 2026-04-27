@@ -698,3 +698,58 @@ def update_auth_user_email_admin(*, user_id: str, new_email: str) -> None:
             fn({"uid": uid, "attributes": {"email": em}})
     except Exception as exc:
         raise RuntimeError(f"Could not update auth email for user_id={uid!r}: {exc!r}") from exc
+
+
+def list_auth_users_admin(*, page: int = 1, per_page: int = 200) -> list[dict[str, Any]]:
+    """
+    Return Supabase Auth users (auth.users) via Admin API.
+
+    Used for destructive actions where we must use the real `auth.users.id` (not profiles.id).
+    """
+    admin = get_admin_client()
+    try:
+        fn = getattr(admin.auth.admin, "list_users", None)
+        if fn is None:
+            raise AttributeError("auth.admin.list_users is not available in this Supabase client.")
+        try:
+            res = fn(page=page, per_page=per_page)
+        except TypeError:
+            # Some versions accept a single dict payload.
+            res = fn({"page": page, "per_page": per_page})
+    except Exception as exc:
+        raise RuntimeError(f"Could not list auth users: {exc!r}") from exc
+
+    users = getattr(res, "users", None)
+    if users is None and isinstance(res, dict):
+        users = res.get("users")
+    if users is None:
+        return []
+    out: list[dict[str, Any]] = []
+    for u in users or []:
+        if isinstance(u, dict):
+            out.append(u)
+        else:
+            out.append(
+                {
+                    "id": getattr(u, "id", None),
+                    "email": getattr(u, "email", None),
+                    "phone": getattr(u, "phone", None),
+                    "created_at": getattr(u, "created_at", None),
+                }
+            )
+    return out
+
+
+def delete_auth_user_admin(*, user_id: str) -> None:
+    """Delete a user from Supabase Auth (auth.users) via Admin API."""
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise RuntimeError("Auth user id is required.")
+    admin = get_admin_client()
+    fn = getattr(admin.auth.admin, "delete_user", None)
+    if fn is None:
+        raise RuntimeError("auth.admin.delete_user is not available in this Supabase client.")
+    try:
+        fn(uid)
+    except TypeError:
+        fn({"uid": uid})
