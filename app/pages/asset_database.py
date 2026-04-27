@@ -343,12 +343,15 @@ def _render_asset_panel_view(row: dict) -> None:
                 st.session_state["tta_create_asset_id"] = str(row.get("id") or "").strip()
                 st.rerun()
 
-            # --- Tool Kits (quick manage inside Asset Database view panel) ---
-            st.markdown("-----")
-            st.subheader("Tool Kits")
-            asset_id = str(row.get("id") or "").strip()
-            if not asset_id:
-                return
+        # --- Tool Kits (visible for any selected asset) ---
+        st.markdown("-----")
+        st.subheader("Tool Kits")
+        if at.lower() != "tool trailer":
+            st.caption("Kits are usually used for tool trailers, but can be added to any asset.")
+
+        asset_id = str(row.get("id") or "").strip()
+        if not asset_id:
+            return
 
             def _as_float(v, default: float = 0.0) -> float:
                 try:
@@ -370,45 +373,48 @@ def _render_asset_panel_view(row: dict) -> None:
             def _today() -> date:
                 return datetime.utcnow().date()
 
-            show_add_key = f"show_add_kit_{asset_id}"
-            if show_add_key not in st.session_state:
-                st.session_state[show_add_key] = False
-
             can_edit = current_role() in {"admin", "pm"}
-            if can_edit and st.button("Add Kit", use_container_width=True, key=f"adb_add_kit_btn_{asset_id}"):
-                st.session_state[show_add_key] = True
-                st.rerun()
+        if can_edit and st.button("Add Kit", key=f"add_kit_{asset_id}", use_container_width=True):
+            st.session_state["show_add_kit"] = True
+            st.session_state["kit_asset_id"] = asset_id
+            st.rerun()
 
-            if st.session_state.get(show_add_key):
-                kit_name = st.text_input("Kit Name", key=f"adb_kit_name_{asset_id}")
-                description = st.text_area("Description", key=f"adb_kit_desc_{asset_id}", height=72)
-                b1, b2 = st.columns(2, gap="small")
-                with b1:
-                    if st.button("Create Kit", type="primary", use_container_width=True, key=f"adb_kit_create_{asset_id}"):
-                        t = str(kit_name or "").strip()
-                        if not t:
-                            st.error("Kit Name is required.")
-                            st.stop()
-                        try:
-                            insert_row_admin(
-                                "asset_kits",
-                                {
-                                    "asset_id": asset_id,
-                                    "kit_name": t,
-                                    "description": str(description or "").strip(),
-                                    "is_active": True,
-                                },
-                            )
-                            st.success("Kit created")
-                            st.session_state[show_add_key] = False
-                            st.rerun()
-                        except Exception as exc:
+        if bool(st.session_state.get("show_add_kit")) and str(st.session_state.get("kit_asset_id") or "") == asset_id:
+            kit_name = st.text_input("Kit Name", key=f"adb_kit_name_{asset_id}")
+            description = st.text_area("Description", key=f"adb_kit_desc_{asset_id}", height=72)
+            b1, b2 = st.columns(2, gap="small")
+            with b1:
+                if st.button("Create Kit", type="primary", use_container_width=True, key=f"adb_kit_create_{asset_id}"):
+                    t = str(kit_name or "").strip()
+                    if not t:
+                        st.error("Kit Name is required.")
+                        st.stop()
+                    payload = {
+                        "asset_id": asset_id,
+                        "kit_name": t,
+                        "description": str(description or "").strip(),
+                        "is_active": True,
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                    try:
+                        insert_row_admin("asset_kits", payload)
+                    except Exception as exc:
+                        # Back-compat if created_at column doesn't exist
+                        if "created_at" in str(exc).lower() and "column" in str(exc).lower():
+                            payload.pop("created_at", None)
+                            insert_row_admin("asset_kits", payload)
+                        else:
                             st.error(f"Could not create kit: {exc}")
                             st.stop()
-                with b2:
-                    if st.button("Cancel", use_container_width=True, key=f"adb_kit_cancel_{asset_id}"):
-                        st.session_state[show_add_key] = False
-                        st.rerun()
+                    st.success("Kit created")
+                    st.session_state["show_add_kit"] = False
+                    st.session_state["kit_asset_id"] = None
+                    st.rerun()
+            with b2:
+                if st.button("Cancel", use_container_width=True, key=f"adb_kit_cancel_{asset_id}"):
+                    st.session_state["show_add_kit"] = False
+                    st.session_state["kit_asset_id"] = None
+                    st.rerun()
 
             kits = []
             try:
@@ -431,9 +437,9 @@ def _render_asset_panel_view(row: dict) -> None:
             except Exception:
                 replacements = []
 
-            if not kits:
-                st.caption("No kits yet.")
-                return
+        if not kits:
+            st.caption("No kits yet.")
+            return
 
             # Pending/overdue audits quick summary (optional module)
             try:
