@@ -953,6 +953,22 @@ def render() -> None:
         with bar_ph.container():
             _render_inventory_action_bar(df_all=df, visible_df=filtered, can_edit=can_edit)
 
+        # Auto-load details panel when exactly one row is selected (checkbox selection should feel immediate).
+        sel_ids = get_selected_ids(TABLE_KEY_INVENTORY)
+        cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
+        if len(sel_ids) == 1:
+            if cur_mode not in {"add", "edit"}:
+                if str(st.session_state.get("inventory_panel_id") or "") != str(sel_ids[0]):
+                    st.session_state["inventory_panel_id"] = str(sel_ids[0])
+                if cur_mode != "view":
+                    st.session_state["inventory_panel_mode"] = "view"
+                st.rerun()
+        else:
+            # If the user is just browsing (view mode), collapse details when selection is cleared or multi-select.
+            if cur_mode == "view":
+                _clear_panel()
+                st.rerun()
+
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
         with main_col:
