@@ -84,15 +84,24 @@ def render() -> None:
     try:
         rows = fetch_table_admin(
             "profiles",
-            columns="id,email,role,created_at,must_reset_password,is_active",
+            columns="id,email,phone_number,role,created_at,must_reset_password,is_active",
             limit=2000,
             order_by="email",
         )
     except Exception as exc:
-        st.error("Could not load profiles. Check SUPABASE_SERVICE_ROLE_KEY and database permissions.")
-        with st.expander("Technical details"):
-            st.code(repr(exc), language="text")
-        return
+        # Back-compat: phone_number column may not exist yet.
+        try:
+            rows = fetch_table_admin(
+                "profiles",
+                columns="id,email,role,created_at,must_reset_password,is_active",
+                limit=2000,
+                order_by="email",
+            )
+        except Exception:
+            st.error("Could not load profiles. Check SUPABASE_SERVICE_ROLE_KEY and database permissions.")
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+            return
 
     df = pd.DataFrame(rows)
     if df.empty:
@@ -106,14 +115,17 @@ def render() -> None:
     for col in ("email", "role", "created_at"):
         if col not in view.columns:
             view[col] = ""
+    if "phone_number" not in view.columns:
+        view["phone_number"] = ""
 
     st.caption("Edit role/active status below and click **Save changes**.")
     edited = st.data_editor(
-        view[["email", "role", "created_at", "must_reset_password", "is_active", "id"]],
+        view[["email", "phone_number", "role", "created_at", "must_reset_password", "is_active", "id"]],
         hide_index=True,
         use_container_width=True,
         disabled=["email", "created_at", "id"],
         column_config={
+            "phone_number": st.column_config.TextColumn("phone_number"),
             "role": st.column_config.SelectboxColumn("role", options=list(_ROLE_OPTIONS), required=True),
             "must_reset_password": st.column_config.CheckboxColumn("must_reset_password"),
             "is_active": st.column_config.CheckboxColumn("is_active"),
@@ -192,6 +204,7 @@ def render() -> None:
                         new_role = "viewer"
                     new_active = bool(erow.get("is_active", True))
                     new_mrpw = bool(erow.get("must_reset_password", False))
+                    new_phone = str(erow.get("phone_number") or "").strip() or None
                     payload = {}
                     if str(before.get("role") or "").strip().lower() != new_role:
                         payload["role"] = new_role
@@ -199,8 +212,16 @@ def render() -> None:
                         payload["is_active"] = new_active
                     if bool(before.get("must_reset_password", False)) != new_mrpw:
                         payload["must_reset_password"] = new_mrpw
+                    if "phone_number" in before and str(before.get("phone_number") or "").strip() != str(new_phone or ""):
+                        payload["phone_number"] = new_phone
                     if payload:
-                        update_rows_admin("profiles", payload, {"id": uid})
+                        try:
+                            update_rows_admin("profiles", payload, {"id": uid})
+                        except Exception as exc:
+                            if "phone" in str(exc).lower() and ("column" in str(exc).lower() or "does not exist" in str(exc).lower()):
+                                st.error("Could not save phone number — database is missing `profiles.phone_number`.")
+                                st.stop()
+                            raise
                         changed += 1
                 if changed:
                     st.success(f"Saved {changed} update(s).")

@@ -70,7 +70,26 @@ def _auth_session_tokens(client: Any) -> tuple[str, str] | None:
     return at_s, rt_s
 
 
-def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "") -> None:
+def _norm_phone(v: str) -> str:
+    s = str(v or "").strip()
+    if not s:
+        return ""
+    keep = []
+    for ch in s:
+        if ch.isdigit() or ch == "+":
+            keep.append(ch)
+    out = "".join(keep)
+    digits = "".join([c for c in out if c.isdigit()])
+    if out.startswith("+"):
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    return digits
+
+
+def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", phone_hint: str = "") -> None:
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
         user_id = user.get("id")
@@ -80,7 +99,19 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "") -
 
     profile = fetch_one("profiles", {"id": uid})
     if not profile:
-        raise RuntimeError("No profile row found for this user. Ask an admin to invite you.")
+        # Fallback match: allow admins to link a login to a profile by email/phone value,
+        # but do NOT auto-create new profiles (no self-registration).
+        em = str(email_hint or "").strip().lower()
+        ph = _norm_phone(phone_hint)
+        if em:
+            profile = fetch_one("profiles", {"email": em})
+        if not profile and ph:
+            profile = fetch_one("profiles", {"phone_number": ph})
+        if not profile:
+            raise RuntimeError("No profile row found for this user. Ask an admin to invite you.")
+        raise RuntimeError(
+            "This login is not linked to a profile id yet. Ask an admin to link it (profiles.id must match the Auth user id)."
+        )
     if not bool(profile.get("is_active", True)):
         raise RuntimeError("This user is inactive.")
 
@@ -274,6 +305,74 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
         raise RuntimeError("Login failed: no user returned from Supabase.")
 
     _apply_user_and_profile_from_auth_user(user, email_hint=email)
+
+    toks = _auth_session_tokens(client)
+    if toks:
+        at, rt = toks
+        st.session_state["_ips_auth_persist_pending"] = {
+            "access_token": at,
+            "refresh_token": rt,
+            "remember_device": remember_device,
+        }
+
+
+def start_phone_otp(*, phone_number: str) -> None:
+    """Send an SMS OTP to a phone number via Supabase Auth."""
+    ph = _norm_phone(phone_number)
+    if not ph:
+        raise RuntimeError("Enter a valid phone number.")
+    client = get_client()
+    try:
+        fn = getattr(client.auth, "sign_in_with_otp", None)
+        if fn is None:
+            raise AttributeError("auth.sign_in_with_otp is not available in this Supabase client.")
+        try:
+            fn({"phone": ph})
+        except TypeError:
+            fn(phone=ph)
+    except Exception as exc:
+        raise RuntimeError(f"Could not send OTP: {exc}") from exc
+
+
+def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = False) -> None:
+    """Verify SMS OTP and set authenticated session."""
+    ph = _norm_phone(phone_number)
+    tok = "".join(ch for ch in str(code or "").strip() if ch.isdigit())
+    if not ph:
+        raise RuntimeError("Enter a valid phone number.")
+    if len(tok) < 4:
+        raise RuntimeError("Enter the verification code.")
+    client = get_client()
+    try:
+        fn = getattr(client.auth, "verify_otp", None)
+        if fn is None:
+            raise AttributeError("auth.verify_otp is not available in this Supabase client.")
+        try:
+            resp = fn({"phone": ph, "token": tok, "type": "sms"})
+        except TypeError:
+            resp = fn(phone=ph, token=tok, type="sms")
+    except Exception as exc:
+        raise RuntimeError("Invalid code or expired OTP.") from exc
+
+    user = getattr(resp, "user", None)
+    if not user and resp is not None:
+        sess = getattr(resp, "session", None)
+        if sess is not None:
+            user = getattr(sess, "user", None)
+            if user is None and isinstance(sess, dict):
+                user = sess.get("user")
+    if not user:
+        try:
+            gu = client.auth.get_user()
+            user = getattr(gu, "user", None)
+            if user is None and isinstance(gu, dict):
+                user = gu.get("user")
+        except Exception:
+            user = None
+    if not user:
+        raise RuntimeError("Login failed: no user returned from Supabase.")
+
+    _apply_user_and_profile_from_auth_user(user, phone_hint=ph)
 
     toks = _auth_session_tokens(client)
     if toks:

@@ -14,8 +14,10 @@ from auth import (
     require_login,
     run_auth_browser_cookie_effects,
     sign_in,
+    start_phone_otp,
     try_restore_supabase_session_from_cookies,
     update_password,
+    verify_phone_otp,
 )
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
@@ -148,20 +150,52 @@ def main() -> None:
         if _pend:
             st.info("You opened an **inventory scan** link. Sign in below, then we will take you to **Scan Inventory** for that code.")
 
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
+        tab_email, tab_phone = st.tabs(["Email login", "Phone login (OTP)"])
+
         remember_device = st.checkbox(
             "Remember this device",
             value=True,
             help="Keeps you signed in on this phone or browser after refresh (uses secure cookies).",
         )
 
-        if st.button("Sign in", use_container_width=True):
-            try:
-                sign_in(email, password, remember_device=remember_device)
-                st.rerun()
-            except Exception as exc:
-                show_auth_error(exc)
+        with tab_email:
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
+                try:
+                    sign_in(email, password, remember_device=remember_device)
+                    st.rerun()
+                except Exception as exc:
+                    show_auth_error(exc)
+
+        with tab_phone:
+            st.caption("Enter your phone number to receive a one-time code via SMS.")
+            phone = st.text_input("Phone number", placeholder="+1 555 123 4567", key="login_phone")
+            c1, c2 = st.columns([1, 1], gap="small")
+            with c1:
+                if st.button("Send code", use_container_width=True, key="login_phone_send"):
+                    try:
+                        start_phone_otp(phone_number=phone)
+                        st.session_state["login_phone_otp_sent"] = True
+                        st.success("Code sent. Check your text messages.")
+                    except Exception as exc:
+                        show_auth_error(exc)
+            with c2:
+                if st.button("Clear", use_container_width=True, key="login_phone_clear"):
+                    st.session_state.pop("login_phone_otp_sent", None)
+                    st.session_state["login_phone"] = ""
+                    st.rerun()
+
+            if st.session_state.get("login_phone_otp_sent"):
+                code = st.text_input("Enter code", key="login_phone_code")
+                if st.button("Verify & login", type="primary", use_container_width=True, key="login_phone_verify"):
+                    try:
+                        verify_phone_otp(phone_number=phone, code=code, remember_device=remember_device)
+                        st.session_state.pop("login_phone_otp_sent", None)
+                        st.session_state.pop("login_phone_code", None)
+                        st.rerun()
+                    except Exception as exc:
+                        show_auth_error(exc)
 
         st.stop()
 

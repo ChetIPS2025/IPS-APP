@@ -18,6 +18,7 @@ from db import (
     fetch_one,
     fetch_table,
     fetch_table_admin,
+    get_admin_client,
     invite_auth_user,
     resend_invite_by_email,
     update_auth_user_email_admin,
@@ -83,6 +84,7 @@ except ImportError:
     )
 
 _PEOPLE_EMP_DELETE_PREFIX = "people_emp_delete"
+_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX = "people_unlinked_login_delete"
 _PEOPLE_PANEL_KEY = "people_panel"  # "list" | "detail" | "add_emp" | "add_user"
 _USERS_PANEL_MODE = getattr(usr_mod, "_USERS_PANEL_MODE", "users_panel_mode")
 
@@ -277,6 +279,27 @@ def _display_df_for_editor(filtered: pd.DataFrame) -> pd.DataFrame:
     }
     disp.rename(columns={k: v for k, v in rename.items() if k in disp.columns}, inplace=True)
     return disp
+
+
+def _delete_login_account_admin(*, user_id: str) -> None:
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise RuntimeError("Missing user id.")
+
+    admin = get_admin_client()
+    fn = getattr(admin.auth.admin, "delete_user", None)
+    if fn is None:
+        raise RuntimeError("Supabase Admin API delete_user is not available in this client.")
+    try:
+        fn(uid)
+    except TypeError:
+        fn({"uid": uid})
+
+    # Best-effort cleanup of the linked profile row too.
+    try:
+        delete_rows_admin("profiles", {"id": uid})
+    except Exception:
+        pass
 
 
 def _render_people_toolbar(
@@ -474,6 +497,13 @@ def _render_right_panel(
             ),
             key=f"{pk}_email",
         )
+        ed_phone = st.text_input(
+            "Phone number",
+            value=str(row.get("phone_number") or ""),
+            disabled=not edit_mode,
+            help="Optional. Used for OTP login if linked to a login/profile.",
+            key=f"{pk}_phone",
+        )
         c1, c2 = st.columns(2, gap="small")
         ed_job_role = c1.text_input(
             "Employee Job Role",
@@ -491,15 +521,38 @@ def _render_right_panel(
             key=f"{pk}_hr",
         )
 
-        # Linked login/profile (by email, case-insensitive)
+        # Linked login/profile (by email or phone)
         prof: dict[str, Any] | None = None
         prof_id: str | None = None
         prof_email: str = ""
         emp_email_norm = " ".join(str(ed_email or "").strip().lower().split())
+        emp_phone_norm = "".join(ch for ch in str(ed_phone or "").strip() if ch.isdigit() or ch == "+")
+        emp_phone_digits = "".join(ch for ch in emp_phone_norm if ch.isdigit())
+        if emp_phone_norm.startswith("+"):
+            emp_phone_norm = "+" + emp_phone_digits
+        elif len(emp_phone_digits) == 10:
+            emp_phone_norm = "+1" + emp_phone_digits
+        else:
+            emp_phone_norm = emp_phone_digits
         if emp_email_norm:
             for p in profiles or []:
                 p_em = " ".join(str(p.get("email") or "").strip().lower().split())
                 if p_em and p_em == emp_email_norm:
+                    prof = p
+                    prof_id = str(p.get("id") or "").strip() or None
+                    prof_email = str(p.get("email") or "").strip()
+                    break
+        if (not prof) and emp_phone_norm:
+            for p in profiles or []:
+                p_ph = "".join(ch for ch in str(p.get("phone_number") or "").strip() if ch.isdigit() or ch == "+")
+                p_digits = "".join(ch for ch in p_ph if ch.isdigit())
+                if p_ph.startswith("+"):
+                    p_ph = "+" + p_digits
+                elif len(p_digits) == 10:
+                    p_ph = "+1" + p_digits
+                else:
+                    p_ph = p_digits
+                if p_ph and p_ph == emp_phone_norm:
                     prof = p
                     prof_id = str(p.get("id") or "").strip() or None
                     prof_email = str(p.get("email") or "").strip()
@@ -570,6 +623,10 @@ def _render_right_panel(
                         }
                         if employees_has_email:
                             emp_payload["email"] = str(ed_email or "").strip() or None
+                        if str(ed_phone or "").strip():
+                            emp_payload["phone_number"] = str(ed_phone or "").strip()
+                        else:
+                            emp_payload["phone_number"] = None
                         update_rows("employees", emp_payload, {"id": eid})
                         if prof_id:
                             prof_payload: dict[str, Any] = {
@@ -579,7 +636,17 @@ def _render_right_panel(
                             }
                             if employees_has_email:
                                 prof_payload["email"] = str(ed_email or "").strip() or None
-                            update_rows_admin("profiles", prof_payload, {"id": prof_id})
+                            # Keep profile phone in sync when column exists.
+                            prof_payload["phone_number"] = str(ed_phone or "").strip() or None
+                            try:
+                                update_rows_admin("profiles", prof_payload, {"id": prof_id})
+                            except Exception as exc:
+                                if "phone" in str(exc).lower() and ("column" in str(exc).lower() or "does not exist" in str(exc).lower()):
+                                    # Phone column missing; retry without it.
+                                    prof_payload.pop("phone_number", None)
+                                    update_rows_admin("profiles", prof_payload, {"id": prof_id})
+                                else:
+                                    raise
                         st.success("Saved.")
                         st.rerun()
                     except Exception as exc:
@@ -649,15 +716,27 @@ def render() -> None:
         profiles = list(
             fetch_table_admin(
                 "profiles",
-                columns="id,email,role,must_reset_password,created_at,is_active,full_name",
+                columns="id,email,phone_number,role,must_reset_password,created_at,is_active,full_name",
                 limit=2000,
                 order_by="email",
             )
             or []
         )
     except Exception as exc:
-        st.error(f"Could not load profiles: {exc}")
-        profiles = []
+        # Back-compat: phone_number column may not exist yet.
+        try:
+            profiles = list(
+                fetch_table_admin(
+                    "profiles",
+                    columns="id,email,role,must_reset_password,created_at,is_active,full_name",
+                    limit=2000,
+                    order_by="email",
+                )
+                or []
+            )
+        except Exception as exc2:
+            st.error(f"Could not load profiles: {exc2}")
+            profiles = []
 
     unified = _build_unified_frame(employees, profiles)
 
@@ -720,9 +799,73 @@ def render() -> None:
     if not unlinked:
         st.info("No unlinked login accounts.")
     else:
+        # Delete confirmation (admin-only page; still confirm destructive auth operation)
+        _del_open = destructive_confirm_open_key(_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX)
+        if st.session_state.get(_del_open):
+            pending_uid = str(st.session_state.get("people_pending_unlinked_login_delete_id") or "").strip()
+            if not pending_uid:
+                close_destructive_confirmation(_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX)
+                st.session_state.pop("people_pending_unlinked_login_delete_id", None)
+                st.rerun()
+
+            pending_email = ""
+            for p in unlinked:
+                if str(p.get("id") or "").strip() == pending_uid:
+                    pending_email = str(p.get("email") or "").strip()
+                    break
+
+            def _on_confirm_delete_login() -> None:
+                try:
+                    _delete_login_account_admin(user_id=pending_uid)
+                    st.success("Login account deleted.")
+                except Exception as exc:
+                    st.error(f"Could not delete login account: {exc}")
+                st.session_state.pop("people_pending_unlinked_login_delete_id", None)
+                close_destructive_confirmation(_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX)
+                st.rerun()
+
+            def _on_cancel_delete_login() -> None:
+                st.session_state.pop("people_pending_unlinked_login_delete_id", None)
+                close_destructive_confirmation(_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX)
+
+            render_destructive_confirmation(
+                key_prefix=_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX,
+                title="Confirm delete login account",
+                message=(
+                    "Delete this login account from **Supabase Auth**? This cannot be undone."
+                ),
+                confirm_label="Confirm delete",
+                cancel_label="Cancel",
+                on_confirm=_on_confirm_delete_login,
+                on_cancel=_on_cancel_delete_login,
+                name_lines=[pending_email or pending_uid[:10] + "…"],
+            )
+
         udf = pd.DataFrame(unlinked)
         show_cols = [c for c in ["email", "role", "created_at", "must_reset_password", "is_active", "id"] if c in udf.columns]
         st.dataframe(udf[show_cols], use_container_width=True, hide_index=True)
+
+        st.markdown("##### Manage unlinked logins")
+        st.caption("Use **Delete Login Account** to remove an unlinked login from Supabase Auth.")
+        for p in unlinked:
+            uid = str(p.get("id") or "").strip()
+            em = str(p.get("email") or "").strip() or "—"
+            role = str(p.get("role") or "").strip() or "—"
+            c0, c1, c2, c3 = st.columns([2.2, 1.0, 1.0, 1.1], gap="small")
+            c0.write(em)
+            c1.write(role)
+            c2.write("Active" if bool(p.get("is_active", True)) else "Inactive")
+            with c3:
+                if st.button(
+                    "Delete Login Account",
+                    type="secondary",
+                    use_container_width=True,
+                    key=f"people_unlinked_delete_{uid}",
+                    disabled=not bool(uid),
+                ):
+                    st.session_state["people_pending_unlinked_login_delete_id"] = uid
+                    open_destructive_confirmation(_PEOPLE_UNLINKED_LOGIN_DELETE_PREFIX)
+                    st.rerun()
 
         employees_has_email = False
         try:
