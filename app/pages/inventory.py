@@ -310,8 +310,8 @@ def _render_inventory_action_bar(
                 disabled=not can_edit or not one,
                 key="inv_btn_edit",
             ):
-                st.session_state["inventory_panel_mode"] = "edit"
-                st.session_state["inventory_panel_id"] = str(sel[0])
+                st.session_state["inventory_edit_popup_open"] = True
+                st.session_state["editing_inventory_id"] = str(sel[0])
                 st.rerun()
         with b2:
             if st.button(
@@ -512,7 +512,7 @@ def _render_edit_panel(row: dict) -> None:
     pk = f"inv_ed_{rid}"
     with st.container(border=True):
         st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Edit inventory item")
+        st.markdown("### Edit Inventory Item")
         st.caption(f"ID `{rid[:8]}…`")
 
         name = st.text_input("Item Name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
@@ -680,11 +680,27 @@ def _render_edit_panel(row: dict) -> None:
                             )
                         else:
                             st.warning(f"Image upload skipped: {exc}")
+                st.session_state["inventory_edit_mode"] = False
+                st.session_state["editing_inventory_id"] = None
+                st.session_state["selected_inventory_ids"] = []
+                for k in list(st.session_state.keys()):
+                    if str(k).startswith("inv_select_"):
+                        del st.session_state[k]
+                clear_selected_ids(TABLE_KEY_INVENTORY)
                 _clear_panel()
-                st.success("Inventory item updated.")
+                st.session_state["inventory_success"] = "Inventory item updated."
+                st.session_state["inventory_edit_popup_open"] = False
+                st.session_state["editing_inventory_id"] = None
                 st.rerun()
         with u2:
             if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+                st.session_state["inventory_edit_popup_open"] = False
+                st.session_state["editing_inventory_id"] = None
+                st.session_state["selected_inventory_ids"] = []
+                for k in list(st.session_state.keys()):
+                    if str(k).startswith("inv_select_"):
+                        del st.session_state[k]
+                clear_selected_ids(TABLE_KEY_INVENTORY)
                 _clear_panel()
                 st.rerun()
 
@@ -847,19 +863,21 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     sel_ids = selected_ids
     cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
     if len(sel_ids) == 1:
-        if cur_mode not in {"add", "edit"}:
+        if cur_mode != "add":
             need_rerun = False
-            if str(st.session_state.get("inventory_panel_id") or "") != str(sel_ids[0]):
-                st.session_state["inventory_panel_id"] = str(sel_ids[0])
+            if not bool(st.session_state.get("inventory_edit_popup_open")):
+                st.session_state["inventory_edit_popup_open"] = True
                 need_rerun = True
-            if cur_mode != "view":
-                st.session_state["inventory_panel_mode"] = "view"
+            if str(st.session_state.get("editing_inventory_id") or "") != str(sel_ids[0]):
+                st.session_state["editing_inventory_id"] = str(sel_ids[0])
                 need_rerun = True
             if need_rerun:
                 st.rerun()
-    elif cur_mode == "view":
-        _clear_panel()
-        st.rerun()
+    else:
+        if bool(st.session_state.get("inventory_edit_popup_open")):
+            st.session_state["inventory_edit_popup_open"] = False
+            st.session_state["editing_inventory_id"] = None
+            st.rerun()
 
 
 def render() -> None:
@@ -872,6 +890,10 @@ def render() -> None:
         "Reusable tools (torque wrenches, meters, etc.) use **Tool Checkout** — they do **not** reduce quantity here."
     )
 
+    msg = st.session_state.pop("inventory_success", None)
+    if msg:
+        st.success(msg)
+
     can_edit = current_role() == "admin"
 
     selected_key = "selected_inventory_ids"
@@ -881,6 +903,8 @@ def render() -> None:
     # Ensure required session keys exist (explicitly requested by spec)
     st.session_state.setdefault("inventory_panel_mode", None)
     st.session_state.setdefault("inventory_panel_id", None)
+    st.session_state.setdefault("inventory_edit_popup_open", False)
+    st.session_state.setdefault("editing_inventory_id", None)
 
     try:
         rows = fetch_table_admin(_TABLE, limit=5000, order_by="item_name")
@@ -967,33 +991,35 @@ def render() -> None:
 
     # --- Panel routing ---
     panel_mode = st.session_state.get("inventory_panel_mode")
-    panel_id = st.session_state.get("inventory_panel_id")
-
-    if panel_mode in ("add", "edit", "view") and not can_edit:
+    if panel_mode == "add" and not can_edit:
         _clear_panel()
         panel_mode = None
-        panel_id = None
-
-    panel_row: dict | None = None
-    if panel_mode in ("edit", "view") and panel_id:
-        pr = fetch_by_match_admin(_TABLE, {"id": panel_id}, limit=1)
-        panel_row = pr[0] if pr else None
-        if not panel_row:
-            _clear_panel()
-            panel_mode = None
-            panel_id = None
-
-    panel_open = bool(
-        (panel_mode == "add" and can_edit)
-        or (panel_mode in ("edit", "view") and panel_row is not None)
-    )
 
     # Filters → low stock → table → action bar (single call). Details render below when open.
     _render_inventory_list(df=df, can_edit=can_edit, selected_key=selected_key)
-    if panel_open:
-        if panel_mode == "add":
-            _render_add_panel()
-        elif panel_mode == "edit" and panel_row:
-            _render_edit_panel(panel_row)
-        elif panel_mode == "view" and panel_row:
+
+    # Add panel (kept as-is)
+    if panel_mode == "add" and can_edit:
+        _render_add_panel()
+
+    # Edit popup (single selection opens it; clearing selection closes it)
+    if st.session_state.get("inventory_edit_popup_open"):
+        if not can_edit:
+            st.session_state["inventory_edit_popup_open"] = False
+            st.session_state["editing_inventory_id"] = None
+            st.rerun()
+        eid = str(st.session_state.get("editing_inventory_id") or "").strip()
+        if not eid:
+            st.session_state["inventory_edit_popup_open"] = False
+            st.rerun()
+        pr = fetch_by_match_admin(_TABLE, {"id": eid}, limit=1)
+        panel_row = pr[0] if pr else None
+        if not panel_row:
+            st.session_state["inventory_edit_popup_open"] = False
+            st.session_state["editing_inventory_id"] = None
+            st.rerun()
+        if hasattr(st, "dialog"):
+            with st.dialog("Edit Inventory Item"):
+                _render_edit_panel(panel_row)
+        else:
             _render_edit_panel(panel_row)
