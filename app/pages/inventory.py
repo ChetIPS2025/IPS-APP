@@ -1018,8 +1018,6 @@ def render() -> None:
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
             st.rerun()
-        if hasattr(st, "dialog"):
-            with st.dialog("Edit Inventory Item"):
-                _render_edit_panel(panel_row)
-        else:
+        st.markdown("### Edit Inventory Item")
+        with st.container(border=True):
             _render_edit_panel(panel_row)
