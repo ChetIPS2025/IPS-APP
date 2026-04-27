@@ -279,8 +279,8 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
     inject_ips_crud_list_styles()
     inject_table_action_styles()
 
-    # Selection is stored in session under ``inventory_selected_ids``; we also mirror it into table_actions for exports.
-    sel = [str(x) for x in (st.session_state.get("inventory_selected_ids") or []) if str(x).strip()]
+    # Selection is stored in session under ``selected_inventory_ids``; we also mirror it into table_actions for exports.
+    sel = [str(x) for x in (st.session_state.get("selected_inventory_ids") or []) if str(x).strip()]
     n = len(sel)
     one = n == 1
     none = n == 0
@@ -367,7 +367,7 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=not vis_ids or all_visible_selected,
                 key="inv_btn_sel_all",
             ):
-                st.session_state["inventory_selected_ids"] = list(vis_ids)
+                st.session_state["selected_inventory_ids"] = list(vis_ids)
                 for vid in vis_ids:
                     st.session_state[f"inv_select_{vid}"] = True
                 set_selected_ids(TABLE_KEY_INVENTORY, list(vis_ids))
@@ -379,7 +379,7 @@ def _render_inventory_action_bar(*, df_all: pd.DataFrame, visible_df: pd.DataFra
                 disabled=none,
                 key="inv_btn_clear",
             ):
-                st.session_state["inventory_selected_ids"] = []
+                st.session_state["selected_inventory_ids"] = []
                 for k in list(st.session_state.keys()):
                     if str(k).startswith("inv_select_"):
                         del st.session_state[k]
@@ -719,7 +719,7 @@ def render() -> None:
 
     # Inventory selection state (explicit, independent of data_editor quirks)
     INVENTORY_TABLE_KEY = "inventory"
-    selected_key = "inventory_selected_ids"
+    selected_key = "selected_inventory_ids"
     if selected_key not in st.session_state or not isinstance(st.session_state.get(selected_key), list):
         st.session_state[selected_key] = []
 
