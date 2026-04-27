@@ -607,6 +607,8 @@ def invite_auth_user(
     *,
     email: str,
     role: str = "employee",
+    employee_id: str | None = None,
+    require_employee_link: bool = True,
 ) -> dict[str, Any]:
     """
     Invite a user by email (magic link) using Supabase Admin API.
@@ -616,6 +618,48 @@ def invite_auth_user(
     em = str(email or "").strip().lower()
     if not em:
         raise RuntimeError("Email is required.")
+
+    # Duplicate prevention: block invites when a profile already uses this email.
+    try:
+        existing_email = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=2)  # type: ignore[name-defined]
+    except Exception:
+        existing_email = []
+    if existing_email:
+        raise RuntimeError("A login/profile already exists for this email.")
+
+    # Load employees and find match by normalized email (best-effort; employees.email is optional)
+    emp_rows: list[dict[str, Any]] = []
+    employees_has_email = False
+    try:
+        emp_rows = fetch_table_admin("employees", columns="id,email,profile_id,auth_user_id,name", limit=5000, order_by="name")  # type: ignore[name-defined]
+        employees_has_email = any("email" in (r or {}) for r in emp_rows or [])
+    except Exception:
+        emp_rows = []
+        employees_has_email = False
+
+    def _norm_email(v: object) -> str:
+        return " ".join(str(v or "").strip().lower().split())
+
+    matched_emp_id: str | None = None
+    if employees_has_email:
+        matches = []
+        for e in emp_rows or []:
+            if _norm_email(e.get("email")) == _norm_email(em):
+                matches.append(e)
+        if len(matches) > 1:
+            raise RuntimeError("Multiple employees share this email. Fix employee emails before inviting.")
+        if len(matches) == 1:
+            matched_emp_id = str(matches[0].get("id") or "").strip() or None
+
+    if employee_id:
+        matched_emp_id = str(employee_id or "").strip() or None
+
+    # Enforce: no standalone login accounts for work roles (preferred behavior).
+    role_norm = str(role or "employee").strip().lower() or "employee"
+    if role_norm in {"pm", "estimator"}:
+        role_norm = "manager"
+    if require_employee_link and role_norm not in {"admin", "viewer"} and not matched_emp_id:
+        raise RuntimeError("Select/create an employee with a matching email before inviting this role.")
 
     admin = get_admin_client()
     try:
@@ -644,10 +688,12 @@ def invite_auth_user(
     profile_payload: dict[str, Any] = {
         "id": user_id,
         "email": user_email,
-        "role": role,
+        "role": role_norm,
         "is_active": True,
         "must_reset_password": True,
     }
+    if matched_emp_id:
+        profile_payload["employee_id"] = matched_emp_id
 
     # Upsert profile with service role (bypass RLS).
     try:
@@ -659,7 +705,24 @@ def invite_auth_user(
     except Exception as exc:
         raise RuntimeError(f"Invite sent, but creating the profile row failed: {exc!r}") from exc
 
-    return {"id": str(user_id), "email": str(user_email), "role": str(role)}
+    # Link employee back to this auth/profile id when possible (columns may not exist yet).
+    if matched_emp_id:
+        for col in ("auth_user_id", "profile_id"):
+            try:
+                update_rows_admin("employees", {col: str(user_id)}, {"id": matched_emp_id})
+                break
+            except Exception:
+                continue
+        # If employee email is blank, fill it from the invited email when column exists.
+        if employees_has_email:
+            try:
+                cur = next((e for e in emp_rows if str(e.get("id") or "").strip() == matched_emp_id), None) or {}
+                if not _norm_email(cur.get("email")):
+                    update_rows_admin("employees", {"email": em}, {"id": matched_emp_id})
+            except Exception:
+                pass
+
+    return {"id": str(user_id), "email": str(user_email), "role": str(role_norm)}
 
 
 def resend_invite_by_email(*, email: str) -> None:
@@ -670,7 +733,7 @@ def resend_invite_by_email(*, email: str) -> None:
     em = str(email or "").strip().lower()
     if not em:
         raise RuntimeError("Email is required.")
-    _ = invite_auth_user(email=em, role="employee")
+    _ = invite_auth_user(email=em, role="employee", require_employee_link=False)
 
 
 def update_auth_user_email_admin(*, user_id: str, new_email: str) -> None:

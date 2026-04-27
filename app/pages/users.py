@@ -10,11 +10,11 @@ try:
     from app.auth import current_role
     from app.branding import render_header
     from app.db import (
-        delete_auth_user_admin,
         delete_rows_admin,
         fetch_one,
         fetch_table,
         fetch_table_admin,
+        get_admin_client,
         invite_auth_user,
         list_auth_users_admin,
         resend_invite_by_email,
@@ -26,11 +26,11 @@ except ImportError:
     from auth import current_role  # type: ignore
     from branding import render_header  # type: ignore
     from db import (  # type: ignore
-        delete_auth_user_admin,
         delete_rows_admin,
         fetch_one,
         fetch_table,
         fetch_table_admin,
+        get_admin_client,
         invite_auth_user,
         list_auth_users_admin,
         resend_invite_by_email,
@@ -59,6 +59,11 @@ def _employees_has_email_column() -> bool:
         return True
     except Exception:
         return False
+
+
+def delete_auth_user(user_id: str):
+    admin = get_admin_client()
+    return admin.auth.admin.delete_user(user_id)
 
 
 def _safe_update_profile_employee_id(*, profile_id: str, employee_id: str | None) -> None:
@@ -131,12 +136,62 @@ def render() -> None:
     render_crud_list_subtitle("Invite users, manage roles, deactivate accounts, and resend invites.")
 
     with st.container(border=True):
-        c1, c2 = st.columns([2, 1], gap="small")
-        invite_email = c1.text_input("Email", placeholder="name@company.com", key="users_invite_email")
-        default_role = c2.selectbox("Default role", list(_ROLE_OPTIONS), index=_ROLE_OPTIONS.index("employee"))
+        # Prefer employee-linked invites to prevent "unlinked login accounts".
+        # Admin/viewer can be invited without an employee (override).
+        employees_has_email = _employees_has_email_column()
+        try:
+            emp_cols = "id,name,email" if employees_has_email else "id,name"
+            emp_rows = list(fetch_table("employees", columns=emp_cols, limit=5000, order_by="name") or [])
+        except Exception:
+            emp_rows = []
+
+        emp_opts: list[tuple[str, str]] = []
+        for e in emp_rows:
+            eid = str(e.get("id") or "").strip()
+            if not eid:
+                continue
+            nm = str(e.get("name") or "").strip() or "—"
+            em = str(e.get("email") or "").strip() if employees_has_email else ""
+            label = f"{nm} · {em}" if em else nm
+            emp_opts.append((eid, label))
+        emp_opts.sort(key=lambda t: t[1].lower())
+        emp_labels = ["— Select employee —"] + [l for _, l in emp_opts]
+        emp_id_by_label = {l: eid for eid, l in emp_opts}
+
+        c1, c2, c3 = st.columns([2, 1, 1], gap="small")
+        picked_emp = c1.selectbox("Employee (recommended)", emp_labels, key="users_invite_emp_pick")
+        invite_email = c2.text_input("Email (optional)", placeholder="name@company.com", key="users_invite_email")
+        default_role = c3.selectbox("Default role", list(_ROLE_OPTIONS), index=_ROLE_OPTIONS.index("employee"))
+
+        allow_unlinked = st.checkbox(
+            "Admin override: allow standalone login (no employee link)",
+            value=False,
+            help="Prefer linking to an employee to prevent unlinked accounts. Use only for admin/viewer or exceptional cases.",
+            key="users_invite_allow_unlinked",
+        )
         if st.button("Send Invite", type="primary", use_container_width=True, key="users_send_invite_btn"):
             try:
-                invited = invite_auth_user(email=invite_email, role=str(default_role))
+                role_norm = str(default_role or "employee").strip().lower()
+                if role_norm in {"pm", "estimator"}:
+                    role_norm = "manager"
+                employee_id = emp_id_by_label.get(picked_emp) if picked_emp and not picked_emp.startswith("—") else None
+                email = str(invite_email or "").strip().lower()
+                if employee_id and employees_has_email:
+                    # Use employee email as source of truth when possible.
+                    emp_row = next((e for e in emp_rows if str(e.get("id") or "").strip() == str(employee_id)), None) or {}
+                    emp_email = str(emp_row.get("email") or "").strip().lower()
+                    if emp_email:
+                        email = emp_email
+                if not email:
+                    st.error("Email is required (or select an employee with an email).")
+                    st.stop()
+                require_emp = not (allow_unlinked or role_norm in {"admin", "viewer"})
+                invited = invite_auth_user(
+                    email=email,
+                    role=str(role_norm),
+                    employee_id=str(employee_id) if employee_id else None,
+                    require_employee_link=bool(require_emp),
+                )
                 st.success(f"Invite sent to {invited.get('email')}.")
                 st.rerun()
             except Exception as exc:
@@ -281,28 +336,15 @@ def render() -> None:
             key="users_delete_login_go",
         ):
             # Temporary debug safety (requested)
-            st.write(f"Deleting user: {user_id}")
+            st.write("Deleting:", user_id)
             try:
                 # Must use auth.users.id (not profiles.id / employee id)
-                delete_auth_user_admin(user_id=user_id)
+                delete_auth_user(user_id)
+                delete_rows_admin("profiles", {"id": user_id})
                 st.success("Login account deleted")
+                st.rerun()
             except Exception as e:
-                st.error(f"Failed to delete user: {e}")
-                st.stop()
-
-            # Clean up profile row if it exists
-            try:
-                prof = fetch_one("profiles", {"id": user_id})
-            except Exception:
-                prof = None
-            if prof:
-                try:
-                    delete_rows_admin("profiles", {"id": user_id})
-                except Exception:
-                    pass
-
-            st.session_state.pop("selected_login_id", None)
-            st.rerun()
+                st.error(f"Delete failed: {e}")
 
     with st.expander("Link login accounts to employees", expanded=False):
         st.caption("Links `public.profiles` login accounts to `public.employees` safely (prevents mismatches).")
