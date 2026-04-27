@@ -180,12 +180,48 @@ def render() -> None:
 
             existing = []
             try:
-                existing = fetch_by_match_admin("profiles", {"email": email}, columns="id,email", limit=1)
+                existing = fetch_by_match_admin(
+                    "profiles",
+                    {"email": email},
+                    columns="id,email,employee_id,role,is_active,must_reset_password",
+                    limit=1,
+                )
             except Exception:
                 existing = []
             if existing:
-                st.warning("Email already exists")
-                st.stop()
+                prof = existing[0] or {}
+                prof_id = str(prof.get("id") or "").strip()
+                linked_emp = str(prof.get("employee_id") or "").strip()
+                if linked_emp and str(linked_emp) != str(eid):
+                    st.warning("Existing login is already linked to another employee.")
+                    confirm = st.checkbox(
+                        "Admin confirm: re-link this login to the selected employee",
+                        value=False,
+                        key="users_relink_existing_profile_confirm",
+                    )
+                    if not confirm:
+                        st.stop()
+
+                # Link existing profile/login to this employee (best-effort; columns may not exist yet)
+                try:
+                    update_profile_admin(prof_id, {"employee_id": str(eid)})
+                except Exception:
+                    # Column may not exist; ignore.
+                    pass
+                for col in ("profile_id", "auth_user_id"):
+                    try:
+                        update_rows_admin("employees", {col: prof_id}, {"id": str(eid)})
+                        break
+                    except Exception:
+                        continue
+                # Ensure employee email is set
+                try:
+                    update_rows_admin("employees", {"email": email}, {"id": str(eid)})
+                except Exception:
+                    pass
+
+                st.success("Existing login found and linked to employee.")
+                st.rerun()
 
             try:
                 invited = invite_auth_user(
