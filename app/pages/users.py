@@ -787,7 +787,8 @@ def render() -> None:
                     st.info("No changes to save.")
                 st.rerun()
             except Exception as exc:
-                st.error(f"Update failed: {exc}")
+                st.error("Could not save changes.")
+                st.exception(exc)
     with b2:
         sel_email = st.text_input("Resend invite to email", placeholder="name@company.com", key="users_resend_email")
         if st.button("Resend invite", use_container_width=True, key="users_resend_invite_btn"):
