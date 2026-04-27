@@ -27,6 +27,7 @@ try:
         IPS_PENDING_DELETE,
         TABLE_KEY_JOBS,
         clear_selected_ids,
+        clean_column_config,
         get_selected_ids,
         inject_table_action_styles,
         set_selected_ids,
@@ -36,6 +37,7 @@ except ImportError:
         IPS_PENDING_DELETE,
         TABLE_KEY_JOBS,
         clear_selected_ids,
+        clean_column_config,
         get_selected_ids,
         inject_table_action_styles,
         set_selected_ids,
@@ -178,7 +180,16 @@ JOB_STATUSES = [
 
 HIDDEN_COLUMNS: frozenset[str] = frozenset(
     {
+        "id",
+        "uuid",
+        "unified_id",
+        "auth_user_id",
+        "profile_id",
+        "created_by",
+        "updated_by",
         "source_type",
+        "created_at",
+        "updated_at",
         "project_manager",
         "supervisor",
         "start_date",
@@ -188,6 +199,18 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
+VISIBLE_COLUMNS: tuple[str, ...] = (
+    "job_number",
+    "job_name",
+    "customer_name",
+    "Location",
+    "Contact",
+    "status",
+    "Linked estimate",
+    "Quote (estimate)",
+    "awarded_amount",
+)
+
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
     {"customer_id", "estimate_label", "Source"}
@@ -195,7 +218,8 @@ _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
 
 
 def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
-    return [c for c in columns if c not in _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE]
+    available = [c for c in columns if c not in _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE]
+    return [c for c in VISIBLE_COLUMNS if c in available]
 
 
 def _job_db_admin_read() -> bool:

@@ -50,6 +50,7 @@ except ImportError:
 
 try:
     from app.table_actions import (
+        CLEAN_COLUMN_LABELS,
         IPS_PENDING_DELETE,
         TABLE_KEY_ASSETS,
         clear_selected_ids,
@@ -59,6 +60,7 @@ try:
     )
 except ImportError:
     from table_actions import (  # type: ignore
+        CLEAN_COLUMN_LABELS,
         IPS_PENDING_DELETE,
         TABLE_KEY_ASSETS,
         clear_selected_ids,
@@ -76,6 +78,17 @@ _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
 _ADB_TOP_ACTIONS_CSS_KEY = "ips_asset_db_top_actions_css_injected"
 _ADB_MOBILE_CSS_KEY = "ips_asset_db_mobile_css_injected_v2"
 _KIT_AUDIT_LOGS = "kit_item_audit_logs"
+
+ASSET_VISIBLE_COLUMNS: tuple[str, ...] = (
+    "Photo",
+    "asset_name",
+    "asset_id",
+    "serial_number",
+    "status",
+    "category",
+    "Held by",
+    "On job",
+)
 
 
 def _inject_asset_database_mobile_css() -> None:
@@ -1170,6 +1183,16 @@ def _render_asset_list_thumbnail(asset_row: dict, *, thumb_px: int = 88) -> None
         st.markdown(ph, unsafe_allow_html=True)
 
 
+def _signed_asset_thumb_url(photo_path: object) -> str:
+    pp = str(photo_path or "").strip()
+    if not pp:
+        return ""
+    try:
+        return create_signed_url(pp, expires_in=3600) or ""
+    except Exception:
+        return ""
+
+
 ASSET_TABLE_COLS = [
     "asset_id",
     "asset_name",
@@ -1424,15 +1447,6 @@ def render_asset_database_card_list(
                     st.session_state["asset_detail_id"] = aid
                     st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                     st.rerun()
-                if can_quick_edit and st.button(
-                    "Quick edit",
-                    key=f"{key_prefix}_qedit_{i}_{aid}",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["asset_panel_mode"] = "edit"
-                    st.session_state["asset_panel_id"] = aid
-                    st.rerun()
             continue
 
         if i > 0:
@@ -1542,25 +1556,19 @@ def render() -> None:
             )
         st.caption("Checkbox column on the left — action bar sits directly under the grid.")
         disp = _enrich_asset_table_for_checkout(filtered, job_label_by_id=job_label_by_id, emp_by_id=emp_by_id)
-        table_cols = [
-            c
-            for c in [
-                "asset_name",
-                "asset_id",
-                "serial_number",
-                "status",
-                "Checkout tool",
-                "Held by",
-                "On job",
-                "manufacturer",
-                "model",
-                "category",
-                "is_rental",
-            ]
-            if c in disp.columns
-        ]
+        if "Photo" not in disp.columns:
+            disp["Photo"] = disp["photo_path"].map(_signed_asset_thumb_url) if "photo_path" in disp.columns else ""
+        table_cols = [c for c in ASSET_VISIBLE_COLUMNS if c in disp.columns]
         if "id" not in disp.columns:
-            st.dataframe(disp[table_cols], use_container_width=True, hide_index=True)
+            st.dataframe(
+                disp[table_cols],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Photo": st.column_config.ImageColumn("Photo", width="small"),
+                    **{c: st.column_config.Column(CLEAN_COLUMN_LABELS[c]) for c in table_cols if c in CLEAN_COLUMN_LABELS},
+                },
+            )
             return
 
         _, sel = render_selectable_dataframe(
@@ -1570,6 +1578,12 @@ def render() -> None:
             columns=table_cols,
             editor_key="asset_db_sel_editor",
             hide_id_column=True,
+            extra_column_config={
+                "Photo": st.column_config.ImageColumn("Photo", width="small"),
+                **{c: st.column_config.Column(CLEAN_COLUMN_LABELS[c]) for c in table_cols if c in CLEAN_COLUMN_LABELS},
+                "Held by": st.column_config.Column("Holder"),
+                "On job": st.column_config.Column("Job"),
+            },
         )
         actions = render_selection_action_bar(
             TABLE_KEY_ASSETS,

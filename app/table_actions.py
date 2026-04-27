@@ -53,6 +53,63 @@ TABLE_KEY_TIMESHEETS = "timesheets"
 TABLE_KEY_INVENTORY_SUPPLIES = "inventory_supplies"
 TABLE_KEY_INVENTORY = "inventory"
 
+INTERNAL_TABLE_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "uuid",
+        "unified_id",
+        "auth_user_id",
+        "profile_id",
+        "created_by",
+        "updated_by",
+        "source_type",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "is_deleted",
+        "internal",
+        "internal_flag",
+    }
+)
+
+CLEAN_COLUMN_LABELS: dict[str, str] = {
+    "job_number": "Job #",
+    "job_name": "Job Name",
+    "item_name": "Item",
+    "quantity_on_hand": "On Hand",
+    "reorder_point": "Reorder",
+    "unit_cost": "Unit Cost",
+    "asset_name": "Asset",
+    "asset_id": "Asset #",
+    "serial_number": "Serial #",
+    "qr_code_value": "QR Code",
+    "sku": "SKU",
+    "category": "Category",
+    "status": "Status",
+    "customer_name": "Customer",
+    "email": "Email",
+    "role": "Access Role",
+    "hourly_rate": "Hourly",
+    "is_active": "Active",
+}
+
+
+def visible_table_columns(columns: list[str] | pd.Index, *, include: list[str] | tuple[str, ...] | None = None) -> list[str]:
+    """Return UI-safe columns: explicit order first, with internal database fields removed."""
+    col_list = [str(c) for c in columns]
+    if include is not None:
+        return [str(c) for c in include if str(c) in col_list and str(c) not in INTERNAL_TABLE_COLUMNS]
+    return [c for c in col_list if c not in INTERNAL_TABLE_COLUMNS and not c.startswith("_")]
+
+
+def clean_column_config(columns: list[str] | pd.Index) -> dict:
+    """Human labels for raw database columns; callers can merge specialized config over this."""
+    return {
+        str(c): st.column_config.Column(CLEAN_COLUMN_LABELS[str(c)])
+        for c in columns
+        if str(c) in CLEAN_COLUMN_LABELS
+    }
+
 # Backward compatibility: old dict keys -> canonical table_key
 _LEGACY_TABLE_KEY_MAP: dict[str, str] = {
     "asset_manager": TABLE_KEY_ASSET_MANAGER,
@@ -352,9 +409,8 @@ def render_selectable_dataframe(
     column_order = None
     if hide_id_column and id_column in ed_base.columns:
         column_order = [c for c in ed_base.columns if c != id_column]
-    column_config: dict = {
-        "__select__": st.column_config.CheckboxColumn(" ", default=False, width="small"),
-    }
+    column_config: dict = clean_column_config(ed_base.columns)
+    column_config["__select__"] = st.column_config.CheckboxColumn("Select", default=False, width="small")
     if extra_column_config:
         column_config = {**column_config, **extra_column_config}
     editor_kw: dict = dict(

@@ -98,8 +98,20 @@ def _people_col_norm_token(name: str) -> str:
     return "".join(ch.lower() for ch in str(name) if ch.isalnum())
 
 
-# Never show ``unified_id`` in the grid; it must stay on the dataframe for ``id_column`` / selection.
-HIDDEN_COLUMNS: frozenset[str] = frozenset({"unified_id"})
+# Never show internal ids/flags in the grid; they stay on the dataframe for selection and updates.
+HIDDEN_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "uuid",
+        "unified_id",
+        "profile_id",
+        "auth_user_id",
+        "employee_id",
+        "created_by",
+        "updated_by",
+        "source_type",
+    }
+)
 HIDDEN_FIELDS = HIDDEN_COLUMNS  # alias: visible-column filter + docs
 
 # Also hidden by normalized header token (spellings like ``Acct active`` / ``Unified ID``).
@@ -121,17 +133,7 @@ def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
         for c in col_list
         if c not in HIDDEN_FIELDS and _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS
     ]
-    preferred = [
-        "Kind",
-        "Name",
-        "Email",
-        "Employee Job Role",
-        "Hourly rate",
-        "Access Role",
-        "Login enabled",
-        "Must reset password",
-        "Is active",
-    ]
+    preferred = ["Name", "Email", "Employee Job Role", "Hourly rate", "Access Role", "Is active"]
     ordered = [c for c in preferred if c in kept]
     tail = [c for c in kept if c not in ordered]
     return ordered + tail

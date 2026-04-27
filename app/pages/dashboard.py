@@ -87,6 +87,55 @@ def count_active_employees(employees: list[dict]) -> int:
     return sum(1 for r in rows if bool((r or {}).get("is_active", False)))
 
 
+def count_low_stock_items(items: list[dict]) -> int:
+    n = 0
+    for r in items or []:
+        if not isinstance(r, dict):
+            continue
+        try:
+            qoh = float(r.get("quantity_on_hand") or 0)
+            reorder = float(r.get("reorder_point") or 0)
+        except Exception:
+            continue
+        if reorder > 0 and qoh <= reorder:
+            n += 1
+    return n
+
+
+def count_open_todos(todos: list[dict]) -> int:
+    return sum(1 for t in todos or [] if str((t or {}).get("status") or "Open").strip() != "Complete")
+
+
+def _render_low_stock_alerts(items: list[dict]) -> None:
+    rows: list[dict] = []
+    for r in items or []:
+        if not isinstance(r, dict):
+            continue
+        try:
+            qoh = float(r.get("quantity_on_hand") or 0)
+            reorder = float(r.get("reorder_point") or 0)
+        except Exception:
+            continue
+        if reorder <= 0 or qoh > reorder:
+            continue
+        rows.append(
+            {
+                "Item": str(r.get("item_name") or "").strip() or "—",
+                "SKU": str(r.get("sku") or "").strip() or "—",
+                "Category": str(r.get("category") or "").strip() or "—",
+                "On Hand": qoh,
+                "Reorder": reorder,
+                "Status": "Low",
+            }
+        )
+    with st.container(border=True):
+        st.markdown("##### Low Stock Alerts")
+        if not rows:
+            st.caption("No low-stock inventory items.")
+            return
+        st.dataframe(pd.DataFrame(rows).head(12), use_container_width=True, hide_index=True, height=320)
+
+
 def _row_ts(row: dict) -> str:
     for k in ("updated_at", "modified_at", "created_at"):
         v = row.get(k)
@@ -123,6 +172,34 @@ def _jobs_display_df(rows: list[dict]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(out)
+
+
+def _low_stock_rows(inventory_items: list[dict], *, limit: int = 12) -> list[dict]:
+    rows: list[dict] = []
+    for item in inventory_items or []:
+        if not isinstance(item, dict):
+            continue
+        qoh = _dash_kf(item.get("quantity_on_hand"))
+        reorder = _dash_kf(item.get("reorder_point"))
+        if qoh <= reorder:
+            rows.append(item)
+    rows.sort(key=lambda r: (_dash_kf(r.get("quantity_on_hand")) - _dash_kf(r.get("reorder_point")), str(r.get("item_name") or "")))
+    return rows[:limit]
+
+
+def _low_stock_display_df(rows: list[dict]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Item": str(r.get("item_name") or "").strip() or "—",
+                "SKU": str(r.get("sku") or "").strip() or "—",
+                "Category": str(r.get("category") or "").strip() or "—",
+                "On Hand": r.get("quantity_on_hand") if r.get("quantity_on_hand") not in (None, "") else 0,
+                "Reorder": r.get("reorder_point") if r.get("reorder_point") not in (None, "") else 0,
+            }
+            for r in rows
+        ]
+    )
 
 
 # Days out for dashboard "Who Has What" (match tool_dashboard overdue rule).
@@ -557,7 +634,7 @@ def render() -> None:
     render_header(
         "IPS Dashboard",
         subtitle="Industrial Plant Solutions, LLC",
-        help_text="Pipeline snapshot, customers on file, and recent jobs and estimates — use the sidebar for every module.",
+        help_text="Simple operating snapshot for jobs, inventory, tools, and open tasks.",
     )
 
     sk = str(current_profile().get("id") or "anonymous")
@@ -593,6 +670,12 @@ def render() -> None:
         )
     except Exception:
         assets = []
+    try:
+        inventory_items = fetch_table_for_session(
+            "inventory_items", session_key=sk, limit=_lim, order_by="item_name", use_admin=use_admin
+        )
+    except Exception:
+        inventory_items = []
     kit_items_d: list[dict] = []
     repl_d: list[dict] = []
     if role_can_open_page(current_role(), "Asset Database"):
@@ -617,42 +700,59 @@ def render() -> None:
         except Exception:
             repl_d = []
 
+    low_stock = _low_stock_rows(list(inventory_items or []), limit=12)
+    checked_out_tools = [a for a in (assets or []) if isinstance(a, dict) and _asset_is_out(a)]
+
+    try:
+        todos_for_metric = fetch_table_for_session(
+            "todos",
+            session_key=sk,
+            limit=2000,
+            order_by="created_at",
+            use_admin=use_admin,
+        )
+    except Exception:
+        todos_for_metric = []
+    open_todos = [
+        t
+        for t in (todos_for_metric or [])
+        if isinstance(t, dict) and str(t.get("status") or "Open").strip() != "Complete"
+    ]
+
     with st.container(border=True):
         st.markdown('<span class="ips-dash-metrics"></span>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4, gap="small")
-        c1.metric("Customers", len(customers or []))
-        c2.metric("Jobs awarded", count_awarded_jobs(jobs))
-        c3.metric("Jobs bidding", count_bidding_jobs(jobs))
-        c4.metric("Active employees", count_active_employees(employees))
-
-    _render_who_has_what_dashboard(
-        list(assets or []),
-        list(jobs or []),
-        list(employees or []),
-        role=current_role(),
-    )
-    _render_kit_theft_alerts_dashboard(
-        list(assets or []),
-        list(kit_items_d or []),
-        list(repl_d or []),
-        role=current_role(),
-    )
-
-    _render_todo_list(session_key=sk, use_admin=use_admin)
+        c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+        c1.metric("Active Jobs", count_awarded_jobs(jobs))
+        c2.metric("Jobs Bidding", count_bidding_jobs(jobs))
+        c3.metric("Low Stock Items", len(low_stock))
+        c4.metric("Checked Out Tools", len(checked_out_tools))
+        c5.metric("Open To-Dos", len(open_todos))
 
     left, right = st.columns(2, gap="medium")
     with left:
-        st.markdown("##### Recent jobs")
-        rj = _recent_jobs_rows(list(jobs or []))
-        if not rj:
-            st.caption("No jobs loaded yet.")
-        else:
-            st.dataframe(_jobs_display_df(rj), use_container_width=True, hide_index=True, height=320)
+        _render_todo_list(session_key=sk, use_admin=use_admin)
+    with right:
+        _render_who_has_what_dashboard(
+            list(assets or []),
+            list(jobs or []),
+            list(employees or []),
+            role=current_role(),
+        )
+
+    left, right = st.columns(2, gap="medium")
+    with left:
+        with st.container(border=True):
+            st.markdown("##### Low Stock Alerts")
+            if not low_stock:
+                st.caption("No low stock items right now.")
+            else:
+                st.dataframe(_low_stock_display_df(low_stock), use_container_width=True, hide_index=True, height=320)
 
     with right:
-        st.markdown("##### Recent estimates")
-        re = _recent_estimates_rows(list(estimates or []))
-        if not re:
-            st.caption("No estimates loaded yet.")
-        else:
-            st.dataframe(_estimates_display_df(re), use_container_width=True, hide_index=True, height=320)
+        with st.container(border=True):
+            st.markdown("##### Recent Jobs")
+            rj = _recent_jobs_rows(list(jobs or []))
+            if not rj:
+                st.caption("No jobs loaded yet.")
+            else:
+                st.dataframe(_jobs_display_df(rj), use_container_width=True, hide_index=True, height=320)

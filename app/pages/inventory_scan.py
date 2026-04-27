@@ -209,19 +209,19 @@ def _inv_item_thumb_display(item: dict) -> None:
     """Small item photo or 📦 placeholder (scan screen)."""
     raw = str(item.get("image_url") or "").strip()
     if not raw:
-        st.markdown('<p style="font-size:2.5rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:4rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
         return
     if raw.startswith("http://") or raw.startswith("https://"):
-        st.image(raw, width=80)
+        st.image(raw, width=132)
         return
     try:
         url = create_signed_url(raw, expires_in=3600)
     except Exception:
         url = ""
     if url:
-        st.image(url, width=80)
+        st.image(url, width=132)
     else:
-        st.markdown('<p style="font-size:2.5rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:4rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
 
 
 def _lookup_sku_case_insensitive(raw: str) -> list[dict]:

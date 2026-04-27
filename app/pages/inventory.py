@@ -31,6 +31,7 @@ try:
     from app.table_actions import (
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
+        CLEAN_COLUMN_LABELS,
         inject_table_action_styles,
         set_selected_ids,
     )
@@ -59,12 +60,22 @@ except ImportError:
     from table_actions import (  # type: ignore
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
+        CLEAN_COLUMN_LABELS,
         inject_table_action_styles,
         set_selected_ids,
     )
 
 _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
+INVENTORY_VISIBLE_COLUMNS: tuple[str, ...] = (
+    "Photo",
+    "item_name",
+    "sku",
+    "category",
+    "quantity_on_hand",
+    "reorder_point",
+    "status",
+)
 
 
 def _inventory_qr_embed_subject(qr_code_value: str) -> str:
@@ -820,7 +831,7 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     if n_low > 0:
         st.warning(f"**Low stock:** {n_low} visible row(s) at or below reorder point.")
         with st.expander("Low stock detail (visible filters)", expanded=False):
-            cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
+            cols_show = [c for c in ("item_name", "sku", "category", "quantity_on_hand", "reorder_point") if c in filtered.columns]
             if cols_show:
                 sub = filtered.loc[low_mask, cols_show].copy()
                 if "quantity_on_hand" in sub.columns and "reorder_point" in sub.columns:
@@ -840,6 +851,11 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
                     hide_index=True,
                     column_config={
                         "Photo": st.column_config.ImageColumn("Photo", width="small"),
+                        **{
+                            c: st.column_config.Column(CLEAN_COLUMN_LABELS[c])
+                            for c in show_low
+                            if c in CLEAN_COLUMN_LABELS
+                        },
                     },
                 )
                 st.caption("**Suggest qty** = shortfall to reorder point (informational).")
@@ -857,15 +873,11 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
     sel_set = set(cur_selected)
 
-    # Sel | Photo | Item | SKU | QOH | Reorder | Status
-    header = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
-    header[0].markdown("**Sel**")
-    header[1].markdown("**Photo**")
-    header[2].markdown("**Item**")
-    header[3].markdown("**SKU**")
-    header[4].markdown("**QOH**")
-    header[5].markdown("**Reorder**")
-    header[6].markdown("**Status**")
+    # Select | Photo | Item | SKU | Category | On Hand | Reorder | Status
+    header = st.columns([0.38, 0.55, 2.05, 1.0, 1.0, 0.9, 1.0, 1.0], gap="small")
+    header[0].markdown("**Select**")
+    for ix, col in enumerate(INVENTORY_VISIBLE_COLUMNS, start=1):
+        header[ix].markdown(f"**{CLEAN_COLUMN_LABELS.get(col, col)}**")
 
     max_rows = 350
     for _, row in filtered.head(max_rows).iterrows():
@@ -873,7 +885,7 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
         if not item_id:
             continue
         checked = item_id in sel_set
-        cols = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
+        cols = st.columns([0.38, 0.55, 2.05, 1.0, 1.0, 0.9, 1.0, 1.0], gap="small")
         with cols[0]:
             new_checked = st.checkbox(
                 "",
@@ -897,9 +909,10 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
                 st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
         cols[2].write(str(row.get("item_name") or "—"))
         cols[3].write(str(row.get("sku") or "—"))
-        cols[4].write(str(row.get("quantity_on_hand") or "0"))
-        cols[5].write(str(row.get("reorder_point") or "0"))
-        cols[6].write("Active" if bool(row.get("is_active", True)) else "Inactive")
+        cols[4].write(str(row.get("category") or "—"))
+        cols[5].write(str(row.get("quantity_on_hand") or "0"))
+        cols[6].write(str(row.get("reorder_point") or "0"))
+        cols[7].write("Active" if bool(row.get("is_active", True)) else "Inactive")
 
     if len(filtered) > max_rows:
         st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")

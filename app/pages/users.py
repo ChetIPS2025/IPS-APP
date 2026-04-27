@@ -53,6 +53,14 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle  # type: ignore
 
 _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "manager", "admin")
+USERS_VISIBLE_COLUMNS: tuple[str, ...] = (
+    "Name",
+    "Email",
+    "Job Role",
+    "Hourly",
+    "Access Role",
+    "Active",
+)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -120,7 +128,7 @@ def render() -> None:
         # Admin/viewer can be invited without an employee (override).
         employees_has_email = _employees_has_email_column()
         try:
-            emp_cols = "id,name,email" if employees_has_email else "id,name"
+            emp_cols = "id,name,email,role,hourly_rate" if employees_has_email else "id,name,role,hourly_rate"
             emp_rows = list(fetch_table("employees", columns=emp_cols, limit=5000, order_by="name") or [])
         except Exception:
             emp_rows = []
@@ -304,7 +312,16 @@ def render() -> None:
         st.info("No users found.")
         return
 
-    # Display table per spec: email, role, created_at
+    emp_by_email: dict[str, dict] = {}
+    try:
+        emp_lookup_cols = "id,name,email,role,hourly_rate" if _employees_has_email_column() else "id,name,role,hourly_rate"
+        for er in fetch_table("employees", columns=emp_lookup_cols, limit=5000, order_by="name") or []:
+            em = _norm_email((er or {}).get("email"))
+            if em:
+                emp_by_email[em] = er or {}
+    except Exception:
+        emp_by_email = {}
+
     view = df.copy()
     if "created_at" in view.columns:
         view["created_at"] = view["created_at"].map(_fmt_ts)
@@ -314,18 +331,30 @@ def render() -> None:
     if "phone_number" not in view.columns:
         view["phone_number"] = ""
 
-    st.caption("Edit role/active status below and click **Save changes**.")
+    def _emp_for_profile(row: pd.Series) -> dict:
+        return emp_by_email.get(_norm_email(row.get("email")), {})
+
+    view["Name"] = view.apply(lambda r: str(_emp_for_profile(r).get("name") or "").strip() or "—", axis=1)
+    view["Email"] = view["email"]
+    view["Job Role"] = view.apply(lambda r: str(_emp_for_profile(r).get("role") or "").strip() or "—", axis=1)
+    view["Hourly"] = view.apply(lambda r: _emp_for_profile(r).get("hourly_rate") or "", axis=1)
+    view["Access Role"] = view["role"]
+    view["Active"] = view["is_active"].fillna(True).astype(bool)
+
+    st.caption("Edit access role/active status below and click **Save changes**.")
     edited = st.data_editor(
-        view[["email", "phone_number", "role", "created_at", "must_reset_password", "is_active", "id"]],
+        view[[*USERS_VISIBLE_COLUMNS, "id"]],
         hide_index=True,
         use_container_width=True,
-        disabled=["email", "created_at", "id"],
+        disabled=["Name", "Email", "Job Role", "Hourly", "id"],
+        column_order=list(USERS_VISIBLE_COLUMNS),
         column_config={
-            "phone_number": st.column_config.TextColumn("phone_number"),
-            "role": st.column_config.SelectboxColumn("role", options=list(_ROLE_OPTIONS), required=True),
-            "must_reset_password": st.column_config.CheckboxColumn("must_reset_password"),
-            "is_active": st.column_config.CheckboxColumn("is_active"),
-            "id": st.column_config.TextColumn("id", disabled=True),
+            "Email": st.column_config.TextColumn("Email"),
+            "Job Role": st.column_config.TextColumn("Job Role"),
+            "Hourly": st.column_config.NumberColumn("Hourly", format="$%.2f"),
+            "Access Role": st.column_config.SelectboxColumn("Access Role", options=list(_ROLE_OPTIONS), required=True),
+            "Active": st.column_config.CheckboxColumn("Active"),
+            "id": None,
         },
         key="users_profiles_editor",
     )
@@ -396,33 +425,24 @@ def render() -> None:
                     if not uid or uid not in base_by_id:
                         continue
                     before = base_by_id[uid]
-                    new_role = str(erow.get("role") or "viewer").strip().lower()
+                    new_role = str(erow.get("Access Role") or "viewer").strip().lower()
                     if new_role in {"pm", "estimator"}:
                         new_role = "manager"
                     if new_role not in _ROLE_OPTIONS:
                         new_role = "viewer"
-                    new_active = bool(erow.get("is_active", True))
-                    new_mrpw = bool(erow.get("must_reset_password", False))
-                    new_phone = str(erow.get("phone_number") or "").strip() or None
+                    new_active = bool(erow.get("Active", True))
                     payload = {}
                     if str(before.get("role") or "").strip().lower() != new_role:
                         payload["role"] = new_role
                     if bool(before.get("is_active", True)) != new_active:
                         payload["is_active"] = new_active
-                    if bool(before.get("must_reset_password", False)) != new_mrpw:
-                        payload["must_reset_password"] = new_mrpw
-                    if "phone_number" in before and str(before.get("phone_number") or "").strip() != str(new_phone or ""):
-                        payload["phone_number"] = new_phone
                     if payload:
-                        # Temporary debug (requested)
-                        st.write("Updating profile:", payload)
-                        st.write("User ID:", uid)
                         try:
-                            clean = {
-                                "role": str(payload.get("role") or "").strip() or None,
-                                "must_reset_password": bool(payload.get("must_reset_password", False)),
-                                "is_active": bool(payload.get("is_active", True)),
-                            }
+                            clean = {}
+                            if "role" in payload:
+                                clean["role"] = str(payload["role"] or "").strip() or None
+                            if "is_active" in payload:
+                                clean["is_active"] = bool(payload["is_active"])
                             clean = {k: v for k, v in clean.items() if v is not None}
                             update_profile_admin(uid, clean)
                         except Exception as exc:
