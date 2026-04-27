@@ -967,13 +967,15 @@ def render() -> None:
 
         # Render a compact “table-like” list with real Streamlit checkboxes.
         # (Avoids data_editor selection not persisting on some mobile/browser combos.)
-        header = st.columns([0.35, 2.2, 1.0, 0.9, 1.1, 1.0], gap="small")
+        # Sel | Photo | Item | SKU | QOH | Reorder | Status
+        header = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
         header[0].markdown("**Sel**")
-        header[1].markdown("**Item**")
-        header[2].markdown("**SKU**")
-        header[3].markdown("**QOH**")
-        header[4].markdown("**Reorder**")
-        header[5].markdown("**Status**")
+        header[1].markdown("**Photo**")
+        header[2].markdown("**Item**")
+        header[3].markdown("**SKU**")
+        header[4].markdown("**QOH**")
+        header[5].markdown("**Reorder**")
+        header[6].markdown("**Status**")
 
         # Limit to avoid rendering thousands of widgets
         max_rows = 350
@@ -982,7 +984,7 @@ def render() -> None:
             if not item_id:
                 continue
             checked = item_id in sel_set
-            cols = st.columns([0.35, 2.2, 1.0, 0.9, 1.1, 1.0], gap="small")
+            cols = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
             with cols[0]:
                 new_checked = st.checkbox(
                     "",
@@ -994,11 +996,21 @@ def render() -> None:
                 sel_set.add(item_id)
             if (not new_checked) and item_id in sel_set:
                 sel_set.remove(item_id)
-            cols[1].write(str(row.get("item_name") or "—"))
-            cols[2].write(str(row.get("sku") or "—"))
-            cols[3].write(str(row.get("quantity_on_hand") or "0"))
-            cols[4].write(str(row.get("reorder_point") or "0"))
-            cols[5].write("Active" if bool(row.get("is_active", True)) else "Inactive")
+            with cols[1]:
+                raw_img = str(row.get("image_url") or "").strip()
+                img_url = _signed_url_for_inventory_image(raw_img) if raw_img else None
+                if img_url:
+                    try:
+                        st.image(img_url, width=36)
+                    except Exception:
+                        st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+            cols[2].write(str(row.get("item_name") or "—"))
+            cols[3].write(str(row.get("sku") or "—"))
+            cols[4].write(str(row.get("quantity_on_hand") or "0"))
+            cols[5].write(str(row.get("reorder_point") or "0"))
+            cols[6].write("Active" if bool(row.get("is_active", True)) else "Inactive")
 
         if len(filtered) > max_rows:
             st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")
