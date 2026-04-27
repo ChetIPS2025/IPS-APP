@@ -824,6 +824,440 @@ def _render_asset_documents_list(
 
 _GALLERY_PREVIEW_QP = "ips_gpv"
 
+_ASSET_EXPENSE_TYPES = ("Repair", "Maintenance", "Parts", "Fuel", "Inspection", "Registration", "Other")
+_KIT_FREQ_MONTH_DAYS = 31
+
+
+def _money(v) -> str:
+    try:
+        if v is None or str(v).strip() == "":
+            return "—"
+        return f"${float(v):,.2f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _as_float(v, default: float = 0.0) -> float:
+    try:
+        if v is None or str(v).strip() == "":
+            return default
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(v, default: int = 0) -> int:
+    try:
+        if v is None or str(v).strip() == "":
+            return default
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_tool_trailer(asset_row: dict) -> bool:
+    return str(asset_row.get("asset_type") or "").strip().lower() == "tool trailer"
+
+
+def _safe_fetch_by_match(table: str, match: dict, *, limit: int = 500) -> list[dict]:
+    """Fetch rows; return [] when the table doesn't exist yet (migration not applied)."""
+    try:
+        return fetch_by_match(table, match, limit=limit)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return fetch_by_match_admin(table, match, limit=limit)  # type: ignore[name-defined]
+        except Exception:
+            return []
+
+
+def _todo_like_job_label(jobs: list[dict], job_id: str | None) -> str:
+    if not job_id:
+        return "—"
+    for j in jobs or []:
+        if str(j.get("id") or "").strip() == str(job_id).strip():
+            return str(j.get("job_name") or "").strip() or "—"
+    return "—"
+
+
+def _render_asset_expenses(
+    *,
+    asset_row: dict,
+    expenses: list[dict],
+    can_edit: bool,
+    profiles: list[dict],
+) -> None:
+    aid = str(asset_row.get("id") or "").strip()
+    if not aid:
+        st.caption("—")
+        return
+
+    # Totals
+    total_repair = sum(_as_float(r.get("amount")) for r in expenses if str(r.get("expense_type")) == "Repair")
+    total_maint = sum(_as_float(r.get("amount")) for r in expenses if str(r.get("expense_type")) == "Maintenance")
+    lifetime = sum(_as_float(r.get("amount")) for r in expenses)
+
+    c1, c2, c3 = st.columns(3, gap="small")
+    c1.metric("Total repair", _money(total_repair))
+    c2.metric("Total maintenance", _money(total_maint))
+    c3.metric("Lifetime expense", _money(lifetime))
+
+    if can_edit:
+        with st.expander("Add repair / expense", expanded=False):
+            et = st.selectbox("Expense type", list(_ASSET_EXPENSE_TYPES), key=f"ae_type_{aid}")
+            ed = st.date_input("Expense date", value=None, key=f"ae_date_{aid}")
+            vendor = st.text_input("Vendor", key=f"ae_vendor_{aid}")
+            desc = st.text_input("Description", key=f"ae_desc_{aid}")
+            amt = st.number_input("Amount", min_value=0.0, value=0.0, step=0.01, format="%.2f", key=f"ae_amt_{aid}")
+            odo = st.number_input(
+                "Odometer / hours (optional)",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=f"ae_odo_{aid}",
+            )
+            notes = st.text_area("Notes", height=72, key=f"ae_notes_{aid}")
+            # Receipt upload stored as an Asset Document; expense row keeps the file path in receipt_url.
+            up = st.file_uploader(
+                "Receipt (optional)",
+                accept_multiple_files=False,
+                key=f"ae_receipt_{aid}",
+                type=["pdf", "png", "jpg", "jpeg"],
+            )
+            receipt_path = ""
+            if st.button("Save expense", type="primary", use_container_width=True, key=f"ae_save_{aid}"):
+                if up:
+                    try:
+                        doc = persist_asset_document_upload(
+                            asset_row=asset_row,
+                            uploaded=up,
+                            document_type="Receipt",
+                            expiration_date=None,
+                            notes=f"Receipt for {et}: {desc}".strip(),
+                            uploaded_by=current_profile().get("id"),
+                        )
+                        receipt_path = str((doc or {}).get("file_path") or "").strip()
+                    except Exception as exc:
+                        st.error(f"Receipt upload failed: {exc}")
+                        receipt_path = ""
+                payload = {
+                    "asset_id": aid,
+                    "expense_type": str(et or "Other"),
+                    "expense_date": ed.isoformat() if ed else datetime.utcnow().date().isoformat(),
+                    "vendor": str(vendor or "").strip(),
+                    "description": str(desc or "").strip(),
+                    "amount": float(amt or 0),
+                    "receipt_url": receipt_path,
+                    "odometer_hours": float(odo) if float(odo or 0) > 0 else None,
+                    "created_by": str(current_profile().get("id") or "").strip() or None,
+                    "notes": str(notes or "").strip(),
+                }
+                try:
+                    insert_row_admin("asset_expenses", payload)  # type: ignore[name-defined]
+                except Exception:
+                    # fall back to RLS client when admin key missing
+                    try:
+                        from app.db import insert_row
+                    except ImportError:
+                        from db import insert_row  # type: ignore
+                    insert_row("asset_expenses", payload)  # type: ignore
+                st.success("Expense saved.")
+                st.rerun()
+
+    if not expenses:
+        st.caption("No expenses recorded.")
+        return
+
+    show = pd.DataFrame(expenses).copy()
+    for drop in ("asset_id",):
+        if drop in show.columns:
+            show = show.drop(columns=[drop], errors="ignore")
+    st.dataframe(show, use_container_width=True, hide_index=True)
+
+
+def _render_tool_trailer_kit(
+    *,
+    asset_row: dict,
+    kit_items: list[dict],
+    replacements: list[dict],
+    jobs: list[dict],
+    can_edit: bool,
+) -> None:
+    aid = str(asset_row.get("id") or "").strip()
+    if not aid:
+        return
+
+    active = [r for r in kit_items if bool((r or {}).get("is_active", True))]
+    kit_value = sum(_as_float(r.get("total_value")) for r in active)
+    trailer_value = _as_float(asset_row.get("current_value") or asset_row.get("purchase_cost") or 0)
+    total_value = kit_value + trailer_value
+
+    # Replacement summaries
+    now = datetime.utcnow().date()
+    repl_this_month = 0
+    repl_cost_life = 0.0
+    for r in replacements or []:
+        repl_cost_life += _as_float(r.get("total_cost"))
+        try:
+            ds = str(r.get("replacement_date") or "").strip()
+            if ds and (now - datetime.fromisoformat(ds).date()).days <= _KIT_FREQ_MONTH_DAYS:
+                repl_this_month += 1
+        except Exception:
+            pass
+
+    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+    c1.metric("Trailer value", _money(trailer_value))
+    c2.metric("Kit value", _money(kit_value))
+    c3.metric("Total value", _money(total_value))
+    c4.metric("Replacements (31d)", repl_this_month)
+    c5.metric("Lifetime repl. cost", _money(repl_cost_life))
+
+    if can_edit:
+        with st.expander("Add kit item", expanded=False):
+            nm = st.text_input("Item name", key=f"kit_add_name_{aid}")
+            cat = st.text_input("Category", key=f"kit_add_cat_{aid}")
+            c1, c2, c3 = st.columns(3, gap="small")
+            qty = c1.number_input("Qty", min_value=0.0, value=1.0, step=1.0, format="%.2f", key=f"kit_add_qty_{aid}")
+            uv = c2.number_input(
+                "Unit value", min_value=0.0, value=0.0, step=0.5, format="%.2f", key=f"kit_add_uv_{aid}"
+            )
+            rc = c3.number_input(
+                "Replacement cost", min_value=0.0, value=0.0, step=0.5, format="%.2f", key=f"kit_add_rc_{aid}"
+            )
+            exp_days = st.number_input(
+                "Expected life (days, optional)", min_value=0, value=0, step=1, key=f"kit_add_life_{aid}"
+            )
+            inv_link = st.text_input(
+                "Inventory item id (optional)",
+                key=f"kit_add_inv_{aid}",
+                help="Optional link to inventory_items.id for replacements from stock.",
+            )
+            qr_val = st.text_input("QR code value (optional)", key=f"kit_add_qr_{aid}")
+            notes = st.text_area("Notes", height=72, key=f"kit_add_notes_{aid}")
+            if st.button("Save kit item", type="primary", use_container_width=True, key=f"kit_add_save_{aid}"):
+                t = str(nm or "").strip()
+                if not t:
+                    st.error("Item name is required.")
+                    st.stop()
+                payload = {
+                    "parent_asset_id": aid,
+                    "item_name": t,
+                    "category": str(cat or "").strip(),
+                    "quantity": float(qty or 0),
+                    "unit_value": float(uv or 0),
+                    "replacement_cost": float(rc or 0),
+                    "expected_life_days": int(exp_days) if int(exp_days or 0) > 0 else None,
+                    "inventory_item_id": str(inv_link or "").strip() or None,
+                    "qr_code_value": str(qr_val or "").strip(),
+                    "is_active": True,
+                    "notes": str(notes or "").strip(),
+                }
+                try:
+                    insert_row_admin("asset_kit_items", payload)  # type: ignore[name-defined]
+                except Exception:
+                    try:
+                        from app.db import insert_row
+                    except ImportError:
+                        from db import insert_row  # type: ignore
+                    insert_row("asset_kit_items", payload)  # type: ignore
+                st.success("Kit item saved.")
+                st.rerun()
+
+    if not kit_items:
+        st.caption("No kit items yet.")
+        return
+
+    # Quick insights
+    by_repl = sorted(active, key=lambda r: (-_as_int(r.get("replacement_count")), -_as_float(r.get("replacement_cost"))))
+    top = by_repl[:5]
+    if top:
+        st.markdown("###### Frequently replaced")
+        st.caption("Highest replacement count, then highest replacement cost.")
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Item": str(r.get("item_name") or ""),
+                        "Count": _as_int(r.get("replacement_count")),
+                        "Replacement cost": _money(r.get("replacement_cost")),
+                        "Last replaced": str(r.get("last_replaced_at") or "—"),
+                    }
+                    for r in top
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("###### Kit items")
+    for it in kit_items:
+        kid = str(it.get("id") or "").strip()
+        if not kid:
+            continue
+        nm = str(it.get("item_name") or "").strip() or "—"
+        qty = _as_float(it.get("quantity"), 0)
+        uv = _as_float(it.get("unit_value"), 0)
+        tv = _as_float(it.get("total_value"), qty * uv)
+        rc = _as_float(it.get("replacement_cost"), 0)
+        lr = str(it.get("last_replaced_at") or "").strip() or "—"
+        cnt = _as_int(it.get("replacement_count"), 0)
+        active_flag = bool(it.get("is_active", True))
+
+        with st.container(border=True):
+            h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([2.6, 0.9, 1.1, 1.15, 1.05, 1.2, 1.3, 1.2], gap="small")
+            h1.markdown(f"**{html.escape(nm)}**")
+            h2.caption(f"Qty: {qty:g}")
+            h3.caption(f"Unit: {_money(uv)}")
+            h4.caption(f"Total: {_money(tv)}")
+            h5.caption(f"Repl: {_money(rc)}")
+            h6.caption(f"Last: {lr}")
+            h7.caption(f"Count: {cnt}")
+            h8.caption("Active" if active_flag else "Inactive")
+
+            if not can_edit:
+                continue
+
+            with st.expander("Replace / edit", expanded=False):
+                r1, r2, r3 = st.columns(3, gap="small")
+                rdate = r1.date_input("Replacement date", value=None, key=f"kit_r_date_{kid}")
+                rqty = r2.number_input(
+                    "Qty replaced", min_value=0.0, value=1.0, step=1.0, format="%.2f", key=f"kit_r_qty_{kid}"
+                )
+                ruc = r3.number_input(
+                    "Unit cost", min_value=0.0, value=float(rc), step=0.5, format="%.2f", key=f"kit_r_uc_{kid}"
+                )
+                reason = st.text_input("Reason", key=f"kit_r_reason_{kid}")
+                job_names = ["— No job —"] + [str(j.get("job_name") or "").strip() for j in jobs if str(j.get("job_name") or "").strip()]
+                job_pick = st.selectbox("Job (optional)", job_names, key=f"kit_r_job_{kid}")
+                job_id = None
+                if job_pick and not job_pick.startswith("—"):
+                    for j in jobs:
+                        if str(j.get("job_name") or "").strip() == job_pick:
+                            job_id = str(j.get("id") or "").strip() or None
+                            break
+                notes = st.text_area("Notes", height=72, key=f"kit_r_notes_{kid}")
+                from_inventory = st.checkbox(
+                    "Deduct from linked inventory item (if set)",
+                    value=True,
+                    key=f"kit_r_from_inv_{kid}",
+                    help="If this kit item has inventory_item_id, deduct qty and write an inventory_transactions row.",
+                )
+                if st.button("Record replacement", type="primary", use_container_width=True, key=f"kit_r_go_{kid}"):
+                    q = float(rqty or 0)
+                    if q <= 0:
+                        st.error("Qty replaced must be greater than zero.")
+                        st.stop()
+                    u = float(ruc or 0)
+                    # Optional inventory deduction
+                    inv_id = str(it.get("inventory_item_id") or "").strip()
+                    if from_inventory and inv_id:
+                        inv = fetch_one("inventory_items", {"id": inv_id})
+                        if inv:
+                            qoh = _as_float(inv.get("quantity_on_hand"), 0)
+                            update_rows_admin("inventory_items", {"quantity_on_hand": qoh - q}, {"id": inv_id})
+                            insert_row_admin(
+                                "inventory_transactions",
+                                {
+                                    "inventory_item_id": inv_id,
+                                    "qty": -q,
+                                    "txn_type": "KIT_REPLACEMENT",
+                                    "job_id": job_id,
+                                    "profile_id": str(current_profile().get("id") or "").strip() or None,
+                                    "notes": f"Kit replacement for trailer {asset_row.get('asset_id')}: {nm}".strip(),
+                                },
+                            )
+                    # Replacement history
+                    rep_payload = {
+                        "parent_asset_id": aid,
+                        "kit_item_id": kid,
+                        "replacement_date": rdate.isoformat() if rdate else datetime.utcnow().date().isoformat(),
+                        "quantity_replaced": q,
+                        "unit_cost": u,
+                        "reason": str(reason or "").strip(),
+                        "replaced_by": str(current_profile().get("id") or "").strip() or None,
+                        "job_id": job_id,
+                        "notes": str(notes or "").strip(),
+                    }
+                    try:
+                        insert_row_admin("asset_kit_replacements", rep_payload)  # type: ignore[name-defined]
+                    except Exception:
+                        try:
+                            from app.db import insert_row
+                        except ImportError:
+                            from db import insert_row  # type: ignore
+                        insert_row("asset_kit_replacements", rep_payload)  # type: ignore
+                    # Update kit item counters
+                    update_rows_admin(
+                        "asset_kit_items",
+                        {
+                            "replacement_count": cnt + 1,
+                            "last_replaced_at": rep_payload["replacement_date"],
+                            "replacement_cost": u,
+                        },
+                        {"id": kid},
+                    )
+                    st.success("Replacement recorded.")
+                    st.rerun()
+
+                st.markdown("-----")
+                enm = st.text_input("Item name", value=nm, key=f"kit_e_name_{kid}")
+                ecat = st.text_input("Category", value=str(it.get("category") or ""), key=f"kit_e_cat_{kid}")
+                ec1, ec2, ec3 = st.columns(3, gap="small")
+                eqty = ec1.number_input("Qty", min_value=0.0, value=float(qty), step=1.0, format="%.2f", key=f"kit_e_qty_{kid}")
+                euv = ec2.number_input("Unit value", min_value=0.0, value=float(uv), step=0.5, format="%.2f", key=f"kit_e_uv_{kid}")
+                erc = ec3.number_input("Replacement cost", min_value=0.0, value=float(rc), step=0.5, format="%.2f", key=f"kit_e_rc_{kid}")
+                eactive = st.checkbox("Active", value=active_flag, key=f"kit_e_active_{kid}")
+                enotes = st.text_area("Notes", value=str(it.get("notes") or ""), height=72, key=f"kit_e_notes_{kid}")
+                b1, b2 = st.columns(2, gap="small")
+                with b1:
+                    if st.button("Save item", type="secondary", use_container_width=True, key=f"kit_e_save_{kid}"):
+                        update_rows_admin(
+                            "asset_kit_items",
+                            {
+                                "item_name": str(enm or "").strip() or nm,
+                                "category": str(ecat or "").strip(),
+                                "quantity": float(eqty or 0),
+                                "unit_value": float(euv or 0),
+                                "replacement_cost": float(erc or 0),
+                                "is_active": bool(eactive),
+                                "notes": str(enotes or "").strip(),
+                            },
+                            {"id": kid},
+                        )
+                        st.success("Saved.")
+                        st.rerun()
+                with b2:
+                    if st.button("Delete item", type="secondary", use_container_width=True, key=f"kit_e_del_{kid}"):
+                        delete_asset_and_related  # keep linter quiet about imported symbol in file scope
+                        try:
+                            from app.db import delete_rows_admin as _del_admin
+                        except ImportError:
+                            from db import delete_rows_admin as _del_admin  # type: ignore
+                        _del_admin("asset_kit_items", {"id": kid})
+                        st.success("Deleted.")
+                        st.rerun()
+
+
+def _render_tool_trailer_replacement_history(*, replacements: list[dict], jobs: list[dict]) -> None:
+    if not replacements:
+        st.caption("No replacements recorded.")
+        return
+    show = []
+    for r in replacements:
+        show.append(
+            {
+                "Date": str(r.get("replacement_date") or "—"),
+                "Kit item id": str(r.get("kit_item_id") or "")[:8] + "…",
+                "Qty": _as_float(r.get("quantity_replaced"), 0),
+                "Unit cost": _money(r.get("unit_cost")),
+                "Total": _money(r.get("total_cost")),
+                "Job": _todo_like_job_label(jobs, str(r.get("job_id") or "") or None),
+                "Reason": str(r.get("reason") or "").strip(),
+                "Notes": str(r.get("notes") or "").strip(),
+            }
+        )
+    st.dataframe(pd.DataFrame(show), use_container_width=True, hide_index=True)
+
 
 def _clear_legacy_gallery_state(aid: str) -> None:
     """Clear stale thumbnail-gallery preview/session state (gallery UI removed)."""
@@ -906,10 +1340,18 @@ def render() -> None:
     assignments = fetch_by_match("asset_assignments", {"asset_id": asset["id"]}, limit=500)
     inspections = fetch_by_match("asset_inspections", {"asset_id": asset["id"]}, limit=500)
 
+    # Optional modules (migrations may not be applied yet)
+    asset_expenses = _safe_fetch_by_match("asset_expenses", {"asset_id": asset["id"]}, limit=1000)
+    kit_items = _safe_fetch_by_match("asset_kit_items", {"parent_asset_id": asset["id"]}, limit=2000)
+    kit_replacements = _safe_fetch_by_match("asset_kit_replacements", {"parent_asset_id": asset["id"]}, limit=5000)
+
     documents.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     maintenance.sort(key=lambda r: str(r.get("service_date") or ""), reverse=True)
     assignments.sort(key=lambda r: str(r.get("created_at") or r.get("check_out_at") or ""), reverse=True)
     inspections.sort(key=lambda r: str(r.get("inspection_date") or ""), reverse=True)
+    asset_expenses.sort(key=lambda r: str(r.get("expense_date") or r.get("created_at") or ""), reverse=True)
+    kit_items.sort(key=lambda r: str(r.get("created_at") or ""), reverse=False)
+    kit_replacements.sort(key=lambda r: str(r.get("replacement_date") or r.get("created_at") or ""), reverse=True)
 
     asset_photos = fetch_by_match("asset_photos", {"asset_id": asset["id"]}, limit=500)
     asset_photos.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
@@ -1448,6 +1890,39 @@ def render() -> None:
                         st.session_state.pop("asset_detail_action", None)
                         st.session_state["asset_detail_flash"] = "Manual uploaded successfully."
                         st.rerun()
+
+    # --- Tool Trailer: kit + expenses + replacement history ---
+    if _is_tool_trailer(asset):
+        st.markdown("### Tool trailer")
+        tab_ov, tab_kit, tab_rep, tab_hist = st.tabs(
+            ["Overview", "Kit Items", "Repairs / Expenses", "Replacement History"]
+        )
+        with tab_ov:
+            st.caption("Tool trailer summary (asset + kit value).")
+            _render_tool_trailer_kit(
+                asset_row=asset,
+                kit_items=kit_items,
+                replacements=kit_replacements,
+                jobs=jobs,
+                can_edit=can_edit,
+            )
+        with tab_kit:
+            _render_tool_trailer_kit(
+                asset_row=asset,
+                kit_items=kit_items,
+                replacements=kit_replacements,
+                jobs=jobs,
+                can_edit=can_edit,
+            )
+        with tab_rep:
+            _render_asset_expenses(
+                asset_row=asset,
+                expenses=asset_expenses,
+                can_edit=can_edit,
+                profiles=[],
+            )
+        with tab_hist:
+            _render_tool_trailer_replacement_history(replacements=kit_replacements, jobs=jobs)
 
     st.markdown("### History & records")
     tab_doc, tab_maint, tab_asg, tab_insp, tab_notes = st.tabs(
