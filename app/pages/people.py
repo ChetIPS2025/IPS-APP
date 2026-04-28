@@ -109,6 +109,11 @@ _PEOPLE_TABLE_HIDDEN_TOKENS: frozenset[str] = frozenset(
         "acctactive",
         "empactive",
         "trade",
+        "kind",
+        "loginenabled",
+        "mustresetpassword",
+        "createdat",
+        "phonenumber",
     }
 )
 
@@ -121,17 +126,8 @@ def _people_visible_table_columns(columns: pd.Index | list[str]) -> list[str]:
         for c in col_list
         if c not in HIDDEN_FIELDS and _people_col_norm_token(c) not in _PEOPLE_TABLE_HIDDEN_TOKENS
     ]
-    preferred = [
-        "Kind",
-        "Name",
-        "Email",
-        "Employee Job Role",
-        "Hourly rate",
-        "Access Role",
-        "Login enabled",
-        "Must reset password",
-        "Is active",
-    ]
+    # Visible columns (browsing only): hide internal ids/flags and login mechanics.
+    preferred = ["Name", "Email", "Employee Job Role", "Hourly rate", "Access Role", "Is active"]
     ordered = [c for c in preferred if c in kept]
     tail = [c for c in kept if c not in ordered]
     return ordered + tail

@@ -857,13 +857,13 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
     sel_set = set(cur_selected)
 
-    # Sel | Photo | Item | SKU | QOH | Reorder | Status
+    # Sel | Photo | Item | SKU | On Hand | Reorder | Status
     header = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
     header[0].markdown("**Sel**")
     header[1].markdown("**Photo**")
     header[2].markdown("**Item**")
     header[3].markdown("**SKU**")
-    header[4].markdown("**QOH**")
+    header[4].markdown("**On Hand**")
     header[5].markdown("**Reorder**")
     header[6].markdown("**Status**")
 

@@ -41,29 +41,40 @@ IPS_ACTIVE_PAGE_KEY = "ips_active_page"
 # Current sidebar page (one of IPS_SIDEBAR_PAGES). Replaces legacy key "ips_nav_radio".
 IPS_NAV_PAGE_KEY = "ips_nav_page"
 
-# Primary: most-used flows (order matches sidebar layout).
-_NAV_PRIMARY: tuple[str, ...] = (
-    "Dashboard",
-)
+# ---- Sidebar structure (simple, field + office friendly) ----
+# Keep routes separate from sidebar visibility so deep links / pending-nav still work.
+_NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 
-# Secondary: tools & operations (shown below divider + TOOLS label).
-_NAV_SECONDARY: tuple[str, ...] = (
+# Jobs (sidebar)
+_NAV_JOBS_SIDEBAR: tuple[str, ...] = ("Job Database", "Estimates", "Job Costing")
+
+# Assets (sidebar)
+_NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Scan", "Tool Trailer Audits")
+
+# Inventory expander (sidebar)
+_NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "Inventory Usage")
+
+# Admin / office tools (sidebar)
+_NAV_ADMIN_SIDEBAR: tuple[str, ...] = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses")
+
+# Pages that remain routable (deep links / internal navigation) but are not shown in the simplified sidebar.
+_NAV_HIDDEN_ROUTES: tuple[str, ...] = (
     "People",
+    "Employees",
     "Employee Toolbox",
-    "Time Tracking",
     "PM Matrix Time Entry",
-    "Weekly Timesheet",
-    "PO / Expenses",
-)
-
-_SECONDARY_ADMIN_ONLY: frozenset[str] = frozenset(
-    {"Labor", "People"}
+    "Labor",
+    "Customers",
+    "Asset Scanner",
+    "Admin",
+    "Asset Detail",
+    "Asset Manager",
 )
 
 # All keys that may appear in the sidebar or session for routing validation.
-_NAV_JOBS: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
-# Routable asset-area pages (Who Has What is not duplicated in the sidebar — summary on Dashboard).
-_NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What")
+_NAV_JOBS_ROUTES: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
+# Routable asset-area pages (Who Has What moved to Dashboard; still routable for View All).
+_NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
 # Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
 _NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
     ("All assets", "All"),
@@ -74,10 +85,7 @@ _NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
 )
 # Labor catalog. Materials are **inventory_items** with ``category`` = Materials (see Inventory).
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
-_NAV_RESOURCES: tuple[str, ...] = (
-    "Labor",
-    "Inventory",
-)
+_NAV_RESOURCES: tuple[str, ...] = ("Inventory",)
 
 # Inventory sub-pages (kept routable, but nested under Inventory in the sidebar UI).
 _NAV_INVENTORY_SUBPAGES: tuple[str, ...] = ("Scan Inventory", "Inventory Usage")
@@ -88,16 +96,27 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "admin": frozenset(
         {
             *_NAV_PRIMARY,
-            *_NAV_JOBS,
+            *_NAV_JOBS_ROUTES,
             *_NAV_ASSET_ROUTES,
             *_NAV_RESOURCES,
-            *_NAV_SECONDARY,
             "Admin",
             "Users",
             "Asset Detail",
             "Asset Manager",
             "Scan Inventory",
             "Inventory Usage",
+            "Time Tracking",
+            "Weekly Timesheet",
+            "PO / Expenses",
+            "Tool Trailer Audits",
+            # legacy / power-user routes kept routable
+            "People",
+            "Employees",
+            "Employee Toolbox",
+            "PM Matrix Time Entry",
+            "Labor",
+            "Asset Scanner",
+            "Customers",
         }
     ),
     "manager": frozenset(
@@ -105,10 +124,11 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Dashboard",
             "Job Database",
             "Estimates",
-            "Customers",
             "Job Costing",
             "Scan Inventory",
             "Who Has What",
+            "Asset Database",
+            "Tool Trailer Audits",
             # Add reporting pages here when present
         }
     ),
@@ -120,10 +140,12 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Scan Inventory",
             "Inventory Usage",
             "Who Has What",
+            "Tool Trailer Audits",
+            # legacy routes kept routable (not necessarily in sidebar)
             "Employee Toolbox",
         }
     ),
-    "viewer": frozenset({"Dashboard", "Inventory Usage", "Who Has What"}),
+    "viewer": frozenset({"Dashboard", "Inventory Usage", "Who Has What", "Asset Database"}),
 }
 
 
@@ -136,7 +158,14 @@ def role_can_open_page(role: str, page: str) -> bool:
         allowed = _ROLE_ALLOWED_PAGES.get("viewer", frozenset())
     return str(page or "").strip() in allowed
 
-IPS_SIDEBAR_PAGES: tuple[str, ...] = _NAV_PRIMARY + _NAV_JOBS + _NAV_ASSET_ROUTES + _NAV_RESOURCES + _NAV_SECONDARY
+IPS_SIDEBAR_PAGES: tuple[str, ...] = (
+    _NAV_PRIMARY
+    + _NAV_JOBS_ROUTES
+    + _NAV_ASSET_ROUTES
+    + _NAV_RESOURCES
+    + _NAV_ADMIN_SIDEBAR
+    + _NAV_HIDDEN_ROUTES
+)
 
 # Keep Inventory sub-pages routable even though they are nested under "Inventory" in the sidebar.
 IPS_SIDEBAR_PAGES = IPS_SIDEBAR_PAGES + _NAV_INVENTORY_SUBPAGES
@@ -154,9 +183,9 @@ def _sidebar_display_label(route_key: str) -> str:
 
 
 def _visible_secondary_pages(role: str) -> tuple[str, ...]:
-    if role == "admin":
-        return _NAV_SECONDARY
-    return tuple(p for p in _NAV_SECONDARY if p not in _SECONDARY_ADMIN_ONLY)
+    # Secondary expander removed; keep function for compatibility (no pages).
+    _ = role
+    return tuple()
 
 
 def apply_pending_navigation() -> None:
@@ -210,7 +239,7 @@ def _inject_sidebar_nav_css() -> None:
 <style>
 /* Primary: section titles */
 section[data-testid="stSidebar"] .ips-nav-section-title {
-  color: #e5e7eb;
+  color: #FFFFFF;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -222,15 +251,15 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 16px !important;
   padding-top: 14px !important;
-  border-top: 1px solid rgba(55, 65, 81, 0.9);
+  border-top: 1px solid rgba(110, 145, 190, 0.22);
 }
 /* Divider + air gap: primary vs TOOLS */
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   margin: 28px 0 14px 0;
   padding: 0;
   border: none;
-  border-top: 1px solid rgba(75, 85, 99, 0.45);
-  box-shadow: 0 1px 0 0 rgba(17, 24, 39, 0.6);
+  border-top: 1px solid rgba(110, 145, 190, 0.22);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03);
   opacity: 1;
 }
 /* Primary nav buttons — align with main IPS button rhythm (height, radius, no wrap) */
@@ -256,7 +285,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.35rem 0.65rem !important;
   border-radius: 8px !important;
   margin-left: 2px !important;
-  border-left: 3px solid rgba(75, 85, 99, 0.65) !important;
+  border-left: 3px solid rgba(110, 145, 190, 0.26) !important;
   padding-left: 10px !important;
   box-sizing: border-box !important;
 }
@@ -270,19 +299,20 @@ section[data-testid="stSidebar"] button[kind="primary"] {
   box-shadow: inset 3px 0 0 0 #60a5fa !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"] {
-  background: rgba(17, 24, 39, 0.45) !important;
-  color: #d1d5db !important;
-  border: 1px solid rgba(55, 65, 81, 0.95) !important;
+  background: #14365C !important;
+  color: #C0CAD8 !important;
+  border: 1px solid rgba(120, 150, 200, 0.25) !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-  border-color: #6b7280 !important;
-  color: #f3f4f6 !important;
+  border-color: rgba(120, 150, 200, 0.35) !important;
+  color: #FFFFFF !important;
+  background: #1A3F6B !important;
 }
 /* TOOLS expander: muted label + chrome */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid rgba(55, 65, 81, 0.65) !important;
+  border: 1px solid rgba(110, 145, 190, 0.22) !important;
   border-radius: 6px !important;
-  background: rgba(17, 24, 39, 0.28) !important;
+  background: rgba(18, 47, 82, 0.35) !important;
   margin-top: 2px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -290,7 +320,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
-  color: #71717a !important;
+  color: rgba(159, 176, 199, 0.9) !important;
   opacity: 0.88 !important;
   padding: 8px 10px !important;
 }
@@ -305,14 +335,14 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   padding: 0.28rem 0.6rem !important;
   border-radius: 8px !important;
   opacity: 0.92 !important;
-  color: #a1a1aa !important;
-  background: rgba(17, 24, 39, 0.25) !important;
-  border: 1px solid rgba(55, 65, 81, 0.65) !important;
+  color: rgba(192, 202, 216, 0.92) !important;
+  background: rgba(18, 47, 82, 0.45) !important;
+  border: 1px solid rgba(140, 175, 220, 0.22) !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover {
-  color: #d4d4d8 !important;
-  border-color: #6b7280 !important;
+  color: #FFFFFF !important;
+  border-color: rgba(170, 205, 240, 0.35) !important;
   opacity: 1 !important;
 }
 /* Active tool: same treatment as primary nav buttons */
@@ -332,7 +362,7 @@ section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
 }
 section[data-testid="stSidebar"] .ips-install-section-title {
-  color: #e5e7eb;
+  color: #FFFFFF;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -486,8 +516,6 @@ def render_sidebar() -> str:
 
     current = st.session_state[IPS_NAV_PAGE_KEY]
     role = current_role()
-    secondary_visible = _visible_secondary_pages(role)
-
     # --- PRIMARY: Dashboard ---
     st.sidebar.markdown(
         '<div class="ips-nav-section-title">Dashboard</div>',
@@ -500,26 +528,28 @@ def render_sidebar() -> str:
         '<div class="ips-nav-section-title ips-nav-group-spaced">Jobs</div>',
         unsafe_allow_html=True,
     )
-    for p in _NAV_JOBS:
+    for p in _NAV_JOBS_SIDEBAR:
         if role_can_open_page(role, p):
             _render_nav_button(p, current=current, indent=True)
 
-    # --- PRIMARY: Asset Dashboard ---
+    # --- PRIMARY: Assets ---
     st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Asset Dashboard</div>',
+        '<div class="ips-nav-section-title ips-nav-group-spaced">Assets</div>',
         unsafe_allow_html=True,
     )
-    _render_assets_sidebar_group(current=current, role=role)
+    if role_can_open_page(role, "Asset Database"):
+        # Keep category lenses under Assets.
+        _render_assets_sidebar_group(current=current, role=role)
+    if role_can_open_page(role, "Scan Inventory"):
+        _render_nav_button_route(label="Scan", route="Scan Inventory", current=current, indent=True, key_suffix="scan")
+    if role_can_open_page(role, "Tool Trailer Audits"):
+        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
 
-    # --- PRIMARY: Resources & Inventory ---
+    # --- PRIMARY: Inventory ---
     st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Resources &amp; Inventory</div>',
+        '<div class="ips-nav-section-title ips-nav-group-spaced">Inventory</div>',
         unsafe_allow_html=True,
     )
-    for p in ("Labor",):
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
-
     inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
     if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
         with st.sidebar.expander("Inventory", expanded=inv_expanded):
@@ -557,23 +587,15 @@ def render_sidebar() -> str:
                         st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
                         st.rerun()
 
-    # --- SECONDARY: TOOLS ---
+    # --- PRIMARY: Admin / office ---
     st.sidebar.markdown(
-        '<hr class="ips-nav-primary-secondary-divider" />',
+        '<div class="ips-nav-section-title ips-nav-group-spaced">Admin</div>',
         unsafe_allow_html=True,
     )
-
-    with st.sidebar.expander("TOOLS", expanded=True):
-        for p in secondary_visible:
-            if not role_can_open_page(role, p):
-                continue
-            active = current == p
-            btn_type = "primary" if active else "secondary"
-            key = _nav_btn_key(p)
-            label = _sidebar_display_label(p)
-            if st.button(label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = p
-                st.rerun()
+    for p in _NAV_ADMIN_SIDEBAR:
+        if role_can_open_page(role, p):
+            # Users is the route key already; Time Tracking / Weekly Timesheet / PO are direct routes too.
+            _render_nav_button(p, current=current, indent=True)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
     st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)

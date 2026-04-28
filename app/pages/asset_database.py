@@ -1424,15 +1424,6 @@ def render_asset_database_card_list(
                     st.session_state["asset_detail_id"] = aid
                     st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                     st.rerun()
-                if can_quick_edit and st.button(
-                    "Quick edit",
-                    key=f"{key_prefix}_qedit_{i}_{aid}",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["asset_panel_mode"] = "edit"
-                    st.session_state["asset_panel_id"] = aid
-                    st.rerun()
             continue
 
         if i > 0:
@@ -1542,25 +1533,39 @@ def render() -> None:
             )
         st.caption("Checkbox column on the left — action bar sits directly under the grid.")
         disp = _enrich_asset_table_for_checkout(filtered, job_label_by_id=job_label_by_id, emp_by_id=emp_by_id)
-        table_cols = [
-            c
-            for c in [
-                "asset_name",
-                "asset_id",
-                "serial_number",
-                "status",
-                "Checkout tool",
-                "Held by",
-                "On job",
-                "manufacturer",
-                "model",
-                "category",
-                "is_rental",
-            ]
-            if c in disp.columns
-        ]
+        # Visible columns only (keep internal ids in the dataframe for selection / panel logic).
+        # Required: Photo, Asset, Asset #, Serial #, Status, Category, Holder, Job.
+        if "Photo" not in disp.columns:
+            if "photo_path" in disp.columns:
+                disp["Photo"] = disp["photo_path"].map(
+                    lambda p: (create_signed_url(str(p), expires_in=3600) if str(p or "").strip() else "")
+                )
+            else:
+                disp["Photo"] = ""
+        # Prefer the enriched labels (Held by / On job); rename for UI.
+        if "Held by" in disp.columns and "Holder" not in disp.columns:
+            disp["Holder"] = disp["Held by"]
+        if "On job" in disp.columns and "Job" not in disp.columns:
+            disp["Job"] = disp["On job"]
+        if "asset_name" in disp.columns and "Asset" not in disp.columns:
+            disp["Asset"] = disp["asset_name"]
+        if "asset_id" in disp.columns and "Asset #" not in disp.columns:
+            disp["Asset #"] = disp["asset_id"]
+        if "serial_number" in disp.columns and "Serial #" not in disp.columns:
+            disp["Serial #"] = disp["serial_number"]
+
+        if "status" in disp.columns and "Status" not in disp.columns:
+            disp["Status"] = disp["status"]
+        if "category" in disp.columns and "Category" not in disp.columns:
+            disp["Category"] = disp["category"]
+        table_cols = [c for c in ("Photo", "Asset", "Asset #", "Serial #", "Status", "Category", "Holder", "Job") if c in disp.columns]
         if "id" not in disp.columns:
-            st.dataframe(disp[table_cols], use_container_width=True, hide_index=True)
+            st.dataframe(
+                disp[table_cols],
+                use_container_width=True,
+                hide_index=True,
+                column_config={"Photo": st.column_config.ImageColumn("Photo", width="small")} if "Photo" in table_cols else None,
+            )
             return
 
         _, sel = render_selectable_dataframe(

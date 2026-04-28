@@ -582,10 +582,10 @@ def _render_job_form_panel(
         else:
             st.caption("Select a customer to choose a contact.")
 
-        st.markdown("#### Job Number")
+        st.markdown("#### Job #")
         if has_job_number_column and selected_job:
             st.text_input(
-                "Job Number",
+                "Job #",
                 value=str(current_value("job_number") or ""),
                 disabled=True,
                 help="Assigned when the job was created.",
@@ -598,7 +598,7 @@ def _render_job_form_panel(
             if "job_number_manual_input" not in st.session_state:
                 st.session_state["job_number_manual_input"] = suggested_jn
             st.text_input(
-                "Job Number",
+                "Job #",
                 key="job_number_manual_input",
                 help="Leave the suggested value or type a custom job number.",
                 label_visibility="collapsed",
@@ -1357,7 +1357,7 @@ def render() -> None:
                     with head[0]:
                         st.caption(" ")
                     with head[1]:
-                        st.caption("Job Number")
+                        st.caption("Job #")
                     with head[2]:
                         st.caption("Job Name")
                     with head[3]:

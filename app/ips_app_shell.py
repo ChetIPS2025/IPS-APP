@@ -30,9 +30,21 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-lg: 0.9rem;
             --ips-radius: 8px;
             --ips-radius-lg: 10px;
-            --ips-border: rgba(71, 85, 105, 0.45);
-            --ips-text-muted: #94a3b8;
-            --ips-surface: rgba(15, 23, 42, 0.35);
+            /* IPS palette (high-end industrial SaaS) */
+            --ips-bg-main: #0F2A4A;
+            --ips-bg-secondary: #122F52; /* card / section */
+            --ips-bg-card: #14365C;      /* alternate sections */
+            --ips-bg-sidebar: #102A4A;
+            --ips-bg-hover: #1A3F6B;
+
+            --ips-text: #FFFFFF;
+            --ips-text-secondary: #C0CAD8;
+            --ips-text-muted: #9FB0C7;
+
+            --ips-border: rgba(120, 150, 200, 0.25);
+            --ips-border-strong: rgba(120, 150, 200, 0.35);
+            --ips-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+            --ips-surface: rgba(18, 47, 82, 0.88);
             /* Button system (main content) — dense pages override with more specific rules */
             --ips-btn-height: 2.125rem;
             --ips-btn-pad-y: 0.625rem;
@@ -48,12 +60,23 @@ def inject_ips_app_shell_styles() -> None:
             --ips-ctrl-pad-y: 0.24rem;
             --ips-ctrl-pad-x: 0.5rem;
             --ips-ctrl-h: 2rem;
-            --ips-ctrl-border: rgba(71, 85, 105, 0.58);
-            --ips-ctrl-bg: rgba(15, 23, 42, 0.55);
-            --ips-ctrl-fg: #f1f5f9;
+            --ips-ctrl-border: rgba(120, 150, 200, 0.35);
+            --ips-ctrl-bg: #122F52;
+            --ips-ctrl-fg: var(--ips-text);
+            --ips-ctrl-ph: rgba(159, 176, 199, 0.8);
             --ips-label-fs: 0.76rem;
-            --ips-label-color: #94a3b8;
+            --ips-label-color: var(--ips-text-muted);
             --ips-widget-gap: 0.28rem;
+        }
+
+        /* ----- App background + default text ----- */
+        section[data-testid="stMain"] {
+            background: transparent !important;
+            color: var(--ips-text) !important;
+        }
+        section[data-testid="stMain"] .stMarkdown,
+        section[data-testid="stMain"] .stMarkdown p {
+            color: var(--ips-text-secondary) !important;
         }
 
         /* ----- Main block: consistent horizontal padding & max readable width ----- */
@@ -69,7 +92,7 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Typography hierarchy (Streamlit markdown + headers) ----- */
         section[data-testid="stMain"] h1 {
-            color: #f8fafc !important;
+            color: var(--ips-text) !important;
             font-size: 1.55rem !important;
             font-weight: 750 !important;
             letter-spacing: -0.02em;
@@ -77,14 +100,14 @@ def inject_ips_app_shell_styles() -> None:
         }
         section[data-testid="stMain"] h2,
         section[data-testid="stMain"] h3 {
-            color: #e2e8f0 !important;
+            color: var(--ips-text) !important;
             font-size: 1.05rem !important;
             font-weight: 650 !important;
             margin: 0.45rem 0 0.28rem 0 !important;
         }
         section[data-testid="stMain"] h4,
         section[data-testid="stMain"] h5 {
-            color: #cbd5e1 !important;
+            color: var(--ips-text-secondary) !important;
             font-size: 0.92rem !important;
             font-weight: 600 !important;
             margin: 0.4rem 0 0.22rem 0 !important;
@@ -125,13 +148,25 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Expanders ----- */
         section[data-testid="stMain"] [data-testid="stExpander"] details {
-            border: 1px solid rgba(71, 85, 105, 0.4) !important;
+            border: 1px solid var(--ips-border) !important;
             border-radius: var(--ips-radius-lg) !important;
-            background: var(--ips-surface) !important;
+            background: var(--ips-bg-card) !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] summary {
             font-weight: 600 !important;
             font-size: 0.9rem !important;
+        }
+
+        /* ----- Cards / containers (Streamlit "border=True") ----- */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 12px !important;
+            border: 1px solid var(--ips-border) !important;
+            background: var(--ips-bg-secondary) !important;
+            box-shadow: var(--ips-shadow) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"] > div {
+            padding: 10px 12px !important;
         }
 
         /* ----- IPS button system (main): primary / secondary / tertiary + downloads + link buttons ----- */
@@ -164,16 +199,31 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
             font-weight: var(--ips-btn-fw-strong) !important;
-            box-shadow: 0 1px 6px rgba(37, 99, 235, 0.25) !important;
+            color: #fff !important;
+            background: linear-gradient(180deg, #b91c1c 0%, #991b1b 100%) !important;
+            border: 1px solid rgba(248, 113, 113, 0.55) !important;
+            box-shadow: 0 10px 20px rgba(153, 27, 27, 0.22) !important;
+        }
+        section[data-testid="stMain"] .stButton > button[kind="primary"]:hover,
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
+        section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%) !important;
+            border-color: rgba(252, 165, 165, 0.6) !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"],
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="secondary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
-            color: #cbd5e1 !important;
-            border-color: rgba(100, 116, 139, 0.45) !important;
-            background: rgba(30, 41, 59, 0.55) !important;
+            color: var(--ips-text-secondary) !important;
+            border-color: rgba(120, 150, 200, 0.25) !important;
+            background: #14365C !important;
             font-weight: var(--ips-btn-fw) !important;
+        }
+        section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
+        section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
+            background: #1E4A7D !important;
+            border-color: rgba(120, 150, 200, 0.35) !important;
+            color: #fff !important;
         }
         section[data-testid="stMain"] .stLinkButton > a {
             border-radius: var(--ips-btn-radius) !important;
@@ -213,23 +263,26 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDataFrame"],
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
             border-radius: var(--ips-radius-lg) !important;
-            border: 1px solid rgba(51, 65, 85, 0.55) !important;
+            border: 1px solid var(--ips-border) !important;
             overflow: hidden;
         }
-        /* Force dark table surfaces (avoid mixed light tables on some machines) */
-        .stDataFrame, .stTable,
         section[data-testid="stMain"] [data-testid="stDataFrame"],
         section[data-testid="stMain"] [data-testid="stTable"],
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
-            background-color: #0b2247 !important;
-            color: #f3f6fb !important;
+            background: #122F52 !important;
+            color: var(--ips-text-secondary) !important;
         }
-        .stDataFrame div, .stTable div,
-        section[data-testid="stMain"] [data-testid="stDataFrame"] div,
-        section[data-testid="stMain"] [data-testid="stTable"] div,
-        section[data-testid="stMain"] [data-testid="stDataEditor"] div {
-            background-color: #0b2247 !important;
-            color: #f3f6fb !important;
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] {
+            background: transparent !important;
+        }
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:hover {
+            background: var(--ips-bg-hover) !important;
+        }
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] th,
+        section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] td {
+            border-color: rgba(120, 150, 200, 0.25) !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
         }
 
         /* ----- IPS form controls (main + sidebar): labels + fields ----- */
@@ -257,6 +310,11 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid var(--ips-ctrl-border) !important;
             color: var(--ips-ctrl-fg) !important;
             box-sizing: border-box !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextInput"] input::placeholder,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stNumberInput"] input::placeholder,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea::placeholder {
+            color: var(--ips-ctrl-ph) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea {
@@ -342,10 +400,11 @@ def inject_ips_app_shell_styles() -> None:
         }
 
         section[data-testid="stMain"] .stMetric {
-            background: rgba(15, 23, 42, 0.45);
-            border: 1px solid rgba(71, 85, 105, 0.4);
+            background: rgba(20, 54, 92, 0.62);
+            border: 1px solid var(--ips-border);
             border-radius: var(--ips-radius-lg);
-            padding: 0.45rem 0.55rem !important;
+            padding: 0.55rem 0.65rem !important;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
         }
         section[data-testid="stMain"] [data-testid="stMetricLabel"] {
             font-size: 0.72rem !important;
@@ -358,16 +417,16 @@ def inject_ips_app_shell_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(15, 23, 42, 0.5) !important;
-            border-color: rgba(100, 116, 139, 0.38) !important;
+            background: rgba(20, 54, 92, 0.55) !important;
+            border-color: var(--ips-border) !important;
         }
 
         /* ----- Estimate editor: totals strip + document-style proposal surface ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 0.45rem !important;
-            background: rgba(15, 23, 42, 0.55) !important;
-            border-color: rgba(100, 116, 139, 0.38) !important;
+            background: rgba(20, 54, 92, 0.55) !important;
+            border-color: var(--ips-border) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
             background: rgba(248, 250, 252, 0.04) !important;

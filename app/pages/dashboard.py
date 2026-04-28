@@ -557,18 +557,12 @@ def render() -> None:
     render_header(
         "IPS Dashboard",
         subtitle="Industrial Plant Solutions, LLC",
-        help_text="Pipeline snapshot, customers on file, and recent jobs and estimates — use the sidebar for every module.",
+        help_text="A simple snapshot for office + field: jobs, low stock, checked-out tools, and your to-dos.",
     )
 
     sk = str(current_profile().get("id") or "anonymous")
     use_admin = current_role() in {"admin", "pm"}
     _lim = 5000
-    try:
-        customers = fetch_table_for_session(
-            "customers", session_key=sk, limit=_lim, order_by="customer_name", use_admin=use_admin
-        )
-    except Exception:
-        customers = []
     try:
         jobs = fetch_table_for_session(
             "jobs", session_key=sk, limit=_lim, order_by="job_number", use_admin=use_admin
@@ -593,37 +587,52 @@ def render() -> None:
         )
     except Exception:
         assets = []
-    kit_items_d: list[dict] = []
-    repl_d: list[dict] = []
-    if role_can_open_page(current_role(), "Asset Database"):
+    inv_rows: list[dict] = []
+    if role_can_open_page(current_role(), "Inventory"):
         try:
-            kit_items_d = fetch_table_for_session(
-                "asset_kit_items",
+            inv_rows = fetch_table_for_session(
+                "inventory_items",
                 session_key=sk,
-                limit=15000,
-                order_by="parent_asset_id",
+                limit=12000,
+                order_by="item_name",
                 use_admin=use_admin,
             )
         except Exception:
-            kit_items_d = []
-        try:
-            repl_d = fetch_table_for_session(
-                "asset_kit_replacements",
-                session_key=sk,
-                limit=25000,
-                order_by="replacement_date",
-                use_admin=use_admin,
-            )
-        except Exception:
-            repl_d = []
+            inv_rows = []
 
     with st.container(border=True):
         st.markdown('<span class="ips-dash-metrics"></span>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4, gap="small")
-        c1.metric("Customers", len(customers or []))
-        c2.metric("Jobs awarded", count_awarded_jobs(jobs))
-        c3.metric("Jobs bidding", count_bidding_jobs(jobs))
-        c4.metric("Active employees", count_active_employees(employees))
+        m1, m2, m3, m4, m5 = st.columns(5, gap="small")
+        m1.metric("Active Jobs", count_awarded_jobs(jobs))
+        m2.metric("Jobs Bidding", count_bidding_jobs(jobs))
+        # Low stock = on hand <= reorder point (active items only when that field exists).
+        low_n = 0
+        if inv_rows:
+            try:
+                df_inv = pd.DataFrame(inv_rows)
+                if "is_active" in df_inv.columns:
+                    df_inv = df_inv[df_inv["is_active"] != False]  # noqa: E712
+                qoh = pd.to_numeric(df_inv.get("quantity_on_hand", 0), errors="coerce").fillna(0)
+                rp = pd.to_numeric(df_inv.get("reorder_point", 0), errors="coerce").fillna(0)
+                low_n = int((qoh <= rp).sum())
+            except Exception:
+                low_n = 0
+        m3.metric("Low Stock Items", f"{low_n:,}")
+        # Checked-out tools: assets Checked Out OR has holder id
+        out_n = sum(
+            1
+            for a in (assets or [])
+            if str((a or {}).get("status") or "").strip() == "Checked Out"
+            or str((a or {}).get("current_holder_employee_id") or "").strip()
+        )
+        m4.metric("Checked Out Tools", f"{out_n:,}")
+        # Open to-dos are counted inside the to-do query; keep a light approximation here.
+        try:
+            todos = fetch_table_for_session("todos", session_key=sk, limit=2000, order_by="created_at", use_admin=use_admin)
+            open_todos = sum(1 for t in (todos or []) if str((t or {}).get("status") or "Open").strip() != "Complete")
+        except Exception:
+            open_todos = 0
+        m5.metric("Open To-Dos", f"{open_todos:,}")
 
     _render_who_has_what_dashboard(
         list(assets or []),
@@ -631,28 +640,40 @@ def render() -> None:
         list(employees or []),
         role=current_role(),
     )
-    _render_kit_theft_alerts_dashboard(
-        list(assets or []),
-        list(kit_items_d or []),
-        list(repl_d or []),
-        role=current_role(),
-    )
+
+    # Low stock alerts (keep simple; details belong on Inventory page).
+    if inv_rows and low_n > 0:
+        try:
+            df_inv2 = pd.DataFrame(inv_rows)
+            if "is_active" in df_inv2.columns:
+                df_inv2 = df_inv2[df_inv2["is_active"] != False]  # noqa: E712
+            qoh2 = pd.to_numeric(df_inv2.get("quantity_on_hand", 0), errors="coerce").fillna(0)
+            rp2 = pd.to_numeric(df_inv2.get("reorder_point", 0), errors="coerce").fillna(0)
+            low_df = df_inv2.loc[qoh2 <= rp2, :].copy()
+            show_cols = [c for c in ("item_name", "sku", "category", "quantity_on_hand", "reorder_point") if c in low_df.columns]
+            if show_cols:
+                disp = low_df[show_cols].copy()
+                disp = disp.rename(
+                    columns={
+                        "item_name": "Item",
+                        "quantity_on_hand": "On Hand",
+                        "reorder_point": "Reorder",
+                        "unit_cost": "Unit Cost",
+                        "qr_code_value": "QR Code",
+                    }
+                )
+                with st.container(border=True):
+                    st.markdown("##### Low Stock Alerts")
+                    st.caption("Items at or below reorder point (based on current on-hand vs reorder settings).")
+                    st.dataframe(disp, use_container_width=True, hide_index=True, height=min(360, 44 + 30 * len(disp)))
+        except Exception:
+            pass
 
     _render_todo_list(session_key=sk, use_admin=use_admin)
 
-    left, right = st.columns(2, gap="medium")
-    with left:
-        st.markdown("##### Recent jobs")
-        rj = _recent_jobs_rows(list(jobs or []))
-        if not rj:
-            st.caption("No jobs loaded yet.")
-        else:
-            st.dataframe(_jobs_display_df(rj), use_container_width=True, hide_index=True, height=320)
-
-    with right:
-        st.markdown("##### Recent estimates")
-        re = _recent_estimates_rows(list(estimates or []))
-        if not re:
-            st.caption("No estimates loaded yet.")
-        else:
-            st.dataframe(_estimates_display_df(re), use_container_width=True, hide_index=True, height=320)
+    st.markdown("##### Recent jobs")
+    rj = _recent_jobs_rows(list(jobs or []))
+    if not rj:
+        st.caption("No jobs loaded yet.")
+    else:
+        st.dataframe(_jobs_display_df(rj), use_container_width=True, hide_index=True, height=320)
