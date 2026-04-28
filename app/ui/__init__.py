@@ -412,7 +412,7 @@ def _ensure_valid_nav_page() -> None:
         p
         for p in (
             set(_NAV_PRIMARY)
-            | set(_NAV_JOBS)
+            | set(_NAV_JOBS_ROUTES)
             | set(_NAV_ASSET_ROUTES)
             | set(_NAV_RESOURCES)
             | set(_NAV_INVENTORY_SUBPAGES)
