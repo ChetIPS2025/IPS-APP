@@ -74,7 +74,7 @@ def inject_pwa_support() -> None:
   }});
 
   if ('serviceWorker' in w.navigator) {{
-    w.navigator.serviceWorker.register(cfg.sw)
+    w.navigator.serviceWorker.register(cfg.sw, {{ scope: '/app/static/' }})
       .then(() => console.log('SW registered:', cfg.sw))
       .catch(err => console.error('SW failed:', err));
   }}
