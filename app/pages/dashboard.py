@@ -38,6 +38,14 @@ except ImportError:
         labor_hours_actual_by_job,
     )
 
+try:
+    from app.services.job_health import compute_job_health_rows, job_health_summary_counts
+except ImportError:
+    from services.job_health import compute_job_health_rows, job_health_summary_counts  # type: ignore
+
+_DASH_JOB_HEALTH_SELECTED = "dash_job_health_selected"
+_DASH_JOB_HEALTH_CSS = "ips_job_health_css_v1"
+
 
 def _norm_status(v) -> str:
     return " ".join(str(v or "").strip().split()).casefold()
@@ -566,6 +574,183 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                         st.rerun()
 
 
+def _inject_job_health_css_once() -> None:
+    if st.session_state.get(_DASH_JOB_HEALTH_CSS):
+        return
+    st.session_state[_DASH_JOB_HEALTH_CSS] = True
+    st.markdown(
+        """
+<style>
+.ips-health-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.ips-health-green { background: #15803d; color: #ecfdf5; }
+.ips-health-yellow { background: #ca8a04; color: #422006; }
+.ips-health-red { background: #b91c1c; color: #fff7ed; }
+.ips-health-row { margin: 0.12rem 0 0.4rem 0; }
+@media (max-width: 700px) {
+  .ips-health-pill { font-size: 0.74rem; padding: 3px 8px; }
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _pill_html(status: str, pill: str) -> str:
+    cls = {
+        "green": "ips-health-green",
+        "yellow": "ips-health-yellow",
+        "red": "ips-health-red",
+    }.get(status, "ips-health-yellow")
+    return f"<span class='ips-health-pill {cls}'>{pill}</span>"
+
+
+def _render_job_health_detail(row: dict[str, Any]) -> None:
+    d = row.get("detail") or {}
+    st.markdown(f"#### {row.get('label') or 'Job'}")
+    st.caption(f"Health: **{row.get('pill') or '—'}**")
+    c1, c2 = st.columns(2, gap="small")
+    with c1:
+        st.markdown(f"**Last daily report:** `{d.get('last_report_date') or '—'}`")
+        st.markdown(f"**Last supervisor:** {d.get('last_supervisor') or '—'}")
+        st.markdown(f"**Crew size (last report):** {d.get('crew_size') if d.get('crew_size') is not None else '—'}")
+        delays = d.get("reported_delays") or []
+        st.markdown("**Delays on last report**")
+        if delays:
+            st.write(", ".join(str(x) for x in delays))
+        else:
+            st.caption("None reported.")
+    with c2:
+        est = d.get("est_labor_hrs")
+        act = d.get("act_labor_hrs")
+        st.markdown(f"**Estimated labor (bid):** {est if est is not None else '—'} hrs")
+        st.markdown(f"**Actual labor (time entries):** {act if act is not None else '—'} hrs")
+        lr = d.get("labor_ratio_vs_estimate")
+        if lr is not None:
+            st.caption(f"Variance vs bid: **{lr:+.1f}%** (actual vs estimate).")
+        st.markdown("**Safety (from daily reports)**")
+        st.caption(
+            f"Safety-delay days (14d): **{d.get('safety_delay_days_14d', 0)}** · "
+            f"Safety delay on latest report: **{'Yes' if d.get('safety_delay_on_latest') else 'No'}**"
+        )
+    rep = d.get("repeated_delay_reasons") or []
+    st.markdown("**Repeated delay reasons (7d)**")
+    if rep:
+        st.write(" · ".join(f"{a} ({b} days)" for a, b in rep))
+    else:
+        st.caption("None in the last 7 days.")
+    rr = row.get("reasons_red") or []
+    yy = row.get("reasons_yellow") or []
+    gg = row.get("green_reasons") or []
+    if rr:
+        for msg in rr:
+            st.error(msg)
+    if yy:
+        for msg in yy:
+            st.warning(msg)
+    if row.get("status") == "green" and gg:
+        for msg in gg:
+            st.success(msg)
+    st.info(d.get("recommended_action") or "Review this job in Job Database.")
+    b1, b2 = st.columns(2, gap="small")
+    with b1:
+        if role_can_open_page(current_role(), "Job Database"):
+            if st.button("Open in Job Database", use_container_width=True, key="jh_open_jdb"):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                st.session_state["job_mode"] = "edit"
+                st.session_state["job_edit_id"] = str(row.get("job_id") or "")
+                st.session_state.pop(_DASH_JOB_HEALTH_SELECTED, None)
+                st.rerun()
+    with b2:
+        if st.button("Close details", use_container_width=True, key="jh_close"):
+            st.session_state.pop(_DASH_JOB_HEALTH_SELECTED, None)
+            st.rerun()
+
+
+def _render_job_health_dashboard(
+    *,
+    today: date,
+    jobs: list[dict],
+    estimates: list[dict],
+    session_key: str,
+    use_admin: bool,
+) -> None:
+    """Traffic-light job health for active field jobs (uses supervisor daily reports + labor)."""
+    _inject_job_health_css_once()
+    try:
+        since = today - timedelta(days=30)
+        reports = fetch_all_reports_since(since, admin=use_admin, limit=8000)
+    except Exception:
+        reports = []
+    try:
+        te_rows = fetch_table_for_session(
+            "time_entries",
+            session_key=session_key,
+            limit=20000,
+            order_by=None,
+            use_admin=use_admin,
+        )
+    except Exception:
+        te_rows = []
+    hours_by_job = labor_hours_actual_by_job(list(te_rows or []))
+    estimates_by_id = {str(e.get("id")): e for e in (estimates or []) if isinstance(e, dict) and e.get("id")}
+    hrows = compute_job_health_rows(
+        today=today,
+        jobs=list(jobs or []),
+        reports=list(reports or []),
+        hours_by_job=hours_by_job,
+        estimates_by_id=estimates_by_id,
+    )
+    summ = job_health_summary_counts(hrows)
+
+    with st.container(border=True):
+        st.markdown("##### Job health")
+        st.caption(
+            "Traffic-light status for **active field jobs** (In Progress / Scheduled / Awarded) using daily reports, "
+            "delays, labor vs bid estimate, and report cadence."
+        )
+        a1, a2, a3, a4 = st.columns(4, gap="small")
+        a1.metric("Active jobs", f"{summ['active']:,}")
+        a2.metric("Green (on track)", f"{summ['green']:,}")
+        a3.metric("Yellow (needs attention)", f"{summ['yellow']:,}")
+        a4.metric("Red (at risk)", f"{summ['red']:,}")
+        b1, b2, b3 = st.columns(3, gap="small")
+        b1.metric("Missing today’s report", f"{summ['missing_daily']:,}")
+        b2.metric("Over bid labor estimate", f"{summ['over_labor_estimate']:,}")
+        b3.metric("Repeated delays (7d)", f"{summ['repeated_delays']:,}")
+
+    st.markdown("##### Active jobs — health")
+    if not hrows:
+        st.caption("No active field jobs in the current list, or jobs could not be loaded.")
+    else:
+        for hr in hrows:
+            r1, r2, r3 = st.columns([2.2, 1.1, 1.0], gap="small")
+            with r1:
+                st.markdown(f"<div class='ips-health-row'>{hr.get('label') or '—'}</div>", unsafe_allow_html=True)
+            with r2:
+                st.markdown(_pill_html(str(hr.get("status")), str(hr.get("pill"))), unsafe_allow_html=True)
+            with r3:
+                if st.button("Details", key=f"jh_btn_{hr.get('job_id')}", use_container_width=True):
+                    st.session_state[_DASH_JOB_HEALTH_SELECTED] = str(hr.get("job_id") or "")
+                    st.rerun()
+
+    sel = str(st.session_state.get(_DASH_JOB_HEALTH_SELECTED) or "").strip()
+    if sel:
+        picked = next((x for x in hrows if str(x.get("job_id")) == sel), None)
+        if picked:
+            with st.container(border=True):
+                _render_job_health_detail(picked)
+        else:
+            st.session_state.pop(_DASH_JOB_HEALTH_SELECTED, None)
+
+
 def _render_supervisor_daily_reports_dashboard(
     *,
     today: date,
@@ -710,6 +895,14 @@ def render() -> None:
         except Exception:
             open_todos = 0
         m5.metric("Open To-Dos", f"{open_todos:,}")
+
+    _render_job_health_dashboard(
+        today=date.today(),
+        jobs=list(jobs or []),
+        estimates=list(estimates or []),
+        session_key=sk,
+        use_admin=use_admin,
+    )
 
     _render_supervisor_daily_reports_dashboard(
         today=date.today(),

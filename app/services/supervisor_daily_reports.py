@@ -269,11 +269,12 @@ def append_report_photos(
 ) -> None:
     """Each tuple: (bytes, content_type, file_name). Storage keys use ``report_id``."""
     try:
-        from app.db import insert_row, insert_row_admin, upload_bytes_admin
+        from app.db import insert_row, insert_row_admin, upload_bytes, upload_bytes_admin
     except ImportError:
-        from db import insert_row, insert_row_admin, upload_bytes_admin  # type: ignore
+        from db import insert_row, insert_row_admin, upload_bytes, upload_bytes_admin  # type: ignore
 
     insert_fn = insert_row_admin if admin else insert_row
+    upload_fn = upload_bytes_admin if admin else upload_bytes
     rid = str(report_id or "").strip()
     if not rid:
         return
@@ -284,7 +285,7 @@ def append_report_photos(
             continue
         raw_name = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(fname or "photo").strip())[:180] or f"photo_{i}.jpg"
         storage_path = f"supervisor_daily_reports/{rid}/{ts}_{i}_{raw_name}"
-        upload_bytes_admin(storage_path, data, content_type=ctype or "application/octet-stream")
+        upload_fn(storage_path, data, content_type=ctype or "application/octet-stream")
         insert_fn(
             "supervisor_daily_report_photos",
             {
