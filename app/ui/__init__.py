@@ -46,7 +46,7 @@ IPS_NAV_PAGE_KEY = "ips_nav_page"
 _NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 
 # Jobs (sidebar)
-_NAV_JOBS_SIDEBAR: tuple[str, ...] = ("Job Database", "Estimates", "Job Costing")
+_NAV_JOBS_SIDEBAR: tuple[str, ...] = ("Job Database", "Supervisor Daily Reports", "Estimates", "Job Costing")
 
 # Assets (sidebar)
 _NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Scan", "Tool Trailer Audits")
@@ -72,7 +72,7 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 )
 
 # All keys that may appear in the sidebar or session for routing validation.
-_NAV_JOBS_ROUTES: tuple[str, ...] = ("Job Database", "Estimates", "Customers", "Job Costing")
+_NAV_JOBS_ROUTES: tuple[str, ...] = ("Job Database", "Supervisor Daily Reports", "Estimates", "Customers", "Job Costing")
 # Routable asset-area pages (Who Has What moved to Dashboard; still routable for View All).
 _NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
 # Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
@@ -123,18 +123,19 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             "Dashboard",
             "Job Database",
+            "Supervisor Daily Reports",
             "Estimates",
             "Job Costing",
             "Scan Inventory",
             "Who Has What",
             "Asset Database",
             "Tool Trailer Audits",
-            # Add reporting pages here when present
         }
     ),
     "employee": frozenset(
         {
             "Dashboard",
+            "Supervisor Daily Reports",
             "Time Tracking",
             "Asset Database",
             "Scan Inventory",

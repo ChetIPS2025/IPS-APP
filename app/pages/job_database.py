@@ -754,6 +754,108 @@ def _render_job_form_panel(
 
         # --- Weekly Timesheets (customer signature workflow) ---
         if mode == "edit" and selected_job:
+            # --- Email notification settings (per job) ---
+            with st.expander("Email settings", expanded=False):
+                st.caption("Configure customer/internal recipients and enable automatic updates for this job.")
+                try:
+                    from app.services.email_notifications import (
+                        fetch_job_email_settings_row,
+                        upsert_job_email_settings,
+                    )
+                except ImportError:
+                    from services.email_notifications import (  # type: ignore
+                        fetch_job_email_settings_row,
+                        upsert_job_email_settings,
+                    )
+
+                jid = str(selected_job.get("id") or "").strip()
+                row = fetch_job_email_settings_row(jid, admin=_job_db_admin_read()) or {}
+                cust = row.get("customer_recipients") or []
+                internal = row.get("internal_recipients") or []
+                cc = row.get("cc_recipients") or []
+
+                c1, c2 = st.columns(2, gap="small")
+                with c1:
+                    cust_in = st.text_area(
+                        "Customer recipients",
+                        value=", ".join([str(x) for x in (cust or []) if str(x).strip()]),
+                        height=68,
+                        placeholder="email1@customer.com, email2@customer.com",
+                        key=f"job_email_cust_{jid}",
+                    )
+                    internal_in = st.text_area(
+                        "Internal IPS recipients",
+                        value=", ".join([str(x) for x in (internal or []) if str(x).strip()]),
+                        height=68,
+                        placeholder="ops@ips.com, pm@ips.com",
+                        key=f"job_email_internal_{jid}",
+                    )
+                with c2:
+                    cc_in = st.text_area(
+                        "CC recipients",
+                        value=", ".join([str(x) for x in (cc or []) if str(x).strip()]),
+                        height=68,
+                        placeholder="optional CC list",
+                        key=f"job_email_cc_{jid}",
+                    )
+                    notes_email = st.text_area(
+                        "Email notes",
+                        value=str(row.get("notes") or ""),
+                        height=68,
+                        placeholder="Optional",
+                        key=f"job_email_notes_{jid}",
+                    )
+
+                t1, t2 = st.columns(2, gap="small")
+                with t1:
+                    enable_daily = st.checkbox(
+                        "Enable daily update emails",
+                        value=bool(row.get("enable_daily_update_emails", False)),
+                        key=f"job_email_enable_daily_{jid}",
+                    )
+                    enable_weekly = st.checkbox(
+                        "Enable weekly Friday update emails",
+                        value=bool(row.get("enable_weekly_friday_update_emails", False)),
+                        key=f"job_email_enable_weekly_{jid}",
+                    )
+                with t2:
+                    enable_safety = st.checkbox(
+                        "Enable safety item update emails",
+                        value=bool(row.get("enable_safety_item_update_emails", False)),
+                        key=f"job_email_enable_safety_{jid}",
+                        help="Framework toggle (requires safety status source to be configured).",
+                    )
+                    enable_budget = st.checkbox(
+                        "Enable budget/PO alerts",
+                        value=bool(row.get("enable_budget_po_alerts", False)),
+                        key=f"job_email_enable_budget_{jid}",
+                    )
+                is_active = st.checkbox(
+                    "Email settings active",
+                    value=bool(row.get("is_active", True)),
+                    key=f"job_email_is_active_{jid}",
+                )
+
+                if st.button("Save email settings", type="primary", use_container_width=True, key=f"job_email_save_{jid}"):
+                    try:
+                        upsert_job_email_settings(
+                            jid,
+                            customer_recipients=cust_in,
+                            internal_recipients=internal_in,
+                            cc_recipients=cc_in,
+                            enable_daily=enable_daily,
+                            enable_weekly_friday=enable_weekly,
+                            enable_safety=enable_safety,
+                            enable_budget_po_alerts=enable_budget,
+                            is_active=is_active,
+                            notes=notes_email,
+                        )
+                    except Exception as exc:
+                        st.error(f"Could not save: {exc}")
+                    else:
+                        st.success("Saved.")
+                        st.rerun()
+
             with st.expander("Weekly Timesheets", expanded=False):
                 st.caption("Generate a customer-facing weekly timesheet PDF and share a secure signing link.")
                 jid = str(selected_job.get("id") or "").strip()
@@ -851,6 +953,19 @@ def _render_job_form_panel(
                             )
                         st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
                         st.caption("Use **Open sign page** above, or copy any **Sign link** into an email.")
+
+            try:
+                from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+            except ImportError:
+                from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
+
+            _jl = job_row_select_label(selected_job) if selected_job else ""
+            render_daily_reports_for_job(
+                job_id=str((selected_job or {}).get("id") or ""),
+                job_label=_jl,
+                admin_read=_job_db_admin_read(),
+                show_title=True,
+            )
 
 
 def _build_jobs_overview_dataframe(
