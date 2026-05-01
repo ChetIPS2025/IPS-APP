@@ -1,10 +1,5 @@
 """
 Launcher for the IPS Streamlit app.
-
-- Development: run from the project root (`python run_app.py`).
-- Frozen EXE: PyInstaller sets sys.frozen and extracts files to sys._MEIPASS;
-  working directory is set there so `app/main.py`, `assets/`, `sql/`, and
-  `.streamlit/` match the layout expected by `app.config.ROOT_DIR`.
 """
 from __future__ import annotations
 
@@ -29,13 +24,6 @@ def main() -> None:
         sys.exit(1)
 
     os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
-
-    try:
-        from app.streamlit_pwa_static_patch import install as _install_pwa_static_routes
-    except ImportError:
-        from streamlit_pwa_static_patch import install as _install_pwa_static_routes  # type: ignore
-
-    _install_pwa_static_routes()
 
     from streamlit.web import cli as stcli
 
