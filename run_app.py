@@ -30,6 +30,13 @@ def main() -> None:
 
     os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
 
+    try:
+        from app.streamlit_pwa_static_patch import install as _install_pwa_static_routes
+    except ImportError:
+        from streamlit_pwa_static_patch import install as _install_pwa_static_routes  # type: ignore
+
+    _install_pwa_static_routes()
+
     from streamlit.web import cli as stcli
 
     port = os.environ.get("PORT", "10000")
