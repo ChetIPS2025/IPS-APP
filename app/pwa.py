@@ -8,8 +8,8 @@ import streamlit.components.v1 as components
 
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"
 
-_MANIFEST_HREF = "/app/static/manifest.json"
-_SW_HREF = "/app/static/sw.js"
+_MANIFEST_HREF = "/.streamlit/static/manifest.json"
+_SW_HREF = "/.streamlit/static/sw.js"
 
 _THEME_COLOR = "#0b2247"
 _APP_NAME = "IPS App"
