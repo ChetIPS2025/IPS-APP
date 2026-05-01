@@ -151,6 +151,210 @@ def _render_job_db_job_name_cell(container: Any, raw: Any, *, max_len: int = 40)
         container.text(display)
 
 
+def _job_daily_report_employee_options() -> tuple[list[dict[str, Any]], list[str], dict[str, str]]:
+    try:
+        employees = fetch_table_admin("employees", columns="id,name,is_active", limit=5000, order_by="name")
+    except Exception:
+        employees = []
+    active = [
+        e
+        for e in (employees or [])
+        if isinstance(e, dict)
+        and str(e.get("id") or "").strip()
+        and bool(e.get("is_active", True))
+    ]
+    labels = ["— Select employee —"]
+    id_by_label: dict[str, str] = {}
+    for e in active:
+        name = str(e.get("name") or "").strip() or str(e.get("id") or "")[:8]
+        label = name
+        if label in id_by_label:
+            label = f"{name} · {str(e.get('id'))[:8]}"
+        labels.append(label)
+        id_by_label[label] = str(e.get("id") or "").strip()
+    return active, labels, id_by_label
+
+
+def _render_daily_report_form(*, job_id: str, can_edit: bool) -> None:
+    from datetime import date as _date
+
+    try:
+        from app.services.daily_reports import (
+            DAILY_REPORT_DELAY_REASONS,
+            daily_report_photo_signed_url,
+            fetch_daily_reports_for_job,
+            save_daily_report,
+        )
+    except ImportError:
+        from services.daily_reports import (  # type: ignore
+            DAILY_REPORT_DELAY_REASONS,
+            daily_report_photo_signed_url,
+            fetch_daily_reports_for_job,
+            save_daily_report,
+        )
+
+    reports = fetch_daily_reports_for_job(job_id, limit=14)
+    latest = reports[0] if reports else {}
+    st.caption("Supervisor-friendly daily report. Use one report per job per day; saving again updates that day.")
+
+    with st.expander("New / update today", expanded=not bool(reports)):
+        if not can_edit:
+            st.info("Only admin or pm users can submit daily reports from this screen.")
+            return
+
+        employees, employee_labels, employee_id_by_label = _job_daily_report_employee_options()
+        _ = employees
+        today = _date.today()
+        st.text_input("Job ID", value=job_id, disabled=True, key=f"jdr_job_id_{job_id}")
+        report_date = st.date_input("Date", value=today, key=f"jdr_date_{job_id}")
+        c1, c2 = st.columns(2, gap="small")
+        supervisor = c1.text_input("Supervisor", key=f"jdr_supervisor_{job_id}", placeholder="Supervisor name")
+        crew_size = c2.number_input("Crew size", min_value=0, max_value=200, value=0, step=1, key=f"jdr_crew_size_{job_id}")
+
+        st.markdown("##### Crew assignments")
+        st.caption("Keep entries short for field use. Add only active crew lines for the day.")
+        n_lines = int(st.session_state.get(f"jdr_crew_lines_{job_id}", 3) or 3)
+        add_col, rem_col = st.columns(2, gap="small")
+        if add_col.button("Add crew line", use_container_width=True, key=f"jdr_add_line_{job_id}"):
+            st.session_state[f"jdr_crew_lines_{job_id}"] = min(20, n_lines + 1)
+            st.rerun()
+        if rem_col.button("Remove blank line", use_container_width=True, key=f"jdr_rem_line_{job_id}", disabled=n_lines <= 1):
+            st.session_state[f"jdr_crew_lines_{job_id}"] = max(1, n_lines - 1)
+            st.rerun()
+
+        crew_lines: list[dict[str, Any]] = []
+        for idx in range(n_lines):
+            with st.container(border=True):
+                st.markdown(f"**Crew member {idx + 1}**")
+                e_col, h_col = st.columns([2, 1], gap="small")
+                emp_label = e_col.selectbox(
+                    "Employee",
+                    employee_labels,
+                    key=f"jdr_emp_{job_id}_{idx}",
+                )
+                hours = h_col.number_input(
+                    "Hours",
+                    min_value=0.0,
+                    max_value=24.0,
+                    value=0.0,
+                    step=0.25,
+                    key=f"jdr_hours_{job_id}_{idx}",
+                )
+                task = st.text_input("Task", key=f"jdr_task_{job_id}_{idx}", placeholder="What did they work on?")
+                notes = st.text_area("Notes", key=f"jdr_notes_{job_id}_{idx}", height=60, placeholder="Optional")
+                employee_id = employee_id_by_label.get(emp_label)
+                employee_name = "" if emp_label.startswith("—") else emp_label.split(" · ", 1)[0]
+                if employee_id or str(task or "").strip() or float(hours or 0) > 0 or str(notes or "").strip():
+                    crew_lines.append(
+                        {
+                            "employee_id": employee_id,
+                            "employee_name": employee_name,
+                            "task": str(task or "").strip(),
+                            "hours": float(hours or 0),
+                            "notes": str(notes or "").strip(),
+                        }
+                    )
+
+        st.markdown("##### Day plan")
+        main_goal = st.text_area("Main goal for the day", key=f"jdr_goal_{job_id}", height=70)
+        on_track = st.radio("Midday check: on track?", ["Yes", "No"], horizontal=True, key=f"jdr_on_track_{job_id}") == "Yes"
+        reason_no = ""
+        if not on_track:
+            reason_no = st.text_area("Reason if no", key=f"jdr_reason_no_{job_id}", height=70)
+
+        completed_today = st.text_area("Completed today", key=f"jdr_completed_{job_id}", height=80)
+        not_completed = st.text_area("Not completed and reason", key=f"jdr_not_completed_{job_id}", height=80)
+
+        st.markdown("##### Delays / inefficiencies")
+        delay_reasons: list[str] = []
+        reason_cols = st.columns(2, gap="small")
+        for idx, reason in enumerate(DAILY_REPORT_DELAY_REASONS):
+            with reason_cols[idx % 2]:
+                if st.checkbox(reason, key=f"jdr_delay_{job_id}_{idx}"):
+                    delay_reasons.append(reason)
+        other_delay = ""
+        if "Other" in delay_reasons:
+            other_delay = st.text_input("Other delay reason", key=f"jdr_other_delay_{job_id}")
+
+        tomorrow_plan = st.text_area("Tomorrow's plan", key=f"jdr_tomorrow_{job_id}", height=80)
+        uploads = st.file_uploader(
+            "Photo uploads",
+            type=["jpg", "jpeg", "png", "webp"],
+            accept_multiple_files=True,
+            key=f"jdr_photos_{job_id}",
+        )
+
+        if st.button("Submit Daily Report", type="primary", use_container_width=True, key=f"jdr_submit_{job_id}"):
+            if not str(supervisor or "").strip():
+                st.error("Supervisor is required.")
+                st.stop()
+            try:
+                row = save_daily_report(
+                    job_id=job_id,
+                    report_date=report_date,
+                    supervisor=str(supervisor or "").strip(),
+                    crew_size=int(crew_size or 0),
+                    main_goal=str(main_goal or "").strip(),
+                    on_track=bool(on_track),
+                    on_track_reason=str(reason_no or "").strip(),
+                    completed_today=str(completed_today or "").strip(),
+                    not_completed_reason=str(not_completed or "").strip(),
+                    delay_reasons=[str(x) for x in delay_reasons],
+                    other_delay_reason=str(other_delay or "").strip(),
+                    tomorrow_plan=str(tomorrow_plan or "").strip(),
+                    crew_lines=crew_lines,
+                    uploads=list(uploads or []),
+                )
+            except Exception as exc:
+                st.error(f"Could not save daily report: {exc}")
+                st.stop()
+            st.success(f"Daily report saved for {row.get('report_date')}.")
+            st.rerun()
+
+    st.markdown("##### Recent reports")
+    if not reports:
+        st.caption("No daily reports yet. Run migration `sql/045_job_daily_reports.sql` if this section cannot save.")
+        return
+    for report in reports[:5]:
+        label = f"{report.get('report_date') or '—'} · {report.get('supervisor_name') or 'Supervisor'}"
+        with st.expander(label, expanded=False):
+            delay_list = report.get("delay_reasons") if isinstance(report.get("delay_reasons"), list) else []
+            st.caption(
+                f"Crew **{report.get('crew_size') or 0}** · "
+                f"On track **{'Yes' if bool(report.get('on_track', True)) else 'No'}** · "
+                f"Delays **{len(delay_list)}**"
+            )
+            st.markdown("**Main goal**")
+            st.write(str(report.get("main_goal") or "—"))
+            st.markdown("**Completed today**")
+            st.write(str(report.get("completed_today") or "—"))
+            st.markdown("**Not completed / reason**")
+            st.write(str(report.get("not_completed") or "—"))
+            st.markdown("**Tomorrow's plan**")
+            st.write(str(report.get("tomorrow_plan") or "—"))
+            if delay_list:
+                st.caption("Delay reasons: " + ", ".join(str(x) for x in delay_list))
+            crew = report.get("crew") if isinstance(report.get("crew"), list) else []
+            if crew:
+                st.markdown("**Crew**")
+                for line in crew:
+                    st.caption(
+                        f"{line.get('employee_name') or '—'} · {line.get('task') or 'Task'} · "
+                        f"{float(line.get('hours') or 0):g} hrs"
+                    )
+            photos = report.get("photos") if isinstance(report.get("photos"), list) else []
+            if photos:
+                st.markdown("**Photos**")
+                cols = st.columns(min(3, max(1, len(photos))), gap="small")
+                for i, ph in enumerate(photos[:6]):
+                    with cols[i % len(cols)]:
+                        url = daily_report_photo_signed_url(str(ph.get("storage_path") or ""))
+                        if url:
+                            st.image(url, use_column_width=True)
+                        else:
+                            st.caption(str(ph.get("file_name") or "Photo"))
+
+
 def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 20) -> None:
     txt = str(value or "").strip()
     short = txt[:max_len] + ("…" if len(txt) > max_len else "")
@@ -180,7 +384,6 @@ JOB_STATUSES = [
 
 HIDDEN_COLUMNS: frozenset[str] = frozenset(
     {
-        "id",
         "uuid",
         "unified_id",
         "auth_user_id",
@@ -363,6 +566,10 @@ def _clear_job_mode() -> None:
     st.session_state.pop("job_mode", None)
     st.session_state.pop("job_edit_id", None)
     st.session_state.pop("job_number_manual_input", None)
+
+
+def _can_submit_daily_reports() -> bool:
+    return current_role() in {"admin", "pm", "manager", "employee"}
 
 
 def _jobs_table_has_customer_location_column() -> bool:
@@ -775,6 +982,10 @@ def _render_job_form_panel(
         if b2.button("Cancel", use_container_width=True, key="job_form_cancel"):
             _clear_job_mode()
             st.rerun()
+
+        if mode == "edit" and selected_job:
+            with st.expander("Daily Reports", expanded=False):
+                _render_daily_report_form(job_id=str(selected_job.get("id") or ""), can_edit=can_edit)
 
         # --- Weekly Timesheets (customer signature workflow) ---
         if mode == "edit" and selected_job:
@@ -1230,7 +1441,7 @@ def render() -> None:
     )
 
     mode = st.session_state.get("job_mode")
-    panel_open = bool(can_edit and mode in ("add", "edit"))
+    panel_open = bool((can_edit and mode in ("add", "edit")) or mode == "daily_report")
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
     else:
@@ -1471,7 +1682,7 @@ def render() -> None:
 
             with st.container(border=True):
                 st.markdown('<span class="ips-ta-bar-anchor"></span>', unsafe_allow_html=True)
-                left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
+                left, b1, b2, b3 = st.columns([1.35, 1, 1, 1], gap="small")
                 with left:
                     st.markdown(
                         f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
@@ -1490,6 +1701,18 @@ def render() -> None:
                         st.session_state.pop("job_number_manual_input", None)
                         st.rerun()
                 with b2:
+                    if st.button(
+                        "Daily Report",
+                        key="job_daily_report_btn",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=not one,
+                    ):
+                        st.session_state["job_mode"] = "daily_report"
+                        st.session_state["job_edit_id"] = str(sel_ids[0])
+                        st.session_state.pop("job_number_manual_input", None)
+                        st.rerun()
+                with b3:
                     if st.button(
                         "Delete",
                         key="job_delete_btn",
@@ -1545,7 +1768,7 @@ def render() -> None:
         with side_col:
             selected_job = None
             estimate_detail: dict[str, Any] | None = None
-            if mode == "edit":
+            if mode in {"edit", "daily_report"}:
                 edit_id = st.session_state.get("job_edit_id")
                 if edit_id:
                     selected_job = next((j for j in jobs if str(j.get("id")) == str(edit_id)), None)
@@ -1561,17 +1784,27 @@ def render() -> None:
                     )
                     if not estimate_detail:
                         estimate_detail = _fetch_estimate_row_by_id(eid_est)
-            _render_job_form_panel(
-                mode=str(mode),
-                can_edit=can_edit,
-                selected_job=selected_job,
-                jobs=jobs,
-                has_job_number_column=has_job_number_column,
-                has_customer_location_column=has_customer_location_column,
-                customers=customers,
-                estimates=estimates,
-                customer_name_by_id=customer_name_by_id,
-                estimate_label_map=estimate_label_map,
-                estimate_quote_by_id=estimate_quote_by_id,
-                estimate_detail=estimate_detail,
-            )
+            if mode == "daily_report":
+                with st.container(border=True):
+                    st.markdown("### Daily Reports")
+                    if selected_job:
+                        st.caption(job_row_select_label(selected_job))
+                    _render_daily_report_form(job_id=str((selected_job or {}).get("id") or ""), can_edit=True)
+                    if st.button("Close", use_container_width=True, key="job_daily_report_close"):
+                        _clear_job_mode()
+                        st.rerun()
+            else:
+                _render_job_form_panel(
+                    mode=str(mode),
+                    can_edit=can_edit,
+                    selected_job=selected_job,
+                    jobs=jobs,
+                    has_job_number_column=has_job_number_column,
+                    has_customer_location_column=has_customer_location_column,
+                    customers=customers,
+                    estimates=estimates,
+                    customer_name_by_id=customer_name_by_id,
+                    estimate_label_map=estimate_label_map,
+                    estimate_quote_by_id=estimate_quote_by_id,
+                    estimate_detail=estimate_detail,
+                )

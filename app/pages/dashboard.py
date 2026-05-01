@@ -21,6 +21,11 @@ except ImportError:
     from services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
 try:
+    from app.services.daily_reports import build_dashboard_summary, fetch_daily_report_tables
+except ImportError:
+    from services.daily_reports import build_dashboard_summary, fetch_daily_report_tables  # type: ignore
+
+try:
     from app.ui import IPS_NAV_PENDING_KEY, role_can_open_page
 except ImportError:
     from ui import IPS_NAV_PENDING_KEY, role_can_open_page  # type: ignore
@@ -676,6 +681,16 @@ def render() -> None:
         )
     except Exception:
         inventory_items = []
+    try:
+        daily_reports, daily_report_crew = fetch_daily_report_tables()
+    except Exception:
+        daily_reports, daily_report_crew = [], []
+    try:
+        time_entries_for_reports = fetch_table_for_session(
+            "time_entries", session_key=sk, limit=50000, order_by="work_date", use_admin=use_admin
+        )
+    except Exception:
+        time_entries_for_reports = []
     kit_items_d: list[dict] = []
     repl_d: list[dict] = []
     if role_can_open_page(current_role(), "Asset Database"):
@@ -702,6 +717,13 @@ def render() -> None:
 
     low_stock = _low_stock_rows(list(inventory_items or []), limit=12)
     checked_out_tools = [a for a in (assets or []) if isinstance(a, dict) and _asset_is_out(a)]
+    daily_summary = build_dashboard_summary(
+        jobs=list(jobs or []),
+        reports=list(daily_reports or []),
+        crew_rows=list(daily_report_crew or []),
+        estimates=list(estimates or []),
+        time_entries=list(time_entries_for_reports or []),
+    )
 
     try:
         todos_for_metric = fetch_table_for_session(
@@ -727,6 +749,20 @@ def render() -> None:
         c3.metric("Low Stock Items", len(low_stock))
         c4.metric("Checked Out Tools", len(checked_out_tools))
         c5.metric("Open To-Dos", len(open_todos))
+
+    with st.container(border=True):
+        st.markdown("##### Supervisor Daily Reports")
+        c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+        c1.metric("Reports submitted today", daily_summary.get("reports_submitted_today", 0))
+        c2.metric("Missing reports", daily_summary.get("missing_reports", 0))
+        c3.metric("Jobs with delays", daily_summary.get("jobs_with_delays", 0))
+        c4.metric("Repeated delay reasons", daily_summary.get("repeated_delay_reasons", 0))
+        c5.metric("Jobs over est. labor", daily_summary.get("jobs_over_estimated_labor_hours", 0))
+        top_reasons = daily_summary.get("top_delay_reasons") or []
+        if top_reasons:
+            st.caption("Top delay reasons: " + ", ".join(f"{reason} ({count})" for reason, count in top_reasons[:3]))
+        elif not daily_reports:
+            st.caption("No daily reports loaded yet. Run migration `sql/045_job_daily_reports.sql` to enable this card.")
 
     left, right = st.columns(2, gap="medium")
     with left:

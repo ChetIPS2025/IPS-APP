@@ -98,6 +98,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             "Dashboard",
             "Time Tracking",
+            "Job Database",
             "Asset Database",
             "Asset Scanner",
             "Scan Inventory",
