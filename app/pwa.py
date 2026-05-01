@@ -9,8 +9,8 @@ import streamlit.components.v1 as components
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"
 
 # ✅ CORRECT PATHS FOR YOUR APP
-_MANIFEST_HREF = "/static/manifest.json"
-_SW_HREF = "/static/sw.js"
+_SW_HREF = "/app/static/sw.js"
+_MANIFEST_HREF = "/app/static/manifest.json"
 
 _THEME_COLOR = "#0b2247"
 _BACKGROUND_COLOR = "#031633"
