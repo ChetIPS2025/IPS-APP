@@ -60,6 +60,7 @@ def inject_pwa_support() -> None:
 
   upsertLink('manifest', cfg.manifest);
   upsertMeta('theme-color', cfg.themeColor);
+  upsertMeta('mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-title', cfg.appName);
   upsertMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
@@ -73,7 +74,7 @@ def inject_pwa_support() -> None:
   }});
 
   if ('serviceWorker' in w.navigator) {{
-    w.navigator.serviceWorker.register(cfg.sw, {{ scope: '/' }})
+    w.navigator.serviceWorker.register(cfg.sw)
       .then(() => console.log('SW registered:', cfg.sw))
       .catch(err => console.error('SW failed:', err));
   }}
