@@ -6,6 +6,7 @@ toolbarMode = "minimal"
 # Megabytes; raise for large quote PDFs / attachments
 maxUploadSize = 200
 enableXsrfProtection = true
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
