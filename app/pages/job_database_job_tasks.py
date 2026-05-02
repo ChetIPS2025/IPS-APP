@@ -116,6 +116,16 @@ def _task_status_display(slug: str) -> str:
     return _REVIEW_STATUS_LABELS.get(s, s.replace("_", " ").title() or "—")
 
 
+def _task_status_badge(slug: str) -> str:
+    s = str(slug or "").strip().lower()
+    if s == "open":
+        s = "not_started"
+    return (
+        f'<span class="ips-status-badge ips-status-{html.escape(s)}">'
+        f"{html.escape(_task_status_display(s))}</span>"
+    )
+
+
 def _fetch_tasks(job_id: str, *, admin: bool) -> list[dict[str, Any]]:
     fn = fetch_by_match_admin if admin else fetch_by_match
     try:
@@ -285,7 +295,7 @@ def render_job_tasks_tab(
     if can_edit_tasks:
         st.markdown("##### Add task")
         st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
-        a1, a2, a3 = st.columns(3, gap="small")
+        a1, a2 = st.columns(2, gap="small")
         with a1:
             tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
             hn = st.text_input("Hazard #", key=f"jdt_add_hn_{job_id}")
@@ -298,13 +308,14 @@ def render_job_tasks_tab(
                 key=f"jdt_add_pr_{job_id}",
             )
             pl = st.date_input("Planned date", value=date.today(), key=f"jdt_add_pl_{job_id}")
+        a3, a4 = st.columns(2, gap="small")
         with a3:
+            loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
+            iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
+        with a4:
+            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
             st.caption(" ")
-            st.caption(" ")
-        loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
-        iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
-        act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
-        if st.button("Add task", type="primary", key=f"jdt_add_btn_{job_id}"):
+        if st.button("Add task", type="primary", use_container_width=True, key=f"jdt_add_btn_{job_id}"):
             if not str(iss or "").strip():
                 st.error("Enter an issue description.")
             else:

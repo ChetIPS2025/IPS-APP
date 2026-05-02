@@ -59,6 +59,11 @@ except ImportError:
     )
 
 try:
+    from app.ui.field_light_theme import inject_field_light_theme
+except ImportError:
+    from ui.field_light_theme import inject_field_light_theme  # type: ignore
+
+try:
     from services.customer_contacts import (
         contact_none_option_label,
         contact_option_label,
@@ -182,6 +187,33 @@ def _job_db_card_text(v: Any, fallback: str = "—") -> str:
     return s if s else fallback
 
 
+_JOB_STATUS_COLORS: dict[str, str] = {
+    "complete": "#16a34a",
+    "completed": "#16a34a",
+    "closed": "#16a34a",
+    "in progress": "#f59e0b",
+    "scheduled": "#f59e0b",
+    "awarded": "#f59e0b",
+    "blocked": "#dc2626",
+    "on hold": "#dc2626",
+    "not started": "#64748b",
+    "draft": "#64748b",
+    "electrical": "#7c3aed",
+    "electrical / other trade": "#7c3aed",
+    "duplicate": "#64748b",
+    "waiting on customer": "#0891b2",
+}
+
+
+def _job_status_badge_html(status: Any) -> str:
+    label = _job_db_card_text(status)
+    color = _JOB_STATUS_COLORS.get(label.strip().lower(), "#64748b")
+    return (
+        '<span class="ips-status-badge" '
+        f'style="--ips-status-color:{html.escape(color)};">{html.escape(label)}</span>'
+    )
+
+
 JOB_STATUSES = [
     "Draft",
     "Quoted",
@@ -207,7 +239,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v2"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -262,6 +294,20 @@ def _inject_job_database_responsive_styles() -> None:
             padding: 0.35rem 0.55rem;
             overflow-wrap: anywhere;
         }
+        .ips-status-badge {
+            align-items: center;
+            background: color-mix(in srgb, var(--ips-status-color) 12%, white);
+            border: 1px solid color-mix(in srgb, var(--ips-status-color) 38%, white);
+            border-radius: 999px;
+            color: var(--ips-status-color);
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            margin: 0.2rem 0.25rem 0.1rem 0;
+            padding: 0.35rem 0.55rem;
+            white-space: nowrap;
+        }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) {
             display: none;
         }
@@ -277,6 +323,27 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) .stButton > button {
             min-height: 44px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="input"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="base-input"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] > div,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) input,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) textarea,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="input"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="base-input"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="select"] > div,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stFileUploader"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) input,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) textarea {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] *,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="select"] *,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stFileUploader"] * {
+            color: #0f172a !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) input,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] > div,
@@ -308,6 +375,13 @@ def _inject_job_database_responsive_styles() -> None:
             overflow-x: auto !important;
             scrollbar-width: thin;
         }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="tab-list"] button p {
+            color: #0f172a !important;
+            font-weight: 650 !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+        }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="column"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
             min-width: 0 !important;
@@ -332,7 +406,7 @@ def _inject_job_database_responsive_styles() -> None:
                 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
                 flex: 1 1 calc(50% - 0.65rem) !important;
                 max-width: calc(50% - 0.35rem) !important;
-                min-width: 260px !important;
+                min-width: min(260px, 100%) !important;
                 width: calc(50% - 0.35rem) !important;
             }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) {
@@ -353,7 +427,7 @@ def _inject_job_database_responsive_styles() -> None:
                 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
                 flex: 1 1 calc(50% - 0.65rem) !important;
                 max-width: calc(50% - 0.35rem) !important;
-                min-width: 260px !important;
+                min-width: min(260px, 100%) !important;
                 width: calc(50% - 0.35rem) !important;
             }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
@@ -583,19 +657,33 @@ def _render_job_form_panel(
             can_tasks = can_edit or (current_role() == "employee")
             try:
                 from app.pages.job_database_job_tasks import (
+                    render_job_cost_tab,
                     render_job_daily_plan_tab,
+                    render_job_daily_review_tab,
+                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
             except ImportError:
                 from pages.job_database_job_tasks import (  # type: ignore
+                    render_job_cost_tab,
                     render_job_daily_plan_tab,
+                    render_job_daily_review_tab,
+                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_dp = st.tabs(["Overview", "Tasks", "Daily Plan"])
+            t_ov, t_ts, t_dp, t_dr, t_ph, t_co = st.tabs(
+                ["Overview", "Tasks", "Daily Plan", "Daily Review", "Photos", "Cost"]
+            )
             with t_ts:
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
             with t_dp:
                 render_job_daily_plan_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
+            with t_dr:
+                render_job_daily_review_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
+            with t_ph:
+                render_job_photos_tab(job_id=edit_jid, admin_read=admin_rd)
+            with t_co:
+                render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
             tab_overview_ctx = t_ov
         with tab_overview_ctx:
             if mode == "edit" and selected_job and selected_job.get("estimate_id"):
@@ -1350,7 +1438,7 @@ def _render_job_card_list(
                 f'<p class="ips-job-card-meta">'
                 f'<strong>Job #</strong> {html.escape(job_num)} &nbsp; '
                 f'<strong>Customer</strong> {html.escape(customer)}</p>'
-                f'<span class="ips-job-card-pill">Status: {html.escape(status)}</span>'
+                f"{_job_status_badge_html(status)}"
                 f"{amount_html}",
                 unsafe_allow_html=True,
             )
@@ -1363,9 +1451,10 @@ def _render_job_card_list(
                 picked.append(jid)
 
             edit_col, del_col = st.columns(2, gap="small")
+            edit_col.markdown('<span class="ips-job-card-action-row"></span>', unsafe_allow_html=True)
             with edit_col:
                 if st.button(
-                    "Edit",
+                    "Open / Edit",
                     key=f"job_card_edit_{jid}",
                     type="secondary",
                     use_container_width=True,
@@ -1525,6 +1614,7 @@ def render() -> None:
     render_header("Job Database")
     inject_ips_crud_list_styles()
     inject_table_action_styles()
+    _inject_job_database_responsive_styles()
     render_crud_list_subtitle(
         "Search and maintain jobs — standalone or estimate-linked — and keep customer contacts aligned."
     )
