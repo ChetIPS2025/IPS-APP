@@ -217,6 +217,7 @@ def _replace_type_row(
     fname: str,
     admin: bool,
     capture_profile: dict[str, Any] | None = None,
+    daily_work_package_id: str | None = None,
 ) -> str:
     """Replace before/after in ``task_photos`` + ``task-photos`` bucket; returns object key (file_url)."""
     data, ctype, _sfx = tp.compress_image_bytes(raw, fname)
@@ -259,23 +260,31 @@ def _replace_type_row(
         "content_type": ctype[:120],
         "uploaded_by": up_name[:500] if up_name else None,
     }
+    dwp = str(daily_work_package_id or "").strip()
+    if dwp:
+        row_new["daily_work_package_id"] = dwp
     try:
         ins("task_photos", row_new)
     except Exception:
-        slug = _uploader_slug(prof)
-        leg_path = f"job_tasks/{task_id}/{photo_type}_{ts}_{slug}{_sfx}"
-        _upload_bytes(leg_path, data, ctype, admin=admin)
-        ins(
-            "job_task_photos",
-            {
-                "task_id": str(task_id),
-                "photo_type": str(photo_type),
-                "storage_path": leg_path[:2000],
-                "content_type": ctype[:120],
-                **_photo_capture_columns(prof),
-            },
-        )
-        rel_key = leg_path
+        row_fallback = dict(row_new)
+        row_fallback.pop("daily_work_package_id", None)
+        try:
+            ins("task_photos", row_fallback)
+        except Exception:
+            slug = _uploader_slug(prof)
+            leg_path = f"job_tasks/{task_id}/{photo_type}_{ts}_{slug}{_sfx}"
+            _upload_bytes(leg_path, data, ctype, admin=admin)
+            ins(
+                "job_task_photos",
+                {
+                    "task_id": str(task_id),
+                    "photo_type": str(photo_type),
+                    "storage_path": leg_path[:2000],
+                    "content_type": ctype[:120],
+                    **_photo_capture_columns(prof),
+                },
+            )
+            rel_key = leg_path
     if photo_type == tp.PHOTO_TYPES_AFTER:
         upd(
             "job_tasks",
@@ -298,6 +307,7 @@ def _insert_progress(
     fname: str,
     admin: bool,
     capture_profile: dict[str, Any] | None = None,
+    daily_work_package_id: str | None = None,
 ) -> None:
     data, ctype, _sfx = tp.compress_image_bytes(raw, fname)
     prof = capture_profile if isinstance(capture_profile, dict) else _uploader_profile()
@@ -317,22 +327,30 @@ def _insert_progress(
         "content_type": ctype[:120],
         "uploaded_by": up_name[:500] if up_name else None,
     }
+    dwp = str(daily_work_package_id or "").strip()
+    if dwp:
+        row_new["daily_work_package_id"] = dwp
     try:
         ins("task_photos", row_new)
     except Exception:
-        slug = _uploader_slug(prof)
-        leg_path = f"job_tasks/{task_id}/progress_{ts}_{slug}{_sfx}"
-        _upload_bytes(leg_path, data, ctype, admin=admin)
-        ins(
-            "job_task_photos",
-            {
-                "task_id": str(task_id),
-                "photo_type": tp.PHOTO_TYPES_PROGRESS,
-                "storage_path": leg_path[:2000],
-                "content_type": ctype[:120],
-                **_photo_capture_columns(prof),
-            },
-        )
+        row_fb = dict(row_new)
+        row_fb.pop("daily_work_package_id", None)
+        try:
+            ins("task_photos", row_fb)
+        except Exception:
+            slug = _uploader_slug(prof)
+            leg_path = f"job_tasks/{task_id}/progress_{ts}_{slug}{_sfx}"
+            _upload_bytes(leg_path, data, ctype, admin=admin)
+            ins(
+                "job_task_photos",
+                {
+                    "task_id": str(task_id),
+                    "photo_type": tp.PHOTO_TYPES_PROGRESS,
+                    "storage_path": leg_path[:2000],
+                    "content_type": ctype[:120],
+                    **_photo_capture_columns(prof),
+                },
+            )
 
 
 def remove_typed_task_photo(*, task_id: str, photo_type: str, admin_read: bool) -> None:
@@ -388,6 +406,7 @@ def render_task_photo_strip(
     task_row: dict[str, Any],
     can_edit: bool,
     admin_read: bool,
+    daily_work_package_id: str | None = None,
 ) -> None:
     """Mobile-first: before / progress / after with Take photo + Upload + thumb + delete."""
     st.markdown(
@@ -458,9 +477,22 @@ def render_task_photo_strip(
         if src and st.button(f"Save {title}", key=f"sv_{task_id}_{pt}"):
             try:
                 if pt == tp.PHOTO_TYPES_PROGRESS:
-                    _insert_progress(task_id=str(task_id), raw=src, fname=name, admin=admin_read)
+                    _insert_progress(
+                        task_id=str(task_id),
+                        raw=src,
+                        fname=name,
+                        admin=admin_read,
+                        daily_work_package_id=daily_work_package_id,
+                    )
                 else:
-                    _replace_type_row(task_id=str(task_id), photo_type=pt, raw=src, fname=name, admin=admin_read)
+                    _replace_type_row(
+                        task_id=str(task_id),
+                        photo_type=pt,
+                        raw=src,
+                        fname=name,
+                        admin=admin_read,
+                        daily_work_package_id=daily_work_package_id,
+                    )
                 st.success("Saved.")
                 st.rerun()
             except Exception as exc:

@@ -49,17 +49,9 @@ except ImportError:
     from ui.field_light_theme import inject_field_light_theme as _dash_field_light_theme  # type: ignore
 
 try:
-    from app.services.supervisor_planning import (
-        dashboard_task_progress_snapshot,
-        repeated_task_review_delay_reasons,
-        task_row_active_for_dashboard,
-    )
+    from app.services.daily_work_packages import dashboard_dwp_snapshot, repeated_eod_delay_reasons
 except ImportError:
-    from services.supervisor_planning import (  # type: ignore
-        dashboard_task_progress_snapshot,
-        repeated_task_review_delay_reasons,
-        task_row_active_for_dashboard,
-    )
+    from services.daily_work_packages import dashboard_dwp_snapshot, repeated_eod_delay_reasons  # type: ignore
 
 
 def _render_task_progress_dashboard(*, today: date, session_key: str, use_admin: bool) -> None:
@@ -73,28 +65,36 @@ def _render_task_progress_dashboard(*, today: date, session_key: str, use_admin:
         )
     except Exception:
         tasks = []
-    if not tasks:
-        return
     try:
-        daily_plans = fetch_table_for_session(
-            "supervisor_daily_task_plans",
+        packages = fetch_table_for_session(
+            "daily_work_packages",
             session_key=session_key,
             limit=12000,
             order_by="work_date",
             use_admin=use_admin,
         )
     except Exception:
-        daily_plans = []
+        packages = []
     try:
-        daily_reviews = fetch_table_for_session(
-            "job_task_daily_reviews",
+        package_tasks = fetch_table_for_session(
+            "daily_work_package_tasks",
             session_key=session_key,
-            limit=12000,
-            order_by="review_date",
+            limit=24000,
+            order_by=None,
             use_admin=use_admin,
         )
     except Exception:
-        daily_reviews = []
+        package_tasks = []
+    try:
+        executions = fetch_table_for_session(
+            "supervisor_daily_execution",
+            session_key=session_key,
+            limit=12000,
+            order_by="updated_at",
+            use_admin=use_admin,
+        )
+    except Exception:
+        executions = []
     tp_new: list[dict[str, Any]] = []
     try:
         tp_new = fetch_table_for_session(
@@ -121,42 +121,42 @@ def _render_task_progress_dashboard(*, today: date, session_key: str, use_admin:
         if isinstance(r, dict):
             task_photo_rows.append({**r, "storage_path": str(r.get("file_url") or r.get("storage_path") or "")})
     task_photo_rows.extend([x for x in (task_photo_rows_legacy or []) if isinstance(x, dict)])
-    active = [t for t in (tasks or []) if isinstance(t, dict) and task_row_active_for_dashboard(t, today=today)]
-    active_ids = {str(t.get("id") or "").strip() for t in active if str(t.get("id") or "").strip()}
-    photos_for_active = [
-        r
-        for r in (task_photo_rows or [])
-        if isinstance(r, dict) and str(r.get("task_id") or "").strip() in active_ids
-    ]
-    by_tid: dict[str, list[dict[str, Any]]] = {}
-    for r in photos_for_active:
-        tid = str((r or {}).get("task_id") or "").strip()
-        if tid:
-            by_tid.setdefault(tid, []).append(r)
-    ts = dashboard_task_progress_snapshot(
+    ts = dashboard_dwp_snapshot(
         today=today,
-        tasks=active,
-        daily_plans=list(daily_plans or []),
-        active_task_ids=active_ids,
+        packages=list(packages or []),
+        package_tasks=list(package_tasks or []),
+        tasks=list(tasks or []),
         photo_rows=list(task_photo_rows or []),
     )
-    repeat = repeated_task_review_delay_reasons(list(daily_reviews or []), today=today)
+    repeat = repeated_eod_delay_reasons(packages=list(packages or []), executions=list(executions or []), today=today)
     _dash_field_light_theme()
     with st.container(border=True):
-        st.markdown("##### Tasks today")
+        st.markdown("##### Daily work packages (tasks)")
         st.caption(
-            "Active work only. Run **`sql/053_task_photos.sql`** and create bucket **task-photos** for new photo storage."
+            "Metrics only count tasks on a **Daily Work Package** dated today (idle jobs are excluded). "
+            "Run **`sql/055_daily_work_packages_workflow.sql`** and **`sql/053_task_photos.sql`** as needed."
         )
-        c1, c2, c3, c4 = st.columns(4, gap="small")
-        c1.metric("Planned today", f"{ts.get('planned_today', 0):,}")
-        c2.metric("Completed today", f"{ts.get('completed_today', 0):,}")
-        c3.metric("Blocked", f"{ts.get('blocked', 0):,}")
-        c4.metric("Missing after photos", f"{ts.get('missing_after_photo', 0):,}")
+        c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
+        c1.metric("Work packages today", f"{ts.get('work_packages_today', 0):,}")
+        c2.metric("Tasks assigned today", f"{ts.get('tasks_assigned_today', 0):,}")
+        c3.metric("Tasks completed today", f"{ts.get('tasks_completed_today', 0):,}")
+        c4.metric("Blocked tasks", f"{ts.get('blocked', 0):,}")
+        c5.metric("High priority open", f"{ts.get('high_priority_open', 0):,}")
+        c6.metric("Missing after photos", f"{ts.get('missing_after_photo', 0):,}")
         if repeat:
-            st.caption("Repeat delay reasons (14d): " + " · ".join(f"{a} ({b}×)" for a, b in repeat[:6])[:400])
-        if role_can_open_page(current_role(), "Daily Tasks"):
-            if st.button("Open Daily Tasks", key="dash_tasks_plan_open"):
-                st.session_state[IPS_NAV_PENDING_KEY] = "Daily Tasks"
+            st.caption("Repeat shift delay reasons (14d): " + " · ".join(f"{a} ({b}×)" for a, b in repeat[:6])[:400])
+        c_open1, c_open2 = st.columns(2, gap="small")
+        with c_open1:
+            if role_can_open_page(current_role(), "Work & Plan (Supervisor)") and st.button(
+                "Work & Plan (Supervisor)", key="dash_tasks_super_open", use_container_width=True
+            ):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Work & Plan (Supervisor)"
+                st.rerun()
+        with c_open2:
+            if role_can_open_page(current_role(), "Assign Tasks (PM)") and st.button(
+                "Assign Tasks (PM)", key="dash_tasks_pm_open", use_container_width=True
+            ):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Assign Tasks (PM)"
                 st.rerun()
 
 

@@ -377,17 +377,20 @@ def render_job_daily_plan_tab(
         try:
             dlt("supervisor_daily_task_plans", {"job_id": str(job_id), "work_date": w_iso})
             sn = " ".join(str(sup or "").strip().split())[:200]
-            for tid in pick:
+            for i, tid in enumerate(pick):
                 if tid:
-                    ins(
-                        "supervisor_daily_task_plans",
-                        {
-                            "job_id": str(job_id),
-                            "work_date": w_iso,
-                            "supervisor_name": sn,
-                            "task_id": tid,
-                        },
-                    )
+                    row_payload: dict[str, Any] = {
+                        "job_id": str(job_id),
+                        "work_date": w_iso,
+                        "supervisor_name": sn,
+                        "task_id": tid,
+                        "sort_order": int(i),
+                    }
+                    try:
+                        ins("supervisor_daily_task_plans", row_payload)
+                    except Exception:
+                        row_payload.pop("sort_order", None)
+                        ins("supervisor_daily_task_plans", row_payload)
             summary = {
                 "supervisor_name": sn,
                 "crew_plan": str(crew or "").strip()[:8000],

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# NOTE: IPS Dashboard KPIs are task / Daily Work Package based (daily_work_packages.py).
+# This module provides job-level report/labor signals for optional future use — not shown as R/Y/G health tiles.
+
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any

@@ -49,7 +49,8 @@ _NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
     "Job Database",
     "Supervisor Daily Reports",
-    "Daily Tasks",
+    "Assign Tasks (PM)",
+    "Work & Plan (Supervisor)",
     "Estimates",
     "Job Costing",
 )
@@ -81,7 +82,8 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Job Database",
     "Supervisor Daily Reports",
-    "Daily Tasks",
+    "Assign Tasks (PM)",
+    "Work & Plan (Supervisor)",
     "Estimates",
     "Customers",
     "Job Costing",
@@ -130,7 +132,8 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Labor",
             "Asset Scanner",
             "Customers",
-            "Daily Tasks",
+            "Assign Tasks (PM)",
+            "Work & Plan (Supervisor)",
         }
     ),
     "manager": frozenset(
@@ -138,7 +141,8 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Dashboard",
             "Job Database",
             "Supervisor Daily Reports",
-            "Daily Tasks",
+            "Assign Tasks (PM)",
+            "Work & Plan (Supervisor)",
             "Estimates",
             "Job Costing",
             "Scan Inventory",
@@ -151,7 +155,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             "Dashboard",
             "Supervisor Daily Reports",
-            "Daily Tasks",
+            "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
             "Scan Inventory",
@@ -211,7 +215,9 @@ def apply_pending_navigation() -> None:
     if pending == "Tool Checkout":
         pending = "Scan Inventory"
     if pending == "Planning & Goals":
-        pending = "Daily Tasks"
+        pending = "Work & Plan (Supervisor)"
+    if pending == "Daily Tasks":
+        pending = "Work & Plan (Supervisor)"
     if not pending:
         return
     if pending == "Users":
@@ -424,6 +430,8 @@ def _ensure_valid_nav_page() -> None:
         st.session_state["asset_db_f_asset_category"] = "Equipment"
     elif cur0 == "Tool Checkout":
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+    elif cur0 == "Daily Tasks":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
