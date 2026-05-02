@@ -201,13 +201,19 @@ def _inject_job_database_responsive_styles() -> None:
             min-height: 1.65rem;
             padding: 0.18rem 0.55rem;
             border-radius: 999px;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid currentColor;
+            background: #f8fafc;
+            color: #64748b;
             font-size: 0.78rem;
             font-weight: 700;
             line-height: 1.2;
             margin-top: 0.45rem;
         }
+        .ips-job-card-status.is-complete { color: #16a34a; background: #f0fdf4; }
+        .ips-job-card-status.is-progress { color: #f59e0b; background: #fffbeb; }
+        .ips-job-card-status.is-blocked { color: #dc2626; background: #fef2f2; }
+        .ips-job-card-status.is-electrical { color: #7c3aed; background: #f5f3ff; }
+        .ips-job-card-status.is-waiting { color: #0891b2; background: #ecfeff; }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) {
             display: none;
         }
@@ -354,6 +360,21 @@ def _render_job_card_list(
     st.markdown('<span class="ips-job-card-list-anchor"></span>', unsafe_allow_html=True)
     st.markdown("##### Job list")
     st.caption("Tablet / phone view: job cards show the key field details and quick actions.")
+
+    def _status_class(raw: Any) -> str:
+        slug = str(raw or "").strip().lower().replace(" ", "_").replace("/", "_")
+        if slug in {"complete", "completed", "closed"}:
+            return "is-complete"
+        if slug in {"in_progress", "scheduled", "awarded", "approved"}:
+            return "is-progress"
+        if slug in {"blocked", "on_hold"}:
+            return "is-blocked"
+        if slug in {"electrical", "electrical_other_trade"}:
+            return "is-electrical"
+        if slug in {"waiting_on_customer"}:
+            return "is-waiting"
+        return "is-not-started"
+
     for _, row in df_display.iterrows():
         jid = str(row.get("id") or "").strip()
         if not jid:
@@ -372,14 +393,14 @@ def _render_job_card_list(
                 <div class="ips-job-card-title">{html.escape(job_number)} · {html.escape(job_name)}</div>
                 <div class="ips-job-card-meta"><strong>Customer:</strong> {html.escape(customer)}</div>
                 <div class="ips-job-card-meta"><strong>Quote / PO:</strong> {html.escape(amount_text)}</div>
-                <div class="ips-job-card-status">{html.escape(status)}</div>
+                <div class="ips-job-card-status {_status_class(status)}">{html.escape(status)}</div>
                 """,
                 unsafe_allow_html=True,
             )
             e_col, d_col = st.columns(2, gap="small")
             with e_col:
                 if st.button(
-                    "Edit",
+                    "Open / Edit",
                     key=f"job_card_edit_{jid}",
                     type="secondary",
                     use_container_width=True,

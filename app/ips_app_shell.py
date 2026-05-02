@@ -72,7 +72,7 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- App background + default text ----- */
         section[data-testid="stMain"] {
             background: var(--ips-bg-main) !important;
-            color: var(--ips-text) !important;
+            color: #1e293b !important;
         }
         section[data-testid="stMain"] .stMarkdown,
         section[data-testid="stMain"] .stMarkdown p {
@@ -214,8 +214,8 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="secondary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
-            color: var(--ips-text) !important;
-            border-color: var(--ips-border) !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
             background: #f1f5f9 !important;
             font-weight: var(--ips-btn-fw) !important;
         }
@@ -302,6 +302,7 @@ def inject_ips_app_shell_styles() -> None:
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextInput"] input {
             border-radius: var(--ips-ctrl-radius) !important;
             min-height: var(--ips-ctrl-h) !important;
+            width: 100% !important;
             height: auto !important;
             padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
             font-size: var(--ips-ctrl-fs) !important;
@@ -320,6 +321,7 @@ def inject_ips_app_shell_styles() -> None:
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea {
             border-radius: var(--ips-ctrl-radius) !important;
             min-height: 3rem !important;
+            width: 100% !important;
             padding: 0.32rem 0.5rem !important;
             font-size: var(--ips-ctrl-fs) !important;
             line-height: var(--ips-ctrl-lh) !important;
@@ -332,6 +334,7 @@ def inject_ips_app_shell_styles() -> None:
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stNumberInput"] input {
             border-radius: var(--ips-ctrl-radius) !important;
             min-height: var(--ips-ctrl-h) !important;
+            width: 100% !important;
             font-size: var(--ips-ctrl-fs) !important;
             padding: var(--ips-ctrl-pad-y) var(--ips-ctrl-pad-x) !important;
             background: var(--ips-ctrl-bg) !important;
@@ -342,6 +345,7 @@ def inject_ips_app_shell_styles() -> None:
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stSelectbox"] [data-baseweb="select"] > div {
             min-height: var(--ips-ctrl-h) !important;
+            width: 100% !important;
             font-size: var(--ips-ctrl-fs) !important;
             line-height: var(--ips-ctrl-lh) !important;
             border-radius: var(--ips-ctrl-radius) !important;
@@ -351,6 +355,7 @@ def inject_ips_app_shell_styles() -> None:
         }
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
             min-height: var(--ips-ctrl-h) !important;
+            width: 100% !important;
             font-size: var(--ips-ctrl-fs) !important;
             border-radius: var(--ips-ctrl-radius) !important;
             background: var(--ips-ctrl-bg) !important;
@@ -360,6 +365,7 @@ def inject_ips_app_shell_styles() -> None:
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] input,
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] [data-baseweb="input"] {
             min-height: var(--ips-ctrl-h) !important;
+            width: 100% !important;
             font-size: var(--ips-ctrl-fs) !important;
             border-radius: var(--ips-ctrl-radius) !important;
             background: var(--ips-ctrl-bg) !important;

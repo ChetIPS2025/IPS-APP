@@ -44,8 +44,8 @@ _FIELD_LIGHT_CSS = """
   }
   button[kind="secondary"] {
     background-color: #f1f5f9 !important;
-    color: #0f172a !important;
-    border: 1px solid #e2e8f0 !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
   }
   button {
     min-height: 2.75rem !important;

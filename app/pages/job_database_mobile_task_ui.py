@@ -76,7 +76,8 @@ _STATUS_BADGE_CLASS: dict[str, str] = {
     "not_started": "is-not-started",
     "open": "is-not-started",
     "electrical": "is-electrical",
-    "waiting_on_customer": "is-blocked",
+    "duplicate": "is-duplicate",
+    "waiting_on_customer": "is-waiting",
 }
 
 _DELAY_REASONS = (
@@ -107,37 +108,37 @@ def inject_mobile_field_css() -> None:
             min-height: 1.5rem;
             padding: 0.16rem 0.55rem;
             border-radius: 999px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid currentColor;
             background: #f8fafc;
-            color: #475569;
+            color: #64748b;
             font-size: 0.78rem;
             font-weight: 700;
             line-height: 1.2;
         }
         .ips-task-status-badge.is-complete {
             background: #dcfce7;
-            border-color: #86efac;
-            color: #166534;
+            color: #16a34a;
         }
         .ips-task-status-badge.is-progress {
             background: #ffedd5;
-            border-color: #fdba74;
-            color: #9a3412;
+            color: #f59e0b;
         }
         .ips-task-status-badge.is-blocked {
             background: #fee2e2;
-            border-color: #fca5a5;
-            color: #991b1b;
+            color: #dc2626;
         }
-        .ips-task-status-badge.is-not-started {
+        .ips-task-status-badge.is-not-started,
+        .ips-task-status-badge.is-duplicate {
             background: #f1f5f9;
-            border-color: #cbd5e1;
-            color: #475569;
+            color: #64748b;
         }
         .ips-task-status-badge.is-electrical {
             background: #f3e8ff;
-            border-color: #d8b4fe;
-            color: #6b21a8;
+            color: #7c3aed;
+        }
+        .ips-task-status-badge.is-waiting {
+            background: #ecfeff;
+            color: #0891b2;
         }
         </style>
         """,
@@ -205,6 +206,13 @@ def render_mobile_task_detail_form(
             f"**Hazard #** {str(task_row.get('hazard_number') or '—').strip()} · "
             f"**Priority** {str(task_row.get('priority') or '—').strip().title()}"
         )
+        supervisor = str(task_row.get("assigned_supervisor_name") or "").strip()
+        planned = str(task_row.get("planned_date") or "").strip()[:10]
+        if supervisor or planned:
+            st.caption(
+                f"**Assigned supervisor:** {supervisor or '—'} · "
+                f"**Planned date:** {planned or '—'}"
+            )
         cur_st = str(task_row.get("status") or "not_started").strip().lower()
         if cur_st == "open":
             cur_st = "not_started"
