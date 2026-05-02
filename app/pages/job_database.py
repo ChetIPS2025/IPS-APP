@@ -278,9 +278,10 @@ def _inject_job_database_responsive_styles() -> None:
                 div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-topbar)
                 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-                flex: 1 1 calc(50% - 0.7rem) !important;
+                flex: 0 0 calc(50% - 0.7rem) !important;
                 width: calc(50% - 0.7rem) !important;
-                min-width: 260px !important;
+                max-width: calc(50% - 0.7rem) !important;
+                min-width: 0 !important;
             }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-table-anchor),
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-selection-toolbar-anchor) {
