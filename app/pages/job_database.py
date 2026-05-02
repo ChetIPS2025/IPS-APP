@@ -45,15 +45,11 @@ except ImportError:
 
 try:
     from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
 except ImportError:
     from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
@@ -249,7 +245,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v4"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v6"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -398,41 +394,77 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) h4 {
             color: #111827 !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] button {
-            min-height: 44px !important;
-            padding: 0.45rem 0.65rem !important;
-            white-space: nowrap !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="tab-list"] {
-            gap: 0.25rem !important;
+        /* Job detail: iPad-style segmented tabs (override global stMain tab chrome) */
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"],
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 6px !important;
+            margin: 0 0 0.75rem 0 !important;
+            background: #d1d5db !important;
+            border: none !important;
+            border-bottom: none !important;
+            border-radius: 10px !important;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05) !important;
             overflow-x: auto !important;
+            overflow-y: visible !important;
             scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="tab-list"] button p {
-            color: #111827 !important;
-            font-weight: 650 !important;
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"] {
+            flex: 0 1 auto !important;
+            min-height: 0 !important;
+            height: auto !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 8px 14px !important;
+            border-radius: 10px !important;
+            white-space: nowrap !important;
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+            color: inherit !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"] p {
+            color: #374151 !important;
+            font-weight: 500 !important;
+            margin: 0 !important;
             overflow: visible !important;
             text-overflow: clip !important;
             white-space: nowrap !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button[aria-selected="true"],
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button[aria-selected="true"],
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-bottom-color: #cbd5e1 !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button[aria-selected="true"] p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button[aria-selected="true"] p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"][aria-selected="true"] p {
+            color: #111827 !important;
+            font-weight: 600 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button:hover:not(:disabled):not([aria-selected="true"]),
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button:hover:not(:disabled):not([aria-selected="true"]),
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"]:hover:not([aria-selected="true"]) {
+            background: rgba(255, 255, 255, 0.42) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="column"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
             min-width: 0 !important;
         }
-        /* Tablet / iPad landscape: stack list + edit (no side-by-side overlap) */
+        /* Tablet / iPad: list uses cards; job detail is a separate full-width view (no split layout). */
         @media (max-width: 1260px) {
-            div[data-testid="stHorizontalBlock"]:has(.ips-job-split-marker) {
-                flex-direction: column !important;
-                flex-wrap: nowrap !important;
-                gap: 1rem !important;
-                align-items: stretch !important;
-            }
-            div[data-testid="stHorizontalBlock"]:has(.ips-job-split-marker) > div[data-testid="column"] {
-                flex: 1 1 auto !important;
-                max-width: 100% !important;
-                min-width: 0 !important;
-                width: 100% !important;
-            }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) {
                 display: none !important;
             }
@@ -488,9 +520,11 @@ def _inject_job_database_responsive_styles() -> None:
                 min-width: 0 !important;
                 width: 100% !important;
             }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] button {
+            section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button,
+            section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button,
+            section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"] {
                 font-size: 0.86rem !important;
-                padding: 0.45rem 0.55rem !important;
+                padding: 7px 12px !important;
             }
         }
         </style>
@@ -642,6 +676,21 @@ def _clear_job_mode() -> None:
     st.session_state.pop("job_number_manual_input", None)
 
 
+def _job_detail_display_number(row: dict[str, Any] | None, *, has_job_number_column: bool) -> str:
+    """Human-facing job # for detail header (matches list/table logic)."""
+    if not row:
+        return ""
+    if has_job_number_column:
+        jn = str(row.get("job_number") or "").strip()
+        if jn:
+            return jn
+    for k in ("job_id", "id"):
+        v = str(row.get(k) or "").strip()
+        if v:
+            return v
+    return ""
+
+
 def _jobs_table_has_customer_location_column() -> bool:
     try:
         fetch_table("jobs", columns="id,customer_location_id", limit=1)
@@ -675,12 +724,14 @@ def _render_job_form_panel(
     estimate_label_map: dict[str, str],
     estimate_quote_by_id: dict[str, str],
     estimate_detail: dict[str, Any] | None = None,
+    show_main_heading: bool = True,
 ) -> None:
-    """Right-side bordered panel: add/edit job form."""
+    """Full-width job detail card: add/edit form and tabs (list view uses a separate header)."""
     with st.container(border=True):
         st.markdown('<span class="ips-job-edit-panel-anchor"></span>', unsafe_allow_html=True)
-        title = "Add Job" if mode == "add" else "Edit Job"
-        st.markdown(f"### {title}")
+        if show_main_heading:
+            title = "Add Job" if mode == "add" else "Edit Job"
+            st.markdown(f"### {title}")
         if mode == "add":
             st.caption(
                 "Standalone job — **no estimate required**. Leave **Linked estimate** empty, "
@@ -1635,13 +1686,6 @@ def render() -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     _inject_job_database_responsive_styles()
-    render_crud_list_subtitle(
-        "Search and maintain jobs — standalone or estimate-linked — and keep customer contacts aligned."
-    )
-    st.caption(
-        "**Standalone jobs** use **Create New Job** (no quote). **Estimate-linked jobs** use **Convert estimate → job** "
-        "or **Job Received** on the Estimates list once the quote is customer-approved."
-    )
 
     can_edit = current_role() in {"admin", "manager"}
     st.session_state.setdefault("job_db_bypass_filters", True)
@@ -1727,28 +1771,85 @@ def render() -> None:
 
         location_by_id = fetch_all_locations_indexed(admin_read=admin_read)
 
+    jobs_df = pd.DataFrame(jobs)
+
+    mode = st.session_state.get("job_mode")
+    panel_open = bool(
+        mode in ("add", "edit") and (can_edit or (mode == "edit" and current_role() == "employee"))
+    )
+
+    if panel_open:
+        st.markdown('<span class="ips-job-detail-view-anchor"></span>', unsafe_allow_html=True)
+        selected_job: dict[str, Any] | None = None
+        estimate_detail: dict[str, Any] | None = None
+        if mode == "edit":
+            edit_id = st.session_state.get("job_edit_id")
+            if edit_id:
+                selected_job = next((j for j in jobs if str(j.get("id")) == str(edit_id)), None)
+            if not selected_job:
+                st.error("Selected job could not be loaded. It may have been deleted.")
+                _clear_job_mode()
+                st.rerun()
+            if selected_job is not None and selected_job.get("estimate_id"):
+                eid_est = str(selected_job.get("estimate_id"))
+                estimate_detail = next(
+                    (e for e in estimates if str(e.get("id")) == eid_est),
+                    None,
+                )
+                if not estimate_detail:
+                    estimate_detail = _fetch_estimate_row_by_id(eid_est)
+
+        if st.button("← Back to Jobs", type="secondary", key="job_db_back_to_list"):
+            _clear_job_mode()
+            st.rerun()
+
+        if mode == "add":
+            st.markdown("## Add job", unsafe_allow_html=True)
+            st.caption("Standalone or estimate-linked — use the form below.")
+        elif selected_job:
+            jt = str(selected_job.get("job_name") or "").strip() or "Untitled job"
+            jn = _job_detail_display_number(selected_job, has_job_number_column=has_job_number_column)
+            st.markdown(
+                f"<h2 style='margin:0 0 0.25rem 0;color:#111827;'>{html.escape(jt)}</h2>",
+                unsafe_allow_html=True,
+            )
+            if jn:
+                st.caption(f"Job # {jn}")
+
+        _render_job_form_panel(
+            mode=str(mode),
+            can_edit=can_edit,
+            selected_job=selected_job,
+            jobs=jobs,
+            has_job_number_column=has_job_number_column,
+            has_customer_location_column=has_customer_location_column,
+            customers=customers,
+            estimates=estimates,
+            customer_name_by_id=customer_name_by_id,
+            estimate_label_map=estimate_label_map,
+            estimate_quote_by_id=estimate_quote_by_id,
+            estimate_detail=estimate_detail,
+            show_main_heading=False,
+        )
+        return
+
+    render_crud_list_subtitle(
+        "Search and maintain jobs — standalone or estimate-linked — and keep customer contacts aligned."
+    )
+    st.caption(
+        "**Standalone jobs** use **Create New Job** (no quote). **Estimate-linked jobs** use **Convert estimate → job** "
+        "or **Job Received** on the Estimates list once the quote is customer-approved."
+    )
+
     _render_job_db_top_bar(can_edit=can_edit, estimates=estimates, estimate_label_map=estimate_label_map)
     _render_job_db_debug_expander(jobs=jobs, admin_read=admin_read)
-
-    jobs_df = pd.DataFrame(jobs)
 
     st.markdown("### Jobs overview")
     st.caption(
         "**Source** shows estimate links; **Quote (estimate)**, **customer**, **Contact**, and **Location** summarize linked data."
     )
 
-    mode = st.session_state.get("job_mode")
-    panel_open = bool(
-        mode in ("add", "edit") and (can_edit or (mode == "edit" and current_role() == "employee"))
-    )
-    if panel_open:
-        main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        main_col.markdown('<span class="ips-job-split-marker"></span>', unsafe_allow_html=True)
-    else:
-        main_col = st.container()
-        side_col = None
-
-    with main_col:
+    with st.container():
         if jobs_df.empty:
             st.warning("No jobs found in database.")
             if can_edit and not panel_open:
@@ -2066,39 +2167,3 @@ def render() -> None:
                             if st.button("Cancel", use_container_width=True, key="job_db_cancel_delete"):
                                 pend.pop(TABLE_KEY_JOBS, None)
                                 st.rerun()
-
-    if panel_open and side_col is not None:
-        with side_col:
-            st.markdown('<span class="ips-job-split-marker"></span>', unsafe_allow_html=True)
-            selected_job = None
-            estimate_detail: dict[str, Any] | None = None
-            if mode == "edit":
-                edit_id = st.session_state.get("job_edit_id")
-                if edit_id:
-                    selected_job = next((j for j in jobs if str(j.get("id")) == str(edit_id)), None)
-                if not selected_job:
-                    st.error("Selected job could not be loaded. It may have been deleted.")
-                    _clear_job_mode()
-                    st.rerun()
-                if selected_job and selected_job.get("estimate_id"):
-                    eid_est = str(selected_job.get("estimate_id"))
-                    estimate_detail = next(
-                        (e for e in estimates if str(e.get("id")) == eid_est),
-                        None,
-                    )
-                    if not estimate_detail:
-                        estimate_detail = _fetch_estimate_row_by_id(eid_est)
-            _render_job_form_panel(
-                mode=str(mode),
-                can_edit=can_edit,
-                selected_job=selected_job,
-                jobs=jobs,
-                has_job_number_column=has_job_number_column,
-                has_customer_location_column=has_customer_location_column,
-                customers=customers,
-                estimates=estimates,
-                customer_name_by_id=customer_name_by_id,
-                estimate_label_map=estimate_label_map,
-                estimate_quote_by_id=estimate_quote_by_id,
-                estimate_detail=estimate_detail,
-            )
