@@ -239,7 +239,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v2"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v3"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -265,7 +265,7 @@ def _inject_job_database_responsive_styles() -> None:
             margin: 0.15rem 0 0.45rem;
         }
         .ips-job-card-title {
-            color: #0f172a;
+            color: #111827;
             font-size: 1rem;
             font-weight: 700;
             line-height: 1.25;
@@ -273,7 +273,7 @@ def _inject_job_database_responsive_styles() -> None:
             overflow-wrap: anywhere;
         }
         .ips-job-card-meta {
-            color: #475569;
+            color: #4b5563;
             font-size: 0.88rem;
             line-height: 1.45;
             margin: 0.15rem 0 0.4rem;
@@ -313,7 +313,7 @@ def _inject_job_database_responsive_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) {
             background: #ffffff !important;
-            border: 1px solid #e2e8f0 !important;
+            border: 1px solid #d1d5db !important;
             border-radius: 12px !important;
             margin-bottom: 0.65rem !important;
             padding: 0.75rem !important;
@@ -322,7 +322,7 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) .stButton > button {
-            min-height: 44px !important;
+            min-height: 48px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="input"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="base-input"],
@@ -337,13 +337,13 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) textarea {
             background: #ffffff !important;
             background-color: #ffffff !important;
-            border-color: #e2e8f0 !important;
-            color: #0f172a !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #111827 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] *,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="select"] *,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stFileUploader"] * {
-            color: #0f172a !important;
+            color: #111827 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) input,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] > div,
@@ -356,14 +356,15 @@ def _inject_job_database_responsive_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) {
             background: #ffffff !important;
-            border-color: #e2e8f0 !important;
+            border: 1px solid #d1d5db !important;
             border-radius: 12px !important;
-            color: #0f172a !important;
+            color: #111827 !important;
             padding: 0.75rem !important;
+            margin-top: 0.5rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) h3,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) h4 {
-            color: #0f172a !important;
+            color: #111827 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] button {
             min-height: 44px !important;
@@ -376,7 +377,7 @@ def _inject_job_database_responsive_styles() -> None:
             scrollbar-width: thin;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="tab-list"] button p {
-            color: #0f172a !important;
+            color: #111827 !important;
             font-weight: 650 !important;
             overflow: visible !important;
             text-overflow: clip !important;
@@ -386,28 +387,19 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
             min-width: 0 !important;
         }
-        @media (max-width: 1100px) {
-            div[data-testid="stHorizontalBlock"]:has(.ips-job-edit-panel-anchor) {
+        /* Tablet / iPad landscape: stack list + edit (no side-by-side overlap) */
+        @media (max-width: 1260px) {
+            div[data-testid="stHorizontalBlock"]:has(.ips-job-split-marker) {
                 flex-direction: column !important;
-                gap: 0.85rem !important;
+                flex-wrap: nowrap !important;
+                gap: 1rem !important;
+                align-items: stretch !important;
             }
-            div[data-testid="stHorizontalBlock"]:has(.ips-job-edit-panel-anchor) > div[data-testid="column"] {
-                flex: 1 1 100% !important;
+            div[data-testid="stHorizontalBlock"]:has(.ips-job-split-marker) > div[data-testid="column"] {
+                flex: 1 1 auto !important;
                 max-width: 100% !important;
                 min-width: 0 !important;
                 width: 100% !important;
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
-                div[data-testid="stHorizontalBlock"] {
-                flex-wrap: wrap !important;
-                gap: 0.65rem !important;
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
-                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-                flex: 1 1 calc(50% - 0.65rem) !important;
-                max-width: calc(50% - 0.35rem) !important;
-                min-width: min(260px, 100%) !important;
-                width: calc(50% - 0.35rem) !important;
             }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) {
                 display: none !important;
@@ -437,6 +429,21 @@ def _inject_job_database_responsive_styles() -> None:
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
                 [data-testid="stWidgetLabel"] p {
                 font-size: 0.9rem !important;
+            }
+        }
+        /* Filters & search: full-width stack under 1100px */
+        @media (max-width: 1100px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.75rem !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex: 1 1 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
             }
         }
         @media (max-width: 640px) {
@@ -1723,7 +1730,7 @@ def render() -> None:
     )
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        main_col.markdown('<span class="ips-job-edit-panel-anchor"></span>', unsafe_allow_html=True)
+        main_col.markdown('<span class="ips-job-split-marker"></span>', unsafe_allow_html=True)
     else:
         main_col = st.container()
         side_col = None
@@ -2045,6 +2052,7 @@ def render() -> None:
 
     if panel_open and side_col is not None:
         with side_col:
+            st.markdown('<span class="ips-job-split-marker"></span>', unsafe_allow_html=True)
             selected_job = None
             estimate_detail: dict[str, Any] | None = None
             if mode == "edit":

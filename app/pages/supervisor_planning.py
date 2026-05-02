@@ -524,6 +524,7 @@ def render_supervisor() -> None:
 
     st.divider()
     st.markdown("### Tasks (execute)")
+    st.caption("Assigned for this shift — update **status**, **photos**, and **notes**; complete **End of day** below.")
     lines = _lines_for_package(pkg_id, pkg_tasks)
     task_by_id = {str(t.get("id")): t for t in job_tasks if isinstance(t, dict) and t.get("id")}
     for ln in lines:

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v2"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -30,19 +30,20 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-lg: 0.9rem;
             --ips-radius: 10px;
             --ips-radius-lg: 12px;
-            --ips-bg-main: #f5f7fa;
+            /* Medium grey field-ready shell */
+            --ips-bg-main: #e5e7eb;
             --ips-bg-secondary: #ffffff;
             --ips-bg-card: #ffffff;
             --ips-bg-sidebar: #ffffff;
-            --ips-bg-hover: #f1f5f9;
+            --ips-bg-hover: #f3f4f6;
 
-            --ips-text: #0f172a;
-            --ips-text-secondary: #475569;
-            --ips-text-muted: #64748b;
+            --ips-text: #111827;
+            --ips-text-secondary: #4b5563;
+            --ips-text-muted: #6b7280;
 
-            --ips-border: #e2e8f0;
+            --ips-border: #d1d5db;
             --ips-border-strong: #cbd5e1;
-            --ips-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+            --ips-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
             --ips-surface: #ffffff;
             /* Button system (main content) — dense pages override with more specific rules */
             --ips-btn-height: 2.75rem;
@@ -59,19 +60,27 @@ def inject_ips_app_shell_styles() -> None:
             --ips-ctrl-pad-y: 0.45rem;
             --ips-ctrl-pad-x: 0.7rem;
             --ips-ctrl-h: 2.75rem;
-            --ips-ctrl-border: #e2e8f0;
+            --ips-ctrl-border: #cbd5e1;
             --ips-ctrl-bg: #ffffff;
             --ips-ctrl-fg: var(--ips-text);
-            --ips-ctrl-ph: #94a3b8;
+            --ips-ctrl-ph: #9ca3af;
             --ips-label-fs: 0.82rem;
             --ips-label-color: var(--ips-text-muted);
             --ips-widget-gap: 0.28rem;
         }
 
+        .stApp,
+        [data-testid="stAppViewContainer"] {
+            background-color: var(--ips-bg-main) !important;
+        }
         /* ----- App background + default text ----- */
         section[data-testid="stMain"] {
             background: transparent !important;
             color: var(--ips-text) !important;
+        }
+        section[data-testid="stMain"],
+        section[data-testid="stMain"] .block-container {
+            overflow-x: hidden !important;
         }
         section[data-testid="stMain"] .stMarkdown,
         section[data-testid="stMain"] .stMarkdown p {
@@ -123,10 +132,10 @@ def inject_ips_app_shell_styles() -> None:
             border-top: 1px solid var(--ips-border) !important;
         }
 
-        /* ----- Tabs (Materials / Labor / Estimate editor tabs) ----- */
+        /* ----- Tabs (light field theme) ----- */
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {
             gap: 0.25rem !important;
-            border-bottom: 1px solid rgba(51, 65, 85, 0.65) !important;
+            border-bottom: 1px solid var(--ips-border) !important;
             padding-bottom: 2px !important;
         }
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tab"] {
@@ -134,15 +143,15 @@ def inject_ips_app_shell_styles() -> None:
             padding: 0.4rem 0.75rem !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            min-height: 2.2rem !important;
-            color: #94a3b8 !important;
+            min-height: 2.5rem !important;
+            color: var(--ips-text-secondary) !important;
         }
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
-            color: #f1f5f9 !important;
+            color: var(--ips-text) !important;
             font-weight: 600 !important;
-            background: rgba(30, 41, 59, 0.65) !important;
-            border: 1px solid rgba(100, 116, 139, 0.45) !important;
-            border-bottom-color: transparent !important;
+            background: #ffffff !important;
+            border: 1px solid var(--ips-border) !important;
+            border-bottom-color: #ffffff !important;
         }
 
         /* ----- Expanders ----- */
@@ -213,16 +222,16 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="secondary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
-            color: var(--ips-text-secondary) !important;
-            border-color: rgba(120, 150, 200, 0.25) !important;
-            background: #14365C !important;
+            color: #1f2937 !important;
+            border: 1px solid #d1d5db !important;
+            background: #f3f4f6 !important;
             font-weight: var(--ips-btn-fw) !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
-            background: #1E4A7D !important;
-            border-color: rgba(120, 150, 200, 0.35) !important;
-            color: #fff !important;
+            background: #e5e7eb !important;
+            border-color: #9ca3af !important;
+            color: #111827 !important;
         }
         section[data-testid="stMain"] .stLinkButton > a {
             border-radius: var(--ips-btn-radius) !important;
@@ -268,8 +277,8 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stDataFrame"],
         section[data-testid="stMain"] [data-testid="stTable"],
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
-            background: #122F52 !important;
-            color: var(--ips-text-secondary) !important;
+            background: #ffffff !important;
+            color: var(--ips-text) !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] {
             background: transparent !important;
@@ -279,7 +288,7 @@ def inject_ips_app_shell_styles() -> None:
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] th,
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] td {
-            border-color: rgba(120, 150, 200, 0.25) !important;
+            border-color: var(--ips-border) !important;
             padding-top: 10px !important;
             padding-bottom: 10px !important;
         }
@@ -371,18 +380,18 @@ def inject_ips_app_shell_styles() -> None:
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stCheckbox"] label,
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stCheckbox"] span {
             font-size: var(--ips-ctrl-fs) !important;
-            color: #cbd5e1 !important;
+            color: var(--ips-text-secondary) !important;
         }
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stRadio"] label,
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stRadio"] span {
             font-size: var(--ips-ctrl-fs) !important;
-            color: #cbd5e1 !important;
+            color: var(--ips-text-secondary) !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] {
             border-radius: var(--ips-ctrl-radius) !important;
-            border: 1px dashed rgba(100, 116, 139, 0.5) !important;
-            background: rgba(15, 23, 42, 0.35) !important;
+            border: 1px dashed #cbd5e1 !important;
+            background: #ffffff !important;
             padding: 0.28rem 0.4rem !important;
         }
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stFileUploader"] section {
@@ -399,11 +408,11 @@ def inject_ips_app_shell_styles() -> None:
         }
 
         section[data-testid="stMain"] .stMetric {
-            background: rgba(20, 54, 92, 0.62);
+            background: #ffffff;
             border: 1px solid var(--ips-border);
             border-radius: var(--ips-radius-lg);
             padding: 0.55rem 0.65rem !important;
-            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+            box-shadow: var(--ips-shadow);
         }
         section[data-testid="stMain"] [data-testid="stMetricLabel"] {
             font-size: 0.72rem !important;
@@ -416,7 +425,7 @@ def inject_ips_app_shell_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(20, 54, 92, 0.55) !important;
+            background: #ffffff !important;
             border-color: var(--ips-border) !important;
         }
 
@@ -424,17 +433,17 @@ def inject_ips_app_shell_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 0.45rem !important;
-            background: rgba(20, 54, 92, 0.55) !important;
+            background: #ffffff !important;
             border-color: var(--ips-border) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
-            background: rgba(248, 250, 252, 0.04) !important;
-            border-color: rgba(148, 163, 184, 0.35) !important;
+            background: #ffffff !important;
+            border-color: var(--ips-border) !important;
             padding: 10px 12px 12px 12px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) .stMarkdown p,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) [data-testid="stCaptionContainer"] {
-            color: #cbd5e1 !important;
+            color: var(--ips-text-secondary) !important;
         }
 
         /* Destructive / danger (Streamlit tertiary) */

@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected"
-IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected"
+IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v2"
+IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v2"
 
 # Main grid vs side panel — use everywhere (Customers, Labor, Employees) so widths stay identical.
 IPS_CRUD_LIST_PAGE_SPLIT: tuple[float, float] = (2.35, 1.0)
@@ -31,25 +31,23 @@ def inject_ips_modal_styles() -> None:
         <style>
         /* ----- IPS modal / Streamlit st.dialog ----- */
         div[data-testid="stBackdrop"] {
-            background: rgba(2, 6, 23, 0.78) !important;
-            backdrop-filter: blur(6px) !important;
+            background: rgba(17, 24, 39, 0.45) !important;
+            backdrop-filter: blur(4px) !important;
         }
         div[data-testid="stDialog"] {
             max-width: min(480px, 94vw) !important;
         }
         div[data-testid="stDialog"] > div {
-            background: linear-gradient(165deg, #111c33 0%, #0b1224 52%, #0a0f1c 100%) !important;
-            border: 1px solid rgba(71, 85, 105, 0.55) !important;
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
             border-radius: 14px !important;
-            box-shadow:
-                0 28px 56px rgba(0, 0, 0, 0.55),
-                inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+            box-shadow: 0 18px 40px rgba(17, 24, 39, 0.12) !important;
             overflow: hidden !important;
         }
         div[data-testid="stDialog"] h1,
         div[data-testid="stDialog"] h2,
         div[data-testid="stDialog"] h3 {
-            color: #f1f5f9 !important;
+            color: #111827 !important;
             font-size: 1.125rem !important;
             font-weight: 650 !important;
             letter-spacing: -0.02em;
@@ -58,13 +56,13 @@ def inject_ips_modal_styles() -> None:
             border: none !important;
         }
         p.ips-modal-subtitle {
-            color: #94a3b8 !important;
+            color: #4b5563 !important;
             font-size: 0.8125rem !important;
             line-height: 1.45 !important;
             margin: 0 0 0.65rem 0 !important;
         }
         p.ips-modal-hint {
-            color: #64748b !important;
+            color: #6b7280 !important;
             font-size: 0.75rem !important;
             line-height: 1.35 !important;
             margin: 0.25rem 0 0.5rem 0 !important;
@@ -72,15 +70,15 @@ def inject_ips_modal_styles() -> None:
         div[data-testid="stDialog"] hr {
             margin: 0.55rem 0 !important;
             border: none !important;
-            border-top: 1px solid rgba(71, 85, 105, 0.45) !important;
+            border-top: 1px solid #e5e7eb !important;
         }
         div[data-testid="stDialog"] [data-baseweb="input"],
         div[data-testid="stDialog"] input:not([type="checkbox"]):not([type="radio"]),
         div[data-testid="stDialog"] textarea {
-            background: rgba(15, 23, 42, 0.72) !important;
-            border: 1px solid rgba(71, 85, 105, 0.5) !important;
-            border-radius: 8px !important;
-            color: #f8fafc !important;
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            color: #111827 !important;
             font-size: 0.875rem !important;
             min-height: 2.125rem !important;
             box-sizing: border-box !important;
@@ -91,18 +89,18 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] label,
         div[data-testid="stDialog"] [data-testid="stWidgetLabel"] {
-            color: #94a3b8 !important;
+            color: #4b5563 !important;
             font-size: 0.78rem !important;
             font-weight: 500 !important;
         }
         div[data-testid="stDialog"] [data-testid="stCheckbox"] label {
-            color: #e2e8f0 !important;
+            color: #111827 !important;
             font-size: 0.8125rem !important;
         }
         div[data-testid="stDialog"] [data-baseweb="select"] > div {
-            border-radius: 8px !important;
-            border-color: rgba(71, 85, 105, 0.55) !important;
-            background: rgba(15, 23, 42, 0.72) !important;
+            border-radius: 10px !important;
+            border-color: #cbd5e1 !important;
+            background: #ffffff !important;
         }
         /* Primary = strong; secondary = muted (Cancel) */
         div[data-testid="stDialog"] button[kind="primary"],
@@ -123,9 +121,9 @@ def inject_ips_modal_styles() -> None:
             border-color: rgba(96, 165, 250, 0.85) !important;
         }
         div[data-testid="stDialog"] button[kind="secondary"] {
-            background: rgba(30, 41, 59, 0.92) !important;
-            border: 1px solid rgba(100, 116, 139, 0.42) !important;
-            color: #94a3b8 !important;
+            background: #f3f4f6 !important;
+            border: 1px solid #d1d5db !important;
+            color: #1f2937 !important;
             font-weight: 500 !important;
             border-radius: 8px !important;
             min-height: 2.25rem !important;
@@ -139,9 +137,9 @@ def inject_ips_modal_styles() -> None:
             margin: 0 !important;
         }
         div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled) {
-            background: rgba(51, 65, 85, 0.95) !important;
-            border-color: rgba(148, 163, 184, 0.45) !important;
-            color: #cbd5e1 !important;
+            background: #e5e7eb !important;
+            border-color: #9ca3af !important;
+            color: #111827 !important;
         }
         /* Alerts inside modal */
         div[data-testid="stDialog"] [data-testid="stAlert"] {
@@ -164,7 +162,7 @@ def inject_ips_crud_list_styles() -> None:
         <style>
         /* ----- Page subtitle (under render_header) ----- */
         p.ips-crud-page-subtitle {
-            color: #94a3b8;
+            color: #4b5563;
             font-size: 0.8125rem;
             line-height: 1.45;
             margin: 0 0 0.55rem 0;
@@ -239,20 +237,20 @@ def inject_ips_crud_list_styles() -> None:
 
         /* ----- Side panel (add / edit) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) {
-            background: rgba(15, 23, 42, 0.72) !important;
-            border-color: rgba(71, 85, 105, 0.55) !important;
-            border-radius: 10px !important;
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
             padding: 8px 10px 10px 10px !important;
             margin-bottom: 6px !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) h3 {
-            color: #e2e8f0 !important;
+            color: #111827 !important;
             font-size: 1rem !important;
             font-weight: 650 !important;
             margin: 0 0 8px 0 !important;
             padding-bottom: 6px !important;
-            border-bottom: 1px solid rgba(100, 116, 139, 0.35) !important;
+            border-bottom: 1px solid #e5e7eb !important;
         }
         /* Side panel: Save / Cancel / Close — match toolbar button height and radius */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) button {

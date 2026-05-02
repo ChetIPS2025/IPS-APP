@@ -68,7 +68,7 @@ PAGES = {
     # Estimates UI: app/pages/estimates.py → estimates.render
     "Estimates": estimates.render,
     "Job Database": job_database.render,
-    "Supervisor Daily Reports": supervisor_daily_reports.render,
+    "Daily crew report": supervisor_daily_reports.render,
     "Assign Tasks (PM)": supervisor_planning.render_pm,
     "Work & Plan (Supervisor)": supervisor_planning.render_supervisor,
     "Customers": customers_jobs.render_customers,

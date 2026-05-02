@@ -48,7 +48,7 @@ _NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 # Jobs (sidebar)
 _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
     "Job Database",
-    "Supervisor Daily Reports",
+    "Daily crew report",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -81,7 +81,7 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Job Database",
-    "Supervisor Daily Reports",
+    "Daily crew report",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -140,7 +140,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             "Dashboard",
             "Job Database",
-            "Supervisor Daily Reports",
+            "Daily crew report",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
             "Estimates",
@@ -154,7 +154,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "employee": frozenset(
         {
             "Dashboard",
-            "Supervisor Daily Reports",
+            "Daily crew report",
             "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
@@ -218,6 +218,8 @@ def apply_pending_navigation() -> None:
         pending = "Work & Plan (Supervisor)"
     if pending == "Daily Tasks":
         pending = "Work & Plan (Supervisor)"
+    if pending == "Supervisor Daily Reports":
+        pending = "Daily crew report"
     if not pending:
         return
     if pending == "Users":
@@ -432,6 +434,8 @@ def _ensure_valid_nav_page() -> None:
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
     elif cur0 == "Daily Tasks":
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
+    elif cur0 == "Supervisor Daily Reports":
+        st.session_state[IPS_NAV_PAGE_KEY] = "Daily crew report"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))

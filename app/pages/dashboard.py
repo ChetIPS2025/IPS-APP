@@ -725,7 +725,7 @@ def _render_supervisor_daily_reports_dashboard(
     )
     with st.container(border=True):
         st.markdown("##### Supervisor daily reports")
-        st.caption("Field submissions from **Supervisor Daily Reports** and **Job Database** → Daily Reports.")
+        st.caption("Field submissions from **Daily crew report** and **Job Database** → Daily Reports.")
         d1, d2, d3, d4, d5 = st.columns(5, gap="small")
         d1.metric("Reports today", f"{snap['submitted_today']:,}")
         d2.metric("Missing today (active jobs)", f"{snap['missing_reports']:,}")
@@ -745,9 +745,9 @@ def _render_supervisor_daily_reports_dashboard(
         if snap["jobs_over_labor"]:
             rows = [{"Job": lab, "Bid hrs": f"{est:.1f}", "Actual hrs": f"{act:.1f}"} for _jid, lab, est, act in snap["jobs_over_labor"][:10]]
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=min(220, 40 + 28 * len(rows)))
-        if role_can_open_page(current_role(), "Supervisor Daily Reports"):
-            if st.button("Open Supervisor Daily Reports", key="dash_sdr_open"):
-                st.session_state[IPS_NAV_PENDING_KEY] = "Supervisor Daily Reports"
+        if role_can_open_page(current_role(), "Daily crew report"):
+            if st.button("Open Daily crew report", key="dash_sdr_open"):
+                st.session_state[IPS_NAV_PENDING_KEY] = "Daily crew report"
                 st.rerun()
 
 

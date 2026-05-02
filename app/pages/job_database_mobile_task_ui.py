@@ -37,6 +37,8 @@ try:
 except ImportError:
     from ui.field_light_theme import inject_field_light_theme  # type: ignore
 
+import re
+
 _DETAIL_STATUS_LABELS: dict[str, str] = {
     "not_started": "Not Started",
     "in_progress": "In Progress",
@@ -82,12 +84,32 @@ _DELAY_REASONS = (
 )
 
 
+_TASK_STATUS_HEX: dict[str, str] = {
+    "complete": "#16a34a",
+    "completed": "#16a34a",
+    "in_progress": "#f59e0b",
+    "partial": "#f59e0b",
+    "blocked": "#dc2626",
+    "not_started": "#64748b",
+    "open": "#64748b",
+    "duplicate": "#64748b",
+    "electrical": "#7c3aed",
+    "waiting_on_customer": "#0891b2",
+    "cancelled": "#64748b",
+}
+
+
 def _status_badge_html(status: str) -> str:
     slug = str(status or "not_started").strip().lower()
     if slug == "open":
         slug = "not_started"
     label = _DETAIL_STATUS_LABELS.get(slug) or _REVIEW_LABELS.get(slug) or slug.replace("_", " ").title()
-    return f'<span class="ips-status-badge ips-status-{slug}">{label}</span>'
+    safe_slug = re.sub(r"[^a-z0-9_]+", "_", slug)[:40]
+    col = _TASK_STATUS_HEX.get(slug, "#64748b")
+    return (
+        f'<span class="ips-status-badge" style="--ips-status-color:{col};" '
+        f'data-ips-status="{safe_slug}">{label}</span>'
+    )
 
 
 def inject_mobile_field_css() -> None:
@@ -97,7 +119,7 @@ def inject_mobile_field_css() -> None:
         <style>
         .block-container { padding-top: 0.75rem !important; }
         .ips-task-card-title {
-            color: #0f172a;
+            color: #111827;
             font-size: 1rem;
             font-weight: 700;
             line-height: 1.3;
@@ -134,6 +156,35 @@ def inject_mobile_field_css() -> None:
             font-weight: 650;
             margin: 0.35rem 0;
         }
+        .ips-status-badge {
+            align-items: center;
+            background: color-mix(in srgb, var(--ips-status-color) 12%, white);
+            border: 1px solid color-mix(in srgb, var(--ips-status-color) 38%, white);
+            border-radius: 999px;
+            color: var(--ips-status-color);
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            margin: 0.15rem 0.35rem 0.15rem 0;
+            padding: 0.35rem 0.55rem;
+            white-space: nowrap;
+        }
+        .ips-priority-badge {
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            display: inline-flex;
+            font-size: 0.76rem;
+            font-weight: 700;
+            line-height: 1;
+            margin: 0.15rem 0.35rem 0.15rem 0;
+            padding: 0.3rem 0.5rem;
+            white-space: nowrap;
+        }
+        .ips-priority-badge.critical { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+        .ips-priority-badge.high { color: #c2410c; background: #fff7ed; border-color: #fed7aa; }
+        .ips-priority-badge.normal { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+        .ips-priority-badge.low { color: #4b5563; background: #f9fafb; border-color: #e5e7eb; }
         @media (max-width: 640px) {
             .ips-task-card-grid { grid-template-columns: 1fr; }
         }

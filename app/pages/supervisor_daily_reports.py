@@ -107,7 +107,7 @@ def render_daily_reports_for_job(
 ) -> None:
     """
     Collapsible supervisor daily report form + history for one job.
-    Used from Job Database (edit panel) and the standalone Supervisor Daily Reports page.
+    Used from Job Database (edit panel) and the standalone Daily crew report page.
     """
     jid = str(job_id or "").strip()
     if not jid:
@@ -346,7 +346,7 @@ def render_daily_reports_for_job(
 
 
 def render() -> None:
-    render_header("Supervisor Daily Reports", subtitle="Field supervisors — file by job and date.")
+    render_header("Daily crew report", subtitle="Narrative crew summary by job and date — separate from task packages.")
     admin_read = _admin_read()
     jobs = []
     try:

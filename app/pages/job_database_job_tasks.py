@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from datetime import date, datetime, timezone
 from typing import Any, Callable
@@ -120,9 +121,63 @@ def _task_status_badge(slug: str) -> str:
     s = str(slug or "").strip().lower()
     if s == "open":
         s = "not_started"
+    colors = {
+        "complete": "#16a34a",
+        "in_progress": "#f59e0b",
+        "partial": "#f59e0b",
+        "blocked": "#dc2626",
+        "not_started": "#64748b",
+        "duplicate": "#64748b",
+        "electrical": "#7c3aed",
+        "waiting_on_customer": "#0891b2",
+        "cancelled": "#64748b",
+    }
+    col = colors.get(s, "#64748b")
     return (
-        f'<span class="ips-status-badge ips-status-{html.escape(s)}">'
+        f'<span class="ips-status-badge" style="--ips-status-color:{html.escape(col)};">'
         f"{html.escape(_task_status_display(s))}</span>"
+    )
+
+
+def _priority_badge_html(priority: Any) -> str:
+    pr = str(priority or "normal").strip().lower()
+    if pr not in ("low", "normal", "high", "critical"):
+        pr = "normal"
+    label = pr.title()
+    return f'<span class="ips-priority-badge {html.escape(pr)}">{html.escape(label)}</span>'
+
+
+def _inject_task_tab_add_form_css() -> None:
+    key = "ips_job_task_add_form_css_v1"
+    if st.session_state.get(key):
+        return
+    st.session_state[key] = True
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-add-task-anchor)
+            div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.65rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-add-task-anchor)
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            flex: 1 1 calc(50% - 0.65rem) !important;
+            max-width: calc(50% - 0.35rem) !important;
+            min-width: min(280px, 100%) !important;
+        }
+        @media (max-width: 700px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-add-task-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex: 1 1 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -229,70 +284,107 @@ def render_job_tasks_tab(
 
     if visible:
         _mob.inject_mobile_field_css()
+        expand_key = f"jdt_expand_{job_id}"
+        st.session_state.setdefault(expand_key, "")
+        vis_ids = {str(t.get("id") or "").strip() for t in visible if str(t.get("id") or "").strip()}
+        cur_ex = str(st.session_state.get(expand_key) or "").strip()
+        if cur_ex and cur_ex not in vis_ids:
+            st.session_state[expand_key] = ""
 
-        def _task_pick_label(tt: dict[str, Any]) -> str:
-            iss = str(tt.get("issue") or "").strip()
-            snip = (iss[:36] + "…") if len(iss) > 36 else iss
-            return (
-                f"{tt.get('task_number') or '—'}/{tt.get('hazard_number') or '—'} · "
-                f"{_task_status_display(str(tt.get('status')))} · {snip or '—'}"
-            )
+        st.markdown("##### Tasks")
+        st.caption("Each task is a white card — use **Open / Edit** to update status, photos, and notes.")
 
-        pick_ix = st.selectbox(
-            "Select task",
-            options=list(range(len(visible))),
-            format_func=lambda i: _task_pick_label(visible[int(i)]),
-            key=f"jdt_pick_{job_id}_{filt}",
-        )
-        t = visible[int(pick_ix)]
-        tid = str(t.get("id") or "").strip()
-        if tid:
-            st.caption(
-                f"Supervisor **{str(t.get('assigned_supervisor_name') or '—').strip() or '—'}** · "
-                f"Planned **{str(t.get('planned_date') or '—')[:10]}** · "
-                f"Priority **{str(t.get('priority') or '—').title()}**"
-            )
-            with st.expander("Assign supervisor & read-only details", expanded=False):
-                sup = st.text_input(
-                    "Assigned supervisor",
-                    value=str(t.get("assigned_supervisor_name") or ""),
-                    key=f"jdt_asgn_{tid}",
-                    disabled=not can_edit_tasks,
+        for t in visible:
+            tid = str(t.get("id") or "").strip()
+            if not tid:
+                continue
+            stt = str(t.get("status") or "not_started").strip().lower()
+            if stt == "open":
+                stt = "not_started"
+            iss = str(t.get("issue") or "").strip()
+            snip = (iss[:140] + "…") if len(iss) > 140 else iss
+            loc = str(t.get("location") or "").strip() or "—"
+            sup = str(t.get("assigned_supervisor_name") or "").strip() or "—"
+            planned = str(t.get("planned_date") or "").strip()[:10] or "—"
+            tn = str(t.get("task_number") or "—").strip()
+            hn = str(t.get("hazard_number") or "—").strip()
+            quote_po = str(t.get("quote_po") or t.get("po_number") or "").strip()
+
+            with st.container(border=True):
+                extra = ""
+                if quote_po:
+                    extra = f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.85rem;"><strong>Quote/PO</strong> {html.escape(quote_po)}</p>'
+                st.markdown(
+                    f'<p style="margin:0 0 0.35rem;font-size:1rem;font-weight:700;color:#111827;">'
+                    f"Task {html.escape(tn)} / Hazard {html.escape(hn)}</p>"
+                    f'<div style="margin-bottom:0.35rem;">{_task_status_badge(stt)}{_priority_badge_html(t.get("priority"))}</div>'
+                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.9rem;"><strong>Location</strong> '
+                    f"{html.escape(loc)}</p>"
+                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.9rem;"><strong>Issue</strong> '
+                    f"{html.escape(snip or '—')}</p>"
+                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.85rem;"><strong>Supervisor</strong> '
+                    f"{html.escape(sup)} · <strong>Planned</strong> {html.escape(planned)}</p>"
+                    f"{extra}",
+                    unsafe_allow_html=True,
                 )
-                if can_edit_tasks and st.button("Save supervisor", key=f"jdt_asgn_save_{tid}"):
-                    try:
-                        upd(
-                            "job_tasks",
-                            {
-                                "assigned_supervisor_name": " ".join(str(sup or "").split())[:200],
-                                "updated_at": datetime.now(timezone.utc).isoformat(),
-                            },
-                            {"id": tid},
-                        )
-                        st.success("Saved.")
+                if st.button(
+                    "Open / Edit",
+                    key=f"jdt_card_open_{job_id}_{tid}",
+                    use_container_width=True,
+                ):
+                    st.session_state[expand_key] = tid
+                    st.rerun()
+
+            if str(st.session_state.get(expand_key) or "").strip() == tid:
+                with st.container(border=True):
+                    st.markdown("#### Edit task")
+                    if st.button("Close", key=f"jdt_panel_close_{job_id}_{tid}"):
+                        st.session_state[expand_key] = ""
                         st.rerun()
+                    with st.expander("Assign supervisor & action required", expanded=False):
+                        supw = st.text_input(
+                            "Assigned supervisor",
+                            value=str(t.get("assigned_supervisor_name") or ""),
+                            key=f"jdt_asgn_{tid}",
+                            disabled=not can_edit_tasks,
+                        )
+                        if can_edit_tasks and st.button("Save supervisor", key=f"jdt_asgn_save_{tid}"):
+                            try:
+                                upd(
+                                    "job_tasks",
+                                    {
+                                        "assigned_supervisor_name": " ".join(str(supw or "").split())[:200],
+                                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                                    },
+                                    {"id": tid},
+                                )
+                                st.success("Saved.")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(str(exc))
+                        st.text_area(
+                            "Action required",
+                            value=str(t.get("action_required") or ""),
+                            height=70,
+                            disabled=True,
+                            key=f"jdt_ar_{tid}",
+                        )
+                    try:
+                        _mob.render_mobile_task_detail_form(
+                            task_row=t,
+                            task_id=tid,
+                            can_edit=can_edit_tasks,
+                            admin_read=admin_read,
+                            upd=upd,
+                        )
                     except Exception as exc:
                         st.error(str(exc))
-                st.text_area(
-                    "Action required",
-                    value=str(t.get("action_required") or ""),
-                    height=70,
-                    disabled=True,
-                    key=f"jdt_ar_{tid}",
-                )
-            try:
-                _mob.render_mobile_task_detail_form(
-                    task_row=t,
-                    task_id=tid,
-                    can_edit=can_edit_tasks,
-                    admin_read=admin_read,
-                    upd=upd,
-                )
-            except Exception as exc:
-                st.error(str(exc))
-                st.caption("Fallback: run **`sql/051_job_task_photos.sql`** / **`sql/052_job_task_photos_capture_meta.sql`**.")
+                        st.caption(
+                            "Fallback: run **`sql/051_job_task_photos.sql`** / **`sql/052_job_task_photos_capture_meta.sql`**."
+                        )
 
     if can_edit_tasks:
+        _inject_task_tab_add_form_css()
         st.markdown("##### Add task")
         st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
         a1, a2 = st.columns(2, gap="small")
@@ -520,10 +612,10 @@ def render_job_daily_review_tab(
                 )
                 c1, c2 = st.columns(2, gap="small")
                 with c1:
-                    st.caption("Take photo (after)")
+                    st.caption("📷 Take Photo (after)")
                     st.camera_input("a", key=f"jdrf_cam_{jk}_{tid}_{r_iso}", label_visibility="collapsed", disabled=not can_edit_tasks)
                 with c2:
-                    st.caption("Upload (after)")
+                    st.caption("⬆ Upload (after)")
                     st.file_uploader(
                         "u",
                         type=["jpg", "jpeg", "png", "webp"],

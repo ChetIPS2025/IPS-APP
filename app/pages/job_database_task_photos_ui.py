@@ -488,14 +488,14 @@ def render_task_photo_strip(
                             st.error(str(exc))
         if not can_edit:
             return
-        st.caption("Take Photo")
+        st.caption("📷 Take Photo")
         cam = st.camera_input(
             title,
             key=f"cam_{task_id}_{pt}",
             label_visibility="collapsed",
             help=f"Camera: {title}",
         )
-        st.caption("Upload Photo")
+        st.caption("⬆ Upload")
         up = st.file_uploader(
             title,
             type=["jpg", "jpeg", "png", "webp"],
