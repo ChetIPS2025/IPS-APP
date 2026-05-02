@@ -17,6 +17,23 @@ except ImportError:
         job_status_needs_daily_report,
     )
 
+try:
+    from app.services.supervisor_planning import active_goal_job_ids_for_date, active_task_job_ids
+except ImportError:
+    try:
+        from services.supervisor_planning import active_goal_job_ids_for_date, active_task_job_ids  # type: ignore
+    except ImportError:
+
+        def active_goal_job_ids_for_date(*, goals: list, target: date) -> set[str]:  # type: ignore[misc,no-redef]
+            _ = goals
+            _ = target
+            return set()
+
+        def active_task_job_ids(*, tasks: list, today: date) -> set[str]:  # type: ignore[misc,no-redef]
+            _ = tasks
+            _ = today
+            return set()
+
 _DELAY_KEYS = tuple(delay_labels_map().keys())
 _MAJOR_DELAY_KEYS = frozenset(
     {
@@ -200,17 +217,62 @@ def compute_job_health_row(
     today: date,
     reports_for_job: list[dict[str, Any]],
     hours_by_job: dict[str, float],
+    hours_today_by_job: dict[str, float],
     estimates_by_id: dict[str, dict[str, Any]],
+    goal_active_job_ids: set[str],
+    task_work_job_ids: set[str],
 ) -> dict[str, Any]:
     jid = str(job.get("id") or "").strip()
     date_set = _date_set_for_job(reports_for_job)
     missing_streak = _consecutive_missing_days_from_today(today=today, report_dates=date_set)
     report_today = _report_on_date(reports_for_job, target=today)
     latest = _latest_report(reports_for_job, today=today)
+    hours_today = float(hours_today_by_job.get(jid, 0.0))
 
     est_h = _estimate_hours_for_job(job, estimates_by_id)
     act_h = float(hours_by_job.get(jid, 0.0))
     ratio, labor_band = _labor_ratio(actual=act_h, estimated=est_h)
+
+    safety_days, safety_latest = _safety_signal_counts(reports_for_job, today=today, days=14)
+
+    if not report_today and hours_today <= 0 and jid not in goal_active_job_ids and jid not in task_work_job_ids:
+        detail_idle = {
+            "last_report_date": _report_date_str(latest) if latest else None,
+            "last_supervisor": str((latest or {}).get("supervisor_name") or "").strip() or "—",
+            "crew_size": None,
+            "reported_delays": _delay_labels_for_report(latest) if latest else [],
+            "repeated_delay_reasons": [],
+            "labor_ratio_vs_estimate": (round(ratio * 100.0, 1) if ratio is not None else None),
+            "est_labor_hrs": est_h,
+            "act_labor_hrs": round(act_h, 2),
+            "safety_delay_days_14d": safety_days,
+            "safety_delay_on_latest": safety_latest,
+            "missing_streak_days": missing_streak,
+            "recommended_action": (
+                "No daily report, no labor hours, no active goal window today, and no qualifying job-task activity "
+                "today on this job. Health stays **Idle** until one of those is true."
+            ),
+        }
+        last_crew = (latest or {}).get("crew_size")
+        try:
+            detail_idle["crew_size"] = (
+                int(last_crew) if last_crew is not None and str(last_crew).strip() != "" else None
+            )
+        except (TypeError, ValueError):
+            detail_idle["crew_size"] = None
+
+        return {
+            "job_id": jid,
+            "label": "",
+            "status": "idle",
+            "pill": "Idle",
+            "has_report_today": False,
+            "has_activity_today": False,
+            "reasons_red": [],
+            "reasons_yellow": [],
+            "green_reasons": [],
+            "detail": detail_idle,
+        }
 
     per_key_days: dict[str, set[str]] = defaultdict(set)
     start7 = today - timedelta(days=6)
@@ -319,8 +381,6 @@ def compute_job_health_row(
     else:
         rec_action = "Maintain cadence: keep daily reports and labor tracking current."
 
-    safety_days, safety_latest = _safety_signal_counts(reports_for_job, today=today, days=14)
-
     detail = {
         "last_report_date": _report_date_str(latest) if latest else None,
         "last_supervisor": last_sup,
@@ -342,6 +402,7 @@ def compute_job_health_row(
         "status": status,
         "pill": pill,
         "has_report_today": bool(report_today),
+        "has_activity_today": True,
         "reasons_red": reasons_red,
         "reasons_yellow": reasons_yellow,
         "green_reasons": green_reasons if status == "green" else [],
@@ -355,7 +416,10 @@ def compute_job_health_rows(
     jobs: list[dict[str, Any]],
     reports: list[dict[str, Any]],
     hours_by_job: dict[str, float],
+    hours_today_by_job: dict[str, float],
     estimates_by_id: dict[str, dict[str, Any]],
+    goals: list[dict[str, Any]] | None = None,
+    job_tasks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     try:
         from app.services.job_service import job_row_select_label
@@ -363,6 +427,8 @@ def compute_job_health_rows(
         from services.job_service import job_row_select_label  # type: ignore
 
     by_job = _reports_by_job(reports)
+    goal_ids = active_goal_job_ids_for_date(goals=list(goals or []), target=today)
+    task_job_ids = active_task_job_ids(tasks=list(job_tasks or []), today=today)
     rows: list[dict[str, Any]] = []
     for job in _active_jobs(jobs):
         jid = str(job.get("id") or "").strip()
@@ -373,29 +439,43 @@ def compute_job_health_rows(
             today=today,
             reports_for_job=by_job.get(jid, []),
             hours_by_job=hours_by_job,
+            hours_today_by_job=hours_today_by_job,
             estimates_by_id=estimates_by_id,
+            goal_active_job_ids=goal_ids,
+            task_work_job_ids=task_job_ids,
         )
         r["label"] = job_row_select_label(job)
         rows.append(r)
-    rows.sort(key=lambda x: (0 if x["status"] == "red" else 1 if x["status"] == "yellow" else 2, x["label"].lower()))
+
+    def _health_sort_key(row: dict[str, Any]) -> tuple[int, str]:
+        s = str(row.get("status") or "")
+        rank = {"red": 0, "yellow": 1, "green": 2, "idle": 3}.get(s, 9)
+        return (rank, str(row.get("label") or "").lower())
+
+    rows.sort(key=_health_sort_key)
     return rows
 
 
 def job_health_summary_counts(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    c_red = sum(1 for r in rows if r.get("status") == "red")
-    c_yellow = sum(1 for r in rows if r.get("status") == "yellow")
-    c_green = sum(1 for r in rows if r.get("status") == "green")
-    missing_today = sum(1 for r in rows if not r.get("has_report_today"))
+    """Alert-style counts exclude Idle jobs (no report and no labor logged today)."""
+    engaged = [r for r in rows if r.get("status") != "idle"]
+    c_idle = sum(1 for r in rows if r.get("status") == "idle")
+    c_red = sum(1 for r in engaged if r.get("status") == "red")
+    c_yellow = sum(1 for r in engaged if r.get("status") == "yellow")
+    c_green = sum(1 for r in engaged if r.get("status") == "green")
+    missing_today = sum(1 for r in engaged if not r.get("has_report_today"))
     over_est = sum(
         1
-        for r in rows
+        for r in engaged
         if (r.get("detail") or {}).get("est_labor_hrs") is not None
         and float((r.get("detail") or {}).get("act_labor_hrs") or 0)
         > float((r.get("detail") or {}).get("est_labor_hrs") or 0) * 1.001
     )
-    repeated = sum(1 for r in rows if (r.get("detail") or {}).get("repeated_delay_reasons"))
+    repeated = sum(1 for r in engaged if (r.get("detail") or {}).get("repeated_delay_reasons"))
     return {
-        "active": len(rows),
+        "field_jobs": len(rows),
+        "active_today": len(engaged),
+        "idle": c_idle,
         "green": c_green,
         "yellow": c_yellow,
         "red": c_red,

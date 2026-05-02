@@ -58,7 +58,7 @@ def _money_str(value: float) -> str:
 
 
 def _job_costing_admin_read() -> bool:
-    return current_role() in {"admin", "pm"}
+    return current_role() in {"admin", "manager"}
 
 
 def _sort_jobs(jobs: list[dict]) -> list[dict]:
@@ -278,6 +278,13 @@ def render() -> None:
     if not jobs_sorted:
         st.info("No jobs found.")
         return
+
+    focus_jid = str(st.session_state.pop("jc_focus_job_id", "") or "").strip()
+    if focus_jid:
+        for i, j in enumerate(jobs_sorted):
+            if str(j.get("id") or "").strip() == focus_jid:
+                st.session_state["jc_selected_job_ix"] = i
+                break
 
     estimate_by_id = {e.get("id"): e for e in (estimates or []) if e.get("id")}
 

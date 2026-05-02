@@ -130,6 +130,8 @@ class Settings:
     # Public base URL for deep links (no trailing slash). Defaults to live Render; override with APP_BASE_URL.
     app_base_url: str = field(default_factory=_resolve_app_base_url)
     storage_bucket: str = field(default_factory=lambda: _strip_env("STORAGE_BUCKET", "ips-storage"))
+    # Supabase Storage bucket for task before/progress/after images (create in dashboard + policies).
+    task_photos_bucket: str = field(default_factory=lambda: _strip_env("TASK_PHOTOS_BUCKET", "task-photos"))
     # File storage: "supabase" (default) uploads to Supabase Storage; "local" writes under LOCAL_STORAGE_ROOT.
     storage_backend: str = field(default_factory=_storage_backend)
     # When storage_backend is "local", files are stored under this directory (mirrors bucket key paths).

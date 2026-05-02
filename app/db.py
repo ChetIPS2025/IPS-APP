@@ -383,22 +383,40 @@ def _normalize_storage_key(storage_path: str) -> str:
     return s
 
 
-def _local_file_path(storage_path: str) -> Path:
+def _effective_storage_bucket(bucket: str | None) -> str:
+    """Explicit bucket, else default app storage bucket."""
+    if bucket and str(bucket).strip():
+        return str(bucket).strip()
+    return str(getattr(settings, "storage_bucket", "") or "ips-storage").strip()
+
+
+def _local_file_path_for_storage(storage_path: str, bucket: str | None) -> Path:
     key = _normalize_storage_key(storage_path)
     root = _local_storage_root()
-    full = (root / key).resolve()
+    default_b = str(getattr(settings, "storage_bucket", "") or "ips-storage").strip()
+    eff = _effective_storage_bucket(bucket)
+    if eff == default_b:
+        full = (root / key).resolve()
+    else:
+        full = (root / eff / key).resolve()
     if not str(full).startswith(str(root)):
         raise ValueError(f"Storage path escapes root: {storage_path!r}")
     return full
+
+
+def _local_file_path(storage_path: str) -> Path:
+    return _local_file_path_for_storage(storage_path, None)
 
 
 def _upload_bytes_local(
     storage_path: str,
     data: bytes,
     content_type: str = "application/octet-stream",
+    *,
+    bucket: str | None = None,
 ) -> str:
     _ = content_type
-    dest = _local_file_path(storage_path)
+    dest = _local_file_path_for_storage(storage_path, bucket)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     _LOG.debug("Local storage wrote %s (%s bytes)", dest, len(data))
@@ -417,15 +435,18 @@ def upload_bytes_admin(
     storage_path: str,
     data: bytes,
     content_type: str = "application/octet-stream",
+    *,
+    bucket: str | None = None,
 ) -> str:
     if _storage_is_local():
-        return _upload_bytes_local(storage_path, data, content_type)
+        return _upload_bytes_local(storage_path, data, content_type, bucket=bucket)
 
     client = get_admin_client()
-    bucket = client.storage.from_(settings.storage_bucket)
+    bucket_name = _effective_storage_bucket(bucket)
+    st_bucket = client.storage.from_(bucket_name)
     opts = _storage_upload_options(content_type)
     try:
-        bucket.upload(path=storage_path, file=data, file_options=dict(opts))
+        st_bucket.upload(path=storage_path, file=data, file_options=dict(opts))
     except StorageApiError as exc:
         msg = (exc.message or "").lower()
         status = 0
@@ -438,7 +459,7 @@ def upload_bytes_admin(
         if status == 409 or "duplicate" in msg or "already exists" in msg:
             _LOG.info("Storage upload conflict for %s; retrying with update()", storage_path)
             try:
-                bucket.update(path=storage_path, file=data, file_options=dict(opts))
+                st_bucket.update(path=storage_path, file=data, file_options=dict(opts))
             except Exception as upd_exc:
                 raise RuntimeError(
                     f"Storage update after 409 failed for {storage_path!r}: {upd_exc!r}"
@@ -448,13 +469,13 @@ def upload_bytes_admin(
     return storage_path
 
 
-def delete_storage_object_admin(storage_path: str) -> None:
+def delete_storage_object_admin(storage_path: str, *, bucket: str | None = None) -> None:
     key = str(storage_path or "").strip()
     if not key:
         return
     if _storage_is_local():
         try:
-            p = _local_file_path(key)
+            p = _local_file_path_for_storage(key, bucket)
         except ValueError:
             _LOG.warning("Invalid storage path for delete: %s", storage_path, exc_info=True)
             return
@@ -465,9 +486,10 @@ def delete_storage_object_admin(storage_path: str) -> None:
 
     norm = _normalize_storage_key(key)
     client = get_admin_client()
-    bucket = client.storage.from_(settings.storage_bucket)
+    bucket_name = _effective_storage_bucket(bucket)
+    st_bucket = client.storage.from_(bucket_name)
     try:
-        bucket.remove([norm])
+        st_bucket.remove([norm])
     except StorageApiError:
         _LOG.warning("Storage remove failed for %s", norm, exc_info=True)
         raise
@@ -477,8 +499,10 @@ def upload_bytes(
     storage_path: str,
     data: bytes,
     content_type: str = "application/octet-stream",
+    *,
+    bucket: str | None = None,
 ) -> str:
-    return upload_bytes_admin(storage_path, data, content_type)
+    return upload_bytes_admin(storage_path, data, content_type, bucket=bucket)
 
 
 def _signed_url_from_response(resp: Any) -> str:
@@ -502,11 +526,13 @@ def _signed_url_from_response(resp: Any) -> str:
 def create_signed_url(
     storage_path: str,
     expires_in: int = 3600,
+    *,
+    bucket: str | None = None,
 ) -> str:
     if _storage_is_local():
         _ = expires_in
         try:
-            p = _local_file_path(storage_path)
+            p = _local_file_path_for_storage(storage_path, bucket)
         except ValueError:
             return ""
         if p.is_file():
@@ -514,8 +540,9 @@ def create_signed_url(
         return ""
 
     client = get_admin_client()
+    bucket_name = _effective_storage_bucket(bucket)
     try:
-        resp = client.storage.from_(settings.storage_bucket).create_signed_url(storage_path, expires_in)
+        resp = client.storage.from_(bucket_name).create_signed_url(storage_path, expires_in)
     except Exception as exc:
         raise RuntimeError(f"create_signed_url failed for {storage_path!r}: {exc!r}") from exc
     return _signed_url_from_response(resp)

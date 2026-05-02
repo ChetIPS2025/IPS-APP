@@ -39,6 +39,7 @@ from pages import estimates
 from pages import customers_jobs
 from pages import job_database
 from pages import supervisor_daily_reports
+from pages import supervisor_planning
 from pages import job_costing
 from pages import asset_database
 from pages import tool_dashboard
@@ -68,6 +69,7 @@ PAGES = {
     "Estimates": estimates.render,
     "Job Database": job_database.render,
     "Supervisor Daily Reports": supervisor_daily_reports.render,
+    "Daily Tasks": supervisor_planning.render,
     "Customers": customers_jobs.render_customers,
     "Job Costing": job_costing.render,
     "Labor": labor.render,

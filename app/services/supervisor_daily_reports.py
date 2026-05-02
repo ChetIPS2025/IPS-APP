@@ -393,6 +393,31 @@ def labor_hours_actual_by_job(
     return out
 
 
+def labor_hours_actual_by_job_on_date(
+    time_entries: list[dict[str, Any]],
+    *,
+    work_date: date,
+) -> dict[str, float]:
+    """Sum positive hours per job_id for a single calendar ``work_date`` (time_entries.work_date)."""
+    want = work_date.isoformat()[:10]
+    out: dict[str, float] = {}
+    for te in time_entries or []:
+        if not isinstance(te, dict):
+            continue
+        wd = str(te.get("work_date") or "")[:10]
+        if wd != want:
+            continue
+        jid = str(te.get("job_id") or "").strip()
+        if not jid:
+            continue
+        try:
+            h = float(te.get("hours") or 0)
+        except (TypeError, ValueError):
+            h = 0.0
+        out[jid] = out.get(jid, 0.0) + max(0.0, h)
+    return out
+
+
 def jobs_over_estimated_labor_hours(
     jobs: list[dict[str, Any]],
     estimates_by_id: dict[str, dict[str, Any]],
