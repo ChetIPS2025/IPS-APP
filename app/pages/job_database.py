@@ -1667,7 +1667,7 @@ def render() -> None:
                     unsafe_allow_html=True,
                 )
                 st.markdown("##### Filters & search")
-                f1, f2, f3, f4 = st.columns([1.05, 1.05, 2.35, 1.0], gap="small")
+                f1, f2 = st.columns(2, gap="small")
                 customer_names = sorted(
                     [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
                 )
@@ -1685,6 +1685,7 @@ def render() -> None:
                         disabled="status" not in jobs_df.columns,
                         key="job_filt_status",
                     )
+                f3, f4 = st.columns(2, gap="small")
                 with f3:
                     _search_hint = (
                         "Source, quote, contact, location, job_number, job_name, customer, status, …"
