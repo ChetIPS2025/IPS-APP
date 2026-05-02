@@ -284,6 +284,7 @@ def render_job_tasks_tab(
 
     if can_edit_tasks:
         st.markdown("##### Add task")
+        st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
         a1, a2, a3 = st.columns(3, gap="small")
         with a1:
             tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")

@@ -165,6 +165,23 @@ def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 2
     )
 
 
+def _job_db_money_cell(v: Any) -> str:
+    try:
+        if v is None or str(v).strip() == "":
+            return ""
+        fv = float(v)
+        if fv == 0:
+            return ""
+        return f"${fv:,.0f}"
+    except Exception:
+        return ""
+
+
+def _job_db_card_text(v: Any, fallback: str = "—") -> str:
+    s = _job_db_cell_str(v)
+    return s if s else fallback
+
+
 JOB_STATUSES = [
     "Draft",
     "Quoted",
@@ -190,6 +207,8 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected"
+
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
     {"customer_id", "estimate_label", "Source"}
@@ -198,6 +217,173 @@ _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
 
 def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
     return [c for c in columns if c not in _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE]
+
+
+def _inject_job_database_responsive_styles() -> None:
+    """Jobs page tablet/mobile layout overrides. Keeps desktop split/table unchanged."""
+    if st.session_state.get(JOB_DB_RESPONSIVE_STYLES_KEY):
+        return
+    st.session_state[JOB_DB_RESPONSIVE_STYLES_KEY] = True
+    st.markdown(
+        """
+        <style>
+        .ips-job-card-list-note {
+            color: #64748b;
+            font-size: 0.82rem;
+            margin: 0.15rem 0 0.45rem;
+        }
+        .ips-job-card-title {
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1.25;
+            margin: 0 0 0.1rem 0;
+            overflow-wrap: anywhere;
+        }
+        .ips-job-card-meta {
+            color: #475569;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            margin: 0.15rem 0 0.4rem;
+            overflow-wrap: anywhere;
+        }
+        .ips-job-card-pill {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            color: #334155;
+            background: #f8fafc;
+            font-size: 0.78rem;
+            font-weight: 650;
+            line-height: 1;
+            margin: 0.2rem 0.25rem 0.1rem 0;
+            max-width: 100%;
+            padding: 0.35rem 0.55rem;
+            overflow-wrap: anywhere;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) {
+            display: none;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            margin-bottom: 0.65rem !important;
+            padding: 0.75rem !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) .stButton > button {
+            min-height: 44px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) input,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="select"] > div,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) input,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) textarea,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="select"] > div {
+            max-width: 100% !important;
+            min-height: 42px !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) {
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            border-radius: 12px !important;
+            color: #0f172a !important;
+            padding: 0.75rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) h3,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) h4 {
+            color: #0f172a !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] button {
+            min-height: 44px !important;
+            padding: 0.45rem 0.65rem !important;
+            white-space: nowrap !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-baseweb="tab-list"] {
+            gap: 0.25rem !important;
+            overflow-x: auto !important;
+            scrollbar-width: thin;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="column"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
+            min-width: 0 !important;
+        }
+        @media (max-width: 1100px) {
+            div[data-testid="stHorizontalBlock"]:has(.ips-job-edit-panel-anchor) {
+                flex-direction: column !important;
+                gap: 0.85rem !important;
+            }
+            div[data-testid="stHorizontalBlock"]:has(.ips-job-edit-panel-anchor) > div[data-testid="column"] {
+                flex: 1 1 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.65rem !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex: 1 1 calc(50% - 0.65rem) !important;
+                max-width: calc(50% - 0.35rem) !important;
+                min-width: 260px !important;
+                width: calc(50% - 0.35rem) !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) {
+                display: none !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) {
+                display: block !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-action-bar-anchor) {
+                display: none !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
+                div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.65rem !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex: 1 1 calc(50% - 0.65rem) !important;
+                max-width: calc(50% - 0.35rem) !important;
+                min-width: 260px !important;
+                width: calc(50% - 0.35rem) !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
+                div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex: 1 1 calc(50% - 0.65rem) !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
+                [data-testid="stWidgetLabel"] p {
+                font-size: 0.9rem !important;
+            }
+        }
+        @media (max-width: 640px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                flex-basis: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] button {
+                font-size: 0.86rem !important;
+                padding: 0.45rem 0.55rem !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _job_db_admin_read() -> bool:
@@ -379,6 +565,7 @@ def _render_job_form_panel(
 ) -> None:
     """Right-side bordered panel: add/edit job form."""
     with st.container(border=True):
+        st.markdown('<span class="ips-job-edit-panel-anchor"></span>', unsafe_allow_html=True)
         title = "Add Job" if mode == "add" else "Edit Job"
         st.markdown(f"### {title}")
         if mode == "add":
@@ -396,33 +583,19 @@ def _render_job_form_panel(
             can_tasks = can_edit or (current_role() == "employee")
             try:
                 from app.pages.job_database_job_tasks import (
-                    render_job_cost_tab,
                     render_job_daily_plan_tab,
-                    render_job_daily_review_tab,
-                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
             except ImportError:
                 from pages.job_database_job_tasks import (  # type: ignore
-                    render_job_cost_tab,
                     render_job_daily_plan_tab,
-                    render_job_daily_review_tab,
-                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_dp, t_dr, t_ph, t_co = st.tabs(
-                ["Overview", "Tasks", "Daily Plan", "Daily Review", "Photos", "Cost"]
-            )
+            t_ov, t_ts, t_dp = st.tabs(["Overview", "Tasks", "Daily Plan"])
             with t_ts:
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
             with t_dp:
                 render_job_daily_plan_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_dr:
-                render_job_daily_review_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_ph:
-                render_job_photos_tab(job_id=edit_jid, admin_read=admin_rd)
-            with t_co:
-                render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
             tab_overview_ctx = t_ov
         with tab_overview_ctx:
             if mode == "edit" and selected_job and selected_job.get("estimate_id"):
@@ -1136,6 +1309,91 @@ def _build_jobs_overview_dataframe(
     return out
 
 
+def _render_job_card_list(
+    *,
+    df_display: pd.DataFrame,
+    job_num_col: str,
+    can_edit: bool,
+) -> list[str]:
+    picked: list[str] = []
+    st.markdown('<span class="ips-job-card-list-anchor"></span>', unsafe_allow_html=True)
+    st.markdown("##### Job list")
+    st.markdown(
+        '<p class="ips-job-card-list-note">Tablet and phone view: compact job cards replace the wide table.</p>',
+        unsafe_allow_html=True,
+    )
+
+    if df_display.empty:
+        st.caption("No jobs match these filters.")
+        return picked
+
+    for _, row in df_display.iterrows():
+        jid = str(row.get("id") or "").strip()
+        if not jid:
+            continue
+        with st.container(border=True):
+            st.markdown('<span class="ips-job-card-anchor"></span>', unsafe_allow_html=True)
+            job_num = _job_db_card_text(row.get(job_num_col), "No job #")
+            job_name = _job_db_card_text(row.get("job_name"), "Untitled job")
+            customer = _job_db_card_text(row.get("customer_name"))
+            status = _job_db_card_text(row.get("status"))
+            quote = _job_db_card_text(row.get("Quote (estimate)"), "")
+            awarded = _job_db_money_cell(row.get("awarded_amount"))
+            amount = quote or awarded
+            amount_html = (
+                f'<span class="ips-job-card-pill">Quote / PO: {html.escape(amount)}</span>'
+                if amount
+                else ""
+            )
+            st.markdown(
+                f'<p class="ips-job-card-title">{html.escape(job_name)}</p>'
+                f'<p class="ips-job-card-meta">'
+                f'<strong>Job #</strong> {html.escape(job_num)} &nbsp; '
+                f'<strong>Customer</strong> {html.escape(customer)}</p>'
+                f'<span class="ips-job-card-pill">Status: {html.escape(status)}</span>'
+                f"{amount_html}",
+                unsafe_allow_html=True,
+            )
+
+            ck = f"job_list_pick_card_{jid}"
+            if ck not in st.session_state:
+                st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
+            selected = st.checkbox("Select for bulk actions", key=ck)
+            if selected:
+                picked.append(jid)
+
+            edit_col, del_col = st.columns(2, gap="small")
+            with edit_col:
+                if st.button(
+                    "Edit",
+                    key=f"job_card_edit_{jid}",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not (can_edit or current_role() == "employee"),
+                ):
+                    st.session_state["job_mode"] = "edit"
+                    st.session_state["job_edit_id"] = jid
+                    st.session_state.pop("job_number_manual_input", None)
+                    st.rerun()
+            with del_col:
+                if st.button(
+                    "Delete",
+                    key=f"job_card_del_{jid}",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not can_edit,
+                    help="Delete this job (blocked if costing data exists).",
+                ):
+                    pending = st.session_state.get(IPS_PENDING_DELETE)
+                    if not isinstance(pending, dict):
+                        pending = {}
+                        st.session_state[IPS_PENDING_DELETE] = pending
+                    pending[TABLE_KEY_JOBS] = [jid]
+                    st.rerun()
+
+    return picked
+
+
 def _filter_jobs_overview_dataframe(
     filtered: pd.DataFrame,
     *,
@@ -1375,6 +1633,7 @@ def render() -> None:
     )
     if panel_open:
         main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
+        main_col.markdown('<span class="ips-job-edit-panel-anchor"></span>', unsafe_allow_html=True)
     else:
         main_col = st.container()
         side_col = None
@@ -1414,7 +1673,10 @@ def render() -> None:
             )
 
             with st.container(border=True):
-                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-list-top-anchor ips-job-filter-anchor"></span>',
+                    unsafe_allow_html=True,
+                )
                 st.markdown("##### Filters & search")
                 f1, f2, f3, f4 = st.columns([1.05, 1.05, 2.35, 1.0], gap="small")
                 customer_names = sorted(
@@ -1488,7 +1750,10 @@ def render() -> None:
 
             picked: list[str] = []
             with st.container(border=True):
-                st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-list-top-anchor ips-job-desktop-table-anchor"></span>',
+                    unsafe_allow_html=True,
+                )
                 st.markdown("##### Job list")
                 st.caption(
                     "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
@@ -1543,17 +1808,6 @@ def render() -> None:
                     with head[10]:
                         st.caption("Del")
 
-                    def _money_cell(v: Any) -> str:
-                        try:
-                            if v is None or str(v).strip() == "":
-                                return ""
-                            fv = float(v)
-                            if fv == 0:
-                                return ""
-                            return f"${fv:,.0f}"
-                        except Exception:
-                            return ""
-
                     for _, row in df_display.iterrows():
                         jid = str(row.get("id") or "").strip()
                         if not jid:
@@ -1583,7 +1837,7 @@ def render() -> None:
                             # Quote (estimate) is the current visible “quote/po” signal in this UI.
                             _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
                         with rc[9]:
-                            rc[9].text(_money_cell(row.get("awarded_amount")))
+                            rc[9].text(_job_db_money_cell(row.get("awarded_amount")))
 
                         del_help = (
                             "Only admin or pm can delete jobs."
@@ -1606,13 +1860,29 @@ def render() -> None:
                                 st.rerun()
                     set_selected_ids(TABLE_KEY_JOBS, picked)
 
+            if "id" in df_display.columns:
+                with st.container(border=True):
+                    job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
+                    if job_num_col not in df_display.columns:
+                        job_num_col = "id"
+                    card_picked = _render_job_card_list(
+                        df_display=df_display,
+                        job_num_col=job_num_col,
+                        can_edit=can_edit,
+                    )
+                    picked = card_picked
+                    set_selected_ids(TABLE_KEY_JOBS, picked)
+
             sel_ids = picked if "id" in filtered.columns else []
             n_sel = len(sel_ids)
             one = n_sel == 1
             none = n_sel == 0
 
             with st.container(border=True):
-                st.markdown('<span class="ips-ta-bar-anchor"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor"></span>',
+                    unsafe_allow_html=True,
+                )
                 left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
                 with left:
                     st.markdown(
