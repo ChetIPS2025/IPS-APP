@@ -141,7 +141,7 @@ def _migrate_legacy_selection_for_table(table_key: str) -> None:
 
 def inject_table_action_styles() -> None:
     """
-    IPS dark-theme chrome for (1) table selection action bars and (2) list-page top toolbars.
+    IPS light-theme chrome for (1) table selection action bars and (2) list-page top toolbars.
 
     Pages mark toolbars with ``.ips-list-top-anchor`` inside ``st.container(border=True)``.
     Action bars use ``.ips-ta-bar-anchor`` (injected by :func:`render_table_action_bar`).
@@ -156,9 +156,9 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(15, 23, 42, 0.55) !important;
-            border-color: rgba(100, 116, 139, 0.4) !important;
-            border-radius: 10px !important;
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            border-radius: 12px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
             div[data-testid="stHorizontalBlock"] {
@@ -175,7 +175,7 @@ def inject_table_action_styles() -> None:
             min-height: 2.25rem !important;
             min-width: 100px !important;
             width: auto !important;
-            border-radius: 8px !important;
+            border-radius: 10px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
             padding: 10px 16px !important;
@@ -205,9 +205,9 @@ def inject_table_action_styles() -> None:
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
             margin-top: 2px !important;
-            background: rgba(15, 23, 42, 0.72) !important;
-            border-color: rgba(100, 116, 139, 0.42) !important;
-            border-radius: 10px !important;
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            border-radius: 12px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
             div[data-testid="stHorizontalBlock"] {
@@ -224,7 +224,7 @@ def inject_table_action_styles() -> None:
             min-height: 2.25rem !important;
             min-width: 100px !important;
             width: auto !important;
-            border-radius: 8px !important;
+            border-radius: 10px !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
             padding: 10px 16px !important;
@@ -244,18 +244,18 @@ def inject_table_action_styles() -> None:
         .ips-table-actions-bar {
             padding: 10px 12px;
             margin-bottom: 10px;
-            background: rgba(15, 23, 42, 0.78);
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            border-radius: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
         }
         .ips-ta-summary {
-            color: #94a3b8;
+            color: #475569;
             font-size: 12px;
             font-weight: 500;
             letter-spacing: 0.02em;
         }
         .ips-ta-summary .ips-ta-num {
-            color: #e2e8f0;
+            color: #0f172a;
             font-weight: 600;
         }
 
@@ -265,29 +265,29 @@ def inject_table_action_styles() -> None:
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor)
             .stButton > button[kind="primary"]:not(:disabled) {
-            background: linear-gradient(180deg, #059669 0%, #047857 100%) !important;
-            border: 1px solid rgba(52, 211, 153, 0.55) !important;
-            color: #ecfdf5 !important;
+            background: #16a34a !important;
+            border: 1px solid #16a34a !important;
+            color: #ffffff !important;
             font-weight: 600 !important;
-            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.28) !important;
+            box-shadow: none !important;
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor)
             .stButton > button[kind="primary"]:not(:disabled):hover {
-            border-color: rgba(110, 231, 183, 0.75) !important;
-            box-shadow: 0 3px 14px rgba(16, 185, 129, 0.38) !important;
+            border-color: #15803d !important;
+            background: #15803d !important;
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-done)
             .stButton > button[kind="primary"]:disabled {
-            background: rgba(6, 95, 70, 0.55) !important;
-            border: 1px solid rgba(45, 212, 191, 0.38) !important;
-            color: #ccfbf1 !important;
+            background: #dcfce7 !important;
+            border: 1px solid #86efac !important;
+            color: #166534 !important;
             opacity: 1 !important;
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor:not(.ips-est-approve-done))
             .stButton > button:disabled {
-            background: rgba(30, 41, 59, 0.45) !important;
-            border: 1px solid rgba(71, 85, 105, 0.42) !important;
-            color: #94a3b8 !important;
+            background: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #64748b !important;
             opacity: 1 !important;
         }
         </style>

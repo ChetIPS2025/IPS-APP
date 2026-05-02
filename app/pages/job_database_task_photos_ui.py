@@ -410,7 +410,43 @@ def render_task_photo_strip(
 ) -> None:
     """Mobile-first: before / progress / after with Take photo + Upload + thumb + delete."""
     st.markdown(
-        '<style>.ips-tph { font-size:0.82rem; } .ips-tph button { min-height:2.5rem; }</style>',
+        """
+        <style>
+        .ips-tph {
+            color: #0f172a;
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-tph-card-anchor) {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            padding: 0.75rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-tph-card-anchor) button {
+            min-height: 44px !important;
+            border-radius: 10px !important;
+        }
+        @media (max-width: 1100px) {
+            div[data-testid="stHorizontalBlock"]:has(.ips-tph-card-anchor) {
+                flex-wrap: wrap !important;
+            }
+            div[data-testid="stHorizontalBlock"]:has(.ips-tph-card-anchor) > div[data-testid="column"] {
+                flex: 1 1 min(280px, 100%) !important;
+                min-width: min(280px, 100%) !important;
+                max-width: 100% !important;
+            }
+        }
+        @media (max-width: 640px) {
+            div[data-testid="stHorizontalBlock"]:has(.ips-tph-card-anchor) > div[data-testid="column"] {
+                flex-basis: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+        }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
     rows = fetch_task_photos(task_id, admin=admin_read)
@@ -419,6 +455,7 @@ def render_task_photo_strip(
     progress_rows.sort(key=lambda r: str((r or {}).get("created_at") or ""), reverse=True)
 
     def _cell(pt: str, title: str) -> None:
+        st.markdown('<span class="ips-tph-card-anchor"></span>', unsafe_allow_html=True)
         st.markdown(f'<div class="ips-tph"><strong>{title}</strong></div>', unsafe_allow_html=True)
         cur = latest.get(pt) or (
             str(task_row.get("before_photo_url") or "").strip()
@@ -451,14 +488,14 @@ def render_task_photo_strip(
                             st.error(str(exc))
         if not can_edit:
             return
-        st.caption("Take photo")
+        st.caption("Take Photo")
         cam = st.camera_input(
             title,
             key=f"cam_{task_id}_{pt}",
             label_visibility="collapsed",
             help=f"Camera: {title}",
         )
-        st.caption("Upload photo")
+        st.caption("Upload Photo")
         up = st.file_uploader(
             title,
             type=["jpg", "jpeg", "png", "webp"],
@@ -474,7 +511,7 @@ def render_task_photo_strip(
         elif up is not None:
             src = up.getvalue()
             name = str(getattr(up, "name", "") or "upload.jpg")
-        if src and st.button(f"Save {title}", key=f"sv_{task_id}_{pt}"):
+        if src and st.button(f"Save {title}", key=f"sv_{task_id}_{pt}", use_container_width=True):
             try:
                 if pt == tp.PHOTO_TYPES_PROGRESS:
                     _insert_progress(
@@ -497,7 +534,11 @@ def render_task_photo_strip(
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-        if pt != tp.PHOTO_TYPES_PROGRESS and cur and st.button(f"Remove {title}", key=f"rm_{task_id}_{pt}"):
+        if pt != tp.PHOTO_TYPES_PROGRESS and cur and st.button(
+            f"Remove {title}",
+            key=f"rm_{task_id}_{pt}",
+            use_container_width=True,
+        ):
             try:
                 remove_typed_task_photo(task_id=str(task_id), photo_type=pt, admin_read=admin_read)
                 st.rerun()
@@ -531,18 +572,19 @@ def render_daily_review_progress_strip(
         path = str((row or {}).get("storage_path") or "").strip()
         rid = str((row or {}).get("id") or "").strip()
         with st.container(border=True):
+            st.markdown('<span class="ips-tph-card-anchor"></span>', unsafe_allow_html=True)
             st.caption(f"Slot {slot}")
             if path:
                 _thumb(path, key=f"jdrps_{job_id}_{r_iso}_{slot}")
             if not can_edit:
                 continue
-            st.caption("Take photo")
+            st.caption("Take Photo")
             cam = st.camera_input(
                 f"S{slot}",
                 key=f"jdrpc_{job_id}_{r_iso}_{slot}",
                 label_visibility="collapsed",
             )
-            st.caption("Upload photo")
+            st.caption("Upload Photo")
             up = st.file_uploader(
                 f"Slot{slot}",
                 type=["jpg", "jpeg", "png", "webp"],
@@ -559,7 +601,7 @@ def render_daily_review_progress_strip(
                 name = str(getattr(up, "name", "") or "upload.jpg")
             b1, b2 = st.columns(2, gap="small")
             with b1:
-                if src and st.button("Save", key=f"jdrpsv_{job_id}_{r_iso}_{slot}"):
+                if src and st.button("Save", key=f"jdrpsv_{job_id}_{r_iso}_{slot}", use_container_width=True):
                     data, ctype, sfx = tp.compress_image_bytes(src, name)
                     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
                     new_path = f"job_daily_review/{job_id}/{r_iso}_slot{slot}_{ts}{sfx}"
@@ -583,7 +625,7 @@ def render_daily_review_progress_strip(
                     except Exception as exc:
                         st.error(str(exc))
             with b2:
-                if rid and st.button("Delete", key=f"jdrpdl_{job_id}_{r_iso}_{slot}"):
+                if rid and st.button("Delete", key=f"jdrpdl_{job_id}_{r_iso}_{slot}", use_container_width=True):
                     _purge_storage(path)
                     try:
                         dlt("job_daily_review_progress_photos", {"id": rid})

@@ -28,43 +28,42 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-sm: 0.45rem;
             --ips-space-md: 0.65rem;
             --ips-space-lg: 0.9rem;
-            --ips-radius: 8px;
-            --ips-radius-lg: 10px;
-            /* IPS palette (high-end industrial SaaS) */
-            --ips-bg-main: #0F2A4A;
-            --ips-bg-secondary: #122F52; /* card / section */
-            --ips-bg-card: #14365C;      /* alternate sections */
-            --ips-bg-sidebar: #102A4A;
-            --ips-bg-hover: #1A3F6B;
+            --ips-radius: 10px;
+            --ips-radius-lg: 12px;
+            --ips-bg-main: #f5f7fa;
+            --ips-bg-secondary: #ffffff;
+            --ips-bg-card: #ffffff;
+            --ips-bg-sidebar: #ffffff;
+            --ips-bg-hover: #f1f5f9;
 
-            --ips-text: #FFFFFF;
-            --ips-text-secondary: #C0CAD8;
-            --ips-text-muted: #9FB0C7;
+            --ips-text: #0f172a;
+            --ips-text-secondary: #475569;
+            --ips-text-muted: #64748b;
 
-            --ips-border: rgba(120, 150, 200, 0.25);
-            --ips-border-strong: rgba(120, 150, 200, 0.35);
-            --ips-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
-            --ips-surface: rgba(18, 47, 82, 0.88);
+            --ips-border: #e2e8f0;
+            --ips-border-strong: #cbd5e1;
+            --ips-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+            --ips-surface: #ffffff;
             /* Button system (main content) — dense pages override with more specific rules */
-            --ips-btn-height: 2.125rem;
+            --ips-btn-height: 2.75rem;
             --ips-btn-pad-y: 0.625rem;
             --ips-btn-pad-x: 1rem;
             --ips-btn-fs: 0.875rem;
             --ips-btn-fw: 500;
             --ips-btn-fw-strong: 600;
-            --ips-btn-radius: 8px;
+            --ips-btn-radius: 10px;
             /* Form controls (main) — dense pages override with more specific selectors */
             --ips-ctrl-fs: 0.875rem;
             --ips-ctrl-lh: 1.32;
-            --ips-ctrl-radius: 8px;
-            --ips-ctrl-pad-y: 0.24rem;
-            --ips-ctrl-pad-x: 0.5rem;
-            --ips-ctrl-h: 2rem;
-            --ips-ctrl-border: rgba(120, 150, 200, 0.35);
-            --ips-ctrl-bg: #122F52;
+            --ips-ctrl-radius: 10px;
+            --ips-ctrl-pad-y: 0.45rem;
+            --ips-ctrl-pad-x: 0.7rem;
+            --ips-ctrl-h: 2.75rem;
+            --ips-ctrl-border: #e2e8f0;
+            --ips-ctrl-bg: #ffffff;
             --ips-ctrl-fg: var(--ips-text);
-            --ips-ctrl-ph: rgba(159, 176, 199, 0.8);
-            --ips-label-fs: 0.76rem;
+            --ips-ctrl-ph: #94a3b8;
+            --ips-label-fs: 0.82rem;
             --ips-label-color: var(--ips-text-muted);
             --ips-widget-gap: 0.28rem;
         }
@@ -200,15 +199,15 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
             font-weight: var(--ips-btn-fw-strong) !important;
             color: #fff !important;
-            background: linear-gradient(180deg, #b91c1c 0%, #991b1b 100%) !important;
-            border: 1px solid rgba(248, 113, 113, 0.55) !important;
-            box-shadow: 0 10px 20px rgba(153, 27, 27, 0.22) !important;
+            background: #2563eb !important;
+            border: 1px solid #2563eb !important;
+            box-shadow: none !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="primary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="primary"]:hover {
-            background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%) !important;
-            border-color: rgba(252, 165, 165, 0.6) !important;
+            background: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"],
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
