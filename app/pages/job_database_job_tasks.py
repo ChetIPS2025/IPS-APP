@@ -283,27 +283,32 @@ def render_job_tasks_tab(
                 st.caption("Fallback: run **`sql/051_job_task_photos.sql`** / **`sql/052_job_task_photos_capture_meta.sql`**.")
 
     if can_edit_tasks:
-        st.markdown("##### Add task")
-        a1, a2, a3 = st.columns(3, gap="small")
-        with a1:
-            tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
-            hn = st.text_input("Hazard #", key=f"jdt_add_hn_{job_id}")
-        with a2:
-            pr = st.selectbox(
-                "Priority",
-                ("low", "normal", "high", "critical"),
-                index=1,
-                format_func=lambda x: x.title(),
-                key=f"jdt_add_pr_{job_id}",
+        with st.container(border=True):
+            st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
+            st.markdown("##### Add task")
+            left, right = st.columns(2, gap="small")
+            with left:
+                tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
+                hn = st.text_input("Hazard #", key=f"jdt_add_hn_{job_id}")
+                loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
+            with right:
+                pr = st.selectbox(
+                    "Priority",
+                    ("low", "normal", "high", "critical"),
+                    index=1,
+                    format_func=lambda x: x.title(),
+                    key=f"jdt_add_pr_{job_id}",
+                )
+                pl = st.date_input("Planned date", value=date.today(), key=f"jdt_add_pl_{job_id}")
+                iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
+            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
+            add_task_clicked = st.button(
+                "Add task",
+                type="primary",
+                key=f"jdt_add_btn_{job_id}",
+                use_container_width=True,
             )
-            pl = st.date_input("Planned date", value=date.today(), key=f"jdt_add_pl_{job_id}")
-        with a3:
-            st.caption(" ")
-            st.caption(" ")
-        loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
-        iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
-        act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
-        if st.button("Add task", type="primary", key=f"jdt_add_btn_{job_id}"):
+        if add_task_clicked:
             if not str(iss or "").strip():
                 st.error("Enter an issue description.")
             else:
