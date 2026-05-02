@@ -264,7 +264,7 @@ def _inject_sidebar_nav_css() -> None:
 <style>
 /* Primary: section titles */
 section[data-testid="stSidebar"] .ips-nav-section-title {
-  color: #FFFFFF;
+  color: #0f172a;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -276,15 +276,15 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 16px !important;
   padding-top: 14px !important;
-  border-top: 1px solid rgba(110, 145, 190, 0.22);
+  border-top: 1px solid #e2e8f0;
 }
 /* Divider + air gap: primary vs TOOLS */
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   margin: 28px 0 14px 0;
   padding: 0;
   border: none;
-  border-top: 1px solid rgba(110, 145, 190, 0.22);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  border-top: 1px solid #e2e8f0;
+  box-shadow: none;
   opacity: 1;
 }
 /* Primary nav buttons — align with main IPS button rhythm (height, radius, no wrap) */
@@ -310,7 +310,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.35rem 0.65rem !important;
   border-radius: 8px !important;
   margin-left: 2px !important;
-  border-left: 3px solid rgba(110, 145, 190, 0.26) !important;
+  border-left: 3px solid #e2e8f0 !important;
   padding-left: 10px !important;
   box-sizing: border-box !important;
 }
@@ -318,26 +318,26 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   border-left-color: #60a5fa !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"] {
-  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;
-  color: #f8fafc !important;
-  border: 1px solid #3b82f6 !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid #2563eb !important;
   box-shadow: inset 3px 0 0 0 #60a5fa !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"] {
-  background: #14365C !important;
-  color: #C0CAD8 !important;
-  border: 1px solid rgba(120, 150, 200, 0.25) !important;
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
 }
 section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-  border-color: rgba(120, 150, 200, 0.35) !important;
-  color: #FFFFFF !important;
-  background: #1A3F6B !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  background: #e2e8f0 !important;
 }
 /* TOOLS expander: muted label + chrome */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid rgba(110, 145, 190, 0.22) !important;
+  border: 1px solid #e2e8f0 !important;
   border-radius: 6px !important;
-  background: rgba(18, 47, 82, 0.35) !important;
+  background: #ffffff !important;
   margin-top: 2px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -345,7 +345,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
-  color: rgba(159, 176, 199, 0.9) !important;
+  color: #475569 !important;
   opacity: 0.88 !important;
   padding: 8px 10px !important;
 }
@@ -360,14 +360,14 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   padding: 0.28rem 0.6rem !important;
   border-radius: 8px !important;
   opacity: 0.92 !important;
-  color: rgba(192, 202, 216, 0.92) !important;
-  background: rgba(18, 47, 82, 0.45) !important;
-  border: 1px solid rgba(140, 175, 220, 0.22) !important;
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover {
-  color: #FFFFFF !important;
-  border-color: rgba(170, 205, 240, 0.35) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
   opacity: 1 !important;
 }
 /* Active tool: same treatment as primary nav buttons */
@@ -378,16 +378,16 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   padding: 0.35rem 0.75rem !important;
   border-radius: 8px !important;
   opacity: 1 !important;
-  color: #f8fafc !important;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;
-  border: 1px solid #3b82f6 !important;
+  color: #ffffff !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
   box-shadow: inset 3px 0 0 0 #60a5fa !important;
 }
 section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
 }
 section[data-testid="stSidebar"] .ips-install-section-title {
-  color: #FFFFFF;
+  color: #0f172a;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;

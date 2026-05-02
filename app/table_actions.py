@@ -141,7 +141,7 @@ def _migrate_legacy_selection_for_table(table_key: str) -> None:
 
 def inject_table_action_styles() -> None:
     """
-    IPS dark-theme chrome for (1) table selection action bars and (2) list-page top toolbars.
+    IPS light-theme chrome for (1) table selection action bars and (2) list-page top toolbars.
 
     Pages mark toolbars with ``.ips-list-top-anchor`` inside ``st.container(border=True)``.
     Action bars use ``.ips-ta-bar-anchor`` (injected by :func:`render_table_action_bar`).
@@ -156,8 +156,8 @@ def inject_table_action_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(15, 23, 42, 0.55) !important;
-            border-color: rgba(100, 116, 139, 0.4) !important;
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor)
@@ -205,8 +205,8 @@ def inject_table_action_styles() -> None:
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
             margin-top: 2px !important;
-            background: rgba(15, 23, 42, 0.72) !important;
-            border-color: rgba(100, 116, 139, 0.42) !important;
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
             border-radius: 10px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ta-bar-anchor)
@@ -244,18 +244,18 @@ def inject_table_action_styles() -> None:
         .ips-table-actions-bar {
             padding: 10px 12px;
             margin-bottom: 10px;
-            background: rgba(15, 23, 42, 0.78);
-            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 8px;
         }
         .ips-ta-summary {
-            color: #94a3b8;
+            color: #475569;
             font-size: 12px;
             font-weight: 500;
             letter-spacing: 0.02em;
         }
         .ips-ta-summary .ips-ta-num {
-            color: #e2e8f0;
+            color: #0f172a;
             font-weight: 600;
         }
 
@@ -285,9 +285,9 @@ def inject_table_action_styles() -> None:
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor:not(.ips-est-approve-done))
             .stButton > button:disabled {
-            background: rgba(30, 41, 59, 0.45) !important;
-            border: 1px solid rgba(71, 85, 105, 0.42) !important;
-            color: #94a3b8 !important;
+            background: #f1f5f9 !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #64748b !important;
             opacity: 1 !important;
         }
         </style>

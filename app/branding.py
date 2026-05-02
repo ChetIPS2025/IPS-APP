@@ -23,15 +23,15 @@ def apply_branding() -> None:
         """
         <style>
         body {
-            background-color: #0F2A4A;
+            background-color: #f5f7fa;
         }
         .stApp {
-            /* IPS SaaS shell: softer blues + subtle vertical gradient */
-            background: linear-gradient(180deg, #0F2A4A 0%, #0C2345 100%);
+            background: #f5f7fa;
         }
 
         section[data-testid="stSidebar"] {
-            background: #102A4A;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
         }
 
         .ips-topbar {
@@ -47,7 +47,7 @@ def apply_branding() -> None:
         }
 
         .ips-page-title {
-            color: #FFFFFF;
+            color: #0f172a;
             font-size: 1.45rem;
             font-weight: 750;
             letter-spacing: -0.02em;
@@ -56,14 +56,14 @@ def apply_branding() -> None:
         }
 
         .ips-page-subtitle {
-            color: #C0CAD8;
+            color: #475569;
             font-size: 0.8125rem;
             margin-bottom: 0.45rem;
             line-height: 1.45;
         }
 
         .ips-page-help {
-            color: #9FB0C7;
+            color: #475569;
             font-size: 0.8125rem;
             line-height: 1.45;
             margin: 0 0 0.55rem 0;

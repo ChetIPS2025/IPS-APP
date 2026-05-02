@@ -68,6 +68,17 @@ _REVIEW_LABELS: dict[str, str] = {
     "waiting_on_customer": "Waiting on customer",
 }
 
+_STATUS_BADGE_CLASS: dict[str, str] = {
+    "complete": "is-complete",
+    "in_progress": "is-progress",
+    "partial": "is-progress",
+    "blocked": "is-blocked",
+    "not_started": "is-not-started",
+    "open": "is-not-started",
+    "electrical": "is-electrical",
+    "waiting_on_customer": "is-blocked",
+}
+
 _DELAY_REASONS = (
     "none",
     "material",
@@ -90,10 +101,57 @@ def inject_mobile_field_css() -> None:
         .block-container { padding-top: 0.75rem !important; }
         button[kind="secondary"] { min-height: 2.55rem; }
         button[kind="primary"] { min-height: 2.85rem; }
+        .ips-task-status-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.5rem;
+            padding: 0.16rem 0.55rem;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .ips-task-status-badge.is-complete {
+            background: #dcfce7;
+            border-color: #86efac;
+            color: #166534;
+        }
+        .ips-task-status-badge.is-progress {
+            background: #ffedd5;
+            border-color: #fdba74;
+            color: #9a3412;
+        }
+        .ips-task-status-badge.is-blocked {
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #991b1b;
+        }
+        .ips-task-status-badge.is-not-started {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #475569;
+        }
+        .ips-task-status-badge.is-electrical {
+            background: #f3e8ff;
+            border-color: #d8b4fe;
+            color: #6b21a8;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def _status_badge_html(status_slug: str) -> str:
+    import html
+
+    slug = str(status_slug or "not_started").strip().lower()
+    label = _DETAIL_STATUS_LABELS.get(slug, slug.replace("_", " ").title() or "Not Started")
+    klass = _STATUS_BADGE_CLASS.get(slug, "is-not-started")
+    return f'<span class="ips-task-status-badge {klass}">{html.escape(label)}</span>'
 
 
 def _thumb(path: str, *, key: str, width: int = 200) -> None:
@@ -150,10 +208,7 @@ def render_mobile_task_detail_form(
         cur_st = str(task_row.get("status") or "not_started").strip().lower()
         if cur_st == "open":
             cur_st = "not_started"
-        st.caption(
-            "**Current status:** "
-            f"{_DETAIL_STATUS_LABELS.get(cur_st, cur_st.replace('_', ' ').title())}"
-        )
+        st.markdown(f"**Current status:** {_status_badge_html(cur_st)}", unsafe_allow_html=True)
         loc = str(task_row.get("location") or "").strip()
         if loc:
             st.caption(f"**Location:** {loc}")

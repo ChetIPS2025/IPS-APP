@@ -30,23 +30,23 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-lg: 0.9rem;
             --ips-radius: 8px;
             --ips-radius-lg: 10px;
-            /* IPS palette (high-end industrial SaaS) */
-            --ips-bg-main: #0F2A4A;
-            --ips-bg-secondary: #122F52; /* card / section */
-            --ips-bg-card: #14365C;      /* alternate sections */
-            --ips-bg-sidebar: #102A4A;
-            --ips-bg-hover: #1A3F6B;
+            /* IPS field palette: clean light surfaces for tablet readability */
+            --ips-bg-main: #f5f7fa;
+            --ips-bg-secondary: #ffffff; /* card / section */
+            --ips-bg-card: #ffffff;      /* alternate sections */
+            --ips-bg-sidebar: #ffffff;
+            --ips-bg-hover: #f1f5f9;
 
-            --ips-text: #FFFFFF;
-            --ips-text-secondary: #C0CAD8;
-            --ips-text-muted: #9FB0C7;
+            --ips-text: #0f172a;
+            --ips-text-secondary: #475569;
+            --ips-text-muted: #64748b;
 
-            --ips-border: rgba(120, 150, 200, 0.25);
-            --ips-border-strong: rgba(120, 150, 200, 0.35);
-            --ips-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
-            --ips-surface: rgba(18, 47, 82, 0.88);
+            --ips-border: #e2e8f0;
+            --ips-border-strong: #cbd5e1;
+            --ips-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+            --ips-surface: #ffffff;
             /* Button system (main content) — dense pages override with more specific rules */
-            --ips-btn-height: 2.125rem;
+            --ips-btn-height: 2.75rem;
             --ips-btn-pad-y: 0.625rem;
             --ips-btn-pad-x: 1rem;
             --ips-btn-fs: 0.875rem;
@@ -57,13 +57,13 @@ def inject_ips_app_shell_styles() -> None:
             --ips-ctrl-fs: 0.875rem;
             --ips-ctrl-lh: 1.32;
             --ips-ctrl-radius: 8px;
-            --ips-ctrl-pad-y: 0.24rem;
-            --ips-ctrl-pad-x: 0.5rem;
-            --ips-ctrl-h: 2rem;
-            --ips-ctrl-border: rgba(120, 150, 200, 0.35);
-            --ips-ctrl-bg: #122F52;
+            --ips-ctrl-pad-y: 0.5rem;
+            --ips-ctrl-pad-x: 0.75rem;
+            --ips-ctrl-h: 2.65rem;
+            --ips-ctrl-border: #e2e8f0;
+            --ips-ctrl-bg: #ffffff;
             --ips-ctrl-fg: var(--ips-text);
-            --ips-ctrl-ph: rgba(159, 176, 199, 0.8);
+            --ips-ctrl-ph: #94a3b8;
             --ips-label-fs: 0.76rem;
             --ips-label-color: var(--ips-text-muted);
             --ips-widget-gap: 0.28rem;
@@ -71,7 +71,7 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- App background + default text ----- */
         section[data-testid="stMain"] {
-            background: transparent !important;
+            background: var(--ips-bg-main) !important;
             color: var(--ips-text) !important;
         }
         section[data-testid="stMain"] .stMarkdown,
@@ -127,7 +127,7 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Tabs (Materials / Labor / Estimate editor tabs) ----- */
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {
             gap: 0.25rem !important;
-            border-bottom: 1px solid rgba(51, 65, 85, 0.65) !important;
+            border-bottom: 1px solid var(--ips-border) !important;
             padding-bottom: 2px !important;
         }
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tab"] {
@@ -136,13 +136,13 @@ def inject_ips_app_shell_styles() -> None:
             font-size: 0.875rem !important;
             font-weight: 500 !important;
             min-height: 2.2rem !important;
-            color: #94a3b8 !important;
+            color: var(--ips-text-secondary) !important;
         }
         section[data-testid="stMain"] [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
-            color: #f1f5f9 !important;
+            color: var(--ips-text) !important;
             font-weight: 600 !important;
-            background: rgba(30, 41, 59, 0.65) !important;
-            border: 1px solid rgba(100, 116, 139, 0.45) !important;
+            background: #ffffff !important;
+            border: 1px solid var(--ips-border) !important;
             border-bottom-color: transparent !important;
         }
 
@@ -151,7 +151,7 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid var(--ips-border) !important;
             border-radius: var(--ips-radius-lg) !important;
             background: var(--ips-bg-card) !important;
-            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
+            box-shadow: var(--ips-shadow) !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] summary {
             font-weight: 600 !important;
@@ -199,31 +199,31 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
             font-weight: var(--ips-btn-fw-strong) !important;
-            color: #fff !important;
-            background: linear-gradient(180deg, #b91c1c 0%, #991b1b 100%) !important;
-            border: 1px solid rgba(248, 113, 113, 0.55) !important;
-            box-shadow: 0 10px 20px rgba(153, 27, 27, 0.22) !important;
+            color: #ffffff !important;
+            background: #2563eb !important;
+            border: 1px solid #2563eb !important;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.18) !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="primary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="primary"]:hover {
-            background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%) !important;
-            border-color: rgba(252, 165, 165, 0.6) !important;
+            background: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"],
         section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="secondary"],
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
-            color: var(--ips-text-secondary) !important;
-            border-color: rgba(120, 150, 200, 0.25) !important;
-            background: #14365C !important;
+            color: var(--ips-text) !important;
+            border-color: var(--ips-border) !important;
+            background: #f1f5f9 !important;
             font-weight: var(--ips-btn-fw) !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
-            background: #1E4A7D !important;
-            border-color: rgba(120, 150, 200, 0.35) !important;
-            color: #fff !important;
+            background: #e2e8f0 !important;
+            border-color: #cbd5e1 !important;
+            color: var(--ips-text) !important;
         }
         section[data-testid="stMain"] .stLinkButton > a {
             border-radius: var(--ips-btn-radius) !important;
@@ -400,11 +400,11 @@ def inject_ips_app_shell_styles() -> None:
         }
 
         section[data-testid="stMain"] .stMetric {
-            background: rgba(20, 54, 92, 0.62);
+            background: #ffffff;
             border: 1px solid var(--ips-border);
             border-radius: var(--ips-radius-lg);
             padding: 0.55rem 0.65rem !important;
-            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+            box-shadow: var(--ips-shadow);
         }
         section[data-testid="stMain"] [data-testid="stMetricLabel"] {
             font-size: 0.72rem !important;
@@ -417,7 +417,7 @@ def inject_ips_app_shell_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 8px !important;
-            background: rgba(20, 54, 92, 0.55) !important;
+            background: #ffffff !important;
             border-color: var(--ips-border) !important;
         }
 
@@ -425,17 +425,17 @@ def inject_ips_app_shell_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
             padding: 6px 8px 8px 8px !important;
             margin-bottom: 0.45rem !important;
-            background: rgba(20, 54, 92, 0.55) !important;
+            background: #ffffff !important;
             border-color: var(--ips-border) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
-            background: rgba(248, 250, 252, 0.04) !important;
-            border-color: rgba(148, 163, 184, 0.35) !important;
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
             padding: 10px 12px 12px 12px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) .stMarkdown p,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) [data-testid="stCaptionContainer"] {
-            color: #cbd5e1 !important;
+            color: #475569 !important;
         }
 
         /* Destructive / danger (Streamlit tertiary) */
@@ -445,9 +445,9 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[data-testid="baseButton-tertiary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[kind="tertiary"],
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button[data-testid="baseButton-tertiary"] {
-            color: #fecaca !important;
-            border-color: rgba(248, 113, 113, 0.45) !important;
-            background: rgba(127, 29, 29, 0.22) !important;
+            color: #991b1b !important;
+            border-color: #fecaca !important;
+            background: #fee2e2 !important;
             font-weight: var(--ips-btn-fw) !important;
         }
         </style>
