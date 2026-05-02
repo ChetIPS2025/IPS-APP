@@ -246,6 +246,10 @@ def _inject_job_database_responsive_styles() -> None:
             overflow: visible !important;
             text-overflow: clip !important;
             font-size: 0.9rem !important;
+            color: #0f172a !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [role="tab"]:not([aria-selected="true"]) p {
+            color: #475569 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) input,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) textarea,

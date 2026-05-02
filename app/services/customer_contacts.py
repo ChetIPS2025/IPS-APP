@@ -118,7 +118,7 @@ _CONTACT_PICKER_STYLE_KEY = "ips_contact_picker_styles_injected"
 
 
 def inject_contact_picker_styles() -> None:
-    """IPS dark-theme polish for contact preview + quick-add (Estimates / Jobs)."""
+    """IPS light-theme polish for contact preview + quick-add (Estimates / Jobs)."""
     if st.session_state.get(_CONTACT_PICKER_STYLE_KEY):
         return
     st.session_state[_CONTACT_PICKER_STYLE_KEY] = True
@@ -126,15 +126,15 @@ def inject_contact_picker_styles() -> None:
         """
         <style>
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-contact-quick-add) {
-            background: rgba(15, 23, 42, 0.55) !important;
-            border: 1px solid rgba(100, 116, 139, 0.42) !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
             border-radius: 10px !important;
             padding: 10px 12px 12px 12px !important;
             margin-top: 6px !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
         .ips-contact-quick-add-title {
-            color: #e2e8f0 !important;
+            color: #0f172a !important;
             font-size: 0.82rem !important;
             font-weight: 650 !important;
             margin: 0 0 6px 0 !important;
@@ -144,23 +144,23 @@ def inject_contact_picker_styles() -> None:
             margin-top: 6px;
             padding: 8px 10px;
             border-radius: 8px;
-            border: 1px solid rgba(71, 85, 105, 0.55);
-            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
         }
         .ips-contact-preview .ips-cp-name {
-            color: #f1f5f9;
+            color: #0f172a;
             font-size: 0.88rem;
             font-weight: 600;
             margin: 0 0 4px 0;
         }
         .ips-contact-preview .ips-cp-role {
-            color: #cbd5e1;
+            color: #475569;
             font-size: 0.8rem;
             font-weight: 500;
             margin: 0 0 6px 0;
         }
         .ips-contact-preview .ips-cp-line {
-            color: #94a3b8;
+            color: #475569;
             font-size: 0.78rem;
             line-height: 1.45;
             margin: 0;

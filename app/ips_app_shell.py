@@ -182,11 +182,11 @@ def inject_ips_app_shell_styles() -> None:
             padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
-            white-space: nowrap !important;
+            white-space: normal !important;
         }
         section[data-testid="stMain"] .stButton > button p,
         section[data-testid="stMain"] [data-testid="stDownloadButton"] button p {
-            white-space: nowrap !important;
+            white-space: normal !important;
             overflow: visible !important;
             text-overflow: clip !important;
             margin: 0 !important;
@@ -249,10 +249,10 @@ def inject_ips_app_shell_styles() -> None:
             padding: 10px 16px !important;
             line-height: 1.25 !important;
             box-sizing: border-box !important;
-            white-space: nowrap !important;
+            white-space: normal !important;
         }
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button p {
-            white-space: nowrap !important;
+            white-space: normal !important;
             overflow: visible !important;
             text-overflow: clip !important;
             margin: 0 !important;
