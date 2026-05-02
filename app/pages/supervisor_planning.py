@@ -314,7 +314,7 @@ def _render_package_task_row(
 def render_pm() -> None:
     render_header(
         "Assign Tasks (PM)",
-        subtitle="Create a **Daily Work Package**: job, date, supervisor, tasks in order, and PM notes.",
+        subtitle="**PM assigns what work gets done** — build a daily work package: job, date, field lead, tasks in order, and PM notes.",
     )
     _inject_field_touch_css()
     _mob.inject_mobile_field_css()
@@ -427,7 +427,7 @@ def render_pm() -> None:
 def render_supervisor() -> None:
     render_header(
         "Work & Plan (Supervisor)",
-        subtitle="Your **Daily Work Package** for the selected day: plan the shift, execute tasks, submit end-of-day.",
+        subtitle="**Supervisor** plans the shift, **updates tasks**, **uploads photos**, and **submits the end-of-day review** — all here.",
     )
     _inject_field_touch_css()
     _mob.inject_mobile_field_css()

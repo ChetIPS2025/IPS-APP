@@ -1,4 +1,4 @@
-"""Job detail tabs: Tasks, Daily Plan, Daily Review, Photos, Cost — task-first workflow."""
+"""Job detail tabs: Tasks, Daily Plan, Photos, Cost — task-first workflow (field review in Work & Plan)."""
 
 from __future__ import annotations
 
@@ -40,11 +40,6 @@ except ImportError:
     )
 
 try:
-    from app.services.supervisor_planning import TASK_STATUSES, delay_reason_label
-except ImportError:
-    from services.supervisor_planning import TASK_STATUSES, delay_reason_label  # type: ignore
-
-try:
     from app.services import task_photos as _tp_svc
 except ImportError:
     import services.task_photos as _tp_svc  # type: ignore
@@ -74,7 +69,7 @@ try:
 except ImportError:
     from utils.formatters import job_display_label as _job_display_label  # type: ignore
 
-# Review / end-of-day status choices (subset of TASK_STATUSES; labels for field UI)
+# Task status labels for badges / pickers
 _REVIEW_STATUS_LABELS: dict[str, str] = {
     "complete": "Complete",
     "partial": "Partial",
@@ -84,30 +79,6 @@ _REVIEW_STATUS_LABELS: dict[str, str] = {
     "electrical": "Electrical / other trade",
     "waiting_on_customer": "Waiting on customer",
 }
-
-
-_JDR_REVIEW_SLUGS: tuple[str, ...] = (
-    "complete",
-    "partial",
-    "blocked",
-    "not_started",
-    "duplicate",
-    "electrical",
-    "waiting_on_customer",
-)
-
-_JDR_DELAY_REASONS: tuple[str, ...] = (
-    "none",
-    "material",
-    "tools",
-    "direction",
-    "rework",
-    "customer",
-    "safety",
-    "equipment",
-    "weather",
-    "other",
-)
 
 
 def _task_status_display(slug: str) -> str:
@@ -197,20 +168,6 @@ def _fetch_plans_for_job(job_id: str, *, admin: bool) -> list[dict[str, Any]]:
         return []
 
 
-def _fetch_reviews_for_tasks(task_ids: list[str], *, admin: bool) -> list[dict[str, Any]]:
-    if not task_ids:
-        return []
-    fn = fetch_by_match_admin if admin else fetch_by_match
-    out: list[dict[str, Any]] = []
-    # fetch_by_match single eq — batch by task in loop (small N per job)
-    for tid in task_ids[:400]:
-        try:
-            out.extend(fn("job_task_daily_reviews", {"task_id": tid}, limit=120) or [])
-        except Exception:
-            continue
-    return out
-
-
 def _fetch_work_plan(job_id: str, work_date: str, *, admin: bool) -> dict[str, Any] | None:
     fn = fetch_by_match_admin if admin else fetch_by_match
     try:
@@ -238,7 +195,10 @@ def render_job_tasks_tab(
     admin_read: bool,
 ) -> None:
     inject_field_light_theme()
-    st.caption("Jobs are containers — break work into **tasks**. Mobile-first: pick a task, then update status and photos.")
+    st.caption(
+        "Jobs are containers — break work into **tasks**. "
+        "Supervisors run status, photos, and end-of-day review in **Work & Plan (Supervisor)** (no separate report page)."
+    )
     rows = _fetch_tasks(job_id, admin=admin_read)
     today_iso = date.today().isoformat()[:10]
 
@@ -439,7 +399,10 @@ def render_job_daily_plan_tab(
     can_edit_tasks: bool,
     admin_read: bool,
 ) -> None:
-    st.caption("Pick **today’s tasks**, assign the lead supervisor, and capture shift context.")
+    st.caption(
+        "Pick **today’s tasks**, assign the lead supervisor, and capture shift context. "
+        "Supervisors execute and close the day in **Work & Plan (Supervisor)** — one screen."
+    )
     wdate = st.date_input("Work date", value=date.today(), key=f"jdp_date_{job_id}")
     w_iso = wdate.isoformat()[:10]
     rows = _fetch_tasks(job_id, admin=admin_read)
@@ -522,209 +485,9 @@ def render_job_daily_plan_tab(
             st.error(str(exc))
 
 
-def render_job_daily_review_tab(
-    *,
-    job_id: str,
-    can_edit_tasks: bool,
-    admin_read: bool,
-) -> None:
-    inject_field_light_theme()
-    _mob.inject_mobile_field_css()
-    st.caption(
-        "Shows tasks **on the daily plan** for the review date or tasks with **planned date** set to that day. "
-        "Submit once at the bottom."
-    )
-    rdate = st.date_input("Review date", value=date.today(), key=f"jdr_date_{job_id}")
-    r_iso = rdate.isoformat()[:10]
-    rows = _fetch_tasks(job_id, admin=admin_read)
-    plans = _fetch_plans_for_job(job_id, admin=admin_read)
-    planned_today = {
-        str(p.get("task_id"))
-        for p in plans
-        if isinstance(p, dict) and str(p.get("work_date") or "")[:10] == r_iso
-    }
-    task_ids = [str(t.get("id") or "") for t in rows if str(t.get("id") or "").strip()]
-    all_reviews = _fetch_reviews_for_tasks(task_ids, admin=admin_read)
-    rev_by_task: dict[str, dict[str, Any]] = {}
-    for rv in all_reviews:
-        if not isinstance(rv, dict):
-            continue
-        if str(rv.get("review_date") or "")[:10] != r_iso:
-            continue
-        tid = str(rv.get("task_id") or "").strip()
-        if tid:
-            rev_by_task[tid] = rv
-
-    candidates: list[dict[str, Any]] = []
-    for t in rows:
-        if not isinstance(t, dict):
-            continue
-        tid = str(t.get("id") or "").strip()
-        if not tid:
-            continue
-        if tid in planned_today or str(t.get("planned_date") or "")[:10] == r_iso:
-            candidates.append(t)
-    candidates.sort(key=lambda x: str(x.get("task_number") or ""))
-
-    if not candidates:
-        st.info("No tasks planned for this date. Use **Daily Plan** or set the task **planned date**.")
-        return
-
-    ins, upd, _ = _wrow(admin_read)
-    jk = re.sub(r"[^a-z0-9]+", "", str(job_id).lower())[:12]
-
-    try:
-        _tph.render_daily_review_progress_strip(
-            job_id=str(job_id),
-            review_date=r_iso,
-            can_edit=can_edit_tasks,
-            admin_read=admin_read,
-        )
-    except Exception as exc:
-        st.caption(f"Shift photos unavailable ({exc}).")
-
-    with st.form(f"jdr_batch_{job_id}_{r_iso}"):
-        st.text_input(
-            "Supervisor sign-off (name)",
-            key=f"jdrf_sup_{jk}_{r_iso}",
-            placeholder="Required to submit",
-            disabled=not can_edit_tasks,
-        )
-        for t in candidates:
-            tid = str(t.get("id") or "").strip()
-            if not tid:
-                continue
-            prior = rev_by_task.get(tid) or {}
-            iss = str(t.get("issue") or "").strip()
-            snip = (iss[:56] + "…") if len(iss) > 56 else iss
-            with st.container(border=True):
-                st.markdown(f"**{t.get('task_number') or '—'}** · _{snip or '—'}_")
-                cur_st = str(prior.get("status_after") or t.get("status") or "not_started").strip().lower()
-                if cur_st not in _JDR_REVIEW_SLUGS:
-                    cur_st = "not_started"
-                st.selectbox(
-                    "Status",
-                    list(_JDR_REVIEW_SLUGS),
-                    index=list(_JDR_REVIEW_SLUGS).index(cur_st),
-                    format_func=lambda s: _REVIEW_STATUS_LABELS.get(s, s),
-                    key=f"jdrf_st_{jk}_{tid}_{r_iso}",
-                    disabled=not can_edit_tasks,
-                )
-                c1, c2 = st.columns(2, gap="small")
-                with c1:
-                    st.caption("📷 Take Photo (after)")
-                    st.camera_input("a", key=f"jdrf_cam_{jk}_{tid}_{r_iso}", label_visibility="collapsed", disabled=not can_edit_tasks)
-                with c2:
-                    st.caption("⬆ Upload (after)")
-                    st.file_uploader(
-                        "u",
-                        type=["jpg", "jpeg", "png", "webp"],
-                        key=f"jdrf_up_{jk}_{tid}_{r_iso}",
-                        label_visibility="collapsed",
-                        disabled=not can_edit_tasks,
-                    )
-                dr_cur = str(prior.get("delay_reason") or "none").strip().lower()
-                dr_ix = _JDR_DELAY_REASONS.index(dr_cur) if dr_cur in _JDR_DELAY_REASONS else 0
-                st.selectbox(
-                    "Delay reason",
-                    list(_JDR_DELAY_REASONS),
-                    index=dr_ix,
-                    format_func=delay_reason_label,
-                    key=f"jdrf_dr_{jk}_{tid}_{r_iso}",
-                    disabled=not can_edit_tasks,
-                )
-                st.text_area(
-                    "Notes",
-                    value=str(prior.get("notes") or ""),
-                    height=56,
-                    key=f"jdrf_nt_{jk}_{tid}_{r_iso}",
-                    disabled=not can_edit_tasks,
-                )
-        submitted = st.form_submit_button(
-            "Submit Daily Review",
-            type="primary",
-            use_container_width=True,
-            disabled=not can_edit_tasks,
-        )
-
-    if submitted and can_edit_tasks:
-        supv = str(st.session_state.get(f"jdrf_sup_{jk}_{r_iso}") or "").strip()
-        if not supv:
-            st.error("Supervisor sign-off is required.")
-            st.stop()
-        supv = " ".join(supv.split())[:200]
-        try:
-            for t in candidates:
-                tid = str(t.get("id") or "").strip()
-                if not tid:
-                    continue
-                prior = rev_by_task.get(tid) or {}
-                ns_raw = st.session_state.get(f"jdrf_st_{jk}_{tid}_{r_iso}")
-                ns = str(ns_raw or "not_started").strip().lower()
-                cam_raw = st.session_state.get(f"jdrf_cam_{jk}_{tid}_{r_iso}")
-                up_raw = st.session_state.get(f"jdrf_up_{jk}_{tid}_{r_iso}")
-                pending: bytes | None = None
-                fn = "after.jpg"
-                if cam_raw is not None and hasattr(cam_raw, "getvalue"):
-                    pending = cam_raw.getvalue()
-                    fn = "camera.jpg"
-                elif up_raw is not None and hasattr(up_raw, "getvalue"):
-                    pending = up_raw.getvalue()
-                    fn = str(getattr(up_raw, "name", "") or "after.jpg")
-                if ns == "complete" and not _tph.task_has_after_for_validation(
-                    task_id=tid,
-                    task_row=t,
-                    prior_review=prior,
-                    pending_upload_bytes=pending,
-                    admin_read=admin_read,
-                ):
-                    st.error(f"Task {t.get('task_number') or tid}: After photo required to complete task.")
-                    st.stop()
-                photo_path = str(prior.get("after_photo_url") or "").strip()
-                if pending:
-                    photo_path = _tph.save_review_after_photo(
-                        task_id=tid,
-                        review_date=r_iso,
-                        raw=pending,
-                        fname=fn,
-                        admin_read=admin_read,
-                    )
-                delay = str(st.session_state.get(f"jdrf_dr_{jk}_{tid}_{r_iso}") or "none").strip().lower()
-                notes = str(st.session_state.get(f"jdrf_nt_{jk}_{tid}_{r_iso}") or "").strip()[:4000]
-                payload_rev = {
-                    "supervisor_name": supv,
-                    "status_after": ns,
-                    "delay_reason": delay,
-                    "notes": notes,
-                    "after_photo_url": photo_path[:2000],
-                }
-                if prior:
-                    upd("job_task_daily_reviews", payload_rev, {"task_id": tid, "review_date": r_iso})
-                else:
-                    ins(
-                        "job_task_daily_reviews",
-                        {"task_id": tid, "review_date": r_iso, **payload_rev},
-                    )
-                task_upd: dict[str, Any] = {
-                    "status": ns,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-                if ns == "complete":
-                    task_upd["completed_date"] = r_iso
-                else:
-                    task_upd["completed_date"] = None
-                if photo_path:
-                    task_upd["after_photo_url"] = photo_path[:2000]
-                upd("job_tasks", task_upd, {"id": tid})
-            st.success("Daily review saved.")
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
-
-
 def render_job_photos_tab(*, job_id: str, admin_read: bool) -> None:
     rows = _fetch_tasks(job_id, admin=admin_read)
-    st.caption("Before / after / progress from **Tasks** and **Daily Review** (stored in Supabase).")
+    st.caption("Before / after / progress from **Tasks** and **Work & Plan (Supervisor)** (stored in Supabase).")
     by_tid: dict[str, list[dict[str, Any]]] = {}
     for t in rows:
         if not isinstance(t, dict):
@@ -793,7 +556,7 @@ def render_job_photos_tab(*, job_id: str, admin_read: bool) -> None:
         if b or a or prog:
             tiles.append((t, b, a, prog))
     if not tiles:
-        st.info("No task photos yet. Use **Tasks** (before / progress / after) or **Daily Review**.")
+        st.info("No task photos yet. Use **Tasks** (before / progress / after) or **Work & Plan (Supervisor)**.")
         return
     for t, b, a, prog in tiles[:50]:
         label = f"{t.get('task_number') or '—'} / {t.get('hazard_number') or '—'}"

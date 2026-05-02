@@ -26,19 +26,6 @@ except ImportError:
     from ui import IPS_NAV_PENDING_KEY, role_can_open_page  # type: ignore
 
 try:
-    from app.services.supervisor_daily_reports import (
-        dashboard_daily_report_snapshot,
-        fetch_all_reports_since,
-        labor_hours_actual_by_job,
-    )
-except ImportError:
-    from services.supervisor_daily_reports import (  # type: ignore
-        dashboard_daily_report_snapshot,
-        fetch_all_reports_since,
-        labor_hours_actual_by_job,
-    )
-
-try:
     from app.services import task_photos as _dash_task_photos
 except ImportError:
     import services.task_photos as _dash_task_photos  # type: ignore
@@ -687,70 +674,6 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                         st.rerun()
 
 
-def _render_supervisor_daily_reports_dashboard(
-    *,
-    today: date,
-    jobs: list[dict],
-    estimates: list[dict],
-    session_key: str,
-    use_admin: bool,
-) -> None:
-    """Supervisor daily report KPIs (requires ``sql/045_supervisor_daily_reports.sql``)."""
-    try:
-        since = today - timedelta(days=14)
-        reports_recent = fetch_all_reports_since(since, admin=use_admin, limit=4000)
-    except Exception:
-        reports_recent = []
-    t_iso = today.isoformat()[:10]
-    reports_today = [r for r in reports_recent if isinstance(r, dict) and str(r.get("report_date") or "")[:10] == t_iso]
-    try:
-        te_rows = fetch_table_for_session(
-            "time_entries",
-            session_key=session_key,
-            limit=20000,
-            order_by=None,
-            use_admin=use_admin,
-        )
-    except Exception:
-        te_rows = []
-    hours_by_job = labor_hours_actual_by_job(list(te_rows or []))
-    estimates_by_id = {str(e.get("id")): e for e in (estimates or []) if isinstance(e, dict) and e.get("id")}
-    snap = dashboard_daily_report_snapshot(
-        today=today,
-        jobs=list(jobs or []),
-        reports_today=reports_today,
-        reports_recent=list(reports_recent or []),
-        hours_by_job=hours_by_job,
-        estimates_by_id=estimates_by_id,
-    )
-    with st.container(border=True):
-        st.markdown("##### Supervisor daily reports")
-        st.caption("Field submissions from **Daily crew report** and **Job Database** → Daily Reports.")
-        d1, d2, d3, d4, d5 = st.columns(5, gap="small")
-        d1.metric("Reports today", f"{snap['submitted_today']:,}")
-        d2.metric("Missing today (active jobs)", f"{snap['missing_reports']:,}")
-        d3.metric("Jobs w/ delays (14d)", f"{snap['jobs_with_delays']:,}")
-        pairs = snap.get("repeated_delay_reasons") or []
-        if pairs:
-            lbl, n = pairs[0]
-            short = (lbl[:26] + "…") if len(lbl) > 27 else lbl
-            d4.metric(f"Top delay: {short}", f"{n:,}")
-            if len(pairs) > 1:
-                d4.caption(" · ".join(f"{a} ({b})" for a, b in pairs[1:4])[:200])
-        else:
-            d4.metric("Top delay (14d)", "—")
-        d5.metric("Jobs over bid labor hrs", f"{len(snap['jobs_over_labor']):,}")
-        if snap.get("missing_sample_labels") and snap["missing_reports"] > 0:
-            st.caption("Examples: " + ", ".join(snap["missing_sample_labels"][:6]))
-        if snap["jobs_over_labor"]:
-            rows = [{"Job": lab, "Bid hrs": f"{est:.1f}", "Actual hrs": f"{act:.1f}"} for _jid, lab, est, act in snap["jobs_over_labor"][:10]]
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=min(220, 40 + 28 * len(rows)))
-        if role_can_open_page(current_role(), "Daily crew report"):
-            if st.button("Open Daily crew report", key="dash_sdr_open"):
-                st.session_state[IPS_NAV_PENDING_KEY] = "Daily crew report"
-                st.rerun()
-
-
 def render() -> None:
     render_header(
         "IPS Dashboard",
@@ -830,14 +753,6 @@ def render() -> None:
         m5.metric("Open to-dos", f"{open_todos:,}")
 
     _render_task_progress_dashboard(today=date.today(), session_key=sk, use_admin=use_admin)
-
-    _render_supervisor_daily_reports_dashboard(
-        today=date.today(),
-        jobs=list(jobs or []),
-        estimates=list(estimates or []),
-        session_key=sk,
-        use_admin=use_admin,
-    )
 
     _render_who_has_what_dashboard(
         list(assets or []),

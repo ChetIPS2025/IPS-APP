@@ -38,7 +38,6 @@ from pages import dashboard
 from pages import estimates
 from pages import customers_jobs
 from pages import job_database
-from pages import supervisor_daily_reports
 from pages import supervisor_planning
 from pages import job_costing
 from pages import asset_database
@@ -68,7 +67,6 @@ PAGES = {
     # Estimates UI: app/pages/estimates.py → estimates.render
     "Estimates": estimates.render,
     "Job Database": job_database.render,
-    "Daily crew report": supervisor_daily_reports.render,
     "Assign Tasks (PM)": supervisor_planning.render_pm,
     "Work & Plan (Supervisor)": supervisor_planning.render_supervisor,
     "Customers": customers_jobs.render_customers,

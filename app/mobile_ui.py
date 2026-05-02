@@ -63,6 +63,8 @@ section[data-testid="stSidebar"],
 .stSidebar {
   width: 260px !important;
   min-width: 260px !important;
+  background-color: #d1d5db !important;
+  background: #d1d5db !important;
 }
 
 @media (max-width: 900px) {
@@ -232,7 +234,10 @@ section[data-testid="stSidebar"],
     min-width: 260px !important;
     max-width: min(260px, 92vw) !important;
     transition: transform 0.2s ease-out !important;
-    box-shadow: 4px 0 22px rgba(0, 0, 0, 0.45) !important;
+    background: #d1d5db !important;
+    background-color: #d1d5db !important;
+    color: #1e293b !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
   }
   [data-testid="stSidebar"][aria-expanded="false"],
   section[data-testid="stSidebar"][aria-expanded="false"] {

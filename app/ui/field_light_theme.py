@@ -10,8 +10,10 @@ _FIELD_LIGHT_CSS = """
     background-color: #e5e7eb !important;
   }
   [data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] div[data-testid="stExpander"],
-  section[data-testid="stSidebar"] {
-    background-color: #ffffff !important;
+  section[data-testid="stSidebar"],
+  [data-testid="stSidebar"] {
+    background-color: #d1d5db !important;
+    background: #d1d5db !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #ffffff !important;

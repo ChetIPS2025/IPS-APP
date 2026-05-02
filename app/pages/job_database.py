@@ -146,25 +146,35 @@ def _render_job_db_job_name_cell(container: Any, raw: Any, *, max_len: int = 40)
     full = _job_db_cell_str(raw)
     display = short_text(full, max_len=max_len)
     if not full:
-        container.text("")
+        container.markdown(
+            '<span class="ips-job-list-cell" style="color:#111827;">—</span>',
+            unsafe_allow_html=True,
+        )
     elif len(full) > max_len:
         container.markdown(
-            f'<span title="{html.escape(full, quote=True)}">{html.escape(display)}</span>',
+            f'<span class="ips-job-list-cell" title="{html.escape(full, quote=True)}" '
+            f'style="color:#111827;">{html.escape(display)}</span>',
             unsafe_allow_html=True,
         )
     else:
-        container.text(display)
+        container.markdown(
+            f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(display)}</span>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 20) -> None:
     txt = str(value or "").strip()
     short = txt[:max_len] + ("…" if len(txt) > max_len else "")
     if not txt:
-        container.text("")
+        container.markdown(
+            '<span class="ips-job-list-cell" style="color:#111827;">—</span>',
+            unsafe_allow_html=True,
+        )
         return
     container.markdown(
-        f"<span title='{html.escape(txt, quote=True)}' "
-        "style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+        f"<span class='ips-job-list-cell' title='{html.escape(txt, quote=True)}' "
+        "style='color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
         f"{html.escape(short)}</span>",
         unsafe_allow_html=True,
     )
@@ -239,7 +249,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v3"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v4"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -260,12 +270,12 @@ def _inject_job_database_responsive_styles() -> None:
         """
         <style>
         .ips-job-card-list-note {
-            color: #64748b;
+            color: #64748b !important;
             font-size: 0.82rem;
             margin: 0.15rem 0 0.45rem;
         }
         .ips-job-card-title {
-            color: #111827;
+            color: #111827 !important;
             font-size: 1rem;
             font-weight: 700;
             line-height: 1.25;
@@ -273,7 +283,7 @@ def _inject_job_database_responsive_styles() -> None:
             overflow-wrap: anywhere;
         }
         .ips-job-card-meta {
-            color: #4b5563;
+            color: #4b5563 !important;
             font-size: 0.88rem;
             line-height: 1.45;
             margin: 0.15rem 0 0.4rem;
@@ -284,7 +294,7 @@ def _inject_job_database_responsive_styles() -> None:
             align-items: center;
             border: 1px solid #cbd5e1;
             border-radius: 999px;
-            color: #334155;
+            color: #334155 !important;
             background: #f8fafc;
             font-size: 0.78rem;
             font-weight: 650;
@@ -307,6 +317,28 @@ def _inject_job_database_responsive_styles() -> None:
             margin: 0.2rem 0.25rem 0.1rem 0;
             padding: 0.35rem 0.55rem;
             white-space: nowrap;
+        }
+        /*
+         * Job overview: Streamlit theme is base=dark (light text tokens). List rows sit on white
+         * bordered cards, so themed body text is effectively invisible. Force readable ink.
+         */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="column"] .stMarkdown,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="column"] .stMarkdown p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="column"] .stMarkdown span,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="column"] [data-testid="stText"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="column"] pre {
+            color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="stCaptionContainer"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="stCaptionContainer"] p {
+            color: #4b5563 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) h5,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) .stMarkdown,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) .stMarkdown p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stMarkdown,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stMarkdown p {
+            color: #111827 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) {
             display: none;
@@ -666,7 +698,6 @@ def _render_job_form_panel(
                 from app.pages.job_database_job_tasks import (
                     render_job_cost_tab,
                     render_job_daily_plan_tab,
-                    render_job_daily_review_tab,
                     render_job_photos_tab,
                     render_job_tasks_tab,
                 )
@@ -674,19 +705,16 @@ def _render_job_form_panel(
                 from pages.job_database_job_tasks import (  # type: ignore
                     render_job_cost_tab,
                     render_job_daily_plan_tab,
-                    render_job_daily_review_tab,
                     render_job_photos_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_dp, t_dr, t_ph, t_co = st.tabs(
-                ["Overview", "Tasks", "Daily Plan", "Daily Review", "Photos", "Cost"]
+            t_ov, t_ts, t_dp, t_ph, t_co = st.tabs(
+                ["Overview", "Tasks", "Daily Plan", "Photos", "Cost"]
             )
             with t_ts:
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
             with t_dp:
                 render_job_daily_plan_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_dr:
-                render_job_daily_review_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
             with t_ph:
                 render_job_photos_tab(job_id=edit_jid, admin_read=admin_rd)
             with t_co:
@@ -1269,21 +1297,6 @@ def _render_job_form_panel(
                                 )
                             st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
                             st.caption("Use **Open sign page** above, or copy any **Sign link** into an email.")
-    
-                if selected_job:
-                    try:
-                        from app.pages.supervisor_daily_reports import render_daily_reports_for_job
-                    except ImportError:
-                        from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
-    
-                    _jl = job_row_select_label(selected_job)
-                    render_daily_reports_for_job(
-                        job_id=str(selected_job.get("id") or ""),
-                        job_label=_jl,
-                        admin_read=_job_db_admin_read(),
-                        show_title=True,
-                    )
-    
     
 def _build_jobs_overview_dataframe(
     jobs_df: pd.DataFrame,
@@ -1934,7 +1947,11 @@ def render() -> None:
                             # Quote (estimate) is the current visible “quote/po” signal in this UI.
                             _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
                         with rc[9]:
-                            rc[9].text(_job_db_money_cell(row.get("awarded_amount")))
+                            amt = _job_db_money_cell(row.get("awarded_amount"))
+                            rc[9].markdown(
+                                f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(amt)}</span>',
+                                unsafe_allow_html=True,
+                            )
 
                         del_help = (
                             "Only admin or pm can delete jobs."

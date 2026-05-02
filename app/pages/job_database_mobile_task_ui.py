@@ -1,4 +1,4 @@
-"""Mobile-first task detail and compact daily review rows (field / phone)."""
+"""Mobile-first task detail form (field / phone)."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ except ImportError:
     import services.task_photos as tp  # type: ignore
 
 try:
-    from app.services.supervisor_planning import TASK_STATUSES, delay_reason_label
+    from app.services.supervisor_planning import TASK_STATUSES
 except ImportError:
-    from services.supervisor_planning import TASK_STATUSES, delay_reason_label  # type: ignore
+    from services.supervisor_planning import TASK_STATUSES  # type: ignore
 
 try:
     from app.pages import job_database_task_photos_ui as tph
@@ -51,15 +51,6 @@ _DETAIL_STATUS_LABELS: dict[str, str] = {
     "cancelled": "Cancelled",
 }
 
-_REVIEW_SLUGS = (
-    "complete",
-    "partial",
-    "blocked",
-    "not_started",
-    "duplicate",
-    "electrical",
-    "waiting_on_customer",
-)
 _REVIEW_LABELS: dict[str, str] = {
     "complete": "Complete",
     "partial": "Partial",
@@ -69,20 +60,6 @@ _REVIEW_LABELS: dict[str, str] = {
     "electrical": "Electrical / trade",
     "waiting_on_customer": "Waiting on customer",
 }
-
-_DELAY_REASONS = (
-    "none",
-    "material",
-    "tools",
-    "direction",
-    "rework",
-    "customer",
-    "safety",
-    "equipment",
-    "weather",
-    "other",
-)
-
 
 _TASK_STATUS_HEX: dict[str, str] = {
     "complete": "#16a34a",
@@ -340,157 +317,3 @@ def render_mobile_task_detail_form(
                 _thumb(pth, key=f"mt_ro_{tid}_{pt}", width=160)
             else:
                 st.caption("—")
-
-
-def render_daily_review_row_mobile(
-    *,
-    job_id: str,
-    r_iso: str,
-    task_row: dict[str, Any],
-    prior: dict[str, Any],
-    sup_day: str,
-    can_edit: bool,
-    admin_read: bool,
-    ins: Callable[..., Any],
-    upd: Callable[..., Any],
-) -> None:
-    """One compact row: title, status + photo popover, optional delay expander, notes, Save."""
-    tid = str(task_row.get("id") or "").strip()
-    if not tid:
-        return
-    jk = str(job_id).replace("-", "")[:12]
-    iss = str(task_row.get("issue") or "")[:56]
-    cur_st = str(prior.get("status_after") or task_row.get("status") or "not_started").strip().lower()
-    if cur_st not in _REVIEW_SLUGS:
-        cur_st = "not_started"
-
-    with st.container(border=True):
-        st.markdown(
-            f'<p class="ips-task-card-title">{task_row.get("task_number") or "—"} / '
-            f'{task_row.get("hazard_number") or "—"} {_status_badge_html(cur_st)}</p>'
-            f'<p class="ips-task-issue">{iss or "—"}</p>',
-            unsafe_allow_html=True,
-        )
-
-        c1, c2 = st.columns([1.35, 1], gap="small")
-        with c1:
-            new_status = st.selectbox(
-                "Status",
-                list(_REVIEW_SLUGS),
-                index=list(_REVIEW_SLUGS).index(cur_st),
-                format_func=lambda s: _REVIEW_LABELS.get(s, s),
-                key=f"mjdr_{jk}_st_{tid}_{r_iso}",
-                disabled=not can_edit,
-            )
-            if str(new_status).strip().lower() == "complete":
-                st.markdown(
-                    '<p class="ips-review-required">After photo required to complete task.</p>',
-                    unsafe_allow_html=True,
-                )
-        with c2:
-            if can_edit:
-                with st.popover("After photo", use_container_width=True):
-                    st.caption("Take Photo")
-                    pcam = st.camera_input("qcam", key=f"mjdr_{jk}_pc_{tid}_{r_iso}", label_visibility="collapsed")
-                    st.caption("Upload Photo")
-                    pup = st.file_uploader("qup", type=["jpg", "jpeg", "png", "webp"], key=f"mjdr_{jk}_pu_{tid}_{r_iso}", label_visibility="collapsed")
-                    if st.button("Save photo", key=f"mjdr_{jk}_psv_{tid}_{r_iso}", use_container_width=True):
-                        raw: bytes | None = None
-                        fn = "after.jpg"
-                        if pcam is not None:
-                            raw = pcam.getvalue()
-                            fn = "camera.jpg"
-                        elif pup is not None:
-                            raw = pup.getvalue()
-                            fn = str(getattr(pup, "name", "") or "after.jpg")
-                        if not raw:
-                            st.warning("Choose a photo first.")
-                            st.stop()
-                        try:
-                            path = tph.save_task_after_photo_bytes(task_id=tid, raw=raw, fname=fn, admin_read=admin_read)
-                            if path and prior:
-                                try:
-                                    upd(
-                                        "job_task_daily_reviews",
-                                        {"after_photo_url": path[:2000]},
-                                        {"task_id": tid, "review_date": r_iso},
-                                    )
-                                except Exception:
-                                    pass
-                            st.success("Photo saved.")
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(str(exc))
-            else:
-                st.caption("—")
-
-        delay = str(prior.get("delay_reason") or "none").strip().lower()
-        notes_val = str(prior.get("notes") or "")
-        if can_edit:
-            with st.expander("Delay / details", expanded=False):
-                dr_cur = str(prior.get("delay_reason") or "none").strip().lower()
-                dr_ix = _DELAY_REASONS.index(dr_cur) if dr_cur in _DELAY_REASONS else 0
-                delay = st.selectbox(
-                    "Delay",
-                    _DELAY_REASONS,
-                    index=dr_ix,
-                    format_func=lambda x: delay_reason_label(x),
-                    key=f"mjdr_{jk}_dr_{tid}_{r_iso}",
-                    disabled=False,
-                )
-                notes_val = st.text_area(
-                    "Notes",
-                    value=notes_val,
-                    height=64,
-                    key=f"mjdr_{jk}_nt_{tid}_{r_iso}",
-                    disabled=False,
-                )
-
-        if not can_edit:
-            return
-
-        if st.button("Save row", key=f"mjdr_{jk}_sv_{tid}_{r_iso}", use_container_width=True):
-            if not str(sup_day or "").strip():
-                st.error("Enter supervisor sign-off at the top.")
-                st.stop()
-            ns = str(new_status).strip().lower()
-            if ns == "complete" and not tph.task_has_after_for_validation(
-                task_id=tid,
-                task_row=task_row,
-                prior_review=prior,
-                pending_upload_bytes=None,
-                admin_read=admin_read,
-            ):
-                st.error("After photo required to complete task.")
-                st.stop()
-            photo_path = str(prior.get("after_photo_url") or "").strip()
-            try:
-                payload_rev = {
-                    "supervisor_name": " ".join(str(sup_day or "").strip().split())[:200],
-                    "status_after": ns,
-                    "delay_reason": str(delay or "none").strip().lower(),
-                    "notes": str(notes_val or "").strip()[:4000],
-                    "after_photo_url": photo_path[:2000],
-                }
-                if prior:
-                    upd("job_task_daily_reviews", payload_rev, {"task_id": tid, "review_date": r_iso})
-                else:
-                    ins(
-                        "job_task_daily_reviews",
-                        {"task_id": tid, "review_date": r_iso, **payload_rev},
-                    )
-                task_upd: dict[str, Any] = {
-                    "status": ns,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-                if ns == "complete":
-                    task_upd["completed_date"] = r_iso
-                else:
-                    task_upd["completed_date"] = None
-                if photo_path:
-                    task_upd["after_photo_url"] = photo_path[:2000]
-                upd("job_tasks", task_upd, {"id": tid})
-                st.success("Saved.")
-                st.rerun()
-            except Exception as exc:
-                st.error(str(exc))

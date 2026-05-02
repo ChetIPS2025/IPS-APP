@@ -48,7 +48,6 @@ _NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 # Jobs (sidebar)
 _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
     "Job Database",
-    "Daily crew report",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -81,7 +80,6 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Job Database",
-    "Daily crew report",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -140,12 +138,13 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
         {
             "Dashboard",
             "Job Database",
-            "Daily crew report",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
             "Estimates",
             "Job Costing",
+            "Inventory",
             "Scan Inventory",
+            "Inventory Usage",
             "Who Has What",
             "Asset Database",
             "Tool Trailer Audits",
@@ -154,15 +153,12 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "employee": frozenset(
         {
             "Dashboard",
-            "Daily crew report",
             "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
             "Scan Inventory",
-            "Inventory Usage",
             "Who Has What",
             "Tool Trailer Audits",
-            # legacy routes kept routable (not necessarily in sidebar)
             "Employee Toolbox",
         }
     ),
@@ -218,8 +214,8 @@ def apply_pending_navigation() -> None:
         pending = "Work & Plan (Supervisor)"
     if pending == "Daily Tasks":
         pending = "Work & Plan (Supervisor)"
-    if pending == "Supervisor Daily Reports":
-        pending = "Daily crew report"
+    if pending in ("Supervisor Daily Reports", "Daily crew report"):
+        pending = "Work & Plan (Supervisor)"
     if not pending:
         return
     if pending == "Users":
@@ -264,9 +260,35 @@ def _inject_sidebar_nav_css() -> None:
     st.sidebar.markdown(
         """
 <style>
-/* Primary: section titles */
+/* --- Surface: sidebar slightly darker than main (#e5e7eb) --- */
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] > div,
+[data-testid="stSidebar"] {
+  background-color: #d1d5db !important;
+  background: #d1d5db !important;
+  color: #1e293b !important;
+}
+section[data-testid="stSidebar"] .block-container {
+  background: transparent !important;
+}
+section[data-testid="stSidebar"] .stMarkdown,
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown h1,
+section[data-testid="stSidebar"] .stMarkdown h2,
+section[data-testid="stSidebar"] .stMarkdown h3,
+section[data-testid="stSidebar"] .stMarkdown h4,
+section[data-testid="stSidebar"] .stMarkdown h5,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+section[data-testid="stSidebar"] [data-testid="stCaption"] {
+  color: #1e293b !important;
+}
+section[data-testid="stSidebar"] .stLinkButton > a {
+  color: #1e293b !important;
+}
+/* Section labels: subtle hierarchy, still high contrast */
 section[data-testid="stSidebar"] .ips-nav-section-title {
-  color: #FFFFFF;
+  color: #334155 !important;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -278,19 +300,20 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 16px !important;
   padding-top: 14px !important;
-  border-top: 1px solid rgba(110, 145, 190, 0.22);
+  border-top: 1px solid #94a3b8 !important;
 }
-/* Divider + air gap: primary vs TOOLS */
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   margin: 28px 0 14px 0;
   padding: 0;
   border: none;
-  border-top: 1px solid rgba(110, 145, 190, 0.22);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  border-top: 1px solid #94a3b8 !important;
+  box-shadow: none !important;
   opacity: 1;
 }
-/* Primary nav buttons — align with main IPS button rhythm (height, radius, no wrap) */
-section[data-testid="stSidebar"] div.stButton > button {
+/* Sidebar buttons: light chrome, slate text */
+section[data-testid="stSidebar"] div.stButton > button,
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"],
+section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
   min-height: 2.25rem !important;
@@ -298,12 +321,24 @@ section[data-testid="stSidebar"] div.stButton > button {
   border-radius: 8px !important;
   line-height: 1.25 !important;
   box-sizing: border-box !important;
+  background: #e5e7eb !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] div.stButton > button:hover:not(:disabled),
+section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover:not(:disabled),
+section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
 }
 section[data-testid="stSidebar"] div.stButton > button p {
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   margin: 0 !important;
+  color: #1e293b !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button {
   font-size: 0.8125rem !important;
@@ -311,35 +346,39 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   min-height: 2.25rem !important;
   padding: 0.35rem 0.65rem !important;
   border-radius: 8px !important;
-  margin-left: 2px !important;
-  border-left: 3px solid rgba(110, 145, 190, 0.26) !important;
-  padding-left: 10px !important;
   box-sizing: border-box !important;
+  background: #e5e7eb !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button[kind="primary"] {
-  border-left-color: #60a5fa !important;
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
 }
-section[data-testid="stSidebar"] button[kind="primary"] {
-  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;
-  color: #f8fafc !important;
-  border: 1px solid #3b82f6 !important;
-  box-shadow: inset 3px 0 0 0 #60a5fa !important;
+/* Active page: slightly stronger fill, same ink (no white-on-light) */
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+  background: #cbd5e1 !important;
+  border: 1px solid #94a3b8 !important;
+  color: #1e293b !important;
+  box-shadow: none !important;
 }
-section[data-testid="stSidebar"] button[kind="secondary"] {
-  background: #14365C !important;
-  color: #C0CAD8 !important;
-  border: 1px solid rgba(120, 150, 200, 0.25) !important;
+section[data-testid="stSidebar"] button[kind="primary"]:hover:not(:disabled),
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover:not(:disabled) {
+  background: #b8c4d4 !important;
+  border-color: #64748b !important;
+  color: #1e293b !important;
 }
-section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-  border-color: rgba(120, 150, 200, 0.35) !important;
-  color: #FFFFFF !important;
-  background: #1A3F6B !important;
+section[data-testid="stSidebar"] button[kind="primary"] p,
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
+  color: #1e293b !important;
 }
-/* TOOLS expander: muted label + chrome */
+/* TOOLS expander */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid rgba(110, 145, 190, 0.22) !important;
-  border-radius: 6px !important;
-  background: rgba(18, 47, 82, 0.35) !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #e5e7eb !important;
   margin-top: 2px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -347,49 +386,59 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
-  color: rgba(159, 176, 199, 0.9) !important;
-  opacity: 0.88 !important;
+  color: #334155 !important;
+  opacity: 1 !important;
   padding: 8px 10px !important;
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] svg,
+section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
+  color: #475569 !important;
+  fill: #475569 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
   padding: 2px 8px 12px 8px !important;
+  background: transparent !important;
 }
-/* Secondary tools: compact but same radius / nowrap as main chrome */
-section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"] {
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"],
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.8125rem !important;
   font-weight: 500 !important;
   min-height: 2.125rem !important;
   padding: 0.28rem 0.6rem !important;
   border-radius: 8px !important;
-  opacity: 0.92 !important;
-  color: rgba(192, 202, 216, 0.92) !important;
-  background: rgba(18, 47, 82, 0.45) !important;
-  border: 1px solid rgba(140, 175, 220, 0.22) !important;
+  background: #e5e7eb !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
   box-shadow: none !important;
-}
-section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover {
-  color: #FFFFFF !important;
-  border-color: rgba(170, 205, 240, 0.35) !important;
   opacity: 1 !important;
 }
-/* Active tool: same treatment as primary nav buttons */
-section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"] {
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover:not(:disabled) {
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"],
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-primary"] {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
   min-height: 2.25rem !important;
   padding: 0.35rem 0.75rem !important;
   border-radius: 8px !important;
-  opacity: 1 !important;
-  color: #f8fafc !important;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%) !important;
-  border: 1px solid #3b82f6 !important;
-  box-shadow: inset 3px 0 0 0 #60a5fa !important;
+  background: #cbd5e1 !important;
+  border: 1px solid #94a3b8 !important;
+  color: #1e293b !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"]:hover:not(:disabled) {
+  background: #b8c4d4 !important;
+  border-color: #64748b !important;
+  color: #1e293b !important;
 }
 section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
 }
 section[data-testid="stSidebar"] .ips-install-section-title {
-  color: #FFFFFF;
+  color: #334155 !important;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -434,8 +483,8 @@ def _ensure_valid_nav_page() -> None:
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
     elif cur0 == "Daily Tasks":
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
-    elif cur0 == "Supervisor Daily Reports":
-        st.session_state[IPS_NAV_PAGE_KEY] = "Daily crew report"
+    elif cur0 in ("Supervisor Daily Reports", "Daily crew report"):
+        st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
 
     role = current_role()
     visible_secondary = set(_visible_secondary_pages(role))
@@ -531,6 +580,159 @@ def _render_assets_sidebar_group(*, current: str, role: str) -> None:
                 st.rerun()
 
 
+def _sidebar_nav_title(extra_class: str, text: str) -> None:
+    cls = "ips-nav-section-title" + (f" {extra_class}" if extra_class else "")
+    st.sidebar.markdown(
+        f'<div class="{cls.strip()}">{text}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_sidebar_office(*, current: str, role: str) -> None:
+    """PM / admin / manager — jobs, packages, inventory, assets, office tools."""
+    _sidebar_nav_title("", "Dashboard")
+    _render_nav_button("Dashboard", current=current, indent=False)
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Jobs")
+    st.sidebar.caption("Job records, estimates, and costing.")
+    for p in _NAV_JOBS_SIDEBAR:
+        if not role_can_open_page(role, p):
+            continue
+        if p == "Assign Tasks (PM)":
+            _render_nav_button_route(
+                label="Assign work (PM)",
+                route="Assign Tasks (PM)",
+                current=current,
+                indent=True,
+                key_suffix="pm",
+            )
+        elif p == "Work & Plan (Supervisor)":
+            _render_nav_button_route(
+                label="Work & plan (supervisor)",
+                route="Work & Plan (Supervisor)",
+                current=current,
+                indent=True,
+                key_suffix="sup",
+            )
+        else:
+            _render_nav_button(p, current=current, indent=True)
+    st.sidebar.caption(
+        "**Assign work (PM)** — PM lines up today’s work packages. "
+        "**Work & plan** — supervisor plans the shift, updates tasks and photos, and submits end-of-day review."
+    )
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Assets")
+    if role_can_open_page(role, "Asset Database"):
+        _render_assets_sidebar_group(current=current, role=role)
+    if role_can_open_page(role, "Who Has What"):
+        _render_nav_button("Who Has What", current=current, indent=True)
+    if role_can_open_page(role, "Tool Trailer Audits"):
+        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
+    inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
+    if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
+        with st.sidebar.expander("Inventory", expanded=inv_expanded):
+            _, inv_inner = st.columns([0.06, 0.94])
+            with inv_inner:
+                _inv_focus = _sidebar_inventory_category_focus_norm()
+                inv_list_active = current == "Inventory" and _inv_focus == "All"
+                if role_can_open_page(role, "Inventory"):
+                    if st.button(
+                        "Inventory list",
+                        key=_nav_btn_key("Inventory__list_all"),
+                        type="primary" if inv_list_active else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+                        st.session_state["inv_f_cat"] = "All"
+                        st.rerun()
+                if role_can_open_page(role, "Scan Inventory"):
+                    if st.button(
+                        "Scan inventory",
+                        key=_nav_btn_key("Scan Inventory"),
+                        type="primary" if current == "Scan Inventory" else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+                        st.rerun()
+                if role_can_open_page(role, "Inventory Usage"):
+                    if st.button(
+                        "Inventory usage",
+                        key=_nav_btn_key("Inventory Usage"),
+                        type="primary" if current == "Inventory Usage" else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
+                        st.rerun()
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
+    for p in _NAV_ADMIN_SIDEBAR:
+        if role_can_open_page(role, p):
+            _render_nav_button(p, current=current, indent=True)
+    if role == "admin" and role_can_open_page(role, "Admin"):
+        _render_nav_button("Admin", current=current, indent=True)
+
+
+def _render_sidebar_field(*, current: str, role: str) -> None:
+    """Field supervisor / crew — one primary workflow plus scan and tools."""
+    _sidebar_nav_title("", "Dashboard")
+    _render_nav_button("Dashboard", current=current, indent=False)
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Today’s work")
+    st.sidebar.caption("Plan the shift, tasks, photos, and end-of-day review — one screen.")
+    if role_can_open_page(role, "Work & Plan (Supervisor)"):
+        _render_nav_button_route(
+            label="Work & plan (supervisor)",
+            route="Work & Plan (Supervisor)",
+            current=current,
+            indent=True,
+            key_suffix="sup",
+        )
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
+    if role_can_open_page(role, "Scan Inventory"):
+        _render_nav_button_route(
+            label="Scan inventory",
+            route="Scan Inventory",
+            current=current,
+            indent=True,
+            key_suffix="scan",
+        )
+
+    _sidebar_nav_title("ips-nav-group-spaced", "Tools & assets")
+    if role_can_open_page(role, "Who Has What"):
+        _render_nav_button("Who Has What", current=current, indent=True)
+    if role_can_open_page(role, "Asset Database"):
+        _render_nav_button_route(
+            label="Asset list",
+            route="Asset Database",
+            current=current,
+            indent=True,
+            key_suffix="ad",
+        )
+    if role_can_open_page(role, "Employee Toolbox"):
+        _render_nav_button_route(
+            label="My tools",
+            route="Employee Toolbox",
+            current=current,
+            indent=True,
+            key_suffix="tb",
+        )
+    if role_can_open_page(role, "Tool Trailer Audits"):
+        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
+    if role_can_open_page(role, "Time Tracking"):
+        _render_nav_button("Time Tracking", current=current, indent=True)
+
+
+def _render_sidebar_viewer(*, current: str, role: str) -> None:
+    _sidebar_nav_title("", "Dashboard")
+    _render_nav_button("Dashboard", current=current, indent=False)
+    for p in ("Asset Database", "Who Has What", "Inventory Usage"):
+        if role_can_open_page(role, p):
+            _render_nav_button(p, current=current, indent=True)
+
+
 def render_sidebar() -> str:
     _sidebar_brand()
 
@@ -547,86 +749,15 @@ def render_sidebar() -> str:
 
     current = st.session_state[IPS_NAV_PAGE_KEY]
     role = current_role()
-    # --- PRIMARY: Dashboard ---
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title">Dashboard</div>',
-        unsafe_allow_html=True,
-    )
-    _render_nav_button("Dashboard", current=current, indent=False)
-
-    # --- PRIMARY: Jobs ---
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Jobs</div>',
-        unsafe_allow_html=True,
-    )
-    for p in _NAV_JOBS_SIDEBAR:
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
-
-    # --- PRIMARY: Assets ---
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Assets</div>',
-        unsafe_allow_html=True,
-    )
-    if role_can_open_page(role, "Asset Database"):
-        # Keep category lenses under Assets.
-        _render_assets_sidebar_group(current=current, role=role)
-    if role_can_open_page(role, "Scan Inventory"):
-        _render_nav_button_route(label="Scan", route="Scan Inventory", current=current, indent=True, key_suffix="scan")
-    if role_can_open_page(role, "Tool Trailer Audits"):
-        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
-
-    # --- PRIMARY: Inventory ---
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Inventory</div>',
-        unsafe_allow_html=True,
-    )
-    inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
-    if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
-        with st.sidebar.expander("Inventory", expanded=inv_expanded):
-            # Nested links only under this expander (no standalone Scan / Usage in the sidebar).
-            _, inv_inner = st.columns([0.06, 0.94])
-            with inv_inner:
-                _inv_focus = _sidebar_inventory_category_focus_norm()
-                inv_list_active = current == "Inventory" and _inv_focus == "All"
-                if role_can_open_page(role, "Inventory"):
-                    if st.button(
-                        "Inventory List",
-                        key=_nav_btn_key("Inventory__list_all"),
-                        type="primary" if inv_list_active else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
-                        st.session_state["inv_f_cat"] = "All"
-                        st.rerun()
-                if role_can_open_page(role, "Scan Inventory"):
-                    if st.button(
-                        "Scan Inventory",
-                        key=_nav_btn_key("Scan Inventory"),
-                        type="primary" if current == "Scan Inventory" else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-                        st.rerun()
-                if role_can_open_page(role, "Inventory Usage"):
-                    if st.button(
-                        "Inventory Usage",
-                        key=_nav_btn_key("Inventory Usage"),
-                        type="primary" if current == "Inventory Usage" else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
-                        st.rerun()
-
-    # --- PRIMARY: Admin / office ---
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Admin</div>',
-        unsafe_allow_html=True,
-    )
-    for p in _NAV_ADMIN_SIDEBAR:
-        if role_can_open_page(role, p):
-            # Users is the route key already; Time Tracking / Weekly Timesheet / PO are direct routes too.
-            _render_nav_button(p, current=current, indent=True)
+    r = str(role or "viewer").strip().lower()
+    if r in ("pm", "estimator"):
+        r = "manager"
+    if r in ("admin", "manager"):
+        _render_sidebar_office(current=current, role=role)
+    elif r == "employee":
+        _render_sidebar_field(current=current, role=role)
+    else:
+        _render_sidebar_viewer(current=current, role=role)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
     st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)

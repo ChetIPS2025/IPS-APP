@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v2"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v3"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -34,7 +34,7 @@ def inject_ips_app_shell_styles() -> None:
             --ips-bg-main: #e5e7eb;
             --ips-bg-secondary: #ffffff;
             --ips-bg-card: #ffffff;
-            --ips-bg-sidebar: #ffffff;
+            --ips-bg-sidebar: #d1d5db;
             --ips-bg-hover: #f3f4f6;
 
             --ips-text: #111827;
@@ -402,9 +402,32 @@ def inject_ips_app_shell_styles() -> None:
             font-size: 0.75rem !important;
         }
 
-        /* ----- Sidebar: slightly tighter on all sizes ----- */
+        /* ----- Sidebar: darker grey than main (#e5e7eb), readable slate text ----- */
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] > div,
+        [data-testid="stSidebar"] {
+            background: var(--ips-bg-sidebar) !important;
+            background-color: var(--ips-bg-sidebar) !important;
+            color: #1e293b !important;
+        }
         section[data-testid="stSidebar"] .block-container {
             padding-top: 0.5rem !important;
+            background: transparent !important;
+        }
+        section[data-testid="stSidebar"] .stMarkdown,
+        section[data-testid="stSidebar"] .stMarkdown p,
+        section[data-testid="stSidebar"] .stMarkdown h1,
+        section[data-testid="stSidebar"] .stMarkdown h2,
+        section[data-testid="stSidebar"] .stMarkdown h3,
+        section[data-testid="stSidebar"] .stMarkdown h4,
+        section[data-testid="stSidebar"] .stMarkdown h5,
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            color: #1e293b !important;
+        }
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label,
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] span {
+            color: #334155 !important;
         }
 
         section[data-testid="stMain"] .stMetric {

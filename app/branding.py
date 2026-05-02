@@ -30,7 +30,7 @@ def apply_branding() -> None:
         }
 
         section[data-testid="stSidebar"] {
-            background: #ffffff;
+            background: #d1d5db;
         }
 
         .ips-topbar {
