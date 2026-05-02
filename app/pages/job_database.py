@@ -275,7 +275,16 @@ def _inject_job_database_responsive_styles() -> None:
                 gap: 0.7rem !important;
             }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
-                div[data-testid="stHorizontalBlock"] > div[data-testid="column"],
+                div[data-testid="stHorizontalBlock"] {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
+                div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+            }
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-topbar)
                 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
                 flex: 0 0 calc(50% - 0.7rem) !important;
