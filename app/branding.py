@@ -23,14 +23,14 @@ def apply_branding() -> None:
         """
         <style>
         body {
-            background-color: #f5f7fa;
+            background-color: #d1d5db;
         }
         .stApp {
-            background: #f5f7fa;
+            background: #d1d5db;
         }
 
         section[data-testid="stSidebar"] {
-            background: #d1d5db;
+            background: #cbd5e1;
         }
 
         .ips-topbar {
@@ -46,24 +46,26 @@ def apply_branding() -> None:
         }
 
         .ips-page-title {
-            color: #0f172a;
+            color: #111827;
             font-size: 1.45rem;
-            font-weight: 750;
+            font-weight: 700;
             letter-spacing: -0.02em;
             margin: 2px 0 2px 0;
             line-height: 1.2;
         }
 
         .ips-page-subtitle {
-            color: #475569;
-            font-size: 0.8125rem;
+            color: #1f2937;
+            font-size: 0.875rem;
+            font-weight: 600;
             margin-bottom: 0.45rem;
             line-height: 1.45;
         }
 
         .ips-page-help {
-            color: #475569;
-            font-size: 0.8125rem;
+            color: #1f2937;
+            font-size: 0.875rem;
+            font-weight: 500;
             line-height: 1.45;
             margin: 0 0 0.55rem 0;
             max-width: 920px;

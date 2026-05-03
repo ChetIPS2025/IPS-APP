@@ -45,6 +45,11 @@ except ImportError:
     import services.task_photos as _tp_svc  # type: ignore
 
 try:
+    from app.services.task_display import task_number_display
+except ImportError:
+    from services.task_display import task_number_display  # type: ignore
+
+try:
     from app.pages import job_database_task_photos_ui as _tph
 except ImportError:
     import pages.job_database_task_photos_ui as _tph  # type: ignore
@@ -53,6 +58,16 @@ try:
     from app.pages import job_database_mobile_task_ui as _mob
 except ImportError:
     import pages.job_database_mobile_task_ui as _mob  # type: ignore
+
+try:
+    from app.pages import job_reference_attachments_ui as _jra_ui
+except ImportError:
+    import pages.job_reference_attachments_ui as _jra_ui  # type: ignore
+
+try:
+    from app.auth import current_role as _jra_role
+except ImportError:
+    from auth import current_role as _jra_role  # type: ignore
 
 try:
     from app.ui.field_light_theme import inject_field_light_theme
@@ -264,27 +279,17 @@ def render_job_tasks_tab(
             iss = str(t.get("issue") or "").strip()
             snip = (iss[:140] + "…") if len(iss) > 140 else iss
             loc = str(t.get("location") or "").strip() or "—"
-            sup = str(t.get("assigned_supervisor_name") or "").strip() or "—"
-            planned = str(t.get("planned_date") or "").strip()[:10] or "—"
-            tn = str(t.get("task_number") or "—").strip()
-            hn = str(t.get("hazard_number") or "—").strip()
-            quote_po = str(t.get("quote_po") or t.get("po_number") or "").strip()
+            tno = html.escape(task_number_display(t))
 
             with st.container(border=True):
-                extra = ""
-                if quote_po:
-                    extra = f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.85rem;"><strong>Quote/PO</strong> {html.escape(quote_po)}</p>'
                 st.markdown(
-                    f'<p style="margin:0 0 0.35rem;font-size:1rem;font-weight:700;color:#111827;">'
-                    f"Task {html.escape(tn)} / Hazard {html.escape(hn)}</p>"
-                    f'<div style="margin-bottom:0.35rem;">{_task_status_badge(stt)}{_priority_badge_html(t.get("priority"))}</div>'
+                    f'<p style="margin:0 0 0.25rem;font-size:1.45rem;font-weight:700;color:#0f172a;">{tno}</p>'
+                    f'<div style="margin-bottom:0.4rem;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:center;">'
+                    f'{_priority_badge_html(t.get("priority"))}{_task_status_badge(stt)}</div>'
                     f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.9rem;"><strong>Location</strong> '
                     f"{html.escape(loc)}</p>"
                     f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.9rem;"><strong>Issue</strong> '
-                    f"{html.escape(snip or '—')}</p>"
-                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.85rem;"><strong>Supervisor</strong> '
-                    f"{html.escape(sup)} · <strong>Planned</strong> {html.escape(planned)}</p>"
-                    f"{extra}",
+                    f"{html.escape(snip or '—')}</p>",
                     unsafe_allow_html=True,
                 )
                 if st.button(
@@ -343,15 +348,21 @@ def render_job_tasks_tab(
                             "Fallback: run **`sql/051_job_task_photos.sql`** / **`sql/052_job_task_photos_capture_meta.sql`**."
                         )
 
+    st.divider()
+    _jra_ui.render_job_reference_attachments_panel(
+        job_id=job_id,
+        tasks=list(rows or []),
+        admin_read=admin_read,
+        can_manage=str(_jra_role() or "").strip().lower() in {"admin", "manager"},
+    )
+
     if can_edit_tasks:
         _inject_task_tab_add_form_css()
         st.markdown("##### Add task")
         st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
+        tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
         a1, a2 = st.columns(2, gap="small")
         with a1:
-            tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
-            hn = st.text_input("Hazard #", key=f"jdt_add_hn_{job_id}")
-        with a2:
             pr = st.selectbox(
                 "Priority",
                 ("low", "normal", "high", "critical"),
@@ -359,14 +370,14 @@ def render_job_tasks_tab(
                 format_func=lambda x: x.title(),
                 key=f"jdt_add_pr_{job_id}",
             )
+        with a2:
             pl = st.date_input("Planned date", value=date.today(), key=f"jdt_add_pl_{job_id}")
         a3, a4 = st.columns(2, gap="small")
         with a3:
             loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
-            iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
         with a4:
-            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
-            st.caption(" ")
+            iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
+        act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
         if st.button("Add task", type="primary", use_container_width=True, key=f"jdt_add_btn_{job_id}"):
             if not str(iss or "").strip():
                 st.error("Enter an issue description.")
@@ -377,7 +388,6 @@ def render_job_tasks_tab(
                         {
                             "job_id": str(job_id),
                             "task_number": str(tn or "").strip()[:200],
-                            "hazard_number": str(hn or "").strip()[:200],
                             "priority": pr,
                             "location": str(loc or "").strip()[:500],
                             "issue": str(iss or "").strip()[:4000],
@@ -414,7 +424,7 @@ def render_job_daily_plan_tab(
     def _fmt(tid: str) -> str:
         tt = next((x for x in rows if str(x.get("id")) == tid), {})
         iss = str(tt.get("issue") or "")[:40]
-        return f"{tt.get('task_number') or '—'}/{tt.get('hazard_number') or '—'} · {iss}"
+        return f"{task_number_display(tt)} · {iss}"
 
     pick = st.multiselect(
         "Tasks for this day",
@@ -510,7 +520,7 @@ def render_job_photos_tab(*, job_id: str, admin_read: bool) -> None:
             continue
         b, a = _tp_svc.before_after_storage_paths(t, by_tid.get(tid), task_id=tid)
         if b and a:
-            lab = f"{t.get('task_number') or '—'} / {t.get('hazard_number') or '—'}"
+            lab = task_number_display(t)
             cmp_opts.append((lab, tid, b, a))
 
     if cmp_opts:
@@ -559,7 +569,7 @@ def render_job_photos_tab(*, job_id: str, admin_read: bool) -> None:
         st.info("No task photos yet. Use **Tasks** (before / progress / after) or **Work & Plan (Supervisor)**.")
         return
     for t, b, a, prog in tiles[:50]:
-        label = f"{t.get('task_number') or '—'} / {t.get('hazard_number') or '—'}"
+        label = task_number_display(t)
         st.markdown(f"**{label}**")
         c1, c2 = st.columns(2, gap="small")
         with c1:

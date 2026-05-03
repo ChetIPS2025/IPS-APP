@@ -1,4 +1,4 @@
-"""App-wide responsive CSS for phones and narrow viewports (IPS dark theme preserved)."""
+"""App-wide responsive CSS for phones and narrow viewports (IPS field theme)."""
 
 from __future__ import annotations
 
@@ -63,8 +63,9 @@ section[data-testid="stSidebar"],
 .stSidebar {
   width: 260px !important;
   min-width: 260px !important;
-  background-color: #d1d5db !important;
-  background: #d1d5db !important;
+  background-color: #cbd5e1 !important;
+  background: #cbd5e1 !important;
+  color: #111827 !important;
 }
 
 @media (max-width: 900px) {
@@ -92,11 +93,11 @@ section[data-testid="stSidebar"],
   [data-testid="stMain"] main .stButton > button,
   [data-testid="stMain"] [data-testid="stDownloadButton"] button,
   [data-testid="stMain"] [data-testid="stFormSubmitButton"] button {
-    min-height: 2.25rem !important;
-    padding: 0.32rem 0.7rem !important;
+    min-height: 3rem !important;
+    padding: 0.45rem 0.85rem !important;
     font-size: 0.875rem !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
     line-height: 1.25 !important;
     box-sizing: border-box !important;
   }
@@ -111,10 +112,11 @@ section[data-testid="stSidebar"],
   }
   [data-testid="stMain"] .stLinkButton > a,
   [data-testid="stMain"] main .stLinkButton > a {
-    min-height: 2.25rem !important;
-    padding: 0.32rem 0.7rem !important;
+    min-height: 3rem !important;
+    padding: 0.45rem 0.85rem !important;
     font-size: 0.875rem !important;
-    border-radius: 8px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
     white-space: nowrap !important;
     box-sizing: border-box !important;
   }
@@ -234,9 +236,9 @@ section[data-testid="stSidebar"],
     min-width: 260px !important;
     max-width: min(260px, 92vw) !important;
     transition: transform 0.2s ease-out !important;
-    background: #d1d5db !important;
-    background-color: #d1d5db !important;
-    color: #1e293b !important;
+    background: #cbd5e1 !important;
+    background-color: #cbd5e1 !important;
+    color: #111827 !important;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
   }
   [data-testid="stSidebar"][aria-expanded="false"],
@@ -259,8 +261,9 @@ section[data-testid="stSidebar"],
   .stApp [data-testid="stFormSubmitButton"] button {
     padding: 14px 16px !important;
     font-size: 16px !important;
+    font-weight: 600 !important;
     border-radius: 10px !important;
-    min-height: 44px !important;
+    min-height: 48px !important;
     box-sizing: border-box !important;
   }
 

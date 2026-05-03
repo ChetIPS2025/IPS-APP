@@ -1,11 +1,10 @@
--- Job tasks (hazard / work items) + links to PM goals, tactical plans, and EOD outcomes.
+-- Job tasks (work items) + links to PM goals, tactical plans, and EOD outcomes.
 -- Run after public.jobs and sql/047_supervisor_planning_goals.sql.
 
 create table if not exists public.job_tasks (
     id uuid primary key default gen_random_uuid(),
     job_id uuid not null references public.jobs (id) on delete cascade,
     task_number text not null default '',
-    hazard_number text not null default '',
     priority text not null default 'normal' check (priority in ('low', 'normal', 'high', 'critical')),
     location text not null default '',
     issue text not null default '',
@@ -39,7 +38,7 @@ create index if not exists idx_job_tasks_planned_date on public.job_tasks (plann
 create index if not exists idx_job_tasks_status on public.job_tasks (status);
 create index if not exists idx_job_tasks_priority on public.job_tasks (priority);
 
-comment on table public.job_tasks is 'Discrete work/hazard items under a job; linked to goals, plans, and EOD.';
+comment on table public.job_tasks is 'Discrete work items under a job; linked to goals, plans, and EOD.';
 
 create table if not exists public.supervisor_goal_tasks (
     goal_id uuid not null references public.supervisor_goals (id) on delete cascade,

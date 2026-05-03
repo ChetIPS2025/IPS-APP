@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from datetime import date, datetime, timezone
 from typing import Any, Callable
 
@@ -21,6 +22,11 @@ try:
     from app.services import task_photos as tp
 except ImportError:
     import services.task_photos as tp  # type: ignore
+
+try:
+    from app.services.task_display import task_number_display
+except ImportError:
+    from services.task_display import task_number_display  # type: ignore
 
 try:
     from app.services.supervisor_planning import TASK_STATUSES
@@ -76,6 +82,14 @@ _TASK_STATUS_HEX: dict[str, str] = {
 }
 
 
+def _priority_badge_html(priority: Any) -> str:
+    pr = str(priority or "normal").strip().lower()
+    if pr not in ("low", "normal", "high", "critical"):
+        pr = "normal"
+    label = pr.title()
+    return f'<span class="ips-priority-badge {html.escape(pr)}">{html.escape(label)}</span>'
+
+
 def _status_badge_html(status: str) -> str:
     slug = str(status or "not_started").strip().lower()
     if slug == "open":
@@ -96,12 +110,19 @@ def inject_mobile_field_css() -> None:
         <style>
         .block-container { padding-top: 0.75rem !important; }
         .ips-task-card-title {
-            color: #111827;
-            font-size: 1rem;
+            color: #0f172a;
+            font-size: 1.35rem;
             font-weight: 700;
-            line-height: 1.3;
+            line-height: 1.25;
             margin: 0 0 0.35rem;
             overflow-wrap: anywhere;
+        }
+        .ips-task-card-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            align-items: center;
+            margin: 0.25rem 0 0.5rem;
         }
         .ips-task-card-grid {
             display: grid;
@@ -221,19 +242,13 @@ def render_mobile_task_detail_form(
             cur_st = "not_started"
         loc = str(task_row.get("location") or "").strip()
         iss = str(task_row.get("issue") or "").strip()
-        sup = str(task_row.get("assigned_supervisor_name") or "").strip()
-        planned = str(task_row.get("planned_date") or "").strip()[:10]
+        tno = html.escape(task_number_display(task_row))
         st.markdown(
-            f'<p class="ips-task-card-title">'
-            f'Task {str(task_row.get("task_number") or "—").strip()} / '
-            f'Hazard {str(task_row.get("hazard_number") or "—").strip()} '
-            f'{_status_badge_html(cur_st)}</p>'
-            f'<div class="ips-task-card-grid">'
-            f'<span><strong>Priority</strong> {str(task_row.get("priority") or "—").strip().title()}</span>'
-            f'<span><strong>Location</strong> {loc or "—"}</span>'
-            f'<span><strong>Supervisor</strong> {sup or "—"}</span>'
-            f'<span><strong>Planned</strong> {planned or "—"}</span>'
-            f"</div>",
+            f'<p class="ips-task-card-title">{tno}</p>'
+            f'<div class="ips-task-card-badges">'
+            f"{_priority_badge_html(task_row.get('priority'))}{_status_badge_html(cur_st)}</div>"
+            f'<p style="margin:0.2rem 0;color:#475569;font-size:0.88rem;"><strong>Location</strong> '
+            f"{html.escape(loc or '—')}</p>",
             unsafe_allow_html=True,
         )
         if iss:

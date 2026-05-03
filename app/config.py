@@ -132,6 +132,10 @@ class Settings:
     storage_bucket: str = field(default_factory=lambda: _strip_env("STORAGE_BUCKET", "ips-storage"))
     # Supabase Storage bucket for task before/progress/after images (create in dashboard + policies).
     task_photos_bucket: str = field(default_factory=lambda: _strip_env("TASK_PHOTOS_BUCKET", "task-photos"))
+    # PM reference uploads (drawings, PDFs) for supervisors — create bucket + policies in Supabase.
+    job_reference_attachments_bucket: str = field(
+        default_factory=lambda: _strip_env("JOB_REFERENCE_ATTACHMENTS_BUCKET", "job-reference-attachments")
+    )
     # File storage: "supabase" (default) uploads to Supabase Storage; "local" writes under LOCAL_STORAGE_ROOT.
     storage_backend: str = field(default_factory=_storage_backend)
     # When storage_backend is "local", files are stored under this directory (mirrors bucket key paths).

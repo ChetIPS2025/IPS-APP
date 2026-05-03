@@ -47,6 +47,11 @@ except ImportError:
     import pages.job_database_mobile_task_ui as _mob  # type: ignore
 
 try:
+    from app.pages import job_reference_attachments_ui as _jra_ui
+except ImportError:
+    import pages.job_reference_attachments_ui as _jra_ui  # type: ignore
+
+try:
     from app.ui.field_light_theme import inject_field_light_theme
 except ImportError:
     from ui.field_light_theme import inject_field_light_theme  # type: ignore
@@ -60,6 +65,11 @@ try:
     from app.services.supervisor_planning import TASK_STATUSES, delay_reason_label
 except ImportError:
     from services.supervisor_planning import TASK_STATUSES, delay_reason_label  # type: ignore
+
+try:
+    from app.services.task_display import task_number_display
+except ImportError:
+    from services.task_display import task_number_display  # type: ignore
 
 _LOG = logging.getLogger(__name__)
 
@@ -137,7 +147,7 @@ def _job_options(jobs: list[dict[str, Any]]) -> tuple[list[str], dict[str, str]]
 def _task_label(t: dict[str, Any]) -> str:
     iss = str(t.get("issue") or "")
     disp = (iss[:40] + "…") if len(iss) > 40 else (iss or "—")
-    return f"{t.get('task_number') or '—'}/{t.get('hazard_number') or '—'} · {disp}"
+    return f"{task_number_display(t)} · {disp}"
 
 
 def _profile_name_tokens() -> tuple[str, str]:
@@ -523,9 +533,17 @@ def render_supervisor() -> None:
             st.error(str(exc))
 
     st.divider()
+    lines = _lines_for_package(pkg_id, pkg_tasks)
+    job_id_pkg = str(pkg.get("job_id") or "").strip()
+    if job_id_pkg:
+        pkg_tids = [str(ln.get("job_task_id") or "").strip() for ln in lines if str(ln.get("job_task_id") or "").strip()]
+        _jra_ui.render_reference_attachments_for_package(
+            job_id=job_id_pkg,
+            package_task_ids=pkg_tids,
+            admin_read=use_admin,
+        )
     st.markdown("### Tasks (execute)")
     st.caption("Assigned for this shift — update **status**, **photos**, and **notes**; complete **End of day** below.")
-    lines = _lines_for_package(pkg_id, pkg_tasks)
     task_by_id = {str(t.get("id")): t for t in job_tasks if isinstance(t, dict) and t.get("id")}
     for ln in lines:
         tid = str(ln.get("job_task_id") or "").strip()

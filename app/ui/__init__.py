@@ -260,19 +260,20 @@ def _inject_sidebar_nav_css() -> None:
     st.sidebar.markdown(
         """
 <style>
-/* --- Surface: sidebar slightly darker than main (#e5e7eb) --- */
+/* --- Sidebar: slightly darker than main (#d1d5db), high-contrast ink --- */
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"] > div,
 [data-testid="stSidebar"] {
-  background-color: #d1d5db !important;
-  background: #d1d5db !important;
-  color: #1e293b !important;
+  background-color: #cbd5e1 !important;
+  background: #cbd5e1 !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] .block-container {
   background: transparent !important;
 }
 section[data-testid="stSidebar"] .stMarkdown,
 section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown li,
 section[data-testid="stSidebar"] .stMarkdown h1,
 section[data-testid="stSidebar"] .stMarkdown h2,
 section[data-testid="stSidebar"] .stMarkdown h3,
@@ -281,14 +282,25 @@ section[data-testid="stSidebar"] .stMarkdown h5,
 section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
 section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
 section[data-testid="stSidebar"] [data-testid="stCaption"] {
-  color: #1e293b !important;
+  color: #111827 !important;
+  font-weight: 500 !important;
+}
+section[data-testid="stSidebar"] .stMarkdown h1,
+section[data-testid="stSidebar"] .stMarkdown h2,
+section[data-testid="stSidebar"] .stMarkdown h3 {
+  font-weight: 700 !important;
+}
+section[data-testid="stSidebar"] .stMarkdown h4,
+section[data-testid="stSidebar"] .stMarkdown h5 {
+  font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] .stLinkButton > a {
-  color: #1e293b !important;
+  color: #111827 !important;
+  font-weight: 600 !important;
 }
 /* Section labels: subtle hierarchy, still high contrast */
 section[data-testid="stSidebar"] .ips-nav-section-title {
-  color: #334155 !important;
+  color: #111827 !important;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -316,63 +328,66 @@ section[data-testid="stSidebar"] div.stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
-  min-height: 2.25rem !important;
-  padding: 0.35rem 0.75rem !important;
-  border-radius: 8px !important;
+  min-height: 3rem !important;
+  padding: 0.45rem 0.75rem !important;
+  border-radius: 10px !important;
   line-height: 1.25 !important;
   box-sizing: border-box !important;
   background: #e5e7eb !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #1e293b !important;
+  border: 1px solid #9ca3af !important;
+  color: #111827 !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] div.stButton > button:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
-  background: #cbd5e1 !important;
-  border-color: #94a3b8 !important;
-  color: #1e293b !important;
+  background: #d1d5db !important;
+  border-color: #6b7280 !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] div.stButton > button p {
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   margin: 0 !important;
-  color: #1e293b !important;
+  color: #111827 !important;
+  font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button {
   font-size: 0.8125rem !important;
-  font-weight: 500 !important;
-  min-height: 2.25rem !important;
-  padding: 0.35rem 0.65rem !important;
-  border-radius: 8px !important;
+  font-weight: 600 !important;
+  min-height: 3rem !important;
+  padding: 0.45rem 0.65rem !important;
+  border-radius: 10px !important;
   box-sizing: border-box !important;
   background: #e5e7eb !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #1e293b !important;
+  border: 1px solid #9ca3af !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
-  background: #cbd5e1 !important;
-  border-color: #94a3b8 !important;
-  color: #1e293b !important;
+  background: #d1d5db !important;
+  border-color: #6b7280 !important;
+  color: #111827 !important;
 }
-/* Active page: slightly stronger fill, same ink (no white-on-light) */
+/* Active page: white card on grey rail */
 section[data-testid="stSidebar"] button[kind="primary"],
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
-  background: #cbd5e1 !important;
-  border: 1px solid #94a3b8 !important;
-  color: #1e293b !important;
+  background: #ffffff !important;
+  border: 1px solid #9ca3af !important;
+  color: #111827 !important;
   box-shadow: none !important;
+  font-weight: 700 !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover:not(:disabled) {
-  background: #b8c4d4 !important;
-  border-color: #64748b !important;
-  color: #1e293b !important;
+  background: #f3f4f6 !important;
+  border-color: #6b7280 !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"] p,
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
-  color: #1e293b !important;
+  color: #111827 !important;
+  font-weight: 700 !important;
 }
 /* TOOLS expander */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
@@ -386,14 +401,14 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
-  color: #334155 !important;
+  color: #111827 !important;
   opacity: 1 !important;
   padding: 8px 10px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] svg,
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
-  color: #475569 !important;
-  fill: #475569 !important;
+  color: #374151 !important;
+  fill: #374151 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
   padding: 2px 8px 12px 8px !important;
@@ -402,43 +417,43 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpa
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.8125rem !important;
-  font-weight: 500 !important;
-  min-height: 2.125rem !important;
-  padding: 0.28rem 0.6rem !important;
-  border-radius: 8px !important;
+  font-weight: 600 !important;
+  min-height: 3rem !important;
+  padding: 0.4rem 0.6rem !important;
+  border-radius: 10px !important;
   background: #e5e7eb !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #1e293b !important;
+  border: 1px solid #9ca3af !important;
+  color: #111827 !important;
   box-shadow: none !important;
   opacity: 1 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover:not(:disabled) {
-  background: #cbd5e1 !important;
-  border-color: #94a3b8 !important;
-  color: #1e293b !important;
+  background: #d1d5db !important;
+  border-color: #6b7280 !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"],
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-primary"] {
   font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  min-height: 2.25rem !important;
-  padding: 0.35rem 0.75rem !important;
-  border-radius: 8px !important;
-  background: #cbd5e1 !important;
-  border: 1px solid #94a3b8 !important;
-  color: #1e293b !important;
+  font-weight: 700 !important;
+  min-height: 3rem !important;
+  padding: 0.4rem 0.75rem !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border: 1px solid #9ca3af !important;
+  color: #111827 !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"]:hover:not(:disabled) {
-  background: #b8c4d4 !important;
-  border-color: #64748b !important;
-  color: #1e293b !important;
+  background: #f3f4f6 !important;
+  border-color: #6b7280 !important;
+  color: #111827 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
 }
 section[data-testid="stSidebar"] .ips-install-section-title {
-  color: #334155 !important;
+  color: #111827 !important;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;

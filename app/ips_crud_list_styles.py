@@ -49,20 +49,22 @@ def inject_ips_modal_styles() -> None:
         div[data-testid="stDialog"] h3 {
             color: #111827 !important;
             font-size: 1.125rem !important;
-            font-weight: 650 !important;
+            font-weight: 700 !important;
             letter-spacing: -0.02em;
             margin: 0 0 0.35rem 0 !important;
             padding: 0 !important;
             border: none !important;
         }
         p.ips-modal-subtitle {
-            color: #4b5563 !important;
+            color: #1f2937 !important;
+            font-weight: 500 !important;
             font-size: 0.8125rem !important;
             line-height: 1.45 !important;
             margin: 0 0 0.65rem 0 !important;
         }
         p.ips-modal-hint {
-            color: #6b7280 !important;
+            color: #374151 !important;
+            font-weight: 500 !important;
             font-size: 0.75rem !important;
             line-height: 1.35 !important;
             margin: 0.25rem 0 0.5rem 0 !important;
@@ -76,7 +78,7 @@ def inject_ips_modal_styles() -> None:
         div[data-testid="stDialog"] input:not([type="checkbox"]):not([type="radio"]),
         div[data-testid="stDialog"] textarea {
             background: #ffffff !important;
-            border: 1px solid #cbd5e1 !important;
+            border: 1px solid #9ca3af !important;
             border-radius: 10px !important;
             color: #111827 !important;
             font-size: 0.875rem !important;
