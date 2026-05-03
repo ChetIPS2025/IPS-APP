@@ -479,10 +479,7 @@ def _migrate_legacy_nav_session_keys() -> None:
 def _ensure_valid_nav_page() -> None:
     _migrate_legacy_nav_session_keys()
     cur0 = st.session_state.get(IPS_NAV_PAGE_KEY)
-    if cur0 == "Users":
-        st.session_state[IPS_NAV_PAGE_KEY] = "People"
-        st.session_state["people_section_radio"] = "User accounts"
-    elif cur0 == "Employees":
+    if cur0 == "Employees":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "Employees"
     elif cur0 == "Inventory scan":
@@ -511,6 +508,7 @@ def _ensure_valid_nav_page() -> None:
             | set(_NAV_ASSET_ROUTES)
             | set(_NAV_RESOURCES)
             | set(_NAV_INVENTORY_SUBPAGES)
+            | set(_NAV_ADMIN_SIDEBAR)
             | visible_secondary
         )
         if role_can_open_page(role, p)
@@ -527,6 +525,19 @@ def _ensure_valid_nav_page() -> None:
         st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
 
 
+def _set_sidebar_page(page: str) -> None:
+    st.session_state[IPS_NAV_PAGE_KEY] = page
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+    st.rerun()
+
+
+def _sidebar_sign_out() -> None:
+    sign_out()
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+    st.session_state.pop(IPS_NAV_PAGE_KEY, None)
+    st.rerun()
+
+
 def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
     active = current == page
     btn_type = "primary" if active else "secondary"
@@ -535,12 +546,10 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
         _, c2 = st.sidebar.columns([0.06, 0.94])
         with c2:
             if st.button(page, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = page
-                st.rerun()
+                _set_sidebar_page(page)
     else:
         if st.sidebar.button(page, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = page
-            st.rerun()
+            _set_sidebar_page(page)
 
 
 def _render_nav_button_route(*, label: str, route: str, current: str, indent: bool, key_suffix: str) -> None:
@@ -552,12 +561,10 @@ def _render_nav_button_route(*, label: str, route: str, current: str, indent: bo
         _, c2 = st.sidebar.columns([0.06, 0.94])
         with c2:
             if st.button(label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = route
-                st.rerun()
+                _set_sidebar_page(route)
     else:
         if st.sidebar.button(label, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = route
-            st.rerun()
+            _set_sidebar_page(route)
 
 
 def _sidebar_asset_category_focus_norm() -> str:
@@ -590,9 +597,8 @@ def _render_assets_sidebar_group(*, current: str, role: str) -> None:
             btn_type = "primary" if active else "secondary"
             key = _nav_btn_key(f"Asset_Database__focus_{cat_norm}")
             if st.button(nav_label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
                 st.session_state["asset_db_f_asset_category"] = "All" if cat_norm == "All" else cat_norm
-                st.rerun()
+                _set_sidebar_page("Asset Database")
 
 
 def _sidebar_nav_title(extra_class: str, text: str) -> None:
@@ -659,9 +665,8 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if inv_list_active else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
                         st.session_state["inv_f_cat"] = "All"
-                        st.rerun()
+                        _set_sidebar_page("Inventory")
                 if role_can_open_page(role, "Scan Inventory"):
                     if st.button(
                         "Scan inventory",
@@ -669,8 +674,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if current == "Scan Inventory" else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-                        st.rerun()
+                        _set_sidebar_page("Scan Inventory")
                 if role_can_open_page(role, "Inventory Usage"):
                     if st.button(
                         "Inventory usage",
@@ -678,8 +682,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if current == "Inventory Usage" else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
-                        st.rerun()
+                        _set_sidebar_page("Inventory Usage")
 
     _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
     for p in _NAV_ADMIN_SIDEBAR:
@@ -775,5 +778,6 @@ def render_sidebar() -> str:
         _render_sidebar_viewer(current=current, role=role)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
-    st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)
+    if st.sidebar.button("Sign Out", use_container_width=True):
+        _sidebar_sign_out()
     return current
