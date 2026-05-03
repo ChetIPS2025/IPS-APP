@@ -1901,7 +1901,7 @@ def render() -> None:
                 )
             with hours_col:
                 st.number_input(
-                    "Hours",
+                    "Hrs",
                     min_value=0.0,
                     max_value=24.0,
                     step=0.5,
@@ -1917,7 +1917,7 @@ def render() -> None:
             st.text_input(
                 "Notes optional",
                 key=notes_key,
-                placeholder="Notes optional",
+                placeholder="Optional note",
             )
 
     if not can_edit:
