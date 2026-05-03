@@ -4,6 +4,7 @@ import contextlib
 import html
 import logging
 from typing import Any
+from urllib.parse import urlencode
 
 _LOG = logging.getLogger(__name__)
 
@@ -250,6 +251,7 @@ JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v7"
 JOB_DB_TABLET_MOBILE_BREAKPOINT_PX = 1100
 JOB_DB_TABLET_MOBILE_KEY = "job_db_is_tablet_or_mobile"
 JOB_DB_VIEWPORT_QUERY_PARAM = "ips_job_vp"
+JOB_DB_OPEN_QUERY_PARAM = "job_open_id"
 _JOB_DB_VIEWPORT_SCRIPT_SENT_KEY = "_job_db_viewport_detect_script_sent"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
@@ -311,6 +313,27 @@ def _ensure_job_db_viewport_detected() -> bool:
     return bool(st.session_state.get(JOB_DB_TABLET_MOBILE_KEY, False))
 
 
+def _consume_job_card_open_request(*, jobs: list[dict[str, Any]], can_open: bool) -> None:
+    try:
+        raw = st.query_params.get(JOB_DB_OPEN_QUERY_PARAM)
+        if isinstance(raw, list):
+            raw = raw[0] if raw else ""
+        jid = str(raw or "").strip()
+        if JOB_DB_OPEN_QUERY_PARAM in st.query_params:
+            del st.query_params[JOB_DB_OPEN_QUERY_PARAM]
+    except Exception:
+        jid = ""
+    if not jid or not can_open:
+        return
+    valid_ids = {str(j.get("id") or "").strip() for j in jobs}
+    if jid not in valid_ids:
+        return
+    st.session_state["job_mode"] = "edit"
+    st.session_state["job_edit_id"] = jid
+    st.session_state.pop("job_number_manual_input", None)
+    st.rerun()
+
+
 def _inject_job_database_responsive_styles() -> None:
     """Jobs page tablet/mobile layout overrides. Keeps desktop split/table unchanged."""
     if st.session_state.get(JOB_DB_RESPONSIVE_STYLES_KEY):
@@ -326,6 +349,7 @@ def _inject_job_database_responsive_styles() -> None:
         }
         .ips-job-card-title {
             color: #111827 !important;
+            display: block;
             font-size: 1rem;
             font-weight: 700;
             line-height: 1.25;
@@ -334,10 +358,37 @@ def _inject_job_database_responsive_styles() -> None:
         }
         .ips-job-card-meta {
             color: #4b5563 !important;
+            display: block;
             font-size: 0.88rem;
             line-height: 1.45;
             margin: 0.15rem 0 0.4rem;
             overflow-wrap: anywhere;
+        }
+        .ips-job-card-open {
+            color: inherit !important;
+            display: block;
+            min-height: 92px;
+            padding: 0.15rem 0.1rem 0.35rem;
+            text-decoration: none !important;
+            -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
+        }
+        .ips-job-card-open:active,
+        .ips-job-card-open:focus,
+        .ips-job-card-open:hover {
+            text-decoration: none !important;
+        }
+        .ips-job-card-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-top: 0.35rem;
+        }
+        .ips-job-card-open-hint {
+            color: #2563eb !important;
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-top: 0.55rem;
         }
         .ips-job-card-pill {
             display: inline-flex;
@@ -367,6 +418,11 @@ def _inject_job_database_responsive_styles() -> None:
             margin: 0.2rem 0.25rem 0.1rem 0;
             padding: 0.35rem 0.55rem;
             white-space: nowrap;
+        }
+        .ips-job-card-open:focus-visible {
+            border-radius: 10px;
+            outline: 3px solid #93c5fd;
+            outline-offset: 4px;
         }
         /*
          * Job overview: Streamlit theme is base=dark (light text tokens). List rows sit on white
@@ -400,11 +456,6 @@ def _inject_job_database_responsive_styles() -> None:
             margin-bottom: 0.65rem !important;
             padding: 0.75rem !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-job-card-selected) {
-            border: 2px solid #2563eb !important;
-            background: #eff6ff !important;
-            box-shadow: 0 1px 4px rgba(37, 99, 235, 0.18) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
@@ -1521,32 +1572,26 @@ def _render_job_card_list(
     *,
     df_display: pd.DataFrame,
     job_num_col: str,
-) -> list[str]:
-    picked: list[str] = []
+    can_delete: bool,
+) -> None:
     st.markdown('<span class="ips-job-card-list-anchor"></span>', unsafe_allow_html=True)
     st.markdown("##### Job list")
     st.markdown(
-        '<p class="ips-job-card-list-note">Tablet and phone: job cards replace the wide table. '
-        "Select one or more jobs with the <strong>checkbox</strong>, then use <strong>Edit</strong> or "
-        "<strong>Delete</strong> in the bar below.</p>",
+        '<p class="ips-job-card-list-note">Tap a job card to open details. Delete is a separate action.</p>',
         unsafe_allow_html=True,
     )
 
     if df_display.empty:
         st.caption("No jobs match these filters.")
-        return picked
+        return
 
     for _, row in df_display.iterrows():
         jid = str(row.get("id") or "").strip()
         if not jid:
             continue
         with st.container(border=True):
-            ck = f"job_list_pick_card_{jid}"
-            if ck not in st.session_state:
-                st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
-            sel_cls = " ips-job-card-selected" if st.session_state.get(ck) else ""
             st.markdown(
-                f'<span class="ips-job-card-anchor{sel_cls}"></span>',
+                '<span class="ips-job-card-anchor"></span>',
                 unsafe_allow_html=True,
             )
             job_num = _job_db_card_text(row.get(job_num_col), "No job #")
@@ -1561,25 +1606,33 @@ def _render_job_card_list(
                 if amount
                 else ""
             )
+            open_href = "?" + urlencode({JOB_DB_OPEN_QUERY_PARAM: jid})
             st.markdown(
-                f'<p class="ips-job-card-title">{html.escape(job_name)}</p>'
-                f'<p class="ips-job-card-meta">'
+                f'<a class="ips-job-card-open" href="{html.escape(open_href, quote=True)}" '
+                f'aria-label="Open job {html.escape(job_num, quote=True)} {html.escape(job_name, quote=True)}">'
+                f'<span class="ips-job-card-title">{html.escape(job_name)}</span>'
+                f'<span class="ips-job-card-meta">'
                 f'<strong>Job #</strong> {html.escape(job_num)} &nbsp; '
-                f'<strong>Customer</strong> {html.escape(customer)}</p>'
-                f"{_job_status_badge_html(status)}"
-                f"{amount_html}",
+                f'<strong>Customer</strong> {html.escape(customer)}</span>'
+                f'<span class="ips-job-card-badges">{_job_status_badge_html(status)}{amount_html}</span>'
+                f'<span class="ips-job-card-open-hint">Tap to open</span>'
+                "</a>",
                 unsafe_allow_html=True,
             )
-
-            pick_label = (
-                f"Select · {job_num} · {short_text(job_name, 42)} · {short_text(customer, 28)} · "
-                f"{short_text(status, 18)}"
-            )
-            selected = st.checkbox(pick_label, key=ck)
-            if selected:
-                picked.append(jid)
-
-    return picked
+            if can_delete:
+                if st.button(
+                    "Delete",
+                    key=f"job_card_del_{jid}",
+                    type="secondary",
+                    use_container_width=False,
+                    help="Delete this job (blocked if costing data exists).",
+                ):
+                    pending = st.session_state.get(IPS_PENDING_DELETE)
+                    if not isinstance(pending, dict):
+                        pending = {}
+                        st.session_state[IPS_PENDING_DELETE] = pending
+                    pending[TABLE_KEY_JOBS] = [jid]
+                    st.rerun()
 
 
 def _filter_jobs_overview_dataframe(
@@ -1755,6 +1808,11 @@ def render() -> None:
         jobs = sort_jobs_by_number_then_name(jobs)
     else:
         jobs = sort_jobs_by_name(jobs)
+
+    _consume_job_card_open_request(
+        jobs=jobs,
+        can_open=can_edit or current_role() == "employee",
+    )
 
     customer_name_by_id: dict[str, str] = {}
     for c in customers:
@@ -2117,63 +2175,64 @@ def render() -> None:
                         )
                         if job_num_col not in df_display.columns:
                             job_num_col = "id"
-                        picked = _render_job_card_list(
+                        _render_job_card_list(
                             df_display=df_display,
                             job_num_col=job_num_col,
+                            can_delete=can_edit,
                         )
-                        set_selected_ids(TABLE_KEY_JOBS, picked)
 
             sel_ids = picked if "id" in filtered.columns else []
             n_sel = len(sel_ids)
             one = n_sel == 1
             none = n_sel == 0
 
-            with st.container(border=True):
-                st.markdown(
-                    '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor"></span>',
-                    unsafe_allow_html=True,
-                )
-                left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
-                with left:
+            if not is_tablet_or_mobile:
+                with st.container(border=True):
                     st.markdown(
-                        f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
+                        '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor"></span>',
                         unsafe_allow_html=True,
                     )
-                with b1:
-                    if st.button(
-                        "Edit",
-                        key="job_edit_btn",
-                        type="secondary",
-                        use_container_width=True,
-                        disabled=not (can_edit or current_role() == "employee"),
-                    ):
-                        if not one:
+                    left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
+                    with left:
+                        st.markdown(
+                            f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
+                            unsafe_allow_html=True,
+                        )
+                    with b1:
+                        if st.button(
+                            "Edit",
+                            key="job_edit_btn",
+                            type="secondary",
+                            use_container_width=True,
+                            disabled=not (can_edit or current_role() == "employee"),
+                        ):
+                            if not one:
+                                if none:
+                                    st.warning("Please select a job first.")
+                                else:
+                                    st.warning("Please select exactly one job to edit.")
+                            else:
+                                st.session_state["job_mode"] = "edit"
+                                st.session_state["job_edit_id"] = str(sel_ids[0])
+                                st.session_state.pop("job_number_manual_input", None)
+                                st.rerun()
+                    with b2:
+                        if st.button(
+                            "Delete",
+                            key="job_delete_btn",
+                            type="secondary",
+                            use_container_width=True,
+                            disabled=not can_edit,
+                        ):
                             if none:
                                 st.warning("Please select a job first.")
                             else:
-                                st.warning("Please select exactly one job to edit.")
-                        else:
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = str(sel_ids[0])
-                            st.session_state.pop("job_number_manual_input", None)
-                            st.rerun()
-                with b2:
-                    if st.button(
-                        "Delete",
-                        key="job_delete_btn",
-                        type="secondary",
-                        use_container_width=True,
-                        disabled=not can_edit,
-                    ):
-                        if none:
-                            st.warning("Please select a job first.")
-                        else:
-                            pending = st.session_state.get(IPS_PENDING_DELETE)
-                            if not isinstance(pending, dict):
-                                pending = {}
-                                st.session_state[IPS_PENDING_DELETE] = pending
-                            pending[TABLE_KEY_JOBS] = list(sel_ids)
-                            st.rerun()
+                                pending = st.session_state.get(IPS_PENDING_DELETE)
+                                if not isinstance(pending, dict):
+                                    pending = {}
+                                    st.session_state[IPS_PENDING_DELETE] = pending
+                                pending[TABLE_KEY_JOBS] = list(sel_ids)
+                                st.rerun()
 
             pend = st.session_state.get(IPS_PENDING_DELETE) or {}
             if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):
