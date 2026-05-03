@@ -48,6 +48,7 @@ try:
         index_by_employee_date,
         monday_of_week,
         sum_employee_week_hours,
+        upsert_time_entry,
         week_dates,
     )
 except ImportError:
@@ -60,10 +61,11 @@ except ImportError:
         index_by_employee_date,
         monday_of_week,
         sum_employee_week_hours,
+        upsert_time_entry,
         week_dates,
     )
 
-TT_EDIT_ROLES = frozenset({"admin", "pm", "employee"})
+TT_EDIT_ROLES = frozenset({"admin", "pm", "manager", "supervisor", "employee"})
 
 _OT_THRESHOLD_DEFAULT = 40.0
 
@@ -1542,27 +1544,409 @@ def _tt_render_footer_section(day_col_totals: list[float], days: list[date], gri
         st.markdown(f'<p class="ips-tt-metric">{total_h:.1f}</p>', unsafe_allow_html=True)
 
 
+def _inject_tt_simple_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .stApp { background: #d1d5db !important; color: #111827 !important; }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-card),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-row-card) {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+            padding: 14px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-row-card) {
+            margin-bottom: 10px !important;
+        }
+        .ips-tt-day-title {
+            color: #111827 !important;
+            font-weight: 800 !important;
+            font-size: 1.05rem !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+        }
+        .ips-tt-day-status {
+            color: #475569 !important;
+            font-weight: 700 !important;
+            font-size: 0.84rem !important;
+            margin: 0.15rem 0 0 0 !important;
+        }
+        label[data-testid="stWidgetLabel"] p {
+            color: #111827 !important;
+            font-weight: 800 !important;
+            font-size: 0.95rem !important;
+        }
+        [data-testid="stNumberInput"] input,
+        [data-testid="stTextInput"] input,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+            min-height: 48px !important;
+            border-color: #cbd5e1 !important;
+            color: #111827 !important;
+            font-size: 1rem !important;
+        }
+        [data-testid="stNumberInput"] [data-baseweb="input"] {
+            min-height: 48px !important;
+        }
+        .stButton > button {
+            min-height: 48px !important;
+            border-radius: 10px !important;
+            font-weight: 800 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-card) button,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-day-row-card) button {
+            min-height: 48px !important;
+        }
+        @media (max-width: 768px) {
+            div[data-testid="stHorizontalBlock"] {
+                gap: 0.5rem !important;
+            }
+            .ips-tt-day-title {
+                font-size: 1.12rem !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _tt_employee_label(emp: dict) -> str:
+    name = str(emp.get("name") or "").strip() or "Unnamed employee"
+    return f"{name} ({str(emp.get('id') or '')[:8]})"
+
+
+def _tt_find_employee_index(active_employees: list[dict], employee_id: str) -> int:
+    for i, emp in enumerate(active_employees):
+        if str(emp.get("id") or "") == str(employee_id):
+            return i
+    return 0
+
+
+def _tt_work_item_matches(entry: dict, work_item: dict) -> bool:
+    wi_type = str(work_item.get("type") or "").strip()
+    if wi_type == "job":
+        return str(entry.get("job_id") or "").strip() == str(work_item.get("id") or "").strip()
+    if wi_type == "non_job":
+        return (
+            not str(entry.get("job_id") or "").strip()
+            and str(entry.get("non_job_code") or "").strip() == str(work_item.get("code") or "").strip()
+        )
+    return False
+
+
+def _tt_entry_for_work_item(entries: list[dict], work_item: dict) -> dict | None:
+    for entry in entries:
+        if _tt_work_item_matches(entry, work_item):
+            return entry
+    return None
+
+
+def _tt_entry_work_item_index(work_item_options: list[dict], entry: dict | None, default_index: int) -> int:
+    if entry:
+        return _work_item_index_for_entry(work_item_options, ent=entry)
+    return default_index
+
+
+def _tt_delete_matching_entry(entries: list[dict], work_item: dict) -> None:
+    entry = _tt_entry_for_work_item(entries, work_item)
+    if entry and entry.get("id"):
+        delete_rows("time_entries", {"id": str(entry["id"])})
+
+
+def _tt_apply_default_week(days: list[date], employee_id: str, default_hours: float, default_work_item: dict) -> None:
+    for d in days:
+        wd = d.isoformat()
+        st.session_state[f"tt_simple_hours_{employee_id}_{wd}"] = float(default_hours) if d.weekday() < 5 else 0.0
+        st.session_state[f"tt_simple_notes_{employee_id}_{wd}"] = ""
+        st.session_state[f"tt_simple_work_item_{employee_id}_{wd}"] = default_work_item
+
+
+def _tt_save_simple_week(
+    *,
+    employee_id: str,
+    days: list[date],
+    idx: dict,
+    user_id,
+    ts_iso: str,
+) -> tuple[int, int]:
+    saved = 0
+    cleared = 0
+    for d in days:
+        wd = d.isoformat()
+        work_item = st.session_state.get(f"tt_simple_work_item_{employee_id}_{wd}")
+        if not isinstance(work_item, dict):
+            continue
+        try:
+            hours = float(st.session_state.get(f"tt_simple_hours_{employee_id}_{wd}") or 0)
+        except (TypeError, ValueError):
+            hours = 0.0
+        notes = str(st.session_state.get(f"tt_simple_notes_{employee_id}_{wd}") or "").strip()
+        entries = idx.get((employee_id, wd), [])
+        original_id = str(st.session_state.get(f"tt_simple_original_entry_{employee_id}_{wd}") or "").strip()
+        original_entry = next((entry for entry in entries if str(entry.get("id") or "") == original_id), None)
+        if hours <= 0:
+            if original_entry and original_entry.get("id"):
+                delete_rows("time_entries", {"id": str(original_entry["id"])})
+            else:
+                _tt_delete_matching_entry(entries, work_item)
+            cleared += 1
+            continue
+        if original_entry and not _tt_work_item_matches(original_entry, work_item):
+            delete_rows("time_entries", {"id": str(original_entry["id"])})
+        wi_type = str(work_item.get("type") or "").strip()
+        if wi_type == "job":
+            job_id = str(work_item.get("id") or "").strip()
+            if not job_id:
+                continue
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=job_id,
+                non_job_code=None,
+                work_date=d,
+                hours=min(hours, 24.0),
+                notes=notes,
+                created_by=user_id,
+                updated_at_iso=ts_iso,
+            )
+        elif wi_type == "non_job":
+            non_job_code = str(work_item.get("code") or "").strip()
+            if not non_job_code:
+                continue
+            upsert_time_entry(
+                employee_id=employee_id,
+                job_id=None,
+                non_job_code=non_job_code,
+                work_date=d,
+                hours=min(hours, 24.0),
+                notes=notes,
+                created_by=user_id,
+                updated_at_iso=ts_iso,
+            )
+        else:
+            continue
+        saved += 1
+    return saved, cleared
+
+
 def render() -> None:
     today = date.today()
-    can_edit, fast = _tt_render_header_section()
-    week_start, days, week_end = _tt_render_toolbar_section(today)
-    filt = _tt_render_filters_section(fast=fast)
-    week_data = _tt_render_summary_section(week_start, week_end, filt)
-    if week_data is None:
+    render_header("Time Tracking", subtitle="")
+    _inject_tt_simple_styles()
+    ensure_narrow_viewport_detected()
+
+    role = current_role()
+    can_edit = role in TT_EDIT_ROLES
+    admin_mode = role in {"admin", "pm", "manager", "supervisor"}
+    profile = current_profile()
+    linked_employee_id = str(profile.get("employee_id") or "").strip()
+
+    try:
+        all_employees = fetch_table("employees", limit=5000, order_by="name")
+    except Exception as exc:
+        st.error(f"Could not load employees: {exc}")
         return
-    footer = _tt_render_grid_section(
-        can_edit=can_edit,
-        fast=fast,
-        today=today,
-        week_start=week_start,
-        days=days,
-        week_end=week_end,
-        filt=filt,
-        week_data=week_data,
+    active_employees = [e for e in all_employees if e.get("is_active", True) is not False and e.get("id")]
+    if not active_employees:
+        st.warning("No active employees found.")
+        return
+
+    try:
+        jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
+    except Exception as exc:
+        st.error(f"Could not load jobs: {exc}")
+        return
+    job_label_to_id = {
+        job_row_select_label(j): str(j.get("id"))
+        for j in jobs
+        if j.get("id") and job_row_select_label(j) and job_row_select_label(j) != "—"
+    }
+    job_labels_sorted = sorted(job_label_to_id.keys(), key=str.casefold)
+    work_item_options = _build_work_item_options(
+        job_labels_sorted=job_labels_sorted,
+        job_label_to_id=job_label_to_id,
     )
-    if footer is not None:
-        day_col_totals, grid_ratios = footer
-        _tt_render_footer_section(day_col_totals, days, grid_ratios)
+    if not work_item_options:
+        st.warning("No jobs are available for time entry.")
+        return
+
+    st.session_state.setdefault("tt_week_start", monday_of_week(today))
+    week_start: date = st.session_state["tt_week_start"]
+    if week_start.weekday() != 0:
+        week_start = monday_of_week(week_start)
+        st.session_state["tt_week_start"] = week_start
+    days = week_dates(week_start)
+    week_end = days[-1]
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-tt-simple-card" aria-hidden="true"></span>', unsafe_allow_html=True)
+        w1, w2, w3 = st.columns(3, gap="small")
+        with w1:
+            if st.button("Previous", key="tt_simple_prev_week", use_container_width=True):
+                st.session_state["tt_week_start"] = week_start - timedelta(days=7)
+                st.rerun()
+        with w2:
+            if st.button("Current Week", key="tt_simple_current_week", use_container_width=True):
+                st.session_state["tt_week_start"] = monday_of_week(today)
+                st.rerun()
+        with w3:
+            if st.button("Next", key="tt_simple_next_week", use_container_width=True):
+                st.session_state["tt_week_start"] = week_start + timedelta(days=7)
+                st.rerun()
+        st.markdown(f"**Week:** {week_start.strftime('%b %d')} - {week_end.strftime('%b %d, %Y')}")
+
+        if admin_mode:
+            employee_labels = [_tt_employee_label(emp) for emp in active_employees]
+            default_emp_idx = _tt_find_employee_index(
+                active_employees,
+                str(st.session_state.get("tt_simple_employee_id") or linked_employee_id),
+            )
+            selected_emp_label = st.selectbox(
+                "Employee",
+                employee_labels,
+                index=default_emp_idx,
+            )
+            selected_emp = active_employees[employee_labels.index(selected_emp_label)]
+            selected_employee_id = str(selected_emp.get("id"))
+            st.session_state["tt_simple_employee_id"] = selected_employee_id
+            eprev, enext = st.columns(2, gap="small")
+            emp_idx = _tt_find_employee_index(active_employees, selected_employee_id)
+            with eprev:
+                if st.button("Previous Employee", use_container_width=True, disabled=emp_idx <= 0):
+                    st.session_state["tt_simple_employee_id"] = str(active_employees[emp_idx - 1].get("id"))
+                    st.rerun()
+            with enext:
+                if st.button("Next Employee", use_container_width=True, disabled=emp_idx >= len(active_employees) - 1):
+                    st.session_state["tt_simple_employee_id"] = str(active_employees[emp_idx + 1].get("id"))
+                    st.rerun()
+        else:
+            selected_employee_id = linked_employee_id or str(active_employees[0].get("id"))
+            selected_emp = active_employees[_tt_find_employee_index(active_employees, selected_employee_id)]
+            st.markdown(f"**Employee:** {_tt_employee_label(selected_emp)}")
+
+        default_work_item = work_item_options[0]
+        saved_work_item = st.session_state.get("tt_simple_default_work_item")
+        if isinstance(saved_work_item, dict):
+            for i, opt in enumerate(work_item_options):
+                if opt == saved_work_item:
+                    default_work_item = work_item_options[i]
+                    break
+        default_index = work_item_options.index(default_work_item)
+        default_work_item = st.selectbox(
+            "Job",
+            work_item_options,
+            index=default_index,
+            key="tt_simple_default_work_item",
+            format_func=lambda o: str((o or {}).get("label") or "—"),
+        )
+        st.session_state.setdefault(TT_DEFAULT_HOURS_KEY, 8.0)
+        default_hours = st.number_input(
+            "Default hours",
+            min_value=0.0,
+            max_value=24.0,
+            value=float(_tt_default_hours()),
+            step=0.5,
+            format="%.1f",
+            key="tt_simple_default_hours",
+        )
+        st.session_state[TT_DEFAULT_HOURS_KEY] = float(default_hours)
+        if st.button("Apply to week", key="tt_simple_apply_week", use_container_width=True, type="primary"):
+            _tt_apply_default_week(days, selected_employee_id, float(default_hours), default_work_item)
+            st.rerun()
+
+    try:
+        grid_rows = fetch_time_entries_between(week_start, week_end)
+    except Exception as exc:
+        st.error(f"Could not load time entries: {exc}")
+        return
+    idx = index_by_employee_date(grid_rows)
+    selected_week_total = sum_employee_week_hours(grid_rows, selected_employee_id, days)
+    employee_name = str(selected_emp.get("name") or "Employee").strip() or "Employee"
+    st.markdown(f"**{html.escape(employee_name)}:** {selected_week_total:.1f} hrs this week")
+
+    for d in days:
+        wd = d.isoformat()
+        entries = idx.get((selected_employee_id, wd), [])
+        existing = _tt_entry_for_work_item(entries, default_work_item) or (entries[0] if entries else None)
+        prev_original_id = str(st.session_state.get(f"tt_simple_original_entry_{selected_employee_id}_{wd}") or "")
+        entry_work_item_index = _tt_entry_work_item_index(work_item_options, existing, default_index)
+        default_day_hours = float(existing.get("hours") or 0) if existing else (float(default_hours) if d.weekday() < 5 else 0.0)
+        default_notes = str(existing.get("notes") or "") if existing else ""
+        hours_key = f"tt_simple_hours_{selected_employee_id}_{wd}"
+        notes_key = f"tt_simple_notes_{selected_employee_id}_{wd}"
+        work_item_key = f"tt_simple_work_item_{selected_employee_id}_{wd}"
+        current_original_id = str(existing.get("id") or "") if existing else ""
+        if prev_original_id != current_original_id:
+            for key in (hours_key, notes_key, work_item_key):
+                st.session_state.pop(key, None)
+        st.session_state.setdefault(hours_key, default_day_hours)
+        st.session_state.setdefault(notes_key, default_notes)
+        st.session_state.setdefault(work_item_key, work_item_options[entry_work_item_index])
+        st.session_state[f"tt_simple_original_entry_{selected_employee_id}_{wd}"] = (
+            current_original_id
+        )
+        status = "Saved" if existing else "Ready"
+        if entries and len(entries) > 1:
+            status = f"{status} · {len(entries)} lines"
+
+        with st.container(border=True):
+            st.markdown('<span class="ips-tt-day-row-card" aria-hidden="true"></span>', unsafe_allow_html=True)
+            title_col, hours_col = st.columns([1.05, 1], gap="small")
+            with title_col:
+                st.markdown(
+                    f'<p class="ips-tt-day-title">{d.strftime("%a %m/%d")}</p>'
+                    f'<p class="ips-tt-day-status">{html.escape(status)}</p>',
+                    unsafe_allow_html=True,
+                )
+            with hours_col:
+                st.number_input(
+                    "Hours",
+                    min_value=0.0,
+                    max_value=24.0,
+                    step=0.5,
+                    format="%.1f",
+                    key=hours_key,
+                )
+            st.selectbox(
+                "Job",
+                work_item_options,
+                key=work_item_key,
+                format_func=lambda o: str((o or {}).get("label") or "—"),
+            )
+            st.text_input(
+                "Notes optional",
+                key=notes_key,
+                placeholder="Notes optional",
+            )
+
+    if not can_edit:
+        st.info("View-only mode. Sign in as admin, pm, supervisor, or employee to log time.")
+        return
+
+    save_col, clear_col = st.columns(2, gap="small")
+    with save_col:
+        if st.button("Save Week", key="tt_simple_save_week", use_container_width=True, type="primary"):
+            try:
+                saved, cleared = _tt_save_simple_week(
+                    employee_id=selected_employee_id,
+                    days=days,
+                    idx=idx,
+                    user_id=profile.get("id"),
+                    ts_iso=datetime.now(timezone.utc).isoformat(),
+                )
+                st.success(f"Saved {saved} day(s). Cleared {cleared} zero-hour day(s).")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not save week: {exc}")
+    with clear_col:
+        if st.button("Clear Week", key="tt_simple_clear_week", use_container_width=True):
+            try:
+                delete_employee_week(selected_employee_id, week_start, week_end)
+                st.success("Week cleared.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not clear week: {exc}")
 
 
 def _render_quick_actions_popup(
