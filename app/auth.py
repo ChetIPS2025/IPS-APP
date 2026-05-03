@@ -24,13 +24,56 @@ _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this devic
 
 
 def init_session() -> None:
-    # Canonical app auth state (requested keys)
+    # Canonical app auth state.
+    st.session_state.setdefault("authenticated", False)
     st.session_state.setdefault("user", None)
     st.session_state.setdefault("user_email", None)
     # Back-compat keys used throughout existing code
     st.session_state.setdefault("auth_user", None)
     st.session_state.setdefault("auth_profile", None)
     st.session_state.setdefault("auth_employee", None)
+    st.session_state.setdefault("auth_role", None)
+
+    # Migrate older in-memory sessions that predate the canonical flag.
+    if st.session_state.get("auth_user") is not None and st.session_state.get("auth_profile") is not None:
+        st.session_state["authenticated"] = True
+        st.session_state["user"] = st.session_state.get("auth_user")
+        profile = st.session_state.get("auth_profile") or {}
+        st.session_state["auth_role"] = str(profile.get("role") or "viewer").strip().lower() or "viewer"
+    elif st.session_state.get("authenticated"):
+        _clear_authenticated_session()
+
+
+def _clear_authenticated_session() -> None:
+    st.session_state["authenticated"] = False
+    st.session_state["user"] = None
+    st.session_state["user_email"] = None
+    st.session_state["auth_user"] = None
+    st.session_state["auth_profile"] = None
+    st.session_state["auth_employee"] = None
+    st.session_state["auth_role"] = None
+
+
+def _set_authenticated_session(
+    *,
+    user: Any,
+    profile: dict,
+    email_hint: str = "",
+    employee: dict | None = None,
+) -> None:
+    user_email = getattr(user, "email", None)
+    if user_email is None and isinstance(user, dict):
+        user_email = user.get("email")
+
+    st.session_state["authenticated"] = True
+    st.session_state["auth_user"] = user
+    st.session_state["auth_profile"] = profile
+    st.session_state["auth_employee"] = employee
+    st.session_state["auth_role"] = str(profile.get("role") or "viewer").strip().lower() or "viewer"
+    st.session_state["user"] = user
+    st.session_state["user_email"] = (
+        str(user_email or profile.get("email") or email_hint or "").strip() or None
+    )
 
 
 def _cookie_secure_flag() -> bool:
@@ -116,26 +159,23 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     if not bool(profile.get("is_active", True)):
         raise RuntimeError("This user is inactive.")
 
-    st.session_state["auth_user"] = user
-    st.session_state["auth_profile"] = profile
-    st.session_state["user"] = user
     user_email = getattr(user, "email", None)
     if user_email is None and isinstance(user, dict):
         user_email = user.get("email")
-    st.session_state["user_email"] = (
-        str(user_email or profile.get("email") or email_hint or "").strip() or None
-    )
+    email = str(user_email or profile.get("email") or email_hint or "").strip() or None
 
     # Optional employee link (does not gate login)
-    st.session_state["auth_employee"] = None
+    employee = None
     emp_id = str(profile.get("employee_id") or "").strip() if isinstance(profile, dict) else ""
     if emp_id:
         try:
             emp = fetch_one("employees", {"id": emp_id})
             if emp:
-                st.session_state["auth_employee"] = emp
+                employee = emp
         except Exception:
-            st.session_state["auth_employee"] = None
+            employee = None
+
+    _set_authenticated_session(user=user, profile=profile, email_hint=email, employee=employee)
 
 
 def try_restore_supabase_session_from_cookies() -> None:
@@ -234,36 +274,11 @@ def _js_cookie_clear_reload(*, secure: bool) -> str:
 """
 
 
-def _js_cookie_set_reload(*, access_token: str, refresh_token: str, remember_device: bool, secure: bool) -> str:
-    sec_js = "true" if secure else "false"
-    ma = "2592000" if remember_device else ""
-    at_lit = json.dumps(access_token)
-    rt_lit = json.dumps(refresh_token)
-    ma_lit = json.dumps(ma)
-    rem_lit = "true" if remember_device else "false"
-    return f"""
-(function() {{
-  var sec = {sec_js};
-  var base = "Path=/; SameSite=Lax" + (sec ? "; Secure" : "");
-  var ma = {ma_lit};
-  var attrsTok = base + (ma ? ("; Max-Age=" + ma) : "");
-  document.cookie = "{_COOKIE_ACCESS}=" + encodeURIComponent({at_lit}) + "; " + attrsTok;
-  document.cookie = "{_COOKIE_REFRESH}=" + encodeURIComponent({rt_lit}) + "; " + attrsTok;
-  if ({rem_lit}) {{
-    document.cookie = "{_COOKIE_PERSIST}=1; " + base + "; Max-Age=2592000";
-  }} else {{
-    document.cookie = "{_COOKIE_PERSIST}=; " + base + "; Max-Age=0";
-  }}
-  window.parent.location.reload();
-}})();
-"""
-
-
 def run_auth_browser_cookie_effects() -> None:
     """
     One-shot browser bridges: clear cookies after sign-out, or persist tokens after sign-in.
 
-    Uses a full page reload so ``st.context.cookies`` picks up new values on the next run.
+    Sign-in writes cookies silently so the authenticated in-memory session can continue immediately.
     """
     if st.session_state.pop("_ips_auth_clear_pending", False):
         st.info("Signing out — refreshing the page…")
@@ -279,15 +294,7 @@ def run_auth_browser_cookie_effects() -> None:
     remember = bool(pending.get("remember_device"))
     if not at or not rt:
         return
-    st.info("Saving your session — refreshing the page…")
-    script = _js_cookie_set_reload(
-        access_token=at,
-        refresh_token=rt,
-        remember_device=remember,
-        secure=_cookie_secure_flag(),
-    )
-    components_html(f"<script>{script}</script>", height=8, width=1)
-    st.stop()
+    _silent_write_auth_cookies(at, rt, remember_device=remember)
 
 
 def sign_in(email: str, password: str, *, remember_device: bool = False) -> None:
@@ -402,15 +409,16 @@ def sign_out() -> None:
         client.auth.sign_out()
     except Exception:
         pass
-    st.session_state["user"] = None
-    st.session_state["user_email"] = None
-    st.session_state["auth_user"] = None
-    st.session_state["auth_profile"] = None
+    _clear_authenticated_session()
     st.session_state["_ips_auth_clear_pending"] = True
 
 
 def require_login() -> bool:
-    return st.session_state.get("user") is not None or st.session_state.get("auth_user") is not None
+    return (
+        st.session_state.get("authenticated") is True
+        and st.session_state.get("auth_user") is not None
+        and st.session_state.get("auth_profile") is not None
+    )
 
 
 def current_profile() -> dict:
@@ -430,7 +438,7 @@ def current_role() -> str:
     Legacy compatibility:
     - pm, estimator -> manager
     """
-    raw = str(current_profile().get("role", "viewer") or "viewer").strip().lower()
+    raw = str(st.session_state.get("auth_role") or current_profile().get("role", "viewer") or "viewer").strip().lower()
     if raw in {"estimator", "pm"}:
         return "manager"
     if raw in {"admin", "manager", "employee", "viewer"}:

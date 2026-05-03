@@ -609,9 +609,6 @@ def _set_sidebar_page(page: str) -> None:
 
 def _sidebar_sign_out() -> None:
     sign_out()
-    st.session_state[IPS_ROUTE_SLUG_KEY] = "dashboard"
-    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
-    st.session_state.pop(IPS_NAV_PAGE_KEY, None)
     st.rerun()
 
 

@@ -62,6 +62,12 @@ from pages import admin
 from pages import users
 
 
+def _route_to_dashboard_after_login() -> None:
+    st.session_state[IPS_ROUTE_SLUG_KEY] = "dashboard"
+    st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+
+
 PAGES = {
     "Dashboard": dashboard.render,
     # Estimates UI: app/pages/estimates.py → estimates.render
@@ -161,6 +167,7 @@ def main() -> None:
             if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
                 try:
                     sign_in(email, password, remember_device=remember_device)
+                    _route_to_dashboard_after_login()
                     st.rerun()
                 except Exception as exc:
                     show_auth_error(exc)
@@ -190,6 +197,7 @@ def main() -> None:
                         verify_phone_otp(phone_number=phone, code=code, remember_device=remember_device)
                         st.session_state.pop("login_phone_otp_sent", None)
                         st.session_state.pop("login_phone_code", None)
+                        _route_to_dashboard_after_login()
                         st.rerun()
                     except Exception as exc:
                         show_auth_error(exc)
