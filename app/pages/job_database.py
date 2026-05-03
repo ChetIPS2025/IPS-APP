@@ -346,7 +346,7 @@ def _inject_job_database_responsive_styles() -> None:
         .ips-job-card-title {
             color: #111827 !important;
             display: block;
-            font-size: 1rem;
+            font-size: 1.05rem;
             font-weight: 700;
             line-height: 1.25;
             margin: 0 0 0.1rem 0;
@@ -355,7 +355,7 @@ def _inject_job_database_responsive_styles() -> None:
         .ips-job-card-meta {
             color: #4b5563 !important;
             display: block;
-            font-size: 0.88rem;
+            font-size: 0.92rem;
             line-height: 1.45;
             margin: 0.15rem 0 0.4rem;
             overflow-wrap: anywhere;
@@ -365,7 +365,7 @@ def _inject_job_database_responsive_styles() -> None:
             cursor: pointer;
             display: block;
             min-height: 92px;
-            padding: 0.15rem 0.1rem 0.35rem;
+            padding: 0;
             text-decoration: none !important;
             -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
         }
@@ -452,15 +452,20 @@ def _inject_job_database_responsive_styles() -> None:
             border-radius: 12px !important;
             cursor: pointer;
             margin-bottom: 0.65rem !important;
-            padding: 0.75rem !important;
+            padding: 1rem !important;
             position: relative !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
-            transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+            transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover {
-            background: #f8fafc !important;
-            border-color: #93c5fd !important;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12) !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):focus-within,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):has(.stButton > button[kind="primary"]:active) {
+            background: #eff6ff !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.16) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):has(.stButton > button[kind="primary"]:active) {
+            transform: scale(0.995);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button[kind="primary"] {
             cursor: pointer !important;
