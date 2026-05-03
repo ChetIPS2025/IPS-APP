@@ -9,6 +9,7 @@ _LOG = logging.getLogger(__name__)
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from auth import current_role
 from branding import render_header
@@ -246,6 +247,10 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
 )
 
 JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v7"
+JOB_DB_TABLET_MOBILE_BREAKPOINT_PX = 1100
+JOB_DB_TABLET_MOBILE_KEY = "job_db_is_tablet_or_mobile"
+JOB_DB_VIEWPORT_QUERY_PARAM = "ips_job_vp"
+_JOB_DB_VIEWPORT_SCRIPT_SENT_KEY = "_job_db_viewport_detect_script_sent"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -255,6 +260,55 @@ _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
 
 def _job_db_visible_table_columns(columns: list[str]) -> list[str]:
     return [c for c in columns if c not in _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE]
+
+
+def _job_db_width_is_tablet_or_mobile(width: Any) -> bool:
+    try:
+        return int(float(str(width).strip())) <= JOB_DB_TABLET_MOBILE_BREAKPOINT_PX
+    except Exception:
+        return False
+
+
+def _ensure_job_db_viewport_detected() -> bool:
+    """Classify this page at the 1100px job-list breakpoint for Python rendering."""
+    try:
+        if JOB_DB_VIEWPORT_QUERY_PARAM in st.query_params:
+            raw = st.query_params.get(JOB_DB_VIEWPORT_QUERY_PARAM, "0")
+            if isinstance(raw, list):
+                raw = raw[0] if raw else "0"
+            st.session_state[JOB_DB_TABLET_MOBILE_KEY] = str(raw).strip() == "1"
+            try:
+                del st.query_params[JOB_DB_VIEWPORT_QUERY_PARAM]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    current_flag = st.session_state.get(JOB_DB_TABLET_MOBILE_KEY)
+    if current_flag is None or not st.session_state.get(_JOB_DB_VIEWPORT_SCRIPT_SENT_KEY):
+        st.session_state[_JOB_DB_VIEWPORT_SCRIPT_SENT_KEY] = True
+        known = "unknown" if current_flag is None else ("1" if bool(current_flag) else "0")
+        components.html(
+            f"""
+<script>
+(function () {{
+  try {{
+    var topWindow = window.top || window;
+    var url = new URL(topWindow.location.href);
+    if (url.searchParams.get("{JOB_DB_VIEWPORT_QUERY_PARAM}") != null) return;
+    var width = topWindow.innerWidth || window.innerWidth || 1200;
+    var next = width <= {JOB_DB_TABLET_MOBILE_BREAKPOINT_PX} ? "1" : "0";
+    if ("{known}" !== "unknown" && "{known}" === next) return;
+    url.searchParams.set("{JOB_DB_VIEWPORT_QUERY_PARAM}", next);
+    topWindow.location.replace(url.toString());
+  }} catch (e) {{}}
+}})();
+</script>
+            """,
+            height=0,
+        )
+
+    return bool(st.session_state.get(JOB_DB_TABLET_MOBILE_KEY, False))
 
 
 def _inject_job_database_responsive_styles() -> None:
@@ -469,7 +523,7 @@ def _inject_job_database_responsive_styles() -> None:
             min-width: 0 !important;
         }
         /* Tablet / iPad: list uses cards; job detail is a separate full-width view (no split layout). */
-        @media (max-width: 1260px) {
+        @media (max-width: 1100px) {
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) {
                 display: none !important;
             }
@@ -1660,6 +1714,7 @@ def render() -> None:
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     _inject_job_database_responsive_styles()
+    is_tablet_or_mobile = _ensure_job_db_viewport_detected()
 
     can_edit = current_role() in {"admin", "manager"}
     st.session_state.setdefault("job_db_bypass_filters", True)
@@ -1934,134 +1989,139 @@ def render() -> None:
             visible_cols = _job_db_visible_table_columns([c for c in show_cols if c in df_display.columns])
 
             picked: list[str] = []
-            with st.container(border=True):
-                st.markdown(
-                    '<span class="ips-list-top-anchor ips-job-desktop-table-anchor"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown("##### Job list")
-                st.caption(
-                    "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
-                    "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
-                )
-                if "id" not in df_display.columns:
-                    st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)
-                else:
-                    inject_table_action_styles()
-                    # Match Estimates table rhythm: fixed columns + explicit weights.
-                    job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
-                    if job_num_col not in df_display.columns:
-                        job_num_col = "id"
-
-                    # Visible order (exact):
-                    # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
-                    col_weights = [
-                        0.40,  # checkbox
-                        1.00,  # job number
-                        2.30,  # job name
-                        1.70,  # customer
-                        1.25,  # location
-                        1.25,  # contact
-                        0.95,  # status
-                        1.10,  # linked estimate
-                        1.00,  # quote/po
-                        1.05,  # awarded amount
-                        0.50,  # delete
-                    ]
-
-                    head = st.columns(col_weights)
-                    with head[0]:
-                        st.caption(" ")
-                    with head[1]:
-                        st.caption("Job #")
-                    with head[2]:
-                        st.caption("Job Name")
-                    with head[3]:
-                        st.caption("Customer")
-                    with head[4]:
-                        st.caption("Location")
-                    with head[5]:
-                        st.caption("Contact")
-                    with head[6]:
-                        st.caption("Status")
-                    with head[7]:
-                        st.caption("Linked Estimate")
-                    with head[8]:
-                        st.caption("Quote / PO")
-                    with head[9]:
-                        st.caption("Awarded")
-                    with head[10]:
-                        st.caption("Del")
-
-                    for _, row in df_display.iterrows():
-                        jid = str(row.get("id") or "").strip()
-                        if not jid:
-                            continue
-                        rc = st.columns(col_weights)
-                        with rc[0]:
-                            ck = f"job_list_pick_{jid}"
-                            if ck not in st.session_state:
-                                st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
-                            if st.checkbox("", key=ck, label_visibility="collapsed"):
-                                picked.append(jid)
-                        with rc[1]:
-                            _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
-                        with rc[2]:
-                            _render_job_db_job_name_cell(rc[2], row.get("job_name"))
-                        with rc[3]:
-                            _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
-                        with rc[4]:
-                            _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
-                        with rc[5]:
-                            _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
-                        with rc[6]:
-                            _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
-                        with rc[7]:
-                            _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
-                        with rc[8]:
-                            # Quote (estimate) is the current visible “quote/po” signal in this UI.
-                            _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
-                        with rc[9]:
-                            amt = _job_db_money_cell(row.get("awarded_amount"))
-                            rc[9].markdown(
-                                f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(amt)}</span>',
-                                unsafe_allow_html=True,
-                            )
-
-                        del_help = (
-                            "Only admin or pm can delete jobs."
-                            if not can_edit
-                            else "Delete this job (blocked if costing data exists)."
-                        )
-                        with rc[10]:
-                            if st.button(
-                                "🗑",
-                                key=f"job_row_del_{jid}",
-                                disabled=not can_edit,
-                                use_container_width=True,
-                                help=del_help,
-                            ):
-                                pending = st.session_state.get(IPS_PENDING_DELETE)
-                                if not isinstance(pending, dict):
-                                    pending = {}
-                                    st.session_state[IPS_PENDING_DELETE] = pending
-                                pending[TABLE_KEY_JOBS] = [jid]
-                                st.rerun()
-                    set_selected_ids(TABLE_KEY_JOBS, picked)
-
-            if "id" in df_display.columns:
+            if not is_tablet_or_mobile:
                 with st.container(border=True):
-                    job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
-                    if job_num_col not in df_display.columns:
-                        job_num_col = "id"
-                    card_picked = _render_job_card_list(
-                        df_display=df_display,
-                        job_num_col=job_num_col,
+                    st.markdown(
+                        '<span class="ips-list-top-anchor ips-job-desktop-table-anchor"></span>',
+                        unsafe_allow_html=True,
                     )
-                    # Table and cards use different checkbox keys; merge so desktop table selection
-                    # is not cleared when the (CSS-hidden) card list still runs in the same script.
-                    picked = sorted({*picked, *card_picked})
-                    set_selected_ids(TABLE_KEY_JOBS, picked)
+                    st.markdown("##### Job list")
+                    st.caption(
+                        "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
+                        "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
+                    )
+                    if "id" not in df_display.columns:
+                        st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)
+                    else:
+                        inject_table_action_styles()
+                        # Match Estimates table rhythm: fixed columns + explicit weights.
+                        job_num_col = (
+                            "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
+                        )
+                        if job_num_col not in df_display.columns:
+                            job_num_col = "id"
+
+                        # Visible order (exact):
+                        # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
+                        col_weights = [
+                            0.40,  # checkbox
+                            1.00,  # job number
+                            2.30,  # job name
+                            1.70,  # customer
+                            1.25,  # location
+                            1.25,  # contact
+                            0.95,  # status
+                            1.10,  # linked estimate
+                            1.00,  # quote/po
+                            1.05,  # awarded amount
+                            0.50,  # delete
+                        ]
+
+                        head = st.columns(col_weights)
+                        with head[0]:
+                            st.caption(" ")
+                        with head[1]:
+                            st.caption("Job #")
+                        with head[2]:
+                            st.caption("Job Name")
+                        with head[3]:
+                            st.caption("Customer")
+                        with head[4]:
+                            st.caption("Location")
+                        with head[5]:
+                            st.caption("Contact")
+                        with head[6]:
+                            st.caption("Status")
+                        with head[7]:
+                            st.caption("Linked Estimate")
+                        with head[8]:
+                            st.caption("Quote / PO")
+                        with head[9]:
+                            st.caption("Awarded")
+                        with head[10]:
+                            st.caption("Del")
+
+                        for _, row in df_display.iterrows():
+                            jid = str(row.get("id") or "").strip()
+                            if not jid:
+                                continue
+                            rc = st.columns(col_weights)
+                            with rc[0]:
+                                ck = f"job_list_pick_{jid}"
+                                if ck not in st.session_state:
+                                    st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
+                                if st.checkbox("", key=ck, label_visibility="collapsed"):
+                                    picked.append(jid)
+                            with rc[1]:
+                                _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
+                            with rc[2]:
+                                _render_job_db_job_name_cell(rc[2], row.get("job_name"))
+                            with rc[3]:
+                                _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
+                            with rc[4]:
+                                _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
+                            with rc[5]:
+                                _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
+                            with rc[6]:
+                                _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
+                            with rc[7]:
+                                _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
+                            with rc[8]:
+                                # Quote (estimate) is the current visible quote/po signal in this UI.
+                                _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
+                            with rc[9]:
+                                amt = _job_db_money_cell(row.get("awarded_amount"))
+                                rc[9].markdown(
+                                    f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(amt)}</span>',
+                                    unsafe_allow_html=True,
+                                )
+
+                            del_help = (
+                                "Only admin or pm can delete jobs."
+                                if not can_edit
+                                else "Delete this job (blocked if costing data exists)."
+                            )
+                            with rc[10]:
+                                if st.button(
+                                    "🗑",
+                                    key=f"job_row_del_{jid}",
+                                    disabled=not can_edit,
+                                    use_container_width=True,
+                                    help=del_help,
+                                ):
+                                    pending = st.session_state.get(IPS_PENDING_DELETE)
+                                    if not isinstance(pending, dict):
+                                        pending = {}
+                                        st.session_state[IPS_PENDING_DELETE] = pending
+                                    pending[TABLE_KEY_JOBS] = [jid]
+                                    st.rerun()
+                        set_selected_ids(TABLE_KEY_JOBS, picked)
+
+            if is_tablet_or_mobile:
+                if "id" not in df_display.columns:
+                    st.warning("Job cards require job IDs; reload after the jobs table finishes syncing.")
+                else:
+                    with st.container(border=True):
+                        job_num_col = (
+                            "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
+                        )
+                        if job_num_col not in df_display.columns:
+                            job_num_col = "id"
+                        picked = _render_job_card_list(
+                            df_display=df_display,
+                            job_num_col=job_num_col,
+                        )
+                        set_selected_ids(TABLE_KEY_JOBS, picked)
 
             sel_ids = picked if "id" in filtered.columns else []
             n_sel = len(sel_ids)
