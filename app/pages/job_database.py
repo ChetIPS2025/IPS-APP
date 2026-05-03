@@ -543,7 +543,7 @@ def _inject_job_database_responsive_styles() -> None:
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button p,
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button p,
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"] p {
-            color: #374151 !important;
+            color: #111827 !important;
             font-weight: 500 !important;
             margin: 0 !important;
             overflow: visible !important;
@@ -820,6 +820,62 @@ def _job_form_linked_estimate_id(estimate_options: dict[str, Any], linked_label:
     return s or None
 
 
+def _render_job_estimates_tab(
+    *,
+    selected_job: dict[str, Any],
+    estimates: list[dict],
+    customers: list[dict],
+    customer_name_by_id: dict[str, str],
+    estimate_detail: dict[str, Any] | None = None,
+) -> None:
+    """Read-only estimate context for Job Detail; full editing remains on the Estimates page."""
+    st.markdown("#### Estimates")
+    linked_eid = str(selected_job.get("estimate_id") or "").strip()
+    if not linked_eid:
+        st.info("No estimate is linked to this job.")
+        st.caption("Use the Overview tab's Linked estimate field to attach an existing quote.")
+        return
+
+    est = estimate_detail or next((e for e in estimates if str(e.get("id") or "").strip() == linked_eid), None)
+    if not est:
+        st.warning(f"This job references estimate `{linked_eid[:8]}…`, but the estimate row could not be loaded.")
+        return
+
+    quote = str(est.get("quote_number") or "").strip() or f"Estimate {linked_eid[:8]}…"
+    status = str(est.get("status") or "").strip() or "—"
+    customer = _customer_display_name_for_id(est.get("customer_id"), customers, customer_name_by_id) or "—"
+    proposal_total = _job_db_money_cell(est.get("proposal_total")) or "—"
+    scope = _text_snippet(str(est.get("scope_of_work") or ""))
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4, gap="small")
+        c1.metric("Quote", quote)
+        c2.metric("Status", status)
+        c3.metric("Proposal total", proposal_total)
+        c4.metric("Customer", customer)
+        if scope:
+            st.caption("Scope of work")
+            st.markdown(
+                f"<div style='white-space:pre-wrap;color:#111827;font-size:0.9rem'>{html.escape(scope)}</div>",
+                unsafe_allow_html=True,
+            )
+
+    if current_role() in {"admin", "manager"}:
+        if st.button("Open linked estimate", type="primary", use_container_width=True, key="job_detail_open_linked_estimate"):
+            try:
+                from app.pages import estimates as estimates_page
+                from app.ui import IPS_NAV_PENDING_KEY
+            except ImportError:
+                from pages import estimates as estimates_page  # type: ignore
+                from ui import IPS_NAV_PENDING_KEY  # type: ignore
+
+            estimates_page._load_estimate_into_session(linked_eid)
+            st.session_state["estimates_view"] = "edit"
+            st.session_state[IPS_NAV_PENDING_KEY] = "Estimates"
+            st.rerun()
+
+
 def _render_job_form_panel(
     *,
     mode: str,
@@ -865,9 +921,17 @@ def _render_job_form_panel(
                     render_job_cost_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_co = st.tabs(["Overview", "Tasks", "Cost"])
+            t_ov, t_ts, t_est, t_co = st.tabs(["Overview", "Tasks", "Estimates", "Cost"])
             with t_ts:
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
+            with t_est:
+                _render_job_estimates_tab(
+                    selected_job=selected_job,
+                    estimates=estimates,
+                    customers=customers,
+                    customer_name_by_id=customer_name_by_id,
+                    estimate_detail=estimate_detail,
+                )
             with t_co:
                 render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
             tab_overview_ctx = t_ov
