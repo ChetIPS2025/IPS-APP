@@ -753,26 +753,16 @@ def _render_job_form_panel(
             try:
                 from app.pages.job_database_job_tasks import (
                     render_job_cost_tab,
-                    render_job_daily_plan_tab,
-                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
             except ImportError:
                 from pages.job_database_job_tasks import (  # type: ignore
                     render_job_cost_tab,
-                    render_job_daily_plan_tab,
-                    render_job_photos_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_dp, t_ph, t_co = st.tabs(
-                ["Overview", "Tasks", "Daily Plan", "Photos", "Cost"]
-            )
+            t_ov, t_ts, t_co = st.tabs(["Overview", "Tasks", "Cost"])
             with t_ts:
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_dp:
-                render_job_daily_plan_tab(job_id=edit_jid, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_ph:
-                render_job_photos_tab(job_id=edit_jid, admin_read=admin_rd)
             with t_co:
                 render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
             tab_overview_ctx = t_ov
