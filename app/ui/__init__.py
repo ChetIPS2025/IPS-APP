@@ -40,6 +40,8 @@ IPS_NAV_PENDING_KEY = "ips_nav_pending"
 IPS_ACTIVE_PAGE_KEY = "ips_active_page"
 # Current sidebar page (one of IPS_SIDEBAR_PAGES). Replaces legacy key "ips_nav_radio".
 IPS_NAV_PAGE_KEY = "ips_nav_page"
+# Public/native route slug used by sidebar buttons and simple app-style routing.
+IPS_ROUTE_SLUG_KEY = "page"
 
 # ---- Sidebar structure (simple, field + office friendly) ----
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
@@ -50,8 +52,6 @@ _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
     "Job Database",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
-    "Estimates",
-    "Job Costing",
 )
 
 # Assets (sidebar)
@@ -62,6 +62,51 @@ _NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "
 
 # Admin / office tools (sidebar)
 _NAV_ADMIN_SIDEBAR: tuple[str, ...] = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses")
+
+_NAV_ROUTE_SLUGS: dict[str, str] = {
+    "Dashboard": "dashboard",
+    "Job Database": "jobs",
+    "Assign Tasks (PM)": "assign_tasks_pm",
+    "Work & Plan (Supervisor)": "work_plan_supervisor",
+    "Inventory": "inventory",
+    "Scan Inventory": "inventory_scan",
+    "Asset Database": "assets",
+    "Who Has What": "who_has_what",
+    "Tool Trailer Audits": "tool_trailer_audits",
+    "Employee Toolbox": "employee_toolbox",
+    "Users": "users",
+    "Time Tracking": "time_tracking",
+    "Weekly Timesheet": "weekly_timesheet",
+    "PO / Expenses": "po_expenses",
+    "Admin": "admin",
+}
+
+_NAV_SLUG_ROUTES: dict[str, str] = {slug: page for page, slug in _NAV_ROUTE_SLUGS.items()}
+
+_NAV_ICONS: dict[str, str] = {
+    "Dashboard": "🏠",
+    "Job Database": "📋",
+    "Assign Tasks (PM)": "🗂️",
+    "Work & Plan (Supervisor)": "🛠️",
+    "Inventory": "📦",
+    "Scan Inventory": "📦",
+    "Asset Database": "🧰",
+    "Who Has What": "🧰",
+    "Tool Trailer Audits": "🧰",
+    "Employee Toolbox": "🧰",
+    "Users": "👥",
+    "Time Tracking": "⏱️",
+    "Weekly Timesheet": "🗓️",
+    "PO / Expenses": "💵",
+    "Admin": "⚙️",
+}
+
+_NAV_LABELS: dict[str, str] = {
+    "Job Database": "Jobs",
+    "Asset Database": "Assets",
+    "Scan Inventory": "Inventory Scan",
+    "Employee Toolbox": "My Tools",
+}
 
 # Pages that remain routable (deep links / internal navigation) but are not shown in the simplified sidebar.
 _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
@@ -194,9 +239,30 @@ def _nav_btn_key(page: str) -> str:
 
 def _sidebar_display_label(route_key: str) -> str:
     """Visible sidebar label; route/session keys stay unchanged (e.g. People → Users)."""
-    if route_key == "People":
-        return "Users"
-    return route_key
+    return _NAV_LABELS.get(route_key, "Users" if route_key == "People" else route_key)
+
+
+def _sidebar_button_label(route_key: str) -> str:
+    label = _sidebar_display_label(route_key)
+    icon = _NAV_ICONS.get(route_key, "")
+    return f"{icon} {label}" if icon else label
+
+
+def _set_route_slug_for_page(page: str) -> None:
+    slug = _NAV_ROUTE_SLUGS.get(page)
+    if slug:
+        st.session_state[IPS_ROUTE_SLUG_KEY] = slug
+
+
+def _sync_nav_from_route_slug() -> None:
+    raw = st.session_state.get(IPS_ROUTE_SLUG_KEY)
+    page = _NAV_SLUG_ROUTES.get(str(raw or "").strip())
+    if page:
+        st.session_state[IPS_NAV_PAGE_KEY] = page
+
+
+def _nav_visible_active(current: str, page: str) -> bool:
+    return current == page
 
 
 def _visible_secondary_pages(role: str) -> tuple[str, ...]:
@@ -212,9 +278,7 @@ def apply_pending_navigation() -> None:
         pending = "Scan Inventory"
     if pending == "Planning & Goals":
         pending = "Work & Plan (Supervisor)"
-    if pending == "Daily Tasks":
-        pending = "Work & Plan (Supervisor)"
-    if pending in ("Supervisor Daily Reports", "Daily crew report"):
+    if pending in ("Daily Tasks", "Daily crew report"):
         pending = "Work & Plan (Supervisor)"
     if not pending:
         return
@@ -334,7 +398,7 @@ section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-s
   line-height: 1.25 !important;
   box-sizing: border-box !important;
   background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  border: 1px solid #cbd5e1 !important;
   color: #111827 !important;
   box-shadow: none !important;
 }
@@ -361,7 +425,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   border-radius: 10px !important;
   box-sizing: border-box !important;
   background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  border: 1px solid #cbd5e1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
@@ -372,21 +436,21 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
 /* Active page: white card on grey rail */
 section[data-testid="stSidebar"] button[kind="primary"],
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
-  background: #ffffff !important;
-  border: 1px solid #9ca3af !important;
-  color: #111827 !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
   box-shadow: none !important;
   font-weight: 700 !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover:not(:disabled) {
-  background: #f3f4f6 !important;
-  border-color: #6b7280 !important;
-  color: #111827 !important;
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"] p,
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
-  color: #111827 !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
 }
 /* TOOLS expander */
@@ -479,10 +543,7 @@ def _migrate_legacy_nav_session_keys() -> None:
 def _ensure_valid_nav_page() -> None:
     _migrate_legacy_nav_session_keys()
     cur0 = st.session_state.get(IPS_NAV_PAGE_KEY)
-    if cur0 == "Users":
-        st.session_state[IPS_NAV_PAGE_KEY] = "People"
-        st.session_state["people_section_radio"] = "User accounts"
-    elif cur0 == "Employees":
+    if cur0 == "Employees":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "Employees"
     elif cur0 == "Inventory scan":
@@ -496,9 +557,7 @@ def _ensure_valid_nav_page() -> None:
         st.session_state["asset_db_f_asset_category"] = "Equipment"
     elif cur0 == "Tool Checkout":
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-    elif cur0 == "Daily Tasks":
-        st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
-    elif cur0 in ("Supervisor Daily Reports", "Daily crew report"):
+    elif cur0 in ("Daily Tasks", "Daily crew report"):
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
 
     role = current_role()
@@ -511,6 +570,7 @@ def _ensure_valid_nav_page() -> None:
             | set(_NAV_ASSET_ROUTES)
             | set(_NAV_RESOURCES)
             | set(_NAV_INVENTORY_SUBPAGES)
+            | set(_NAV_ADMIN_SIDEBAR)
             | visible_secondary
         )
         if role_can_open_page(role, p)
@@ -527,225 +587,92 @@ def _ensure_valid_nav_page() -> None:
         st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
 
 
+def _set_sidebar_page(page: str) -> None:
+    st.session_state[IPS_NAV_PAGE_KEY] = page
+    _set_route_slug_for_page(page)
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+    st.rerun()
+
+
+def _sidebar_sign_out() -> None:
+    sign_out()
+    st.session_state[IPS_ROUTE_SLUG_KEY] = "dashboard"
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+    st.session_state.pop(IPS_NAV_PAGE_KEY, None)
+    st.rerun()
+
+
 def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
-    active = current == page
+    active = _nav_visible_active(current, page)
     btn_type = "primary" if active else "secondary"
     key = _nav_btn_key(page)
-    if indent:
-        _, c2 = st.sidebar.columns([0.06, 0.94])
-        with c2:
-            if st.button(page, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = page
-                st.rerun()
-    else:
-        if st.sidebar.button(page, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = page
-            st.rerun()
-
-
-def _render_nav_button_route(*, label: str, route: str, current: str, indent: bool, key_suffix: str) -> None:
-    """Render a nav button whose label differs from its route key."""
-    active = current == route
-    btn_type = "primary" if active else "secondary"
-    key = _nav_btn_key(route + "__" + key_suffix)
+    label = _sidebar_button_label(page)
     if indent:
         _, c2 = st.sidebar.columns([0.06, 0.94])
         with c2:
             if st.button(label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = route
-                st.rerun()
+                _set_sidebar_page(page)
     else:
         if st.sidebar.button(label, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = route
-            st.rerun()
+            _set_sidebar_page(page)
 
 
-def _sidebar_asset_category_focus_norm() -> str:
-    v = str(st.session_state.get("asset_db_f_asset_category") or "All").strip()
-    if not v or v.lower() == "all":
-        return "All"
-    return v
-
-
-def _sidebar_inventory_category_focus_norm() -> str:
-    v = str(st.session_state.get("inv_f_cat") or "All").strip()
-    if not v or v.lower() == "all":
-        return "All"
-    return v
-
-
-def _render_assets_sidebar_group(*, current: str, role: str) -> None:
-    """Asset Database + category lenses (same ``assets`` table as the main list)."""
-    if not role_can_open_page(role, "Asset Database"):
+def _render_assets_group(*, current: str, role: str) -> None:
+    pages = ("Asset Database", "Who Has What", "Tool Trailer Audits")
+    visible_pages = [page for page in pages if role_can_open_page(role, page)]
+    if not visible_pages:
         return
-    focus = _sidebar_asset_category_focus_norm()
-    assets_expanded = current == "Asset Database"
-    with st.sidebar.expander("Assets", expanded=assets_expanded):
-        for nav_label, cat in _NAV_ASSET_CATEGORY_FOCUS:
-            cat_norm = "All" if cat == "All" else cat
-            active = current == "Asset Database" and (
-                (cat_norm == "All" and focus == "All")
-                or (cat_norm != "All" and focus.lower() == cat_norm.lower())
-            )
-            btn_type = "primary" if active else "secondary"
-            key = _nav_btn_key(f"Asset_Database__focus_{cat_norm}")
-            if st.button(nav_label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
-                st.session_state["asset_db_f_asset_category"] = "All" if cat_norm == "All" else cat_norm
-                st.rerun()
-
-
-def _sidebar_nav_title(extra_class: str, text: str) -> None:
-    cls = "ips-nav-section-title" + (f" {extra_class}" if extra_class else "")
     st.sidebar.markdown(
-        f'<div class="{cls.strip()}">{text}</div>',
+        '<div class="ips-nav-section-title ips-nav-group-spaced">Assets</div>',
         unsafe_allow_html=True,
     )
+    for page in visible_pages:
+        _render_nav_button(page, current=current, indent=True)
 
 
 def _render_sidebar_office(*, current: str, role: str) -> None:
-    """PM / admin / manager — jobs, packages, inventory, assets, office tools."""
-    _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Jobs")
-    st.sidebar.caption("Job records, estimates, and costing.")
-    for p in _NAV_JOBS_SIDEBAR:
-        if not role_can_open_page(role, p):
+    """PM / admin / manager — clean app menu."""
+    for page in (
+        "Dashboard",
+        "Job Database",
+        "Assign Tasks (PM)",
+        "Work & Plan (Supervisor)",
+        "Inventory",
+        "Users",
+        "Time Tracking",
+        "Weekly Timesheet",
+        "PO / Expenses",
+        "Admin",
+    ):
+        if page == "Admin" and role != "admin":
             continue
-        if p == "Assign Tasks (PM)":
-            _render_nav_button_route(
-                label="Assign work (PM)",
-                route="Assign Tasks (PM)",
-                current=current,
-                indent=True,
-                key_suffix="pm",
-            )
-        elif p == "Work & Plan (Supervisor)":
-            _render_nav_button_route(
-                label="Work & plan (supervisor)",
-                route="Work & Plan (Supervisor)",
-                current=current,
-                indent=True,
-                key_suffix="sup",
-            )
-        else:
-            _render_nav_button(p, current=current, indent=True)
-    st.sidebar.caption(
-        "**Assign work (PM)** — PM lines up today’s work packages. "
-        "**Work & plan** — supervisor plans the shift, updates tasks and photos, and submits end-of-day review."
-    )
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Assets")
-    if role_can_open_page(role, "Asset Database"):
-        _render_assets_sidebar_group(current=current, role=role)
-    if role_can_open_page(role, "Who Has What"):
-        _render_nav_button("Who Has What", current=current, indent=True)
-    if role_can_open_page(role, "Tool Trailer Audits"):
-        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
-    inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
-    if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
-        with st.sidebar.expander("Inventory", expanded=inv_expanded):
-            _, inv_inner = st.columns([0.06, 0.94])
-            with inv_inner:
-                _inv_focus = _sidebar_inventory_category_focus_norm()
-                inv_list_active = current == "Inventory" and _inv_focus == "All"
-                if role_can_open_page(role, "Inventory"):
-                    if st.button(
-                        "Inventory list",
-                        key=_nav_btn_key("Inventory__list_all"),
-                        type="primary" if inv_list_active else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
-                        st.session_state["inv_f_cat"] = "All"
-                        st.rerun()
-                if role_can_open_page(role, "Scan Inventory"):
-                    if st.button(
-                        "Scan inventory",
-                        key=_nav_btn_key("Scan Inventory"),
-                        type="primary" if current == "Scan Inventory" else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-                        st.rerun()
-                if role_can_open_page(role, "Inventory Usage"):
-                    if st.button(
-                        "Inventory usage",
-                        key=_nav_btn_key("Inventory Usage"),
-                        type="primary" if current == "Inventory Usage" else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
-                        st.rerun()
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
-    for p in _NAV_ADMIN_SIDEBAR:
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
-    if role == "admin" and role_can_open_page(role, "Admin"):
-        _render_nav_button("Admin", current=current, indent=True)
+        if role_can_open_page(role, page):
+            _render_nav_button(page, current=current, indent=False)
+        if page == "Inventory":
+            _render_assets_group(current=current, role=role)
 
 
 def _render_sidebar_field(*, current: str, role: str) -> None:
-    """Field supervisor / crew — one primary workflow plus scan and tools."""
-    _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Today’s work")
-    st.sidebar.caption("Plan the shift, tasks, photos, and end-of-day review — one screen.")
-    if role_can_open_page(role, "Work & Plan (Supervisor)"):
-        _render_nav_button_route(
-            label="Work & plan (supervisor)",
-            route="Work & Plan (Supervisor)",
-            current=current,
-            indent=True,
-            key_suffix="sup",
-        )
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
-    if role_can_open_page(role, "Scan Inventory"):
-        _render_nav_button_route(
-            label="Scan inventory",
-            route="Scan Inventory",
-            current=current,
-            indent=True,
-            key_suffix="scan",
-        )
-
-    _sidebar_nav_title("ips-nav-group-spaced", "Tools & assets")
-    if role_can_open_page(role, "Who Has What"):
-        _render_nav_button("Who Has What", current=current, indent=True)
-    if role_can_open_page(role, "Asset Database"):
-        _render_nav_button_route(
-            label="Asset list",
-            route="Asset Database",
-            current=current,
-            indent=True,
-            key_suffix="ad",
-        )
-    if role_can_open_page(role, "Employee Toolbox"):
-        _render_nav_button_route(
-            label="My tools",
-            route="Employee Toolbox",
-            current=current,
-            indent=True,
-            key_suffix="tb",
-        )
-    if role_can_open_page(role, "Tool Trailer Audits"):
-        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
-    if role_can_open_page(role, "Time Tracking"):
-        _render_nav_button("Time Tracking", current=current, indent=True)
+    """Field supervisor / crew — field-friendly app menu."""
+    for page in (
+        "Dashboard",
+        "Work & Plan (Supervisor)",
+        "Scan Inventory",
+        "Employee Toolbox",
+        "Time Tracking",
+    ):
+        if role_can_open_page(role, page):
+            _render_nav_button(page, current=current, indent=False)
+        if page == "Employee Toolbox":
+            _render_assets_group(current=current, role=role)
 
 
 def _render_sidebar_viewer(*, current: str, role: str) -> None:
-    _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
-    for p in ("Asset Database", "Who Has What", "Inventory Usage"):
+    for p in ("Dashboard", "Inventory Usage"):
         if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
+            _render_nav_button(p, current=current, indent=False)
+        if p == "Dashboard":
+            _render_assets_group(current=current, role=role)
 
 
 def render_sidebar() -> str:
@@ -757,6 +684,7 @@ def render_sidebar() -> str:
 
     render_install_app_sidebar_block()
 
+    _sync_nav_from_route_slug()
     _ensure_valid_nav_page()
     _inject_sidebar_nav_css()
     inject_ips_global_mobile_css()
@@ -775,5 +703,6 @@ def render_sidebar() -> str:
         _render_sidebar_viewer(current=current, role=role)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
-    st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)
+    if st.sidebar.button("🚪 Sign Out", use_container_width=True):
+        _sidebar_sign_out()
     return current
