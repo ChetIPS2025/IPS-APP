@@ -445,12 +445,22 @@ def _inject_job_database_responsive_styles() -> None:
             border-radius: 12px !important;
             cursor: pointer;
             margin-bottom: 0.65rem !important;
-            padding: 0.75rem !important;
+            padding: 0 !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+            transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease,
+                transform 140ms ease;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):focus-within {
+            background: #eff6ff !important;
             border-color: #2563eb !important;
             box-shadow: 0 2px 8px rgba(37, 99, 235, 0.16) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):active {
+            background: #eff6ff !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 1px 4px rgba(37, 99, 235, 0.16) !important;
+            transform: translateY(1px);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
@@ -459,28 +469,37 @@ def _inject_job_database_responsive_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button {
             align-items: flex-start !important;
-            background: #ffffff !important;
+            background: transparent !important;
             border: 1px solid transparent !important;
-            border-radius: 10px !important;
+            border-radius: 12px !important;
             box-shadow: none !important;
             color: #111827 !important;
             cursor: pointer !important;
             justify-content: flex-start !important;
-            min-height: 92px !important;
-            padding: 0.55rem 0.65rem !important;
+            min-height: 120px !important;
+            padding: 16px !important;
             text-align: left !important;
+            transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease,
+                transform 140ms ease;
             width: 100% !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button:hover,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button:focus {
-            background: #f8fafc !important;
-            border-color: #93c5fd !important;
+            background: #eff6ff !important;
+            border-color: #2563eb !important;
+            box-shadow: none !important;
             color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button:active {
+            background: #eff6ff !important;
+            border-color: #2563eb !important;
+            transform: translateY(1px);
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button p {
             color: #111827 !important;
+            font-size: 1rem !important;
             font-weight: 700 !important;
-            line-height: 1.35 !important;
+            line-height: 1.45 !important;
             margin: 0 !important;
             overflow: visible !important;
             text-align: left !important;
@@ -811,6 +830,9 @@ def _safe_date_value(value):
 def _clear_job_mode() -> None:
     st.session_state.pop("job_mode", None)
     st.session_state.pop("job_edit_id", None)
+    st.session_state.pop("selected_job_id", None)
+    if st.session_state.get("page") == "job_detail":
+        st.session_state.pop("page", None)
     st.session_state.pop("job_number_manual_input", None)
 
 
@@ -1629,23 +1651,15 @@ def _render_job_card_list(
             quote = _job_db_card_text(row.get("Quote (estimate)"), "")
             awarded = _job_db_money_cell(row.get("awarded_amount"))
             amount = quote or awarded
-            amount_html = (
-                f'<span class="ips-job-card-pill">Quote / PO: {html.escape(amount)}</span>'
-                if amount
-                else ""
-            )
+            amount_line = f"\nQuote / PO: {amount}" if amount else ""
             if st.button(
-                f"{job_name}\n\nJob # {job_num} | Customer {customer}\n\nTap to open details",
+                f"{job_name}\n\nJob # {job_num} | Customer {customer}\nStatus {status}{amount_line}\n\nTap to open",
                 key=f"open_{jid}",
                 type="secondary",
                 use_container_width=True,
                 help=f"Open {job_name}",
             ):
                 _open_job_detail(jid)
-            st.markdown(
-                f'<span class="ips-job-card-badges">{_job_status_badge_html(status)}{amount_html}</span>',
-                unsafe_allow_html=True,
-            )
             if can_delete:
                 if st.button(
                     "Delete",
@@ -1887,6 +1901,9 @@ def render() -> None:
 
     jobs_df = pd.DataFrame(jobs)
 
+    if st.session_state.get("page") == "job_detail" and st.session_state.get("selected_job_id"):
+        st.session_state["job_mode"] = "edit"
+        st.session_state["job_edit_id"] = st.session_state["selected_job_id"]
     mode = st.session_state.get("job_mode")
     panel_open = bool(
         mode in ("add", "edit") and (can_edit or (mode == "edit" and current_role() == "employee"))
