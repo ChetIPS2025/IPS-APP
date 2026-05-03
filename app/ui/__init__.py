@@ -71,6 +71,8 @@ _NAV_ROUTE_SLUGS: dict[str, str] = {
     "Inventory": "inventory",
     "Scan Inventory": "inventory_scan",
     "Asset Database": "assets",
+    "Who Has What": "who_has_what",
+    "Tool Trailer Audits": "tool_trailer_audits",
     "Employee Toolbox": "employee_toolbox",
     "Users": "users",
     "Time Tracking": "time_tracking",
@@ -89,6 +91,8 @@ _NAV_ICONS: dict[str, str] = {
     "Inventory": "📦",
     "Scan Inventory": "📦",
     "Asset Database": "🧰",
+    "Who Has What": "🧰",
+    "Tool Trailer Audits": "🧰",
     "Employee Toolbox": "🧰",
     "Users": "👥",
     "Time Tracking": "⏱️",
@@ -421,7 +425,7 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   border-radius: 10px !important;
   box-sizing: border-box !important;
   background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  border: 1px solid #cbd5e1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
@@ -613,6 +617,19 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
             _set_sidebar_page(page)
 
 
+def _render_assets_group(*, current: str, role: str) -> None:
+    pages = ("Asset Database", "Who Has What", "Tool Trailer Audits")
+    visible_pages = [page for page in pages if role_can_open_page(role, page)]
+    if not visible_pages:
+        return
+    st.sidebar.markdown(
+        '<div class="ips-nav-section-title ips-nav-group-spaced">Assets</div>',
+        unsafe_allow_html=True,
+    )
+    for page in visible_pages:
+        _render_nav_button(page, current=current, indent=True)
+
+
 def _render_sidebar_office(*, current: str, role: str) -> None:
     """PM / admin / manager — clean app menu."""
     for page in (
@@ -621,7 +638,6 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
         "Assign Tasks (PM)",
         "Work & Plan (Supervisor)",
         "Inventory",
-        "Asset Database",
         "Users",
         "Time Tracking",
         "Weekly Timesheet",
@@ -632,6 +648,8 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
             continue
         if role_can_open_page(role, page):
             _render_nav_button(page, current=current, indent=False)
+        if page == "Inventory":
+            _render_assets_group(current=current, role=role)
 
 
 def _render_sidebar_field(*, current: str, role: str) -> None:
@@ -641,17 +659,20 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
         "Work & Plan (Supervisor)",
         "Scan Inventory",
         "Employee Toolbox",
-        "Asset Database",
         "Time Tracking",
     ):
         if role_can_open_page(role, page):
             _render_nav_button(page, current=current, indent=False)
+        if page == "Employee Toolbox":
+            _render_assets_group(current=current, role=role)
 
 
 def _render_sidebar_viewer(*, current: str, role: str) -> None:
-    for p in ("Dashboard", "Asset Database", "Inventory Usage"):
+    for p in ("Dashboard", "Inventory Usage"):
         if role_can_open_page(role, p):
             _render_nav_button(p, current=current, indent=False)
+        if p == "Dashboard":
+            _render_assets_group(current=current, role=role)
 
 
 def render_sidebar() -> str:
