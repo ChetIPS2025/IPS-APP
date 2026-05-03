@@ -167,6 +167,257 @@ def _inject_task_tab_add_form_css() -> None:
     )
 
 
+def _jdt_af_result_key(job_id: str) -> str:
+    return f"jdt_af_result_{job_id}"
+
+
+def _jdt_af_css_once() -> None:
+    k = "ips_jdt_af_css_v1"
+    if st.session_state.get(k):
+        return
+    st.session_state[k] = True
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-af-card) {
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            margin-bottom: 0.75rem !important;
+            box-sizing: border-box !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-af-card) button[kind] {
+            min-height: 3rem !important;
+            padding-top: 0.65rem !important;
+            padding-bottom: 0.65rem !important;
+            font-size: 1.05rem !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _af_should_apply_text(existing: str, proposed: str | None, overwrite: bool) -> bool:
+    if proposed is None or not str(proposed).strip():
+        return False
+    if overwrite:
+        return True
+    return not str(existing or "").strip()
+
+
+def _apply_autofill_to_add_task_widgets(job_id: str, parsed: dict[str, Any], *, overwrite: bool) -> None:
+    """Write Add task widget session keys (must run before those widgets on next rerun)."""
+
+    def gtn() -> str:
+        v = st.session_state.get(f"jdt_add_tn_{job_id}")
+        return str(v or "").strip() if v is not None else ""
+
+    def gloc() -> str:
+        v = st.session_state.get(f"jdt_add_loc_{job_id}")
+        return str(v or "").strip() if v is not None else ""
+
+    def giss() -> str:
+        v = st.session_state.get(f"jdt_add_iss_{job_id}")
+        return str(v or "").strip() if v is not None else ""
+
+    def gact() -> str:
+        v = st.session_state.get(f"jdt_add_act_{job_id}")
+        return str(v or "").strip() if v is not None else ""
+
+    tn = str(parsed.get("task_number") or "").strip()
+    if _af_should_apply_text(gtn(), tn, overwrite):
+        st.session_state[f"jdt_add_tn_{job_id}"] = tn[:200]
+
+    pr = str(parsed.get("priority") or "").strip().lower()
+    if pr in ("low", "normal", "high", "critical"):
+        pr_touched = bool(st.session_state.get(f"jdt_add_pr_touched_{job_id}"))
+        if overwrite or not pr_touched:
+            st.session_state[f"jdt_add_pr_{job_id}"] = pr
+
+    loc = str(parsed.get("location") or "").strip()
+    if _af_should_apply_text(gloc(), loc, overwrite):
+        st.session_state[f"jdt_add_loc_{job_id}"] = loc[:500]
+
+    iss = str(parsed.get("issue") or "").strip()
+    if _af_should_apply_text(giss(), iss, overwrite):
+        st.session_state[f"jdt_add_iss_{job_id}"] = iss[:4000]
+
+    act = str(parsed.get("action_required") or "").strip()
+    if _af_should_apply_text(gact(), act, overwrite):
+        st.session_state[f"jdt_add_act_{job_id}"] = act[:4000]
+
+    pd = parsed.get("planned_date")
+    if isinstance(pd, date):
+        cur_pl = st.session_state.get(f"jdt_add_pl_{job_id}", date.today())
+        pl_touched = bool(st.session_state.get(f"jdt_add_pl_touched_{job_id}"))
+        if isinstance(cur_pl, date):
+            if overwrite or (not pl_touched and cur_pl == date.today()):
+                st.session_state[f"jdt_add_pl_{job_id}"] = pd
+
+
+def _render_add_task_autofill_from_attachment(*, job_id: str, admin_read: bool) -> None:
+    try:
+        from app.services import job_reference_attachments as _jra_svc
+        from app.services import task_attachment_autofill as _taf
+    except ImportError:
+        import services.job_reference_attachments as _jra_svc  # type: ignore
+        import services.task_attachment_autofill as _taf  # type: ignore
+
+    _jdt_af_css_once()
+    rk = _jdt_af_result_key(job_id)
+    toast_k = f"jdt_af_applied_{job_id}"
+    if st.session_state.pop(toast_k, None):
+        try:
+            st.toast("Applied — review **Add task** below.")
+        except Exception:
+            st.success("Applied — review **Add task** below.")
+    bucket = _jra_svc.reference_bucket()
+    fn = fetch_by_match_admin if admin_read else fetch_by_match
+    try:
+        att_rows = list(
+            fn("job_reference_attachments", {"job_id": str(job_id).strip()}, limit=200) or []
+        )
+    except Exception:
+        att_rows = []
+    candidates = [
+        r
+        for r in att_rows
+        if isinstance(r, dict) and _taf.is_autofill_supported_filename(str(r.get("file_name") or ""))
+    ]
+    id_to_row = {str(r.get("id")): r for r in candidates if str(r.get("id") or "").strip()}
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-jdt-af-card"></span>', unsafe_allow_html=True)
+        st.markdown("###### Auto fill from attachment")
+        st.caption(
+            "Pick a **saved reference** file or **upload** a PDF/image, then extract text to pre-fill **Add task** "
+            "(best-effort; review before saving)."
+        )
+        ids = [str(r.get("id")) for r in candidates if str(r.get("id") or "").strip()]
+
+        def _lbl(rid: str) -> str:
+            if not rid:
+                return "— Select saved reference —"
+            row = id_to_row.get(rid) or {}
+            return str(row.get("file_name") or rid)[:100]
+
+        sel = st.selectbox(
+            "Reference attachment",
+            options=[""] + ids,
+            format_func=_lbl,
+            key=f"jdt_af_sel_{job_id}",
+            label_visibility="visible",
+        )
+        up = st.file_uploader(
+            "Or upload PDF / image (one-time, not saved as reference)",
+            type=["jpg", "jpeg", "png", "webp", "pdf"],
+            key=f"jdt_af_up_{job_id}",
+            accept_multiple_files=False,
+        )
+
+        if st.button(
+            "Auto Fill From Attachment",
+            type="secondary",
+            use_container_width=True,
+            key=f"jdt_af_go_{job_id}",
+        ):
+            data: bytes | None = None
+            fname = ""
+            if up is not None:
+                try:
+                    data = up.getvalue()
+                    fname = str(getattr(up, "name", "") or "upload")
+                except Exception:
+                    data = None
+            elif str(sel or "").strip():
+                row = id_to_row.get(str(sel).strip())
+                if row:
+                    data, fname = _taf.fetch_bytes_for_row(row, bucket=bucket)
+            if not data:
+                st.session_state[rk] = {
+                    "ok": False,
+                    "msg": "Choose a saved attachment or upload a file first.",
+                }
+                st.rerun()
+            if not _taf.is_autofill_supported_filename(fname):
+                st.session_state[rk] = {
+                    "ok": False,
+                    "msg": "Could not auto-fill from this attachment. Please enter task details manually.",
+                }
+                st.rerun()
+            txt = _taf.extract_text_from_bytes(fname, data)
+            if not str(txt or "").strip():
+                st.session_state[rk] = {
+                    "ok": False,
+                    "msg": "Could not auto-fill from this attachment. Please enter task details manually.",
+                }
+                st.rerun()
+            parsed = _taf.parse_hazard_sheet_text(txt)
+            has_any = any(
+                str(parsed.get(k) or "").strip()
+                for k in ("task_number", "location", "issue", "action_required")
+            ) or bool(parsed.get("priority")) or bool(parsed.get("planned_date"))
+            if not has_any:
+                st.session_state[rk] = {
+                    "ok": False,
+                    "msg": "Could not auto-fill from this attachment. Please enter task details manually.",
+                }
+                st.rerun()
+            st.session_state[rk] = {"ok": True, "parsed": parsed}
+            st.rerun()
+
+    res = st.session_state.get(rk)
+    if isinstance(res, dict):
+        if not res.get("ok"):
+            st.warning(str(res.get("msg") or "Could not auto-fill from this attachment."))
+            if st.button("Dismiss", key=f"jdt_af_dismiss_{job_id}", use_container_width=True):
+                st.session_state.pop(rk, None)
+                st.rerun()
+        else:
+            parsed = dict(res.get("parsed") or {})
+            with st.container(border=True):
+                st.markdown('<span class="ips-jdt-af-card"></span>', unsafe_allow_html=True)
+                pd = parsed.get("planned_date")
+                pd_line = ""
+                if isinstance(pd, date):
+                    pd_line = f"- **Planned date:** {html.escape(pd.isoformat())}  \n"
+                st.markdown(
+                    "**Extracted preview**\n\n"
+                    f"- **Task #:** {html.escape(str(parsed.get('task_number') or '—'))}  \n"
+                    f"- **Priority:** {html.escape(str(parsed.get('priority') or '—'))}  \n"
+                    f"{pd_line}"
+                    f"- **Location:** {html.escape(str(parsed.get('location') or '—'))}  \n"
+                    f"- **Issue:** {html.escape(str(parsed.get('issue') or '—'))}  \n"
+                    f"- **Action required:** {html.escape(str(parsed.get('action_required') or '—'))}"
+                )
+                overwrite = st.checkbox(
+                    "Replace fields I already filled",
+                    value=False,
+                    key=f"jdt_af_over_{job_id}",
+                    help="When off, only empty Add task fields are updated.",
+                )
+                b1, b2 = st.columns(2, gap="small")
+                with b1:
+                    if st.button(
+                        "Apply to Task Form",
+                        type="primary",
+                        use_container_width=True,
+                        key=f"jdt_af_apply_{job_id}",
+                    ):
+                        _apply_autofill_to_add_task_widgets(job_id, parsed, overwrite=overwrite)
+                        st.session_state.pop(rk, None)
+                        st.session_state[f"jdt_af_applied_{job_id}"] = True
+                        st.rerun()
+                with b2:
+                    if st.button("Cancel", type="secondary", use_container_width=True, key=f"jdt_af_cancel_{job_id}"):
+                        st.session_state.pop(rk, None)
+                        st.rerun()
+
+
 def _fetch_tasks(job_id: str, *, admin: bool) -> list[dict[str, Any]]:
     fn = fetch_by_match_admin if admin else fetch_by_match
     try:
@@ -359,6 +610,7 @@ def render_job_tasks_tab(
     if can_edit_tasks:
         _inject_task_tab_add_form_css()
         st.markdown("##### Add task")
+        _render_add_task_autofill_from_attachment(job_id=job_id, admin_read=admin_read)
         st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
         tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
         a1, a2 = st.columns(2, gap="small")
@@ -369,9 +621,15 @@ def render_job_tasks_tab(
                 index=1,
                 format_func=lambda x: x.title(),
                 key=f"jdt_add_pr_{job_id}",
+                on_change=lambda: st.session_state.update({f"jdt_add_pr_touched_{job_id}": True}),
             )
         with a2:
-            pl = st.date_input("Planned date", value=date.today(), key=f"jdt_add_pl_{job_id}")
+            pl = st.date_input(
+                "Planned date",
+                value=date.today(),
+                key=f"jdt_add_pl_{job_id}",
+                on_change=lambda: st.session_state.update({f"jdt_add_pl_touched_{job_id}": True}),
+            )
         a3, a4 = st.columns(2, gap="small")
         with a3:
             loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
