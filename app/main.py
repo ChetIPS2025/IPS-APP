@@ -97,6 +97,12 @@ PAGES = {
 _ADMIN_ONLY_PAGES = frozenset({"People", "Employees", "Admin", "Users"})
 
 
+def _route_authenticated_user_to_dashboard() -> None:
+    st.session_state[IPS_ROUTE_SLUG_KEY] = "dashboard"
+    st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
+    st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
+
+
 def main() -> None:
     configure_logging(settings.log_level)
 
@@ -107,7 +113,7 @@ def main() -> None:
     )
 
     init_session()
-    # Persisted Supabase tokens (browser cookies): clear after sign-out, write after sign-in (reloads once).
+    # Persisted Supabase tokens (browser cookies): restore on startup, clear only after sign-out.
     run_auth_browser_cookie_effects()
     try_restore_supabase_session_from_cookies()
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
@@ -161,6 +167,7 @@ def main() -> None:
             if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
                 try:
                     sign_in(email, password, remember_device=remember_device)
+                    _route_authenticated_user_to_dashboard()
                     st.rerun()
                 except Exception as exc:
                     show_auth_error(exc)
@@ -190,6 +197,7 @@ def main() -> None:
                         verify_phone_otp(phone_number=phone, code=code, remember_device=remember_device)
                         st.session_state.pop("login_phone_otp_sent", None)
                         st.session_state.pop("login_phone_code", None)
+                        _route_authenticated_user_to_dashboard()
                         st.rerun()
                     except Exception as exc:
                         show_auth_error(exc)

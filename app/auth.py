@@ -24,13 +24,19 @@ _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this devic
 
 
 def init_session() -> None:
-    # Canonical app auth state (requested keys)
+    # Canonical app auth state.
+    st.session_state.setdefault("authenticated", False)
     st.session_state.setdefault("user", None)
     st.session_state.setdefault("user_email", None)
+    st.session_state.setdefault("role", None)
     # Back-compat keys used throughout existing code
     st.session_state.setdefault("auth_user", None)
     st.session_state.setdefault("auth_profile", None)
     st.session_state.setdefault("auth_employee", None)
+    if not st.session_state["authenticated"] and (
+        st.session_state.get("user") is not None or st.session_state.get("auth_user") is not None
+    ):
+        st.session_state["authenticated"] = True
 
 
 def _cookie_secure_flag() -> bool:
@@ -119,12 +125,14 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     st.session_state["auth_user"] = user
     st.session_state["auth_profile"] = profile
     st.session_state["user"] = user
+    st.session_state["authenticated"] = True
     user_email = getattr(user, "email", None)
     if user_email is None and isinstance(user, dict):
         user_email = user.get("email")
     st.session_state["user_email"] = (
         str(user_email or profile.get("email") or email_hint or "").strip() or None
     )
+    st.session_state["role"] = _role_from_profile(profile)
 
     # Optional employee link (does not gate login)
     st.session_state["auth_employee"] = None
@@ -263,7 +271,8 @@ def run_auth_browser_cookie_effects() -> None:
     """
     One-shot browser bridges: clear cookies after sign-out, or persist tokens after sign-in.
 
-    Uses a full page reload so ``st.context.cookies`` picks up new values on the next run.
+    Sign-in persistence is non-blocking because session_state already owns the active login.
+    Sign-out still reloads once so cleared cookies are reflected in ``st.context.cookies``.
     """
     if st.session_state.pop("_ips_auth_clear_pending", False):
         st.info("Signing out — refreshing the page…")
@@ -279,15 +288,7 @@ def run_auth_browser_cookie_effects() -> None:
     remember = bool(pending.get("remember_device"))
     if not at or not rt:
         return
-    st.info("Saving your session — refreshing the page…")
-    script = _js_cookie_set_reload(
-        access_token=at,
-        refresh_token=rt,
-        remember_device=remember,
-        secure=_cookie_secure_flag(),
-    )
-    components_html(f"<script>{script}</script>", height=8, width=1)
-    st.stop()
+    _silent_write_auth_cookies(at, rt, remember_device=remember)
 
 
 def sign_in(email: str, password: str, *, remember_device: bool = False) -> None:
@@ -402,15 +403,19 @@ def sign_out() -> None:
         client.auth.sign_out()
     except Exception:
         pass
+    st.session_state["authenticated"] = False
     st.session_state["user"] = None
     st.session_state["user_email"] = None
+    st.session_state["role"] = None
     st.session_state["auth_user"] = None
     st.session_state["auth_profile"] = None
+    st.session_state["auth_employee"] = None
+    st.session_state.pop("_ips_auth_persist_pending", None)
     st.session_state["_ips_auth_clear_pending"] = True
 
 
 def require_login() -> bool:
-    return st.session_state.get("user") is not None or st.session_state.get("auth_user") is not None
+    return bool(st.session_state.get("authenticated"))
 
 
 def current_profile() -> dict:
@@ -430,7 +435,13 @@ def current_role() -> str:
     Legacy compatibility:
     - pm, estimator -> manager
     """
-    raw = str(current_profile().get("role", "viewer") or "viewer").strip().lower()
+    raw = _role_from_profile(current_profile())
+    st.session_state["role"] = raw
+    return raw
+
+
+def _role_from_profile(profile: dict) -> str:
+    raw = str((profile or {}).get("role", "viewer") or "viewer").strip().lower()
     if raw in {"estimator", "pm"}:
         return "manager"
     if raw in {"admin", "manager", "employee", "viewer"}:
