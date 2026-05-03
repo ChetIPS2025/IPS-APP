@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -228,10 +229,41 @@ def _is_pdf_filename(name: str) -> bool:
     return jra.normalize_extension(name) == "pdf"
 
 
-def _preview_kind(fname: str) -> str:
+def _is_pdf_mimetype(file_type: str) -> bool:
+    return str(file_type or "").strip().lower() == "application/pdf"
+
+
+def _is_pdf_document(fname: str, file_type: str) -> bool:
+    """PDF by stored MIME (primary) or by filename extension."""
+    return _is_pdf_mimetype(file_type) or _is_pdf_filename(fname)
+
+
+def _gview_embed_url(public_file_url: str) -> str:
+    """Google Docs viewer — fetches the PDF URL server-side; works where raw PDF iframe is blank."""
+    q = quote(str(public_file_url).strip(), safe="")
+    return f"https://docs.google.com/gview?url={q}&embedded=true"
+
+
+def _pdf_iframe_html(*, signed_url: str, fname: str, iframe_height_px: int) -> str:
+    """Iframe HTML for inline or modal PDF preview via Google viewer (border none)."""
+    viewer = _gview_embed_url(signed_url)
+    src_attr = html.escape(viewer, quote=True)
+    safe_name = html.escape(fname)
+    h = max(600, min(800, int(iframe_height_px)))
+    return (
+        f'<div style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;margin:0;">'
+        f'<iframe src="{src_attr}" title="{safe_name}" loading="lazy" '
+        'referrerpolicy="no-referrer-when-downgrade" '
+        f'style="width:100%;height:{h}px;min-height:600px;max-height:800px;'
+        'border:none;background:#ffffff;box-sizing:border-box;display:block;">'
+        "</iframe></div>"
+    )
+
+
+def _preview_kind(fname: str, file_type: str = "") -> str:
     if jra.is_image_filename(fname):
         return "image"
-    if _is_pdf_filename(fname):
+    if _is_pdf_document(fname, file_type):
         return "pdf"
     return "other"
 
@@ -256,17 +288,10 @@ def _reference_attachment_fullscreen_dialog(fname: str, signed: str, kind: str) 
             unsafe_allow_html=True,
         )
     elif kind == "pdf" and signed:
-        src_attr = html.escape(signed, quote=True)
-        safe_name = html.escape(fname)
+        inner_h = 720
         components.html(
-            f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;">'
-            f'<iframe src="{src_attr}#toolbar=1" title="{safe_name}" '
-            'referrerpolicy="no-referrer-when-downgrade" '
-            'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads" '
-            'style="width:100%;height:calc(90vh - 120px);min-height:420px;max-height:780px;'
-            "border:1px solid #d1d5db;border-radius:10px;background:#ffffff;"
-            'box-sizing:border-box;display:block;"></iframe></div>',
-            height=720,
+            _pdf_iframe_html(signed_url=signed, fname=fname, iframe_height_px=inner_h),
+            height=min(820, inner_h + 40),
             scrolling=True,
         )
     else:
@@ -284,12 +309,13 @@ def _maybe_run_fs_dialog() -> None:
         st.session_state[IPS_JRA_FS_SESSION_KEY] = None
         return
     fname = str(spec.get("fname") or "Attachment")
-    kind = str(spec.get("kind") or _preview_kind(fname))
+    ftype = str(spec.get("file_type") or "")
+    kind = str(spec.get("kind") or _preview_kind(fname, ftype))
     _reference_attachment_fullscreen_dialog(fname, signed, kind)
 
 
-def _render_preview_block(*, signed: str, fname: str) -> None:
-    """Full-width preview above metadata (image, PDF iframe, or doc fallback)."""
+def _render_preview_block(*, signed: str, fname: str, file_type: str = "") -> None:
+    """Full-width preview above metadata (image, PDF via Google viewer, or doc fallback)."""
     if not signed:
         st.markdown(
             '<div class="ips-jra-doc-fallback"><p style="margin:0;font-size:0.9rem;color:#374151;">'
@@ -306,17 +332,9 @@ def _render_preview_block(*, signed: str, fname: str) -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
-    elif _is_pdf_filename(fname):
-        # components.html keeps iframe reliable (st.markdown may strip iframes).
-        src_attr = html.escape(signed, quote=True)
+    elif _is_pdf_document(fname, file_type):
         components.html(
-            f'<div style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;margin:0 0 4px 0;">'
-            f'<iframe src="{src_attr}#toolbar=1" title="{safe_name}" '
-            'referrerpolicy="no-referrer-when-downgrade" '
-            'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads" '
-            'style="width:100%;min-height:600px;height:700px;max-height:800px;'
-            "border:1px solid #d1d5db;border-radius:10px;background:#ffffff;"
-            'box-sizing:border-box;display:block;"></iframe></div>',
+            _pdf_iframe_html(signed_url=signed, fname=fname, iframe_height_px=700),
             height=720,
             scrolling=True,
         )
@@ -359,7 +377,7 @@ def _render_attachment_card(
 
     with st.container(border=True):
         st.markdown('<span class="ips-job-ref-attach-card"></span>', unsafe_allow_html=True)
-        _render_preview_block(signed=signed, fname=fname)
+        _render_preview_block(signed=signed, fname=fname, file_type=ftype)
 
         st.markdown(
             f"<p class='ips-jra-meta' style='font-weight:700;font-size:1rem;margin:0 0 0.25rem 0;'>{html.escape(fname)}</p>"
@@ -386,7 +404,8 @@ def _render_attachment_card(
                         st.session_state[IPS_JRA_FS_SESSION_KEY] = {
                             "fname": fname,
                             "signed": signed,
-                            "kind": _preview_kind(fname),
+                            "file_type": ftype,
+                            "kind": _preview_kind(fname, ftype),
                         }
                         st.rerun()
                 else:
@@ -423,7 +442,8 @@ def _render_attachment_card(
                         st.session_state[IPS_JRA_FS_SESSION_KEY] = {
                             "fname": fname,
                             "signed": signed,
-                            "kind": _preview_kind(fname),
+                            "file_type": ftype,
+                            "kind": _preview_kind(fname, ftype),
                         }
                         st.rerun()
                 else:
