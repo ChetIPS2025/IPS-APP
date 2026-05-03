@@ -55,7 +55,7 @@ _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
 )
 
 # Assets (sidebar)
-_NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Scan", "Tool Trailer Audits")
+_NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
 
 # Inventory expander (sidebar)
 _NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "Inventory Usage")
@@ -131,8 +131,8 @@ _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Customers",
     "Job Costing",
 )
-# Routable asset-area pages (Who Has What moved to Dashboard; still routable for View All).
-_NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
+# Routable asset-area pages.
+_NAV_ASSET_ROUTES: tuple[str, ...] = _NAV_ASSETS_SIDEBAR
 # Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
 _NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
     ("All assets", "All"),
@@ -367,8 +367,7 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
   color: #111827 !important;
   font-size: 0.68rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.02em;
   margin: 0 0 6px 0;
   padding: 0;
   line-height: 1.3;
@@ -618,8 +617,7 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
 
 
 def _render_assets_group(*, current: str, role: str) -> None:
-    pages = ("Asset Database", "Who Has What", "Tool Trailer Audits")
-    visible_pages = [page for page in pages if role_can_open_page(role, page)]
+    visible_pages = [page for page in _NAV_ASSETS_SIDEBAR if role_can_open_page(role, page)]
     if not visible_pages:
         return
     st.sidebar.markdown(
