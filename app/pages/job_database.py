@@ -4,7 +4,6 @@ import contextlib
 import html
 import logging
 from typing import Any
-from urllib.parse import urlencode
 
 _LOG = logging.getLogger(__name__)
 
@@ -328,8 +327,17 @@ def _consume_job_card_open_request(*, jobs: list[dict[str, Any]], can_open: bool
     valid_ids = {str(j.get("id") or "").strip() for j in jobs}
     if jid not in valid_ids:
         return
+    _open_job_detail(jid)
+
+
+def _open_job_detail(job_id: str) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
     st.session_state["job_mode"] = "edit"
     st.session_state["job_edit_id"] = jid
+    st.session_state["selected_job_id"] = jid
+    st.session_state["page"] = "job_detail"
     st.session_state.pop("job_number_manual_input", None)
     st.rerun()
 
@@ -363,19 +371,6 @@ def _inject_job_database_responsive_styles() -> None:
             line-height: 1.45;
             margin: 0.15rem 0 0.4rem;
             overflow-wrap: anywhere;
-        }
-        .ips-job-card-open {
-            color: inherit !important;
-            display: block;
-            min-height: 92px;
-            padding: 0.15rem 0.1rem 0.35rem;
-            text-decoration: none !important;
-            -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
-        }
-        .ips-job-card-open:active,
-        .ips-job-card-open:focus,
-        .ips-job-card-open:hover {
-            text-decoration: none !important;
         }
         .ips-job-card-badges {
             display: flex;
@@ -419,11 +414,6 @@ def _inject_job_database_responsive_styles() -> None:
             padding: 0.35rem 0.55rem;
             white-space: nowrap;
         }
-        .ips-job-card-open:focus-visible {
-            border-radius: 10px;
-            outline: 3px solid #93c5fd;
-            outline-offset: 4px;
-        }
         /*
          * Job overview: Streamlit theme is base=dark (light text tokens). List rows sit on white
          * bordered cards, so themed body text is effectively invisible. Force readable ink.
@@ -453,14 +443,52 @@ def _inject_job_database_responsive_styles() -> None:
             background: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 12px !important;
+            cursor: pointer;
             margin-bottom: 0.65rem !important;
             padding: 0.75rem !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover {
+            border-color: #2563eb !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.16) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) .stButton > button {
             min-height: 48px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button {
+            align-items: flex-start !important;
+            background: #ffffff !important;
+            border: 1px solid transparent !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            color: #111827 !important;
+            cursor: pointer !important;
+            justify-content: flex-start !important;
+            min-height: 92px !important;
+            padding: 0.55rem 0.65rem !important;
+            text-align: left !important;
+            width: 100% !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button:hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button:focus {
+            background: #f8fafc !important;
+            border-color: #93c5fd !important;
+            color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button p {
+            color: #111827 !important;
+            font-weight: 700 !important;
+            line-height: 1.35 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            text-align: left !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .ips-job-card-badges {
+            margin-bottom: 0.35rem;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="input"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-baseweb="base-input"],
@@ -1606,17 +1634,16 @@ def _render_job_card_list(
                 if amount
                 else ""
             )
-            open_href = "?" + urlencode({JOB_DB_OPEN_QUERY_PARAM: jid})
+            if st.button(
+                f"{job_name}\n\nJob # {job_num} | Customer {customer}\n\nTap to open details",
+                key=f"open_{jid}",
+                type="secondary",
+                use_container_width=True,
+                help=f"Open {job_name}",
+            ):
+                _open_job_detail(jid)
             st.markdown(
-                f'<a class="ips-job-card-open" href="{html.escape(open_href, quote=True)}" '
-                f'aria-label="Open job {html.escape(job_num, quote=True)} {html.escape(job_name, quote=True)}">'
-                f'<span class="ips-job-card-title">{html.escape(job_name)}</span>'
-                f'<span class="ips-job-card-meta">'
-                f'<strong>Job #</strong> {html.escape(job_num)} &nbsp; '
-                f'<strong>Customer</strong> {html.escape(customer)}</span>'
-                f'<span class="ips-job-card-badges">{_job_status_badge_html(status)}{amount_html}</span>'
-                f'<span class="ips-job-card-open-hint">Tap to open</span>'
-                "</a>",
+                f'<span class="ips-job-card-badges">{_job_status_badge_html(status)}{amount_html}</span>',
                 unsafe_allow_html=True,
             )
             if can_delete:
