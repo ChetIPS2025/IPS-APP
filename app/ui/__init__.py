@@ -57,11 +57,23 @@ _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
 # Assets (sidebar)
 _NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
 
-# Inventory expander (sidebar)
-_NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "Inventory Usage")
+# Inventory (sidebar)
+_NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory", "Scan Inventory", "Inventory Usage")
 
-# Admin / office tools (sidebar)
-_NAV_ADMIN_SIDEBAR: tuple[str, ...] = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses")
+# Office / reports (sidebar)
+_NAV_OFFICE_REPORTS_SIDEBAR: tuple[str, ...] = ("Time Tracking", "Weekly Timesheet", "PO / Expenses")
+
+# Admin tools (sidebar)
+_NAV_ADMIN_SIDEBAR: tuple[str, ...] = ("Users", "Admin")
+
+_NAV_SECTION_STATE_PREFIX = "ips_nav_section_expanded__"
+_NAV_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("jobs_work", "Jobs / Work", _NAV_JOBS_SIDEBAR),
+    ("assets", "Assets", _NAV_ASSETS_SIDEBAR),
+    ("inventory", "Inventory", _NAV_INVENTORY_SIDEBAR),
+    ("office_reports", "Office & Reports", _NAV_OFFICE_REPORTS_SIDEBAR),
+    ("admin", "Admin", _NAV_ADMIN_SIDEBAR),
+)
 
 _NAV_ROUTE_SLUGS: dict[str, str] = {
     "Dashboard": "dashboard",
@@ -225,6 +237,7 @@ IPS_SIDEBAR_PAGES: tuple[str, ...] = (
     + _NAV_JOBS_ROUTES
     + _NAV_ASSET_ROUTES
     + _NAV_RESOURCES
+    + _NAV_OFFICE_REPORTS_SIDEBAR
     + _NAV_ADMIN_SIDEBAR
     + _NAV_HIDDEN_ROUTES
 )
@@ -569,6 +582,7 @@ def _ensure_valid_nav_page() -> None:
             | set(_NAV_ASSET_ROUTES)
             | set(_NAV_RESOURCES)
             | set(_NAV_INVENTORY_SUBPAGES)
+            | set(_NAV_OFFICE_REPORTS_SIDEBAR)
             | set(_NAV_ADMIN_SIDEBAR)
             | visible_secondary
         )
@@ -616,61 +630,61 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
             _set_sidebar_page(page)
 
 
-def _render_assets_group(*, current: str, role: str) -> None:
-    visible_pages = [page for page in _NAV_ASSETS_SIDEBAR if role_can_open_page(role, page)]
+def _nav_section_state_key(section_key: str) -> str:
+    return f"{_NAV_SECTION_STATE_PREFIX}{section_key}"
+
+
+def _visible_section_pages(role: str, pages: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(page for page in pages if role_can_open_page(role, page))
+
+
+def _section_contains_current(current: str, pages: tuple[str, ...]) -> bool:
+    return current in pages
+
+
+def _section_expanded(section_key: str, current: str, pages: tuple[str, ...]) -> bool:
+    state_key = _nav_section_state_key(section_key)
+    if _section_contains_current(current, pages):
+        st.session_state[state_key] = True
+        return True
+    if state_key not in st.session_state:
+        st.session_state[state_key] = False
+    return bool(st.session_state[state_key])
+
+
+def _toggle_section(section_key: str, current: str, pages: tuple[str, ...]) -> None:
+    state_key = _nav_section_state_key(section_key)
+    if _section_contains_current(current, pages):
+        st.session_state[state_key] = True
+    else:
+        st.session_state[state_key] = not bool(st.session_state.get(state_key, False))
+    st.rerun()
+
+
+def _render_nav_section(section_key: str, label: str, pages: tuple[str, ...], *, current: str, role: str) -> None:
+    visible_pages = _visible_section_pages(role, pages)
     if not visible_pages:
         return
-    st.sidebar.markdown(
-        '<div class="ips-nav-section-title ips-nav-group-spaced">Assets</div>',
-        unsafe_allow_html=True,
-    )
-    for page in visible_pages:
-        _render_nav_button(page, current=current, indent=True)
-
-
-def _render_sidebar_office(*, current: str, role: str) -> None:
-    """PM / admin / manager — clean app menu."""
-    for page in (
-        "Dashboard",
-        "Job Database",
-        "Assign Tasks (PM)",
-        "Work & Plan (Supervisor)",
-        "Inventory",
-        "Users",
-        "Time Tracking",
-        "Weekly Timesheet",
-        "PO / Expenses",
-        "Admin",
+    expanded = _section_expanded(section_key, current, visible_pages)
+    marker = "▾" if expanded else "▸"
+    if st.sidebar.button(
+        f"{marker} **{label}**",
+        key=f"ips_nav_section__{section_key}",
+        type="secondary",
+        use_container_width=True,
     ):
-        if page == "Admin" and role != "admin":
-            continue
-        if role_can_open_page(role, page):
-            _render_nav_button(page, current=current, indent=False)
-        if page == "Inventory":
-            _render_assets_group(current=current, role=role)
+        _toggle_section(section_key, current, visible_pages)
+    if expanded:
+        for page in visible_pages:
+            _render_nav_button(page, current=current, indent=True)
 
 
-def _render_sidebar_field(*, current: str, role: str) -> None:
-    """Field supervisor / crew — field-friendly app menu."""
-    for page in (
-        "Dashboard",
-        "Work & Plan (Supervisor)",
-        "Scan Inventory",
-        "Employee Toolbox",
-        "Time Tracking",
-    ):
-        if role_can_open_page(role, page):
-            _render_nav_button(page, current=current, indent=False)
-        if page == "Employee Toolbox":
-            _render_assets_group(current=current, role=role)
-
-
-def _render_sidebar_viewer(*, current: str, role: str) -> None:
-    for p in ("Dashboard", "Inventory Usage"):
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=False)
-        if p == "Dashboard":
-            _render_assets_group(current=current, role=role)
+def _render_sidebar_sections(*, current: str, role: str) -> None:
+    """Role-filtered collapsible app menu."""
+    if role_can_open_page(role, "Dashboard"):
+        _render_nav_button("Dashboard", current=current, indent=False)
+    for section_key, label, pages in _NAV_SECTIONS:
+        _render_nav_section(section_key, label, pages, current=current, role=role)
 
 
 def render_sidebar() -> str:
@@ -690,15 +704,7 @@ def render_sidebar() -> str:
 
     current = st.session_state[IPS_NAV_PAGE_KEY]
     role = current_role()
-    r = str(role or "viewer").strip().lower()
-    if r in ("pm", "estimator"):
-        r = "manager"
-    if r in ("admin", "manager"):
-        _render_sidebar_office(current=current, role=role)
-    elif r == "employee":
-        _render_sidebar_field(current=current, role=role)
-    else:
-        _render_sidebar_viewer(current=current, role=role)
+    _render_sidebar_sections(current=current, role=role)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
     if st.sidebar.button("🚪 Sign Out", use_container_width=True):
