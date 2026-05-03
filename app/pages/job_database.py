@@ -4,7 +4,6 @@ import contextlib
 import html
 import logging
 from typing import Any
-from urllib.parse import urlencode
 
 _LOG = logging.getLogger(__name__)
 
@@ -328,10 +327,7 @@ def _consume_job_card_open_request(*, jobs: list[dict[str, Any]], can_open: bool
     valid_ids = {str(j.get("id") or "").strip() for j in jobs}
     if jid not in valid_ids:
         return
-    st.session_state["job_mode"] = "edit"
-    st.session_state["job_edit_id"] = jid
-    st.session_state.pop("job_number_manual_input", None)
-    st.rerun()
+    _open_job_detail(jid)
 
 
 def _inject_job_database_responsive_styles() -> None:
@@ -366,6 +362,7 @@ def _inject_job_database_responsive_styles() -> None:
         }
         .ips-job-card-open {
             color: inherit !important;
+            cursor: pointer;
             display: block;
             min-height: 92px;
             padding: 0.15rem 0.1rem 0.35rem;
@@ -453,9 +450,31 @@ def _inject_job_database_responsive_styles() -> None:
             background: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 12px !important;
+            cursor: pointer;
             margin-bottom: 0.65rem !important;
             padding: 0.75rem !important;
+            position: relative !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+            transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor):hover {
+            background: #f8fafc !important;
+            border-color: #93c5fd !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button[kind="primary"] {
+            cursor: pointer !important;
+            height: 100% !important;
+            inset: 0 !important;
+            min-height: 100% !important;
+            opacity: 0 !important;
+            position: absolute !important;
+            width: 100% !important;
+            z-index: 2 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button[kind="secondary"] {
+            position: relative !important;
+            z-index: 3 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
@@ -783,7 +802,32 @@ def _safe_date_value(value):
 def _clear_job_mode() -> None:
     st.session_state.pop("job_mode", None)
     st.session_state.pop("job_edit_id", None)
+    st.session_state.pop("selected_job_id", None)
+    if st.session_state.get("page") == "job_detail":
+        st.session_state.pop("page", None)
     st.session_state.pop("job_number_manual_input", None)
+
+
+def _open_job_detail(job_id: str) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    st.session_state["selected_job_id"] = jid
+    st.session_state["page"] = "job_detail"
+    st.session_state["job_mode"] = "edit"
+    st.session_state["job_edit_id"] = jid
+    st.session_state.pop("job_number_manual_input", None)
+    st.rerun()
+
+
+def _sync_job_detail_route() -> None:
+    if st.session_state.get("page") != "job_detail":
+        return
+    jid = str(st.session_state.get("selected_job_id") or "").strip()
+    if not jid:
+        return
+    st.session_state["job_mode"] = "edit"
+    st.session_state["job_edit_id"] = jid
 
 
 def _job_detail_display_number(row: dict[str, Any] | None, *, has_job_number_column: bool) -> str:
@@ -1572,6 +1616,7 @@ def _render_job_card_list(
     *,
     df_display: pd.DataFrame,
     job_num_col: str,
+    can_open: bool,
     can_delete: bool,
 ) -> None:
     st.markdown('<span class="ips-job-card-list-anchor"></span>', unsafe_allow_html=True)
@@ -1606,9 +1651,8 @@ def _render_job_card_list(
                 if amount
                 else ""
             )
-            open_href = "?" + urlencode({JOB_DB_OPEN_QUERY_PARAM: jid})
             st.markdown(
-                f'<a class="ips-job-card-open" href="{html.escape(open_href, quote=True)}" '
+                f'<div class="ips-job-card-open" '
                 f'aria-label="Open job {html.escape(job_num, quote=True)} {html.escape(job_name, quote=True)}">'
                 f'<span class="ips-job-card-title">{html.escape(job_name)}</span>'
                 f'<span class="ips-job-card-meta">'
@@ -1616,9 +1660,18 @@ def _render_job_card_list(
                 f'<strong>Customer</strong> {html.escape(customer)}</span>'
                 f'<span class="ips-job-card-badges">{_job_status_badge_html(status)}{amount_html}</span>'
                 f'<span class="ips-job-card-open-hint">Tap to open</span>'
-                "</a>",
+                "</div>",
                 unsafe_allow_html=True,
             )
+            if st.button(
+                f"Open {job_name}",
+                key=f"open_{jid}",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_open,
+                help=f"Open {job_name}",
+            ):
+                _open_job_detail(jid)
             if can_delete:
                 if st.button(
                     "Delete",
@@ -1813,6 +1866,7 @@ def render() -> None:
         jobs=jobs,
         can_open=can_edit or current_role() == "employee",
     )
+    _sync_job_detail_route()
 
     customer_name_by_id: dict[str, str] = {}
     for c in customers:
@@ -2178,6 +2232,7 @@ def render() -> None:
                         _render_job_card_list(
                             df_display=df_display,
                             job_num_col=job_num_col,
+                            can_open=can_edit or current_role() == "employee",
                             can_delete=can_edit,
                         )
 
