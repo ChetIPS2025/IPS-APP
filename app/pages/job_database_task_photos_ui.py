@@ -353,6 +353,24 @@ def _insert_progress(
             )
 
 
+def save_task_progress_photo_from_bytes(
+    *,
+    task_id: str,
+    raw: bytes,
+    fname: str,
+    admin_read: bool,
+    daily_work_package_id: str | None = None,
+) -> None:
+    """Same persistence as the Progress slot in ``render_task_photo_strip`` (field quick-capture)."""
+    _insert_progress(
+        task_id=str(task_id),
+        raw=raw,
+        fname=str(fname or "capture.jpg"),
+        admin=admin_read,
+        daily_work_package_id=daily_work_package_id,
+    )
+
+
 def remove_typed_task_photo(*, task_id: str, photo_type: str, admin_read: bool) -> None:
     """Remove before or after from task_photos (and legacy job_task_photos) and clear job_tasks URL columns."""
     if str(photo_type).lower() not in (tp.PHOTO_TYPES_BEFORE, tp.PHOTO_TYPES_AFTER):

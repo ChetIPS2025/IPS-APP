@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 from datetime import date, datetime, timezone
@@ -72,6 +73,11 @@ except ImportError:
     import services.job_reference_attachments as _jra_svc  # type: ignore
 
 try:
+    from app.services.supervisor_planning import TASK_STATUSES
+except ImportError:
+    from services.supervisor_planning import TASK_STATUSES  # type: ignore
+
+try:
     from app.auth import current_role as _jra_role
 except ImportError:
     from auth import current_role as _jra_role  # type: ignore
@@ -92,6 +98,18 @@ except ImportError:
     from utils.formatters import job_display_label as _job_display_label  # type: ignore
 
 # Task status labels for badges / pickers
+_JDT_STATUS_LABELS: dict[str, str] = {
+    "not_started": "Not Started",
+    "in_progress": "In Progress",
+    "complete": "Complete",
+    "partial": "Partial",
+    "blocked": "Blocked",
+    "duplicate": "Duplicate",
+    "electrical": "Electrical / Other Trade",
+    "waiting_on_customer": "Waiting on Customer",
+    "cancelled": "Cancelled",
+}
+
 _REVIEW_STATUS_LABELS: dict[str, str] = {
     "complete": "Complete",
     "partial": "Partial",
@@ -148,20 +166,59 @@ def _inject_task_card_row_css() -> None:
     st.markdown(
         """
         <style>
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind] {
+            min-height: 2.85rem !important;
+            font-size: 1.02rem !important;
+        }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="secondary"] {
             background-color: #f3f4f6 !important;
             color: #111827 !important;
             border: 1px solid #d1d5db !important;
-            min-height: 2.85rem !important;
-            font-size: 1.02rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="secondary"]:hover {
             background-color: #e5e7eb !important;
             border-color: #9ca3af !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="primary"] {
-            min-height: 2.85rem !important;
-            font-size: 1.02rem !important;
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            border: 1px solid #1d4ed8 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="primary"]:hover {
+            background-color: #1d4ed8 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _inject_jdt_field_tap_css() -> None:
+    key = "ips_jdt_field_tap_css_v1"
+    if st.session_state.get(key):
+        return
+    st.session_state[key] = True
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-field-zone) {
+            background-color: #d1d5db !important;
+            padding: 0.75rem !important;
+            border-radius: 12px !important;
+            margin-bottom: 0.75rem !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) div[data-testid="stSelectbox"] label {
+            display: none !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) div[data-testid="stSelectbox"] > div {
+            min-height: 3rem !important;
         }
         </style>
         """,
@@ -206,25 +263,6 @@ def _is_pdf_reference(fname: str, file_type: str) -> bool:
     return str(file_type or "").strip().lower() == "application/pdf"
 
 
-def _latest_image_or_pdf_ref_by_task_id(att_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Most recent job_reference_attachments row per task (images + PDF only)."""
-    out: dict[str, dict[str, Any]] = {}
-    for r in att_rows:
-        if not isinstance(r, dict):
-            continue
-        tid = str(r.get("task_id") or "").strip()
-        if not tid:
-            continue
-        fname = str(r.get("file_name") or "")
-        ftype = str(r.get("file_type") or "")
-        if not (_jra_svc.is_image_filename(fname) or _is_pdf_reference(fname, ftype)):
-            continue
-        prev = out.get(tid)
-        if prev is None or str(r.get("created_at") or "") >= str(prev.get("created_at") or ""):
-            out[tid] = r
-    return out
-
-
 def _render_task_card_reference_preview(att: dict[str, Any], *, bucket: str) -> None:
     path = str((att or {}).get("file_url") or "").strip()
     fname = str((att or {}).get("file_name") or "file").strip()
@@ -254,12 +292,232 @@ def _render_task_card_reference_preview(att: dict[str, Any], *, bucket: str) -> 
         )
 
 
+def _jdt_status_label(slug: str) -> str:
+    s = str(slug or "not_started").strip().lower()
+    if s == "open":
+        s = "not_started"
+    return _JDT_STATUS_LABELS.get(s, s.replace("_", " ").title())
+
+
+def _norm_task_status_slug(val: Any) -> str:
+    s = str(val or "not_started").strip().lower()
+    if s == "open":
+        return "not_started"
+    return s
+
+
+def _fetch_job_task_by_id(task_id: str, *, admin_read: bool) -> dict[str, Any] | None:
+    tid = str(task_id or "").strip()
+    if not tid:
+        return None
+    fn = fetch_by_match_admin if admin_read else fetch_by_match
+    try:
+        r = fn("job_tasks", {"id": tid}, limit=1) or []
+        return r[0] if r and isinstance(r[0], dict) else None
+    except Exception:
+        return None
+
+
+def _persist_quick_task_update(
+    *,
+    upd: Callable[..., Any],
+    tid: str,
+    task_row: dict[str, Any],
+    status: str,
+    notes: str,
+    admin_read: bool,
+) -> tuple[bool, str]:
+    rows_all = _tph.fetch_task_photos(tid, admin=admin_read)
+    by_tp = _tp_svc.photos_by_task_id(rows_all)
+    ns = str(status or "").strip().lower()
+    if ns == "complete" and not _tp_svc.task_has_after_photo(tid, task_row, by_tp):
+        return False, "After photo required to complete task."
+    try:
+        payload: dict[str, Any] = {
+            "status": ns,
+            "notes": str(notes or "").strip()[:4000],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if ns == "complete":
+            payload["completed_date"] = date.today().isoformat()[:10]
+        else:
+            payload["completed_date"] = None
+        upd("job_tasks", payload, {"id": tid})
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _make_jdt_status_pending_cb(job_id: str, tid: str) -> Callable[[], None]:
+    def _cb() -> None:
+        st.session_state[f"jdt_st_pending_{job_id}"] = {
+            "tid": str(tid).strip(),
+            "st": st.session_state.get(f"jdt_st_{job_id}_{tid}"),
+        }
+
+    return _cb
+
+
+@st.dialog("Camera", width="large")
+def _task_camera_capture_dialog(*, job_id: str, tid: str, admin_read: bool) -> None:
+    """Single camera capture → auto-save as progress photo; optional file upload."""
+    row = _fetch_job_task_by_id(tid, admin_read=admin_read) or {}
+    st.markdown(f"**{html.escape(task_number_display(row))}**")
+    st.caption("Capture saves automatically as a **progress** photo.")
+    ver = int(st.session_state.get(f"jdt_capver_{job_id}_{tid}", 0))
+    cam = st.camera_input(
+        "Capture",
+        key=f"jdt_capinp_{job_id}_{tid}_{ver}",
+        label_visibility="collapsed",
+        help="Take a photo",
+    )
+    if cam is not None:
+        raw = cam.getvalue()
+        if len(raw) > 800:
+            sig = hashlib.sha256(raw).hexdigest()
+            last_sig = str(st.session_state.get(f"jdt_capsig_{job_id}_{tid}") or "")
+            if sig != last_sig:
+                try:
+                    _tph.save_task_progress_photo_from_bytes(
+                        task_id=tid,
+                        raw=raw,
+                        fname="capture.jpg",
+                        admin_read=admin_read,
+                    )
+                    st.session_state[f"jdt_capsig_{job_id}_{tid}"] = sig
+                    st.session_state[f"jdt_capver_{job_id}_{tid}"] = ver + 1
+                    st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+                    try:
+                        st.toast("Photo saved")
+                    except Exception:
+                        pass
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+    with st.expander("Upload from files instead", expanded=False):
+        up = st.file_uploader(
+            "Photo file",
+            type=["jpg", "jpeg", "png", "webp"],
+            key=f"jdt_capup_{job_id}_{tid}",
+            label_visibility="collapsed",
+        )
+        if up is not None and st.button("Upload", type="primary", key=f"jdt_capup_go_{job_id}_{tid}"):
+            try:
+                raw = up.getvalue()
+                nm = str(getattr(up, "name", "") or "upload.jpg")
+                _tph.save_task_progress_photo_from_bytes(
+                    task_id=tid,
+                    raw=raw,
+                    fname=nm,
+                    admin_read=admin_read,
+                )
+                st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+                try:
+                    st.toast("Photo saved")
+                except Exception:
+                    pass
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+    if st.button("Close", use_container_width=True, key=f"jdt_cap_close_{job_id}_{tid}"):
+        st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+        st.rerun()
+
+
+@st.dialog("Task details", width="large")
+def _task_view_details_dialog(
+    *,
+    job_id: str,
+    tid: str,
+    task_row: dict[str, Any],
+    att_rows: list[dict[str, Any]],
+    bucket: str,
+    can_edit: bool,
+    admin_read: bool,
+    upd: Callable[..., Any],
+) -> None:
+    """Full action, reference files for this task, photo history, supervisor."""
+    st.markdown(f"#### {html.escape(task_number_display(task_row))}")
+    st.caption("Full task context — change status from the task list.")
+    arq = str(task_row.get("action_required") or "").strip()
+    st.markdown("**Action required**")
+    if arq:
+        st.markdown(f"<div style='white-space:pre-wrap;font-size:0.92rem'>{html.escape(arq[:8000])}</div>", unsafe_allow_html=True)
+    else:
+        st.caption("—")
+
+    task_refs = [
+        r
+        for r in (att_rows or [])
+        if isinstance(r, dict) and str(r.get("task_id") or "").strip() == tid
+    ]
+    st.markdown("**Reference attachments (this task)**")
+    if not task_refs:
+        st.caption("No files linked to this task.")
+    else:
+        for r in sorted(task_refs, key=lambda x: str(x.get("created_at") or ""), reverse=True)[:20]:
+            fname = str(r.get("file_name") or "file")
+            with st.container(border=True):
+                st.caption(str(fname)[:120])
+                _render_task_card_reference_preview(r, bucket=bucket)
+
+    st.markdown("**Photo history**")
+    try:
+        ph_rows = list(_tph.fetch_task_photos(tid, admin=admin_read) or [])
+    except Exception:
+        ph_rows = []
+    if not ph_rows:
+        st.caption("No photos yet.")
+    else:
+        ph_rows.sort(key=lambda x: str((x or {}).get("created_at") or ""), reverse=True)
+        cols = st.columns(min(4, max(1, len(ph_rows))))
+        for i, pr in enumerate(ph_rows[:16]):
+            pp = str((pr or {}).get("storage_path") or (pr or {}).get("file_url") or "").strip()
+            pt = str((pr or {}).get("photo_type") or "").strip()
+            with cols[i % len(cols)]:
+                st.caption(html.escape(pt or "photo"))
+                if pp:
+                    url = _tph.sign_task_photo_url(pp, expires_in=1800) if not pp.startswith("http") else pp
+                    if url:
+                        try:
+                            st.image(url, use_container_width=True)
+                        except Exception:
+                            st.caption("(preview)")
+                else:
+                    st.caption("—")
+
+    with st.expander("Supervisor & assignment", expanded=False):
+        supw = st.text_input(
+            "Assigned supervisor",
+            value=str(task_row.get("assigned_supervisor_name") or ""),
+            key=f"jdt_vd_sup_{job_id}_{tid}",
+            disabled=not can_edit,
+        )
+        if can_edit and st.button("Save supervisor", key=f"jdt_vd_supsv_{job_id}_{tid}"):
+            try:
+                upd(
+                    "job_tasks",
+                    {
+                        "assigned_supervisor_name": " ".join(str(supw or "").split())[:200],
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    {"id": tid},
+                )
+                st.success("Saved.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+
+    if st.button("Close", use_container_width=True, key=f"jdt_vd_close_{job_id}_{tid}"):
+        st.session_state.pop(f"jdt_vd_{job_id}", None)
+        st.rerun()
+
+
 @st.dialog("Delete this task?")
 def _task_delete_confirm_dialog(
     *,
     job_id: str,
     tid: str,
-    expand_key: str,
     dlt: Callable[..., Any],
 ) -> None:
     st.caption("This removes the task from the job. You cannot undo this from the app.")
@@ -276,8 +534,8 @@ def _task_delete_confirm_dialog(
                 st.error(str(exc))
                 return
             st.session_state.pop(f"jdt_del_dialog_{job_id}", None)
-            if str(st.session_state.get(expand_key) or "").strip() == tid:
-                st.session_state[expand_key] = ""
+            st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+            st.session_state.pop(f"jdt_vd_{job_id}", None)
             st.session_state[f"jdt_task_del_ok_{job_id}"] = True
             st.rerun()
 
@@ -615,6 +873,16 @@ def render_job_tasks_tab(
             st.toast("Task deleted.")
         except Exception:
             st.success("Task deleted.")
+    if st.session_state.pop(f"jdt_task_sv_ok_{job_id}", None):
+        try:
+            st.toast("Task updated.")
+        except Exception:
+            st.success("Task updated.")
+    if st.session_state.pop(f"jdt_st_saved_{job_id}", None):
+        try:
+            st.toast("Status saved")
+        except Exception:
+            pass
     st.caption(
         "Jobs are containers — break work into **tasks**. "
         "Supervisors run status, photos, and end-of-day review in **Work & Plan (Supervisor)** (no separate report page)."
@@ -662,23 +930,65 @@ def render_job_tasks_tab(
 
     ins, upd, dlt = _wrow(admin_read)
 
+    all_task_ids = {
+        str(t.get("id") or "").strip()
+        for t in rows
+        if isinstance(t, dict) and str(t.get("id") or "").strip()
+    }
+    visible_ids = {
+        str(t.get("id") or "").strip()
+        for t in visible
+        if isinstance(t, dict) and str(t.get("id") or "").strip()
+    }
+    for sk in (f"jdt_del_dialog_{job_id}", f"jdt_cam_dlg_{job_id}", f"jdt_vd_{job_id}"):
+        tid0 = str(st.session_state.get(sk) or "").strip()
+        if not tid0:
+            continue
+        if tid0 not in all_task_ids:
+            st.session_state.pop(sk, None)
+        elif visible and tid0 not in visible_ids:
+            st.session_state.pop(sk, None)
+        elif not visible:
+            st.session_state.pop(sk, None)
+
     if visible:
         _mob.inject_mobile_field_css()
         _jra_ui._inject_ref_attachment_css()
         _inject_task_card_row_css()
-        expand_key = f"jdt_expand_{job_id}"
-        st.session_state.setdefault(expand_key, "")
-        vis_ids = {str(t.get("id") or "").strip() for t in visible if str(t.get("id") or "").strip()}
-        cur_ex = str(st.session_state.get(expand_key) or "").strip()
-        if cur_ex and cur_ex not in vis_ids:
-            st.session_state[expand_key] = ""
-
+        _inject_jdt_field_tap_css()
         ref_bucket = _jra_svc.reference_bucket()
         att_rows_all = _ref_attach_rows_for_job(job_id, admin_read=admin_read)
-        by_task_ref = _latest_image_or_pdf_ref_by_task_id(att_rows_all)
 
+        st.markdown('<span class="ips-jdt-field-zone"></span>', unsafe_allow_html=True)
         st.markdown("##### Tasks")
-        st.caption("Each task is a white card — use **Open / Edit** to update status, photos, and notes.")
+        st.caption(
+            "Change **status** to save instantly. **📷** opens the camera (progress photos). "
+            "**View details** for action, attachments, and full photo history."
+        )
+
+        pend = st.session_state.pop(f"jdt_st_pending_{job_id}", None)
+        if isinstance(pend, dict) and can_edit_tasks:
+            ptid = str(pend.get("tid") or "").strip()
+            nst = _norm_task_status_slug(pend.get("st"))
+            if ptid and nst:
+                rowp = _fetch_job_task_by_id(ptid, admin_read=admin_read)
+                if rowp:
+                    old = _norm_task_status_slug(rowp.get("status"))
+                    if nst != old:
+                        ok, err = _persist_quick_task_update(
+                            upd=upd,
+                            tid=ptid,
+                            task_row=dict(rowp),
+                            status=nst,
+                            notes=str(rowp.get("notes") or ""),
+                            admin_read=admin_read,
+                        )
+                        if ok:
+                            st.session_state[f"jdt_st_saved_{job_id}"] = True
+                            st.rerun()
+                        st.session_state[f"jdt_st_{job_id}_{ptid}"] = old
+                        st.session_state[f"jdt_st_flash_{job_id}_{ptid}"] = str(err)
+                        st.rerun()
 
         for t in visible:
             tid = str(t.get("id") or "").strip()
@@ -691,152 +1001,149 @@ def render_job_tasks_tab(
             snip = (iss[:140] + "…") if len(iss) > 140 else iss
             loc = str(t.get("location") or "").strip() or "—"
             tno = html.escape(task_number_display(t))
-            att = by_task_ref.get(tid)
+            pr_badge = _priority_badge_html(t.get("priority"))
+            opts = [s for s in TASK_STATUSES if s != "cancelled"]
+            cur_sl = stt if stt in opts else "not_started"
+            ix = opts.index(cur_sl)
 
             with st.container(border=True):
                 st.markdown('<span class="ips-jdt-task-card"></span>', unsafe_allow_html=True)
-                h1, h2 = st.columns((5, 2), gap="small")
-                with h1:
-                    st.markdown(
-                        f'<p style="margin:0;font-size:1.45rem;font-weight:700;color:#0f172a;">{tno}</p>',
-                        unsafe_allow_html=True,
-                    )
-                with h2:
-                    st.markdown(
-                        f'<div style="text-align:right;margin-top:0.15rem;">'
-                        f"{_priority_badge_html(t.get('priority'))}</div>",
-                        unsafe_allow_html=True,
-                    )
+                fl = st.session_state.pop(f"jdt_st_flash_{job_id}_{tid}", None)
+                if fl:
+                    st.warning(str(fl))
                 st.markdown(
-                    f'<div style="margin:0.15rem 0 0.45rem;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:center;">'
-                    f"{_task_status_badge(stt)}</div>"
-                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.95rem;line-height:1.45;"><strong>Location</strong> '
-                    f"{html.escape(loc)}</p>"
-                    f'<p style="margin:0.15rem 0;color:#4b5563;font-size:0.95rem;line-height:1.45;"><strong>Issue</strong> '
+                    f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin:0 0 0.2rem 0;">'
+                    f'<span style="font-size:1.28rem;font-weight:800;color:#111827;">{tno}</span>'
+                    f"<span>{pr_badge}</span></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<p style="margin:0 0 0.55rem;font-size:1.02rem;font-weight:600;color:#111827;line-height:1.35;">'
                     f"{html.escape(snip or '—')}</p>",
                     unsafe_allow_html=True,
                 )
-                if att:
-                    _render_task_card_reference_preview(att, bucket=ref_bucket)
-
-                if can_edit_tasks:
-                    o1, o2 = st.columns(2, gap="small")
-                    with o1:
+                cst, cph = st.columns([5, 2], gap="small")
+                with cst:
+                    if can_edit_tasks:
+                        st.selectbox(
+                            "Status",
+                            opts,
+                            index=ix,
+                            format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
+                            key=f"jdt_st_{job_id}_{tid}",
+                            label_visibility="collapsed",
+                            on_change=_make_jdt_status_pending_cb(job_id, tid),
+                        )
+                        st.caption("Saves when changed")
+                    else:
+                        st.caption(_jdt_status_label(stt))
+                with cph:
+                    if can_edit_tasks:
                         if st.button(
-                            "Open / Edit",
+                            "📷",
                             type="primary",
-                            key=f"jdt_card_open_{job_id}_{tid}",
+                            key=f"jdt_cam_btn_{job_id}_{tid}",
                             use_container_width=True,
                         ):
-                            st.session_state[expand_key] = tid
+                            st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
                             st.rerun()
-                    with o2:
-                        if st.button(
-                            "Delete",
-                            type="secondary",
-                            key=f"jdt_card_del_{job_id}_{tid}",
-                            use_container_width=True,
-                        ):
-                            st.session_state[f"jdt_del_dialog_{job_id}"] = tid
+                    else:
+                        st.caption("—")
+                with st.expander("Location & notes", expanded=False):
+                    st.markdown(
+                        f'<p style="margin:0.1rem 0;color:#374151;font-size:0.95rem;"><strong>Location</strong><br/>'
+                        f"{html.escape(loc)}</p>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<p style="margin:0.35rem 0;color:#111827;font-size:0.95rem;"><strong>Issue</strong><br/>'
+                        f"{html.escape(iss or '—')}</p>",
+                        unsafe_allow_html=True,
+                    )
+                    nx = st.text_area(
+                        "Notes",
+                        value=str(t.get("notes") or ""),
+                        height=72,
+                        key=f"jdt_exp_notes_{job_id}_{tid}",
+                        disabled=not can_edit_tasks,
+                    )
+                    if can_edit_tasks and st.button(
+                        "Save notes",
+                        type="secondary",
+                        key=f"jdt_exp_nsv_{job_id}_{tid}",
+                    ):
+                        try:
+                            upd(
+                                "job_tasks",
+                                {
+                                    "notes": str(nx or "").strip()[:4000],
+                                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                                },
+                                {"id": tid},
+                            )
+                            try:
+                                st.toast("Notes saved")
+                            except Exception:
+                                pass
                             st.rerun()
-                else:
+                        except Exception as exc:
+                            st.error(str(exc))
+                bot_l, bot_r = st.columns(2, gap="small")
+                with bot_l:
                     if st.button(
-                        "Open / Edit",
+                        "View details",
                         type="primary",
-                        key=f"jdt_card_open_{job_id}_{tid}",
+                        key=f"jdt_vd_btn_{job_id}_{tid}",
                         use_container_width=True,
                     ):
-                        st.session_state[expand_key] = tid
+                        st.session_state[f"jdt_vd_{job_id}"] = tid
                         st.rerun()
-
-            if str(st.session_state.get(expand_key) or "").strip() == tid:
-                with st.container(border=True):
-                    st.markdown("#### Edit task")
-                    if st.button("Close", key=f"jdt_panel_close_{job_id}_{tid}"):
-                        st.session_state[expand_key] = ""
+                with bot_r:
+                    if can_edit_tasks and st.button(
+                        "Delete",
+                        type="secondary",
+                        key=f"jdt_card_del_{job_id}_{tid}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[f"jdt_del_dialog_{job_id}"] = tid
                         st.rerun()
-                    with st.expander("Assign supervisor & action required", expanded=False):
-                        supw = st.text_input(
-                            "Assigned supervisor",
-                            value=str(t.get("assigned_supervisor_name") or ""),
-                            key=f"jdt_asgn_{tid}",
-                            disabled=not can_edit_tasks,
-                        )
-                        if can_edit_tasks and st.button("Save supervisor", key=f"jdt_asgn_save_{tid}"):
-                            try:
-                                upd(
-                                    "job_tasks",
-                                    {
-                                        "assigned_supervisor_name": " ".join(str(supw or "").split())[:200],
-                                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                                    },
-                                    {"id": tid},
-                                )
-                                st.success("Saved.")
-                                st.rerun()
-                            except Exception as exc:
-                                st.error(str(exc))
-                        st.text_area(
-                            "Action required",
-                            value=str(t.get("action_required") or ""),
-                            height=70,
-                            disabled=True,
-                            key=f"jdt_ar_{tid}",
-                        )
-                    try:
-                        _mob.render_mobile_task_detail_form(
-                            task_row=t,
-                            task_id=tid,
-                            can_edit=can_edit_tasks,
-                            admin_read=admin_read,
-                            upd=upd,
-                        )
-                    except Exception as exc:
-                        st.error(str(exc))
-                        st.caption(
-                            "Fallback: run **`sql/051_job_task_photos.sql`** / **`sql/052_job_task_photos_capture_meta.sql`**."
-                        )
 
         dlg_tid = str(st.session_state.get(f"jdt_del_dialog_{job_id}") or "").strip()
-        if dlg_tid:
-            if dlg_tid not in vis_ids:
-                st.session_state.pop(f"jdt_del_dialog_{job_id}", None)
-            elif can_edit_tasks:
-                _task_delete_confirm_dialog(
+        cam_dlg = str(st.session_state.get(f"jdt_cam_dlg_{job_id}") or "").strip()
+        vd = str(st.session_state.get(f"jdt_vd_{job_id}") or "").strip()
+        if dlg_tid and can_edit_tasks:
+            _task_delete_confirm_dialog(job_id=job_id, tid=dlg_tid, dlt=dlt)
+        elif cam_dlg and can_edit_tasks:
+            _task_camera_capture_dialog(job_id=job_id, tid=cam_dlg, admin_read=admin_read)
+        elif vd:
+            tvd = next(
+                (x for x in rows if isinstance(x, dict) and str(x.get("id") or "").strip() == vd),
+                None,
+            )
+            if tvd:
+                _task_view_details_dialog(
                     job_id=job_id,
-                    tid=dlg_tid,
-                    expand_key=expand_key,
-                    dlt=dlt,
+                    tid=vd,
+                    task_row=dict(tvd),
+                    att_rows=att_rows_all,
+                    bucket=ref_bucket,
+                    can_edit=can_edit_tasks,
+                    admin_read=admin_read,
+                    upd=upd,
                 )
 
-    dlg_stale = str(st.session_state.get(f"jdt_del_dialog_{job_id}") or "").strip()
-    if dlg_stale:
-        all_task_ids = {
-            str(t.get("id") or "").strip()
-            for t in rows
-            if isinstance(t, dict) and str(t.get("id") or "").strip()
-        }
-        visible_ids = {
-            str(t.get("id") or "").strip()
-            for t in visible
-            if isinstance(t, dict) and str(t.get("id") or "").strip()
-        }
-        if dlg_stale not in all_task_ids or (visible and dlg_stale not in visible_ids):
-            st.session_state.pop(f"jdt_del_dialog_{job_id}", None)
-        elif not visible:
-            st.session_state.pop(f"jdt_del_dialog_{job_id}", None)
+    st.divider()
+    with st.expander("Job reference attachments", expanded=False):
+        _jra_ui.render_job_reference_attachments_panel(
+            job_id=job_id,
+            tasks=list(rows or []),
+            admin_read=admin_read,
+            can_manage=str(_jra_role() or "").strip().lower() in {"admin", "manager"},
+        )
 
     st.divider()
-    _jra_ui.render_job_reference_attachments_panel(
-        job_id=job_id,
-        tasks=list(rows or []),
-        admin_read=admin_read,
-        can_manage=str(_jra_role() or "").strip().lower() in {"admin", "manager"},
-    )
-
-    st.divider()
-    st.markdown("##### Task photos")
-    render_job_photos_tab(job_id=job_id, admin_read=admin_read)
+    with st.expander("All task photos (review)", expanded=False):
+        render_job_photos_tab(job_id=job_id, admin_read=admin_read)
 
     if can_edit_tasks:
         _inject_task_tab_add_form_css()
