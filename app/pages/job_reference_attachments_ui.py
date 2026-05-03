@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 try:
     from auth import current_profile
@@ -48,7 +49,8 @@ try:
 except ImportError:
     from services.task_display import task_number_display  # type: ignore
 
-_CSS_KEY = "ips_job_reference_attachments_css_v1"
+_CSS_KEY = "ips_job_reference_attachments_css_v3"
+IPS_JRA_FS_SESSION_KEY = "ips_jra_fullscreen_preview"
 
 
 def _inject_ref_attachment_css() -> None:
@@ -62,13 +64,100 @@ def _inject_ref_attachment_css() -> None:
             background: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 12px !important;
-            padding: 0.65rem 0.75rem !important;
-            margin-bottom: 0.55rem !important;
+            padding: 16px !important;
+            margin-bottom: 1rem !important;
+            box-sizing: border-box !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-ref-attach-card) p {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-ref-attach-card) p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-ref-attach-card) .ips-jra-meta {
             color: #111827 !important;
-            margin: 0.1rem 0 !important;
+            margin: 0.15rem 0 !important;
+        }
+        .ips-jra-preview-wrap {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
+            margin: 0 0 14px 0 !important;
+        }
+        .ips-jra-preview-wrap iframe {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            display: block !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 10px !important;
+            background: #ffffff !important;
+            min-height: 600px !important;
+            height: min(75vh, 800px) !important;
+        }
+        .ips-jra-preview-wrap img.ips-jra-preview-img {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            border-radius: 10px !important;
+            border: 1px solid #d1d5db !important;
+            box-sizing: border-box !important;
+        }
+        .ips-jra-doc-fallback {
+            text-align: center;
+            padding: 1.25rem 0.75rem;
+            background: #f9fafb;
+            border: 1px dashed #d1d5db;
+            border-radius: 10px;
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+        /* Full-screen preview modal (only while dialog with marker is mounted) */
+        .stApp:has(.ips-jra-fs-modal-root) [data-testid="stBackdrop"] {
+            background: rgba(17, 24, 39, 0.85) !important;
+        }
+        div[data-testid="stDialog"]:has(.ips-jra-fs-modal-root) {
+            width: min(95vw, 1600px) !important;
+            max-width: 95vw !important;
+            min-height: min(90vh, 900px) !important;
+            max-height: 90vh !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stDialog"]:has(.ips-jra-fs-modal-root) > div {
+            background: #ffffff !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            width: 100% !important;
+            max-width: 95vw !important;
+            min-height: 85vh !important;
+            max-height: 90vh !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+        }
+        .ips-jra-fs-img-box {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        .ips-jra-fs-img-box img {
+            max-width: 100%;
+            max-height: calc(90vh - 120px);
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            border-radius: 8px;
+        }
+        div[data-testid="stDialog"]:has(.ips-jra-fs-modal-root) button[kind="primary"] {
+            min-height: 48px !important;
+            font-weight: 600 !important;
         }
         </style>
         """,
@@ -127,6 +216,225 @@ def _task_label(t: dict[str, Any]) -> str:
     return f"{task_number_display(t)} ({tid}…)"
 
 
+def _scope_label(task_id: str, tasks: list[dict[str, Any]] | None) -> str:
+    tid = str(task_id or "").strip()
+    if not tid:
+        return "Job-wide"
+    match = next((x for x in (tasks or []) if isinstance(x, dict) and str(x.get("id") or "").strip() == tid), None)
+    return _task_label(match) if match else f"Task {tid[:8]}…"
+
+
+def _is_pdf_filename(name: str) -> bool:
+    return jra.normalize_extension(name) == "pdf"
+
+
+def _preview_kind(fname: str) -> str:
+    if jra.is_image_filename(fname):
+        return "image"
+    if _is_pdf_filename(fname):
+        return "pdf"
+    return "other"
+
+
+@st.dialog("Attachment preview", width="large")
+def _reference_attachment_fullscreen_dialog(fname: str, signed: str, kind: str) -> None:
+    """Full-screen style preview (PDF iframe / image); close clears session flag."""
+    st.markdown('<span class="ips-jra-fs-modal-root"></span>', unsafe_allow_html=True)
+    top_l, top_r = st.columns([5, 1])
+    with top_l:
+        st.markdown(f"##### {html.escape(fname)}")
+    with top_r:
+        if st.button("✕ Close", key="ips_jra_fs_close_dialog", use_container_width=True, type="primary"):
+            st.session_state[IPS_JRA_FS_SESSION_KEY] = None
+            st.rerun()
+
+    if kind == "image" and signed:
+        safe_src = html.escape(signed, quote=True)
+        safe_name = html.escape(fname)
+        st.markdown(
+            f'<div class="ips-jra-fs-img-box"><img src="{safe_src}" alt="{safe_name}" /></div>',
+            unsafe_allow_html=True,
+        )
+    elif kind == "pdf" and signed:
+        src_attr = html.escape(signed, quote=True)
+        safe_name = html.escape(fname)
+        components.html(
+            f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;">'
+            f'<iframe src="{src_attr}#toolbar=1" title="{safe_name}" '
+            'referrerpolicy="no-referrer-when-downgrade" '
+            'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads" '
+            'style="width:100%;height:calc(90vh - 120px);min-height:420px;max-height:780px;'
+            "border:1px solid #d1d5db;border-radius:10px;background:#ffffff;"
+            'box-sizing:border-box;display:block;"></iframe></div>',
+            height=720,
+            scrolling=True,
+        )
+    else:
+        st.info("Inline preview is not available for this file type. Use **View / Open** from the list.")
+        if signed:
+            st.link_button("View / Open", signed, use_container_width=True, type="primary")
+
+
+def _maybe_run_fs_dialog() -> None:
+    spec = st.session_state.get(IPS_JRA_FS_SESSION_KEY)
+    if not isinstance(spec, dict):
+        return
+    signed = str(spec.get("signed") or "").strip()
+    if not signed:
+        st.session_state[IPS_JRA_FS_SESSION_KEY] = None
+        return
+    fname = str(spec.get("fname") or "Attachment")
+    kind = str(spec.get("kind") or _preview_kind(fname))
+    _reference_attachment_fullscreen_dialog(fname, signed, kind)
+
+
+def _render_preview_block(*, signed: str, fname: str) -> None:
+    """Full-width preview above metadata (image, PDF iframe, or doc fallback)."""
+    if not signed:
+        st.markdown(
+            '<div class="ips-jra-doc-fallback"><p style="margin:0;font-size:0.9rem;color:#374151;">'
+            "Preview unavailable — use View / Open below if shown.</p></div>",
+            unsafe_allow_html=True,
+        )
+        return
+    safe_src = html.escape(signed, quote=True)
+    safe_name = html.escape(fname)
+    if jra.is_image_filename(fname):
+        st.markdown(
+            f'<div class="ips-jra-preview-wrap">'
+            f'<img class="ips-jra-preview-img" src="{safe_src}" alt="{safe_name}" />'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    elif _is_pdf_filename(fname):
+        # components.html keeps iframe reliable (st.markdown may strip iframes).
+        src_attr = html.escape(signed, quote=True)
+        components.html(
+            f'<div style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;margin:0 0 4px 0;">'
+            f'<iframe src="{src_attr}#toolbar=1" title="{safe_name}" '
+            'referrerpolicy="no-referrer-when-downgrade" '
+            'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads" '
+            'style="width:100%;min-height:600px;height:700px;max-height:800px;'
+            "border:1px solid #d1d5db;border-radius:10px;background:#ffffff;"
+            'box-sizing:border-box;display:block;"></iframe></div>',
+            height=720,
+            scrolling=True,
+        )
+    else:
+        ic = _icon_for_filename(fname)
+        st.markdown(
+            f'<div class="ips-jra-preview-wrap"><div class="ips-jra-doc-fallback">'
+            f'<p style="font-size:2.5rem;margin:0;line-height:1;">{html.escape(ic)}</p>'
+            '<p style="margin:0.4rem 0 0;font-size:0.88rem;color:#374151;font-weight:500;">'
+            "No inline preview — use View / Open below.</p>"
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_attachment_card(
+    *,
+    job_id: str,
+    r: dict[str, Any],
+    tasks: list[dict[str, Any]] | None,
+    bucket: str,
+    can_manage: bool,
+    dlt: Any,
+) -> None:
+    rid = str(r.get("id") or "").strip()
+    if not rid:
+        return
+    fname = str(r.get("file_name") or "file").strip()
+    path = str(r.get("file_url") or "").strip()
+    ftype = str(r.get("file_type") or "").strip()
+    task_id = str(r.get("task_id") or "").strip()
+    link_lbl = _scope_label(task_id, tasks)
+
+    signed = ""
+    if path:
+        try:
+            signed = create_signed_url(path, expires_in=3600, bucket=bucket)
+        except Exception:
+            signed = ""
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-job-ref-attach-card"></span>', unsafe_allow_html=True)
+        _render_preview_block(signed=signed, fname=fname)
+
+        st.markdown(
+            f"<p class='ips-jra-meta' style='font-weight:700;font-size:1rem;margin:0 0 0.25rem 0;'>{html.escape(fname)}</p>"
+            f"<p class='ips-jra-meta' style='font-size:0.875rem;color:#1f2937;font-weight:500;margin:0.15rem 0;'>"
+            f"{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<p class='ips-jra-meta' style='font-size:0.875rem;color:#1f2937;font-weight:500;margin:0.15rem 0 0.65rem 0;'>"
+            f"Scope: <strong>{html.escape(link_lbl)}</strong></p>",
+            unsafe_allow_html=True,
+        )
+
+        if can_manage:
+            c_fs, c_vw, c_dl = st.columns(3, gap="small")
+            with c_fs:
+                if signed:
+                    if st.button(
+                        "Preview Full Screen",
+                        key=f"jra_fs_open_{job_id}_{rid}",
+                        use_container_width=True,
+                        type="secondary",
+                    ):
+                        st.session_state[IPS_JRA_FS_SESSION_KEY] = {
+                            "fname": fname,
+                            "signed": signed,
+                            "kind": _preview_kind(fname),
+                        }
+                        st.rerun()
+                else:
+                    st.button("Preview Full Screen", key=f"jra_fs_open_{job_id}_{rid}", disabled=True, use_container_width=True)
+            with c_vw:
+                if signed:
+                    st.link_button("View / Open", signed, use_container_width=True, type="primary")
+                else:
+                    st.caption("Link unavailable")
+            with c_dl:
+                if st.button("Delete", key=f"jra_del_{job_id}_{rid}", type="secondary", use_container_width=True):
+                    try:
+                        if path:
+                            try:
+                                delete_storage_object_admin(path, bucket=bucket)
+                            except Exception:
+                                pass
+                        dlt("job_reference_attachments", {"id": rid})
+                        st.session_state.pop(IPS_JRA_FS_SESSION_KEY, None)
+                        st.success("Deleted.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+        else:
+            c_fs, c_vw = st.columns(2, gap="small")
+            with c_fs:
+                if signed:
+                    if st.button(
+                        "Preview Full Screen",
+                        key=f"jra_fs_open_{job_id}_{rid}",
+                        use_container_width=True,
+                        type="secondary",
+                    ):
+                        st.session_state[IPS_JRA_FS_SESSION_KEY] = {
+                            "fname": fname,
+                            "signed": signed,
+                            "kind": _preview_kind(fname),
+                        }
+                        st.rerun()
+                else:
+                    st.button("Preview Full Screen", key=f"jra_fs_open_{job_id}_{rid}", disabled=True, use_container_width=True)
+            with c_vw:
+                if signed:
+                    st.link_button("View / Open", signed, use_container_width=True, type="primary")
+                else:
+                    st.caption("Link unavailable")
+
+
 def render_job_reference_attachments_panel(
     *,
     job_id: str,
@@ -136,6 +444,7 @@ def render_job_reference_attachments_panel(
 ) -> None:
     """PM/admin: upload + list + delete. Others: view/download only."""
     _inject_ref_attachment_css()
+    _maybe_run_fs_dialog()
     st.markdown("##### Reference Attachments")
     st.caption(
         "PM / admin: upload drawings, PDFs, photos, or spreadsheets for the **whole job** or a **specific task**. "
@@ -217,68 +526,16 @@ def render_job_reference_attachments_panel(
         return
 
     for r in rows:
-        rid = str(r.get("id") or "").strip()
-        if not rid:
+        if not isinstance(r, dict):
             continue
-        fname = str(r.get("file_name") or "file").strip()
-        path = str(r.get("file_url") or "").strip()
-        ftype = str(r.get("file_type") or "").strip()
-        task_id = str(r.get("task_id") or "").strip()
-        link_lbl = "Job-wide"
-        if task_id:
-            match = next((x for x in (tasks or []) if str(x.get("id")) == task_id), None)
-            link_lbl = _task_label(match) if match else f"Task {task_id[:8]}…"
-
-        signed = ""
-        if path:
-            try:
-                signed = create_signed_url(path, expires_in=3600, bucket=bucket)
-            except Exception:
-                signed = ""
-
-        with st.container(border=True):
-            st.markdown('<span class="ips-job-ref-attach-card"></span>', unsafe_allow_html=True)
-            ic = _icon_for_filename(fname)
-            c1, c2 = st.columns([1.15, 2.2], gap="small")
-            with c1:
-                if signed and jra.is_image_filename(fname):
-                    st.markdown(
-                        f'<img src="{html.escape(signed)}" alt="" '
-                        'style="max-width:120px;width:100%;border-radius:8px;border:1px solid #d1d5db;" />',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        f'<p style="font-size:2.5rem;text-align:center;margin:0.5rem 0;">{html.escape(ic)}</p>',
-                        unsafe_allow_html=True,
-                    )
-            with c2:
-                st.markdown(
-                    f"<p style='font-weight:650;font-size:0.95rem;'>{html.escape(fname)}</p>"
-                    f"<p style='font-size:0.82rem;color:#4b5563;'>{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>"
-                    f"<p style='font-size:0.8rem;color:#64748b;'>Scope: <strong>{html.escape(link_lbl)}</strong></p>",
-                    unsafe_allow_html=True,
-                )
-                b1, b2 = st.columns(2, gap="small")
-                with b1:
-                    if signed:
-                        st.link_button("View / Open", signed, use_container_width=True, type="primary")
-                    else:
-                        st.caption("Link unavailable")
-                with b2:
-                    if can_manage:
-                        if st.button("Delete", key=f"jra_del_{job_id}_{rid}", type="secondary", use_container_width=True):
-                            try:
-                                if path:
-                                    try:
-                                        delete_storage_object_admin(path, bucket=bucket)
-                                    except Exception:
-                                        pass
-                                dlt("job_reference_attachments", {"id": rid})
-                                st.success("Deleted.")
-                                st.rerun()
-                            except Exception as exc:
-                                st.error(str(exc))
+        _render_attachment_card(
+            job_id=job_id,
+            r=r,
+            tasks=list(tasks or []),
+            bucket=bucket,
+            can_manage=can_manage,
+            dlt=dlt,
+        )
 
 
 def render_reference_attachments_for_package(
@@ -286,9 +543,11 @@ def render_reference_attachments_for_package(
     job_id: str,
     package_task_ids: list[str],
     admin_read: bool,
+    tasks: list[dict[str, Any]] | None = None,
 ) -> None:
     """Supervisor: read-only list filtered to job-wide + tasks on this daily package."""
     _inject_ref_attachment_css()
+    _maybe_run_fs_dialog()
     st.markdown("##### Reference attachments")
     st.caption("Files from the PM for this job and today’s assigned tasks.")
 
@@ -300,38 +559,15 @@ def render_reference_attachments_for_package(
         return
 
     bucket = jra.reference_bucket()
+    _, dlt_ro = _ins_del(admin_read)
     for r in sorted(filtered, key=lambda x: str(x.get("created_at") or ""), reverse=True):
-        rid = str(r.get("id") or "").strip()
-        fname = str(r.get("file_name") or "file").strip()
-        path = str(r.get("file_url") or "").strip()
-        ftype = str(r.get("file_type") or "").strip()
-        signed = ""
-        if path:
-            try:
-                signed = create_signed_url(path, expires_in=3600, bucket=bucket)
-            except Exception:
-                signed = ""
-        with st.container(border=True):
-            st.markdown('<span class="ips-job-ref-attach-card"></span>', unsafe_allow_html=True)
-            ic = _icon_for_filename(fname)
-            c1, c2 = st.columns([1.05, 2.4], gap="small")
-            with c1:
-                if signed and jra.is_image_filename(fname):
-                    st.markdown(
-                        f'<img src="{html.escape(signed)}" alt="" '
-                        'style="max-width:100px;width:100%;border-radius:8px;border:1px solid #d1d5db;" />',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        f'<p style="font-size:2.1rem;text-align:center;margin:0.35rem 0;">{html.escape(ic)}</p>',
-                        unsafe_allow_html=True,
-                    )
-            with c2:
-                st.markdown(
-                    f"<p style='font-weight:650;font-size:0.9rem;'>{html.escape(fname)}</p>"
-                    f"<p style='font-size:0.78rem;color:#4b5563;'>{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>",
-                    unsafe_allow_html=True,
-                )
-                if signed:
-                    st.link_button("View / Open", signed, use_container_width=True, type="primary")
+        if not isinstance(r, dict):
+            continue
+        _render_attachment_card(
+            job_id=job_id,
+            r=r,
+            tasks=tasks,
+            bucket=bucket,
+            can_manage=False,
+            dlt=dlt_ro,
+        )

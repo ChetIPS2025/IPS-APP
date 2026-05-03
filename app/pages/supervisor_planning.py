@@ -534,6 +534,7 @@ def render_supervisor() -> None:
 
     st.divider()
     lines = _lines_for_package(pkg_id, pkg_tasks)
+    task_by_id = {str(t.get("id")): t for t in job_tasks if isinstance(t, dict) and t.get("id")}
     job_id_pkg = str(pkg.get("job_id") or "").strip()
     if job_id_pkg:
         pkg_tids = [str(ln.get("job_task_id") or "").strip() for ln in lines if str(ln.get("job_task_id") or "").strip()]
@@ -541,10 +542,10 @@ def render_supervisor() -> None:
             job_id=job_id_pkg,
             package_task_ids=pkg_tids,
             admin_read=use_admin,
+            tasks=list(task_by_id.values()),
         )
     st.markdown("### Tasks (execute)")
     st.caption("Assigned for this shift — update **status**, **photos**, and **notes**; complete **End of day** below.")
-    task_by_id = {str(t.get("id")): t for t in job_tasks if isinstance(t, dict) and t.get("id")}
     for ln in lines:
         tid = str(ln.get("job_task_id") or "").strip()
         t = task_by_id.get(tid) or {}
