@@ -399,7 +399,7 @@ def _jdt_gview_embed_url(public_file_url: str) -> str:
     return f"https://docs.google.com/gview?url={q}&embedded=true"
 
 
-def _jdt_task_card_ref_strip_html(*, signed_url: str, title: str, *, is_pdf: bool) -> str:
+def _jdt_task_card_ref_strip_html(*, signed_url: str, title: str, is_pdf: bool) -> str:
     """Tight PDF (Google viewer) or image strip for the task card right column (180–220px tall)."""
     safe_title = html.escape(title)
     h = 200
