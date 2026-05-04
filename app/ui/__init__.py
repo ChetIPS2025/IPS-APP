@@ -54,8 +54,10 @@ _NAV_JOBS_SIDEBAR: tuple[str, ...] = (
     "Job Costing",
 )
 
-# Assets (sidebar)
-_NAV_ASSETS_SIDEBAR: tuple[str, ...] = ("Asset Database", "Scan", "Tool Trailer Audits")
+# Assets expander (sidebar): route keys match ``IPS_NAV_PAGE_KEY`` / main page map.
+_NAV_ASSETS_EXPANDER_PAGES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
+# Legacy name kept for grep/docs alignment with asset-area routes.
+_NAV_ASSETS_SIDEBAR: tuple[str, ...] = _NAV_ASSETS_EXPANDER_PAGES
 
 # Inventory expander (sidebar)
 _NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "Inventory Usage")
@@ -86,16 +88,8 @@ _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Customers",
     "Job Costing",
 )
-# Routable asset-area pages (Who Has What moved to Dashboard; still routable for View All).
+# Routable asset-area pages (sidebar: nested under **Assets** expander when shown).
 _NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
-# Sidebar shortcuts → Asset Database + ``asset_db_f_asset_category`` (assets are rows in ``assets``).
-_NAV_ASSET_CATEGORY_FOCUS: tuple[tuple[str, str], ...] = (
-    ("All assets", "All"),
-    ("Equipment", "Equipment"),
-    ("Trailer", "Trailer"),
-    ("Vehicle", "Vehicle"),
-    ("Tool", "Tool"),
-)
 # Labor catalog. Materials are **inventory_items** with ``category`` = Materials (see Inventory).
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
 _NAV_RESOURCES: tuple[str, ...] = ("Inventory",)
@@ -369,24 +363,24 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   border-color: #6b7280 !important;
   color: #111827 !important;
 }
-/* Active page: white card on grey rail */
+/* Active page: blue highlight */
 section[data-testid="stSidebar"] button[kind="primary"],
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
-  background: #ffffff !important;
-  border: 1px solid #9ca3af !important;
-  color: #111827 !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
   box-shadow: none !important;
   font-weight: 700 !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover:not(:disabled) {
-  background: #f3f4f6 !important;
-  border-color: #6b7280 !important;
-  color: #111827 !important;
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
 }
 section[data-testid="stSidebar"] button[kind="primary"] p,
 section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
-  color: #111827 !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
 }
 /* TOOLS expander */
@@ -439,15 +433,21 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   min-height: 3rem !important;
   padding: 0.4rem 0.75rem !important;
   border-radius: 10px !important;
-  background: #ffffff !important;
-  border: 1px solid #9ca3af !important;
-  color: #111827 !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
   box-shadow: none !important;
 }
-section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"]:hover:not(:disabled) {
-  background: #f3f4f6 !important;
-  border-color: #6b7280 !important;
-  color: #111827 !important;
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"]:hover:not(:disabled),
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-primary"]:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"] p,
+section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-primary"] p {
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-signout-spacer {
   height: 12px;
@@ -560,13 +560,6 @@ def _render_nav_button_route(*, label: str, route: str, current: str, indent: bo
             st.rerun()
 
 
-def _sidebar_asset_category_focus_norm() -> str:
-    v = str(st.session_state.get("asset_db_f_asset_category") or "All").strip()
-    if not v or v.lower() == "all":
-        return "All"
-    return v
-
-
 def _sidebar_inventory_category_focus_norm() -> str:
     v = str(st.session_state.get("inv_f_cat") or "All").strip()
     if not v or v.lower() == "all":
@@ -574,25 +567,33 @@ def _sidebar_inventory_category_focus_norm() -> str:
     return v
 
 
+def _visible_assets_expander_pages(role: str) -> tuple[str, ...]:
+    return tuple(p for p in _NAV_ASSETS_EXPANDER_PAGES if role_can_open_page(role, p))
+
+
 def _render_assets_sidebar_group(*, current: str, role: str) -> None:
-    """Asset Database + category lenses (same ``assets`` table as the main list)."""
-    if not role_can_open_page(role, "Asset Database"):
+    """Collapsible **Assets** group: main asset list, Who Has What, Tool Trailer Audits."""
+    visible = _visible_assets_expander_pages(role)
+    if not visible:
         return
-    focus = _sidebar_asset_category_focus_norm()
-    assets_expanded = current == "Asset Database"
-    with st.sidebar.expander("Assets", expanded=assets_expanded):
-        for nav_label, cat in _NAV_ASSET_CATEGORY_FOCUS:
-            cat_norm = "All" if cat == "All" else cat
-            active = current == "Asset Database" and (
-                (cat_norm == "All" and focus == "All")
-                or (cat_norm != "All" and focus.lower() == cat_norm.lower())
-            )
-            btn_type = "primary" if active else "secondary"
-            key = _nav_btn_key(f"Asset_Database__focus_{cat_norm}")
-            if st.button(nav_label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
-                st.session_state["asset_db_f_asset_category"] = "All" if cat_norm == "All" else cat_norm
-                st.rerun()
+    expanded = current in visible
+    with st.sidebar.expander("Assets", expanded=expanded, key="ips_sidebar_assets_group"):
+        _, inner = st.columns([0.08, 0.92])
+        with inner:
+            for page in visible:
+                active = current == page
+                btn_type = "primary" if active else "secondary"
+                if page == "Asset Database":
+                    key = _nav_btn_key("Asset_Database__sidebar_assets")
+                    if st.button("Assets", key=key, type=btn_type, use_container_width=True):
+                        st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
+                        st.session_state["asset_db_f_asset_category"] = "All"
+                        st.rerun()
+                else:
+                    key = _nav_btn_key(page)
+                    if st.button(page, key=key, type=btn_type, use_container_width=True):
+                        st.session_state[IPS_NAV_PAGE_KEY] = page
+                        st.rerun()
 
 
 def _sidebar_nav_title(extra_class: str, text: str) -> None:
@@ -637,12 +638,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
     )
 
     _sidebar_nav_title("ips-nav-group-spaced", "Assets")
-    if role_can_open_page(role, "Asset Database"):
-        _render_assets_sidebar_group(current=current, role=role)
-    if role_can_open_page(role, "Who Has What"):
-        _render_nav_button("Who Has What", current=current, indent=True)
-    if role_can_open_page(role, "Tool Trailer Audits"):
-        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
+    _render_assets_sidebar_group(current=current, role=role)
 
     _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
     inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
@@ -716,16 +712,7 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
         )
 
     _sidebar_nav_title("ips-nav-group-spaced", "Tools & assets")
-    if role_can_open_page(role, "Who Has What"):
-        _render_nav_button("Who Has What", current=current, indent=True)
-    if role_can_open_page(role, "Asset Database"):
-        _render_nav_button_route(
-            label="Asset list",
-            route="Asset Database",
-            current=current,
-            indent=True,
-            key_suffix="ad",
-        )
+    _render_assets_sidebar_group(current=current, role=role)
     if role_can_open_page(role, "Employee Toolbox"):
         _render_nav_button_route(
             label="My tools",
@@ -734,8 +721,6 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
             indent=True,
             key_suffix="tb",
         )
-    if role_can_open_page(role, "Tool Trailer Audits"):
-        _render_nav_button("Tool Trailer Audits", current=current, indent=True)
     if role_can_open_page(role, "Time Tracking"):
         _render_nav_button("Time Tracking", current=current, indent=True)
 
@@ -743,9 +728,9 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
 def _render_sidebar_viewer(*, current: str, role: str) -> None:
     _sidebar_nav_title("", "Dashboard")
     _render_nav_button("Dashboard", current=current, indent=False)
-    for p in ("Asset Database", "Who Has What", "Inventory Usage"):
-        if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
+    _render_assets_sidebar_group(current=current, role=role)
+    if role_can_open_page(role, "Inventory Usage"):
+        _render_nav_button("Inventory Usage", current=current, indent=True)
 
 
 def render_sidebar() -> str:
