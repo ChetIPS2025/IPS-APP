@@ -7,10 +7,14 @@ import html
 import re
 from datetime import date, datetime, timezone
 from typing import Any, Callable
+from urllib.parse import quote
+
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 try:
     from app.db import (
+        create_signed_url,
         delete_rows,
         delete_rows_admin,
         fetch_by_match,
@@ -24,6 +28,7 @@ try:
     )
 except ImportError:
     from db import (  # type: ignore
+        create_signed_url,
         delete_rows,
         delete_rows_admin,
         fetch_by_match,
@@ -228,6 +233,219 @@ def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str,
         )
     except Exception:
         return []
+
+
+_JDT_REF_PDF_CSS_KEY = "ips_jdt_task_ref_pdf_css_v1"
+
+
+def _inject_jdt_task_ref_pdf_css() -> None:
+    """Responsive Google viewer iframe heights inside task cards (components.html island)."""
+    if st.session_state.get(_JDT_REF_PDF_CSS_KEY):
+        return
+    st.session_state[_JDT_REF_PDF_CSS_KEY] = True
+    st.markdown(
+        """
+        <style>
+        .ips-jdt-refpdf-host {
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
+            margin: 0 0 0.45rem 0;
+        }
+        .ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {
+            width: 100% !important;
+            max-width: 100% !important;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #ffffff;
+            display: block;
+            box-sizing: border-box;
+        }
+        @media (max-width: 640px) {
+            .ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {
+                height: 320px !important;
+                min-height: 320px !important;
+            }
+        }
+        @media (min-width: 641px) {
+            .ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {
+                height: 450px !important;
+                min-height: 450px !important;
+            }
+        }
+        .ips-jdt-refpdf-pick {
+            font-size: 0.8rem;
+            color: #4b5563;
+            margin: 0.2rem 0 0.1rem 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _jdt_row_is_pdf_attachment(r: dict[str, Any]) -> bool:
+    fname = str((r or {}).get("file_name") or "")
+    ftype = str((r or {}).get("file_type") or "").strip().lower()
+    if _jra_svc.normalize_extension(fname) == "pdf":
+        return True
+    return ftype == "application/pdf"
+
+
+def _jdt_merged_pdf_attachments_for_task(
+    job_id: str, task_id: str, att_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Job-wide (null task_id) + task-specific rows; PDFs only; deduped; newest first."""
+    jid = str(job_id or "").strip()
+    tid = str(task_id or "").strip()
+    candidates: list[dict[str, Any]] = []
+    for r in att_rows or []:
+        if not isinstance(r, dict):
+            continue
+        rj = str((r or {}).get("job_id") or "").strip()
+        if rj and rj != jid:
+            continue
+        rt = str((r or {}).get("task_id") or "").strip()
+        if rt and rt != tid:
+            continue
+        if not _jdt_row_is_pdf_attachment(r):
+            continue
+        candidates.append(r)
+    candidates.sort(key=lambda x: str((x or {}).get("created_at") or ""), reverse=True)
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in candidates:
+        rid = str((r or {}).get("id") or "").strip()
+        if rid:
+            if rid in seen:
+                continue
+            seen.add(rid)
+        out.append(r)
+    return out
+
+
+def _jdt_gview_embed_url(public_file_url: str) -> str:
+    q = quote(str(public_file_url).strip(), safe="")
+    return f"https://docs.google.com/gview?url={q}&embedded=true"
+
+
+def _jdt_task_card_pdf_iframe_html(*, signed_url: str, title: str) -> str:
+    """Embedded Google Docs viewer; styles duplicated for components.html document context."""
+    viewer = _jdt_gview_embed_url(signed_url)
+    src_attr = html.escape(viewer, quote=True)
+    safe_title = html.escape(title)
+    return f"""<style>
+.ips-jdt-refpdf-host {{
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin: 0;
+}}
+.ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {{
+  width: 100% !important;
+  max-width: 100% !important;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  display: block;
+  box-sizing: border-box;
+}}
+@media (max-width: 640px) {{
+  .ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {{
+    height: 320px !important;
+    min-height: 320px !important;
+  }}
+}}
+@media (min-width: 641px) {{
+  .ips-jdt-refpdf-host iframe.ips-jdt-refpdf-frame {{
+    height: 450px !important;
+    min-height: 450px !important;
+  }}
+}}
+</style>
+<div class="ips-jdt-refpdf-host">
+<iframe class="ips-jdt-refpdf-frame" src="{src_attr}" title="{safe_title}" loading="lazy"
+  referrerpolicy="no-referrer-when-downgrade"></iframe>
+</div>"""
+
+
+def _render_jdt_task_card_reference_pdf_block(
+    *,
+    job_id: str,
+    tid: str,
+    pdfs: list[dict[str, Any]],
+    bucket: str,
+    stt: str,
+    n_visible_tasks: int,
+    n_tasks_with_pdf: int,
+) -> None:
+    """In-card PDF preview: first PDF + switchers; optional expander when list is heavy."""
+    if not pdfs:
+        return
+    _inject_jdt_task_ref_pdf_css()
+    ix_key = f"jdt_card_pdf_ix_{job_id}_{tid}"
+    sel = int(st.session_state.get(ix_key, 0) or 0)
+    if sel < 0 or sel >= len(pdfs):
+        sel = 0
+        st.session_state[ix_key] = 0
+
+    row = pdfs[sel]
+    path = str((row or {}).get("file_url") or "").strip()
+    fname = str((row or {}).get("file_name") or "document.pdf").strip()
+    signed = ""
+    if path:
+        try:
+            signed = create_signed_url(path, expires_in=3600, bucket=bucket)
+        except Exception:
+            signed = ""
+    if not str(signed or "").strip():
+        return
+
+    heavy = n_visible_tasks > 8 or n_tasks_with_pdf > 10
+    exp_open = str(stt or "").strip().lower() in ("in_progress", "blocked")
+
+    def _body() -> None:
+        components.html(
+            _jdt_task_card_pdf_iframe_html(signed_url=signed, title=fname),
+            height=470,
+            scrolling=True,
+        )
+        if len(pdfs) > 1:
+            st.markdown(
+                f'<p class="ips-jdt-refpdf-pick">Showing attachment {sel + 1} of {len(pdfs)}</p>',
+                unsafe_allow_html=True,
+            )
+            others = [i for i in range(len(pdfs)) if i != sel]
+            if len(others) <= 4:
+                pick_cols = st.columns(len(others))
+                for ci, i in enumerate(others):
+                    label = f"View Attachment {i + 1}"
+                    with pick_cols[ci]:
+                        if st.button(
+                            label,
+                            key=f"jdt_card_pdf_pick_{job_id}_{tid}_{i}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[ix_key] = i
+                            st.rerun()
+            else:
+                for i in others:
+                    label = f"View Attachment {i + 1}"
+                    if st.button(
+                        label,
+                        key=f"jdt_card_pdf_pick_{job_id}_{tid}_{i}",
+                        use_container_width=True,
+                    ):
+                        st.session_state[ix_key] = i
+                        st.rerun()
+
+    if heavy:
+        with st.expander("Reference PDF", expanded=exp_open):
+            _body()
+    else:
+        _body()
 
 
 def _jdt_status_label(slug: str) -> str:
@@ -924,6 +1142,16 @@ def render_job_tasks_tab(
                         st.session_state[f"jdt_st_flash_{job_id}_{ptid}"] = str(err)
                         st.rerun()
 
+        pdf_by_tid: dict[str, list[dict[str, Any]]] = {}
+        for _t in visible:
+            _xtid = str(_t.get("id") or "").strip()
+            if _xtid:
+                pdf_by_tid[_xtid] = _jdt_merged_pdf_attachments_for_task(
+                    job_id, _xtid, att_rows_all
+                )
+        n_visible_tasks = len(visible)
+        n_tasks_with_pdf = sum(1 for _lst in pdf_by_tid.values() if _lst)
+
         for t in visible:
             tid = str(t.get("id") or "").strip()
             if not tid:
@@ -955,6 +1183,15 @@ def render_job_tasks_tab(
                     f'<p style="margin:0 0 0.55rem;font-size:1.02rem;font-weight:600;color:#111827;line-height:1.35;">'
                     f"{html.escape(snip or '—')}</p>",
                     unsafe_allow_html=True,
+                )
+                _render_jdt_task_card_reference_pdf_block(
+                    job_id=job_id,
+                    tid=tid,
+                    pdfs=pdf_by_tid.get(tid, []),
+                    bucket=ref_bucket,
+                    stt=stt,
+                    n_visible_tasks=n_visible_tasks,
+                    n_tasks_with_pdf=n_tasks_with_pdf,
                 )
                 cst, cph = st.columns([5, 2], gap="small")
                 with cst:
