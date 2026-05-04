@@ -7,15 +7,10 @@ import html
 import re
 from datetime import date, datetime, timezone
 from typing import Any, Callable
-from urllib.parse import quote
-
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
-
 try:
     from app.db import (
-        create_signed_url,
         delete_rows,
         delete_rows_admin,
         fetch_by_match,
@@ -29,7 +24,6 @@ try:
     )
 except ImportError:
     from db import (  # type: ignore
-        create_signed_url,
         delete_rows,
         delete_rows_admin,
         fetch_by_match,
@@ -226,26 +220,6 @@ def _inject_jdt_field_tap_css() -> None:
     )
 
 
-def _gview_embed_url_for_task_card(public_file_url: str) -> str:
-    q = quote(str(public_file_url).strip(), safe="")
-    return f"https://docs.google.com/gview?url={q}&embedded=true"
-
-
-def _task_card_pdf_iframe_html(*, signed_url: str, fname: str) -> str:
-    viewer = _gview_embed_url_for_task_card(signed_url)
-    src_attr = html.escape(viewer, quote=True)
-    safe_name = html.escape(fname)
-    h = 460
-    return (
-        f'<div style="width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;margin:0 0 0.5rem 0;">'
-        f'<iframe src="{src_attr}" title="{safe_name}" loading="lazy" '
-        'referrerpolicy="no-referrer-when-downgrade" '
-        f'style="width:100%;height:{h}px;min-height:400px;max-height:500px;'
-        'border:1px solid #d1d5db;border-radius:10px;background:#ffffff;box-sizing:border-box;display:block;">'
-        "</iframe></div>"
-    )
-
-
 def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str, Any]]:
     fn = fetch_by_match_admin if admin_read else fetch_by_match
     try:
@@ -254,42 +228,6 @@ def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str,
         )
     except Exception:
         return []
-
-
-def _is_pdf_reference(fname: str, file_type: str) -> bool:
-    ext = _jra_svc.normalize_extension(fname)
-    if ext == "pdf":
-        return True
-    return str(file_type or "").strip().lower() == "application/pdf"
-
-
-def _render_task_card_reference_preview(att: dict[str, Any], *, bucket: str) -> None:
-    path = str((att or {}).get("file_url") or "").strip()
-    fname = str((att or {}).get("file_name") or "file").strip()
-    ftype = str((att or {}).get("file_type") or "").strip()
-    if not path:
-        return
-    try:
-        signed = create_signed_url(path, expires_in=3600, bucket=bucket)
-    except Exception:
-        return
-    if not str(signed or "").strip():
-        return
-    safe_src = html.escape(signed, quote=True)
-    safe_name = html.escape(fname)
-    if _jra_svc.is_image_filename(fname):
-        st.markdown(
-            f'<div class="ips-jra-preview-wrap" style="margin:0.35rem 0 0.65rem 0;">'
-            f'<img class="ips-jra-preview-img" src="{safe_src}" alt="{safe_name}" loading="lazy" />'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-    elif _is_pdf_reference(fname, ftype):
-        components.html(
-            _task_card_pdf_iframe_html(signed_url=signed, fname=fname),
-            height=500,
-            scrolling=True,
-        )
 
 
 def _jdt_status_label(slug: str) -> str:
@@ -435,6 +373,8 @@ def _task_view_details_dialog(
     can_edit: bool,
     admin_read: bool,
     upd: Callable[..., Any],
+    dlt: Callable[..., Any],
+    can_manage_attachments: bool,
 ) -> None:
     """Full action, reference files for this task, photo history, supervisor."""
     st.markdown(f"#### {html.escape(task_number_display(task_row))}")
@@ -446,20 +386,14 @@ def _task_view_details_dialog(
     else:
         st.caption("—")
 
-    task_refs = [
-        r
-        for r in (att_rows or [])
-        if isinstance(r, dict) and str(r.get("task_id") or "").strip() == tid
-    ]
-    st.markdown("**Reference attachments (this task)**")
-    if not task_refs:
-        st.caption("No files linked to this task.")
-    else:
-        for r in sorted(task_refs, key=lambda x: str(x.get("created_at") or ""), reverse=True)[:20]:
-            fname = str(r.get("file_name") or "file")
-            with st.container(border=True):
-                st.caption(str(fname)[:120])
-                _render_task_card_reference_preview(r, bucket=bucket)
+    _jra_ui.render_task_details_reference_attachments(
+        job_id=job_id,
+        task_id=tid,
+        att_rows=list(att_rows or []),
+        bucket=bucket,
+        can_manage=can_manage_attachments,
+        dlt=dlt,
+    )
 
     st.markdown("**Photo history**")
     try:
@@ -1121,6 +1055,7 @@ def render_job_tasks_tab(
         elif cam_dlg and can_edit_tasks:
             _task_camera_capture_dialog(job_id=job_id, tid=cam_dlg, admin_read=admin_read)
         elif vd:
+            _jra_ui.run_reference_attachment_fullscreen_dialog_if_pending()
             tvd = next(
                 (x for x in rows if isinstance(x, dict) and str(x.get("id") or "").strip() == vd),
                 None,
@@ -1135,6 +1070,8 @@ def render_job_tasks_tab(
                     can_edit=can_edit_tasks,
                     admin_read=admin_read,
                     upd=upd,
+                    dlt=dlt,
+                    can_manage_attachments=str(_jra_role() or "").strip().lower() in {"admin", "manager"},
                 )
 
     st.divider()

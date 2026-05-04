@@ -455,6 +455,179 @@ def _render_attachment_card(
                     st.caption("Link unavailable")
 
 
+def run_reference_attachment_fullscreen_dialog_if_pending() -> None:
+    """Call early on the page when full-screen preview may open from reference attachments (any context)."""
+    _maybe_run_fs_dialog()
+
+
+def _render_task_details_attachment_row(
+    *,
+    job_id: str,
+    task_id: str,
+    section: str,
+    r: dict[str, Any],
+    bucket: str,
+    can_manage: bool,
+    dlt: Any,
+) -> None:
+    """Single reference row for Task Details modal (no upload); keys isolated from the job-wide panel."""
+    rid = str(r.get("id") or "").strip()
+    if not rid:
+        return
+    fname = str(r.get("file_name") or "file").strip()
+    path = str(r.get("file_url") or "").strip()
+    ftype = str(r.get("file_type") or "").strip()
+    kp = f"jdtvd_{section}_{job_id}_{task_id}_{rid}"
+
+    signed = ""
+    if path:
+        try:
+            signed = create_signed_url(path, expires_in=3600, bucket=bucket)
+        except Exception:
+            signed = ""
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-job-ref-attach-card"></span>', unsafe_allow_html=True)
+        _render_preview_block(signed=signed, fname=fname, file_type=ftype)
+
+        st.markdown(
+            f"<p class='ips-jra-meta' style='font-weight:700;font-size:0.95rem;margin:0 0 0.25rem 0;color:#111827;'>"
+            f"{html.escape(fname)}</p>"
+            f"<p class='ips-jra-meta' style='font-size:0.8rem;color:#4b5563;margin:0;'>"
+            f"{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>",
+            unsafe_allow_html=True,
+        )
+
+        if can_manage:
+            c_fs, c_vw, c_dl = st.columns(3, gap="small")
+            with c_fs:
+                if signed:
+                    if st.button(
+                        "Preview Full Screen",
+                        key=f"{kp}_fs",
+                        use_container_width=True,
+                        type="secondary",
+                    ):
+                        st.session_state[IPS_JRA_FS_SESSION_KEY] = {
+                            "fname": fname,
+                            "signed": signed,
+                            "file_type": ftype,
+                            "kind": _preview_kind(fname, ftype),
+                        }
+                        st.rerun()
+                else:
+                    st.button("Preview Full Screen", key=f"{kp}_fs", disabled=True, use_container_width=True)
+            with c_vw:
+                if signed:
+                    st.link_button("View / Open", signed, use_container_width=True, type="primary")
+                else:
+                    st.caption("Link unavailable")
+            with c_dl:
+                if st.button("Delete", key=f"{kp}_del", type="secondary", use_container_width=True):
+                    try:
+                        if path:
+                            try:
+                                delete_storage_object_admin(path, bucket=bucket)
+                            except Exception:
+                                pass
+                        dlt("job_reference_attachments", {"id": rid})
+                        st.session_state.pop(IPS_JRA_FS_SESSION_KEY, None)
+                        st.success("Deleted.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+        else:
+            c_fs, c_vw = st.columns(2, gap="small")
+            with c_fs:
+                if signed:
+                    if st.button(
+                        "Preview Full Screen",
+                        key=f"{kp}_fs",
+                        use_container_width=True,
+                        type="secondary",
+                    ):
+                        st.session_state[IPS_JRA_FS_SESSION_KEY] = {
+                            "fname": fname,
+                            "signed": signed,
+                            "file_type": ftype,
+                            "kind": _preview_kind(fname, ftype),
+                        }
+                        st.rerun()
+                else:
+                    st.button("Preview Full Screen", key=f"{kp}_fs", disabled=True, use_container_width=True)
+            with c_vw:
+                if signed:
+                    st.link_button("View / Open", signed, use_container_width=True, type="primary")
+                else:
+                    st.caption("Link unavailable")
+
+
+def render_task_details_reference_attachments(
+    *,
+    job_id: str,
+    task_id: str,
+    att_rows: list[dict[str, Any]],
+    bucket: str,
+    can_manage: bool,
+    dlt: Any,
+) -> None:
+    """
+    Task Details modal: show job-wide (task_id empty/null) and task-specific rows from ``att_rows``.
+    Does not change upload behavior — display and actions only.
+    """
+    _inject_ref_attachment_css()
+    jid = str(job_id or "").strip()
+    tid = str(task_id or "").strip()
+
+    def _row_job_matches(rr: dict[str, Any]) -> bool:
+        rj = str((rr or {}).get("job_id") or "").strip()
+        return (not rj) or (rj == jid)
+
+    raw = [r for r in (att_rows or []) if isinstance(r, dict) and _row_job_matches(r)]
+    job_wide = [r for r in raw if not str((r or {}).get("task_id") or "").strip()]
+    task_only = [r for r in raw if str((r or {}).get("task_id") or "").strip() == tid]
+
+    job_wide.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    task_only.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    job_wide = job_wide[:50]
+    task_only = task_only[:50]
+
+    st.markdown("##### Reference Attachments")
+    if not job_wide and not task_only:
+        st.caption("No reference attachments for this job or task.")
+        return
+
+    st.markdown("**Job-wide attachments**")
+    if job_wide:
+        for r in job_wide:
+            _render_task_details_attachment_row(
+                job_id=jid,
+                task_id=tid,
+                section="jw",
+                r=r,
+                bucket=bucket,
+                can_manage=can_manage,
+                dlt=dlt,
+            )
+    else:
+        st.caption("No job-wide files.")
+
+    st.markdown("**This task attachments**")
+    if task_only:
+        for r in task_only:
+            _render_task_details_attachment_row(
+                job_id=jid,
+                task_id=tid,
+                section="ts",
+                r=r,
+                bucket=bucket,
+                can_manage=can_manage,
+                dlt=dlt,
+            )
+    else:
+        st.caption("No files linked only to this task.")
+
+
 def render_job_reference_attachments_panel(
     *,
     job_id: str,
