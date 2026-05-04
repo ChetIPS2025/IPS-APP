@@ -399,6 +399,42 @@ def _jdt_gview_embed_url(public_file_url: str) -> str:
     return f"https://docs.google.com/gview?url={q}&embedded=true"
 
 
+def _jdt_pick_primary_modal_reference_row(merged: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Prefer first PDF, then first image, else first row (job-wide + task merged list)."""
+    if not merged:
+        return None
+    for r in merged:
+        if isinstance(r, dict) and _jdt_row_is_pdf_attachment(r):
+            return r
+    for r in merged:
+        if isinstance(r, dict) and _jdt_row_is_image_attachment(r):
+            return r
+    m0 = merged[0]
+    return m0 if isinstance(m0, dict) else None
+
+
+def _jdt_gview_modal_80vh_iframe_html(*, signed_url: str, title: str) -> str:
+    """Full-height Google Docs viewer for reference modal (width 100%, ~80vh)."""
+    v = _jdt_gview_embed_url(signed_url)
+    src = html.escape(v, quote=True)
+    safe_title = html.escape(title)
+    return (
+        f'<div style="width:100%;max-width:100%;box-sizing:border-box;">'
+        f'<iframe src="{src}" title="{safe_title}" loading="lazy" '
+        'referrerpolicy="no-referrer-when-downgrade" '
+        'style="width:100%;height:80vh;min-height:360px;border:none;'
+        'border-radius:10px;display:block;box-sizing:border-box;"></iframe>'
+        f"</div>"
+    )
+
+
+def _clear_jdt_reference_overlay() -> None:
+    st.session_state["show_reference"] = False
+    for k in ("reference_url", "reference_modal_task_id", "reference_job_id"):
+        if k in st.session_state:
+            del st.session_state[k]
+
+
 def _jdt_task_card_ref_strip_html(*, signed_url: str, title: str, is_pdf: bool) -> str:
     """Tight PDF (Google viewer) or image strip for the task card right column (180–220px tall)."""
     safe_title = html.escape(title)
@@ -509,22 +545,33 @@ def _jdt_render_reference_preview(
 
 
 @st.dialog("Job reference", width="large")
-def _task_reference_pdf_dialog(
-    *,
-    job_id: str,
-    tid: str,
-    att_rows: list[dict[str, Any]],
-    bucket: str,
-) -> None:
-    """Job-wide + this-task reference attachments (PDF / image preview or open link)."""
+def _jdt_reference_preview_dialog(*, job_id: str, admin_read: bool, bucket: str) -> None:
+    """Opened when ``show_reference`` is true; previews signed ``reference_url`` (PDF / image / link)."""
     st.markdown('<span class="ips-jdt-refpdf-dialog-mark"></span>', unsafe_allow_html=True)
-    merged = _jdt_merged_attachments_for_task(job_id, tid, att_rows)
-    if not merged:
-        st.caption("No reference attachments for this task.")
-        if st.button("Close", use_container_width=True, key=f"jdt_refpdf_close_empty_{job_id}_{tid}"):
-            st.session_state.pop(f"jdt_ref_modal_{job_id}", None)
+    _inject_jdt_task_ref_pdf_css()
+    tid = str(st.session_state.get("reference_modal_task_id") or "").strip()
+    if not tid:
+        st.caption("Missing task context for this reference.")
+        if st.button("Close", use_container_width=True, key=f"jdt_ref_overlay_close_notid_{job_id}"):
+            _clear_jdt_reference_overlay()
             st.rerun()
         return
+    rows = _ref_attach_rows_for_job(job_id, admin_read=admin_read)
+    merged = _jdt_merged_attachments_for_task(job_id, tid, rows)
+    if not merged:
+        st.caption("No reference attachments for this task.")
+        if st.button("Close", use_container_width=True, key=f"jdt_ref_overlay_close_empty_{job_id}"):
+            _clear_jdt_reference_overlay()
+            st.rerun()
+        return
+
+    hdr_l, hdr_r = st.columns([5, 1])
+    with hdr_l:
+        st.markdown("##### Reference preview")
+    with hdr_r:
+        if st.button("Close", type="primary", use_container_width=True, key=f"jdt_ref_overlay_close_{job_id}"):
+            _clear_jdt_reference_overlay()
+            st.rerun()
 
     sel_ix = 0
     if len(merged) > 1:
@@ -534,16 +581,38 @@ def _task_reference_pdf_dialog(
                 "Select Reference File",
                 options=list(range(len(merged))),
                 format_func=lambda i, _lbls=labels: _lbls[int(i)],
-                key=f"jdt_ref_modal_sb_{job_id}_{tid}",
+                key=f"jdt_ref_overlay_pick_{job_id}_{tid}",
             )
         )
 
     row = merged[sel_ix]
-    _jdt_render_reference_preview(row, bucket=bucket, variant="modal")
+    signed, fname = _jdt_sign_attachment_row(row, bucket=bucket)
+    if signed:
+        st.session_state["reference_url"] = signed
+    url = str(st.session_state.get("reference_url") or "").strip()
+    if not url:
+        st.caption("Preview link unavailable.")
+        return
 
-    if st.button("Close", use_container_width=True, key=f"jdt_refpdf_close_{job_id}_{tid}"):
-        st.session_state.pop(f"jdt_ref_modal_{job_id}", None)
-        st.rerun()
+    if _jdt_row_is_pdf_attachment(row):
+        components.html(
+            _jdt_gview_modal_80vh_iframe_html(signed_url=url, title=fname),
+            height=780,
+            scrolling=True,
+        )
+    elif _jdt_row_is_image_attachment(row):
+        safe_u = html.escape(url, quote=True)
+        safe_a = html.escape(fname)
+        st.markdown(
+            f'<div class="ips-jdt-refimg-wrap" style="max-height:80vh;overflow:auto;">'
+            f'<img src="{safe_u}" alt="{safe_a}" loading="lazy" '
+            'style="width:100%;max-width:100%;max-height:80vh;object-fit:contain;border-radius:10px;'
+            'border:none;display:block;box-sizing:border-box;" />'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.link_button("View / Open", url, use_container_width=True, type="primary")
 
 
 def _jdt_status_label(slug: str) -> str:
@@ -1190,7 +1259,7 @@ def render_job_tasks_tab(
         for t in visible
         if isinstance(t, dict) and str(t.get("id") or "").strip()
     }
-    for sk in (f"jdt_del_dialog_{job_id}", f"jdt_cam_dlg_{job_id}", f"jdt_vd_{job_id}", f"jdt_ref_modal_{job_id}"):
+    for sk in (f"jdt_del_dialog_{job_id}", f"jdt_cam_dlg_{job_id}", f"jdt_vd_{job_id}"):
         tid0 = str(st.session_state.get(sk) or "").strip()
         if not tid0:
             continue
@@ -1200,6 +1269,15 @@ def render_job_tasks_tab(
             st.session_state.pop(sk, None)
         elif not visible:
             st.session_state.pop(sk, None)
+
+    if st.session_state.get("show_reference"):
+        rjb = str(st.session_state.get("reference_job_id") or "").strip()
+        if rjb and rjb != str(job_id).strip():
+            _clear_jdt_reference_overlay()
+        else:
+            tmk = str(st.session_state.get("reference_modal_task_id") or "").strip()
+            if visible and tmk and tmk not in visible_ids:
+                _clear_jdt_reference_overlay()
 
     if visible:
         _mob.inject_mobile_field_css()
@@ -1350,8 +1428,16 @@ def render_job_tasks_tab(
                             use_container_width=True,
                             help="View Reference",
                         ):
-                            st.session_state[f"jdt_ref_modal_{job_id}"] = tid
-                            st.rerun()
+                            merged_btn = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
+                            row0 = _jdt_pick_primary_modal_reference_row(merged_btn)
+                            if row0:
+                                su0, _ = _jdt_sign_attachment_row(row0, bucket=ref_bucket)
+                                if su0:
+                                    st.session_state["reference_modal_task_id"] = tid
+                                    st.session_state["reference_job_id"] = str(job_id).strip()
+                                    st.session_state["show_reference"] = True
+                                    st.session_state["reference_url"] = su0
+                                    st.rerun()
                     with camc:
                         if can_edit_tasks:
                             if st.button(
@@ -1456,29 +1542,20 @@ def render_job_tasks_tab(
                         st.session_state[f"jdt_del_dialog_{job_id}"] = tid
                         st.rerun()
 
+        if st.session_state.get("show_reference"):
+            _jdt_reference_preview_dialog(
+                job_id=job_id,
+                admin_read=admin_read,
+                bucket=ref_bucket,
+            )
+
         dlg_tid = str(st.session_state.get(f"jdt_del_dialog_{job_id}") or "").strip()
         cam_dlg = str(st.session_state.get(f"jdt_cam_dlg_{job_id}") or "").strip()
-        ref_tid = str(st.session_state.get(f"jdt_ref_modal_{job_id}") or "").strip()
         vd = str(st.session_state.get(f"jdt_vd_{job_id}") or "").strip()
         if dlg_tid and can_edit_tasks:
             _task_delete_confirm_dialog(job_id=job_id, tid=dlg_tid, dlt=dlt)
         elif cam_dlg and can_edit_tasks:
             _task_camera_capture_dialog(job_id=job_id, tid=cam_dlg, admin_read=admin_read)
-        elif ref_tid:
-            tref = next(
-                (x for x in rows if isinstance(x, dict) and str(x.get("id") or "").strip() == ref_tid),
-                None,
-            )
-            if tref:
-                _task_reference_pdf_dialog(
-                    job_id=job_id,
-                    tid=ref_tid,
-                    att_rows=att_rows_all,
-                    bucket=ref_bucket,
-                )
-            else:
-                st.session_state.pop(f"jdt_ref_modal_{job_id}", None)
-                st.rerun()
         elif vd:
             _jra_ui.run_reference_attachment_fullscreen_dialog_if_pending()
             tvd = next(
