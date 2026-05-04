@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v4"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v6"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -367,21 +367,117 @@ def inject_ips_app_shell_styles() -> None:
             box-sizing: border-box !important;
         }
 
-        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stSelectbox"] [data-baseweb="select"] > div {
-            min-height: var(--ips-ctrl-h) !important;
+        /*
+         * BaseWeb select / multiselect: single full-width field — border only on [data-baseweb="select"].
+         * Strip nested white “bubbles” from inner div/span/input (Streamlit/BaseWeb defaults).
+         */
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"],
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            border: 1px solid #9ca3af !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            min-height: 48px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            min-height: 48px !important;
+            padding: 10px 12px !important;
             font-size: var(--ips-ctrl-fs) !important;
             line-height: var(--ips-ctrl-lh) !important;
-            border-radius: var(--ips-ctrl-radius) !important;
-            background: var(--ips-ctrl-bg) !important;
-            border-color: var(--ips-ctrl-border) !important;
-            color: var(--ips-ctrl-fg) !important;
+            color: #111827 !important;
+            align-items: center !important;
         }
-        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
-            min-height: var(--ips-ctrl-h) !important;
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] span,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] span {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            color: #111827 !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] input,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] input {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            color: #111827 !important;
+            min-height: auto !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
             font-size: var(--ips-ctrl-fs) !important;
-            border-radius: var(--ips-ctrl-radius) !important;
-            background: var(--ips-ctrl-bg) !important;
-            border-color: var(--ips-ctrl-border) !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"],
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] [role="combobox"] {
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            min-height: auto !important;
+            color: #111827 !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stSelectbox"] [data-baseweb="select"] svg,
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] svg {
+            color: #374151 !important;
+            fill: #374151 !important;
+            opacity: 1 !important;
+            flex-shrink: 0 !important;
+        }
+        /* Multiselect: tag chips only — no full-height white slabs inside the control */
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] ul {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            gap: 6px !important;
+            min-height: 0 !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"])
+            [data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"] {
+            background: #e5e7eb !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            color: #111827 !important;
+            box-shadow: none !important;
+            min-height: 0 !important;
+            margin: 0 !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stDateInput"] input,

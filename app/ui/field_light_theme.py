@@ -42,23 +42,14 @@ _FIELD_LIGHT_CSS = """
   section[data-testid="stMain"] [data-testid="stDateInput"] input,
   section[data-testid="stMain"] [data-testid="stDateInput"] [data-baseweb="input"],
   section[data-testid="stMain"] [data-testid="stTextArea"] textarea,
-  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
-  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
   section[data-testid="stMain"] [data-baseweb="input"],
   section[data-testid="stMain"] [data-baseweb="textarea"],
-  section[data-testid="stMain"] [data-baseweb="select"],
   section[data-testid="stMain"] [data-baseweb="base-input"],
   section[data-testid="stMain"] [data-baseweb="input"] > div,
-  section[data-testid="stMain"] [data-baseweb="select"] > div,
   section[data-testid="stMain"] [data-baseweb="textarea"] > div,
   section[data-testid="stMain"] [data-baseweb="base-input"] > div,
-  section[data-testid="stMain"] [role="combobox"],
-  div[data-baseweb="select"] > div,
-  div[data-baseweb="input"],
-  div[data-baseweb="textarea"],
-  div[data-baseweb="base-input"],
-  textarea,
-  input {
+  section[data-testid="stMain"] textarea,
+  section[data-testid="stMain"] input {
     background: #ffffff !important;
     border: 1px solid #9ca3af !important;
     border-radius: 10px !important;
@@ -68,9 +59,72 @@ _FIELD_LIGHT_CSS = """
     box-sizing: border-box !important;
     font-weight: 500 !important;
   }
+  /* Select / multiselect: single outer field; inner nodes transparent (chips use explicit tag rule below). */
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"],
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 1px solid #9ca3af !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    min-height: 48px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-height: 48px !important;
+    padding: 10px 12px !important;
+    color: #111827 !important;
+  }
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] span {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+  }
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] input,
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    min-height: auto !important;
+    padding: 0 !important;
+  }
+  section[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"],
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] [role="combobox"] {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-height: auto !important;
+    color: #111827 !important;
+  }
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] ul {
+    background: transparent !important;
+    border: none !important;
+    gap: 6px !important;
+  }
+  section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"] {
+    background: #e5e7eb !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
   section[data-testid="stMain"] [data-baseweb="input"] *,
   section[data-testid="stMain"] [data-baseweb="textarea"] *,
-  section[data-testid="stMain"] [data-baseweb="select"] *,
   section[data-testid="stMain"] [data-baseweb="base-input"] * {
     background-color: transparent !important;
     color: #111827 !important;
