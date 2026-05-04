@@ -433,12 +433,12 @@ def _inject_job_database_responsive_styles() -> None:
             background: transparent !important;
             border: 1px solid transparent !important;
             box-shadow: none !important;
-            color: inherit !important;
+            color: #111827 !important;
         }
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button p,
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button p,
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"] p {
-            color: #374151 !important;
+            color: #111827 !important;
             font-weight: 500 !important;
             margin: 0 !important;
             overflow: visible !important;
@@ -463,6 +463,53 @@ def _inject_job_database_responsive_styles() -> None:
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tablist"] button:hover:not(:disabled):not([aria-selected="true"]),
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="stTabs"] [role="tab"]:hover:not([aria-selected="true"]) {
             background: rgba(255, 255, 255, 0.42) !important;
+        }
+        /* Job overview: estimate summary (grey tray + white inner card) */
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) {
+            background: #d1d5db !important;
+            border: 1px solid #c4c4cc !important;
+            border-radius: 12px !important;
+            padding: 0.65rem 0.75rem 0.75rem !important;
+            margin: 0 0 0.85rem 0 !important;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) h4 {
+            color: #111827 !important;
+            font-weight: 700 !important;
+            margin: 0 0 0.5rem 0 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .stCaption,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .stCaption p {
+            color: #374151 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .ips-jes-card {
+            background: #ffffff !important;
+            border-radius: 10px !important;
+            padding: 0.65rem 0.85rem !important;
+            margin: 0 0 0.5rem 0 !important;
+            border: 1px solid #e5e7eb !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .ips-jes-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+            gap: 0.45rem 1rem !important;
+            color: #111827 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .ips-jes-lbl {
+            display: block !important;
+            font-weight: 700 !important;
+            font-size: 0.78rem !important;
+            color: #374151 !important;
+            margin-bottom: 0.12rem !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) .ips-jes-val {
+            display: block !important;
+            font-weight: 600 !important;
+            font-size: 0.92rem !important;
+            color: #111827 !important;
+            line-height: 1.35 !important;
+            overflow-wrap: anywhere !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="column"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
@@ -553,9 +600,11 @@ def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
 
 
 def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
-    """Columns for labels + optional scope; fall back if a column is missing."""
+    """Columns for labels + overview card; fall back if a column is missing."""
     if _job_db_admin_read():
         for cols in (
+            "id,quote_number,customer_id,customer_contact_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount,po_number,estimate_description",
+            "id,quote_number,customer_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount",
             "id,quote_number,customer_id,proposal_total,status,job_id,scope_of_work",
             "id,quote_number,customer_id,proposal_total,status,job_id",
         ):
@@ -573,6 +622,8 @@ def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
         except Exception:
             return fetch_table("estimates", limit=5000, order_by="quote_number")
     for cols in (
+        "id,quote_number,customer_id,customer_contact_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount,po_number,estimate_description",
+        "id,quote_number,customer_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount",
         "id,quote_number,customer_id,proposal_total,status,job_id,scope_of_work",
         "id,quote_number,customer_id,proposal_total,status,job_id",
     ):
@@ -715,6 +766,220 @@ def _job_form_linked_estimate_id(estimate_options: dict[str, Any], linked_label:
     return s or None
 
 
+def _build_job_form_estimate_options(
+    *,
+    estimates: list[dict[str, Any]],
+    estimate_label_map: dict[str, str],
+    selected_job: dict[str, Any] | None,
+    estimate_detail: dict[str, Any] | None,
+    customers: list[dict[str, Any]],
+    customer_name_by_id: dict[str, str],
+) -> dict[str, Any]:
+    """Label → estimate id for the job form (includes current link even if filtered out of list)."""
+    estimate_options: dict[str, Any] = {"": None}
+    for e in estimates:
+        eid = str(e.get("id") or "").strip()
+        if not eid:
+            continue
+        lab = estimate_label_map.get(eid)
+        if lab:
+            estimate_options[lab] = eid
+    if selected_job and selected_job.get("estimate_id"):
+        _leid = str(selected_job.get("estimate_id"))
+        existing_ids = {str(v) for v in estimate_options.values() if v is not None}
+        if _leid not in existing_ids:
+            lab = estimate_label_map.get(_leid)
+            if not lab and estimate_detail:
+                qn = str(estimate_detail.get("quote_number") or "").strip()
+                cn = _customer_display_name_for_id(
+                    estimate_detail.get("customer_id"),
+                    customers,
+                    customer_name_by_id,
+                )
+                _est_status_lbl = str(estimate_detail.get("status") or "").strip()
+                lab = (
+                    f"{qn} | {cn} | {_est_status_lbl}"
+                    if qn or cn or _est_status_lbl
+                    else f"Estimate ({_leid[:8]}…)"
+                )
+            elif not lab:
+                lab = f"Estimate ({_leid[:8]}…)"
+            estimate_options[lab] = _leid
+    return estimate_options
+
+
+def _job_db_money_detail(v: Any) -> str:
+    """Currency for job overview estimate card (2 decimals, $0.00 shows as $0.00)."""
+    try:
+        if v is None or str(v).strip() == "":
+            return "—"
+        fv = float(v)
+        return f"${fv:,.2f}"
+    except Exception:
+        return "—"
+
+
+def _estimate_row_money_for_total(row: dict[str, Any]) -> str:
+    """Prefer proposal total, then final bid (same idea as Job Costing)."""
+    for key in ("proposal_total", "final_bid"):
+        if key not in row:
+            continue
+        raw = row.get(key)
+        if raw is None or str(raw).strip() == "":
+            continue
+        try:
+            fv = float(raw)
+            if fv != 0 or key == "proposal_total":
+                return _job_db_money_detail(fv)
+        except Exception:
+            continue
+    return "—"
+
+
+def _merge_estimate_detail_for_display(
+    *,
+    estimate_id: str,
+    estimate_detail: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """DB row plus list row overlay (display only; list wins on overlapping keys)."""
+    full = _fetch_estimate_row_by_id(estimate_id) or {}
+    base = dict(estimate_detail or {})
+    return {**full, **base}
+
+
+def _estimate_contact_display(det: dict[str, Any]) -> str:
+    cid = str(det.get("customer_contact_id") or "").strip()
+    if not cid:
+        return "—"
+    row = _contact_row_by_id(cid)
+    if not row:
+        return f"Contact id `{cid[:8]}…`"
+    try:
+        from services.customer_contacts import contact_option_label
+    except ImportError:
+        from app.services.customer_contacts import contact_option_label  # type: ignore
+    return str(contact_option_label(row)).strip() or "—"
+
+
+def _render_job_estimate_summary_overview(
+    *,
+    selected_job: dict[str, Any],
+    estimate_options: dict[str, Any],
+    estimate_detail: dict[str, Any] | None,
+    estimate_label_map: dict[str, str],
+    estimate_quote_by_id: dict[str, str],
+    customers: list[dict[str, Any]],
+    customer_name_by_id: dict[str, str],
+    can_edit: bool,
+) -> str:
+    """
+    Overview-only estimate block: summary + link / open / unlink (returns linked-estimate widget value).
+    """
+    try:
+        from app.ui import IPS_NAV_PENDING_KEY
+    except ImportError:
+        from ui import IPS_NAV_PENDING_KEY  # type: ignore
+
+    jid = str(selected_job.get("id") or "").strip()
+    eid = str(selected_job.get("estimate_id") or "").strip()
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-job-estimate-summary-host"></span>', unsafe_allow_html=True)
+        st.markdown("#### Estimate Summary")
+
+        if not eid:
+            st.markdown(
+                "<p style='margin:0 0 0.5rem 0;font-weight:700;color:#111827;'>No estimate linked to this job.</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Pick a quote below, then click **Update Job** to save the link.")
+        else:
+            det = _merge_estimate_detail_for_display(estimate_id=eid, estimate_detail=estimate_detail)
+            qn = str(
+                estimate_quote_by_id.get(eid)
+                or det.get("quote_number")
+                or ""
+            ).strip()
+            name_hint = str(det.get("estimate_description") or "").strip()
+            title_line = html.escape(qn) if qn else f"Estimate `{html.escape(eid[:8])}…`"
+            if name_hint and len(name_hint) <= 120:
+                title_line += f" · <span style='font-weight:600'>{html.escape(name_hint)}</span>"
+            elif name_hint:
+                title_line += f" · <span style='font-weight:600'>{html.escape(name_hint[:117])}…</span>"
+            st_t = str(det.get("status") or "").strip()
+            cust = _customer_display_name_for_id(det.get("customer_id"), customers, customer_name_by_id)
+            po_amt = _job_db_money_detail(det.get("po_amount"))
+            po_num = str(det.get("po_number") or "").strip()
+            po_lbl = f"PO amount ({html.escape(po_num)})" if po_num else "PO / quote amount"
+            prop = _job_db_money_detail(det.get("proposal_total")) if det.get("proposal_total") not in (None, "") else "—"
+            fin = _job_db_money_detail(det.get("final_bid")) if det.get("final_bid") not in (None, "") else "—"
+            tot = _estimate_row_money_for_total(det)
+            awarded = _job_db_money_detail(selected_job.get("awarded_amount"))
+            contact_disp = html.escape(_estimate_contact_display(det))
+            card_html = (
+                f"<div class='ips-jes-card'>"
+                f"<p style='margin:0 0 0.65rem 0;font-size:0.95rem;color:#111827;'><strong>Linked quote</strong> · {title_line}</p>"
+                f"<div class='ips-jes-grid'>"
+                f"<div><span class='ips-jes-lbl'>Status</span><span class='ips-jes-val'>{html.escape(st_t) if st_t else '—'}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Estimate total</span><span class='ips-jes-val'>{html.escape(tot)}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Proposal</span><span class='ips-jes-val'>{html.escape(prop)}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Final bid</span><span class='ips-jes-val'>{html.escape(fin)}</span></div>"
+                f"<div><span class='ips-jes-lbl'>{po_lbl}</span><span class='ips-jes-val'>{html.escape(po_amt)}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Awarded (job)</span><span class='ips-jes-val'>{html.escape(awarded)}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Customer</span><span class='ips-jes-val'>{html.escape(cust) if cust else '—'}</span></div>"
+                f"<div><span class='ips-jes-lbl'>Contact (on quote)</span><span class='ips-jes-val'>{contact_disp}</span></div>"
+                f"</div></div>"
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
+
+        b_open, b_rm = st.columns([1, 1], gap="small")
+        with b_open:
+            if eid and st.button("Open estimate", type="primary", use_container_width=True, key=f"job_ov_open_est_{jid}"):
+                try:
+                    from app.pages import estimates as _estimates_page
+                except ImportError:
+                    import pages.estimates as _estimates_page  # type: ignore
+                _estimates_page._load_estimate_into_session(eid)
+                if str(st.session_state.get("loaded_estimate_id") or "").strip() == eid:
+                    st.session_state["estimates_view"] = "edit"
+                    st.session_state[IPS_NAV_PENDING_KEY] = "Estimates"
+                    st.rerun()
+                st.warning("Could not open that estimate (missing or no access).")
+        with b_rm:
+            if eid and can_edit:
+                with st.popover("Unlink estimate", use_container_width=True):
+                    st.caption("Removes the link from this job only. The estimate is **not** deleted.")
+                    if st.button("Remove linked estimate", type="primary", key=f"job_ov_unlink_est_{jid}"):
+                        update_rows_admin("jobs", {"estimate_id": None}, {"id": selected_job["id"]})
+                        st.success("Link removed. You can attach a different quote below.")
+                        st.rerun()
+
+        estimate_labels = [""] + [k for k in estimate_options.keys() if k]
+        current_estimate_label = ""
+        if selected_job.get("estimate_id"):
+            _seid = str(selected_job.get("estimate_id"))
+            current_estimate_label = estimate_label_map.get(_seid, "")
+            if not current_estimate_label:
+                for lab, eid_opt in estimate_options.items():
+                    if lab and str(eid_opt) == _seid:
+                        current_estimate_label = lab
+                        break
+        _lbl = "Link estimate" if not eid else "Linked estimate (change)"
+        linked_estimate = st.selectbox(
+            _lbl,
+            estimate_labels,
+            index=estimate_labels.index(current_estimate_label) if current_estimate_label in estimate_labels else 0,
+            disabled=not can_edit,
+            key="job_form_linked_estimate",
+            help="Leave blank for a standalone job. Pick a quote to link this job to an estimate.",
+        )
+        if not eid:
+            if st.button("Link estimate", type="secondary", use_container_width=True, key=f"job_ov_link_hint_{jid}"):
+                st.info("Choose a quote in **Link estimate** above, then click **Update Job** at the bottom of the form.")
+
+    return linked_estimate
+
+
 def _render_job_form_panel(
     *,
     mode: str,
@@ -767,79 +1032,34 @@ def _render_job_form_panel(
                 render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
             tab_overview_ctx = t_ov
         with tab_overview_ctx:
-            if mode == "edit" and selected_job and selected_job.get("estimate_id"):
-                st.markdown("#### Estimate source")
-                _eid = str(selected_job.get("estimate_id"))
-                _eq = str(
-                    estimate_quote_by_id.get(_eid)
-                    or (estimate_detail or {}).get("quote_number")
-                    or ""
-                ).strip()
-                _est = estimate_detail or {}
-                _st = str(_est.get("status") or "").strip()
-                _cust = _customer_display_name_for_id(
-                    _est.get("customer_id"),
-                    customers,
-                    customer_name_by_id,
+            linked_estimate = ""
+            estimate_options = _build_job_form_estimate_options(
+                estimates=estimates,
+                estimate_label_map=estimate_label_map,
+                selected_job=selected_job,
+                estimate_detail=estimate_detail,
+                customers=customers,
+                customer_name_by_id=customer_name_by_id,
+            )
+            if use_job_tabs and selected_job:
+                linked_estimate = _render_job_estimate_summary_overview(
+                    selected_job=selected_job,
+                    estimate_options=estimate_options,
+                    estimate_detail=estimate_detail,
+                    estimate_label_map=estimate_label_map,
+                    estimate_quote_by_id=estimate_quote_by_id,
+                    customers=customers,
+                    customer_name_by_id=customer_name_by_id,
+                    can_edit=can_edit,
                 )
-                _scope = _text_snippet(str(_est.get("scope_of_work") or ""))
-                with st.container(border=True):
-                    st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-                    line_parts: list[str] = []
-                    if _eq:
-                        line_parts.append(f"Source estimate **{_eq}**")
-                    else:
-                        line_parts.append(f"Source estimate id `{_eid[:8]}…`")
-                    if _st:
-                        line_parts.append(f"estimate status **{_st}**")
-                    if _cust:
-                        line_parts.append(f"customer **{_cust}**")
-                    st.markdown("**Source** · " + " · ".join(line_parts), unsafe_allow_html=True)
-                    st.caption("This job originated from an estimate (jobs.estimate_id is set).")
-                    if _scope:
-                        st.caption("Scope (from estimate)")
-                        st.markdown(
-                            f"<div style='white-space:pre-wrap;font-size:0.88rem'>{html.escape(_scope)}</div>",
-                            unsafe_allow_html=True,
-                        )
-    
+
             customer_options: dict[str, str] = {}
             for c in customers:
                 nm = str(c.get("customer_name") or "").strip()
                 cid = str(c.get("id") or "").strip()
                 if nm and cid:
                     customer_options[nm] = cid
-    
-            estimate_options: dict[str, Any] = {"": None}
-            for e in estimates:
-                eid = str(e.get("id") or "").strip()
-                if not eid:
-                    continue
-                lab = estimate_label_map.get(eid)
-                if lab:
-                    estimate_options[lab] = eid
-            if mode == "edit" and selected_job and selected_job.get("estimate_id"):
-                _leid = str(selected_job.get("estimate_id"))
-                existing_ids = {str(v) for v in estimate_options.values() if v is not None}
-                if _leid not in existing_ids:
-                    lab = estimate_label_map.get(_leid)
-                    if not lab and estimate_detail:
-                        qn = str(estimate_detail.get("quote_number") or "").strip()
-                        cn = _customer_display_name_for_id(
-                            estimate_detail.get("customer_id"),
-                            customers,
-                            customer_name_by_id,
-                        )
-                        _est_status_lbl = str(estimate_detail.get("status") or "").strip()
-                        lab = (
-                            f"{qn} | {cn} | {_est_status_lbl}"
-                            if qn or cn or _est_status_lbl
-                            else f"Estimate ({_leid[:8]}…)"
-                        )
-                    elif not lab:
-                        lab = f"Estimate ({_leid[:8]}…)"
-                    estimate_options[lab] = _leid
-    
+
             def current_value(field_name, default=""):
                 if selected_job:
                     value = selected_job.get(field_name, default)
@@ -989,42 +1209,53 @@ def _render_job_form_panel(
             # Site/address: use Job site above (customer_location_id). Preserve legacy jobs.location on edit only.
             location = str(current_value("location") or "").strip()
     
-            st.markdown("#### Status & linked estimate")
-            if mode == "add":
-                st.caption("*Linked estimate* is optional — leave the first row selected for a job with no quote.")
-            c5, c6 = st.columns(2, gap="small")
+            if use_job_tabs and selected_job:
+                st.markdown("#### Status")
+            else:
+                st.markdown("#### Status & linked estimate")
+                if mode == "add":
+                    st.caption("*Linked estimate* is optional — leave the first row selected for a job with no quote.")
             status_options = list(JOB_STATUSES)
             current_status = str(current_value("status", "Draft") or "Draft").strip() or "Draft"
             if current_status not in status_options:
                 status_options = status_options + [current_status]
             status_idx = status_options.index(current_status)
-            status = c5.selectbox(
-                "Status",
-                status_options,
-                index=status_idx,
-                disabled=_ro,
-                key="job_form_status",
-            )
-    
-            estimate_labels = [""] + [k for k in estimate_options.keys() if k]
-            current_estimate_label = ""
-            if selected_job and selected_job.get("estimate_id"):
-                _seid = str(selected_job.get("estimate_id"))
-                current_estimate_label = estimate_label_map.get(_seid, "")
-                if not current_estimate_label:
-                    for lab, eid in estimate_options.items():
-                        if lab and str(eid) == _seid:
-                            current_estimate_label = lab
-                            break
-            _link_lbl = "Linked estimate (optional)" if mode == "add" else "Linked estimate"
-            linked_estimate = c6.selectbox(
-                _link_lbl,
-                estimate_labels,
-                index=estimate_labels.index(current_estimate_label) if current_estimate_label in estimate_labels else 0,
-                disabled=_ro,
-                key="job_form_linked_estimate",
-                help="Leave blank for a standalone job. Pick a row only when this job should reference an estimate.",
-            )
+            if use_job_tabs and selected_job:
+                status = st.selectbox(
+                    "Status",
+                    status_options,
+                    index=status_idx,
+                    disabled=_ro,
+                    key="job_form_status",
+                )
+            else:
+                c5, c6 = st.columns(2, gap="small")
+                status = c5.selectbox(
+                    "Status",
+                    status_options,
+                    index=status_idx,
+                    disabled=_ro,
+                    key="job_form_status",
+                )
+                estimate_labels = [""] + [k for k in estimate_options.keys() if k]
+                current_estimate_label = ""
+                if selected_job and selected_job.get("estimate_id"):
+                    _seid = str(selected_job.get("estimate_id"))
+                    current_estimate_label = estimate_label_map.get(_seid, "")
+                    if not current_estimate_label:
+                        for lab, eid in estimate_options.items():
+                            if lab and str(eid) == _seid:
+                                current_estimate_label = lab
+                                break
+                _link_lbl = "Linked estimate (optional)" if mode == "add" else "Linked estimate"
+                linked_estimate = c6.selectbox(
+                    _link_lbl,
+                    estimate_labels,
+                    index=estimate_labels.index(current_estimate_label) if current_estimate_label in estimate_labels else 0,
+                    disabled=_ro,
+                    key="job_form_linked_estimate",
+                    help="Leave blank for a standalone job. Pick a row only when this job should reference an estimate.",
+                )
     
             st.markdown("#### Awarded amount")
             awarded_amount = st.number_input(
