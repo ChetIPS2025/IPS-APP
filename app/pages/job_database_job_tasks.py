@@ -235,7 +235,7 @@ def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str,
         return []
 
 
-_JDT_REF_PDF_CSS_KEY = "ips_jdt_task_ref_pdf_css_v2"
+_JDT_REF_PDF_CSS_KEY = "ips_jdt_task_ref_pdf_css_v3"
 
 
 def _inject_jdt_task_ref_pdf_css() -> None:
@@ -279,10 +279,40 @@ def _inject_jdt_task_ref_pdf_css() -> None:
             overflow-x: hidden !important;
             box-sizing: border-box !important;
         }
+        .ips-jdt-refimg-wrap {
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
+            margin: 0 0 0.5rem 0;
+        }
+        .ips-jdt-refimg-wrap img {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            max-height: min(70vh, 640px);
+            object-fit: contain;
+            border-radius: 10px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            box-sizing: border-box;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def _jdt_job_id_matches_row(r: dict[str, Any], job_id: str) -> bool:
+    """Match attachment row to current job (tolerate casing / missing job_id on scoped fetch)."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return False
+    rj = str((r or {}).get("job_id") or "").strip()
+    if not rj:
+        return True
+    return rj.lower() == jid.lower()
 
 
 def _jdt_row_is_pdf_attachment(r: dict[str, Any]) -> bool:
@@ -293,29 +323,19 @@ def _jdt_row_is_pdf_attachment(r: dict[str, Any]) -> bool:
     return ftype == "application/pdf"
 
 
-def _jdt_merged_pdf_attachments_for_task(
-    job_id: str, task_id: str, att_rows: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    """Job-wide (null task_id) + task-specific rows; PDFs only; deduped; newest first."""
-    jid = str(job_id or "").strip()
-    tid = str(task_id or "").strip()
-    candidates: list[dict[str, Any]] = []
-    for r in att_rows or []:
-        if not isinstance(r, dict):
-            continue
-        rj = str((r or {}).get("job_id") or "").strip()
-        if rj and rj != jid:
-            continue
-        rt = str((r or {}).get("task_id") or "").strip()
-        if rt and rt != tid:
-            continue
-        if not _jdt_row_is_pdf_attachment(r):
-            continue
-        candidates.append(r)
-    candidates.sort(key=lambda x: str((x or {}).get("created_at") or ""), reverse=True)
+def _jdt_row_is_image_attachment(r: dict[str, Any]) -> bool:
+    fname = str((r or {}).get("file_name") or "")
+    ftype = str((r or {}).get("file_type") or "").strip().lower()
+    if _jra_svc.is_image_filename(fname):
+        return True
+    return ftype.startswith("image/")
+
+
+def _jdt_dedupe_sort_attachments(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = sorted(rows, key=lambda x: str((x or {}).get("created_at") or ""), reverse=True)
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
-    for r in candidates:
+    for r in rows:
         rid = str((r or {}).get("id") or "").strip()
         if rid:
             if rid in seen:
@@ -323,39 +343,49 @@ def _jdt_merged_pdf_attachments_for_task(
             seen.add(rid)
         out.append(r)
     return out
+
+
+def _jdt_job_wide_attachments(job_id: str, att_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """``job_reference_attachments`` for this job with ``task_id`` null (job-wide)."""
+    jid = str(job_id or "").strip()
+    raw: list[dict[str, Any]] = []
+    for r in att_rows or []:
+        if not isinstance(r, dict):
+            continue
+        if not _jdt_job_id_matches_row(r, jid):
+            continue
+        if str((r or {}).get("task_id") or "").strip():
+            continue
+        if not str((r or {}).get("file_url") or "").strip():
+            continue
+        raw.append(r)
+    return _jdt_dedupe_sort_attachments(raw)
+
+
+def _jdt_merged_attachments_for_task(
+    job_id: str, task_id: str, att_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Job-wide (null ``task_id``) + rows for ``task_id``; all attachment types with storage path."""
+    jid = str(job_id or "").strip()
+    tid = str(task_id or "").strip()
+    raw: list[dict[str, Any]] = []
+    for r in att_rows or []:
+        if not isinstance(r, dict):
+            continue
+        if not _jdt_job_id_matches_row(r, jid):
+            continue
+        rt = str((r or {}).get("task_id") or "").strip()
+        if rt and rt != tid:
+            continue
+        if not str((r or {}).get("file_url") or "").strip():
+            continue
+        raw.append(r)
+    return _jdt_dedupe_sort_attachments(raw)
 
 
 def _jdt_gview_embed_url(public_file_url: str) -> str:
     q = quote(str(public_file_url).strip(), safe="")
     return f"https://docs.google.com/gview?url={q}&embedded=true"
-
-
-def _jdt_job_wide_pdf_attachments(job_id: str, att_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """PDF rows for this job with no task_id (job-wide reference drawings)."""
-    jid = str(job_id or "").strip()
-    candidates: list[dict[str, Any]] = []
-    for r in att_rows or []:
-        if not isinstance(r, dict):
-            continue
-        rj = str((r or {}).get("job_id") or "").strip()
-        if rj and rj != jid:
-            continue
-        if str((r or {}).get("task_id") or "").strip():
-            continue
-        if not _jdt_row_is_pdf_attachment(r):
-            continue
-        candidates.append(r)
-    candidates.sort(key=lambda x: str((x or {}).get("created_at") or ""), reverse=True)
-    seen: set[str] = set()
-    out: list[dict[str, Any]] = []
-    for r in candidates:
-        rid = str((r or {}).get("id") or "").strip()
-        if rid:
-            if rid in seen:
-                continue
-            seen.add(rid)
-        out.append(r)
-    return out
 
 
 def _jdt_ref_pdf_iframe_html(*, signed_url: str, title: str, variant: str) -> str:
@@ -396,9 +426,9 @@ def _jdt_ref_pdf_iframe_html(*, signed_url: str, title: str, variant: str) -> st
 </div>"""
 
 
-def _jdt_sign_pdf_row(r: dict[str, Any], *, bucket: str) -> tuple[str, str]:
+def _jdt_sign_attachment_row(r: dict[str, Any], *, bucket: str) -> tuple[str, str]:
     path = str((r or {}).get("file_url") or "").strip()
-    fname = str((r or {}).get("file_name") or "document.pdf").strip()
+    fname = str((r or {}).get("file_name") or "file").strip() or "file"
     if not path:
         return "", fname
     try:
@@ -408,21 +438,52 @@ def _jdt_sign_pdf_row(r: dict[str, Any], *, bucket: str) -> tuple[str, str]:
     return (str(signed or "").strip(), fname)
 
 
-def _render_jdt_shared_job_reference_pdf(
+def _jdt_render_reference_preview(
+    row: dict[str, Any],
+    *,
+    bucket: str,
+    variant: str,
+) -> None:
+    """PDF: Google viewer iframe. Image: full-width img. Other: open link."""
+    signed, fname = _jdt_sign_attachment_row(row, bucket=bucket)
+    if not signed:
+        st.caption("Preview link unavailable.")
+        return
+    _inject_jdt_task_ref_pdf_css()
+    if _jdt_row_is_pdf_attachment(row):
+        h = 520 if variant == "top" else 720
+        components.html(
+            _jdt_ref_pdf_iframe_html(signed_url=signed, title=fname, variant=variant),
+            height=h,
+            scrolling=True,
+        )
+    elif _jdt_row_is_image_attachment(row):
+        safe_u = html.escape(signed, quote=True)
+        safe_a = html.escape(fname)
+        st.markdown(
+            f'<div class="ips-jdt-refimg-wrap">'
+            f'<img src="{safe_u}" alt="{safe_a}" loading="lazy" />'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.link_button("View / Open", signed, use_container_width=True)
+
+
+def _render_jdt_shared_job_reference_section(
     *,
     job_id: str,
     att_rows: list[dict[str, Any]],
     bucket: str,
 ) -> None:
-    """Single shared iframe for job-wide PDF references (top of Tasks section)."""
-    rows = _jdt_job_wide_pdf_attachments(job_id, att_rows)
+    """One shared preview above task cards: job-wide attachments only (``task_id`` null)."""
+    rows = _jdt_job_wide_attachments(job_id, att_rows)
     if not rows:
         return
-    _inject_jdt_task_ref_pdf_css()
     st.markdown("##### Job Reference")
     ix = 0
     if len(rows) > 1:
-        labels = [str((r or {}).get("file_name") or f"PDF {i + 1}")[:120] for i, r in enumerate(rows)]
+        labels = [str((r or {}).get("file_name") or f"File {i + 1}")[:120] for i, r in enumerate(rows)]
         ix = int(
             st.selectbox(
                 "Select Reference File",
@@ -432,18 +493,10 @@ def _render_jdt_shared_job_reference_pdf(
             )
         )
     row = rows[ix]
-    signed, fname = _jdt_sign_pdf_row(row, bucket=bucket)
-    if not signed:
-        st.caption("Preview link unavailable.")
-        return
-    components.html(
-        _jdt_ref_pdf_iframe_html(signed_url=signed, title=fname, variant="top"),
-        height=520,
-        scrolling=True,
-    )
+    _jdt_render_reference_preview(row, bucket=bucket, variant="top")
 
 
-@st.dialog("Reference PDF", width="large")
+@st.dialog("Job reference", width="large")
 def _task_reference_pdf_dialog(
     *,
     job_id: str,
@@ -451,12 +504,11 @@ def _task_reference_pdf_dialog(
     att_rows: list[dict[str, Any]],
     bucket: str,
 ) -> None:
-    """Full viewer for job-wide + this-task PDF references (one iframe in modal)."""
+    """Job-wide + this-task reference attachments (PDF / image preview or open link)."""
     st.markdown('<span class="ips-jdt-refpdf-dialog-mark"></span>', unsafe_allow_html=True)
-    _inject_jdt_task_ref_pdf_css()
-    merged = _jdt_merged_pdf_attachments_for_task(job_id, tid, att_rows)
+    merged = _jdt_merged_attachments_for_task(job_id, tid, att_rows)
     if not merged:
-        st.caption("No PDF reference attachments for this task.")
+        st.caption("No reference attachments for this task.")
         if st.button("Close", use_container_width=True, key=f"jdt_refpdf_close_empty_{job_id}_{tid}"):
             st.session_state.pop(f"jdt_ref_modal_{job_id}", None)
             st.rerun()
@@ -464,7 +516,7 @@ def _task_reference_pdf_dialog(
 
     sel_ix = 0
     if len(merged) > 1:
-        labels = [str((r or {}).get("file_name") or f"PDF {i + 1}")[:120] for i, r in enumerate(merged)]
+        labels = [str((r or {}).get("file_name") or f"File {i + 1}")[:120] for i, r in enumerate(merged)]
         sel_ix = int(
             st.selectbox(
                 "Select Reference File",
@@ -475,15 +527,7 @@ def _task_reference_pdf_dialog(
         )
 
     row = merged[sel_ix]
-    signed, fname = _jdt_sign_pdf_row(row, bucket=bucket)
-    if signed:
-        components.html(
-            _jdt_ref_pdf_iframe_html(signed_url=signed, title=fname, variant="modal"),
-            height=720,
-            scrolling=True,
-        )
-    else:
-        st.caption("Preview link unavailable.")
+    _jdt_render_reference_preview(row, bucket=bucket, variant="modal")
 
     if st.button("Close", use_container_width=True, key=f"jdt_refpdf_close_{job_id}_{tid}"):
         st.session_state.pop(f"jdt_ref_modal_{job_id}", None)
@@ -1184,7 +1228,7 @@ def render_job_tasks_tab(
                         st.session_state[f"jdt_st_flash_{job_id}_{ptid}"] = str(err)
                         st.rerun()
 
-        _render_jdt_shared_job_reference_pdf(
+        _render_jdt_shared_job_reference_section(
             job_id=job_id,
             att_rows=att_rows_all,
             bucket=ref_bucket,
@@ -1222,10 +1266,10 @@ def render_job_tasks_tab(
                     f"{html.escape(snip or '—')}</p>",
                     unsafe_allow_html=True,
                 )
-                merged_pdfs = _jdt_merged_pdf_attachments_for_task(job_id, tid, att_rows_all)
-                if merged_pdfs:
+                merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
+                if merged_refs:
                     if st.button(
-                        "📄 View Reference",
+                        "View Reference",
                         type="secondary",
                         key=f"jdt_ref_btn_{job_id}_{tid}",
                     ):
