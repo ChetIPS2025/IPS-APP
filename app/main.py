@@ -21,7 +21,14 @@ from auth import (
 )
 from errors import show_auth_error, show_page_error
 from logging_config import configure_logging
-from ui import IPS_ACTIVE_PAGE_KEY, IPS_NAV_PAGE_KEY, apply_pending_navigation, render_sidebar
+from ui import (
+    IPS_ACTIVE_PAGE_KEY,
+    IPS_NAV_PAGE_KEY,
+    IPS_ROUTE_SLUG_KEY,
+    apply_pending_navigation,
+    render_sidebar,
+    sync_session_route_slug_to_nav_page,
+)
 from ui import role_can_open_page
 from branding import apply_branding, render_header
 
@@ -218,6 +225,8 @@ def main() -> None:
         st.stop()
 
     apply_pending_navigation()
+    # Align ``st.session_state["page"]`` slug (Office & reports) with ``ips_nav_page`` before sidebar.
+    sync_session_route_slug_to_nav_page()
     # After auth: ``?page=Scan%20Inventory`` and/or ``?code=INV-…`` from QR / camera links.
     _want_scan = bool(st.session_state.get("_ips_query_wants_scan_inventory"))
     _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
@@ -227,6 +236,7 @@ def main() -> None:
         and role_can_open_page(current_role(), "Scan Inventory")
     ):
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
     sidebar_page = render_sidebar()
     if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
         prev = st.session_state.get("_ips_last_nav_page")

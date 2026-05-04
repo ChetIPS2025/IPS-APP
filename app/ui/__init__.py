@@ -40,6 +40,18 @@ IPS_NAV_PENDING_KEY = "ips_nav_pending"
 IPS_ACTIVE_PAGE_KEY = "ips_active_page"
 # Current sidebar page (one of IPS_SIDEBAR_PAGES). Replaces legacy key "ips_nav_radio".
 IPS_NAV_PAGE_KEY = "ips_nav_page"
+# URL-style route slug (mirrors Office & reports sidebar); kept in sync with ``IPS_NAV_PAGE_KEY`` for those pages.
+IPS_ROUTE_SLUG_KEY = "page"
+
+# Slugs for Office & reports + Admin (``main`` may read ``IPS_ROUTE_SLUG_KEY`` before rendering).
+_ROUTE_SLUG_BY_PAGE: dict[str, str] = {
+    "Users": "users",
+    "Time Tracking": "time_tracking",
+    "Weekly Timesheet": "weekly_timesheet",
+    "PO / Expenses": "po_expenses",
+    "Admin": "admin",
+}
+_PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.items()}
 
 # ---- Sidebar structure (simple, field + office friendly) ----
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
@@ -186,6 +198,30 @@ def _nav_btn_key(page: str) -> str:
     return "ips_nav__" + page.replace(" ", "_").replace("/", "_")
 
 
+def _set_sidebar_nav_page(page: str) -> None:
+    """Update primary nav and optional route slug (``IPS_ROUTE_SLUG_KEY``)."""
+    p = str(page or "").strip()
+    if not p:
+        return
+    st.session_state[IPS_NAV_PAGE_KEY] = p
+    slug = _ROUTE_SLUG_BY_PAGE.get(p)
+    if slug:
+        st.session_state[IPS_ROUTE_SLUG_KEY] = slug
+    else:
+        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
+
+
+def sync_session_route_slug_to_nav_page() -> None:
+    """If ``page`` holds a known slug, align ``ips_nav_page`` (runs before ``render_sidebar``)."""
+    raw = st.session_state.get(IPS_ROUTE_SLUG_KEY)
+    if not isinstance(raw, str) or not raw.strip():
+        return
+    target = _PAGE_BY_ROUTE_SLUG.get(raw.strip())
+    if target is None:
+        return
+    st.session_state[IPS_NAV_PAGE_KEY] = target
+
+
 def _sidebar_display_label(route_key: str) -> str:
     """Visible sidebar label; route/session keys stay unchanged (e.g. People → Users)."""
     if route_key == "People":
@@ -212,6 +248,7 @@ def apply_pending_navigation() -> None:
         pending = "Work & Plan (Supervisor)"
     if not pending:
         return
+    st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
     if pending == "Users":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "User accounts"
@@ -479,10 +516,7 @@ def _migrate_legacy_nav_session_keys() -> None:
 def _ensure_valid_nav_page() -> None:
     _migrate_legacy_nav_session_keys()
     cur0 = st.session_state.get(IPS_NAV_PAGE_KEY)
-    if cur0 == "Users":
-        st.session_state[IPS_NAV_PAGE_KEY] = "People"
-        st.session_state["people_section_radio"] = "User accounts"
-    elif cur0 == "Employees":
+    if cur0 == "Employees":
         st.session_state[IPS_NAV_PAGE_KEY] = "People"
         st.session_state["people_section_radio"] = "Employees"
     elif cur0 == "Inventory scan":
@@ -501,30 +535,20 @@ def _ensure_valid_nav_page() -> None:
     elif cur0 in ("Supervisor Daily Reports", "Daily crew report"):
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
 
-    role = current_role()
-    visible_secondary = set(_visible_secondary_pages(role))
-    visible_all = set(
-        p
-        for p in (
-            set(_NAV_PRIMARY)
-            | set(_NAV_JOBS_ROUTES)
-            | set(_NAV_ASSET_ROUTES)
-            | set(_NAV_RESOURCES)
-            | set(_NAV_INVENTORY_SUBPAGES)
-            | visible_secondary
-        )
-        if role_can_open_page(role, p)
-    )
+    if st.session_state.get(IPS_NAV_PAGE_KEY) != cur0:
+        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
 
+    role = current_role()
     cur = st.session_state.get(IPS_NAV_PAGE_KEY)
     routable = frozenset(IPS_SIDEBAR_PAGES) | {"Admin"}
     if cur not in routable:
         st.session_state[IPS_NAV_PAGE_KEY] = IPS_SIDEBAR_PAGES[0]
+        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
         return
 
-    admin_only_routes = {"Admin"} if role == "admin" else frozenset()
-    if cur not in visible_all and cur not in admin_only_routes:
+    if not role_can_open_page(role, str(cur or "")):
         st.session_state[IPS_NAV_PAGE_KEY] = "Dashboard"
+        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
 
 
 def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
@@ -535,11 +559,11 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
         _, c2 = st.sidebar.columns([0.06, 0.94])
         with c2:
             if st.button(page, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = page
+                _set_sidebar_nav_page(page)
                 st.rerun()
     else:
         if st.sidebar.button(page, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = page
+            _set_sidebar_nav_page(page)
             st.rerun()
 
 
@@ -552,11 +576,11 @@ def _render_nav_button_route(*, label: str, route: str, current: str, indent: bo
         _, c2 = st.sidebar.columns([0.06, 0.94])
         with c2:
             if st.button(label, key=key, type=btn_type, use_container_width=True):
-                st.session_state[IPS_NAV_PAGE_KEY] = route
+                _set_sidebar_nav_page(route)
                 st.rerun()
     else:
         if st.sidebar.button(label, key=key, type=btn_type, use_container_width=True):
-            st.session_state[IPS_NAV_PAGE_KEY] = route
+            _set_sidebar_nav_page(route)
             st.rerun()
 
 
@@ -586,13 +610,13 @@ def _render_assets_sidebar_group(*, current: str, role: str) -> None:
                 if page == "Asset Database":
                     key = _nav_btn_key("Asset_Database__sidebar_assets")
                     if st.button("Assets", key=key, type=btn_type, use_container_width=True):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
+                        _set_sidebar_nav_page("Asset Database")
                         st.session_state["asset_db_f_asset_category"] = "All"
                         st.rerun()
                 else:
                     key = _nav_btn_key(page)
                     if st.button(page, key=key, type=btn_type, use_container_width=True):
-                        st.session_state[IPS_NAV_PAGE_KEY] = page
+                        _set_sidebar_nav_page(page)
                         st.rerun()
 
 
@@ -655,7 +679,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if inv_list_active else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory"
+                        _set_sidebar_nav_page("Inventory")
                         st.session_state["inv_f_cat"] = "All"
                         st.rerun()
                 if role_can_open_page(role, "Scan Inventory"):
@@ -665,7 +689,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if current == "Scan Inventory" else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+                        _set_sidebar_nav_page("Scan Inventory")
                         st.rerun()
                 if role_can_open_page(role, "Inventory Usage"):
                     if st.button(
@@ -674,7 +698,7 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                         type="primary" if current == "Inventory Usage" else "secondary",
                         use_container_width=True,
                     ):
-                        st.session_state[IPS_NAV_PAGE_KEY] = "Inventory Usage"
+                        _set_sidebar_nav_page("Inventory Usage")
                         st.rerun()
 
     _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
