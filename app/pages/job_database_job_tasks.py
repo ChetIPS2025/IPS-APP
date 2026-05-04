@@ -363,6 +363,16 @@ def _jdt_job_wide_attachments(job_id: str, att_rows: list[dict[str, Any]]) -> li
     return _jdt_dedupe_sort_attachments(raw)
 
 
+def _jdt_first_job_wide_strip_attachment(
+    job_id: str, att_rows: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """First job-wide row that is a PDF or image (compact in-card preview)."""
+    for r in _jdt_job_wide_attachments(job_id, att_rows):
+        if _jdt_row_is_pdf_attachment(r) or _jdt_row_is_image_attachment(r):
+            return r
+    return None
+
+
 def _jdt_merged_attachments_for_task(
     job_id: str, task_id: str, att_rows: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -387,6 +397,33 @@ def _jdt_merged_attachments_for_task(
 def _jdt_gview_embed_url(public_file_url: str) -> str:
     q = quote(str(public_file_url).strip(), safe="")
     return f"https://docs.google.com/gview?url={q}&embedded=true"
+
+
+def _jdt_task_card_ref_strip_html(*, signed_url: str, title: str, *, is_pdf: bool) -> str:
+    """Tight PDF (Google viewer) or image strip for the task card right column (180–220px tall)."""
+    safe_title = html.escape(title)
+    h = 200
+    if is_pdf:
+        v = _jdt_gview_embed_url(signed_url)
+        src = html.escape(v, quote=True)
+        return (
+            f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;'
+            f'border-radius:8px;background:#ffffff;">'
+            f'<iframe src="{src}" title="{safe_title}" loading="lazy" '
+            'referrerpolicy="no-referrer-when-downgrade" '
+            f'style="width:100%;height:{h}px;min-height:180px;max-height:220px;border:none;'
+            f'border-radius:8px;display:block;box-sizing:border-box;"></iframe>'
+            f"</div>"
+        )
+    su = html.escape(signed_url, quote=True)
+    return (
+        f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;'
+        f'border-radius:8px;background:#fafafa;">'
+        f'<img src="{su}" alt="{safe_title}" loading="lazy" '
+        'style="width:100%;height:180px;object-fit:cover;border:none;border-radius:8px;'
+        'display:block;box-sizing:border-box;" />'
+        "</div>"
+    )
 
 
 def _jdt_ref_pdf_iframe_html(*, signed_url: str, title: str, variant: str) -> str:
@@ -469,32 +506,6 @@ def _jdt_render_reference_preview(
         )
     else:
         st.link_button("View / Open", signed, use_container_width=True)
-
-
-def _render_jdt_shared_job_reference_section(
-    *,
-    job_id: str,
-    att_rows: list[dict[str, Any]],
-    bucket: str,
-) -> None:
-    """One shared preview above task cards: job-wide attachments only (``task_id`` null)."""
-    rows = _jdt_job_wide_attachments(job_id, att_rows)
-    if not rows:
-        return
-    st.markdown("##### Job Reference")
-    ix = 0
-    if len(rows) > 1:
-        labels = [str((r or {}).get("file_name") or f"File {i + 1}")[:120] for i, r in enumerate(rows)]
-        ix = int(
-            st.selectbox(
-                "Select Reference File",
-                options=list(range(len(rows))),
-                format_func=lambda i, _lbls=labels: _lbls[int(i)],
-                key=f"jdt_job_ref_sb_{job_id}",
-            )
-        )
-    row = rows[ix]
-    _jdt_render_reference_preview(row, bucket=bucket, variant="top")
 
 
 @st.dialog("Job reference", width="large")
@@ -1229,11 +1240,16 @@ def render_job_tasks_tab(
                         st.session_state[f"jdt_st_flash_{job_id}_{ptid}"] = str(err)
                         st.rerun()
 
-        _render_jdt_shared_job_reference_section(
-            job_id=job_id,
-            att_rows=att_rows_all,
-            bucket=ref_bucket,
-        )
+        strip_row = _jdt_first_job_wide_strip_attachment(job_id, att_rows_all)
+        strip_signed = ""
+        strip_fn = ""
+        strip_is_pdf = False
+        strip_is_img = False
+        if strip_row:
+            strip_signed, strip_fn = _jdt_sign_attachment_row(strip_row, bucket=ref_bucket)
+            strip_is_pdf = _jdt_row_is_pdf_attachment(strip_row)
+            strip_is_img = _jdt_row_is_image_attachment(strip_row)
+        show_strip = bool(strip_signed and (strip_is_pdf or strip_is_img))
 
         for t in visible:
             tid = str(t.get("id") or "").strip()
@@ -1268,28 +1284,64 @@ def render_job_tasks_tab(
                     unsafe_allow_html=True,
                 )
                 merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
-                has_ref = bool(merged_refs)
-                if has_ref:
-                    cst, cref, camc = st.columns([5, 1, 1], gap="small")
-                else:
-                    cst, camc = st.columns([5, 2], gap="small")
+                has_ref_btn = bool(merged_refs) and not show_strip
 
-                with cst:
-                    if can_edit_tasks:
-                        st.selectbox(
-                            "Status",
-                            opts,
-                            index=ix,
-                            format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
-                            key=f"jdt_st_{job_id}_{tid}",
-                            label_visibility="collapsed",
-                            on_change=_make_jdt_status_pending_cb(job_id, tid),
+                if show_strip:
+                    row_l, row_r = st.columns([5, 2], gap="small")
+                    with row_l:
+                        inner_s, inner_c = st.columns([5, 1], gap="small")
+                        with inner_s:
+                            if can_edit_tasks:
+                                st.selectbox(
+                                    "Status",
+                                    opts,
+                                    index=ix,
+                                    format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
+                                    key=f"jdt_st_{job_id}_{tid}",
+                                    label_visibility="collapsed",
+                                    on_change=_make_jdt_status_pending_cb(job_id, tid),
+                                )
+                                st.caption("Saves when changed")
+                            else:
+                                st.caption(_jdt_status_label(stt))
+                        with inner_c:
+                            if can_edit_tasks:
+                                if st.button(
+                                    "📷",
+                                    type="primary",
+                                    key=f"jdt_cam_btn_{job_id}_{tid}",
+                                    use_container_width=True,
+                                ):
+                                    st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
+                                    st.rerun()
+                            else:
+                                st.caption("—")
+                    with row_r:
+                        components.html(
+                            _jdt_task_card_ref_strip_html(
+                                signed_url=strip_signed,
+                                title=strip_fn or "Reference",
+                                is_pdf=strip_is_pdf,
+                            ),
+                            height=228,
+                            scrolling=False,
                         )
-                        st.caption("Saves when changed")
-                    else:
-                        st.caption(_jdt_status_label(stt))
-
-                if has_ref:
+                elif has_ref_btn:
+                    cst, cref, camc = st.columns([5, 1, 1], gap="small")
+                    with cst:
+                        if can_edit_tasks:
+                            st.selectbox(
+                                "Status",
+                                opts,
+                                index=ix,
+                                format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
+                                key=f"jdt_st_{job_id}_{tid}",
+                                label_visibility="collapsed",
+                                on_change=_make_jdt_status_pending_cb(job_id, tid),
+                            )
+                            st.caption("Saves when changed")
+                        else:
+                            st.caption(_jdt_status_label(stt))
                     with cref:
                         if st.button(
                             "📄",
@@ -1300,19 +1352,46 @@ def render_job_tasks_tab(
                         ):
                             st.session_state[f"jdt_ref_modal_{job_id}"] = tid
                             st.rerun()
-
-                with camc:
-                    if can_edit_tasks:
-                        if st.button(
-                            "📷",
-                            type="primary",
-                            key=f"jdt_cam_btn_{job_id}_{tid}",
-                            use_container_width=True,
-                        ):
-                            st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
-                            st.rerun()
-                    else:
-                        st.caption("—")
+                    with camc:
+                        if can_edit_tasks:
+                            if st.button(
+                                "📷",
+                                type="primary",
+                                key=f"jdt_cam_btn_{job_id}_{tid}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
+                                st.rerun()
+                        else:
+                            st.caption("—")
+                else:
+                    cst, camc = st.columns([5, 2], gap="small")
+                    with cst:
+                        if can_edit_tasks:
+                            st.selectbox(
+                                "Status",
+                                opts,
+                                index=ix,
+                                format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
+                                key=f"jdt_st_{job_id}_{tid}",
+                                label_visibility="collapsed",
+                                on_change=_make_jdt_status_pending_cb(job_id, tid),
+                            )
+                            st.caption("Saves when changed")
+                        else:
+                            st.caption(_jdt_status_label(stt))
+                    with camc:
+                        if can_edit_tasks:
+                            if st.button(
+                                "📷",
+                                type="primary",
+                                key=f"jdt_cam_btn_{job_id}_{tid}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
+                                st.rerun()
+                        else:
+                            st.caption("—")
                 _tph.render_task_photo_gallery_for_task_card(
                     task_id=tid,
                     task_row=dict(t),
