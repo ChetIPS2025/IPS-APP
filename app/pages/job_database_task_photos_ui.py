@@ -6,6 +6,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+import html as html_mod
+
 import streamlit as st
 
 
@@ -100,6 +102,195 @@ def _task_photo_bucket_name() -> str:
 def _is_task_photo_object_key(path: str) -> bool:
     p = str(path or "").strip()
     return bool(re.match(r"^[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}/", p))
+
+
+TASK_PHOTO_PREVIEW_CSS_KEY = "ips_task_photo_preview_css_v2"
+
+TASK_PHOTO_PREVIEW_CSS = """
+<style>
+.ips-task-photo-preview-host {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ips-task-photo-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0.65rem 0 0.35rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ips-task-photo-preview-wrap {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.ips-task-photo-preview-img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 480px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  box-sizing: border-box;
+}
+@media (max-width: 900px) {
+  .ips-task-photo-preview-img {
+    max-height: 420px;
+  }
+}
+</style>
+"""
+
+
+def inject_task_photo_preview_css() -> None:
+    """Full-width task photo previews (shared by Job Database cards + supervisor strip)."""
+    if st.session_state.get(TASK_PHOTO_PREVIEW_CSS_KEY):
+        return
+    st.session_state[TASK_PHOTO_PREVIEW_CSS_KEY] = True
+    st.markdown(TASK_PHOTO_PREVIEW_CSS, unsafe_allow_html=True)
+
+
+_IMAGE_FILE_EXT = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def path_looks_like_task_photo_image(path: str) -> bool:
+    p = str(path or "").strip().lower().split("?")[0]
+    return any(p.endswith(ext) for ext in _IMAGE_FILE_EXT)
+
+
+def photo_row_is_displayable_image(row: dict[str, Any]) -> bool:
+    """Skip PDFs and non-image MIME types; allow image/* or infer from file extension."""
+    if not isinstance(row, dict):
+        return False
+    ct = str(row.get("content_type") or "").strip().lower()
+    if ct:
+        if ct == "application/pdf" or "pdf" in ct:
+            return False
+        if not ct.startswith("image/"):
+            return False
+    path = str(row.get("storage_path") or row.get("file_url") or "").strip()
+    if not path:
+        return False
+    return path_looks_like_task_photo_image(path)
+
+
+def render_signed_task_photo_preview(path_or_url: str, *, alt: str) -> None:
+    """Single image: full-width, max-height capped, object-fit contain (no Streamlit width cap)."""
+    inject_task_photo_preview_css()
+    p = str(path_or_url or "").strip()
+    if not p:
+        return
+    url = sign_task_photo_url(p, expires_in=2400) if not p.startswith("http") else p
+    if not url:
+        return
+    safe_u = html_mod.escape(url, quote=True)
+    safe_a = html_mod.escape(alt)
+    st.markdown(
+        f'<div class="ips-task-photo-preview-wrap">'
+        f'<img class="ips-task-photo-preview-img" src="{safe_u}" alt="{safe_a}" loading="lazy" />'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_task_photo_gallery_for_task_card(
+    *,
+    task_id: str,
+    task_row: dict[str, Any],
+    admin_read: bool,
+) -> None:
+    """
+    Job Database task cards: stacked Before / Progress / After previews from ``task_photos``
+    (plus legacy ``before_photo_url`` / ``after_photo_url`` when no rows).
+    """
+    inject_task_photo_preview_css()
+    rows = list(fetch_task_photos(str(task_id), admin=admin_read) or [])
+    img_rows = [r for r in rows if isinstance(r, dict) and photo_row_is_displayable_image(r)]
+
+    def _sort_created(r: dict[str, Any]) -> str:
+        return str((r or {}).get("created_at") or "")
+
+    before_rows = [
+        r
+        for r in img_rows
+        if str((r or {}).get("photo_type") or "").strip().lower() == tp.PHOTO_TYPES_BEFORE
+    ]
+    prog_rows = [
+        r
+        for r in img_rows
+        if str((r or {}).get("photo_type") or "").strip().lower() == tp.PHOTO_TYPES_PROGRESS
+    ]
+    after_rows = [
+        r
+        for r in img_rows
+        if str((r or {}).get("photo_type") or "").strip().lower() == tp.PHOTO_TYPES_AFTER
+    ]
+    before_rows.sort(key=_sort_created)
+    prog_rows.sort(key=_sort_created)
+    after_rows.sort(key=_sort_created)
+
+    legacy_b = str((task_row or {}).get("before_photo_url") or "").strip()
+    legacy_a = str((task_row or {}).get("after_photo_url") or "").strip()
+
+    sections: list[tuple[str, list[str]]] = []
+    if before_rows:
+        sections.append(
+            (
+                "Before",
+                [
+                    str((r or {}).get("storage_path") or (r or {}).get("file_url") or "").strip()
+                    for r in before_rows
+                ],
+            )
+        )
+    elif legacy_b and path_looks_like_task_photo_image(legacy_b):
+        sections.append(("Before", [legacy_b]))
+
+    if prog_rows:
+        sections.append(
+            (
+                "Progress",
+                [
+                    str((r or {}).get("storage_path") or (r or {}).get("file_url") or "").strip()
+                    for r in prog_rows
+                ],
+            )
+        )
+
+    if after_rows:
+        sections.append(
+            (
+                "After",
+                [
+                    str((r or {}).get("storage_path") or (r or {}).get("file_url") or "").strip()
+                    for r in after_rows
+                ],
+            )
+        )
+    elif legacy_a and path_looks_like_task_photo_image(legacy_a):
+        sections.append(("After", [legacy_a]))
+
+    if not sections:
+        return
+
+    st.markdown('<div class="ips-task-photo-preview-host"></div>', unsafe_allow_html=True)
+    for label, paths in sections:
+        paths_clean = [p for p in paths if str(p).strip()]
+        if not paths_clean:
+            continue
+        st.markdown(
+            f'<div class="ips-task-photo-section-label">{html_mod.escape(label)}</div>',
+            unsafe_allow_html=True,
+        )
+        for pth in paths_clean:
+            render_signed_task_photo_preview(pth, alt=f"{label} photo")
 
 
 def sign_task_photo_url(path: str, *, expires_in: int = 2400) -> str:
@@ -406,18 +597,6 @@ def remove_typed_task_photo(*, task_id: str, photo_type: str, admin_read: bool) 
     )
 
 
-def _thumb(path: str, *, key: str) -> None:
-    p = str(path or "").strip()
-    if not p:
-        return
-    url = sign_task_photo_url(p, expires_in=2400) if not p.startswith("http") else p
-    if url:
-        try:
-            st.image(url, width=120)
-        except Exception:
-            st.caption("Preview unavailable")
-
-
 def render_task_photo_strip(
     *,
     task_id: str,
@@ -426,7 +605,8 @@ def render_task_photo_strip(
     admin_read: bool,
     daily_work_package_id: str | None = None,
 ) -> None:
-    """Mobile-first: before / progress / after with Take photo + Upload + thumb + delete."""
+    """Mobile-first: before / progress / after with Take photo + Upload + full preview + delete."""
+    inject_task_photo_preview_css()
     st.markdown(
         """
         <style>
@@ -482,28 +662,41 @@ def render_task_photo_strip(
             if pt == tp.PHOTO_TYPES_AFTER
             else ""
         )
-        if cur and pt != tp.PHOTO_TYPES_PROGRESS:
-            _thumb(cur, key=f"th_{task_id}_{pt}")
-        if pt == tp.PHOTO_TYPES_PROGRESS:
-            for pr in progress_rows[:6]:
+        typed_img = [
+            r
+            for r in (rows or [])
+            if isinstance(r, dict)
+            and photo_row_is_displayable_image(r)
+            and str((r or {}).get("photo_type") or "").strip().lower() == pt
+        ]
+        typed_img.sort(key=lambda r: str((r or {}).get("created_at") or ""))
+
+        if pt in (tp.PHOTO_TYPES_BEFORE, tp.PHOTO_TYPES_AFTER):
+            if typed_img:
+                for r in typed_img:
+                    pp = str((r or {}).get("storage_path") or (r or {}).get("file_url") or "").strip()
+                    render_signed_task_photo_preview(pp, alt=title)
+            elif cur and path_looks_like_task_photo_image(cur):
+                render_signed_task_photo_preview(cur, alt=title)
+        elif pt == tp.PHOTO_TYPES_PROGRESS:
+            for pr in progress_rows[:24]:
+                if not isinstance(pr, dict) or not photo_row_is_displayable_image(pr):
+                    continue
                 pid = str(pr.get("id") or "")
-                pp = str(pr.get("storage_path") or pr.get("file_url") or "")
-                c1, c2 = st.columns((3, 1))
-                with c1:
-                    _thumb(pp, key=f"thp_{pid}")
-                with c2:
-                    if can_edit and pid and st.button("Del", key=f"delpr_{pid}"):
-                        _, _, dlt = _w(admin_read)
-                        tbl = "task_photos" if _is_task_photo_object_key(pp) else "job_task_photos"
-                        try:
-                            if tbl == "task_photos":
-                                delete_storage_object_admin(pp, bucket=_task_photo_bucket_name())
-                            else:
-                                _purge_storage(pp)
-                            dlt(tbl, {"id": pid})
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(str(exc))
+                pp = str((pr or {}).get("storage_path") or (pr or {}).get("file_url") or "").strip()
+                render_signed_task_photo_preview(pp, alt="Progress")
+                if can_edit and pid and st.button("Delete", key=f"delpr_{task_id}_{pid}"):
+                    _, _, dlt = _w(admin_read)
+                    tbl = "task_photos" if _is_task_photo_object_key(pp) else "job_task_photos"
+                    try:
+                        if tbl == "task_photos":
+                            delete_storage_object_admin(pp, bucket=_task_photo_bucket_name())
+                        else:
+                            _purge_storage(pp)
+                        dlt(tbl, {"id": pid})
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
         if not can_edit:
             return
         st.caption("📷 Take Photo")
@@ -552,7 +745,10 @@ def render_task_photo_strip(
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-        if pt != tp.PHOTO_TYPES_PROGRESS and cur and st.button(
+        can_remove = pt != tp.PHOTO_TYPES_PROGRESS and (
+            typed_img or (cur and path_looks_like_task_photo_image(cur))
+        )
+        if can_remove and st.button(
             f"Remove {title}",
             key=f"rm_{task_id}_{pt}",
             use_container_width=True,
@@ -592,8 +788,8 @@ def render_daily_review_progress_strip(
         with st.container(border=True):
             st.markdown('<span class="ips-tph-card-anchor"></span>', unsafe_allow_html=True)
             st.caption(f"Slot {slot}")
-            if path:
-                _thumb(path, key=f"jdrps_{job_id}_{r_iso}_{slot}")
+            if path and path_looks_like_task_photo_image(path):
+                render_signed_task_photo_preview(path, alt=f"Slot {slot}")
             if not can_edit:
                 continue
             st.caption("Take Photo")

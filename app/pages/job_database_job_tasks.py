@@ -1049,6 +1049,11 @@ def render_job_tasks_tab(
                             st.rerun()
                     else:
                         st.caption("—")
+                _tph.render_task_photo_gallery_for_task_card(
+                    task_id=tid,
+                    task_row=dict(t),
+                    admin_read=admin_read,
+                )
                 with st.expander("Location & notes", expanded=False):
                     st.markdown(
                         f'<p style="margin:0.1rem 0;color:#374151;font-size:0.95rem;"><strong>Location</strong><br/>'
