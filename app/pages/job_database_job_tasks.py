@@ -158,7 +158,7 @@ def _priority_badge_html(priority: Any) -> str:
 
 
 def _inject_task_card_row_css() -> None:
-    key = "ips_jdt_task_card_css_v1"
+    key = "ips_jdt_task_card_css_v2"
     if st.session_state.get(key):
         return
     st.session_state[key] = True
@@ -182,6 +182,7 @@ def _inject_task_card_row_css() -> None:
             background-color: #2563eb !important;
             color: #ffffff !important;
             border: 1px solid #1d4ed8 !important;
+            border-radius: 0.5rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="primary"]:hover {
             background-color: #1d4ed8 !important;
@@ -1267,15 +1268,12 @@ def render_job_tasks_tab(
                     unsafe_allow_html=True,
                 )
                 merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
-                if merged_refs:
-                    if st.button(
-                        "View Reference",
-                        type="secondary",
-                        key=f"jdt_ref_btn_{job_id}_{tid}",
-                    ):
-                        st.session_state[f"jdt_ref_modal_{job_id}"] = tid
-                        st.rerun()
-                cst, cph = st.columns([5, 2], gap="small")
+                has_ref = bool(merged_refs)
+                if has_ref:
+                    cst, cref, camc = st.columns([5, 1, 1], gap="small")
+                else:
+                    cst, camc = st.columns([5, 2], gap="small")
+
                 with cst:
                     if can_edit_tasks:
                         st.selectbox(
@@ -1290,7 +1288,20 @@ def render_job_tasks_tab(
                         st.caption("Saves when changed")
                     else:
                         st.caption(_jdt_status_label(stt))
-                with cph:
+
+                if has_ref:
+                    with cref:
+                        if st.button(
+                            "📄",
+                            type="primary",
+                            key=f"jdt_ref_btn_{job_id}_{tid}",
+                            use_container_width=True,
+                            help="View Reference",
+                        ):
+                            st.session_state[f"jdt_ref_modal_{job_id}"] = tid
+                            st.rerun()
+
+                with camc:
                     if can_edit_tasks:
                         if st.button(
                             "📷",
