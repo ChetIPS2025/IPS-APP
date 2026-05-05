@@ -158,7 +158,7 @@ def _priority_badge_html(priority: Any) -> str:
 
 
 def _inject_task_card_row_css() -> None:
-    key = "ips_jdt_task_card_css_v3"
+    key = "ips_jdt_task_card_css_v4"
     if st.session_state.get(key):
         return
     st.session_state[key] = True
@@ -447,64 +447,95 @@ def _jdt_gview_embed_url(public_file_url: str) -> str:
     return f"https://docs.google.com/gview?url={q}&embedded=true"
 
 
-_JDT_CARD_PREVIEW_BOX_PX = 168
+# Task card reference preview: desktop ~260px, narrow viewports ~220px (CSS below).
+_JDT_CARD_PREVIEW_COMPONENT_H = 264
+
+# Injected per components.html iframe (parent page CSS does not reach the sandbox).
+_JDT_WCP_STYLE = """
+<style>
+.ips-jdt-wcp-root{width:100%;max-width:100%;margin:0;padding:0;box-sizing:border-box;}
+.ips-jdt-wcp-fill{
+  width:100%;margin:0;padding:0;border-radius:10px;border:1px solid #d1d5db;
+  box-sizing:border-box;overflow:hidden;background:#fff;
+  height:260px;display:block;position:relative;
+}
+@media (max-width:900px){
+  .ips-jdt-wcp-fill{height:220px!important;}
+}
+.ips-jdt-wcp-fill iframe.ips-jdt-wcp-iframe{
+  width:100%!important;height:100%!important;border:none!important;display:block;margin:0;padding:0;
+  box-sizing:border-box;
+}
+.ips-jdt-wcp-fill img.ips-jdt-wcp-img{
+  width:100%;height:100%;object-fit:cover;object-position:center;display:block;margin:0;padding:0;
+}
+.ips-jdt-wcp-ph{
+  width:100%;margin:0;padding:0;border-radius:10px;border:1px solid #d1d5db;box-sizing:border-box;
+  height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#6b7280;font-size:0.8125rem;
+}
+@media (max-width:900px){
+  .ips-jdt-wcp-ph{height:220px!important;}
+}
+.ips-jdt-wcp-ph--muted{background:#f3f4f6;}
+.ips-jdt-wcp-ph--empty{background:#e5e7eb;}
+.ips-jdt-wcp-link{
+  width:100%;height:260px;margin:0;padding:0;border-radius:10px;border:1px solid #d1d5db;
+  box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;background:#e5e7eb;color:#374151;text-decoration:none;font-size:0.8125rem;
+}
+@media (max-width:900px){
+  .ips-jdt-wcp-link{height:220px!important;}
+}
+</style>
+"""
+
+
+def _jdt_work_card_preview_shell(inner: str) -> str:
+    return f"{_JDT_WCP_STYLE}<div class=\"ips-jdt-wcp-root\">{inner}</div>"
 
 
 def _jdt_work_card_preview_placeholder_html() -> str:
-    h = _JDT_CARD_PREVIEW_BOX_PX
-    return (
-        f'<div style="width:100%;height:{h}px;border-radius:8px;background:#e5e7eb;'
-        "display:flex;flex-direction:column;align-items:center;justify-content:center;"
-        'color:#6b7280;font-size:0.8125rem;border:1px solid #d1d5db;box-sizing:border-box;">'
+    return _jdt_work_card_preview_shell(
+        '<div class="ips-jdt-wcp-ph ips-jdt-wcp-ph--empty">'
         '<span style="font-size:1.75rem;line-height:1;">📄</span>'
-        '<span style="margin-top:4px;">No reference</span></div>'
+        "<span style=\"margin-top:4px;\">No reference</span></div>"
     )
 
 
 def _jdt_work_card_preview_unavailable_html() -> str:
-    h = _JDT_CARD_PREVIEW_BOX_PX
-    return (
-        f'<div style="width:100%;height:{h}px;border-radius:8px;background:#f3f4f6;'
-        "display:flex;flex-direction:column;align-items:center;justify-content:center;"
-        'color:#6b7280;font-size:0.8125rem;border:1px solid #d1d5db;box-sizing:border-box;">'
-        "<span>Preview unavailable</span></div>"
+    return _jdt_work_card_preview_shell(
+        '<div class="ips-jdt-wcp-ph ips-jdt-wcp-ph--muted"><span>Preview unavailable</span></div>'
     )
 
 
 def _jdt_work_card_preview_html(*, signed_url: str, row: dict[str, Any]) -> str:
-    """Right-rail reference preview: capped height, lazy-loaded media (iframe/img)."""
-    h = _JDT_CARD_PREVIEW_BOX_PX
+    """Right-rail reference preview: Google viewer / image; lazy-loaded; compact margins."""
     fname = html.escape(str((row or {}).get("file_name") or "Reference"))
     if _jdt_row_is_pdf_attachment(row):
         v = _jdt_gview_embed_url(signed_url)
         src = html.escape(v, quote=True)
-        return (
-            f'<div style="width:100%;height:{h}px;border-radius:8px;overflow:hidden;'
-            'border:1px solid #d1d5db;background:#ffffff;box-sizing:border-box;">'
-            f'<iframe src="{src}" title="{fname}" loading="lazy" width="100%" height="100%" '
-            'referrerpolicy="no-referrer-when-downgrade" '
-            f'style="width:100%;height:{h}px;border:none;display:block;box-sizing:border-box;">'
-            "</iframe></div>"
+        inner = (
+            f'<div class="ips-jdt-wcp-fill">'
+            f'<iframe class="ips-jdt-wcp-iframe" src="{src}" title="{fname}" loading="lazy" '
+            'referrerpolicy="no-referrer-when-downgrade"></iframe></div>'
         )
+        return _jdt_work_card_preview_shell(inner)
     if _jdt_row_is_image_attachment(row):
         su = html.escape(signed_url, quote=True)
-        return (
-            f'<div style="width:100%;height:{h}px;border-radius:8px;overflow:hidden;'
-            'border:1px solid #d1d5db;background:#f3f4f6;box-sizing:border-box;">'
-            f'<img src="{su}" alt="{fname}" loading="lazy" decoding="async" width="300" height="{h}" '
-            'style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" />'
+        inner = (
+            '<div class="ips-jdt-wcp-fill" style="background:#f3f4f6;">'
+            f'<img class="ips-jdt-wcp-img" src="{su}" alt="{fname}" loading="lazy" decoding="async" />'
             "</div>"
         )
+        return _jdt_work_card_preview_shell(inner)
     su = html.escape(signed_url, quote=True)
-    return (
-        f'<a href="{su}" target="_blank" rel="noopener noreferrer" '
-        f'style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
-        f'text-align:center;height:{h}px;width:100%;border-radius:8px;background:#e5e7eb;'
-        'color:#374151;text-decoration:none;font-size:0.8125rem;border:1px solid #d1d5db;'
-        'box-sizing:border-box;">'
+    inner = (
+        f'<a class="ips-jdt-wcp-link" href="{su}" target="_blank" rel="noopener noreferrer">'
         '<span style="font-size:1.75rem;line-height:1;">📄</span>'
         "<span style=\"margin-top:4px;\">Open file</span></a>"
     )
+    return _jdt_work_card_preview_shell(inner)
 
 
 def _jdt_pick_primary_modal_reference_row(merged: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -521,16 +552,16 @@ def _jdt_pick_primary_modal_reference_row(merged: list[dict[str, Any]]) -> dict[
     return m0 if isinstance(m0, dict) else None
 
 
-def _jdt_gview_modal_80vh_iframe_html(*, signed_url: str, title: str) -> str:
-    """Full-height Google Docs viewer for reference modal (width 100%, ~80vh)."""
+def _jdt_gview_modal_90vh_iframe_html(*, signed_url: str, title: str) -> str:
+    """Google Docs viewer for expanded reference modal (width 100%, ~90vh)."""
     v = _jdt_gview_embed_url(signed_url)
     src = html.escape(v, quote=True)
     safe_title = html.escape(title)
     return (
-        f'<div style="width:100%;max-width:100%;box-sizing:border-box;">'
+        f'<div style="width:100%;max-width:100%;box-sizing:border-box;margin:0;padding:0;">'
         f'<iframe src="{src}" title="{safe_title}" loading="lazy" '
         'referrerpolicy="no-referrer-when-downgrade" '
-        'style="width:100%;height:80vh;min-height:360px;border:none;'
+        'style="width:100%;height:90vh;min-height:360px;border:none;'
         'border-radius:10px;display:block;box-sizing:border-box;"></iframe>'
         f"</div>"
     )
@@ -677,17 +708,17 @@ def _jdt_reference_preview_dialog(*, job_id: str, admin_read: bool, bucket: str)
 
     if _jdt_row_is_pdf_attachment(row):
         components.html(
-            _jdt_gview_modal_80vh_iframe_html(signed_url=url, title=fname),
-            height=780,
+            _jdt_gview_modal_90vh_iframe_html(signed_url=url, title=fname),
+            height=900,
             scrolling=True,
         )
     elif _jdt_row_is_image_attachment(row):
         safe_u = html.escape(url, quote=True)
         safe_a = html.escape(fname)
         st.markdown(
-            f'<div class="ips-jdt-refimg-wrap" style="max-height:80vh;overflow:auto;">'
+            f'<div class="ips-jdt-refimg-wrap" style="max-height:90vh;overflow:auto;">'
             f'<img src="{safe_u}" alt="{safe_a}" loading="lazy" '
-            'style="width:100%;max-width:100%;max-height:80vh;object-fit:contain;border-radius:10px;'
+            'style="width:100%;max-width:100%;max-height:90vh;object-fit:contain;border-radius:10px;'
             'border:none;display:block;box-sizing:border-box;" />'
             f"</div>",
             unsafe_allow_html=True,
@@ -1439,7 +1470,7 @@ def render_job_tasks_tab(
             )
 
             with st.container(border=True):
-                c_main, c_prev = st.columns([0.67, 0.33], gap="medium")
+                c_main, c_prev = st.columns([0.57, 0.43], gap="medium")
                 with c_main:
                     st.markdown(
                         '<span class="ips-jdt-task-card ips-jdt-split-main"></span>',
@@ -1564,6 +1595,22 @@ def render_job_tasks_tab(
                         '<span class="ips-jdt-split-prev" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
+                    ex_sp, ex_btn = st.columns([5, 1], gap="small")
+                    with ex_sp:
+                        st.empty()
+                    with ex_btn:
+                        if isinstance(pref_row, dict) and signed_pv.strip():
+                            if st.button(
+                                "⛶",
+                                key=f"jdt_ref_expand_{job_id}_{tid}",
+                                help="Expand reference (full screen)",
+                                use_container_width=True,
+                            ):
+                                st.session_state["reference_modal_task_id"] = tid
+                                st.session_state["reference_job_id"] = str(job_id).strip()
+                                st.session_state["show_reference"] = True
+                                st.session_state["reference_url"] = signed_pv.strip()
+                                st.rerun()
                     if isinstance(pref_row, dict) and signed_pv.strip():
                         pv_html = _jdt_work_card_preview_html(signed_url=signed_pv.strip(), row=pref_row)
                     elif isinstance(pref_row, dict):
@@ -1571,9 +1618,8 @@ def render_job_tasks_tab(
                     else:
                         pv_html = _jdt_work_card_preview_placeholder_html()
                     components.html(
-                        "<div style=\"width:100%;max-width:100%;box-sizing:border-box;margin:0;padding:0;\">"
-                        f"{pv_html}</div>",
-                        height=_JDT_CARD_PREVIEW_BOX_PX + 8,
+                        pv_html,
+                        height=_JDT_CARD_PREVIEW_COMPONENT_H,
                         scrolling=False,
                     )
 
