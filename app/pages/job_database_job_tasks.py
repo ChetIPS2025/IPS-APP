@@ -226,14 +226,51 @@ def _inject_jdt_field_tap_css() -> None:
     )
 
 
-def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str, Any]]:
-    fn = fetch_by_match_admin if admin_read else fetch_by_match
+_JDT_JOB_DATA_VER_PREFIX = "jdt_job_data_ver_"
+
+
+def _jdt_job_data_ver_key(job_id: str) -> str:
+    return f"{_JDT_JOB_DATA_VER_PREFIX}{str(job_id).strip()}"
+
+
+def _bump_jdt_job_data_cache(job_id: str) -> None:
+    """Invalidate cached job tasks + reference rows for this job (session-scoped version)."""
+    k = _jdt_job_data_ver_key(job_id)
+    st.session_state[k] = int(st.session_state.get(k, 0)) + 1
+
+
+@st.cache_data(ttl=45)
+def _cached_fetch_job_tasks(job_id: str, admin_token: int, data_ver: int) -> list[dict[str, Any]]:
+    fn = fetch_by_match_admin if admin_token else fetch_by_match
+    try:
+        return list(fn("job_tasks", {"job_id": str(job_id).strip()}, limit=500) or [])
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=45)
+def _cached_fetch_job_reference_attachments(job_id: str, admin_token: int, data_ver: int) -> list[dict[str, Any]]:
+    fn = fetch_by_match_admin if admin_token else fetch_by_match
     try:
         return list(
             fn("job_reference_attachments", {"job_id": str(job_id).strip()}, limit=300) or []
         )
     except Exception:
         return []
+
+
+def _load_job_tasks_cached(job_id: str, *, admin_read: bool) -> list[dict[str, Any]]:
+    ver = int(st.session_state.get(_jdt_job_data_ver_key(job_id), 0))
+    return list(_cached_fetch_job_tasks(str(job_id).strip(), 1 if admin_read else 0, ver))
+
+
+def _load_job_ref_attachments_cached(job_id: str, *, admin_read: bool) -> list[dict[str, Any]]:
+    ver = int(st.session_state.get(_jdt_job_data_ver_key(job_id), 0))
+    return list(_cached_fetch_job_reference_attachments(str(job_id).strip(), 1 if admin_read else 0, ver))
+
+
+def _ref_attach_rows_for_job(job_id: str, *, admin_read: bool) -> list[dict[str, Any]]:
+    return _load_job_ref_attachments_cached(job_id, admin_read=admin_read)
 
 
 _JDT_REF_PDF_CSS_KEY = "ips_jdt_task_ref_pdf_css_v3"
@@ -363,16 +400,6 @@ def _jdt_job_wide_attachments(job_id: str, att_rows: list[dict[str, Any]]) -> li
     return _jdt_dedupe_sort_attachments(raw)
 
 
-def _jdt_first_job_wide_strip_attachment(
-    job_id: str, att_rows: list[dict[str, Any]]
-) -> dict[str, Any] | None:
-    """First job-wide row that is a PDF or image (compact in-card preview)."""
-    for r in _jdt_job_wide_attachments(job_id, att_rows):
-        if _jdt_row_is_pdf_attachment(r) or _jdt_row_is_image_attachment(r):
-            return r
-    return None
-
-
 def _jdt_merged_attachments_for_task(
     job_id: str, task_id: str, att_rows: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -433,33 +460,6 @@ def _clear_jdt_reference_overlay() -> None:
     for k in ("reference_url", "reference_modal_task_id", "reference_job_id"):
         if k in st.session_state:
             del st.session_state[k]
-
-
-def _jdt_task_card_ref_strip_html(*, signed_url: str, title: str, is_pdf: bool) -> str:
-    """Tight PDF (Google viewer) or image strip for the task card right column (180–220px tall)."""
-    safe_title = html.escape(title)
-    h = 200
-    if is_pdf:
-        v = _jdt_gview_embed_url(signed_url)
-        src = html.escape(v, quote=True)
-        return (
-            f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;'
-            f'border-radius:8px;background:#ffffff;">'
-            f'<iframe src="{src}" title="{safe_title}" loading="lazy" '
-            'referrerpolicy="no-referrer-when-downgrade" '
-            f'style="width:100%;height:{h}px;min-height:180px;max-height:220px;border:none;'
-            f'border-radius:8px;display:block;box-sizing:border-box;"></iframe>'
-            f"</div>"
-        )
-    su = html.escape(signed_url, quote=True)
-    return (
-        f'<div style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;'
-        f'border-radius:8px;background:#fafafa;">'
-        f'<img src="{su}" alt="{safe_title}" loading="lazy" '
-        'style="width:100%;height:180px;object-fit:cover;border:none;border-radius:8px;'
-        'display:block;box-sizing:border-box;" />'
-        "</div>"
-    )
 
 
 def _jdt_ref_pdf_iframe_html(*, signed_url: str, title: str, variant: str) -> str:
@@ -671,12 +671,51 @@ def _persist_quick_task_update(
         return False, str(exc)
 
 
-def _make_jdt_status_pending_cb(job_id: str, tid: str) -> Callable[[], None]:
+def _make_jdt_status_save_cb(
+    job_id: str,
+    tid: str,
+    *,
+    admin_read: bool,
+    upd: Callable[..., Any],
+    can_edit_tasks: bool,
+) -> Callable[[], None]:
+    """Persist status on selectbox change (one DB write; cache bump; no extra rerun)."""
+
     def _cb() -> None:
-        st.session_state[f"jdt_st_pending_{job_id}"] = {
-            "tid": str(tid).strip(),
-            "st": st.session_state.get(f"jdt_st_{job_id}_{tid}"),
-        }
+        if not can_edit_tasks:
+            return
+        jid = str(job_id).strip()
+        tid_s = str(tid).strip()
+        ver = int(st.session_state.get(_jdt_job_data_ver_key(jid), 0))
+        rows_now = list(_cached_fetch_job_tasks(jid, 1 if admin_read else 0, ver))
+        rowp = next(
+            (x for x in rows_now if isinstance(x, dict) and str(x.get("id") or "").strip() == tid_s),
+            None,
+        )
+        if not rowp:
+            return
+        nst = _norm_task_status_slug(st.session_state.get(f"jdt_st_{jid}_{tid_s}"))
+        old = _norm_task_status_slug(rowp.get("status"))
+        if nst == old:
+            return
+        ok, err = _persist_quick_task_update(
+            upd=upd,
+            tid=tid_s,
+            task_row=dict(rowp),
+            status=nst,
+            notes=str(rowp.get("notes") or ""),
+            admin_read=admin_read,
+        )
+        if ok:
+            _bump_jdt_job_data_cache(jid)
+            try:
+                st.toast("Status saved")
+            except Exception:
+                pass
+            st.rerun()
+        else:
+            st.session_state[f"jdt_st_{jid}_{tid_s}"] = old
+            st.session_state[f"jdt_st_flash_{jid}_{tid_s}"] = str(err)
 
     return _cb
 
@@ -710,6 +749,7 @@ def _task_camera_capture_dialog(*, job_id: str, tid: str, admin_read: bool) -> N
                     st.session_state[f"jdt_capsig_{job_id}_{tid}"] = sig
                     st.session_state[f"jdt_capver_{job_id}_{tid}"] = ver + 1
                     st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+                    _bump_jdt_job_data_cache(job_id)
                     try:
                         st.toast("Photo saved")
                     except Exception:
@@ -735,6 +775,7 @@ def _task_camera_capture_dialog(*, job_id: str, tid: str, admin_read: bool) -> N
                     admin_read=admin_read,
                 )
                 st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
+                _bump_jdt_job_data_cache(job_id)
                 try:
                     st.toast("Photo saved")
                 except Exception:
@@ -771,20 +812,22 @@ def _task_view_details_dialog(
     else:
         st.caption("—")
 
-    _jra_ui.render_task_details_reference_attachments(
-        job_id=job_id,
-        task_id=tid,
-        att_rows=list(att_rows or []),
-        bucket=bucket,
-        can_manage=can_manage_attachments,
-        dlt=dlt,
-    )
+    with st.spinner("Loading..."):
+        _jra_ui.render_task_details_reference_attachments(
+            job_id=job_id,
+            task_id=tid,
+            att_rows=list(att_rows or []),
+            bucket=bucket,
+            can_manage=can_manage_attachments,
+            dlt=dlt,
+        )
 
     st.markdown("**Photo history**")
-    try:
-        ph_rows = list(_tph.fetch_task_photos(tid, admin=admin_read) or [])
-    except Exception:
-        ph_rows = []
+    with st.spinner("Loading..."):
+        try:
+            ph_rows = list(_tph.fetch_task_photos(tid, admin=admin_read) or [])
+        except Exception:
+            ph_rows = []
     if not ph_rows:
         st.caption("No photos yet.")
     else:
@@ -806,26 +849,29 @@ def _task_view_details_dialog(
                     st.caption("—")
 
     with st.expander("Supervisor & assignment", expanded=False):
-        supw = st.text_input(
-            "Assigned supervisor",
-            value=str(task_row.get("assigned_supervisor_name") or ""),
-            key=f"jdt_vd_sup_{job_id}_{tid}",
-            disabled=not can_edit,
-        )
-        if can_edit and st.button("Save supervisor", key=f"jdt_vd_supsv_{job_id}_{tid}"):
-            try:
-                upd(
-                    "job_tasks",
-                    {
-                        "assigned_supervisor_name": " ".join(str(supw or "").split())[:200],
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                    {"id": tid},
+        if can_edit:
+            with st.form(f"jdt_vd_sup_f_{job_id}_{tid}"):
+                supw = st.text_input(
+                    "Assigned supervisor",
+                    value=str(task_row.get("assigned_supervisor_name") or ""),
+                    key=f"jdt_vd_sup_{job_id}_{tid}",
                 )
-                st.success("Saved.")
-                st.rerun()
-            except Exception as exc:
-                st.error(str(exc))
+                if st.form_submit_button("Save supervisor"):
+                    try:
+                        upd(
+                            "job_tasks",
+                            {
+                                "assigned_supervisor_name": " ".join(str(supw or "").split())[:200],
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            },
+                            {"id": tid},
+                        )
+                        _bump_jdt_job_data_cache(job_id)
+                        st.success("Saved.")
+                    except Exception as exc:
+                        st.error(str(exc))
+        else:
+            st.caption(str(task_row.get("assigned_supervisor_name") or "—"))
 
     if st.button("Close", use_container_width=True, key=f"jdt_vd_close_{job_id}_{tid}"):
         st.session_state.pop(f"jdt_vd_{job_id}", None)
@@ -856,6 +902,7 @@ def _task_delete_confirm_dialog(
             st.session_state.pop(f"jdt_cam_dlg_{job_id}", None)
             st.session_state.pop(f"jdt_vd_{job_id}", None)
             st.session_state[f"jdt_task_del_ok_{job_id}"] = True
+            _bump_jdt_job_data_cache(job_id)
             st.rerun()
 
 
@@ -1002,13 +1049,7 @@ def _render_add_task_autofill_from_attachment(*, job_id: str, admin_read: bool) 
         except Exception:
             st.success("Applied — review **Add task** below.")
     bucket = _jra_svc.reference_bucket()
-    fn = fetch_by_match_admin if admin_read else fetch_by_match
-    try:
-        att_rows = list(
-            fn("job_reference_attachments", {"job_id": str(job_id).strip()}, limit=200) or []
-        )
-    except Exception:
-        att_rows = []
+    att_rows = _load_job_ref_attachments_cached(job_id, admin_read=admin_read)[:200]
     candidates = [
         r
         for r in att_rows
@@ -1145,11 +1186,7 @@ def _render_add_task_autofill_from_attachment(*, job_id: str, admin_read: bool) 
 
 
 def _fetch_tasks(job_id: str, *, admin: bool) -> list[dict[str, Any]]:
-    fn = fetch_by_match_admin if admin else fetch_by_match
-    try:
-        return list(fn("job_tasks", {"job_id": str(job_id)}, limit=500) or [])
-    except Exception:
-        return []
+    return _load_job_tasks_cached(job_id, admin_read=admin)
 
 
 def _fetch_plans_for_job(job_id: str, *, admin: bool) -> list[dict[str, Any]]:
@@ -1197,11 +1234,6 @@ def render_job_tasks_tab(
             st.toast("Task updated.")
         except Exception:
             st.success("Task updated.")
-    if st.session_state.pop(f"jdt_st_saved_{job_id}", None):
-        try:
-            st.toast("Status saved")
-        except Exception:
-            pass
     st.caption(
         "Jobs are containers — break work into **tasks**. "
         "Supervisors run status, photos, and end-of-day review in **Work & Plan (Supervisor)** (no separate report page)."
@@ -1291,43 +1323,8 @@ def render_job_tasks_tab(
         st.markdown("##### Tasks")
         st.caption(
             "Change **status** to save instantly. **📷** opens the camera (progress photos). "
-            "**View details** for action, attachments, and full photo history."
+            "**View details** for attachments and full photo history (loaded when you open it)."
         )
-
-        pend = st.session_state.pop(f"jdt_st_pending_{job_id}", None)
-        if isinstance(pend, dict) and can_edit_tasks:
-            ptid = str(pend.get("tid") or "").strip()
-            nst = _norm_task_status_slug(pend.get("st"))
-            if ptid and nst:
-                rowp = _fetch_job_task_by_id(ptid, admin_read=admin_read)
-                if rowp:
-                    old = _norm_task_status_slug(rowp.get("status"))
-                    if nst != old:
-                        ok, err = _persist_quick_task_update(
-                            upd=upd,
-                            tid=ptid,
-                            task_row=dict(rowp),
-                            status=nst,
-                            notes=str(rowp.get("notes") or ""),
-                            admin_read=admin_read,
-                        )
-                        if ok:
-                            st.session_state[f"jdt_st_saved_{job_id}"] = True
-                            st.rerun()
-                        st.session_state[f"jdt_st_{job_id}_{ptid}"] = old
-                        st.session_state[f"jdt_st_flash_{job_id}_{ptid}"] = str(err)
-                        st.rerun()
-
-        strip_row = _jdt_first_job_wide_strip_attachment(job_id, att_rows_all)
-        strip_signed = ""
-        strip_fn = ""
-        strip_is_pdf = False
-        strip_is_img = False
-        if strip_row:
-            strip_signed, strip_fn = _jdt_sign_attachment_row(strip_row, bucket=ref_bucket)
-            strip_is_pdf = _jdt_row_is_pdf_attachment(strip_row)
-            strip_is_img = _jdt_row_is_image_attachment(strip_row)
-        show_strip = bool(strip_signed and (strip_is_pdf or strip_is_img))
 
         for t in visible:
             tid = str(t.get("id") or "").strip()
@@ -1362,49 +1359,16 @@ def render_job_tasks_tab(
                     unsafe_allow_html=True,
                 )
                 merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
-                has_ref_btn = bool(merged_refs) and not show_strip
+                has_ref_btn = bool(merged_refs)
+                _st_save = _make_jdt_status_save_cb(
+                    job_id,
+                    tid,
+                    admin_read=admin_read,
+                    upd=upd,
+                    can_edit_tasks=can_edit_tasks,
+                )
 
-                if show_strip:
-                    row_l, row_r = st.columns([5, 2], gap="small")
-                    with row_l:
-                        inner_s, inner_c = st.columns([5, 1], gap="small")
-                        with inner_s:
-                            if can_edit_tasks:
-                                st.selectbox(
-                                    "Status",
-                                    opts,
-                                    index=ix,
-                                    format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
-                                    key=f"jdt_st_{job_id}_{tid}",
-                                    label_visibility="collapsed",
-                                    on_change=_make_jdt_status_pending_cb(job_id, tid),
-                                )
-                                st.caption("Saves when changed")
-                            else:
-                                st.caption(_jdt_status_label(stt))
-                        with inner_c:
-                            if can_edit_tasks:
-                                if st.button(
-                                    "📷",
-                                    type="primary",
-                                    key=f"jdt_cam_btn_{job_id}_{tid}",
-                                    use_container_width=True,
-                                ):
-                                    st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
-                                    st.rerun()
-                            else:
-                                st.caption("—")
-                    with row_r:
-                        components.html(
-                            _jdt_task_card_ref_strip_html(
-                                signed_url=strip_signed,
-                                title=strip_fn or "Reference",
-                                is_pdf=strip_is_pdf,
-                            ),
-                            height=228,
-                            scrolling=False,
-                        )
-                elif has_ref_btn:
+                if has_ref_btn:
                     cst, cref, camc = st.columns([5, 1, 1], gap="small")
                     with cst:
                         if can_edit_tasks:
@@ -1415,7 +1379,7 @@ def render_job_tasks_tab(
                                 format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
                                 key=f"jdt_st_{job_id}_{tid}",
                                 label_visibility="collapsed",
-                                on_change=_make_jdt_status_pending_cb(job_id, tid),
+                                on_change=_st_save,
                             )
                             st.caption("Saves when changed")
                         else:
@@ -1461,7 +1425,7 @@ def render_job_tasks_tab(
                                 format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
                                 key=f"jdt_st_{job_id}_{tid}",
                                 label_visibility="collapsed",
-                                on_change=_make_jdt_status_pending_cb(job_id, tid),
+                                on_change=_st_save,
                             )
                             st.caption("Saves when changed")
                         else:
@@ -1478,11 +1442,6 @@ def render_job_tasks_tab(
                                 st.rerun()
                         else:
                             st.caption("—")
-                _tph.render_task_photo_gallery_for_task_card(
-                    task_id=tid,
-                    task_row=dict(t),
-                    admin_read=admin_read,
-                )
                 with st.expander("Location & notes", expanded=False):
                     st.markdown(
                         f'<p style="margin:0.1rem 0;color:#374151;font-size:0.95rem;"><strong>Location</strong><br/>'
@@ -1494,34 +1453,38 @@ def render_job_tasks_tab(
                         f"{html.escape(iss or '—')}</p>",
                         unsafe_allow_html=True,
                     )
-                    nx = st.text_area(
-                        "Notes",
-                        value=str(t.get("notes") or ""),
-                        height=72,
-                        key=f"jdt_exp_notes_{job_id}_{tid}",
-                        disabled=not can_edit_tasks,
-                    )
-                    if can_edit_tasks and st.button(
-                        "Save notes",
-                        type="secondary",
-                        key=f"jdt_exp_nsv_{job_id}_{tid}",
-                    ):
-                        try:
-                            upd(
-                                "job_tasks",
-                                {
-                                    "notes": str(nx or "").strip()[:4000],
-                                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                                },
-                                {"id": tid},
+                    if can_edit_tasks:
+                        with st.form(f"jdt_notes_f_{job_id}_{tid}"):
+                            nx = st.text_area(
+                                "Notes",
+                                value=str(t.get("notes") or ""),
+                                height=72,
+                                key=f"jdt_exp_notes_{job_id}_{tid}",
                             )
-                            try:
-                                st.toast("Notes saved")
-                            except Exception:
-                                pass
-                            st.rerun()
-                        except Exception as exc:
-                            st.error(str(exc))
+                            if st.form_submit_button("Save notes"):
+                                try:
+                                    upd(
+                                        "job_tasks",
+                                        {
+                                            "notes": str(nx or "").strip()[:4000],
+                                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                                        },
+                                        {"id": tid},
+                                    )
+                                    _bump_jdt_job_data_cache(job_id)
+                                    try:
+                                        st.toast("Notes saved")
+                                    except Exception:
+                                        pass
+                                    st.rerun()
+                                except Exception as exc:
+                                    st.error(str(exc))
+                    else:
+                        st.markdown(
+                            f'<p style="margin:0.35rem 0;color:#374151;font-size:0.92rem;"><strong>Notes</strong><br/>'
+                            f"{html.escape(str(t.get('notes') or '—'))}</p>",
+                            unsafe_allow_html=True,
+                        )
                 bot_l, bot_r = st.columns(2, gap="small")
                 with bot_l:
                     if st.button(
@@ -1594,53 +1557,53 @@ def render_job_tasks_tab(
         st.markdown("##### Add task")
         _render_add_task_autofill_from_attachment(job_id=job_id, admin_read=admin_read)
         st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
-        tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
-        a1, a2 = st.columns(2, gap="small")
-        with a1:
-            pr = st.selectbox(
-                "Priority",
-                ("low", "normal", "high", "critical"),
-                index=1,
-                format_func=lambda x: x.title(),
-                key=f"jdt_add_pr_{job_id}",
-                on_change=lambda: st.session_state.update({f"jdt_add_pr_touched_{job_id}": True}),
-            )
-        with a2:
-            pl = st.date_input(
-                "Planned date",
-                value=date.today(),
-                key=f"jdt_add_pl_{job_id}",
-                on_change=lambda: st.session_state.update({f"jdt_add_pl_touched_{job_id}": True}),
-            )
-        a3, a4 = st.columns(2, gap="small")
-        with a3:
-            loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
-        with a4:
-            iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
-        act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
-        if st.button("Add task", type="primary", use_container_width=True, key=f"jdt_add_btn_{job_id}"):
-            if not str(iss or "").strip():
-                st.error("Enter an issue description.")
-            else:
-                try:
-                    ins(
-                        "job_tasks",
-                        {
-                            "job_id": str(job_id),
-                            "task_number": str(tn or "").strip()[:200],
-                            "priority": pr,
-                            "location": str(loc or "").strip()[:500],
-                            "issue": str(iss or "").strip()[:4000],
-                            "action_required": str(act or "").strip()[:4000],
-                            "status": "not_started",
-                            "planned_date": str(pl) if pl is not None else None,
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        },
-                    )
-                    st.success("Task added.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(str(exc))
+        with st.form(f"jdt_add_task_f_{job_id}", clear_on_submit=True):
+            tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
+            a1, a2 = st.columns(2, gap="small")
+            with a1:
+                pr = st.selectbox(
+                    "Priority",
+                    ("low", "normal", "high", "critical"),
+                    index=1,
+                    format_func=lambda x: x.title(),
+                    key=f"jdt_add_pr_{job_id}",
+                )
+            with a2:
+                pl = st.date_input(
+                    "Planned date",
+                    value=date.today(),
+                    key=f"jdt_add_pl_{job_id}",
+                )
+            a3, a4 = st.columns(2, gap="small")
+            with a3:
+                loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
+            with a4:
+                iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
+            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
+            submitted = st.form_submit_button("Add task", type="primary", use_container_width=True)
+            if submitted:
+                if not str(iss or "").strip():
+                    st.error("Enter an issue description.")
+                else:
+                    try:
+                        ins(
+                            "job_tasks",
+                            {
+                                "job_id": str(job_id),
+                                "task_number": str(tn or "").strip()[:200],
+                                "priority": pr,
+                                "location": str(loc or "").strip()[:500],
+                                "issue": str(iss or "").strip()[:4000],
+                                "action_required": str(act or "").strip()[:4000],
+                                "status": "not_started",
+                                "planned_date": str(pl) if pl is not None else None,
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            },
+                        )
+                        _bump_jdt_job_data_cache(job_id)
+                        st.success("Task added.")
+                    except Exception as exc:
+                        st.error(str(exc))
 
 
 def render_job_daily_plan_tab(

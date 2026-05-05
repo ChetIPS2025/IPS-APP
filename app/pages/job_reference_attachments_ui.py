@@ -54,6 +54,12 @@ _CSS_KEY = "ips_job_reference_attachments_css_v3"
 IPS_JRA_FS_SESSION_KEY = "ips_jra_fullscreen_preview"
 
 
+def bump_job_tasks_tab_data_cache(job_id: str) -> None:
+    """Keep Job Database Tasks tab ``st.cache_data`` reads in sync after attachment changes."""
+    k = f"jdt_job_data_ver_{str(job_id).strip()}"
+    st.session_state[k] = int(st.session_state.get(k, 0)) + 1
+
+
 def _inject_ref_attachment_css() -> None:
     if st.session_state.get(_CSS_KEY):
         return
@@ -425,6 +431,7 @@ def _render_attachment_card(
                                 pass
                         dlt("job_reference_attachments", {"id": rid})
                         st.session_state.pop(IPS_JRA_FS_SESSION_KEY, None)
+                        bump_job_tasks_tab_data_cache(job_id)
                         st.success("Deleted.")
                         st.rerun()
                     except Exception as exc:
@@ -532,6 +539,7 @@ def _render_task_details_attachment_row(
                                 pass
                         dlt("job_reference_attachments", {"id": rid})
                         st.session_state.pop(IPS_JRA_FS_SESSION_KEY, None)
+                        bump_job_tasks_tab_data_cache(job_id)
                         st.success("Deleted.")
                         st.rerun()
                     except Exception as exc:
@@ -712,6 +720,7 @@ def render_job_reference_attachments_panel(
                 for e in errs:
                     st.error(e)
                 if n_ok:
+                    bump_job_tasks_tab_data_cache(job_id)
                     st.rerun()
 
     if not rows:
