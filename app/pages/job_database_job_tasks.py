@@ -158,13 +158,34 @@ def _priority_badge_html(priority: Any) -> str:
 
 
 def _inject_task_card_row_css() -> None:
-    key = "ips_jdt_task_card_css_v2"
+    key = "ips_jdt_task_card_css_v3"
     if st.session_state.get(key):
         return
     st.session_state[key] = True
     st.markdown(
         """
         <style>
+        /* Compact work instruction card */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) {
+            background-color: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
+            margin-bottom: 12px !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) > div {
+            padding: 12px 16px !important;
+        }
+        /* Main | preview row: desktop = info left, preview right; narrow = preview on top */
+        div[data-testid="stHorizontalBlock"]:has(.ips-jdt-split-main):has(.ips-jdt-split-prev) {
+            align-items: center !important;
+            gap: 12px !important;
+        }
+        @media (max-width: 900px) {
+            div[data-testid="stHorizontalBlock"]:has(.ips-jdt-split-main):has(.ips-jdt-split-prev) {
+                flex-direction: column-reverse !important;
+            }
+        }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind] {
             min-height: 2.85rem !important;
             font-size: 1.02rem !important;
@@ -424,6 +445,66 @@ def _jdt_merged_attachments_for_task(
 def _jdt_gview_embed_url(public_file_url: str) -> str:
     q = quote(str(public_file_url).strip(), safe="")
     return f"https://docs.google.com/gview?url={q}&embedded=true"
+
+
+_JDT_CARD_PREVIEW_BOX_PX = 168
+
+
+def _jdt_work_card_preview_placeholder_html() -> str:
+    h = _JDT_CARD_PREVIEW_BOX_PX
+    return (
+        f'<div style="width:100%;height:{h}px;border-radius:8px;background:#e5e7eb;'
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;"
+        'color:#6b7280;font-size:0.8125rem;border:1px solid #d1d5db;box-sizing:border-box;">'
+        '<span style="font-size:1.75rem;line-height:1;">📄</span>'
+        '<span style="margin-top:4px;">No reference</span></div>'
+    )
+
+
+def _jdt_work_card_preview_unavailable_html() -> str:
+    h = _JDT_CARD_PREVIEW_BOX_PX
+    return (
+        f'<div style="width:100%;height:{h}px;border-radius:8px;background:#f3f4f6;'
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;"
+        'color:#6b7280;font-size:0.8125rem;border:1px solid #d1d5db;box-sizing:border-box;">'
+        "<span>Preview unavailable</span></div>"
+    )
+
+
+def _jdt_work_card_preview_html(*, signed_url: str, row: dict[str, Any]) -> str:
+    """Right-rail reference preview: capped height, lazy-loaded media (iframe/img)."""
+    h = _JDT_CARD_PREVIEW_BOX_PX
+    fname = html.escape(str((row or {}).get("file_name") or "Reference"))
+    if _jdt_row_is_pdf_attachment(row):
+        v = _jdt_gview_embed_url(signed_url)
+        src = html.escape(v, quote=True)
+        return (
+            f'<div style="width:100%;height:{h}px;border-radius:8px;overflow:hidden;'
+            'border:1px solid #d1d5db;background:#ffffff;box-sizing:border-box;">'
+            f'<iframe src="{src}" title="{fname}" loading="lazy" width="100%" height="100%" '
+            'referrerpolicy="no-referrer-when-downgrade" '
+            f'style="width:100%;height:{h}px;border:none;display:block;box-sizing:border-box;">'
+            "</iframe></div>"
+        )
+    if _jdt_row_is_image_attachment(row):
+        su = html.escape(signed_url, quote=True)
+        return (
+            f'<div style="width:100%;height:{h}px;border-radius:8px;overflow:hidden;'
+            'border:1px solid #d1d5db;background:#f3f4f6;box-sizing:border-box;">'
+            f'<img src="{su}" alt="{fname}" loading="lazy" decoding="async" width="300" height="{h}" '
+            'style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" />'
+            "</div>"
+        )
+    su = html.escape(signed_url, quote=True)
+    return (
+        f'<a href="{su}" target="_blank" rel="noopener noreferrer" '
+        f'style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
+        f'text-align:center;height:{h}px;width:100%;border-radius:8px;background:#e5e7eb;'
+        'color:#374151;text-decoration:none;font-size:0.8125rem;border:1px solid #d1d5db;'
+        'box-sizing:border-box;">'
+        '<span style="font-size:1.75rem;line-height:1;">📄</span>'
+        "<span style=\"margin-top:4px;\">Open file</span></a>"
+    )
 
 
 def _jdt_pick_primary_modal_reference_row(merged: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1323,7 +1404,7 @@ def render_job_tasks_tab(
         st.markdown("##### Tasks")
         st.caption(
             "Change **status** to save instantly. **📷** opens the camera (progress photos). "
-            "**View details** for attachments and full photo history (loaded when you open it)."
+            "Each card shows a **reference preview** on the right; **View details** for full files and photo history."
         )
 
         for t in visible:
@@ -1342,168 +1423,159 @@ def render_job_tasks_tab(
             cur_sl = stt if stt in opts else "not_started"
             ix = opts.index(cur_sl)
 
-            with st.container(border=True):
-                st.markdown('<span class="ips-jdt-task-card"></span>', unsafe_allow_html=True)
-                fl = st.session_state.pop(f"jdt_st_flash_{job_id}_{tid}", None)
-                if fl:
-                    st.warning(str(fl))
-                st.markdown(
-                    f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin:0 0 0.2rem 0;">'
-                    f'<span style="font-size:1.28rem;font-weight:800;color:#111827;">{tno}</span>'
-                    f"<span>{pr_badge}</span></div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<p style="margin:0 0 0.55rem;font-size:1.02rem;font-weight:600;color:#111827;line-height:1.35;">'
-                    f"{html.escape(snip or '—')}</p>",
-                    unsafe_allow_html=True,
-                )
-                merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
-                has_ref_btn = bool(merged_refs)
-                _st_save = _make_jdt_status_save_cb(
-                    job_id,
-                    tid,
-                    admin_read=admin_read,
-                    upd=upd,
-                    can_edit_tasks=can_edit_tasks,
-                )
+            merged_refs = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
+            pref_row = _jdt_pick_primary_modal_reference_row(merged_refs)
+            signed_pv, _pv_fn = (
+                _jdt_sign_attachment_row(pref_row, bucket=ref_bucket)
+                if isinstance(pref_row, dict)
+                else ("", "")
+            )
+            _st_save = _make_jdt_status_save_cb(
+                job_id,
+                tid,
+                admin_read=admin_read,
+                upd=upd,
+                can_edit_tasks=can_edit_tasks,
+            )
 
-                if has_ref_btn:
-                    cst, cref, camc = st.columns([5, 1, 1], gap="small")
-                    with cst:
-                        if can_edit_tasks:
-                            st.selectbox(
-                                "Status",
-                                opts,
-                                index=ix,
-                                format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
-                                key=f"jdt_st_{job_id}_{tid}",
-                                label_visibility="collapsed",
-                                on_change=_st_save,
-                            )
-                            st.caption("Saves when changed")
-                        else:
-                            st.caption(_jdt_status_label(stt))
-                    with cref:
-                        if st.button(
-                            "📄",
-                            type="primary",
-                            key=f"jdt_ref_btn_{job_id}_{tid}",
-                            use_container_width=True,
-                            help="View Reference",
-                        ):
-                            merged_btn = _jdt_merged_attachments_for_task(job_id, tid, att_rows_all)
-                            row0 = _jdt_pick_primary_modal_reference_row(merged_btn)
-                            if row0:
-                                su0, _ = _jdt_sign_attachment_row(row0, bucket=ref_bucket)
-                                if su0:
-                                    st.session_state["reference_modal_task_id"] = tid
-                                    st.session_state["reference_job_id"] = str(job_id).strip()
-                                    st.session_state["show_reference"] = True
-                                    st.session_state["reference_url"] = su0
-                                    st.rerun()
-                    with camc:
-                        if can_edit_tasks:
-                            if st.button(
-                                "📷",
-                                type="primary",
-                                key=f"jdt_cam_btn_{job_id}_{tid}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
-                                st.rerun()
-                        else:
-                            st.caption("—")
-                else:
-                    cst, camc = st.columns([5, 2], gap="small")
-                    with cst:
-                        if can_edit_tasks:
-                            st.selectbox(
-                                "Status",
-                                opts,
-                                index=ix,
-                                format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
-                                key=f"jdt_st_{job_id}_{tid}",
-                                label_visibility="collapsed",
-                                on_change=_st_save,
-                            )
-                            st.caption("Saves when changed")
-                        else:
-                            st.caption(_jdt_status_label(stt))
-                    with camc:
-                        if can_edit_tasks:
-                            if st.button(
-                                "📷",
-                                type="primary",
-                                key=f"jdt_cam_btn_{job_id}_{tid}",
-                                use_container_width=True,
-                            ):
-                                st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
-                                st.rerun()
-                        else:
-                            st.caption("—")
-                with st.expander("Location & notes", expanded=False):
+            with st.container(border=True):
+                c_main, c_prev = st.columns([0.67, 0.33], gap="medium")
+                with c_main:
                     st.markdown(
-                        f'<p style="margin:0.1rem 0;color:#374151;font-size:0.95rem;"><strong>Location</strong><br/>'
-                        f"{html.escape(loc)}</p>",
+                        '<span class="ips-jdt-task-card ips-jdt-split-main"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    fl = st.session_state.pop(f"jdt_st_flash_{job_id}_{tid}", None)
+                    if fl:
+                        st.warning(str(fl))
+                    st.markdown(
+                        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin:0 0 0.15rem 0;">'
+                        f'<span style="font-size:1.28rem;font-weight:800;color:#111827;">{tno}</span>'
+                        f"<span>{pr_badge}</span></div>",
                         unsafe_allow_html=True,
                     )
                     st.markdown(
-                        f'<p style="margin:0.35rem 0;color:#111827;font-size:0.95rem;"><strong>Issue</strong><br/>'
-                        f"{html.escape(iss or '—')}</p>",
+                        '<p style="margin:0 0 0.35rem;font-size:1.02rem;font-weight:600;color:#111827;line-height:1.35;">'
+                        f"{html.escape(snip or '—')}</p>",
                         unsafe_allow_html=True,
                     )
-                    if can_edit_tasks:
-                        with st.form(f"jdt_notes_f_{job_id}_{tid}"):
-                            nx = st.text_area(
-                                "Notes",
-                                value=str(t.get("notes") or ""),
-                                height=72,
-                                key=f"jdt_exp_notes_{job_id}_{tid}",
-                            )
-                            if st.form_submit_button("Save notes"):
-                                try:
-                                    upd(
-                                        "job_tasks",
-                                        {
-                                            "notes": str(nx or "").strip()[:4000],
-                                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                                        },
-                                        {"id": tid},
-                                    )
-                                    _bump_jdt_job_data_cache(job_id)
-                                    try:
-                                        st.toast("Notes saved")
-                                    except Exception:
-                                        pass
-                                    st.rerun()
-                                except Exception as exc:
-                                    st.error(str(exc))
-                    else:
+                    loc_show = str(loc).strip()
+                    if loc_show and loc_show != "—":
                         st.markdown(
-                            f'<p style="margin:0.35rem 0;color:#374151;font-size:0.92rem;"><strong>Notes</strong><br/>'
-                            f"{html.escape(str(t.get('notes') or '—'))}</p>",
+                            '<p style="margin:0 0 0.45rem;font-size:0.88rem;color:#6b7280;line-height:1.35;">'
+                            f"<strong>Location</strong> {html.escape(loc_show)}</p>",
                             unsafe_allow_html=True,
                         )
-                bot_l, bot_r = st.columns(2, gap="small")
-                with bot_l:
-                    if st.button(
-                        "View details",
-                        type="primary",
-                        key=f"jdt_vd_btn_{job_id}_{tid}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[f"jdt_vd_{job_id}"] = tid
-                        st.rerun()
-                with bot_r:
-                    if can_edit_tasks and st.button(
-                        "Delete",
-                        type="secondary",
-                        key=f"jdt_card_del_{job_id}_{tid}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[f"jdt_del_dialog_{job_id}"] = tid
-                        st.rerun()
+
+                    cst, camc = st.columns([4.5, 1], gap="small")
+                    with cst:
+                        if can_edit_tasks:
+                            st.selectbox(
+                                "Status",
+                                opts,
+                                index=ix,
+                                format_func=lambda s, _lb=_jdt_status_label: _lb(str(s)),
+                                key=f"jdt_st_{job_id}_{tid}",
+                                label_visibility="collapsed",
+                                on_change=_st_save,
+                            )
+                            st.caption("Saves when changed")
+                        else:
+                            st.caption(_jdt_status_label(stt))
+                    with camc:
+                        if can_edit_tasks:
+                            if st.button(
+                                "📷",
+                                type="primary",
+                                key=f"jdt_cam_btn_{job_id}_{tid}",
+                                use_container_width=True,
+                            ):
+                                st.session_state[f"jdt_cam_dlg_{job_id}"] = tid
+                                st.rerun()
+                        else:
+                            st.caption("—")
+
+                    bot_l, bot_r = st.columns(2, gap="small")
+                    with bot_l:
+                        if st.button(
+                            "View details",
+                            type="primary",
+                            key=f"jdt_vd_btn_{job_id}_{tid}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[f"jdt_vd_{job_id}"] = tid
+                            st.rerun()
+                    with bot_r:
+                        if can_edit_tasks and st.button(
+                            "Delete",
+                            type="secondary",
+                            key=f"jdt_card_del_{job_id}_{tid}",
+                            use_container_width=True,
+                        ):
+                            st.session_state[f"jdt_del_dialog_{job_id}"] = tid
+                            st.rerun()
+
+                    with st.expander("Location & notes", expanded=False):
+                        st.markdown(
+                            '<p style="margin:0.1rem 0;color:#374151;font-size:0.95rem;"><strong>Location</strong><br/>'
+                            f"{html.escape(loc)}</p>",
+                            unsafe_allow_html=True,
+                        )
+                        st.markdown(
+                            '<p style="margin:0.35rem 0;color:#111827;font-size:0.95rem;"><strong>Issue</strong><br/>'
+                            f"{html.escape(iss or '—')}</p>",
+                            unsafe_allow_html=True,
+                        )
+                        if can_edit_tasks:
+                            with st.form(f"jdt_notes_f_{job_id}_{tid}"):
+                                nx = st.text_area(
+                                    "Notes",
+                                    value=str(t.get("notes") or ""),
+                                    height=72,
+                                    key=f"jdt_exp_notes_{job_id}_{tid}",
+                                )
+                                if st.form_submit_button("Save notes"):
+                                    try:
+                                        upd(
+                                            "job_tasks",
+                                            {
+                                                "notes": str(nx or "").strip()[:4000],
+                                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                                            },
+                                            {"id": tid},
+                                        )
+                                        _bump_jdt_job_data_cache(job_id)
+                                        try:
+                                            st.toast("Notes saved")
+                                        except Exception:
+                                            pass
+                                        st.rerun()
+                                    except Exception as exc:
+                                        st.error(str(exc))
+                        else:
+                            st.markdown(
+                                '<p style="margin:0.35rem 0;color:#374151;font-size:0.92rem;"><strong>Notes</strong><br/>'
+                                f"{html.escape(str(t.get('notes') or '—'))}</p>",
+                                unsafe_allow_html=True,
+                            )
+
+                with c_prev:
+                    st.markdown(
+                        '<span class="ips-jdt-split-prev" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    if isinstance(pref_row, dict) and signed_pv.strip():
+                        pv_html = _jdt_work_card_preview_html(signed_url=signed_pv.strip(), row=pref_row)
+                    elif isinstance(pref_row, dict):
+                        pv_html = _jdt_work_card_preview_unavailable_html()
+                    else:
+                        pv_html = _jdt_work_card_preview_placeholder_html()
+                    components.html(
+                        "<div style=\"width:100%;max-width:100%;box-sizing:border-box;margin:0;padding:0;\">"
+                        f"{pv_html}</div>",
+                        height=_JDT_CARD_PREVIEW_BOX_PX + 8,
+                        scrolling=False,
+                    )
 
         if st.session_state.get("show_reference"):
             _jdt_reference_preview_dialog(
