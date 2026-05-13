@@ -21,38 +21,83 @@ def scope_text_area_keys(estimate_id: str | None) -> tuple[str, str]:
     return (f"est_scope_sow_{sig}", f"est_scope_cr_{sig}")
 
 
-def _scope_last_saved_keys(estimate_id: str | None) -> tuple[str, str]:
+def _scope_saved_baseline_keys(estimate_id: str | None) -> tuple[str, str]:
+    """DB-aligned scope snapshot (not widget keys); safe to update after widgets are rendered."""
+    sig = _scope_sig(estimate_id)
+    return (f"scope_saved_baseline_sow_{sig}", f"scope_saved_baseline_cr_{sig}")
+
+
+def _scope_legacy_saved_keys(estimate_id: str | None) -> tuple[str, str]:
+    """Pre-baseline-prefix keys; read-only fallback for dirty detection during session migration."""
     sig = _scope_sig(estimate_id)
     return (f"est_scope_saved_sow_{sig}", f"est_scope_saved_cr_{sig}")
 
 
+def _clear_scope_session_keys_for_sig(sig: str) -> None:
+    """Drop widget + baseline state for a previous estimate id so keys do not leak across loads."""
+    for k in (
+        f"est_scope_sow_{sig}",
+        f"est_scope_cr_{sig}",
+        f"scope_saved_baseline_sow_{sig}",
+        f"scope_saved_baseline_cr_{sig}",
+        f"est_scope_saved_sow_{sig}",
+        f"est_scope_saved_cr_{sig}",
+    ):
+        st.session_state.pop(k, None)
+
+
+def _read_scope_baseline_pair(estimate_id: str | None) -> tuple[str, str]:
+    """Last-known-saved SOW/CR for dirty checks (prefers new baseline keys, then legacy saved keys)."""
+    b_sow, b_cr = _scope_saved_baseline_keys(estimate_id)
+    if b_sow in st.session_state or b_cr in st.session_state:
+        return (str(st.session_state.get(b_sow, "")), str(st.session_state.get(b_cr, "")))
+    lk_sow, lk_cr = _scope_legacy_saved_keys(estimate_id)
+    if lk_sow in st.session_state or lk_cr in st.session_state:
+        return (str(st.session_state.get(lk_sow, "")), str(st.session_state.get(lk_cr, "")))
+    return ("", "")
+
+
 def refresh_scope_saved_baseline_from_est(est: dict, estimate_id: str | None = None) -> None:
-    """After a full estimate save, align widgets + dirty baselines with ``est`` (no bind-signature change)."""
+    """
+    After a full estimate save, align saved baseline with ``est``.
+
+    Never assigns to widget keys (``est_scope_sow_*`` / ``est_scope_cr_*``) if they already exist:
+    those keys are owned by ``st.text_area`` after the Job Scope tab runs.
+    """
     s = str(est.get("scope_of_work") or "")
     c = str(est.get("customer_responsibilities") or "")
     k_sow, k_cr = scope_text_area_keys(estimate_id)
-    lk_sow, lk_cr = _scope_last_saved_keys(estimate_id)
-    st.session_state[k_sow] = s
-    st.session_state[k_cr] = c
-    st.session_state[lk_sow] = s
-    st.session_state[lk_cr] = c
+    b_sow, b_cr = _scope_saved_baseline_keys(estimate_id)
+    st.session_state[b_sow] = s
+    st.session_state[b_cr] = c
+    if k_sow not in st.session_state:
+        st.session_state[k_sow] = s
+    if k_cr not in st.session_state:
+        st.session_state[k_cr] = c
 
 
 def ensure_scope_widgets_bound(est: dict, estimate_id: str | None) -> None:
     """
     When the opened estimate changes, copy DB-backed scope strings into widget session keys
     so tab switches do not resurrect stale text or drop in-progress edits for the wrong quote.
+
+    Runs before Job Scope ``st.text_area`` widgets are created; may set widget keys here only.
     """
     sig = _scope_sig(estimate_id)
+    prev = st.session_state.get("_est_scope_bind_sig")
+    if prev is not None and str(prev) != str(sig):
+        _clear_scope_session_keys_for_sig(str(prev))
     if st.session_state.get("_est_scope_bind_sig") == sig:
         return
     st.session_state["_est_scope_bind_sig"] = sig
     k_sow, k_cr = scope_text_area_keys(estimate_id)
-    lk_sow, lk_cr = _scope_last_saved_keys(estimate_id)
-    st.session_state[k_sow] = str(est.get("scope_of_work") or "")
-    st.session_state[k_cr] = str(est.get("customer_responsibilities") or "")
-    st.session_state[lk_sow] = st.session_state[k_sow]
-    st.session_state[lk_cr] = st.session_state[k_cr]
+    b_sow, b_cr = _scope_saved_baseline_keys(estimate_id)
+    sow_db = str(est.get("scope_of_work") or "")
+    cr_db = str(est.get("customer_responsibilities") or "")
+    st.session_state[k_sow] = sow_db
+    st.session_state[k_cr] = cr_db
+    st.session_state[b_sow] = sow_db
+    st.session_state[b_cr] = cr_db
     st.session_state["est_scope_last_edit_mono"] = 0.0
     st.session_state["est_scope_autosave_status"] = "idle"
     st.session_state.pop("est_scope_autosave_err", None)
@@ -67,10 +112,10 @@ def bump_scope_edit_clock() -> None:
 
 def scope_is_dirty(estimate_id: str | None) -> bool:
     k_sow, k_cr = scope_text_area_keys(estimate_id)
-    lk_sow, lk_cr = _scope_last_saved_keys(estimate_id)
     sow = str(st.session_state.get(k_sow, ""))
     cr = str(st.session_state.get(k_cr, ""))
-    return sow != str(st.session_state.get(lk_sow, "")) or cr != str(st.session_state.get(lk_cr, ""))
+    base_s, base_c = _read_scope_baseline_pair(estimate_id)
+    return sow != base_s or cr != base_c
 
 
 def _scope_values_for_save(estimate_id: str | None) -> tuple[str, str]:
@@ -79,9 +124,9 @@ def _scope_values_for_save(estimate_id: str | None) -> tuple[str, str]:
 
 
 def _mark_scope_saved(estimate_id: str | None, sow: str, cr: str) -> None:
-    lk_sow, lk_cr = _scope_last_saved_keys(estimate_id)
-    st.session_state[lk_sow] = sow
-    st.session_state[lk_cr] = cr
+    b_sow, b_cr = _scope_saved_baseline_keys(estimate_id)
+    st.session_state[b_sow] = sow
+    st.session_state[b_cr] = cr
     st.session_state["est_scope_autosave_status"] = "saved"
     st.session_state["est_scope_saved_clock"] = datetime.now().strftime("%I:%M %p")
     st.session_state.pop("est_scope_autosave_err", None)

@@ -79,7 +79,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v8"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v9"):
         return
     st.markdown(
         """
@@ -87,16 +87,16 @@ def _inject_proposal_preview_styles() -> None:
         .ips-proposal-preview-root.ips-proposal-preview-desk {
             box-sizing: border-box;
             width: 100%;
-            max-width: 850px;
+            max-width: 8.75in;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            margin: 0.35rem auto 1rem auto;
-            padding: 1.25rem 1rem 1.5rem;
-            background: #e8edf3;
-            border-radius: 12px;
-            border: 1px solid #cbd5e1;
-            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+            margin: 0.25rem auto 0.75rem auto;
+            padding: 0.5rem 0.35rem;
+            background: #ececec;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
         }
         .ips-proposal-preview-page.ips-proposal-template-page {
             box-sizing: border-box;
@@ -106,15 +106,25 @@ def _inject_proposal_preview_styles() -> None:
             background: #ffffff;
             color: #000000;
             font-size: 11pt;
-            line-height: 1.5;
-            border-radius: 4px;
-            padding: 0.55in 0.55in 0.6in 0.55in;
+            line-height: 1.45;
+            border-radius: 0;
+            padding: 0.62in 0.68in 0.65in 0.68in;
             margin: 0 auto;
-            border: 1px solid #94a3b8;
-            box-shadow:
-                0 1px 3px rgba(15, 23, 42, 0.08),
-                0 14px 36px rgba(15, 23, 42, 0.14);
+            border: 1px solid #b0b0b0;
+            box-shadow: none;
             font-family: "Times New Roman", Times, serif;
+        }
+        .ips-proposal-page .ips-quote-doc {
+            display: flex;
+            flex-direction: column;
+            min-height: 9.35in;
+        }
+        .ips-proposal-page .ips-ph-grow-block {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 2.35in;
+            margin: 0 0 0.08in 0;
         }
         .ips-proposal-page .ips-proposal-page-inner {
             box-sizing: border-box;
@@ -122,20 +132,20 @@ def _inject_proposal_preview_styles() -> None:
             max-width: 100%;
         }
         .ips-proposal-page .ips-ph-logo-wrap {
-            text-align: left;
-            margin: 0 0 0.45rem 0;
+            text-align: center;
+            margin: 0 0 0.28in 0;
         }
         .ips-proposal-page .ips-ph-logo-img {
-            width: 1.35in;
-            max-width: 1.35in;
-            max-height: 1.1in;
+            width: 88%;
+            max-width: 4.65in;
+            max-height: 1.55in;
             height: auto;
             object-fit: contain;
             display: block;
-            margin: 0;
+            margin: 0 auto;
         }
         .ips-proposal-page .ips-ph-logo-missing {
-            min-height: 0.25rem;
+            min-height: 0.35in;
         }
         .ips-proposal-page .proposal-header {
             box-sizing: border-box;
@@ -143,43 +153,49 @@ def _inject_proposal_preview_styles() -> None:
             background: #0b4f8a;
             color: #ffffff;
             text-align: center;
-            padding: 18px 24px;
-            margin: 0 0 0.65rem 0;
-            font-family: Arial, Helvetica, "Segoe UI", sans-serif;
-            border-radius: 6px 6px 0 0;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-            letter-spacing: 0.3px;
+            padding: 14px 18px 16px 18px;
+            margin: 0 0 0.12in 0;
+            font-family: Arial, Helvetica, sans-serif;
+            border-radius: 0;
+            box-shadow: none;
+            letter-spacing: 0.2px;
             -webkit-font-smoothing: antialiased;
         }
         .ips-proposal-page .proposal-header-title {
             color: #ffffff;
-            font-size: clamp(1.35rem, 3.5vw, 30px);
+            font-size: clamp(1.25rem, 3.2vw, 22pt);
             font-weight: 800;
+            font-style: italic;
             margin: 0;
-            line-height: 1.2;
-            letter-spacing: 0.3px;
+            line-height: 1.15;
+            letter-spacing: 0.2px;
         }
         .ips-proposal-page .proposal-header-subtitle,
         .ips-proposal-page .proposal-header-quote {
             color: #ffffff;
-            font-size: clamp(1.05rem, 2.6vw, 22px);
+            font-size: clamp(1rem, 2.4vw, 14pt);
             font-weight: 700;
+            font-style: italic;
             margin: 10px 0 0 0;
-            line-height: 1.25;
-            letter-spacing: 0.3px;
+            line-height: 1.2;
+            letter-spacing: 0.2px;
+        }
+        .ips-proposal-page .ips-ph-quote-lbl {
+            text-decoration: underline;
+            text-underline-offset: 2px;
         }
         .ips-proposal-page .proposal-header-subtitle + .proposal-header-subtitle {
             margin-top: 8px;
         }
-        .ips-proposal-page .ips-ph-meta-line {
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 11pt;
-            border-bottom: 3px double #334155;
-            padding: 0.35rem 0.1rem 0.4rem 0.1rem;
-            margin: 0 0 0.15rem 0;
+        .ips-proposal-page .ips-ph-customer-block {
+            border-bottom: 3px double #000000;
+            padding: 0.12in 0 0.14in 0;
+            margin: 0 0 0.14in 0;
         }
-        .ips-proposal-page .ips-ph-meta-k {
-            font-weight: 700;
+        .ips-proposal-page .ips-ph-customer-line {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            margin: 0 0 0.08in 0;
         }
         .ips-proposal-page .ips-ph-attn-line {
             display: flex;
@@ -187,36 +203,49 @@ def _inject_proposal_preview_styles() -> None:
             gap: 1rem;
             flex-wrap: wrap;
             align-items: baseline;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            margin: 0;
         }
         .ips-proposal-page .ips-ph-quote-amt {
             margin-left: auto;
             white-space: nowrap;
         }
+        .ips-proposal-page .ips-ph-meta-k {
+            font-weight: 700;
+        }
         .ips-proposal-page .ips-ph-intro {
-            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
-            margin: 1rem 0 0.55rem 0;
-            line-height: 1.5;
+            margin: 0.12in 0 0.12in 0;
+            line-height: 1.45;
             color: #000000;
+        }
+        .ips-proposal-page .ips-ph-ul {
+            text-decoration: underline;
+            text-underline-offset: 2px;
         }
         .ips-proposal-page .ips-ph-scope {
             font-family: "Times New Roman", Times, serif;
-            font-size: 13.5pt;
-            font-weight: 700;
+            font-size: 11pt;
+            font-weight: 400;
             line-height: 1.5;
             white-space: normal;
-            margin: 0.5rem 0 0.85rem 0;
+            flex: 1 1 auto;
+            margin: 0;
+            min-height: 1.85in;
             color: #000000;
             word-break: break-word;
         }
         .ips-proposal-page .ips-ph-section-spacer {
-            height: 1.1rem;
+            height: 0.08in;
         }
         .ips-proposal-page .ips-ph-resp-heading {
             font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
             font-weight: 700;
-            margin: 0.85rem 0 0.4rem 0;
+            font-style: italic;
+            margin: 0.12in 0 0.06in 0;
             color: #000000;
             line-height: 1.35;
         }
@@ -225,21 +254,32 @@ def _inject_proposal_preview_styles() -> None:
             font-size: 11pt;
             line-height: 1.5;
             white-space: normal;
-            margin: 0 0 1.15rem 0;
+            margin: 0 0 0.14in 0;
             color: #000000;
         }
-        .ips-proposal-page .ips-ph-prep-line {
-            margin-top: 0.65rem;
+        .ips-proposal-page .ips-ph-close-block {
+            margin-top: auto;
+            padding-top: 0.12in;
         }
+        .ips-proposal-page .ips-ph-prep-line,
         .ips-proposal-page .ips-ph-date-line {
-            margin-bottom: 0.35rem;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            margin: 0.04in 0;
+        }
+        .ips-proposal-page .ips-ph-footer-rule {
+            border-top: 3px double #000000;
+            margin: 0.14in 0 0.1in 0;
+            height: 0;
         }
         .ips-proposal-page .ips-ph-footer {
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
+            font-weight: 700;
+            font-style: italic;
             text-align: center;
-            margin: 1.25rem 0 0 0;
-            line-height: 1.5;
+            margin: 0;
+            line-height: 1.45;
             color: #000000;
         }
         .ips-proposal-fields-wrap {
@@ -253,33 +293,33 @@ def _inject_proposal_preview_styles() -> None:
             width: 100%;
             border-collapse: collapse;
             font-size: 0.875rem;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-            color: #0f172a;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            overflow: hidden;
+            font-family: "Times New Roman", Times, serif;
+            color: #000000;
+            border: 1px solid #000000;
+            border-radius: 0;
+            overflow: visible;
             background: #fff;
         }
         .ips-proposal-fallback-table td {
-            padding: 0.4rem 0.55rem;
+            padding: 0.35rem 0.45rem;
             vertical-align: top;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #000000;
             line-height: 1.4;
         }
         .ips-proposal-fallback-table tr:last-child td {
-            border-bottom: none;
+            border-bottom: 1px solid #000000;
         }
         .ips-proposal-fallback-label {
-            font-weight: 600;
+            font-weight: 700;
             width: 9.5rem;
-            background: #f8fafc;
-            color: #475569;
-            border-right: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #000000;
+            border-right: 1px solid #000000;
         }
         .ips-proposal-fallback-val {
             white-space: pre-wrap;
             word-break: break-word;
-            color: #0f172a;
+            color: #000000;
         }
         .ips-proposal-preview-error {
             margin: 0.65rem 0 0 0;
@@ -343,11 +383,11 @@ def _inject_proposal_preview_styles() -> None:
             border-collapse: collapse;
             margin: 0.4em 0;
             font-size: 11pt;
-            border: 1px solid #64748b;
+            border: 1px solid #000000;
             background: #fff;
         }
         .ips-proposal-docx-td {
-            border: 1px solid #94a3b8;
+            border: 1px solid #000000;
             padding: 0.28rem 0.38rem;
             vertical-align: top;
             color: #000000;
@@ -358,7 +398,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v8"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v9"] = True
 
 
 def _render_proposal_preview_html(

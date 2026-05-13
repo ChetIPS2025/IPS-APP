@@ -19,6 +19,9 @@ _LOGO_FILENAMES: tuple[str, ...] = (
 
 _ESTIMATE_TEMPLATE = "estimate_template_autofill_logo_updated.docx"
 
+# Default footer phone when estimator profile has none (IPS quote letterhead).
+_DEFAULT_QUOTE_FOOTER_PHONE = "(337) 577-3944"
+
 
 def _assets_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "assets"
@@ -123,6 +126,9 @@ def build_proposal_view_model(
     if not jn:
         jn = "Project"
     job_title_token = jn
+    phone = _s(prepared_by_phone)
+    if not phone:
+        phone = _DEFAULT_QUOTE_FOOTER_PHONE
     return ProposalViewModel(
         job_title_token=job_title_token,
         quote_number=_s(est.get("quote_number")),
@@ -132,7 +138,7 @@ def build_proposal_view_model(
         scope_of_work=_s(est.get("scope_of_work")),
         customer_responsibilities=_s(est.get("customer_responsibilities")),
         prepared_by=_s(prepared),
-        prepared_by_phone=_s(prepared_by_phone),
+        prepared_by_phone=phone,
         date_display=datetime.now().strftime("%B %d, %Y"),
     )
 
@@ -187,34 +193,41 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
     dt = html.escape(vm.date_display)
     phone = html.escape(vm.prepared_by_phone)
     footer_contact = html.escape(vm.prepared_by)
-    footer_phone = html.escape(vm.prepared_by_phone)
+    footer_phone = html.escape(vm.prepared_by_phone or _DEFAULT_QUOTE_FOOTER_PHONE)
 
     logo = _logo_data_uri()
     logo_block = (
-        f'<div class="ips-ph-logo-wrap"><img class="ips-ph-logo-img" src="{logo}" alt="IPS logo" /></div>'
+        f'<div class="ips-ph-logo-wrap"><img class="ips-ph-logo-img" src="{logo}" alt="Industrial Plant Solutions" /></div>'
         if logo
         else '<div class="ips-ph-logo-missing"></div>'
     )
 
     inner = f"""
-<div class="ips-proposal-page-inner">
+<div class="ips-proposal-page-inner ips-quote-doc">
 {logo_block}
 <div class="proposal-header">
 <div class="proposal-header-title">{title_line}</div>
-<div class="proposal-header-subtitle">Quote #: {qn}</div>
+<div class="proposal-header-subtitle"><span class="ips-ph-quote-lbl">Quote #:</span> {qn}</div>
 </div>
-<div class="ips-ph-meta-line"><span class="ips-ph-meta-k">Customer:</span> {cust}</div>
-<div class="ips-ph-meta-line ips-ph-attn-line">
-  <span><span class="ips-ph-meta-k">Attn:</span> {attn}</span>
+<div class="ips-ph-customer-block">
+<div class="ips-ph-customer-line"><span class="ips-ph-meta-k">Customer:</span> {cust}</div>
+<div class="ips-ph-attn-line">
+  <span><span class="ips-ph-meta-k">Contact:</span> {attn}</span>
   <span class="ips-ph-quote-amt"><span class="ips-ph-meta-k">Quote Amt:</span> {amt}</span>
 </div>
-<p class="ips-ph-intro">Industrial Plant Solutions, LLC (IPS) proposes to perform the following scope of work:</p>
+</div>
+<p class="ips-ph-intro">Industrial Plant <span class="ips-ph-ul">Solutions</span>, LLC (IPS) proposes to perform the following scope of work:</p>
+<div class="ips-ph-grow-block">
 <div class="ips-ph-scope">{scope_html}</div>
 <div class="ips-ph-section-spacer" aria-hidden="true"></div>
 <div class="ips-ph-resp-heading">{resp_intro}</div>
 <div class="ips-ph-resp-body">{resp_body}</div>
-<div class="ips-ph-meta-line ips-ph-prep-line"><span class="ips-ph-meta-k">Prepared By:</span> {prep}</div>
-<div class="ips-ph-meta-line ips-ph-date-line"><span class="ips-ph-meta-k">Date:</span> {dt}</div>
+</div>
+<div class="ips-ph-close-block">
+<div class="ips-ph-prep-line"><span class="ips-ph-meta-k">Prepared By:</span> {prep}</div>
+<div class="ips-ph-date-line"><span class="ips-ph-meta-k">Date:</span> {dt}</div>
+</div>
+<div class="ips-ph-footer-rule" aria-hidden="true"></div>
 <p class="ips-ph-footer">If you have any questions regarding this Quote, please contact {footer_contact} at {footer_phone}</p>
 </div>
 """.strip()

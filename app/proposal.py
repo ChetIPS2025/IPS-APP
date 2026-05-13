@@ -11,6 +11,10 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_UNDERLINE
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt, RGBColor
 
 # OOXML namespaces (proposal preview reads raw XML when python-docx body text is sparse).
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -37,6 +41,9 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
 )
 
 ESTIMATE_PROPOSAL_TEMPLATE_FILENAME = "estimate_template_autofill_logo_updated.docx"
+
+# Default phone in quote footer when ``PREPARED_BY_PHONE`` is blank (matches IPS letterhead).
+IPS_DEFAULT_QUOTE_FOOTER_PHONE = "(337) 577-3944"
 
 # Standard company logo for proposals (first existing file wins). Same folder as the app ``assets``.
 # Optional Word placeholder: ``{{COMPANY_LOGO}}`` in header/body/footer — replaced with this image when present.
@@ -594,12 +601,10 @@ def _apply_standard_proposal_branding(doc: Document) -> None:
     - If ``{{COMPANY_LOGO}}`` appears in the template, those blocks become the canonical logo image.
     - Otherwise, when a standard logo file exists under ``assets/``, it is prepended to the primary header.
     """
-    from docx.shared import Inches
-
     logo_path = _resolve_standard_company_logo_path()
     if not logo_path:
         return
-    width = Inches(1.35)  # Keep in sync with HTML fallback ``.ips-ph-logo-img`` (1.35in) in proposal_exports.
+    width = Inches(2.15)  # Large centered letterhead logo; keep in sync with HTML preview ``.ips-ph-logo-img``.
     replaced = _replace_company_logo_placeholders_in_document(doc, logo_path, width)
     if replaced == 0:
         try:
@@ -642,7 +647,10 @@ def _normalize_placeholder_tokens(text: str) -> str:
 def _docx_placeholder_replacements(vals: dict[str, str]) -> dict[str, str]:
     repl: dict[str, str] = {}
     for k in _DOCX_CANONICAL_TOKENS:
-        repl["{{" + k + "}}"] = _s(vals.get(k, ""))
+        v = _s(vals.get(k, ""))
+        if k == "PREPARED_BY_PHONE" and not v:
+            v = IPS_DEFAULT_QUOTE_FOOTER_PHONE
+        repl["{{" + k + "}}"] = v
     return repl
 
 
@@ -738,6 +746,226 @@ def _remove_customer_location_paragraphs(doc: Document) -> None:
             parent.remove(el)
 
 
+def _p_ensure_pPr(p_el) -> object:
+    pPr = p_el.find(_w_tag("pPr"))
+    if pPr is None:
+        pPr = OxmlElement("w:pPr")
+        p_el.insert(0, pPr)
+    return pPr
+
+
+def _paragraph_set_shading(paragraph, fill_hex: str) -> None:
+    """Paragraph background (OOXML ``w:shd``); ``fill_hex`` like ``0B4F8A``."""
+    pPr = _p_ensure_pPr(paragraph._element)
+    for el in list(pPr):
+        if el.tag == _w_tag("shd"):
+            pPr.remove(el)
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:fill"), fill_hex)
+    pPr.append(shd)
+
+
+def _paragraph_clear_shading(paragraph) -> None:
+    pPr = paragraph._element.find(_w_tag("pPr"))
+    if pPr is None:
+        return
+    for el in list(pPr):
+        if el.tag == _w_tag("shd"):
+            pPr.remove(el)
+
+
+def _paragraph_set_bottom_border_double(paragraph) -> None:
+    pPr = _p_ensure_pPr(paragraph._element)
+    pBdr = pPr.find(_w_tag("pBdr"))
+    if pBdr is None:
+        pBdr = OxmlElement("w:pBdr")
+        pPr.append(pBdr)
+    for el in list(pBdr):
+        if el.tag == _w_tag("bottom"):
+            pBdr.remove(el)
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "double")
+    bottom.set(qn("w:sz"), "12")
+    bottom.set(qn("w:space"), "4")
+    bottom.set(qn("w:color"), "000000")
+    pBdr.append(bottom)
+
+
+def _paragraph_set_top_border_double(paragraph) -> None:
+    pPr = _p_ensure_pPr(paragraph._element)
+    pBdr = pPr.find(_w_tag("pBdr"))
+    if pBdr is None:
+        pBdr = OxmlElement("w:pBdr")
+        pPr.append(pBdr)
+    for el in list(pBdr):
+        if el.tag == _w_tag("top"):
+            pBdr.remove(el)
+    top = OxmlElement("w:top")
+    top.set(qn("w:val"), "double")
+    top.set(qn("w:sz"), "12")
+    top.set(qn("w:space"), "6")
+    top.set(qn("w:color"), "000000")
+    pBdr.append(top)
+
+
+def _runs_set_font(paragraph, *, name: str, size_pt: float, bold: bool = False, italic: bool = False) -> None:
+    for r in paragraph.runs:
+        r.font.name = name
+        r.font.size = Pt(size_pt)
+        r.font.bold = bold
+        r.font.italic = italic
+        r.font.color.rgb = RGBColor(0, 0, 0)
+
+
+def _runs_set_banner_white(paragraph, *, size_pt: float) -> None:
+    for r in paragraph.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(size_pt)
+        r.font.bold = True
+        r.font.italic = True
+        r.font.color.rgb = RGBColor(255, 255, 255)
+
+
+def _is_quote_title_line(t: str) -> bool:
+    s = (t or "").strip()
+    if "Quote #:" in s:
+        return False
+    return bool(re.search(r"[\u2013\u2014\-]\s*Quote\s*$", s))
+
+
+def _format_intro_solutions_underline(paragraph) -> None:
+    full = (_paragraph_full_text(paragraph) or "").strip()
+    if "Solutions" not in full:
+        _runs_set_font(paragraph, name="Times New Roman", size_pt=11.0)
+        return
+    before, _, after = full.partition("Solutions")
+    _clear_paragraph_runs(paragraph)
+    r0 = paragraph.add_run(before)
+    r1 = paragraph.add_run("Solutions")
+    r2 = paragraph.add_run(after)
+    for r in (r0, r1, r2):
+        r.font.name = "Times New Roman"
+        r.font.size = Pt(11.0)
+    r1.font.underline = WD_UNDERLINE.SINGLE
+
+
+def _apply_ips_proposal_quote_formatting(doc: Document) -> None:
+    """
+    Restyle the standard estimate proposal body to match the IPS quote letterhead.
+
+    Paragraph indices follow ``assets/estimate_template_autofill_logo_updated.docx`` body order.
+    """
+    try:
+        for i, p in enumerate(doc.paragraphs):
+            raw = _paragraph_full_text(p) or ""
+            t = raw.strip()
+            if not t:
+                continue
+
+            is_banner_title = _is_quote_title_line(t) or (
+                i == 1
+                and "quote #:" not in t.lower()
+                and len(t) > 6
+                and t.lower().rstrip().endswith("quote")
+            )
+            if is_banner_title:
+                _set_paragraph_text_merged(p, t)
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                _paragraph_set_shading(p, "0B4F8A")
+                _runs_set_banner_white(p, size_pt=20.0)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.space_before = Pt(0)
+                continue
+
+            if re.match(r"^Quote\s*#\s*:", t, flags=re.IGNORECASE):
+                m = re.match(r"^(Quote\s*#\s*:)\s*(.*)$", t, flags=re.IGNORECASE)
+                label = m.group(1) if m else "Quote #: "
+                body = (m.group(2) if m else "").strip()
+                _clear_paragraph_runs(p)
+                r0 = p.add_run(label)
+                r0.font.underline = WD_UNDERLINE.SINGLE
+                if body:
+                    p.add_run(" " + body)
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                _paragraph_set_shading(p, "0B4F8A")
+                for r in p.runs:
+                    r.font.name = "Arial"
+                    r.font.size = Pt(14.0)
+                    r.font.bold = True
+                    r.font.italic = True
+                    r.font.color.rgb = RGBColor(255, 255, 255)
+                p.paragraph_format.space_after = Pt(4)
+                continue
+
+            if i == 3 and t.startswith("Customer:"):
+                _paragraph_clear_shading(p)
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_before = Pt(8)
+                p.paragraph_format.space_after = Pt(0)
+                continue
+
+            if i == 4 and ("Attn:" in t or "Contact:" in t or "Quote Amt" in t):
+                if t.startswith("Attn:"):
+                    _set_paragraph_text_merged(p, "Contact:" + t[5:])
+                _paragraph_clear_shading(p)
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_after = Pt(6)
+                _paragraph_set_bottom_border_double(p)
+                continue
+
+            if i == 5 and "Industrial Plant Solutions" in t and "proposes" in t:
+                _paragraph_clear_shading(p)
+                _format_intro_solutions_underline(p)
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                p.paragraph_format.space_before = Pt(10)
+                p.paragraph_format.space_after = Pt(8)
+                continue
+
+            if i == 6:
+                _paragraph_clear_shading(p)
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_after = Pt(4)
+                continue
+
+            if i == 14 and "Responsibilities" in t:
+                _paragraph_clear_shading(p)
+                _runs_set_font(p, name="Times New Roman", size_pt=12.0, bold=True, italic=True)
+                p.paragraph_format.space_before = Pt(12)
+                p.paragraph_format.space_after = Pt(4)
+                continue
+
+            if i == 15:
+                _paragraph_clear_shading(p)
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_after = Pt(6)
+                continue
+
+            if i == 18 and t.startswith("Prepared By:"):
+                _paragraph_clear_shading(p)
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_before = Pt(14)
+                continue
+
+            if i == 19 and re.match(r"^Date:\s*", t):
+                _paragraph_clear_shading(p)
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0)
+                p.paragraph_format.space_after = Pt(10)
+                continue
+
+            if i == 20 and t.startswith("If you have any questions"):
+                _paragraph_clear_shading(p)
+                _paragraph_set_top_border_double(p)
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                _set_paragraph_text_merged(p, t)
+                _runs_set_font(p, name="Times New Roman", size_pt=11.0, bold=True, italic=True)
+                p.paragraph_format.space_before = Pt(8)
+    except Exception:
+        return
+
+
 def _strip_legacy_customer_location_tokens(text: str) -> str:
     """Remove spaced variants of ``{{CUSTOMER_LOCATION}}`` left in older templates."""
     if not text:
@@ -756,6 +984,7 @@ def _fill_proposal_docx_from_bytes(raw: bytes, vals: dict[str, str]) -> bytes:
     _apply_to_paragraph_text(doc, _strip_tokens)
     _replace_placeholders_doc(doc, repl)
     _remove_customer_location_paragraphs(doc)
+    _apply_ips_proposal_quote_formatting(doc)
     _apply_standard_proposal_branding(doc)
     bio = BytesIO()
     doc.save(bio)
