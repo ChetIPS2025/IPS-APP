@@ -57,6 +57,8 @@ def _navigate_to_sidebar_page(page: str) -> None:
 
 def _open_job_in_database(job_id: str) -> None:
     """Job Database edit mode for this job id (same keys as job_database)."""
+    st.session_state["job_view_mode"] = "edit"
+    st.session_state["selected_job_id"] = str(job_id)
     st.session_state["job_mode"] = "edit"
     st.session_state["job_edit_id"] = str(job_id)
     st.session_state[_ips_nav_pending_key()] = "Job Database"

@@ -5,7 +5,11 @@ import re
 import streamlit as st
 
 from db import fetch_one
-from proposal import build_proposal_docx, proposal_preview_html, proposal_values
+from proposal import (
+    build_proposal_docx,
+    proposal_preview_page_html,
+    proposal_values,
+)
 
 from app.estimate.customer_job import (
     _fetch_contacts_for_estimate_editor,
@@ -62,50 +66,42 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 
 def _inject_proposal_preview_styles() -> None:
-    """One-time CSS: proposal preview as a centered document on a dark workspace (see :mod:`app.proposal`)."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v2"):
+    """One-time CSS: Word-like page (8.5in) on a light mat — matches :mod:`app.proposal` preview shell."""
+    if st.session_state.get("_ips_proposal_preview_css_injected_v3"):
         return
     st.markdown(
         """
         <style>
-        /* Narrow dark mat — one sheet of paper, not a full-width panel */
         .ips-proposal-preview-root.ips-proposal-preview-desk {
             box-sizing: border-box;
             width: 100%;
-            max-width: 30rem;
+            max-width: 56rem;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            margin: 0.1rem auto 0.35rem auto;
-            padding: 0.45rem 0.4rem 0.55rem;
-            background: #0f172a;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            margin: 0.25rem auto 0.75rem auto;
+            padding: 0.75rem 0.5rem 1rem;
+            background: #e2e8f0;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
         }
-        .ips-proposal-preview-page {
+        .ips-proposal-preview-page.ips-proposal-template-page {
             box-sizing: border-box;
-            width: 100%;
-            max-width: 26.25rem;
+            width: 8.5in;
+            max-width: 100%;
+            min-height: 11in;
             background: #ffffff;
-            color: #0f172a;
-            font-size: 14px;
-            line-height: 1.58;
+            color: #000000;
+            font-size: 11pt;
+            line-height: 1.45;
             border-radius: 2px;
-            padding: 1.45rem 1.6rem 1.6rem;
+            padding: 1in 1in 1in 1.05in;
             margin: 0 auto;
-            border: 1px solid #d1d5db;
+            border: 1px solid #94a3b8;
             box-shadow:
-                0 1px 2px rgba(15, 23, 42, 0.05),
-                0 6px 20px rgba(15, 23, 42, 0.1);
-            font-family: Georgia, "Times New Roman", serif;
-        }
-        .ips-proposal-intro {
-            margin: 0 0 0.7rem 0;
-            font-size: 0.78rem;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-            letter-spacing: 0.01em;
-            color: #64748b;
-            line-height: 1.4;
+                0 1px 3px rgba(15, 23, 42, 0.08),
+                0 12px 28px rgba(15, 23, 42, 0.12);
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-fields-wrap {
             max-height: min(440px, 48vh);
@@ -146,96 +142,82 @@ def _inject_proposal_preview_styles() -> None:
             word-break: break-word;
             color: #0f172a;
         }
-        .ips-proposal-doc-section {
-            margin-top: 0.85rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid #e5e7eb;
-        }
-        .ips-proposal-section-hint {
-            margin: 0 0 0.45rem 0;
-            font-size: 0.75rem;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-            line-height: 1.4;
-        }
-        .ips-proposal-section-hint--muted { color: #64748b; }
-        .ips-proposal-section-hint--soft { color: #78716c; }
         .ips-proposal-preview-error {
             margin: 0.65rem 0 0 0;
-            font-size: 0.8125rem;
+            font-size: 0.875rem;
             font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
             color: #b45309;
-            line-height: 1.4;
+            line-height: 1.45;
         }
         .ips-proposal-letterhead {
-            font-size: 0.8125rem;
-            color: #475569;
+            font-size: 10pt;
+            color: #334155;
             line-height: 1.4;
-            margin-bottom: 0.65rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #e5e7eb;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            margin-bottom: 0.55rem;
+            padding-bottom: 0.45rem;
+            border-bottom: 1px solid #cbd5e1;
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-docx-body {
-            max-height: min(680px, 72vh);
+            max-height: min(720px, 78vh);
             overflow: auto;
             margin: 0;
             padding: 0;
-            font-family: Georgia, "Times New Roman", serif;
-            color: #1e293b;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            color: #000000;
         }
         .ips-proposal-docx-body p {
-            margin: 0.32em 0;
-            line-height: 1.58;
-            color: #1e293b;
+            margin: 0.28em 0;
+            line-height: 1.45;
+            color: #000000;
         }
         .ips-proposal-docx-preview h3 {
-            font-size: 1rem;
-            font-weight: 650;
-            margin: 0.55em 0 0.3em 0;
-            line-height: 1.32;
-            color: #0f172a;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-size: 12pt;
+            font-weight: 700;
+            margin: 0.5em 0 0.28em 0;
+            line-height: 1.25;
+            color: #000000;
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-docx-preview h4 {
-            font-size: 0.9375rem;
-            font-weight: 600;
-            margin: 0.48em 0 0.26em 0;
-            line-height: 1.32;
-            color: #0f172a;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-size: 11.5pt;
+            font-weight: 700;
+            margin: 0.45em 0 0.22em 0;
+            line-height: 1.25;
+            color: #000000;
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-docx-preview h5 {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin: 0.4em 0 0.22em 0;
-            line-height: 1.32;
-            color: #1e293b;
-            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-size: 11pt;
+            font-weight: 700;
+            margin: 0.38em 0 0.2em 0;
+            line-height: 1.25;
+            color: #000000;
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-docx-preview p {
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-docx-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 0.45em 0;
-            font-size: 0.92em;
-            border: 1px solid #94a3b8;
-            border-radius: 3px;
-            overflow: hidden;
+            margin: 0.4em 0;
+            font-size: 11pt;
+            border: 1px solid #64748b;
             background: #fff;
         }
         .ips-proposal-docx-td {
-            border: 1px solid #cbd5e1;
-            padding: 0.35rem 0.45rem;
+            border: 1px solid #94a3b8;
+            padding: 0.28rem 0.38rem;
             vertical-align: top;
-            color: #1e293b;
+            color: #000000;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v2"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v3"] = True
 
 
 def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
@@ -348,3 +330,18 @@ def _build_proposal_docx_and_vals(
         return vals, None, str(e)
     except Exception as e:
         return vals, None, f"Could not build the Word proposal: {type(e).__name__}: {e}"
+
+
+def build_proposal_view_bundle(
+    est: dict,
+    totals: dict,
+    pe: dict,
+) -> tuple[dict[str, str], bytes | None, str, str]:
+    """
+    Shared proposal view for the editor: placeholder map, filled ``.docx`` bytes, build error (if any),
+    and **docx-derived** HTML (same extraction as on-screen preview). Download Word / PDF / Save should
+    reuse ``docx`` from this tuple so all surfaces stay aligned.
+    """
+    vals, docx, err = _build_proposal_docx_and_vals(est, totals, pe)
+    page_html = proposal_preview_page_html(docx) if docx else ""
+    return vals, docx, err, page_html

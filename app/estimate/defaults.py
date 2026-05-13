@@ -48,6 +48,7 @@ def blank_estimate() -> dict:
         "exclusions": "",
         "additional_charges": "",
         "customer_responsibilities": "",
+        "scope_fields_updated_at": "",
         "job_received": False,
         "po_number": "",
         "po_date": "",

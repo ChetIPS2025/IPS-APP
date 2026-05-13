@@ -1354,6 +1354,9 @@ def _back_to_asset_list(*, aid: str | None) -> None:
 
     st.session_state.pop("asset_detail_id", None)
     st.session_state.pop("asset_edit_id", None)
+    st.session_state.pop("assets_view", None)
+    st.session_state["asset_view_mode"] = "list"
+    st.session_state["selected_asset_id"] = None
     st.session_state.pop("asset_return_to", None)
     st.session_state.pop("asset_detail_action", None)
 
@@ -1400,7 +1403,7 @@ def render() -> None:
     is_narrow = bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY, False))
 
     qe_key = f"ad_quick_edit_{aid}"
-    # In-page edit mode (✏️): rental form, uploads, AI. ``asset_edit_id`` is for Asset Manager full-form edit, not this page.
+    # In-page edit mode (✏️): rental form, uploads, AI. Full-form edit uses ``asset_view_mode`` / ``selected_asset_id`` on Asset Manager, not this page.
     quick_edit = can_edit and bool(st.session_state.get(qe_key, False))
 
     jobs = fetch_table("jobs", limit=5000, order_by="job_number")
@@ -1460,9 +1463,11 @@ def render() -> None:
     with _pt3:
         if can_edit:
             if st.button("Edit Asset", key="edit_asset_btn", type="primary", use_container_width=True):
-                st.session_state["assets_view"] = "edit"
-                st.session_state["asset_edit_id"] = str(asset["id"])
+                st.session_state["asset_view_mode"] = "edit"
+                st.session_state["selected_asset_id"] = str(asset["id"])
                 st.session_state["asset_return_to"] = "asset_detail"
+                st.session_state.pop("assets_view", None)
+                st.session_state.pop("asset_edit_id", None)
                 st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
                 st.rerun()
 

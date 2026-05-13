@@ -113,6 +113,13 @@ def delete_employee_week(employee_id: str, week_start: date, week_end: date) -> 
     return len(ids)
 
 
+def _normalize_time_type(raw: str | None) -> str:
+    s = str(raw or "ST").strip().upper()
+    if s in ("OT", "O/T", "O-T"):
+        return "OT"
+    return "ST"
+
+
 def upsert_time_entry(
     *,
     employee_id: str,
@@ -123,18 +130,20 @@ def upsert_time_entry(
     created_by,
     updated_at_iso: str,
     non_job_code: str | None = None,
+    time_type: str | None = None,
 ) -> None:
-    """Insert or update one row: either (employee, job, day) or (employee, non_job_code, day)."""
+    """Insert or update one row: (employee, job, day, ST|OT) or (employee, non_job_code, day, ST|OT)."""
     try:
         from db import insert_row, update_rows
     except ImportError:
         from app.db import insert_row, update_rows  # type: ignore
 
+    tt = _normalize_time_type(time_type)
     wd = work_date.isoformat()[:10]
     client = get_client()
     r = (
         client.table("time_entries")
-        .select("id,job_id,non_job_code")
+        .select("id,job_id,non_job_code,time_type")
         .eq("employee_id", employee_id)
         .eq("work_date", wd)
         .limit(500)
@@ -144,7 +153,7 @@ def upsert_time_entry(
     row0 = None
     if job_id:
         for row in rows:
-            if str(row.get("job_id") or "") == str(job_id):
+            if str(row.get("job_id") or "") == str(job_id) and _normalize_time_type(row.get("time_type")) == tt:
                 row0 = row
                 break
     else:
@@ -153,11 +162,13 @@ def upsert_time_entry(
             raise ValueError("non_job_code is required when job_id is null")
         for row in rows:
             if not row.get("job_id") and str(row.get("non_job_code") or "").strip() == nj:
-                row0 = row
-                break
+                if _normalize_time_type(row.get("time_type")) == tt:
+                    row0 = row
+                    break
     payload_update: dict[str, Any] = {
         "hours": float(hours or 0),
         "notes": (notes or "").strip(),
+        "time_type": tt,
         "updated_at": updated_at_iso,
     }
     if row0:
@@ -168,6 +179,7 @@ def upsert_time_entry(
         "work_date": wd,
         "hours": float(hours or 0),
         "notes": (notes or "").strip(),
+        "time_type": tt,
         "created_by": created_by,
         "updated_at": updated_at_iso,
     }
@@ -204,6 +216,7 @@ def copy_employee_day_to_day(
                 created_by=created_by,
                 updated_at_iso=updated_at_iso,
                 non_job_code=None,
+                time_type=str(row.get("time_type") or "ST"),
             )
         elif nj:
             upsert_time_entry(
@@ -215,6 +228,7 @@ def copy_employee_day_to_day(
                 created_by=created_by,
                 updated_at_iso=updated_at_iso,
                 non_job_code=nj,
+                time_type=str(row.get("time_type") or "ST"),
             )
 
 
@@ -255,6 +269,7 @@ def copy_employee_previous_week_to_current(
                 created_by=created_by,
                 updated_at_iso=updated_at_iso,
                 non_job_code=None,
+                time_type=str(row.get("time_type") or "ST"),
             )
         elif nj:
             upsert_time_entry(
@@ -266,6 +281,7 @@ def copy_employee_previous_week_to_current(
                 created_by=created_by,
                 updated_at_iso=updated_at_iso,
                 non_job_code=nj,
+                time_type=str(row.get("time_type") or "ST"),
             )
 
 
@@ -288,4 +304,5 @@ def fill_employee_job_across_week(
             notes=notes,
             created_by=created_by,
             updated_at_iso=updated_at_iso,
+            time_type="ST",
         )

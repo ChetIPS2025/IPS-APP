@@ -88,171 +88,31 @@ def _safe_date_value(value):
     return s if s else None
 
 
-def render() -> None:
-    render_header("Asset Manager")
+def _clear_asset_manager_edit_session() -> None:
+    st.session_state["asset_view_mode"] = "list"
+    st.session_state["selected_asset_id"] = None
+    st.session_state.pop("assets_view", None)
+    st.session_state.pop("asset_edit_id", None)
 
-    can_edit = current_role() in {"admin", "manager"}
 
-    assets = fetch_table("assets", limit=5000, order_by="asset_name")
-    jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
+def _render_asset_create_update_form(
+    *,
+    assets: list,
+    jobs: list,
+    job_label_by_id: dict,
+    can_edit: bool,
+    edit_only: bool,
+    fixed_edit_asset: dict | None,
+    show_return_from_detail_caption: bool,
+) -> None:
+    """List page: ``edit_only=False``. Table **Edit** / Asset Detail: ``edit_only=True`` with ``fixed_edit_asset``."""
+    st.subheader("Edit Asset" if edit_only else "Create / Update Asset")
 
-    asset_df = pd.DataFrame(assets)
-    job_label_by_id = {j.get("id"): job_row_select_label(j) for j in jobs}
-
-    assets_view = st.session_state.get("assets_view")
-    asset_edit_id = st.session_state.get("asset_edit_id")
-    if assets_view == "edit" and not asset_edit_id:
-        st.session_state.pop("assets_view", None)
-        assets_view = None
-    editing_session = assets_view == "edit" and bool(asset_edit_id)
-    asset_for_edit = fetch_one("assets", {"id": asset_edit_id}) if editing_session and asset_edit_id else None
-    if editing_session and not asset_for_edit:
-        st.warning("Could not load that asset for editing.")
-        st.session_state.pop("asset_edit_id", None)
-        st.session_state.pop("assets_view", None)
-        st.session_state.pop("asset_return_to", None)
-        editing_session = False
-
-    return_to_detail = st.session_state.get("asset_return_to") == "asset_detail"
-
-    st.subheader("Asset Overview")
-
-    if editing_session and asset_for_edit and return_to_detail:
+    if edit_only and show_return_from_detail_caption and fixed_edit_asset:
         st.caption(
-            f"Opened from **Asset Detail** — editing **{asset_for_edit.get('asset_id', '')}** · "
-            f"{asset_for_edit.get('asset_name', '')}. Use **Update Asset** below, or choose another page from the sidebar."
+            f"Opened from **Asset Detail** — editing **{fixed_edit_asset.get('asset_id', '')}** · "
+            f"{fixed_edit_asset.get('asset_name', '')}. Use **Update Asset** below, or choose another page from the sidebar."
         )
-
-    if asset_df.empty and not editing_session:
-        st.info("No assets found.")
-    elif not asset_df.empty:
-        asset_df["assigned_job_name"] = asset_df["assigned_job_id"].map(job_label_by_id)
-
-        f1, f2, f3, f4 = st.columns([1, 1, 1, 2])
-
-        selected_type = f1.selectbox("Filter Type", ["All"] + ASSET_TYPES)
-
-        selected_status = f2.selectbox("Filter Status", ["All"] + ASSET_STATUSES)
-
-        active_options = ["All", "Active Only", "Inactive Only"]
-        selected_active = f3.selectbox("Filter Active", active_options)
-
-        search = f4.text_input(
-            "Search Assets",
-            placeholder="Search asset ID, name, serial, location, employee, job, notes",
-        )
-
-        filtered = asset_df.copy()
-
-        if selected_type != "All" and "asset_type" in filtered.columns:
-            filtered = filtered[filtered["asset_type"].astype(str) == selected_type]
-
-        if selected_status != "All" and "status" in filtered.columns:
-            filtered = filtered[filtered["status"].astype(str) == selected_status]
-
-        if selected_active == "Active Only" and "is_active" in filtered.columns:
-            filtered = filtered[filtered["is_active"] == True]
-        elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
-            filtered = filtered[filtered["is_active"] == False]
-
-        if search.strip():
-            s = search.strip().lower()
-            mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            filtered = filtered[mask.any(axis=1)]
-
-        show_cols = [
-            c
-            for c in [
-                "asset_id",
-                "asset_name",
-                "asset_type",
-                "category",
-                "status",
-                "is_rental",
-                "serial_number",
-                "manufacturer",
-                "model",
-                "assigned_employee",
-                "assigned_job_name",
-                "location",
-                "inspection_due_date",
-                "maintenance_due_date",
-                "is_active",
-            ]
-            if c in filtered.columns
-        ]
-
-        if "id" not in filtered.columns:
-            st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
-        else:
-            _, sel = render_selectable_dataframe(
-                filtered,
-                table_key=TABLE_KEY_ASSET_MANAGER,
-                id_column="id",
-                columns=show_cols,
-                editor_key="asset_mgr_sel_editor",
-            )
-            actions = render_selection_action_bar(
-                TABLE_KEY_ASSET_MANAGER,
-                sel,
-                can_view=True,
-                can_edit=can_edit,
-                can_delete=can_edit,
-                export_df=filtered,
-                id_column="id",
-                export_filename="assets_export.csv",
-            )
-            if actions["view"] and sel:
-                st.session_state["asset_detail_id"] = str(sel[0])
-                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
-                st.rerun()
-            if actions["edit"] and sel:
-                st.session_state["assets_view"] = "edit"
-                st.session_state["asset_edit_id"] = str(sel[0])
-                st.session_state.pop("asset_return_to", None)
-                st.rerun()
-            pending_del = st.session_state.get(IPS_PENDING_DELETE)
-            if not isinstance(pending_del, dict):
-                pending_del = {}
-                st.session_state[IPS_PENDING_DELETE] = pending_del
-            if actions.get("confirm_delete") and pending_del.get(TABLE_KEY_ASSET_MANAGER) and can_edit:
-                ids_to_delete = [str(x).strip() for x in pending_del[TABLE_KEY_ASSET_MANAGER] if str(x).strip()]
-                errors: list[str] = []
-                deleted_n = 0
-                for aid in ids_to_delete:
-                    try:
-                        delete_rows_admin("assets", {"id": aid})
-                        deleted_n += 1
-                    except Exception as exc:
-                        errors.append(f"{aid}: {exc}")
-                pending_del.pop(TABLE_KEY_ASSET_MANAGER, None)
-                st.session_state[IPS_PENDING_DELETE] = pending_del
-                clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
-                st.session_state.pop("asset_mgr_sel_editor", None)
-                if errors and deleted_n == 0:
-                    for msg in errors[:8]:
-                        st.error(msg)
-                    try:
-                        st.toast("Could not delete selected assets.", icon="⚠️")
-                    except Exception:
-                        pass
-                elif errors:
-                    st.warning(f"Deleted {deleted_n} asset(s); {len(errors)} could not be removed.")
-                    for msg in errors[:8]:
-                        st.error(msg)
-                    try:
-                        st.toast(f"Deleted {deleted_n}; {len(errors)} failed.", icon="⚠️")
-                    except Exception:
-                        pass
-                else:
-                    try:
-                        st.toast(f"Deleted {deleted_n} asset(s).", icon="✅")
-                    except Exception:
-                        st.success(f"Deleted {deleted_n} asset(s).")
-                st.rerun()
-
-    st.markdown("---")
-    st.subheader("Edit Asset" if (editing_session and asset_for_edit) else "Create / Update Asset")
 
     existing_asset_labels = [
         f"{a.get('asset_id', '')} | {a.get('asset_name', '')} | {a.get('status', '')}"
@@ -260,11 +120,14 @@ def render() -> None:
     ]
 
     selected_mode = "Edit Existing Asset"
-    selected_asset = None
+    selected_asset: dict | None = None
 
-    if editing_session and asset_for_edit:
-        selected_asset = asset_for_edit
+    if edit_only:
+        selected_asset = fixed_edit_asset
         selected_mode = "Edit Existing Asset"
+        if not selected_asset:
+            st.error("Could not load asset for editing.")
+            return
     else:
         selected_mode = st.radio(
             "Mode",
@@ -275,7 +138,8 @@ def render() -> None:
         if selected_mode == "Edit Existing Asset" and assets:
             selected_asset_label = st.selectbox("Select Asset", existing_asset_labels)
             selected_asset = next(
-                a for a in assets
+                a
+                for a in assets
                 if f"{a.get('asset_id', '')} | {a.get('asset_name', '')} | {a.get('status', '')}" == selected_asset_label
             )
 
@@ -316,7 +180,9 @@ def render() -> None:
     asset_type = c3.selectbox(
         "Asset Type",
         ASSET_TYPES,
-        index=ASSET_TYPES.index(current_value("asset_type", "Other")) if current_value("asset_type", "Other") in ASSET_TYPES else ASSET_TYPES.index("Other"),
+        index=ASSET_TYPES.index(current_value("asset_type", "Other"))
+        if current_value("asset_type", "Other") in ASSET_TYPES
+        else ASSET_TYPES.index("Other"),
         disabled=not can_edit,
         key=_am_key("asset_type"),
     )
@@ -473,7 +339,7 @@ def render() -> None:
         st.info("Only admin or pm users can add or update assets.")
         return
 
-    if selected_mode == "Add New Asset" and not editing_session:
+    if selected_mode == "Add New Asset" and not edit_only:
         if st.button("Add Asset", use_container_width=True):
             if not asset_name.strip():
                 st.error("Asset Name required")
@@ -550,8 +416,7 @@ def render() -> None:
 
             update_rows_admin("assets", payload, {"id": selected_asset["id"]})
 
-            st.session_state.pop("asset_edit_id", None)
-            st.session_state.pop("assets_view", None)
+            _clear_asset_manager_edit_session()
             ret = st.session_state.pop("asset_return_to", None)
             if ret == "asset_detail":
                 st.session_state["asset_detail_id"] = str(selected_asset["id"])
@@ -560,3 +425,208 @@ def render() -> None:
             else:
                 st.success("Asset updated.")
             st.rerun()
+
+
+def render() -> None:
+    render_header("Asset Manager")
+
+    can_edit = current_role() in {"admin", "manager"}
+
+    assets = fetch_table("assets", limit=5000, order_by="asset_name")
+    jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
+
+    asset_df = pd.DataFrame(assets)
+    job_label_by_id = {j.get("id"): job_row_select_label(j) for j in jobs}
+
+    if "asset_view_mode" not in st.session_state:
+        st.session_state["asset_view_mode"] = "list"
+    if "selected_asset_id" not in st.session_state:
+        st.session_state["selected_asset_id"] = None
+
+    legacy_view = st.session_state.get("assets_view")
+    legacy_id = st.session_state.get("asset_edit_id")
+    if legacy_view == "edit" and legacy_id:
+        st.session_state["asset_view_mode"] = "edit"
+        st.session_state["selected_asset_id"] = str(legacy_id)
+        st.session_state.pop("assets_view", None)
+        st.session_state.pop("asset_edit_id", None)
+
+    view_mode = str(st.session_state.get("asset_view_mode") or "list")
+    selected_asset_id = st.session_state.get("selected_asset_id")
+
+    if view_mode == "edit" and not selected_asset_id:
+        _clear_asset_manager_edit_session()
+        view_mode = "list"
+
+    if view_mode == "edit" and selected_asset_id:
+        asset_for_edit = fetch_one("assets", {"id": str(selected_asset_id)})
+        if not asset_for_edit:
+            st.warning("Could not load that asset for editing.")
+            _clear_asset_manager_edit_session()
+            clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
+            st.session_state.pop("asset_mgr_sel_editor", None)
+            st.session_state.pop("asset_return_to", None)
+            st.rerun()
+
+        return_to_detail = st.session_state.get("asset_return_to") == "asset_detail"
+
+        if st.button("← Back to Asset Overview", key="asset_mgr_back_overview", use_container_width=True):
+            _clear_asset_manager_edit_session()
+            clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
+            st.session_state.pop("asset_mgr_sel_editor", None)
+            st.session_state.pop("asset_return_to", None)
+            st.rerun()
+
+        _render_asset_create_update_form(
+            assets=assets,
+            jobs=jobs,
+            job_label_by_id=job_label_by_id,
+            can_edit=can_edit,
+            edit_only=True,
+            fixed_edit_asset=asset_for_edit,
+            show_return_from_detail_caption=return_to_detail,
+        )
+        st.stop()
+
+    st.subheader("Asset Overview")
+
+    if asset_df.empty:
+        st.info("No assets found.")
+    else:
+        asset_df["assigned_job_name"] = asset_df["assigned_job_id"].map(job_label_by_id)
+
+        f1, f2, f3, f4 = st.columns([1, 1, 1, 2])
+
+        selected_type = f1.selectbox("Filter Type", ["All"] + ASSET_TYPES)
+
+        selected_status = f2.selectbox("Filter Status", ["All"] + ASSET_STATUSES)
+
+        active_options = ["All", "Active Only", "Inactive Only"]
+        selected_active = f3.selectbox("Filter Active", active_options)
+
+        search = f4.text_input(
+            "Search Assets",
+            placeholder="Search asset ID, name, serial, location, employee, job, notes",
+        )
+
+        filtered = asset_df.copy()
+
+        if selected_type != "All" and "asset_type" in filtered.columns:
+            filtered = filtered[filtered["asset_type"].astype(str) == selected_type]
+
+        if selected_status != "All" and "status" in filtered.columns:
+            filtered = filtered[filtered["status"].astype(str) == selected_status]
+
+        if selected_active == "Active Only" and "is_active" in filtered.columns:
+            filtered = filtered[filtered["is_active"] == True]
+        elif selected_active == "Inactive Only" and "is_active" in filtered.columns:
+            filtered = filtered[filtered["is_active"] == False]
+
+        if search.strip():
+            s = search.strip().lower()
+            mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
+            filtered = filtered[mask.any(axis=1)]
+
+        show_cols = [
+            c
+            for c in [
+                "asset_id",
+                "asset_name",
+                "asset_type",
+                "category",
+                "status",
+                "is_rental",
+                "serial_number",
+                "manufacturer",
+                "model",
+                "assigned_employee",
+                "assigned_job_name",
+                "location",
+                "inspection_due_date",
+                "maintenance_due_date",
+                "is_active",
+            ]
+            if c in filtered.columns
+        ]
+
+        if "id" not in filtered.columns:
+            st.dataframe(filtered[show_cols], use_container_width=True, hide_index=True)
+        else:
+            _, sel = render_selectable_dataframe(
+                filtered,
+                table_key=TABLE_KEY_ASSET_MANAGER,
+                id_column="id",
+                columns=show_cols,
+                editor_key="asset_mgr_sel_editor",
+            )
+            actions = render_selection_action_bar(
+                TABLE_KEY_ASSET_MANAGER,
+                sel,
+                can_view=True,
+                can_edit=can_edit,
+                can_delete=can_edit,
+                export_df=filtered,
+                id_column="id",
+                export_filename="assets_export.csv",
+            )
+            if actions["view"] and sel:
+                st.session_state["asset_detail_id"] = str(sel[0])
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
+                st.rerun()
+            if actions["edit"] and sel:
+                st.session_state["asset_view_mode"] = "edit"
+                st.session_state["selected_asset_id"] = str(sel[0])
+                st.session_state.pop("asset_return_to", None)
+                clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
+                st.session_state.pop("asset_mgr_sel_editor", None)
+                st.rerun()
+            pending_del = st.session_state.get(IPS_PENDING_DELETE)
+            if not isinstance(pending_del, dict):
+                pending_del = {}
+                st.session_state[IPS_PENDING_DELETE] = pending_del
+            if actions.get("confirm_delete") and pending_del.get(TABLE_KEY_ASSET_MANAGER) and can_edit:
+                ids_to_delete = [str(x).strip() for x in pending_del[TABLE_KEY_ASSET_MANAGER] if str(x).strip()]
+                errors: list[str] = []
+                deleted_n = 0
+                for aid in ids_to_delete:
+                    try:
+                        delete_rows_admin("assets", {"id": aid})
+                        deleted_n += 1
+                    except Exception as exc:
+                        errors.append(f"{aid}: {exc}")
+                pending_del.pop(TABLE_KEY_ASSET_MANAGER, None)
+                st.session_state[IPS_PENDING_DELETE] = pending_del
+                clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
+                st.session_state.pop("asset_mgr_sel_editor", None)
+                if errors and deleted_n == 0:
+                    for msg in errors[:8]:
+                        st.error(msg)
+                    try:
+                        st.toast("Could not delete selected assets.", icon="⚠️")
+                    except Exception:
+                        pass
+                elif errors:
+                    st.warning(f"Deleted {deleted_n} asset(s); {len(errors)} could not be removed.")
+                    for msg in errors[:8]:
+                        st.error(msg)
+                    try:
+                        st.toast(f"Deleted {deleted_n}; {len(errors)} failed.", icon="⚠️")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        st.toast(f"Deleted {deleted_n} asset(s).", icon="✅")
+                    except Exception:
+                        st.success(f"Deleted {deleted_n} asset(s).")
+                st.rerun()
+
+    st.markdown("---")
+    _render_asset_create_update_form(
+        assets=assets,
+        jobs=jobs,
+        job_label_by_id=job_label_by_id,
+        can_edit=can_edit,
+        edit_only=False,
+        fixed_edit_asset=None,
+        show_return_from_detail_caption=False,
+    )

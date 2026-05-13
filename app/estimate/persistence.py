@@ -20,6 +20,7 @@ from db import (
 from app.estimate.calculations import _D0, _q2, compute_totals, money_db
 from app.estimate.defaults import (
     _apply_default_prepared_by_from_profile,
+    _estimate_table_column_names,
     _normalize_prepared_by_id_value,
     _payload_customer_location_for_db,
     _payload_prepared_by_for_db,
@@ -118,6 +119,61 @@ def _sanitize_estimate_json_for_storage(est: dict) -> dict:
         if isinstance(k, str) and (k.startswith("_extracted_") or k.startswith("_import_")):
             out.pop(k, None)
     return out
+
+
+def patch_estimate_job_scope(
+    estimate_id: str,
+    est: dict,
+    *,
+    scope_of_work: str,
+    customer_responsibilities: str,
+) -> tuple[bool, str]:
+    """
+    PATCH only scope columns + ``estimate_json`` for an existing estimate row (never inserts).
+
+    Mirrors narrative fields into ``est`` and ``estimate_json``; updates ``updated_at`` when the
+    column exists. Rolls back in-memory ``est`` fields if the update fails.
+    """
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return False, "Missing estimate id."
+
+    prev_s = est.get("scope_of_work")
+    prev_c = est.get("customer_responsibilities")
+    prev_ts = est.get("scope_fields_updated_at")
+
+    sow = "" if scope_of_work is None else str(scope_of_work)
+    cr = "" if customer_responsibilities is None else str(customer_responsibilities)
+    now_iso = datetime.utcnow().isoformat()
+
+    est["scope_of_work"] = sow
+    est["customer_responsibilities"] = cr
+    est["scope_fields_updated_at"] = now_iso
+
+    ej = _sanitize_estimate_json_for_storage(est)
+    cols = _estimate_table_column_names()
+    payload: dict = {}
+    if "scope_of_work" in cols:
+        payload["scope_of_work"] = sow
+    if "customer_responsibilities" in cols:
+        payload["customer_responsibilities"] = cr
+    if "updated_at" in cols:
+        payload["updated_at"] = now_iso
+    if "estimate_json" in cols:
+        payload["estimate_json"] = ej
+    if not payload:
+        est["scope_of_work"] = prev_s
+        est["customer_responsibilities"] = prev_c
+        est["scope_fields_updated_at"] = prev_ts
+        return False, "Database estimates table has no scope/estimate_json columns to update."
+    try:
+        update_rows_admin("estimates", payload, {"id": eid})
+    except Exception as ex:
+        est["scope_of_work"] = prev_s
+        est["customer_responsibilities"] = prev_c
+        est["scope_fields_updated_at"] = prev_ts
+        return False, str(ex)
+    return True, ""
 
 
 def validate_import_customer_id(customer_id) -> str:

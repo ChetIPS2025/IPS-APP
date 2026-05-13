@@ -48,6 +48,7 @@ try:
         index_by_employee_date,
         monday_of_week,
         sum_employee_week_hours,
+        upsert_time_entry,
         week_dates,
     )
 except ImportError:
@@ -60,6 +61,7 @@ except ImportError:
         index_by_employee_date,
         monday_of_week,
         sum_employee_week_hours,
+        upsert_time_entry,
         week_dates,
     )
 
@@ -159,7 +161,89 @@ class _TTWeekDataResult(NamedTuple):
 
 
 def _tt_fast_entry() -> bool:
-    return bool(st.session_state.get(TT_FAST_ENTRY_KEY, False))
+    """Legacy fast-entry layout disabled; simplified timesheet always uses standard density."""
+    return False
+
+
+_TT_CLOSED_JOB_STATUSES = frozenset(
+    {"closed", "complete", "completed", "cancelled", "archived", "close", "done"}
+)
+
+
+def _tt_entry_time_type(ent: dict) -> str:
+    s = str(ent.get("time_type") or "").strip().upper()
+    if s in ("OT", "O/T", "O-T"):
+        return "OT"
+    return "ST"
+
+
+def _tt_time_type_label(ent: dict) -> str:
+    return "O/T" if _tt_entry_time_type(ent) == "OT" else "S/T"
+
+
+def _tt_job_is_active_open(j: dict) -> bool:
+    st = str(j.get("status") or j.get("job_status") or "").strip().lower()
+    if not st:
+        return True
+    return st not in _TT_CLOSED_JOB_STATUSES
+
+
+def _tt_day_column_totals(
+    idx: dict[tuple[str, str], list[dict]],
+    days: list[date],
+    show_emp_ids: set[str],
+    fj_id: str | None,
+) -> list[float]:
+    out = [0.0] * len(days)
+    for di, d in enumerate(days):
+        wd = d.isoformat()
+        for eid in show_emp_ids:
+            for ent in idx.get((str(eid), wd), []):
+                if fj_id:
+                    jid = str(ent.get("job_id") or "").strip()
+                    if jid and jid != fj_id:
+                        continue
+                out[di] += float(ent.get("hours") or 0)
+    return out
+
+
+def _tt_emp_hours_breakdown_for_week(
+    eid: str, days: list[date], idx: dict[tuple[str, str], list[dict]], fj_id: str | None
+) -> tuple[float, float, float]:
+    st_sum = 0.0
+    ot_sum = 0.0
+    for d in days:
+        wd = d.isoformat()
+        for ent in idx.get((eid, wd), []):
+            if fj_id:
+                jid = str(ent.get("job_id") or "").strip()
+                if jid and jid != fj_id:
+                    continue
+            h = float(ent.get("hours") or 0)
+            if _tt_entry_time_type(ent) == "OT":
+                ot_sum += h
+            else:
+                st_sum += h
+    return st_sum + ot_sum, st_sum, ot_sum
+
+
+def _tt_emp_hours_breakdown_for_day(
+    eid: str, d: date, idx: dict[tuple[str, str], list[dict]], fj_id: str | None
+) -> tuple[float, float, float]:
+    st_sum = 0.0
+    ot_sum = 0.0
+    wd = d.isoformat()
+    for ent in idx.get((eid, wd), []):
+        if fj_id:
+            jid = str(ent.get("job_id") or "").strip()
+            if jid and jid != fj_id:
+                continue
+        h = float(ent.get("hours") or 0)
+        if _tt_entry_time_type(ent) == "OT":
+            ot_sum += h
+        else:
+            st_sum += h
+    return st_sum + ot_sum, st_sum, ot_sum
 
 
 def _tt_qa_day_key(eid: str) -> str:
@@ -277,6 +361,8 @@ def _persist_time_entry_row(te_id: str, job_label_to_id: dict[str, str]) -> tupl
         return False, "Invalid work item selection."
     hrs = float(st.session_state.get(hk) or 0)
     note = str(st.session_state.get(nk) or "").strip()
+    tt_lbl = str(st.session_state.get(f"tt_tt_{te_id}") or "S/T")
+    tt_db = "OT" if tt_lbl == "O/T" else "ST"
     wi_type = str(wi.get("type") or "").strip()
     if wi_type == "job":
         new_jid = str(wi.get("id") or "").strip()
@@ -296,6 +382,7 @@ def _persist_time_entry_row(te_id: str, job_label_to_id: dict[str, str]) -> tupl
         {
             "hours": hrs,
             "notes": note,
+            "time_type": tt_db,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -304,7 +391,7 @@ def _persist_time_entry_row(te_id: str, job_label_to_id: dict[str, str]) -> tupl
     except Exception as exc:
         return False, str(exc)
     snap_k = f"tt_row_snap_{te_id}"
-    st.session_state[snap_k] = (snap_work, hrs, note)
+    st.session_state[snap_k] = (snap_work, hrs, note, tt_db)
     return True, None
 
 
@@ -324,6 +411,8 @@ def _maybe_autosave_entry(te_id: str) -> None:
     note = str(st.session_state.get(nk) or "").strip()
     if not isinstance(wi, dict):
         return
+    tt_lbl = str(st.session_state.get(f"tt_tt_{te_id}") or "S/T")
+    tt_db = "OT" if tt_lbl == "O/T" else "ST"
     wi_type = str(wi.get("type") or "").strip()
     if wi_type == "job":
         candidate_work = ("job", str(wi.get("id") or "").strip())
@@ -331,9 +420,12 @@ def _maybe_autosave_entry(te_id: str) -> None:
         candidate_work = ("non_job", str(wi.get("code") or "").strip())
     else:
         return
-    candidate = (candidate_work, hrs, note)
+    candidate = (candidate_work, hrs, note, tt_db)
     snap_k = f"tt_row_snap_{te_id}"
-    if st.session_state.get(snap_k) == candidate:
+    prev = st.session_state.get(snap_k)
+    if prev is not None and len(prev) == 3:
+        prev = (prev[0], prev[1], prev[2], "ST")
+    if prev == candidate:
         return
     ok, err = _persist_time_entry_row(te_id, jm)
     if ok:
@@ -362,10 +454,12 @@ def _init_row_snap_from_ent(
 ) -> None:
     snap_k = f"tt_row_snap_{te_id}"
     if snap_k not in st.session_state:
+        tt0 = "OT" if _tt_entry_time_type(ent) == "OT" else "ST"
         st.session_state[snap_k] = (
             work_item_snap,
             float(ent.get("hours", 0) or 0),
             str(ent.get("notes") or "").strip(),
+            tt0,
         )
 
 
@@ -979,6 +1073,7 @@ def _tt_flat_entry_rows(
                 "employee": emp_id_to_name.get(eid, eid[:8] + "…" if len(eid) > 8 else eid),
                 "work_date": str(e.get("work_date") or "")[:10],
                 "job": job_disp,
+                "type": _tt_time_type_label(e),
                 "hours": float(e.get("hours") or 0),
                 "notes": str(e.get("notes") or ""),
             }
@@ -1049,8 +1144,8 @@ def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> No
 
 
 def _tt_render_header_section() -> tuple[bool, bool]:
-    """Branding, styles, viewport, Fast Entry. Returns (can_edit, fast)."""
-    render_header("Time Tracking", subtitle="Weekly timesheet — by employee and job")
+    """Branding, styles, viewport. Returns (can_edit, fast); fast is always False (legacy)."""
+    render_header("Time Tracking", subtitle="Log hours by employee, job, and day — S/T vs O/T")
 
     _inject_tt_styles()
     ensure_narrow_viewport_detected()
@@ -1058,19 +1153,7 @@ def _tt_render_header_section() -> tuple[bool, bool]:
     role = current_role()
     can_edit = role in TT_EDIT_ROLES
 
-    if can_edit:
-        st.session_state.setdefault(TT_FAST_ENTRY_KEY, False)
-        st.checkbox(
-            "Fast Entry Mode",
-            key=TT_FAST_ENTRY_KEY,
-            help="Denser grid and controls; same data and filters.",
-        )
-
-    fast = _tt_fast_entry()
-    if fast:
-        _inject_tt_fast_compact_css()
-
-    return can_edit, fast
+    return can_edit, False
 
 
 def _tt_render_toolbar_section(today: date) -> tuple[date, list[date], date]:
@@ -1080,11 +1163,9 @@ def _tt_render_toolbar_section(today: date) -> tuple[date, list[date], date]:
     except ImportError:
         from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
 
-    fast = _tt_fast_entry()
     pm_row1, pm_row2 = st.columns([4, 1])
     with pm_row1:
-        if not fast:
-            st.caption("One-day crew grid: **PM Matrix Time Entry** (sidebar).")
+        st.caption("One-day crew grid: **PM Matrix Time Entry** (sidebar).")
     with pm_row2:
         if st.button("PM Matrix", key="tt_open_pm_matrix", use_container_width=True):
             st.session_state[IPS_NAV_PENDING_KEY] = "PM Matrix Time Entry"
@@ -1252,6 +1333,179 @@ def _tt_render_summary_section(
     )
 
 
+def _tt_render_simple_timesheet(
+    *,
+    today: date,
+    week_start: date,
+    days: list[date],
+    filt: _TTFiltersResult,
+    week_data: _TTWeekDataResult,
+    fj_id: str | None,
+) -> tuple[list[float], list[float]]:
+    """Compact per-employee entry: job + S/T|O/T + hours + save; list for selected day."""
+    uid = current_profile().get("id")
+    ts_now = datetime.now(timezone.utc).isoformat()
+    try:
+        jobs_raw = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
+    except Exception:
+        jobs_raw = []
+    active_ids = {str(j.get("id")) for j in jobs_raw if j.get("id") and _tt_job_is_active_open(j)}
+    active_labels = [
+        lb
+        for lb in filt.job_labels_sorted
+        if str(filt.job_label_to_id.get(lb) or "") in active_ids
+    ]
+    if not active_labels:
+        active_labels = [lb for lb in filt.job_labels_sorted if filt.job_label_to_id.get(lb)]
+    if fj_id:
+        active_labels = [lb for lb in active_labels if str(filt.job_label_to_id.get(lb) or "") == fj_id]
+
+    st.subheader("Time entry")
+    wk_date_key = f"tt_simple_work_date_{week_start.isoformat()}"
+    day_isos = [d.isoformat() for d in days]
+    if wk_date_key not in st.session_state or st.session_state[wk_date_key] not in day_isos:
+        st.session_state[wk_date_key] = (today.isoformat() if today in days else days[0].isoformat())
+    sel_iso = st.selectbox(
+        "Working date",
+        day_isos,
+        format_func=lambda s: date.fromisoformat(s).strftime("%a %m/%d"),
+        key=wk_date_key,
+        help="New lines and the lists below use this date.",
+    )
+    work_d = date.fromisoformat(sel_iso)
+    work_iso = work_d.isoformat()
+
+    for emp in week_data.visible_emps:
+        eid = str(emp.get("id"))
+        nm = str(emp.get("name", "") or "—").strip() or "—"
+        wtot, wst, wot = _tt_emp_hours_breakdown_for_week(eid, days, week_data.idx, fj_id)
+        _, dst, dot = _tt_emp_hours_breakdown_for_day(eid, work_d, week_data.idx, fj_id)
+        row_h = sum_employee_week_hours(week_data.grid_rows, eid, days)
+        over = row_h > filt.ot_threshold
+        over_note = f" · over **{filt.ot_threshold:g}** h/week" if over else ""
+
+        with st.container(border=True):
+            st.markdown(f"**{html.escape(nm)}**")
+            st.caption(
+                f"{work_d.strftime('%a %m/%d')}: S/T **{dst:.2f}** h · O/T **{dot:.2f}** h · "
+                f"Week: S/T **{wst:.2f}** · O/T **{wot:.2f}** · Σ **{wtot:.2f}** h{over_note}"
+            )
+
+            q = st.text_input(
+                "Find job",
+                value="",
+                key=f"tt_job_q_{week_start}_{eid}",
+                placeholder="Search job # or name…",
+                label_visibility="collapsed",
+            )
+            qn = str(q or "").strip().lower()
+            job_opts = [lb for lb in active_labels if not qn or qn in lb.lower()]
+            if not job_opts:
+                job_opts = ["(No match — clear search)"]
+
+            with st.form(key=f"tt_add_form_{week_start}_{eid}", clear_on_submit=False):
+                job_pick = st.selectbox("Job", job_opts, key=f"tt_job_pick_{week_start}_{eid}")
+                c1, c2 = st.columns(2)
+                with c1:
+                    tt_pick = st.selectbox("Time type", ["S/T", "O/T"], key=f"tt_tt_pick_{week_start}_{eid}")
+                with c2:
+                    hrs_in = st.number_input(
+                        "Hours",
+                        min_value=0.0,
+                        max_value=99.0,
+                        value=0.0,
+                        step=0.25,
+                        format="%.2f",
+                        key=f"tt_hrs_add_{week_start}_{eid}",
+                    )
+                submitted = st.form_submit_button("Save / Add", use_container_width=True)
+
+            if submitted:
+                if job_pick.startswith("(No match"):
+                    st.warning("Pick a job or clear the search filter.")
+                elif not uid:
+                    st.error("Not signed in; cannot save.")
+                else:
+                    jid = str(filt.job_label_to_id.get(job_pick) or "").strip()
+                    if not jid:
+                        st.error("Could not resolve job for that label.")
+                    else:
+                        tt_db = "OT" if tt_pick == "O/T" else "ST"
+                        try:
+                            upsert_time_entry(
+                                employee_id=eid,
+                                job_id=jid,
+                                work_date=work_d,
+                                hours=float(hrs_in),
+                                notes="",
+                                created_by=uid,
+                                updated_at_iso=ts_now,
+                                non_job_code=None,
+                                time_type=tt_db,
+                            )
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Save failed: {exc}")
+
+            ents = list(week_data.idx.get((eid, work_iso), []))
+            if fj_id:
+                ents = [e for e in ents if (not e.get("job_id")) or str(e.get("job_id")) == fj_id]
+
+            def _sort_key(ent: dict) -> str:
+                jid = str(ent.get("job_id") or "").strip()
+                nj = str(ent.get("non_job_code") or "").strip()
+                if jid:
+                    return str(filt.job_id_to_label.get(jid, jid)).lower()
+                if nj:
+                    return f"non-job {nj}".lower()
+                return ""
+
+            if ents:
+                st.markdown(
+                    '<p class="ips-tt-field-label" style="margin-top:0.5rem;">Entries for this date</p>',
+                    unsafe_allow_html=True,
+                )
+                for ent in sorted(ents, key=_sort_key):
+                    tid = str(ent.get("id") or "")
+                    if not tid:
+                        continue
+                    jid = str(ent.get("job_id") or "").strip()
+                    nj = str(ent.get("non_job_code") or "").strip()
+                    if jid:
+                        jlab = html.escape(str(filt.job_id_to_label.get(jid, jid))[:80])
+                    elif nj:
+                        jlab = html.escape(f"NON-JOB — {nj}")
+                    else:
+                        jlab = "—"
+                    h = float(ent.get("hours") or 0)
+                    ttl = _tt_time_type_label(ent)
+                    line = f"{jlab} · **{ttl}** · {h:.2f} h"
+                    c_a, c_b = st.columns([5, 1])
+                    with c_a:
+                        st.markdown(line, unsafe_allow_html=True)
+                    with c_b:
+                        if st.button("✕", key=f"tt_rm_{tid}", help="Remove this line"):
+                            try:
+                                delete_rows("time_entries", {"id": tid})
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(str(exc))
+
+    wk_st = wk_ot = 0.0
+    for eid in filt.show_emp_ids:
+        _, s, o = _tt_emp_hours_breakdown_for_week(str(eid), days, week_data.idx, fj_id)
+        wk_st += s
+        wk_ot += o
+    st.caption(
+        f"Week total (current filters): S/T **{wk_st:.2f}** h · O/T **{wk_ot:.2f}** h · "
+        f"Σ **{wk_st + wk_ot:.2f}** h"
+    )
+
+    day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
+    grid_ratios = _week_grid_column_ratios(fast=False)
+    return day_col_totals, grid_ratios
+
+
 def _tt_render_grid_section(
     *,
     can_edit: bool,
@@ -1274,38 +1528,6 @@ def _tt_render_grid_section(
     )
     entries_df = pd.DataFrame(flat_rows)
 
-    if can_edit:
-        st.session_state.setdefault(TT_DEFAULT_HOURS_KEY, 8.0)
-        st.session_state.setdefault(TT_AUTOSAVE_KEY, False)
-        with st.container(border=True):
-            st.markdown(
-                '<span class="ips-tt-fast-toolbar-scope" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            tb1, tb2, tb3 = st.columns([1.25, 1.0, 2.8], gap="small")
-            with tb1:
-                dh = st.number_input(
-                    "Def. hrs" if fast else "Default hrs",
-                    min_value=0.0,
-                    max_value=24.0,
-                    value=float(_tt_default_hours()),
-                    step=_hours_step(fast=fast),
-                    key="tt_toolbar_default_hrs",
-                    help=None if fast else "Prefills new-line hours for each day.",
-                )
-                st.session_state[TT_DEFAULT_HOURS_KEY] = float(dh)
-            with tb2:
-                st.checkbox(
-                    "Auto-save",
-                    key=TT_AUTOSAVE_KEY,
-                    help="When on, job / hours / notes save on change; **Save** still commits explicitly.",
-                )
-            with tb3:
-                if not fast:
-                    st.caption(
-                        "One **employee × job × day** line; edit in each row’s **Quick Actions** panel or via the table below."
-                    )
-
     tv_id = st.session_state.get("tt_entry_view_id")
     if tv_id:
         vr = fetch_one("time_entries", {"id": tv_id})
@@ -1315,23 +1537,22 @@ def _tt_render_grid_section(
             st.subheader("Time entry detail")
             e_nm = week_data.emp_id_to_name.get(str(vr.get("employee_id") or ""), "—")
             j_nm = filt.job_id_to_label.get(str(vr.get("job_id") or ""), "—")
+            tt_v = _tt_time_type_label(vr)
             st.markdown(f"**Employee:** {e_nm}")
             st.markdown(f"**Work date:** {vr.get('work_date') or '—'}")
             st.markdown(f"**Job:** {j_nm}")
+            st.markdown(f"**Type:** {tt_v}")
             st.markdown(f"**Hours:** {float(vr.get('hours') or 0):.2f}")
             st.markdown(f"**Notes:** {vr.get('notes') or '—'}")
-            if st.button("← Week", use_container_width=True, key="tt_entry_view_back", help="Back to week grid"):
+            if st.button("← Week", use_container_width=True, key="tt_entry_view_back", help="Back to timesheet"):
                 st.session_state.pop("tt_entry_view_id", None)
                 st.rerun()
             st.divider()
 
     if not entries_df.empty and "id" in entries_df.columns:
         st.subheader("Time entries (this week)")
-        if not _tt_fast_entry():
-            st.caption(
-                "Action bar above the grid. Checkbox on the **left**; selection: **selected_time_entries_ids**."
-            )
-        show_flat = [c for c in ["employee", "work_date", "job", "hours", "notes"] if c in entries_df.columns]
+        st.caption("Select rows for export, edit, or delete.")
+        show_flat = [c for c in ["employee", "work_date", "job", "type", "hours", "notes"] if c in entries_df.columns]
         bar_ph = st.empty()
         _, sel = render_selectable_dataframe(
             entries_df,
@@ -1397,123 +1618,14 @@ def _tt_render_grid_section(
         _render_readonly_pivot(week_data.visible_emps, days, week_data.idx, filt.job_id_to_label)
         return None
 
-    # —— Editable grid —— weekly timesheet: header + employee rows (wide) or stacked days (narrow)
-    if TT_OPEN_EMPLOYEE_POPUP_KEY not in st.session_state:
-        st.session_state[TT_OPEN_EMPLOYEE_POPUP_KEY] = None
-    day_col_totals = [0.0] * 7
-    uid = current_profile().get("id")
-    ts_now = datetime.now(timezone.utc).isoformat()
-    grid_ratios = _week_grid_column_ratios(fast=fast)
-    is_narrow = bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY))
-
-    if not is_narrow:
-        _render_week_header_row(grid_ratios=grid_ratios, days=days)
-
-    for ri, emp in enumerate(week_data.visible_emps):
-        eid = str(emp.get("id"))
-        row_h = sum_employee_week_hours(week_data.grid_rows, eid, days)
-        over = row_h > filt.ot_threshold
-        nm = str(emp.get("name", "") or "—")
-        tot_s = f"{row_h:.1f} h" if fast else f"{row_h:.1f} h / week"
-        zebra = ri % 2
-
-        if is_narrow:
-            with st.container(border=True):
-                st.markdown(
-                    f'<span class="ips-tt-sheet-narrow ips-tt-zebra-{zebra} ips-time-card" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                _render_employee_time_header(
-                    nm=nm,
-                    tot_s=tot_s,
-                    over=over,
-                    ot_threshold=filt.ot_threshold,
-                    eid=eid,
-                )
-                if st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) == eid:
-                    _render_quick_actions_popup(
-                        eid=eid,
-                        emp_name=nm,
-                        days=days,
-                        week_start=week_start,
-                        week_end=week_end,
-                        today=today,
-                        idx=week_data.idx,
-                        fj_id=fj_id,
-                        job_labels_sorted=filt.job_labels_sorted,
-                        job_label_to_id=filt.job_label_to_id,
-                        default_job_label=filt.default_job_label,
-                        fast=fast,
-                        user_id=uid,
-                        ts_iso=ts_now,
-                    )
-                for di, d in enumerate(days):
-                    ds = _render_day_column_body(
-                        d=d,
-                        eid=eid,
-                        idx=week_data.idx,
-                        fj_id=fj_id,
-                        job_id_to_label=filt.job_id_to_label,
-                        show_day_heading=True,
-                    )
-                    day_col_totals[di] += ds
-                st.markdown(
-                    f'<p class="ips-tt-metric" style="text-align:right;margin-top:0.35rem;">Week Σ · {row_h:.1f} h</p>',
-                    unsafe_allow_html=True,
-                )
-        else:
-            row_container = st.container(border=True)
-            with row_container:
-                st.markdown(
-                    '<span class="ips-tt-sheet-emp-card ips-time-card" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                h0, *hday, hlast = st.columns(grid_ratios)
-                with h0:
-                    st.markdown(
-                        f'<span class="ips-tt-sheet-row ips-tt-zebra-{zebra}" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    _render_employee_time_header(
-                        nm=nm,
-                        tot_s=tot_s,
-                        over=over,
-                        ot_threshold=filt.ot_threshold,
-                        eid=eid,
-                    )
-                    if st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) == eid:
-                        _render_quick_actions_popup(
-                            eid=eid,
-                            emp_name=nm,
-                            days=days,
-                            week_start=week_start,
-                            week_end=week_end,
-                            today=today,
-                            idx=week_data.idx,
-                            fj_id=fj_id,
-                            job_labels_sorted=filt.job_labels_sorted,
-                            job_label_to_id=filt.job_label_to_id,
-                            default_job_label=filt.default_job_label,
-                            fast=fast,
-                            user_id=uid,
-                            ts_iso=ts_now,
-                        )
-                for di, d in enumerate(days):
-                    with hday[di]:
-                        ds = _render_day_column_body(
-                            d=d,
-                            eid=eid,
-                            idx=week_data.idx,
-                            fj_id=fj_id,
-                            job_id_to_label=filt.job_id_to_label,
-                            show_day_heading=False,
-                        )
-                        day_col_totals[di] += ds
-                with hlast:
-                    st.caption("Σ")
-                    st.markdown(f'<p class="ips-tt-metric">{row_h:.1f}</p>', unsafe_allow_html=True)
-
-    return day_col_totals, grid_ratios
+    return _tt_render_simple_timesheet(
+        today=today,
+        week_start=week_start,
+        days=days,
+        filt=filt,
+        week_data=week_data,
+        fj_id=fj_id,
+    )
 
 
 def _tt_render_footer_section(day_col_totals: list[float], days: list[date], grid_ratios: list[float]) -> None:
@@ -1763,7 +1875,7 @@ def _render_minimal_table_edit_popup(
     emp_id_to_name: dict[str, str],
     fast: bool,
 ) -> None:
-    """Tiny editor for table Edit action: hours + notes only; job/non-job fixed to current row."""
+    """Tiny editor for table Edit action: hours, notes, S/T vs O/T; job/non-job fixed to current row."""
     te_id = str(ent.get("id"))
     cur_jid = str(ent.get("job_id") or "").strip()
     cur_nj = str(ent.get("non_job_code") or "").strip()
@@ -1771,6 +1883,13 @@ def _render_minimal_table_edit_popup(
         wi_snap = ("job", cur_jid)
     else:
         wi_snap = ("non_job", cur_nj)
+    wk_item = f"work_item_{te_id}"
+    if cur_jid:
+        lb = _job_label_for_id(job_label_to_id, cur_jid) or str(job_id_to_label.get(cur_jid, "—"))
+        st.session_state[wk_item] = {"type": "job", "id": cur_jid, "label": str(lb)}
+    elif cur_nj:
+        code = str(cur_nj).strip()
+        st.session_state[wk_item] = {"type": "non_job", "code": code, "label": f"NON-JOB — {code}"}
     _init_row_snap_from_ent(te_id, ent, wi_snap)
 
     autosave = bool(st.session_state.get(TT_AUTOSAVE_KEY))
@@ -1792,6 +1911,14 @@ def _render_minimal_table_edit_popup(
             '<p class="ips-tt-edit-mini-title">Edit entry</p>'
             f'<p class="ips-tt-edit-mini-sub">{sub_line}</p>',
             unsafe_allow_html=True,
+        )
+        tt_ix = 0 if _tt_entry_time_type(ent) == "ST" else 1
+        st.selectbox(
+            "Time type",
+            ["S/T", "O/T"],
+            index=tt_ix,
+            key=f"tt_tt_{te_id}",
+            **ch_as,
         )
         h1, h2 = st.columns(2, gap="small")
         with h1:
@@ -2222,6 +2349,8 @@ def _render_readonly_pivot(
             wd = d.isoformat()
             ents = idx.get((eid, wd), [])
             h = sum(float(e.get("hours", 0) or 0) for e in ents)
+            st_h = sum(float(e.get("hours", 0) or 0) for e in ents if _tt_entry_time_type(e) == "ST")
+            ot_h = sum(float(e.get("hours", 0) or 0) for e in ents if _tt_entry_time_type(e) == "OT")
             _labels: set[str] = set()
             for e in ents:
                 jid = str(e.get("job_id") or "").strip()
@@ -2232,7 +2361,10 @@ def _render_readonly_pivot(
                     if nj:
                         _labels.add(f"NON-JOB — {nj}")
             jobs = ", ".join(sorted(_labels))
-            r[d.strftime("%a %m/%d")] = f"{h:.1f} h" + (f" ({jobs})" if jobs else "")
+            day_cell = f"{h:.1f} h (S/T {st_h:.1f} · O/T {ot_h:.1f})"
+            if jobs:
+                day_cell += f" ({jobs})"
+            r[d.strftime("%a %m/%d")] = day_cell
             total += h
         r["Σ Week"] = f"{total:.1f}"
         rows.append(r)

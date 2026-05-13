@@ -80,6 +80,7 @@ from pages.estimate_editor import (
     parse_estimate_json_bytes,
     render_estimate_editor,
 )
+from app.estimate.job_scope import ensure_scope_widgets_bound
 
 
 def _estimates_page_admin_read() -> bool:
@@ -272,6 +273,7 @@ def _load_estimate_into_session(selected_id: str) -> None:
     st.session_state["estimate_editor_quote_ready"] = True
     # Ensure editor defaults exist (does not overwrite loaded values).
     ensure_state()
+    ensure_scope_widgets_bound(loaded, selected_id)
 
 
 def _render_estimate_list() -> None:
@@ -596,6 +598,8 @@ def _render_estimate_list() -> None:
                         jid = str(res.job.get("id") or "")
                         if jid and st.session_state.get("est_job_recv_open_job_db", True):
                             st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                            st.session_state["job_view_mode"] = "edit"
+                            st.session_state["selected_job_id"] = jid
                             st.session_state["job_mode"] = "edit"
                             st.session_state["job_edit_id"] = jid
                         st.success(res.message)
@@ -717,6 +721,8 @@ def _render_estimate_list() -> None:
                     st.caption(f"Source estimate quote · {qn}")
                 if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
                     st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                    st.session_state["job_view_mode"] = "edit"
+                    st.session_state["selected_job_id"] = str(open_jid)
                     st.session_state["job_mode"] = "edit"
                     st.session_state["job_edit_id"] = str(open_jid)
                     st.rerun()
@@ -743,6 +749,8 @@ def _render_estimate_list() -> None:
                         jid = str(res.job.get("id") or "")
                         if jid and st.session_state.get("est_list_create_job_open_db", True):
                             st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                            st.session_state["job_view_mode"] = "edit"
+                            st.session_state["selected_job_id"] = jid
                             st.session_state["job_mode"] = "edit"
                             st.session_state["job_edit_id"] = jid
                         st.rerun()

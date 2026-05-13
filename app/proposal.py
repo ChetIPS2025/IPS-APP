@@ -32,6 +32,7 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
     "CONTACT_NAME",
     "PROPOSAL_AMOUNT",
     "SCOPE_OF_WORK",
+    "CUSTOMER_RESPONSIBILITIES",
     "PREPARED_BY",
     "DATE",
     "PREPARED_BY_PHONE",
@@ -416,6 +417,7 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
         ("CONTACT_NAME", "Contact"),
         ("PROPOSAL_AMOUNT", "Proposal amount"),
         ("SCOPE_OF_WORK", "Scope of work"),
+        ("CUSTOMER_RESPONSIBILITIES", "Customer responsibilities"),
         ("PREPARED_BY", "Prepared by"),
         ("DATE", "Date"),
         ("PREPARED_BY_PHONE", "Phone"),
@@ -438,53 +440,46 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
     )
 
 
-def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
+def proposal_preview_page_html(docx_bytes: bytes | None) -> str:
     """
-    Proposal preview: **values table first** (same map as the Word template / :func:`proposal_values`),
-    then optional **DOCX-derived** paragraphs and tables from the filled file when extraction succeeds.
+    Single shared HTML shell for on-screen proposal preview.
+
+    Content is derived only from the **filled** ``.docx`` bytes (same bytes as **Download Proposal (Word)**),
+    so preview, save snapshot, and exports stay aligned with the packaged template.
     """
-    fields = proposal_values_preview_html(fallback_vals)
-    intro = (
-        '<p class="ips-proposal-intro">'
-        "<strong>Proposal values</strong> — same placeholders filled in your downloaded <strong>.docx</strong>.</p>"
-    )
-    # Visual chrome (desk + page) is styled via CSS injected in the estimate editor before ``st.html``.
     desk = '<div class="ips-proposal-preview-root ips-proposal-preview-desk">'
-    page_open = '<div class="ips-proposal-preview-page ips-proposal-docx-preview">'
+    page_open = '<div class="ips-proposal-preview-page ips-proposal-docx-preview ips-proposal-template-page">'
     page_close = "</div></div>"
 
-    docx_block = ""
-    if docx_bytes:
-        inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
-        wrapped = _wrap_docx_preview(inner)
-        if wrapped:
-            n_plain = _preview_plain_text_len(inner)
-            if n_plain >= 20:
-                docx_block = (
-                    '<div class="ips-proposal-doc-section ips-proposal-doc-section--full">'
-                    '<p class="ips-proposal-section-hint ips-proposal-section-hint--muted">'
-                    "<strong>Document preview</strong> — text and tables read from the generated Word file "
-                    "(open Word for exact layout).</p>"
-                    f"{wrapped}</div>"
-                )
-            else:
-                docx_block = (
-                    '<div class="ips-proposal-doc-section ips-proposal-doc-section--partial">'
-                    '<p class="ips-proposal-section-hint ips-proposal-section-hint--soft">'
-                    "<strong>Partial text from the .docx</strong> — some templates use shapes or content "
-                    "controls with little extractable text here.</p>"
-                    f"{wrapped}</div>"
-                )
-
     if not docx_bytes:
-        tail = (
+        inner = (
             '<p class="ips-proposal-preview-error">'
             "<strong>No proposal document was generated.</strong> "
-            "Fix any Word template errors above, then try again.</p>"
+            "Confirm **assets/estimate_template_autofill_logo_updated.docx** is present, then open the "
+            "<strong>Proposal</strong> tab again.</p>"
         )
-        return f"{desk}{page_open}{intro}{fields}{tail}{page_close}"
+        return f"{desk}{page_open}{inner}{page_close}"
 
-    return f"{desk}{page_open}{intro}{fields}{docx_block}{page_close}"
+    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
+    wrapped = _wrap_docx_preview(inner)
+    if not wrapped.strip():
+        inner = (
+            '<p class="ips-proposal-preview-error">'
+            "The Word file was built but no preview text could be extracted from this template. "
+            "Use <strong>Download Proposal (Word)</strong> for the full layout.</p>"
+        )
+        return f"{desk}{page_open}{inner}{page_close}"
+
+    return f"{desk}{page_open}{wrapped}{page_close}"
+
+
+def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
+    """
+    Backward-compatible wrapper. ``fallback_vals`` is ignored; preview is **docx-only**
+    (see :func:`proposal_preview_page_html`).
+    """
+    _ = fallback_vals
+    return proposal_preview_page_html(docx_bytes)
 
 
 def proposal_values(
@@ -507,15 +502,18 @@ def proposal_values(
     prepared = _proposal_prepared_by_display(est)
     jn = _s(job_name or est.get("job_name"))
     if not jn:
-        jn = "Project Quote"
+        jn = "Project"
+    # Template title line is ``{{JOB_NAME}} – Quote`` — supply only the parenthesized job title portion.
+    job_title_token = f"({jn})"
     return {
-        "JOB_NAME": jn,
+        "JOB_NAME": job_title_token,
         "QUOTE_NUMBER": _s(est.get("quote_number")),
         "CUSTOMER_NAME": cust,
         "CUSTOMER_LOCATION": _s(customer_location),
         "CONTACT_NAME": _s_contact(contact_name),
         "PROPOSAL_AMOUNT": pt,
         "SCOPE_OF_WORK": _s(est.get("scope_of_work")),
+        "CUSTOMER_RESPONSIBILITIES": _s(est.get("customer_responsibilities")),
         "DATE": datetime.now().strftime("%B %d, %Y"),
         "PREPARED_BY": _s(prepared),
         "PREPARED_BY_PHONE": _s(prepared_by_phone),
@@ -642,6 +640,7 @@ def _normalize_placeholder_tokens(text: str) -> str:
         (r"\{\{\s*Customer\s+Name\s*\}\}", "{{CUSTOMER_NAME}}"),
         (r"\{\{\s*Customer\s+Location\s*\}\}", "{{CUSTOMER_LOCATION}}"),
         (r"\{\{\s*Scope\s+of\s+Work\s*\}\}", "{{SCOPE_OF_WORK}}"),
+        (r"\{\{\s*Customer\s+Responsibilities\s*\}\}", "{{CUSTOMER_RESPONSIBILITIES}}"),
         (r"\{\{\s*Job\s*Name\s*\}\}", "{{JOB_NAME}}"),
         (r"\{\{\s*Quote\s*Number\s*\}\}", "{{QUOTE_NUMBER}}"),
         (r"\{\{\s*Contact\s*Name\s*\}\}", "{{CONTACT_NAME}}"),

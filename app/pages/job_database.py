@@ -240,7 +240,8 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v11"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v12"
+JOB_DB_DETAIL_VIEW_CSS_KEY = "job_db_detail_view_css_v1"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -331,7 +332,7 @@ def _inject_job_database_responsive_styles() -> None:
             align-items: center !important;
             column-gap: 0.75rem !important;
             width: 100% !important;
-            min-width: 1120px !important;
+            min-width: 1260px !important;
             box-sizing: border-box !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
@@ -393,6 +394,12 @@ def _inject_job_database_responsive_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
             [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(11) {
+            flex: 0 0 auto !important;
+            min-width: 52px !important;
+            max-width: 76px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(12) {
             flex: 0 0 auto !important;
             min-width: 52px !important;
             max-width: 72px !important;
@@ -829,9 +836,89 @@ def _safe_date_value(value):
 
 
 def _clear_job_mode() -> None:
+    st.session_state["job_view_mode"] = "list"
+    st.session_state["selected_job_id"] = None
     st.session_state.pop("job_mode", None)
     st.session_state.pop("job_edit_id", None)
     st.session_state.pop("job_number_manual_input", None)
+
+
+def _sync_job_mode_from_view_state() -> None:
+    """Keep legacy ``job_mode`` / ``job_edit_id`` aligned with ``job_view_mode`` for the add/edit panel."""
+    jvm = str(st.session_state.get("job_view_mode") or "list").strip().lower()
+    sid = str(st.session_state.get("selected_job_id") or "").strip()
+    can_edit = current_role() in {"admin", "manager"}
+    if jvm == "create" and can_edit:
+        st.session_state["job_mode"] = "add"
+        st.session_state.pop("job_edit_id", None)
+    elif jvm == "edit" and sid and (can_edit or current_role() == "employee"):
+        st.session_state["job_mode"] = "edit"
+        st.session_state["job_edit_id"] = sid
+    elif jvm in ("list", "view"):
+        st.session_state.pop("job_mode", None)
+        st.session_state.pop("job_edit_id", None)
+
+
+def _migrate_job_view_mode_from_legacy_session() -> None:
+    """Older flows set ``job_mode`` only; promote to ``job_view_mode`` + ``selected_job_id``."""
+    jvm = str(st.session_state.get("job_view_mode") or "list").strip().lower()
+    if jvm != "list":
+        return
+    jm = st.session_state.get("job_mode")
+    je = str(st.session_state.get("job_edit_id") or "").strip()
+    if jm == "edit" and je:
+        st.session_state["job_view_mode"] = "edit"
+        st.session_state["selected_job_id"] = je
+    elif jm == "add":
+        st.session_state["job_view_mode"] = "create"
+        st.session_state["selected_job_id"] = None
+
+
+def _inject_job_detail_view_page_css() -> None:
+    if st.session_state.get(JOB_DB_DETAIL_VIEW_CSS_KEY):
+        return
+    st.session_state[JOB_DB_DETAIL_VIEW_CSS_KEY] = True
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-detail-sticky-host) {
+            position: sticky;
+            top: 0.5rem;
+            z-index: 50;
+            background: linear-gradient(180deg, #f8fafc 92%, transparent);
+            padding-bottom: 0.35rem;
+            margin-bottom: 0.25rem;
+        }
+        .ips-job-detail-hero {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.1rem 1.25rem;
+            margin: 0.5rem 0 1rem 0;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        }
+        .ips-job-detail-hero h1 {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0 0 0.35rem 0;
+            line-height: 1.2;
+        }
+        .ips-job-detail-meta {
+            color: #475569;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .ips-job-detail-section-title {
+            font-size: 1.12rem;
+            font-weight: 750;
+            color: #0f172a;
+            margin: 0 0 0.5rem 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _job_detail_display_number(row: dict[str, Any] | None, *, has_job_number_column: bool) -> str:
@@ -1839,8 +1926,20 @@ def _render_job_card_list(
                 unsafe_allow_html=True,
             )
 
-            b1, b2 = st.columns([3.2, 1.0], gap="small")
+            b1, b2, b3 = st.columns([2.2, 1.0, 1.0], gap="small")
             with b1:
+                if st.button(
+                    "👁 View",
+                    key=f"job_card_view_{jid}",
+                    use_container_width=True,
+                ):
+                    clear_selected_ids(TABLE_KEY_JOBS)
+                    st.session_state["job_view_mode"] = "view"
+                    st.session_state["selected_job_id"] = jid
+                    st.session_state.pop("job_mode", None)
+                    st.session_state.pop("job_edit_id", None)
+                    st.rerun()
+            with b2:
                 if st.button(
                     "Open",
                     key=f"job_card_open_{jid}",
@@ -1850,11 +1949,13 @@ def _render_job_card_list(
                     help=None if allow_open else "You do not have access to open this job.",
                 ):
                     clear_selected_ids(TABLE_KEY_JOBS)
+                    st.session_state["job_view_mode"] = "edit"
+                    st.session_state["selected_job_id"] = jid
                     st.session_state["job_mode"] = "edit"
                     st.session_state["job_edit_id"] = jid
                     st.session_state.pop("job_number_manual_input", None)
                     st.rerun()
-            with b2:
+            with b3:
                 del_help = (
                     "Only admin or pm can delete jobs."
                     if not can_edit
@@ -1933,6 +2034,8 @@ def _render_job_db_top_bar(
                 disabled=not can_edit,
                 key="job_top_create",
             ):
+                st.session_state["job_view_mode"] = "create"
+                st.session_state["selected_job_id"] = None
                 st.session_state["job_mode"] = "add"
                 st.session_state.pop("job_edit_id", None)
                 st.session_state.pop("job_number_manual_input", None)
@@ -2094,17 +2197,84 @@ def render() -> None:
 
     jobs_df = pd.DataFrame(jobs)
 
-    mode = st.session_state.get("job_mode")
+    if "job_view_mode" not in st.session_state:
+        st.session_state["job_view_mode"] = "list"
+    if "selected_job_id" not in st.session_state:
+        st.session_state["selected_job_id"] = None
+    _migrate_job_view_mode_from_legacy_session()
+
+    jvm_route = str(st.session_state.get("job_view_mode") or "list").strip().lower()
+    sid_route = str(st.session_state.get("selected_job_id") or "").strip()
+
+    if jvm_route == "edit" and not sid_route:
+        _clear_job_mode()
+        st.rerun()
+
+    if jvm_route == "view" and sid_route:
+        job_row = next((j for j in jobs if str(j.get("id")) == sid_route), None)
+        if not job_row:
+            st.error("That job could not be found.")
+            _clear_job_mode()
+            st.rerun()
+        est_row: dict[str, Any] | None = None
+        if job_row.get("estimate_id"):
+            eid_est = str(job_row.get("estimate_id"))
+            est_row = next((e for e in estimates if str(e.get("id")) == eid_est), None)
+            if not est_row:
+                est_row = _fetch_estimate_row_by_id(eid_est)
+        _inject_job_detail_view_page_css()
+        try:
+            from app.pages.job_database_detail_view import render_job_database_detail_view_page as _render_jd_detail
+        except ImportError:
+            from pages.job_database_detail_view import render_job_database_detail_view_page as _render_jd_detail  # type: ignore
+
+        def _clear_job_detail_view() -> None:
+            st.session_state["job_view_mode"] = "list"
+            st.session_state["selected_job_id"] = None
+            st.session_state.pop("job_mode", None)
+            st.session_state.pop("job_edit_id", None)
+
+        def _goto_job_edit_from_detail(jid: str) -> None:
+            st.session_state["job_view_mode"] = "edit"
+            st.session_state["selected_job_id"] = str(jid)
+            st.session_state["job_mode"] = "edit"
+            st.session_state["job_edit_id"] = str(jid)
+            st.session_state.pop("job_number_manual_input", None)
+
+        _render_jd_detail(
+            job_row=job_row,
+            has_job_number_column=has_job_number_column,
+            has_customer_location_column=has_customer_location_column,
+            customers=customers,
+            customer_name_by_id=customer_name_by_id,
+            estimate_label_map=estimate_label_map,
+            estimate_quote_by_id=estimate_quote_by_id,
+            estimate_detail=est_row,
+            location_by_id=location_by_id,
+            contact_label_by_id=contact_label_by_id,
+            can_edit=can_edit,
+            admin_read=admin_read,
+            on_clear_view=_clear_job_detail_view,
+            on_sync_edit=_goto_job_edit_from_detail,
+        )
+        st.stop()
+
+    _sync_job_mode_from_view_state()
+
+    jvm_panel = str(st.session_state.get("job_view_mode") or "list").strip().lower()
+    sid_panel = str(st.session_state.get("selected_job_id") or st.session_state.get("job_edit_id") or "").strip()
     panel_open = bool(
-        mode in ("add", "edit") and (can_edit or (mode == "edit" and current_role() == "employee"))
+        (jvm_panel == "create" and can_edit)
+        or (jvm_panel == "edit" and (can_edit or current_role() == "employee") and sid_panel)
     )
 
     if panel_open:
         st.markdown('<span class="ips-job-detail-view-anchor"></span>', unsafe_allow_html=True)
+        mode = "add" if jvm_panel == "create" else "edit"
         selected_job: dict[str, Any] | None = None
         estimate_detail: dict[str, Any] | None = None
         if mode == "edit":
-            edit_id = st.session_state.get("job_edit_id")
+            edit_id = st.session_state.get("selected_job_id") or st.session_state.get("job_edit_id")
             if edit_id:
                 selected_job = next((j for j in jobs if str(j.get("id")) == str(edit_id)), None)
             if not selected_job:
@@ -2185,6 +2355,8 @@ def render() -> None:
                         type="primary",
                         use_container_width=True,
                     ):
+                        st.session_state["job_view_mode"] = "create"
+                        st.session_state["selected_job_id"] = None
                         st.session_state["job_mode"] = "add"
                         st.session_state.pop("job_edit_id", None)
                         st.session_state.pop("job_number_manual_input", None)
@@ -2307,12 +2479,12 @@ def render() -> None:
                 use_table = st.session_state.get("job_db_view_mode_radio", "Table") == "Table"
                 if use_table:
                     st.caption(
-                        "Checkbox on the **left**; **Del** deletes one job (same rules as bulk). "
+                        "Checkbox on the **left**; **👁** opens read-only job details; **Del** deletes one job (same rules as bulk). "
                         "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
                     )
                 else:
                     st.caption(
-                        "Tap **Open** on a card to view or edit that job. "
+                        "**View** — read-only job portal. **Open** — edit job (admin/manager/employee). "
                         "Use **🗑** on a card for a single-job delete, or switch to **Table** for checkbox selection."
                     )
 
@@ -2332,7 +2504,7 @@ def render() -> None:
                         # Match Estimates table rhythm: fixed columns + explicit weights.
 
                         # Visible order (exact):
-                        # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
+                        # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | View | Del
                         col_weights = [
                             0.40,  # checkbox
                             1.00,  # job number
@@ -2344,6 +2516,7 @@ def render() -> None:
                             1.10,  # linked estimate
                             1.00,  # quote/po
                             1.05,  # awarded amount
+                            0.48,  # view
                             0.50,  # delete
                         ]
 
@@ -2369,6 +2542,8 @@ def render() -> None:
                         with head[9]:
                             st.caption("Awarded")
                         with head[10]:
+                            st.caption("View")
+                        with head[11]:
                             st.caption("Del")
 
                         for _, row in df_display.iterrows():
@@ -2411,12 +2586,26 @@ def render() -> None:
                                     unsafe_allow_html=True,
                                 )
 
+                            with rc[10]:
+                                if st.button(
+                                    "👁",
+                                    key=f"job_row_view_{jid}",
+                                    use_container_width=True,
+                                    help="View job details",
+                                ):
+                                    clear_selected_ids(TABLE_KEY_JOBS)
+                                    st.session_state["job_view_mode"] = "view"
+                                    st.session_state["selected_job_id"] = jid
+                                    st.session_state.pop("job_mode", None)
+                                    st.session_state.pop("job_edit_id", None)
+                                    st.rerun()
+
                             del_help = (
                                 "Only admin or pm can delete jobs."
                                 if not can_edit
                                 else "Delete this job (blocked if costing data exists)."
                             )
-                            with rc[10]:
+                            with rc[11]:
                                 if st.button(
                                     "🗑",
                                     key=f"job_row_del_{jid}",
@@ -2471,6 +2660,8 @@ def render() -> None:
                                 else:
                                     st.warning("Please select exactly one job to edit.")
                             else:
+                                st.session_state["job_view_mode"] = "edit"
+                                st.session_state["selected_job_id"] = str(sel_ids[0])
                                 st.session_state["job_mode"] = "edit"
                                 st.session_state["job_edit_id"] = str(sel_ids[0])
                                 st.session_state.pop("job_number_manual_input", None)

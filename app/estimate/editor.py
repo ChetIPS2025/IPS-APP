@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -72,6 +74,15 @@ from app.estimate.equipment import (
     _equipment_rows_core_for_editor,
 )
 from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
+from app.estimate.job_scope import (
+    bump_scope_edit_clock,
+    ensure_scope_widgets_bound,
+    maybe_autosave_scope,
+    refresh_scope_saved_baseline_from_est,
+    render_scope_autosave_poller,
+    save_scope_now,
+    scope_is_dirty,
+)
 from app.estimate.persistence import (
     _duplicate_quote_message,
     attach_pending_pdf_import_source,
@@ -82,12 +93,20 @@ from app.estimate.persistence import (
 )
 from app.estimate.proposal_exports import (
     PROPOSAL_PDF_UNAVAILABLE_SHORT,
-    _build_proposal_docx_and_vals,
+    build_proposal_view_bundle,
     _inject_proposal_preview_styles,
     _proposal_export_kwargs,
     _render_proposal_preview_html,
-    proposal_preview_html,
+    proposal_preview_page_html,
 )
+
+_LOG = logging.getLogger(__name__)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_merged_materials_catalog_rows() -> list[dict[str, Any]]:
+    """Cache merged materials (inventory Materials + legacy catalog) to avoid refetch every rerun."""
+    return fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
 
 
 def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str]) -> list[dict]:
@@ -120,6 +139,84 @@ def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str
     if not out:
         return [{"item": "", "qty": 0.0}]
     return out
+
+
+def _materials_catalog_to_add_dataframe(materials_catalog: list[dict[str, Any]]) -> pd.DataFrame:
+    """Normalize merged catalog to a deduped, sorted frame for category → material cascading."""
+    rows: list[dict[str, Any]] = []
+    for m in materials_catalog:
+        if not isinstance(m, dict):
+            continue
+        src = str(m.get("_source") or "")
+        if src not in ("", "inventory_items", "materials_catalog"):
+            continue
+        ik = str(m.get("item_key") or "").strip()
+        if not ik:
+            continue
+        cat_raw = str(m.get("category") or "").strip()
+        cat = cat_raw if cat_raw else "Uncategorized"
+        desc = str(m.get("description") or "").strip()
+        display = desc if desc else ik
+        rows.append(
+            {
+                "item_key": ik,
+                "category": cat,
+                "material_name": display.strip() or ik,
+                "label_lc": f"{display} {ik}".lower(),
+                "purchase_price": m.get("purchase_price"),
+                "sell_price": m.get("sell_price"),
+                "unit": str(m.get("unit") or "").strip(),
+                "vendor_item_number": str(m.get("vendor_item_number") or "").strip(),
+                "inventory_id": str(m.get("inventory_id") or "").strip(),
+                "source": src or "materials_catalog",
+            }
+        )
+    cols = [
+        "item_key",
+        "category",
+        "material_name",
+        "label_lc",
+        "purchase_price",
+        "sell_price",
+        "unit",
+        "vendor_item_number",
+        "inventory_id",
+        "source",
+    ]
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    df = pd.DataFrame(rows)
+    df = df.dropna(subset=["material_name"])
+    df["material_name"] = df["material_name"].astype(str).str.strip()
+    df = df[df["material_name"] != ""]
+    df = df.drop_duplicates(subset=["item_key"], keep="first")
+    df = df.sort_values(["category", "material_name"], kind="mergesort").reset_index(drop=True)
+    return df
+
+
+def _material_selectbox_label(row: pd.Series) -> str:
+    nm = str(row.get("material_name") or "").strip()
+    ik = str(row.get("item_key") or "").strip()
+    sku = str(row.get("vendor_item_number") or "").strip()
+    if sku:
+        return f"{nm} — {sku}" if nm else f"{ik} — {sku}"
+    return nm if nm else ik
+
+
+def _filter_materials_df_for_category(
+    materials_df: pd.DataFrame,
+    *,
+    selected_category: str,
+    search_query: str,
+) -> pd.DataFrame:
+    out = materials_df.copy()
+    sc = str(selected_category or "All").strip()
+    if sc and sc != "All":
+        out = out[out["category"].astype(str) == sc]
+    q = str(search_query or "").strip().lower()
+    if q:
+        out = out[out["label_lc"].str.contains(q, na=False)]
+    return out.reset_index(drop=True)
 
 
 def _labor_rows_for_editor(rows: list | None, *, labor_options: list[str]) -> list[dict]:
@@ -188,6 +285,17 @@ def ensure_state():
     st.session_state.setdefault("est_material_last_category", "All")
     st.session_state.setdefault("est_material_last_item", "")
     st.session_state.setdefault("est_material_last_qty", 1.0)
+    st.session_state.setdefault(
+        "selected_material_category",
+        str(st.session_state.get("est_material_last_category") or "All"),
+    )
+    st.session_state.setdefault("selected_material", None)
+    st.session_state.setdefault(
+        "last_material_category",
+        str(st.session_state.get("selected_material_category") or "All"),
+    )
+    st.session_state.setdefault("est_material_add_search", "")
+    st.session_state.setdefault("est_material_edit_search", "")
     st.session_state.setdefault("est_labor_last_classification", "")
     st.session_state.setdefault("est_labor_last_headcount", 1.0)
     st.session_state.setdefault("est_labor_last_st_hours", 8.0)
@@ -207,6 +315,7 @@ def ensure_state():
     st.session_state.setdefault("est_pending_quote_attachments", [])
     st.session_state.setdefault("est_pending_po_attachment", None)
     st.session_state.setdefault("est_revision_note", "")
+    st.session_state.setdefault("est_scope_area_h", 360)
     est0 = st.session_state["estimate_editor_state"]
     # Legacy widget keys from the old free-text customer field (avoid stale session state).
     st.session_state.pop("est_customer_query", None)
@@ -315,7 +424,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             ] + list(customers)
 
     jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=1000, order_by="job_number")
-    materials_catalog = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
+    materials_catalog = _cached_merged_materials_catalog_rows()
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
     existing_estimates = fetch_table("estimates", columns="id,quote_number,status,updated_at,revision_number", limit=1000, order_by="updated_at")
@@ -324,8 +433,20 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     jobs_by_customer = {}
     for j in jobs:
         jobs_by_customer.setdefault(j.get("customer_id"), []).append(j)
-    materials_options = [m["item_key"] for m in materials_catalog]
+    materials_df_all = _materials_catalog_to_add_dataframe(materials_catalog)
+    materials_options = materials_df_all["item_key"].tolist() if not materials_df_all.empty else []
     labor_options = [r["classification"] for r in labor_rates]
+
+    def _attach_stored_proposal_preview_html() -> None:
+        """Store docx-derived HTML on ``est`` so saved quotes reopen with the same proposal preview."""
+        try:
+            pe0 = _proposal_export_kwargs(est, customer_name_by_id, jobs)
+            t0 = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+            _v, _docx, _err, page_h = build_proposal_view_bundle(est, t0, pe0)
+            if page_h.strip():
+                est["proposal_preview_html"] = page_h
+        except Exception:
+            pass
 
     if not embedded:
         render_header("Estimate Editor")
@@ -372,12 +493,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.session_state["estimate_editor_state"] = loaded
                     st.session_state["loaded_estimate_id"] = selected_id
                     st.session_state["estimate_editor_quote_ready"] = True
+                    ensure_scope_widgets_bound(loaded, selected_id)
                     st.rerun()
         with new_col:
             if st.button("New Blank Estimate", use_container_width=True):
                 st.session_state["estimate_editor_state"] = ensure_numeric_defaults(blank_estimate())
                 st.session_state["loaded_estimate_id"] = None
                 st.session_state["estimate_editor_quote_ready"] = False
+                ensure_scope_widgets_bound(st.session_state["estimate_editor_state"], None)
                 st.rerun()
         with gen_col:
             can_generate_qn = not st.session_state.get("loaded_estimate_id") and not str(
@@ -484,7 +607,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        vals, embed_docx, embed_docx_err = _build_proposal_docx_and_vals(est, totals, _pe)
+        _vals, embed_docx, embed_docx_err, embed_live_html = build_proposal_view_bundle(est, totals, _pe)
 
         _, _emb_actions, _ = st.columns([0.2, 1.0, 0.2])
         eb1, eb2, eb3 = _emb_actions.columns([1, 1, 1], gap="small")
@@ -526,14 +649,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.error(embed_docx_err)
         if st.session_state.get("est_embed_proposal_preview"):
             with st.expander("Proposal preview", expanded=True):
-                if embed_docx is not None:
-                    preview_html = proposal_preview_html(embed_docx, fallback_vals=vals)
-                    _render_proposal_preview_html(
-                        preview_html,
-                        caption="From the generated Word document (same bytes as **Download Proposal (Word)**).",
-                    )
-                else:
-                    st.caption("Build the Word proposal first to enable preview.")
+                cached_prev = str(est.get("proposal_preview_html") or "").strip()
+                preview_src = embed_live_html if embed_docx else (cached_prev or proposal_preview_page_html(None))
+                _render_proposal_preview_html(preview_src)
             if st.button("Hide preview", use_container_width=True, key="est_embed_hide_preview"):
                 st.session_state["est_embed_proposal_preview"] = False
                 st.rerun()
@@ -870,67 +988,126 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 _parts.append(_jnm)
             st.markdown(" · ".join(_parts), unsafe_allow_html=True)
 
+    ensure_scope_widgets_bound(est, _loaded_eid)
+
     tabs = st.tabs(["Materials", "Labor", "Equipment", "Travel", "Job Scope", "Attachments / P.O.", "Proposal", "Review / Save"])
 
     with tabs[0]:
-        # Materials row cards + form-based add/edit to avoid "enter twice" UX.
+        # Materials row cards + add/edit. Category/material pickers live OUTSIDE ``st.form`` so
+        # changing category triggers an immediate rerun and refreshes material options (forms defer updates).
         est.setdefault("materials", [])
         controls = est.get("controls", {}) or {}
         material_markup_dec = _dec(controls.get("material_markup_pct", 0) or 0)
         material_map = {m.get("item_key"): m for m in materials_catalog if isinstance(m, dict) and m.get("item_key")}
 
-        # Optional category filter (resilient to schema differences).
-        categories = sorted(
-            {
-                str(m.get("category") or "").strip()
-                for m in materials_catalog
-                if isinstance(m, dict) and str(m.get("category") or "").strip()
-            }
+        materials_df = materials_df_all
+        cats_sorted = (
+            sorted(materials_df["category"].dropna().astype(str).unique().tolist()) if not materials_df.empty else []
         )
-        cat_options = ["All"] + categories if categories else ["All"]
+        cat_options = ["All"] + [c for c in cats_sorted if c]
+        if not cat_options:
+            cat_options = ["All"]
 
-        st.caption("Category (narrow) → material → qty → add.")
+        sel_cat = str(st.session_state.get("selected_material_category") or "All").strip()
+        if sel_cat not in cat_options:
+            sel_cat = "All"
+            st.session_state["selected_material_category"] = "All"
+
+        if st.session_state.get("last_material_category") != sel_cat:
+            st.session_state["last_material_category"] = sel_cat
+            st.session_state.pop("selected_material", None)
+            st.session_state.pop("est_material_add_item", None)
+            st.session_state.pop("est_material_add_category", None)
+
+        search_q = str(st.session_state.get("est_material_add_search") or "")
+        filtered_materials = _filter_materials_df_for_category(
+            materials_df,
+            selected_category=sel_cat,
+            search_query=search_q,
+        )
+        mat_keys = filtered_materials["item_key"].tolist() if not filtered_materials.empty else []
+        if st.session_state.get("selected_material") not in (None, "") and st.session_state.get(
+            "selected_material"
+        ) not in mat_keys:
+            st.session_state.pop("selected_material", None)
+
+        _LOG.debug(
+            "est_materials_picker: category=%r filtered_n=%s selected_material=%r",
+            sel_cat,
+            len(mat_keys),
+            st.session_state.get("selected_material"),
+        )
+
+        st.caption("Category → material (search) → qty → Add.")
+
+        ma1, ma2, ma3 = st.columns([0.58, 1.0, 2.42], gap="medium")
+        with ma1:
+            cat_ix = (
+                cat_options.index(str(st.session_state.get("selected_material_category") or "All"))
+                if str(st.session_state.get("selected_material_category") or "All") in cat_options
+                else 0
+            )
+            st.selectbox(
+                "Category",
+                options=cat_options,
+                index=cat_ix,
+                disabled=is_locked,
+                key="selected_material_category",
+                help="Filters the Material list. Changing category clears the current material selection.",
+            )
+        with ma2:
+            st.text_input(
+                "Search materials",
+                disabled=is_locked,
+                key="est_material_add_search",
+                help="Matches description, item code, or internal key (within the selected category).",
+                placeholder="Type to filter…",
+            )
+        with ma3:
+            label_by_key: dict[str, str] = {}
+            for _, row in filtered_materials.iterrows():
+                label_by_key[str(row["item_key"])] = _material_selectbox_label(row)
+            if not mat_keys:
+                st.session_state.pop("selected_material", None)
+                st.selectbox(
+                    "Material",
+                    options=["__none__"],
+                    index=0,
+                    format_func=lambda _: "No materials available for selected category",
+                    disabled=True,
+                    key="est_material_add_material_disabled",
+                )
+            else:
+                mat_ix = 0
+                if st.session_state.get("selected_material") in mat_keys:
+                    mat_ix = int(mat_keys.index(st.session_state["selected_material"]))
+                st.selectbox(
+                    "Material",
+                    options=mat_keys,
+                    index=mat_ix,
+                    format_func=lambda ik: label_by_key.get(ik, ik),
+                    disabled=is_locked,
+                    key="selected_material",
+                )
+
+        sid = str(st.session_state.get("selected_material") or "").strip()
+        if sid and material_map.get(sid):
+            mm = material_map[sid]
+            pc = mm.get("purchase_price")
+            dsc = str(mm.get("description") or "").strip()
+            sku = str(mm.get("vendor_item_number") or "").strip()
+            inv_id = str(mm.get("inventory_id") or "").strip()
+            unit = str(mm.get("unit") or "").strip()
+            meta_bits = [f"Unit: {unit}" if unit else "", f"Item code: {sku}" if sku else "", f"Inventory: {inv_id}" if inv_id else ""]
+            meta_bits = [b for b in meta_bits if b]
+            st.caption(
+                f"{dsc or sid} · Unit cost {money(_dec(pc or 0))}"
+                + (f" · {' · '.join(meta_bits)}" if meta_bits else "")
+            )
 
         with st.form(key="est_material_add_form", clear_on_submit=True):
-            # Remember last-used category when available.
-            last_cat = str(st.session_state.get("est_material_last_category") or "All")
-            cat_index = cat_options.index(last_cat) if last_cat in cat_options else 0
-            ma1, ma2, ma3, ma4 = st.columns([0.65, 2.35, 0.4, 0.45], gap="small")
-            with ma1:
-                selected_cat = st.selectbox(
-                    "Category",
-                    options=cat_options,
-                    index=cat_index,
-                    disabled=is_locked,
-                    key="est_material_add_category",
-                    help="Optional filter. If your materials table has no category column, this stays as All.",
-                )
-
-            if selected_cat != "All":
-                filtered_items = [
-                    str(m.get("item_key") or "").strip()
-                    for m in materials_catalog
-                    if isinstance(m, dict)
-                    and str(m.get("item_key") or "").strip()
-                    and str(m.get("category") or "").strip() == selected_cat
-                ]
-            else:
-                filtered_items = materials_options
-            filtered_items = [x for x in filtered_items if x]
-            if not filtered_items:
-                filtered_items = [""]
-
-            last_item = str(st.session_state.get("est_material_last_item") or "").strip()
-            item_index = filtered_items.index(last_item) if last_item in filtered_items else 0
-            with ma2:
-                mat_add_item = st.selectbox(
-                    "Material",
-                    options=filtered_items,
-                    index=item_index,
-                    disabled=is_locked,
-                    key="est_material_add_item",
-                )
-            with ma3:
+            fq1, fq2 = st.columns([0.48, 0.42], gap="small")
+            with fq1:
                 mat_add_qty = st.number_input(
                     "Qty",
                     min_value=0.0,
@@ -940,22 +1117,30 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     value=float(st.session_state.get("est_material_last_qty") or 1.0),
                     key="est_material_add_qty",
                 )
-            with ma4:
-                st.markdown("")
-                mat_add_submit = st.form_submit_button("Add", disabled=is_locked)
+            with fq2:
+                st.markdown('<div style="height:1.85rem"></div>', unsafe_allow_html=True)
+                mat_add_submit = st.form_submit_button("Add", disabled=is_locked, use_container_width=True)
 
             if mat_add_submit:
-                if not str(mat_add_item or "").strip():
+                mat_add_item = str(st.session_state.get("selected_material") or "").strip()
+                if not mat_keys:
+                    st.error("No materials available for the selected category.")
+                    st.stop()
+                if not mat_add_item or mat_add_item not in mat_keys:
                     st.error("Select a Material.")
                     st.stop()
-                st.session_state["est_material_last_category"] = str(selected_cat)
-                st.session_state["est_material_last_item"] = str(mat_add_item).strip()
+                st.session_state["est_material_last_category"] = str(
+                    st.session_state.get("selected_material_category") or "All"
+                )
+                st.session_state["est_material_last_item"] = mat_add_item
                 st.session_state["est_material_last_qty"] = float(mat_add_qty or 0.0) or 1.0
-                est["materials"] = (est.get("materials") or []) + [{"item": str(mat_add_item).strip(), "qty": float(mat_add_qty or 0.0)}]
+                est["materials"] = (est.get("materials") or []) + [
+                    {"item": mat_add_item, "qty": float(mat_add_qty or 0.0)}
+                ]
                 st.session_state["est_material_edit_idx"] = None
                 st.rerun()
 
-        # Edit form (only one row at a time)
+        # Edit form (only one row at a time) — material picker outside form for live cascade.
         mat_edit_idx = st.session_state.get("est_material_edit_idx")
         if mat_edit_idx is not None:
             try:
@@ -968,18 +1153,91 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 cur = (est.get("materials") or [])[mat_edit_idx] or {}
                 cur_item = str(cur.get("item") or "").strip()
                 cur_qty = float(cur.get("qty", 0) or 0)
-                with st.form(key=f"est_material_edit_form_{mat_edit_idx}", clear_on_submit=True):
-                    st.caption(f"Editing material line #{mat_edit_idx + 1}")
-                    me1, me2, me3, me4 = st.columns([2.0, 0.42, 0.55, 0.55], gap="small")
-                    with me1:
-                        mat_edit_item = st.selectbox(
+                mcur = material_map.get(cur_item) or {}
+                row_cat0 = str(mcur.get("category") or "").strip() or "Uncategorized"
+
+                if st.session_state.get("_est_material_edit_ctx_idx") != mat_edit_idx:
+                    st.session_state["_est_material_edit_ctx_idx"] = mat_edit_idx
+                    st.session_state["est_material_edit_category"] = (
+                        row_cat0 if row_cat0 in cat_options else "All"
+                    )
+                    st.session_state["est_material_edit_last_category"] = st.session_state["est_material_edit_category"]
+                    st.session_state["est_material_edit_material"] = cur_item if cur_item in materials_options else None
+                    st.session_state["est_material_edit_search"] = ""
+
+                e_cat = str(st.session_state.get("est_material_edit_category") or "All").strip()
+                if e_cat not in cat_options:
+                    e_cat = "All"
+                    st.session_state["est_material_edit_category"] = "All"
+                if st.session_state.get("est_material_edit_last_category") != e_cat:
+                    st.session_state["est_material_edit_last_category"] = e_cat
+                    st.session_state.pop("est_material_edit_material", None)
+
+                e_search = str(st.session_state.get("est_material_edit_search") or "")
+                edit_filtered = _filter_materials_df_for_category(
+                    materials_df,
+                    selected_category=e_cat,
+                    search_query=e_search,
+                )
+                edit_keys = edit_filtered["item_key"].tolist() if not edit_filtered.empty else []
+                if st.session_state.get("est_material_edit_material") not in (None, "") and st.session_state.get(
+                    "est_material_edit_material"
+                ) not in edit_keys:
+                    st.session_state.pop("est_material_edit_material", None)
+
+                st.caption(f"Editing material line #{mat_edit_idx + 1}")
+                ee1, ee2, ee3 = st.columns([0.58, 1.0, 2.42], gap="medium")
+                with ee1:
+                    ec_ix = (
+                        cat_options.index(str(st.session_state.get("est_material_edit_category") or "All"))
+                        if str(st.session_state.get("est_material_edit_category") or "All") in cat_options
+                        else 0
+                    )
+                    st.selectbox(
+                        "Category",
+                        options=cat_options,
+                        index=ec_ix,
+                        disabled=is_locked,
+                        key="est_material_edit_category",
+                        help="Restricts replacement materials to this category.",
+                    )
+                with ee2:
+                    st.text_input(
+                        "Search materials",
+                        disabled=is_locked,
+                        key="est_material_edit_search",
+                        placeholder="Type to filter…",
+                    )
+                with ee3:
+                    elabel: dict[str, str] = {}
+                    for _, row in edit_filtered.iterrows():
+                        elabel[str(row["item_key"])] = _material_selectbox_label(row)
+                    if not edit_keys:
+                        st.session_state.pop("est_material_edit_material", None)
+                        st.selectbox(
                             "Material",
-                            options=materials_options if materials_options else [""],
-                            index=(materials_options.index(cur_item) if cur_item in materials_options else 0),
-                            disabled=is_locked,
-                            key=f"est_material_edit_item_{mat_edit_idx}",
+                            options=["__none__"],
+                            index=0,
+                            format_func=lambda _: "No materials available for selected category",
+                            disabled=True,
+                            key="est_material_edit_material_disabled",
                         )
-                    with me2:
+                    else:
+                        em_ix = 0
+                        if st.session_state.get("est_material_edit_material") in edit_keys:
+                            em_ix = int(edit_keys.index(st.session_state["est_material_edit_material"]))
+                        st.selectbox(
+                            "Material",
+                            options=edit_keys,
+                            index=em_ix,
+                            format_func=lambda ik: elabel.get(ik, ik),
+                            disabled=is_locked,
+                            key="est_material_edit_material",
+                        )
+
+                with st.form(key=f"est_material_edit_form_{mat_edit_idx}", clear_on_submit=True):
+                    emq1, emq2, emq3 = st.columns([0.48, 0.42, 0.42], gap="small")
+                    with emq1:
                         mat_edit_qty = st.number_input(
                             "Qty",
                             min_value=0.0,
@@ -989,22 +1247,31 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                             value=cur_qty,
                             key=f"est_material_edit_qty_{mat_edit_idx}",
                         )
-                    with me3:
+                    with emq2:
+                        st.markdown('<div style="height:1.85rem"></div>', unsafe_allow_html=True)
                         mat_edit_submit = st.form_submit_button(
-                            "Save", disabled=is_locked, key=f"est_material_edit_save_{mat_edit_idx}"
+                            "Save", disabled=is_locked, use_container_width=True, key=f"est_material_edit_save_{mat_edit_idx}"
                         )
-                    with me4:
+                    with emq3:
+                        st.markdown('<div style="height:1.85rem"></div>', unsafe_allow_html=True)
                         mat_edit_cancel = st.form_submit_button(
-                            "Cancel", disabled=is_locked, key=f"est_material_edit_cancel_{mat_edit_idx}"
+                            "Cancel", disabled=is_locked, use_container_width=True, key=f"est_material_edit_cancel_{mat_edit_idx}"
                         )
                     if mat_edit_cancel:
                         st.session_state["est_material_edit_idx"] = None
                         st.rerun()
                     if mat_edit_submit:
-                        if not str(mat_edit_item or "").strip():
+                        mat_edit_item = str(st.session_state.get("est_material_edit_material") or "").strip()
+                        if not edit_keys:
+                            st.error("No materials available for the selected category.")
+                            st.stop()
+                        if not mat_edit_item or mat_edit_item not in edit_keys:
                             st.error("Select a Material.")
                             st.stop()
-                        est["materials"][mat_edit_idx] = {"item": str(mat_edit_item).strip(), "qty": float(mat_edit_qty or 0.0)}
+                        est["materials"][mat_edit_idx] = {
+                            "item": mat_edit_item,
+                            "qty": float(mat_edit_qty or 0.0),
+                        }
                         st.session_state["est_material_edit_idx"] = None
                         st.rerun()
 
@@ -1786,27 +2053,74 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[4]:
         st.caption(
-            "Edit **Scope of Work** and **Customer Responsibilities** in one submit to avoid rerun/reset issues."
+            "Saved estimates: text is written to **Supabase** (debounced autosave + manual save). "
+            "Line breaks and characters you type are preserved as plain text."
         )
-        with st.form(key="est_scope_form", clear_on_submit=False):
-            scope_of_work = st.text_area(
-                "Scope of Work",
-                value=str(est.get("scope_of_work") or ""),
-                height=112,
-                disabled=is_locked,
-                key="est_scope_scope_of_work",
-            )
-            customer_responsibilities = st.text_area(
-                "Customer Responsibilities",
-                value=str(est.get("customer_responsibilities") or ""),
-                height=112,
-                disabled=is_locked,
-                key="est_scope_customer_responsibilities",
-            )
-            if st.form_submit_button("Save scope sections", disabled=is_locked):
-                est["scope_of_work"] = str(scope_of_work or "")
-                est["customer_responsibilities"] = str(customer_responsibilities or "")
-                st.rerun()
+        loaded_scope_eid = st.session_state.get("loaded_estimate_id")
+        st.slider(
+            "Editor height (px)",
+            min_value=220,
+            max_value=620,
+            step=20,
+            disabled=is_locked,
+            key="est_scope_area_h",
+        )
+        area_h = int(st.session_state.get("est_scope_area_h", 360))
+
+        st.text_area(
+            "Scope of Work",
+            height=area_h,
+            disabled=is_locked,
+            key="est_scope_scope_of_work",
+            on_change=bump_scope_edit_clock,
+        )
+        st.text_area(
+            "Customer Responsibilities",
+            height=area_h,
+            disabled=is_locked,
+            key="est_scope_customer_responsibilities",
+            on_change=bump_scope_edit_clock,
+        )
+
+        est["scope_of_work"] = str(st.session_state.get("est_scope_scope_of_work", ""))
+        est["customer_responsibilities"] = str(st.session_state.get("est_scope_customer_responsibilities", ""))
+
+        st1, st2, st3 = st.columns([1.1, 1.1, 1.4])
+        with st1:
+            can_scope_save = bool(loaded_scope_eid) and scope_is_dirty() and not is_locked
+            if st.button(
+                "Save scope to database",
+                type="primary",
+                disabled=not can_scope_save,
+                use_container_width=True,
+                key="est_scope_save_now_btn",
+            ):
+                ok, err = save_scope_now(est, str(loaded_scope_eid))
+                if ok:
+                    st.success("Scope saved.")
+                else:
+                    st.error(err or "Could not save scope.")
+        with st2:
+            status = str(st.session_state.get("est_scope_autosave_status") or "idle")
+            if status == "saving":
+                st.caption("Saving…")
+            elif status == "saved":
+                clk = str(st.session_state.get("est_scope_saved_clock") or "").strip()
+                st.caption(f"Saved{f' at {clk}' if clk else ''}.")
+            elif status == "error":
+                st.caption("Save error — see message below.")
+        with st3:
+            if not loaded_scope_eid:
+                st.caption("Save the estimate once to enable database sync for these fields.")
+
+        if st.session_state.get("est_scope_autosave_status") == "error":
+            err = str(st.session_state.get("est_scope_autosave_err") or "").strip()
+            if err:
+                st.error(err)
+
+        if not is_locked:
+            maybe_autosave_scope(est, str(loaded_scope_eid) if loaded_scope_eid else None)
+            render_scope_autosave_poller(est, str(loaded_scope_eid) if loaded_scope_eid else None)
 
     with tabs[5]:
         st.caption("Add attachments to the draft (they upload when you Save/Submit/Approve/Award).")
@@ -1915,10 +2229,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     with tabs[6]:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        vals, docx_bytes, word_build_error = _build_proposal_docx_and_vals(est, totals, _pe)
+        _vals, docx_bytes, word_build_error, live_preview_html = build_proposal_view_bundle(est, totals, _pe)
         st.caption(
-            "Standard Word template **estimate_template_autofill_logo_updated.docx** — placeholders from this "
-            "estimate; optional **company_logo.png** in **assets/** is merged when present."
+            "Proposal uses **assets/estimate_template_autofill_logo_updated.docx**; optional **company_logo.png** "
+            "in **assets/** is merged when present. Preview HTML matches the filled Word file."
         )
 
         pdf_bytes: bytes | None = None
@@ -1927,7 +2241,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
         with st.container(border=True):
             st.markdown('<span class="ips-proposal-doc-surface"></span>', unsafe_allow_html=True)
-            st.caption("Exports reflect the draft on screen. Open Word for exact pagination.")
             if word_build_error:
                 st.error(word_build_error)
             elif pdf_bytes is None and docx_bytes is not None:
@@ -1988,13 +2301,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             else:
                 st.caption("Save the estimate first to store exports in Supabase.")
 
-        if docx_bytes is not None:
-            preview_html = proposal_preview_html(docx_bytes, fallback_vals=vals)
-            with st.expander("Proposal preview (read-only)", expanded=True):
-                _render_proposal_preview_html(
-                    preview_html,
-                    caption="HTML preview of the same filled document — use Word for print layout.",
-                )
+        cached_preview = str(est.get("proposal_preview_html") or "").strip()
+        preview_to_show = live_preview_html if docx_bytes else (cached_preview or proposal_preview_page_html(None))
+        with st.expander("Proposal preview", expanded=True):
+            if not docx_bytes and cached_preview:
+                st.caption("Showing the proposal preview stored with this quote (Word could not be rebuilt).")
+            _render_proposal_preview_html(preview_to_show)
 
     with tabs[7]:
         totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
@@ -2094,7 +2406,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 _ed = str(est.get("estimate_description") or "").strip()
                 payload["estimate_description"] = _ed[:500] if _ed else None
             est["status"] = "submitted"
+            _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Submitted for approval")
+            refresh_scope_saved_baseline_from_est(est)
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2187,7 +2501,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 _ed = str(est.get("estimate_description") or "").strip()
                 payload["estimate_description"] = _ed[:500] if _ed else None
             est["status"] = "approved"
+            _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Approved")
+            refresh_scope_saved_baseline_from_est(est)
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2280,7 +2596,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 payload["estimate_description"] = _ed[:500] if _ed else None
             est["status"] = "awarded"
             est["job_received"] = True
+            _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Marked awarded")
+            refresh_scope_saved_baseline_from_est(est)
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2375,7 +2693,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 if "estimate_description" in _cols:
                     _ed = str(est.get("estimate_description") or "").strip()
                     payload["estimate_description"] = _ed[:500] if _ed else None
+                _attach_stored_proposal_preview_html()
                 estimate_id = persist_estimate(payload, est, str(st.session_state.get("est_revision_note") or ""))
+                refresh_scope_saved_baseline_from_est(est)
                 attach_pending_pdf_import_source(estimate_id)
                 pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
                 for f in pending_quotes:
