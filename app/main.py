@@ -11,7 +11,6 @@ from auth import (
     current_role,
     init_session,
     must_reset_password,
-    require_login,
     run_auth_browser_cookie_effects,
     sign_in,
     start_phone_otp,
@@ -143,7 +142,8 @@ def main() -> None:
             show_page_error(exc, context="page:sign_timesheet_public")
         return
 
-    if not require_login():
+    # Single gate for the whole app: pages must not duplicate login checks.
+    if st.session_state.get("auth_user") is None:
         render_header("Login")
         st.caption("Supabase-backed multi-user estimator for Industrial Plant Solutions, LLC")
         _pend = str(

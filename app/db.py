@@ -16,8 +16,29 @@ from app.config import ROOT_DIR, settings
 
 _LOG = logging.getLogger(__name__)
 
-_client: Client | None = None
-_admin_client: Client | None = None
+try:
+    import streamlit as _st_for_cache
+except ImportError:  # scripts / tests without Streamlit
+    _st_for_cache = None  # type: ignore
+
+
+def _create_public_supabase_client(url: str, key: str) -> Client:
+    return create_client(url.strip(), key)
+
+
+def _create_admin_supabase_client(url: str, key: str) -> Client:
+    return create_client(url.strip(), key)
+
+
+if _st_for_cache is not None:
+    _cached_public_supabase = _st_for_cache.cache_resource(_create_public_supabase_client)
+    _cached_admin_supabase = _st_for_cache.cache_resource(_create_admin_supabase_client)
+else:
+    _cached_public_supabase = _create_public_supabase_client
+    _cached_admin_supabase = _create_admin_supabase_client
+
+_client_fallback: Client | None = None
+_admin_client_fallback: Client | None = None
 
 _JOBS_STALE_COLUMN_DESCRIPTION = "description"
 _JOBS_ORDER_BY_FOR_STALE_DESCRIPTION = "job_name"
@@ -86,19 +107,25 @@ def _admin_api_key_and_source() -> tuple[str, str]:
 
 def get_client() -> Client:
     """Supabase client with the **publishable / anon** key only (RLS applies)."""
-    global _client
-    if _client is None:
-        public_key = _public_api_key()
-        if not (settings.supabase_url or "").strip() or not public_key:
-            raise RuntimeError(
-                "Supabase URL or public API key is missing. Set SUPABASE_URL and "
-                "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY."
-            )
+    public_key = _public_api_key()
+    url = (settings.supabase_url or "").strip()
+    if not url or not public_key:
+        raise RuntimeError(
+            "Supabase URL or public API key is missing. Set SUPABASE_URL and "
+            "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY."
+        )
+    if _st_for_cache is not None:
         try:
-            _client = create_client(settings.supabase_url.strip(), public_key)
+            return _cached_public_supabase(url, public_key)
         except Exception as exc:
             raise RuntimeError(f"create_client (anon) failed: {exc!r}") from exc
-    return _client
+    global _client_fallback
+    if _client_fallback is None:
+        try:
+            _client_fallback = _create_public_supabase_client(url, public_key)
+        except Exception as exc:
+            raise RuntimeError(f"create_client (anon) failed: {exc!r}") from exc
+    return _client_fallback
 
 
 def get_admin_client() -> Client:
@@ -107,20 +134,26 @@ def get_admin_client() -> Client:
 
     Key resolution: ``SUPABASE_SERVICE_ROLE_KEY`` first, then ``SUPABASE_SECRET_KEY``.
     """
-    global _admin_client
-    if _admin_client is None:
-        key, source = _admin_api_key_and_source()
-        if not (settings.supabase_url or "").strip() or not key:
-            raise RuntimeError(
-                "Supabase URL or admin API key is missing. Set SUPABASE_URL and either "
-                "SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_SECRET_KEY for server-side admin access."
-            )
-        _LOG.debug("Creating Supabase admin client using credentials from %s", source)
+    key, source = _admin_api_key_and_source()
+    url = (settings.supabase_url or "").strip()
+    if not url or not key:
+        raise RuntimeError(
+            "Supabase URL or admin API key is missing. Set SUPABASE_URL and either "
+            "SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_SECRET_KEY for server-side admin access."
+        )
+    _LOG.debug("Creating Supabase admin client using credentials from %s", source)
+    if _st_for_cache is not None:
         try:
-            _admin_client = create_client(settings.supabase_url.strip(), key)
+            return _cached_admin_supabase(url, key)
         except Exception as exc:
             raise RuntimeError(f"create_client (admin) failed: {exc!r}") from exc
-    return _admin_client
+    global _admin_client_fallback
+    if _admin_client_fallback is None:
+        try:
+            _admin_client_fallback = _create_admin_supabase_client(url, key)
+        except Exception as exc:
+            raise RuntimeError(f"create_client (admin) failed: {exc!r}") from exc
+    return _admin_client_fallback
 
 
 def allocate_next_shared_sequence_int() -> int:

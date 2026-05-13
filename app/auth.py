@@ -24,12 +24,13 @@ _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this devic
 
 
 def init_session() -> None:
-    # Canonical app auth state (requested keys)
+    """Initialize auth-related session keys. Access control is enforced only from ``main.py``."""
+    st.session_state.setdefault("auth_user", None)
+    st.session_state.setdefault("auth_session", None)
+    st.session_state.setdefault("auth_profile", None)
+    # Back-compat aliases used throughout the app
     st.session_state.setdefault("user", None)
     st.session_state.setdefault("user_email", None)
-    # Back-compat keys used throughout existing code
-    st.session_state.setdefault("auth_user", None)
-    st.session_state.setdefault("auth_profile", None)
     st.session_state.setdefault("auth_employee", None)
 
 
@@ -47,6 +48,17 @@ def _cookie_secure_flag() -> bool:
     except Exception:
         pass
     return False
+
+
+def _sync_auth_session_from_client(client: Any) -> None:
+    """Store Supabase auth session on ``st.session_state`` (used after login / restore)."""
+    try:
+        raw = client.auth.get_session()
+    except Exception:
+        st.session_state["auth_session"] = None
+        return
+    sess: Any = getattr(raw, "session", raw)
+    st.session_state["auth_session"] = sess
 
 
 def _auth_session_tokens(client: Any) -> tuple[str, str] | None:
@@ -136,6 +148,11 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
                 st.session_state["auth_employee"] = emp
         except Exception:
             st.session_state["auth_employee"] = None
+
+    try:
+        _sync_auth_session_from_client(get_client())
+    except Exception:
+        st.session_state["auth_session"] = None
 
 
 def try_restore_supabase_session_from_cookies() -> None:
@@ -405,12 +422,15 @@ def sign_out() -> None:
     st.session_state["user"] = None
     st.session_state["user_email"] = None
     st.session_state["auth_user"] = None
+    st.session_state["auth_session"] = None
     st.session_state["auth_profile"] = None
+    st.session_state["auth_employee"] = None
     st.session_state["_ips_auth_clear_pending"] = True
 
 
 def require_login() -> bool:
-    return st.session_state.get("user") is not None or st.session_state.get("auth_user") is not None
+    """True when a Supabase user is present. Do not use in pages for gating — only ``main.py`` should."""
+    return st.session_state.get("auth_user") is not None
 
 
 def current_profile() -> dict:
