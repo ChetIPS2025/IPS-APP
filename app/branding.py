@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import html
 from pathlib import Path
 
@@ -85,16 +84,7 @@ def render_header(
     logo_path = _find_wide_logo()
 
     if logo_path and logo_path.exists():
-        ext = logo_path.suffix.lower().replace(".", "") or "png"
-        encoded = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
-        st.markdown(
-            f"""
-            <div class="ips-topbar">
-                <img src="data:image/{ext};base64,{encoded}" alt="IPS Logo" />
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.image(str(logo_path), width=260)
 
     if title:
         st.markdown(f'<div class="ips-page-title">{html.escape(title)}</div>', unsafe_allow_html=True)

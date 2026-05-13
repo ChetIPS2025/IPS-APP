@@ -399,7 +399,12 @@ def _run_batch_analyze(materials: list[dict]) -> None:
     st.session_state[SESSION_QUEUE] = remaining
     st.session_state[SESSION_ROWS] = list(st.session_state[SESSION_ROWS]) + new_lines
     st.rerun()
+
+
+def render_material_quote_import_form(return_to_materials: bool = False) -> None:
     """
+    Render the vendor quote import form for adding Inventory: Materials.
+
     Multi-file vendor quote upload, batch AI extraction, combined grid, import to
     ``material_quotes`` / ``material_quote_items`` / ``inventory_items`` (Materials).
     """
