@@ -652,7 +652,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             with st.expander("Formatted quote preview", expanded=True):
                 cached_prev = str(est.get("proposal_preview_html") or "").strip()
                 preview_src = embed_live_html or cached_prev or proposal_preview_page_html(None)
-                _render_proposal_preview_html(preview_src)
+                _render_proposal_preview_html(preview_src, html_width=920)
             if st.button("Hide preview", use_container_width=True, key="est_embed_hide_preview"):
                 st.session_state["est_embed_proposal_preview"] = False
                 st.rerun()
@@ -2260,56 +2260,55 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.rerun()
 
     with tabs[6]:
+        st.session_state.setdefault("proposal_preview_mode", "edit")
+        st.radio(
+            "View",
+            ["edit", "preview"],
+            format_func=lambda x: "Standard" if x == "edit" else "Document preview",
+            horizontal=True,
+            key="proposal_preview_mode",
+            label_visibility="collapsed",
+            help="Document preview emphasizes the quote page; template notes move into an expander in Standard view.",
+        )
+        is_proposal_preview = st.session_state.get("proposal_preview_mode", "edit") == "preview"
+
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
         _vals, docx_bytes, word_build_error, live_preview_html = build_proposal_view_bundle(est, totals, _pe)
-        st.caption(
-            "Proposal uses **assets/estimate_template_autofill_logo_updated.docx**; optional logo files "
-            "under **assets/** are merged when present. On-screen preview uses the same structured layout "
-            "and field values as Word and PDF exports."
-        )
 
         pdf_bytes: bytes | None = None
         if docx_bytes is not None:
             pdf_bytes, _conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
 
-        with st.container(border=True):
-            st.markdown('<span class="ips-proposal-doc-surface"></span>', unsafe_allow_html=True)
-            if word_build_error:
-                st.error(word_build_error)
-            elif pdf_bytes is None and docx_bytes is not None:
-                st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
-
-            if docx_bytes is None:
-                st.caption("Ensure **assets/estimate_template_autofill_logo_updated.docx** exists in the app bundle.")
-
-            _, _dl_mid, _ = st.columns([0.15, 1.0, 0.15])
-            dc1, dc2 = _dl_mid.columns([1, 1], gap="small")
-            with dc1:
+        _loaded = bool(st.session_state.get("loaded_estimate_id"))
+        _n_act = 1 + (1 if pdf_bytes is not None else 0) + (1 if _loaded else 0) + (1 if _loaded and pdf_bytes is not None else 0)
+        _bar = st.columns([1] * max(_n_act, 2), gap="small")
+        _ix = 0
+        with _bar[_ix]:
+            st.download_button(
+                "Export Word",
+                data=docx_bytes if docx_bytes is not None else b"",
+                file_name=f"{est.get('quote_number') or 'proposal'}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                type="primary",
+                disabled=docx_bytes is None,
+                key="est_proposal_top_docx",
+            )
+        _ix += 1
+        if pdf_bytes is not None:
+            with _bar[_ix]:
                 st.download_button(
-                    "Download Proposal (Word)",
-                    data=docx_bytes if docx_bytes is not None else b"",
-                    file_name=f"{est.get('quote_number') or 'proposal'}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "Export PDF",
+                    data=pdf_bytes,
+                    file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
+                    mime="application/pdf",
                     use_container_width=True,
-                    type="primary",
-                    disabled=docx_bytes is None,
-                    key="est_proposal_dl_docx",
+                    key="est_proposal_top_pdf",
                 )
-            with dc2:
-                if pdf_bytes is not None:
-                    st.download_button(
-                        "Download PDF Proposal",
-                        data=pdf_bytes,
-                        file_name=f"{est.get('quote_number') or 'proposal'}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key="est_proposal_dl_pdf",
-                    )
-
-            if st.session_state.get("loaded_estimate_id"):
-                _, _sv_mid, _ = st.columns([0.15, 1.0, 0.15])
-                sc1, sc2 = _sv_mid.columns([1, 1], gap="small")
-                if sc1.button("Save Word to Supabase", use_container_width=True, key="est_save_word_export"):
+            _ix += 1
+        if _loaded:
+            with _bar[_ix]:
+                if st.button("Save Word to cloud", use_container_width=True, key="est_proposal_top_save_docx"):
                     if docx_bytes is None:
                         st.caption("Build the Word proposal first (check the standard template file).")
                     else:
@@ -2321,8 +2320,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                             "generated_docx",
                         )
                         st.success("Word proposal saved to Supabase Storage.")
-                if pdf_bytes is not None:
-                    if sc2.button("Save PDF to Supabase", use_container_width=True, key="est_save_pdf_export"):
+            _ix += 1
+            if pdf_bytes is not None:
+                with _bar[_ix]:
+                    if st.button("Save PDF to cloud", use_container_width=True, key="est_proposal_top_save_pdf"):
                         upload_generated_export(
                             st.session_state["loaded_estimate_id"],
                             f"{est.get('quote_number') or 'proposal'}.pdf",
@@ -2330,18 +2331,42 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                             "application/pdf",
                             "generated_pdf",
                         )
-                        st.success("PDF proposal saved to Supabase Storage.")
-            else:
-                st.caption("Save the estimate first to store exports in Supabase.")
+                        st.success("PDF saved to storage and linked to this estimate.")
+
+        if word_build_error:
+            st.error(word_build_error)
+        elif not is_proposal_preview and pdf_bytes is None and docx_bytes is not None:
+            st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
+        if docx_bytes is None and not is_proposal_preview:
+            st.caption("Ensure **assets/estimate_template_autofill_logo_updated.docx** exists in the app bundle.")
+
+        if not is_proposal_preview:
+            with st.expander("Template & preview notes", expanded=False):
+                st.caption(
+                    "Proposal uses **assets/estimate_template_autofill_logo_updated.docx**; optional logo files "
+                    "under **assets/** are merged when present. On-screen preview uses the same structured layout "
+                    "and field values as Word and PDF exports."
+                )
+                if not st.session_state.get("loaded_estimate_id"):
+                    st.caption("Save the estimate first to store exports in Supabase.")
 
         cached_preview = str(est.get("proposal_preview_html") or "").strip()
         preview_to_show = live_preview_html or cached_preview or proposal_preview_page_html(None)
-        with st.expander("Formatted quote preview", expanded=True):
-            if not docx_bytes and cached_preview:
-                st.caption(
-                    "Showing the formatted quote preview saved with this estimate (Word could not be rebuilt)."
-                )
-            _render_proposal_preview_html(preview_to_show)
+        _prev_caption = None
+        if not docx_bytes and cached_preview:
+            _prev_caption = (
+                "Showing the formatted quote preview saved with this estimate (Word could not be rebuilt)."
+            )
+
+        if is_proposal_preview:
+            if _prev_caption:
+                st.caption(_prev_caption)
+            _render_proposal_preview_html(preview_to_show, caption=None, html_width=940)
+        else:
+            with st.expander("Formatted quote preview", expanded=True):
+                if _prev_caption:
+                    st.caption(_prev_caption)
+                _render_proposal_preview_html(preview_to_show, caption=None, html_width=920)
 
     with tabs[7]:
         totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)

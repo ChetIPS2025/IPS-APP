@@ -44,7 +44,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v5"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v6"):
         return
     st.markdown(
         """
@@ -52,15 +52,16 @@ def _inject_proposal_preview_styles() -> None:
         .ips-proposal-preview-root.ips-proposal-preview-desk {
             box-sizing: border-box;
             width: 100%;
-            max-width: 56rem;
+            max-width: 950px;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            margin: 0.25rem auto 0.75rem auto;
-            padding: 0.75rem 0.5rem 1rem;
-            background: #e2e8f0;
-            border-radius: 8px;
+            margin: 0.35rem auto 1rem auto;
+            padding: 1.25rem 1rem 1.5rem;
+            background: #e8edf3;
+            border-radius: 12px;
             border: 1px solid #cbd5e1;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
         }
         .ips-proposal-preview-page.ips-proposal-template-page {
             box-sizing: border-box;
@@ -70,28 +71,43 @@ def _inject_proposal_preview_styles() -> None:
             background: #ffffff;
             color: #000000;
             font-size: 11pt;
-            line-height: 1.45;
-            border-radius: 2px;
-            padding: 0.5in 0.5in 0.55in 0.52in;
+            line-height: 1.5;
+            border-radius: 4px;
+            padding: 0.55in 0.55in 0.6in 0.55in;
             margin: 0 auto;
             border: 1px solid #94a3b8;
             box-shadow:
                 0 1px 3px rgba(15, 23, 42, 0.08),
-                0 12px 28px rgba(15, 23, 42, 0.12);
+                0 14px 36px rgba(15, 23, 42, 0.14);
             font-family: "Times New Roman", Times, serif;
         }
         .ips-proposal-page .ips-proposal-page-inner {
             box-sizing: border-box;
             width: 100%;
+            max-width: 100%;
         }
         .ips-proposal-page .ips-ph-logo-wrap {
             text-align: center;
-            margin: 0 0 0.35rem 0;
+            margin: 0 0 0.5rem 0;
         }
         .ips-proposal-page .ips-ph-logo-img {
-            max-width: 100%;
+            max-width: 220px;
+            max-height: 72px;
+            width: auto;
             height: auto;
-            display: inline-block;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+        .ips-proposal-page .ips-ph-company-line {
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            font-size: 15pt;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-align: center;
+            color: #0f172a;
+            margin: 0 0 0.65rem 0;
+            line-height: 1.25;
         }
         .ips-proposal-page .ips-ph-logo-missing {
             min-height: 0.25rem;
@@ -102,8 +118,8 @@ def _inject_proposal_preview_styles() -> None:
             background: #1f5d99;
             color: #fff;
             text-align: center;
-            padding: 14px 20px;
-            margin: 0 0 0.35rem 0;
+            padding: 16px 22px;
+            margin: 0 0 0.65rem 0;
             font-family: Arial, Helvetica, sans-serif;
         }
         .ips-proposal-page .proposal-header-title {
@@ -121,8 +137,8 @@ def _inject_proposal_preview_styles() -> None:
             font-family: Arial, Helvetica, sans-serif;
             font-size: 11pt;
             border-bottom: 3px double #334155;
-            padding: 0.28rem 0.08rem 0.32rem 0.08rem;
-            margin: 0;
+            padding: 0.35rem 0.1rem 0.4rem 0.1rem;
+            margin: 0 0 0.15rem 0;
         }
         .ips-proposal-page .ips-ph-meta-k {
             font-weight: 700;
@@ -141,46 +157,51 @@ def _inject_proposal_preview_styles() -> None:
         .ips-proposal-page .ips-ph-intro {
             font-family: Calibri, "Segoe UI", Arial, sans-serif;
             font-size: 11pt;
-            margin: 0.65rem 0 0.45rem 0;
-            line-height: 1.45;
+            margin: 1rem 0 0.55rem 0;
+            line-height: 1.5;
             color: #000000;
         }
         .ips-proposal-page .ips-ph-scope {
             font-family: "Times New Roman", Times, serif;
             font-size: 13.5pt;
             font-weight: 700;
-            line-height: 1.45;
+            line-height: 1.5;
             white-space: normal;
-            margin: 0.35rem 0 0.6rem 0;
+            margin: 0.5rem 0 0.85rem 0;
             color: #000000;
+            word-break: break-word;
         }
         .ips-proposal-page .ips-ph-section-spacer {
-            height: 0.85rem;
+            height: 1.1rem;
         }
         .ips-proposal-page .ips-ph-resp-heading {
             font-family: "Times New Roman", Times, serif;
-            font-size: 11pt;
+            font-size: 12pt;
             font-weight: 700;
-            margin: 0.35rem 0 0.25rem 0;
+            margin: 0.85rem 0 0.4rem 0;
             color: #000000;
+            line-height: 1.35;
         }
         .ips-proposal-page .ips-ph-resp-body {
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
-            line-height: 1.45;
+            line-height: 1.5;
             white-space: normal;
-            margin: 0 0 0.85rem 0;
+            margin: 0 0 1.15rem 0;
             color: #000000;
         }
         .ips-proposal-page .ips-ph-prep-line {
-            margin-top: 0.35rem;
+            margin-top: 0.65rem;
+        }
+        .ips-proposal-page .ips-ph-date-line {
+            margin-bottom: 0.35rem;
         }
         .ips-proposal-page .ips-ph-footer {
             font-family: "Times New Roman", Times, serif;
             font-size: 11pt;
             text-align: center;
-            margin: 1rem 0 0 0;
-            line-height: 1.45;
+            margin: 1.25rem 0 0 0;
+            line-height: 1.5;
             color: #000000;
         }
         .ips-proposal-fields-wrap {
@@ -292,15 +313,22 @@ def _inject_proposal_preview_styles() -> None:
             padding: 0.28rem 0.38rem;
             vertical-align: top;
             color: #000000;
+            line-height: 1.45;
+            word-break: break-word;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v5"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v6"] = True
 
 
-def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
+def _render_proposal_preview_html(
+    html_block: str,
+    *,
+    caption: str | None = None,
+    html_width: int = 920,
+) -> None:
     """
     Render proposal HTML using ``st.html`` (Streamlit-native). ``components.html`` iframes and
     ``st.markdown(..., unsafe_allow_html=True)`` both tended to show an empty/white panel for this
@@ -319,8 +347,13 @@ def _render_proposal_preview_html(html_block: str, *, caption: str | None = None
         )
         return
     try:
-        # ``width`` on ``st.html`` is newer than our minimum Streamlit pin; default matches parent width.
-        st.html(raw)
+        # Constrain width so Streamlit does not stretch the document to full app width.
+        st.html(raw, width=html_width)
+    except TypeError:
+        try:
+            st.html(raw)
+        except Exception:
+            st.markdown(raw, unsafe_allow_html=True)
     except Exception:
         st.markdown(raw, unsafe_allow_html=True)
 
