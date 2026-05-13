@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -22,11 +23,14 @@ from app.estimate.defaults import (
     _apply_default_prepared_by_from_profile,
     _estimate_table_column_names,
     _normalize_prepared_by_id_value,
+    merge_estimate_narrative_scalars_from_row,
     _payload_customer_location_for_db,
     _payload_prepared_by_for_db,
 )
 from app.estimate.equipment import load_estimate_equipment_from_assets
 from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
+
+_LOG = logging.getLogger(__name__)
 
 
 def save_revision(estimate_id: str, revision_number: int, snapshot_json: dict, note: str = "") -> None:
@@ -165,14 +169,56 @@ def patch_estimate_job_scope(
         est["scope_of_work"] = prev_s
         est["customer_responsibilities"] = prev_c
         est["scope_fields_updated_at"] = prev_ts
+        try:
+            st.session_state.pop("_ips_estimates_physical_columns_v2", None)
+        except Exception:
+            pass
         return False, "Database estimates table has no scope/estimate_json columns to update."
+    rows_out: list = []
     try:
-        update_rows_admin("estimates", payload, {"id": eid})
+        rows_out = update_rows_admin("estimates", payload, {"id": eid})
     except Exception as ex:
         est["scope_of_work"] = prev_s
         est["customer_responsibilities"] = prev_c
         est["scope_fields_updated_at"] = prev_ts
+        _LOG.info(
+            "patch_estimate_job_scope failed estimate_id=%s quote_number=%s len_sow=%s len_cr=%s err=%s",
+            eid,
+            str(est.get("quote_number") or "").strip() or None,
+            len(sow),
+            len(cr),
+            ex,
+        )
         return False, str(ex)
+
+    qn = str(est.get("quote_number") or "").strip() or None
+    _LOG.info(
+        "patch_estimate_job_scope ok estimate_id=%s quote_number=%s len_sow=%s len_cr=%s payload_keys=%s returned_rows=%s",
+        eid,
+        qn,
+        len(sow),
+        len(cr),
+        sorted(payload.keys()),
+        len(rows_out),
+    )
+
+    verified = fetch_by_match_admin("estimates", {"id": eid}, limit=1)
+    if verified:
+        merge_estimate_narrative_scalars_from_row(verified[0], est)
+        rs = str(est.get("scope_of_work") or "")
+        rcr = str(est.get("customer_responsibilities") or "")
+        if len(rs) != len(sow) or len(rcr) != len(cr):
+            _LOG.warning(
+                "patch_estimate_job_scope verify length mismatch estimate_id=%s expected_sow_len=%s got_sow_len=%s expected_cr_len=%s got_cr_len=%s",
+                eid,
+                len(sow),
+                len(rs),
+                len(cr),
+                len(rcr),
+            )
+    else:
+        _LOG.warning("patch_estimate_job_scope no row on re-fetch estimate_id=%s", eid)
+
     return True, ""
 
 

@@ -63,6 +63,7 @@ from app.estimate.defaults import (
     blank_estimate,
     coalesce_imported_estimate,
     ensure_numeric_defaults,
+    merge_estimate_narrative_scalars_from_row,
     merge_estimate_row_scalar_fields_into_editor,
     parse_estimate_json_bytes,
 )
@@ -82,6 +83,7 @@ from app.estimate.job_scope import (
     render_scope_autosave_poller,
     save_scope_now,
     scope_is_dirty,
+    scope_text_area_keys,
 )
 from app.estimate.persistence import (
     _duplicate_quote_message,
@@ -473,21 +475,20 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 row = fetch_one("estimates", {"id": selected_id})
                 if row:
                     loaded = row.get("estimate_json") or {}
+                    if not isinstance(loaded, dict):
+                        loaded = {}
                     loaded.update({
-                        "quote_number": row.get("quote_number", ""),
+                        "quote_number": row.get("quote_number", "") or "",
                         "customer_id": row.get("customer_id"),
                         "customer_contact_id": row.get("customer_contact_id"),
                         "job_id": row.get("job_id"),
                         "status": row.get("status", "draft"),
-                        "scope_of_work": row.get("scope_of_work", ""),
-                        "exclusions": row.get("exclusions", ""),
-                        "additional_charges": row.get("additional_charges", ""),
-                        "customer_responsibilities": row.get("customer_responsibilities", ""),
                         "job_received": row.get("job_received", False),
                         "po_number": row.get("po_number", ""),
                         "po_date": str(row.get("po_date") or ""),
                         "po_amount": float(row.get("po_amount", 0) or 0),
                     })
+                    merge_estimate_narrative_scalars_from_row(row, loaded)
                     merge_estimate_row_scalar_fields_into_editor(row, loaded)
                     ensure_numeric_defaults(loaded)
                     st.session_state["estimate_editor_state"] = loaded
@@ -2067,39 +2068,64 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         )
         area_h = int(st.session_state.get("est_scope_area_h", 360))
 
+        _scope_eid = str(loaded_scope_eid).strip() if loaded_scope_eid else None
+        _sow_key, _cr_key = scope_text_area_keys(_scope_eid)
+
         st.text_area(
             "Scope of Work",
             height=area_h,
             disabled=is_locked,
-            key="est_scope_scope_of_work",
+            key=_sow_key,
             on_change=bump_scope_edit_clock,
         )
         st.text_area(
             "Customer Responsibilities",
             height=area_h,
             disabled=is_locked,
-            key="est_scope_customer_responsibilities",
+            key=_cr_key,
             on_change=bump_scope_edit_clock,
         )
 
-        est["scope_of_work"] = str(st.session_state.get("est_scope_scope_of_work", ""))
-        est["customer_responsibilities"] = str(st.session_state.get("est_scope_customer_responsibilities", ""))
+        est["scope_of_work"] = str(st.session_state.get(_sow_key, ""))
+        est["customer_responsibilities"] = str(st.session_state.get(_cr_key, ""))
 
         st1, st2, st3 = st.columns([1.1, 1.1, 1.4])
+        has_eid = bool(_scope_eid)
+        has_qn = bool(str(est.get("quote_number") or "").strip())
+        has_cust = bool(str(est.get("customer_id") or "").strip())
+        save_failed = st.session_state.get("est_scope_autosave_status") == "error"
+        can_scope_save = (
+            has_eid
+            and has_qn
+            and has_cust
+            and not save_failed
+            and scope_is_dirty(_scope_eid)
+            and not is_locked
+        )
         with st1:
-            can_scope_save = bool(loaded_scope_eid) and scope_is_dirty() and not is_locked
-            if st.button(
+            _scope_save_clicked = st.button(
                 "Save scope to database",
                 type="primary",
                 disabled=not can_scope_save,
                 use_container_width=True,
                 key="est_scope_save_now_btn",
-            ):
-                ok, err = save_scope_now(est, str(loaded_scope_eid))
-                if ok:
-                    st.success("Scope saved.")
+            )
+            if _scope_save_clicked:
+                _st_status = getattr(st, "status", None)
+                if _st_status:
+                    with _st_status("Saving scope…") as _status:
+                        _status.write("Writing to estimates row…")
+                        ok, err = save_scope_now(est, _scope_eid)
+                        if ok:
+                            _status.update(label="Saved successfully", state="complete")
+                        else:
+                            _status.update(label=f"Save failed: {err}", state="error")
                 else:
-                    st.error(err or "Could not save scope.")
+                    ok, err = save_scope_now(est, _scope_eid)
+                    if ok:
+                        st.success("Saved successfully")
+                    else:
+                        st.error(f"Save failed: {err or 'Unknown error'}")
         with st2:
             status = str(st.session_state.get("est_scope_autosave_status") or "idle")
             if status == "saving":
@@ -2110,8 +2136,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             elif status == "error":
                 st.caption("Save error — see message below.")
         with st3:
-            if not loaded_scope_eid:
+            if not has_eid:
                 st.caption("Save the estimate once to enable database sync for these fields.")
+            elif not has_qn:
+                st.caption("Assign a quote number before saving scope.")
+            elif not has_cust:
+                st.caption("Select a customer before saving scope.")
+            elif save_failed:
+                st.caption("Fix the error below or edit the text to retry.")
 
         if st.session_state.get("est_scope_autosave_status") == "error":
             err = str(st.session_state.get("est_scope_autosave_err") or "").strip()
@@ -2119,8 +2151,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.error(err)
 
         if not is_locked:
-            maybe_autosave_scope(est, str(loaded_scope_eid) if loaded_scope_eid else None)
-            render_scope_autosave_poller(est, str(loaded_scope_eid) if loaded_scope_eid else None)
+            maybe_autosave_scope(est, _scope_eid)
+            render_scope_autosave_poller(est, _scope_eid)
 
     with tabs[5]:
         st.caption("Add attachments to the draft (they upload when you Save/Submit/Approve/Award).")
@@ -2411,7 +2443,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             est["status"] = "submitted"
             _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Submitted for approval")
-            refresh_scope_saved_baseline_from_est(est)
+            refresh_scope_saved_baseline_from_est(est, st.session_state.get("loaded_estimate_id"))
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2506,7 +2538,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             est["status"] = "approved"
             _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Approved")
-            refresh_scope_saved_baseline_from_est(est)
+            refresh_scope_saved_baseline_from_est(est, st.session_state.get("loaded_estimate_id"))
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2601,7 +2633,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             est["job_received"] = True
             _attach_stored_proposal_preview_html()
             eid = persist_estimate(payload, est, "Marked awarded")
-            refresh_scope_saved_baseline_from_est(est)
+            refresh_scope_saved_baseline_from_est(est, st.session_state.get("loaded_estimate_id"))
             attach_pending_pdf_import_source(eid)
             pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
             for f in pending_quotes:
@@ -2698,7 +2730,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     payload["estimate_description"] = _ed[:500] if _ed else None
                 _attach_stored_proposal_preview_html()
                 estimate_id = persist_estimate(payload, est, str(st.session_state.get("est_revision_note") or ""))
-                refresh_scope_saved_baseline_from_est(est)
+                refresh_scope_saved_baseline_from_est(est, st.session_state.get("loaded_estimate_id"))
                 attach_pending_pdf_import_source(estimate_id)
                 pending_quotes = list(st.session_state.get("est_pending_quote_attachments") or [])
                 for f in pending_quotes:

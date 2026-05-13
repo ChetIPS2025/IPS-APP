@@ -80,6 +80,7 @@ from pages.estimate_editor import (
     parse_estimate_json_bytes,
     render_estimate_editor,
 )
+from app.estimate.defaults import merge_estimate_narrative_scalars_from_row
 from app.estimate.job_scope import ensure_scope_widgets_bound
 
 
@@ -245,22 +246,21 @@ def _load_estimate_into_session(selected_id: str) -> None:
     if not row:
         return
     loaded = row.get("estimate_json") or {}
+    if not isinstance(loaded, dict):
+        loaded = {}
     loaded.update({
-        "quote_number": row.get("quote_number", ""),
+        "quote_number": row.get("quote_number", "") or "",
         "customer_id": row.get("customer_id"),
         "customer_contact_id": row.get("customer_contact_id"),
         "job_id": row.get("job_id"),
         "status": row.get("status", "draft"),
         "estimate_description": row.get("estimate_description", loaded.get("estimate_description", "")),
-        "scope_of_work": row.get("scope_of_work", ""),
-        "exclusions": row.get("exclusions", ""),
-        "additional_charges": row.get("additional_charges", ""),
-        "customer_responsibilities": row.get("customer_responsibilities", ""),
         "job_received": row.get("job_received", False),
         "po_number": row.get("po_number", ""),
         "po_date": str(row.get("po_date") or ""),
         "po_amount": float(row.get("po_amount", 0) or 0),
     })
+    merge_estimate_narrative_scalars_from_row(row, loaded)
     merge_estimate_row_scalar_fields_into_editor(row, loaded)
     # Only fill missing numeric fields; never overwrites real saved values.
     try:

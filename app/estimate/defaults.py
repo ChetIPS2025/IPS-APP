@@ -157,6 +157,34 @@ def _normalize_prepared_by_id_value(raw: str) -> str:
     return s
 
 
+_NARRATIVE_SCALAR_KEYS: tuple[str, ...] = (
+    "scope_of_work",
+    "exclusions",
+    "additional_charges",
+    "customer_responsibilities",
+)
+
+
+def merge_estimate_narrative_scalars_from_row(row: dict, loaded: dict) -> None:
+    """
+    Merge long narrative text fields into the in-memory estimate dict.
+
+    Prefer non-empty values from denormalized row columns; when a column is null or blank,
+    keep the value already present on ``loaded`` (typically from ``estimate_json``).
+    """
+    if not isinstance(loaded, dict):
+        return
+    for key in _NARRATIVE_SCALAR_KEYS:
+        rv = row.get(key)
+        jv = loaded.get(key)
+        if rv is not None and str(rv).strip():
+            loaded[key] = str(rv)
+        elif jv is not None and str(jv).strip():
+            loaded[key] = str(jv)
+        else:
+            loaded[key] = ""
+
+
 def merge_estimate_row_scalar_fields_into_editor(row: dict, loaded: dict) -> None:
     """Overlay denormalized estimate row columns after ``estimate_json`` is merged."""
     if "estimate_description" in row:

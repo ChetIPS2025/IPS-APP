@@ -408,7 +408,7 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
     """Field-based preview (same placeholder map as the DOCX / :func:`proposal_values`). All rows always render."""
     # Same keys as ``proposal_values`` — always show a row (empty → em dash) so preview matches Word placeholders.
     row_order: tuple[tuple[str, str], ...] = (
-        ("JOB_NAME", "Job / title"),
+        ("JOB_NAME", "Project title (estimate description)"),
         ("QUOTE_NUMBER", "Quote #"),
         ("CUSTOMER_NAME", "Customer"),
         ("CONTACT_NAME", "Contact"),

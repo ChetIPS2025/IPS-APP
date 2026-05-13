@@ -71,10 +71,22 @@ def _logo_data_uri() -> str | None:
     return None
 
 
+def _estimate_description_for_title(est: dict) -> str:
+    """Prefer denormalized column, then ``estimate_json`` (same text as editor Estimate Description)."""
+    ed = _s(est.get("estimate_description"))
+    if ed:
+        return ed
+    ej = est.get("estimate_json")
+    if isinstance(ej, dict):
+        return _s(ej.get("estimate_description"))
+    return ""
+
+
 @dataclass(frozen=True)
 class ProposalViewModel:
     """Canonical proposal fields shared by Word fill and HTML preview (excludes customer location)."""
 
+    # Project line before en-dash Quote (maps to {{JOB_NAME}}): estimate description, else job name, else Project.
     job_title_token: str
     quote_number: str
     customer_name: str
@@ -105,10 +117,12 @@ def build_proposal_view_model(
     cust = _s(customer_name or est.get("customer_name"))
     pt = _fmt_money(totals.get("proposal_total", 0) or 0)
     prepared = _proposal_prepared_by_display(est)
-    jn = _s(job_name or est.get("job_name"))
+    # Quote title line: Estimate Description – Quote (Word {{JOB_NAME}} – Quote); fall back to job name.
+    desc = _estimate_description_for_title(est)
+    jn = desc or _s(job_name or est.get("job_name"))
     if not jn:
         jn = "Project"
-    job_title_token = f"({jn})"
+    job_title_token = jn
     return ProposalViewModel(
         job_title_token=job_title_token,
         quote_number=_s(est.get("quote_number")),
