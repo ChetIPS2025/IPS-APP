@@ -137,36 +137,27 @@ def _job_db_cell_str(val: Any) -> str:
     return s
 
 
-def short_text(val: Any, max_len: int = 40) -> str:
-    txt = str(val or "").strip()
-    return txt[:max_len] + ("…" if len(txt) > max_len else "")
-
-
 def _render_job_db_job_name_cell(container: Any, raw: Any, *, max_len: int = 40) -> None:
-    """Truncate long job names for the overview table; full value in tooltip (display only)."""
+    """Single-line job name with ellipsis; full value in native tooltip (max_len reserved)."""
+    _ = max_len
     full = _job_db_cell_str(raw)
-    display = short_text(full, max_len=max_len)
     if not full:
         container.markdown(
             '<span class="ips-job-list-cell" style="color:#111827;">—</span>',
             unsafe_allow_html=True,
         )
-    elif len(full) > max_len:
-        container.markdown(
-            f'<span class="ips-job-list-cell" title="{html.escape(full, quote=True)}" '
-            f'style="color:#111827;">{html.escape(display)}</span>',
-            unsafe_allow_html=True,
-        )
-    else:
-        container.markdown(
-            f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(display)}</span>',
-            unsafe_allow_html=True,
-        )
+        return
+    container.markdown(
+        f'<span class="ips-job-list-cell" title="{html.escape(full, quote=True)}" '
+        f'style="color:#111827;">{html.escape(full)}</span>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 20) -> None:
+    """Single-line text with ellipsis; full value in native tooltip (max_len kept for call sites)."""
+    _ = max_len
     txt = str(value or "").strip()
-    short = txt[:max_len] + ("…" if len(txt) > max_len else "")
     if not txt:
         container.markdown(
             '<span class="ips-job-list-cell" style="color:#111827;">—</span>',
@@ -174,9 +165,8 @@ def _render_short_cell_with_tooltip(container: Any, value: Any, max_len: int = 2
         )
         return
     container.markdown(
-        f"<span class='ips-job-list-cell' title='{html.escape(txt, quote=True)}' "
-        "style='color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
-        f"{html.escape(short)}</span>",
+        f'<span class="ips-job-list-cell" title="{html.escape(txt, quote=True)}" '
+        f'style="color:#111827;">{html.escape(txt)}</span>',
         unsafe_allow_html=True,
     )
 
@@ -250,7 +240,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v9"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v11"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
 _JOB_DB_COLUMNS_HIDDEN_FROM_TABLE: frozenset[str] = frozenset(
@@ -328,6 +318,119 @@ def _inject_job_database_responsive_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="stCaptionContainer"],
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="stCaptionContainer"] p {
             color: #4b5563 !important;
+        }
+        /* Job desktop table: flex columns clip instead of overlapping; inner host scrolls horizontally. */
+        div[data-testid="stVerticalBlock"]:has(.ips-job-table-scroll-anchor),
+        div[data-testid="element-container"]:has(.ips-job-table-scroll-anchor) {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            column-gap: 0.75rem !important;
+            width: 100% !important;
+            min-width: 1120px !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 0 !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
+            flex: 0 0 auto !important;
+            min-width: 44px !important;
+            max-width: 56px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
+            min-width: 76px !important;
+            max-width: 110px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) {
+            min-width: 160px !important;
+            max-width: 280px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) {
+            min-width: 140px !important;
+            max-width: 220px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(5) {
+            min-width: 120px !important;
+            max-width: 200px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(6) {
+            min-width: 120px !important;
+            max-width: 200px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(7) {
+            min-width: 100px !important;
+            max-width: 150px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(8) {
+            min-width: 120px !important;
+            max-width: 200px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(9) {
+            min-width: 100px !important;
+            max-width: 180px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(10) {
+            min-width: 88px !important;
+            max-width: 120px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(11) {
+            flex: 0 0 auto !important;
+            min-width: 52px !important;
+            max-width: 72px !important;
+            position: relative !important;
+            z-index: 2 !important;
+            isolation: isolate !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) .ips-job-list-cell {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor) .ips-job-money-cell {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] > div[data-testid="column"] .stMarkdown {
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stHorizontalBlock"] [data-testid="column"] p:has(.ips-job-list-cell) {
+            margin: 0 !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-desktop-table-anchor)
+            [data-testid="stCaptionContainer"] p {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            min-width: 0 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) h5,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-list-anchor) .stMarkdown,
@@ -2221,102 +2324,112 @@ def render() -> None:
                         unsafe_allow_html=True,
                     )
                     inject_table_action_styles()
-                    # Match Estimates table rhythm: fixed columns + explicit weights.
-
-                    # Visible order (exact):
-                    # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
-                    col_weights = [
-                        0.40,  # checkbox
-                        1.00,  # job number
-                        2.30,  # job name
-                        1.70,  # customer
-                        1.25,  # location
-                        1.25,  # contact
-                        0.95,  # status
-                        1.10,  # linked estimate
-                        1.00,  # quote/po
-                        1.05,  # awarded amount
-                        0.50,  # delete
-                    ]
-
-                    head = st.columns(col_weights)
-                    with head[0]:
-                        st.caption(" ")
-                    with head[1]:
-                        st.caption("Job #")
-                    with head[2]:
-                        st.caption("Job Name")
-                    with head[3]:
-                        st.caption("Customer")
-                    with head[4]:
-                        st.caption("Location")
-                    with head[5]:
-                        st.caption("Contact")
-                    with head[6]:
-                        st.caption("Status")
-                    with head[7]:
-                        st.caption("Linked Estimate")
-                    with head[8]:
-                        st.caption("Quote / PO")
-                    with head[9]:
-                        st.caption("Awarded")
-                    with head[10]:
-                        st.caption("Del")
-
-                    for _, row in df_display.iterrows():
-                        jid = str(row.get("id") or "").strip()
-                        if not jid:
-                            continue
-                        rc = st.columns(col_weights)
-                        with rc[0]:
-                            ck = f"job_list_pick_{jid}"
-                            if ck not in st.session_state:
-                                st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
-                            if st.checkbox("", key=ck, label_visibility="collapsed"):
-                                picked.append(jid)
-                        with rc[1]:
-                            _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
-                        with rc[2]:
-                            _render_job_db_job_name_cell(rc[2], row.get("job_name"))
-                        with rc[3]:
-                            _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
-                        with rc[4]:
-                            _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
-                        with rc[5]:
-                            _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
-                        with rc[6]:
-                            _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
-                        with rc[7]:
-                            _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
-                        with rc[8]:
-                            # Quote (estimate) is the current visible “quote/po” signal in this UI.
-                            _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
-                        with rc[9]:
-                            amt = _job_db_money_cell(row.get("awarded_amount"))
-                            rc[9].markdown(
-                                f'<span class="ips-job-list-cell" style="color:#111827;">{html.escape(amt)}</span>',
-                                unsafe_allow_html=True,
-                            )
-
-                        del_help = (
-                            "Only admin or pm can delete jobs."
-                            if not can_edit
-                            else "Delete this job (blocked if costing data exists)."
+                    with st.container():
+                        st.markdown(
+                            '<span class="ips-job-table-scroll-anchor"></span>',
+                            unsafe_allow_html=True,
                         )
-                        with rc[10]:
-                            if st.button(
-                                "🗑",
-                                key=f"job_row_del_{jid}",
-                                disabled=not can_edit,
-                                use_container_width=True,
-                                help=del_help,
-                            ):
-                                pending = st.session_state.get(IPS_PENDING_DELETE)
-                                if not isinstance(pending, dict):
-                                    pending = {}
-                                    st.session_state[IPS_PENDING_DELETE] = pending
-                                pending[TABLE_KEY_JOBS] = [jid]
-                                st.rerun()
+                        # Match Estimates table rhythm: fixed columns + explicit weights.
+
+                        # Visible order (exact):
+                        # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | Del
+                        col_weights = [
+                            0.40,  # checkbox
+                            1.00,  # job number
+                            2.30,  # job name
+                            1.70,  # customer
+                            1.25,  # location
+                            1.25,  # contact
+                            0.95,  # status
+                            1.10,  # linked estimate
+                            1.00,  # quote/po
+                            1.05,  # awarded amount
+                            0.50,  # delete
+                        ]
+
+                        head = st.columns(col_weights, gap="medium")
+                        with head[0]:
+                            st.caption(" ")
+                        with head[1]:
+                            st.caption("Job #")
+                        with head[2]:
+                            st.caption("Job Name")
+                        with head[3]:
+                            st.caption("Customer")
+                        with head[4]:
+                            st.caption("Location")
+                        with head[5]:
+                            st.caption("Contact")
+                        with head[6]:
+                            st.caption("Status")
+                        with head[7]:
+                            st.caption("Linked Estimate")
+                        with head[8]:
+                            st.caption("Quote / PO")
+                        with head[9]:
+                            st.caption("Awarded")
+                        with head[10]:
+                            st.caption("Del")
+
+                        for _, row in df_display.iterrows():
+                            jid = str(row.get("id") or "").strip()
+                            if not jid:
+                                continue
+                            rc = st.columns(col_weights, gap="medium")
+                            with rc[0]:
+                                ck = f"job_list_pick_{jid}"
+                                if ck not in st.session_state:
+                                    st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
+                                if st.checkbox("", key=ck, label_visibility="collapsed"):
+                                    picked.append(jid)
+                            with rc[1]:
+                                _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
+                            with rc[2]:
+                                _render_job_db_job_name_cell(rc[2], row.get("job_name"))
+                            with rc[3]:
+                                _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
+                            with rc[4]:
+                                _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
+                            with rc[5]:
+                                _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
+                            with rc[6]:
+                                _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
+                            with rc[7]:
+                                _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
+                            with rc[8]:
+                                # Quote (estimate) is the current visible “quote/po” signal in this UI.
+                                _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
+                            with rc[9]:
+                                raw_aw = row.get("awarded_amount")
+                                amt = _job_db_money_cell(raw_aw)
+                                aw_title = ""
+                                if raw_aw is not None and str(raw_aw).strip() != "":
+                                    aw_title = f' title="{html.escape(str(raw_aw).strip(), quote=True)}"'
+                                rc[9].markdown(
+                                    f'<span class="ips-job-list-cell ips-job-money-cell"{aw_title} '
+                                    f'style="color:#111827;">{html.escape(amt)}</span>',
+                                    unsafe_allow_html=True,
+                                )
+
+                            del_help = (
+                                "Only admin or pm can delete jobs."
+                                if not can_edit
+                                else "Delete this job (blocked if costing data exists)."
+                            )
+                            with rc[10]:
+                                if st.button(
+                                    "🗑",
+                                    key=f"job_row_del_{jid}",
+                                    disabled=not can_edit,
+                                    use_container_width=True,
+                                    help=del_help,
+                                ):
+                                    pending = st.session_state.get(IPS_PENDING_DELETE)
+                                    if not isinstance(pending, dict):
+                                        pending = {}
+                                        st.session_state[IPS_PENDING_DELETE] = pending
+                                    pending[TABLE_KEY_JOBS] = [jid]
+                                    st.rerun()
                     set_selected_ids(TABLE_KEY_JOBS, picked)
                 else:
                     clear_selected_ids(TABLE_KEY_JOBS)

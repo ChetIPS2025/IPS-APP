@@ -91,7 +91,7 @@ def _safe_date_value(value):
 def render() -> None:
     render_header("Asset Manager")
 
-    can_edit = current_role() in {"admin", "pm"}
+    can_edit = current_role() in {"admin", "manager"}
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
@@ -211,16 +211,44 @@ def render() -> None:
                 st.session_state["asset_edit_id"] = str(sel[0])
                 st.session_state.pop("asset_return_to", None)
                 st.rerun()
-            pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-            if actions.get("confirm_delete") and pend.get(TABLE_KEY_ASSET_MANAGER):
-                for aid in pend[TABLE_KEY_ASSET_MANAGER]:
+            pending_del = st.session_state.get(IPS_PENDING_DELETE)
+            if not isinstance(pending_del, dict):
+                pending_del = {}
+                st.session_state[IPS_PENDING_DELETE] = pending_del
+            if actions.get("confirm_delete") and pending_del.get(TABLE_KEY_ASSET_MANAGER) and can_edit:
+                ids_to_delete = [str(x).strip() for x in pending_del[TABLE_KEY_ASSET_MANAGER] if str(x).strip()]
+                errors: list[str] = []
+                deleted_n = 0
+                for aid in ids_to_delete:
                     try:
                         delete_rows_admin("assets", {"id": aid})
+                        deleted_n += 1
                     except Exception as exc:
-                        st.error(f"Could not delete {aid}: {exc}")
-                pend.pop(TABLE_KEY_ASSET_MANAGER, None)
+                        errors.append(f"{aid}: {exc}")
+                pending_del.pop(TABLE_KEY_ASSET_MANAGER, None)
+                st.session_state[IPS_PENDING_DELETE] = pending_del
                 clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
-                st.success("Delete completed where permitted.")
+                st.session_state.pop("asset_mgr_sel_editor", None)
+                if errors and deleted_n == 0:
+                    for msg in errors[:8]:
+                        st.error(msg)
+                    try:
+                        st.toast("Could not delete selected assets.", icon="⚠️")
+                    except Exception:
+                        pass
+                elif errors:
+                    st.warning(f"Deleted {deleted_n} asset(s); {len(errors)} could not be removed.")
+                    for msg in errors[:8]:
+                        st.error(msg)
+                    try:
+                        st.toast(f"Deleted {deleted_n}; {len(errors)} failed.", icon="⚠️")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        st.toast(f"Deleted {deleted_n} asset(s).", icon="✅")
+                    except Exception:
+                        st.success(f"Deleted {deleted_n} asset(s).")
                 st.rerun()
 
     st.markdown("---")

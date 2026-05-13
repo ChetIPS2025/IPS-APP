@@ -34,7 +34,7 @@ IPS_PENDING_DELETE = "ips_table_pending_delete"
 IPS_ACTION_BAR_CSS = "ips_table_action_bar_injected"
 
 # Canonical table_key values -> session key ``selected_{table_key}_ids``
-# Asset Database page uses ``assets`` -> ``selected_assets_ids`` (see Asset Manager for separate key).
+# Asset Database uses ``assets`` -> ``selected_assets_ids``; Asset Manager (Overview) uses ``asset_manager``.
 TABLE_KEY_ASSETS = "assets"
 TABLE_KEY_ASSET_MANAGER = "asset_manager"
 TABLE_KEY_EQUIPMENT = "equipment"
@@ -56,7 +56,7 @@ TABLE_KEY_INVENTORY = "inventory"
 # Backward compatibility: old dict keys -> canonical table_key
 _LEGACY_TABLE_KEY_MAP: dict[str, str] = {
     "asset_manager": TABLE_KEY_ASSET_MANAGER,
-    "assets": TABLE_KEY_ASSET_MANAGER,  # legacy Asset Manager used key "assets"
+    # Do NOT map "assets" -> asset_manager: TABLE_KEY_ASSETS is the canonical Asset *Database* key.
     "asset_database": TABLE_KEY_ASSETS,
     "job_database": TABLE_KEY_JOBS,
     "estimates_list": TABLE_KEY_ESTIMATES,
