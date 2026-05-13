@@ -79,7 +79,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v7"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v8"):
         return
     st.markdown(
         """
@@ -140,23 +140,36 @@ def _inject_proposal_preview_styles() -> None:
         .ips-proposal-page .proposal-header {
             box-sizing: border-box;
             width: 100%;
-            background: #1f5d99;
-            color: #fff;
+            background: #0b4f8a;
+            color: #ffffff;
             text-align: center;
-            padding: 16px 22px;
+            padding: 18px 24px;
             margin: 0 0 0.65rem 0;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+            border-radius: 6px 6px 0 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            letter-spacing: 0.3px;
+            -webkit-font-smoothing: antialiased;
         }
         .ips-proposal-page .proposal-header-title {
-            font-size: 28px;
-            font-weight: 700;
-            color: #fff;
+            color: #ffffff;
+            font-size: clamp(1.35rem, 3.5vw, 30px);
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.2;
+            letter-spacing: 0.3px;
         }
+        .ips-proposal-page .proposal-header-subtitle,
         .ips-proposal-page .proposal-header-quote {
-            font-size: 20px;
+            color: #ffffff;
+            font-size: clamp(1.05rem, 2.6vw, 22px);
             font-weight: 700;
-            color: #fff;
-            margin-top: 6px;
+            margin: 10px 0 0 0;
+            line-height: 1.25;
+            letter-spacing: 0.3px;
+        }
+        .ips-proposal-page .proposal-header-subtitle + .proposal-header-subtitle {
+            margin-top: 8px;
         }
         .ips-proposal-page .ips-ph-meta-line {
             font-family: Arial, Helvetica, sans-serif;
@@ -345,7 +358,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v7"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v8"] = True
 
 
 def _render_proposal_preview_html(

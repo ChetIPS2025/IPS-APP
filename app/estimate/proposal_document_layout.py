@@ -201,7 +201,7 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
 {logo_block}
 <div class="proposal-header">
 <div class="proposal-header-title">{title_line}</div>
-<div class="proposal-header-quote">Quote #: {qn}</div>
+<div class="proposal-header-subtitle">Quote #: {qn}</div>
 </div>
 <div class="ips-ph-meta-line"><span class="ips-ph-meta-k">Customer:</span> {cust}</div>
 <div class="ips-ph-meta-line ips-ph-attn-line">
