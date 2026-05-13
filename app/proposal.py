@@ -599,7 +599,7 @@ def _apply_standard_proposal_branding(doc: Document) -> None:
     logo_path = _resolve_standard_company_logo_path()
     if not logo_path:
         return
-    width = Inches(1.35)
+    width = Inches(1.35)  # Keep in sync with HTML fallback ``.ips-ph-logo-img`` (1.35in) in proposal_exports.
     replaced = _replace_company_logo_placeholders_in_document(doc, logo_path, width)
     if replaced == 0:
         try:

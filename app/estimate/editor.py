@@ -98,6 +98,7 @@ from app.estimate.proposal_exports import (
     build_proposal_view_bundle,
     _inject_proposal_preview_styles,
     _proposal_export_kwargs,
+    _render_proposal_document_preview,
     _render_proposal_preview_html,
     proposal_preview_page_html,
 )
@@ -444,7 +445,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         try:
             pe0 = _proposal_export_kwargs(est, customer_name_by_id, jobs)
             t0 = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-            _v, _docx, _err, page_h = build_proposal_view_bundle(est, t0, pe0)
+            _v, _docx, _err, page_h, _pdf = build_proposal_view_bundle(est, t0, pe0)
             if page_h.strip():
                 est["proposal_preview_html"] = page_h
         except Exception:
@@ -608,7 +609,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if embedded:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        _vals, embed_docx, embed_docx_err, embed_live_html = build_proposal_view_bundle(est, totals, _pe)
+        _vals, embed_docx, embed_docx_err, embed_live_html, embed_pdf = build_proposal_view_bundle(est, totals, _pe)
 
         _, _emb_actions, _ = st.columns([0.2, 1.0, 0.2])
         eb1, eb2, eb3 = _emb_actions.columns([1, 1, 1], gap="small")
@@ -633,14 +634,16 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     if not eid:
                         st.caption("Save the estimate first to store the PDF on this quote.")
                     else:
-                        embed_pdf, _conv = try_convert_proposal_docx_to_pdf(embed_docx)
-                        if embed_pdf is None:
+                        epdf = embed_pdf
+                        if epdf is None and embed_docx is not None:
+                            epdf, _conv = try_convert_proposal_docx_to_pdf(embed_docx)
+                        if epdf is None:
                             st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
                         else:
                             upload_generated_export(
                                 str(eid),
                                 f"{est.get('quote_number') or 'proposal'}.pdf",
-                                embed_pdf,
+                                epdf,
                                 "application/pdf",
                                 "generated_pdf",
                             )
@@ -652,7 +655,13 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             with st.expander("Formatted quote preview", expanded=True):
                 cached_prev = str(est.get("proposal_preview_html") or "").strip()
                 preview_src = embed_live_html or cached_prev or proposal_preview_page_html(None)
-                _render_proposal_preview_html(preview_src, html_width=920)
+                _render_proposal_document_preview(
+                    embed_pdf,
+                    preview_src,
+                    caption=None,
+                    html_width=920,
+                    compact=True,
+                )
             if st.button("Hide preview", use_container_width=True, key="est_embed_hide_preview"):
                 st.session_state["est_embed_proposal_preview"] = False
                 st.rerun()
@@ -2273,11 +2282,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         is_proposal_preview = st.session_state.get("proposal_preview_mode", "edit") == "preview"
 
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-        _vals, docx_bytes, word_build_error, live_preview_html = build_proposal_view_bundle(est, totals, _pe)
-
-        pdf_bytes: bytes | None = None
-        if docx_bytes is not None:
-            pdf_bytes, _conv_note = try_convert_proposal_docx_to_pdf(docx_bytes)
+        _vals, docx_bytes, word_build_error, live_preview_html, pdf_bytes = build_proposal_view_bundle(
+            est, totals, _pe
+        )
 
         _loaded = bool(st.session_state.get("loaded_estimate_id"))
         _n_act = 1 + (1 if pdf_bytes is not None else 0) + (1 if _loaded else 0) + (1 if _loaded and pdf_bytes is not None else 0)
@@ -2361,12 +2368,24 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         if is_proposal_preview:
             if _prev_caption:
                 st.caption(_prev_caption)
-            _render_proposal_preview_html(preview_to_show, caption=None, html_width=940)
+            _render_proposal_document_preview(
+                pdf_bytes,
+                preview_to_show,
+                caption=None,
+                html_width=940,
+                compact=True,
+            )
         else:
             with st.expander("Formatted quote preview", expanded=True):
                 if _prev_caption:
                     st.caption(_prev_caption)
-                _render_proposal_preview_html(preview_to_show, caption=None, html_width=920)
+                _render_proposal_document_preview(
+                    pdf_bytes,
+                    preview_to_show,
+                    caption=None,
+                    html_width=920,
+                    compact=False,
+                )
 
     with tabs[7]:
         totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)

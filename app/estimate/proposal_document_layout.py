@@ -195,12 +195,10 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
         if logo
         else '<div class="ips-ph-logo-missing"></div>'
     )
-    company_line = '<div class="ips-ph-company-line">Industrial Plant Solutions</div>'
 
     inner = f"""
 <div class="ips-proposal-page-inner">
 {logo_block}
-{company_line}
 <div class="proposal-header">
 <div class="proposal-header-title">{title_line}</div>
 <div class="proposal-header-quote">Quote #: {qn}</div>

@@ -8,6 +8,7 @@ from db import fetch_one
 from proposal import (
     build_proposal_docx,
     proposal_preview_page_html,
+    try_convert_proposal_docx_to_pdf,
 )
 
 from app.estimate.customer_job import (
@@ -23,6 +24,40 @@ from app.estimate.proposal_document_layout import (
 
 # Shown when Word built OK but server-side PDF conversion is missing (no error/warning box).
 PROPOSAL_PDF_UNAVAILABLE_SHORT = "PDF export not available on this server"
+
+
+def proposal_pdf_preview_pngs(
+    pdf_bytes: bytes | None,
+    *,
+    dpi: int = 115,
+    max_pages: int = 8,
+) -> list[bytes]:
+    """
+    Rasterize PDF pages to PNG for on-screen preview.
+
+    Uses the same bytes as **Export PDF**, so the preview matches the Word layout after conversion
+    (logo size, margins, typography) more closely than a parallel HTML mock.
+    """
+    if not pdf_bytes:
+        return []
+    try:
+        import fitz  # type: ignore  # PyMuPDF
+    except ImportError:
+        return []
+    out: list[bytes] = []
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        try:
+            n = min(int(doc.page_count or 0), max_pages)
+            for i in range(n):
+                page = doc.load_page(i)
+                pix = page.get_pixmap(dpi=int(dpi), alpha=False)
+                out.append(pix.tobytes("png"))
+        finally:
+            doc.close()
+    except Exception:
+        return []
+    return out
 
 
 def _lookup_prepared_by_phone(est: dict) -> str:
@@ -44,7 +79,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v6"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v7"):
         return
     st.markdown(
         """
@@ -52,7 +87,7 @@ def _inject_proposal_preview_styles() -> None:
         .ips-proposal-preview-root.ips-proposal-preview-desk {
             box-sizing: border-box;
             width: 100%;
-            max-width: 950px;
+            max-width: 850px;
             display: flex;
             justify-content: center;
             align-items: flex-start;
@@ -87,27 +122,17 @@ def _inject_proposal_preview_styles() -> None:
             max-width: 100%;
         }
         .ips-proposal-page .ips-ph-logo-wrap {
-            text-align: center;
-            margin: 0 0 0.5rem 0;
+            text-align: left;
+            margin: 0 0 0.45rem 0;
         }
         .ips-proposal-page .ips-ph-logo-img {
-            max-width: 220px;
-            max-height: 72px;
-            width: auto;
+            width: 1.35in;
+            max-width: 1.35in;
+            max-height: 1.1in;
             height: auto;
             object-fit: contain;
             display: block;
-            margin: 0 auto;
-        }
-        .ips-proposal-page .ips-ph-company-line {
-            font-family: Calibri, "Segoe UI", Arial, sans-serif;
-            font-size: 15pt;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            text-align: center;
-            color: #0f172a;
-            margin: 0 0 0.65rem 0;
-            line-height: 1.25;
+            margin: 0;
         }
         .ips-proposal-page .ips-ph-logo-missing {
             min-height: 0.25rem;
@@ -320,7 +345,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v6"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v7"] = True
 
 
 def _render_proposal_preview_html(
@@ -356,6 +381,36 @@ def _render_proposal_preview_html(
             st.markdown(raw, unsafe_allow_html=True)
     except Exception:
         st.markdown(raw, unsafe_allow_html=True)
+
+
+def _render_proposal_document_preview(
+    pdf_bytes: bytes | None,
+    html_block: str,
+    *,
+    caption: str | None = None,
+    html_width: int = 900,
+    compact: bool = False,
+) -> None:
+    """
+    Prefer rasterizing the **filled proposal PDF** (same bytes as Export PDF) so the preview
+    tracks the packaged Word template 1:1. Falls back to structured HTML when PDF is unavailable.
+    """
+    pngs = proposal_pdf_preview_pngs(pdf_bytes)
+    if pngs:
+        _inject_proposal_preview_styles()
+        if caption:
+            st.caption(caption)
+        if not compact:
+            st.caption(
+                "Preview is rendered from the **same PDF** as **Export PDF** (filled Word → PDF), "
+                "so layout, logo size, and spacing match the downloaded document."
+            )
+        _l, _c, _r = st.columns([0.06, 1.0, 0.06])
+        with _c:
+            for buf in pngs:
+                st.image(buf, use_container_width=True)
+        return
+    _render_proposal_preview_html(html_block, caption=caption, html_width=html_width)
 
 
 def _normalize_contact_placeholder_text(val) -> str:
@@ -428,12 +483,12 @@ def build_proposal_view_bundle(
     est: dict,
     totals: dict,
     pe: dict,
-) -> tuple[dict[str, str], bytes | None, str, str]:
+) -> tuple[dict[str, str], bytes | None, str, str, bytes | None]:
     """
     Shared proposal view for the editor: placeholder map, filled ``.docx`` bytes, build error (if any),
-    and **structured** HTML preview from :mod:`app.estimate.proposal_document_layout` (same view model as Word placeholders).
+    structured HTML preview, and optional **PDF bytes** (same pipeline as Export PDF).
 
-    Download Word / PDF reuse ``docx`` from this tuple; preview HTML uses ``build_proposal_view_model``.
+    When PDF conversion succeeds, the UI should rasterize those bytes for a pixel-accurate preview.
     """
     vm = build_proposal_view_model(
         est,
@@ -454,4 +509,7 @@ def build_proposal_view_bundle(
     except Exception as e:
         docx = None
         err = f"Could not build the Word proposal: {type(e).__name__}: {e}"
-    return vals, docx, err, page_html
+    pdf_b: bytes | None = None
+    if docx:
+        pdf_b, _note = try_convert_proposal_docx_to_pdf(docx)
+    return vals, docx, err, page_html, pdf_b
