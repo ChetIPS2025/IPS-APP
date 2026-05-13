@@ -8,7 +8,6 @@ from db import fetch_one
 from proposal import (
     build_proposal_docx,
     proposal_preview_page_html,
-    proposal_values,
 )
 
 from app.estimate.customer_job import (
@@ -16,36 +15,14 @@ from app.estimate.customer_job import (
     _fetch_customer_row_for_proposal,
 )
 from app.estimate.defaults import _normalize_prepared_by_id_value
+from app.estimate.proposal_document_layout import (
+    build_proposal_view_model,
+    proposal_placeholder_map_from_view_model,
+    render_proposal_preview_page_html,
+)
 
 # Shown when Word built OK but server-side PDF conversion is missing (no error/warning box).
 PROPOSAL_PDF_UNAVAILABLE_SHORT = "PDF export not available on this server"
-
-
-def _format_customer_location_line(row: dict | None) -> str:
-    """Single-line location for {{CUSTOMER_LOCATION}} (matches Customers tab field names)."""
-    if not row:
-        return ""
-
-    def _first(keys: tuple[str, ...]) -> str:
-        for k in keys:
-            v = row.get(k)
-            if v is not None and str(v).strip():
-                return str(v).strip()
-        return ""
-
-    addr = _first(("address", "street_address", "address_line1", "line1"))
-    city = _first(("city",))
-    state = _first(("state", "region", "province"))
-    z = _first(("zip", "zip_code", "postal_code", "postcode"))
-    parts: list[str] = []
-    if addr:
-        parts.append(addr)
-    cs = ", ".join(p for p in (city, state) if p)
-    if cs:
-        parts.append(cs)
-    if z:
-        parts.append(z)
-    return ", ".join(parts)
 
 
 def _lookup_prepared_by_phone(est: dict) -> str:
@@ -66,8 +43,8 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 
 def _inject_proposal_preview_styles() -> None:
-    """One-time CSS: Word-like page (8.5in) on a light mat — matches :mod:`app.proposal` preview shell."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v3"):
+    """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
+    if st.session_state.get("_ips_proposal_preview_css_injected_v5"):
         return
     st.markdown(
         """
@@ -95,13 +72,116 @@ def _inject_proposal_preview_styles() -> None:
             font-size: 11pt;
             line-height: 1.45;
             border-radius: 2px;
-            padding: 1in 1in 1in 1.05in;
+            padding: 0.5in 0.5in 0.55in 0.52in;
             margin: 0 auto;
             border: 1px solid #94a3b8;
             box-shadow:
                 0 1px 3px rgba(15, 23, 42, 0.08),
                 0 12px 28px rgba(15, 23, 42, 0.12);
             font-family: "Times New Roman", Times, serif;
+        }
+        .ips-proposal-page .ips-proposal-page-inner {
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .ips-proposal-page .ips-ph-logo-wrap {
+            text-align: center;
+            margin: 0 0 0.35rem 0;
+        }
+        .ips-proposal-page .ips-ph-logo-img {
+            max-width: 100%;
+            height: auto;
+            display: inline-block;
+        }
+        .ips-proposal-page .ips-ph-logo-missing {
+            min-height: 0.25rem;
+        }
+        .ips-proposal-page .proposal-header {
+            box-sizing: border-box;
+            width: 100%;
+            background: #1f5d99;
+            color: #fff;
+            text-align: center;
+            padding: 14px 20px;
+            margin: 0 0 0.35rem 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .ips-proposal-page .proposal-header-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .ips-proposal-page .proposal-header-quote {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 6px;
+        }
+        .ips-proposal-page .ips-ph-meta-line {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11pt;
+            border-bottom: 3px double #334155;
+            padding: 0.28rem 0.08rem 0.32rem 0.08rem;
+            margin: 0;
+        }
+        .ips-proposal-page .ips-ph-meta-k {
+            font-weight: 700;
+        }
+        .ips-proposal-page .ips-ph-attn-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: baseline;
+        }
+        .ips-proposal-page .ips-ph-quote-amt {
+            margin-left: auto;
+            white-space: nowrap;
+        }
+        .ips-proposal-page .ips-ph-intro {
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            font-size: 11pt;
+            margin: 0.65rem 0 0.45rem 0;
+            line-height: 1.45;
+            color: #000000;
+        }
+        .ips-proposal-page .ips-ph-scope {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 13.5pt;
+            font-weight: 700;
+            line-height: 1.45;
+            white-space: normal;
+            margin: 0.35rem 0 0.6rem 0;
+            color: #000000;
+        }
+        .ips-proposal-page .ips-ph-section-spacer {
+            height: 0.85rem;
+        }
+        .ips-proposal-page .ips-ph-resp-heading {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            font-weight: 700;
+            margin: 0.35rem 0 0.25rem 0;
+            color: #000000;
+        }
+        .ips-proposal-page .ips-ph-resp-body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            line-height: 1.45;
+            white-space: normal;
+            margin: 0 0 0.85rem 0;
+            color: #000000;
+        }
+        .ips-proposal-page .ips-ph-prep-line {
+            margin-top: 0.35rem;
+        }
+        .ips-proposal-page .ips-ph-footer {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            text-align: center;
+            margin: 1rem 0 0 0;
+            line-height: 1.45;
+            color: #000000;
         }
         .ips-proposal-fields-wrap {
             max-height: min(440px, 48vh);
@@ -217,7 +297,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v3"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v5"] = True
 
 
 def _render_proposal_preview_html(html_block: str, *, caption: str | None = None) -> None:
@@ -292,7 +372,6 @@ def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) ->
     """Shared context for Word/PDF proposal generation (same DOCX template + placeholders)."""
     cid = str(est.get("customer_id") or "").strip()
     cust_row = _fetch_customer_row_for_proposal(cid) if cid else None
-    location = _format_customer_location_line(cust_row)
     cust_name = customer_name_by_id.get(cid, "") or (
         str(cust_row.get("customer_name") or "").strip() if cust_row else ""
     )
@@ -307,29 +386,9 @@ def _proposal_export_kwargs(est: dict, customer_name_by_id: dict, jobs: list) ->
     return {
         "customer_name": cust_name,
         "job_name": job_name,
-        "customer_location": location,
         "contact_name": contact_name,
         "prepared_by_phone": phone,
     }
-
-
-def _build_proposal_docx_and_vals(
-    est: dict,
-    totals: dict,
-    pe: dict,
-) -> tuple[dict[str, str], bytes | None, str]:
-    """
-    Single proposal pipeline: :func:`proposal_values` once, then :func:`build_proposal_docx` with those
-    values so preview and download use the same DOCX bytes.
-    """
-    vals = proposal_values(est, totals, **pe)
-    try:
-        docx = build_proposal_docx(est, totals, placeholder_values=vals)
-        return vals, docx, ""
-    except FileNotFoundError as e:
-        return vals, None, str(e)
-    except Exception as e:
-        return vals, None, f"Could not build the Word proposal: {type(e).__name__}: {e}"
 
 
 def build_proposal_view_bundle(
@@ -339,9 +398,27 @@ def build_proposal_view_bundle(
 ) -> tuple[dict[str, str], bytes | None, str, str]:
     """
     Shared proposal view for the editor: placeholder map, filled ``.docx`` bytes, build error (if any),
-    and **docx-derived** HTML (same extraction as on-screen preview). Download Word / PDF / Save should
-    reuse ``docx`` from this tuple so all surfaces stay aligned.
+    and **structured** HTML preview from :mod:`app.estimate.proposal_document_layout` (same view model as Word placeholders).
+
+    Download Word / PDF reuse ``docx`` from this tuple; preview HTML uses ``build_proposal_view_model``.
     """
-    vals, docx, err = _build_proposal_docx_and_vals(est, totals, pe)
-    page_html = proposal_preview_page_html(docx) if docx else ""
+    vm = build_proposal_view_model(
+        est,
+        totals,
+        customer_name=pe["customer_name"],
+        job_name=pe["job_name"],
+        contact_name=pe["contact_name"],
+        prepared_by_phone=pe["prepared_by_phone"],
+    )
+    vals = proposal_placeholder_map_from_view_model(vm)
+    page_html = render_proposal_preview_page_html(vm)
+    try:
+        docx = build_proposal_docx(est, totals, placeholder_values=vals)
+        err = ""
+    except FileNotFoundError as e:
+        docx = None
+        err = str(e)
+    except Exception as e:
+        docx = None
+        err = f"Could not build the Word proposal: {type(e).__name__}: {e}"
     return vals, docx, err, page_html

@@ -438,7 +438,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     labor_options = [r["classification"] for r in labor_rates]
 
     def _attach_stored_proposal_preview_html() -> None:
-        """Store docx-derived HTML on ``est`` so saved quotes reopen with the same proposal preview."""
+        """Store formatted proposal preview HTML on ``est`` so saved quotes reopen with the same quote page preview."""
         try:
             pe0 = _proposal_export_kwargs(est, customer_name_by_id, jobs)
             t0 = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
@@ -648,9 +648,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         if embed_docx_err and embed_docx is None:
             st.error(embed_docx_err)
         if st.session_state.get("est_embed_proposal_preview"):
-            with st.expander("Proposal preview", expanded=True):
+            with st.expander("Formatted quote preview", expanded=True):
                 cached_prev = str(est.get("proposal_preview_html") or "").strip()
-                preview_src = embed_live_html if embed_docx else (cached_prev or proposal_preview_page_html(None))
+                preview_src = embed_live_html or cached_prev or proposal_preview_page_html(None)
                 _render_proposal_preview_html(preview_src)
             if st.button("Hide preview", use_container_width=True, key="est_embed_hide_preview"):
                 st.session_state["est_embed_proposal_preview"] = False
@@ -2231,8 +2231,9 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         _pe = _proposal_export_kwargs(est, customer_name_by_id, jobs)
         _vals, docx_bytes, word_build_error, live_preview_html = build_proposal_view_bundle(est, totals, _pe)
         st.caption(
-            "Proposal uses **assets/estimate_template_autofill_logo_updated.docx**; optional **company_logo.png** "
-            "in **assets/** is merged when present. Preview HTML matches the filled Word file."
+            "Proposal uses **assets/estimate_template_autofill_logo_updated.docx**; optional logo files "
+            "under **assets/** are merged when present. On-screen preview uses the same structured layout "
+            "and field values as Word and PDF exports."
         )
 
         pdf_bytes: bytes | None = None
@@ -2302,10 +2303,12 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.caption("Save the estimate first to store exports in Supabase.")
 
         cached_preview = str(est.get("proposal_preview_html") or "").strip()
-        preview_to_show = live_preview_html if docx_bytes else (cached_preview or proposal_preview_page_html(None))
-        with st.expander("Proposal preview", expanded=True):
+        preview_to_show = live_preview_html or cached_preview or proposal_preview_page_html(None)
+        with st.expander("Formatted quote preview", expanded=True):
             if not docx_bytes and cached_preview:
-                st.caption("Showing the proposal preview stored with this quote (Word could not be rebuilt).")
+                st.caption(
+                    "Showing the formatted quote preview saved with this estimate (Word could not be rebuilt)."
+                )
             _render_proposal_preview_html(preview_to_show)
 
     with tabs[7]:

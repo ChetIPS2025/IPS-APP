@@ -7,7 +7,6 @@ import tempfile
 import zipfile
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
-from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -28,7 +27,6 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
     "JOB_NAME",
     "QUOTE_NUMBER",
     "CUSTOMER_NAME",
-    "CUSTOMER_LOCATION",
     "CONTACT_NAME",
     "PROPOSAL_AMOUNT",
     "SCOPE_OF_WORK",
@@ -413,7 +411,6 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
         ("JOB_NAME", "Job / title"),
         ("QUOTE_NUMBER", "Quote #"),
         ("CUSTOMER_NAME", "Customer"),
-        ("CUSTOMER_LOCATION", "Location"),
         ("CONTACT_NAME", "Contact"),
         ("PROPOSAL_AMOUNT", "Proposal amount"),
         ("SCOPE_OF_WORK", "Scope of work"),
@@ -440,46 +437,25 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
     )
 
 
-def proposal_preview_page_html(docx_bytes: bytes | None) -> str:
+def proposal_preview_page_html(view_model=None):
     """
-    Single shared HTML shell for on-screen proposal preview.
+    HTML preview shell aligned with :mod:`app.estimate.proposal_document_layout`
+    (same structured layout as Word exports — not OOXML extraction).
 
-    Content is derived only from the **filled** ``.docx`` bytes (same bytes as **Download Proposal (Word)**),
-    so preview, save snapshot, and exports stay aligned with the packaged template.
+    Pass ``None`` when no view model can be built (shows an instructional placeholder page).
     """
-    desk = '<div class="ips-proposal-preview-root ips-proposal-preview-desk">'
-    page_open = '<div class="ips-proposal-preview-page ips-proposal-docx-preview ips-proposal-template-page">'
-    page_close = "</div></div>"
+    try:
+        from app.estimate.proposal_document_layout import render_proposal_preview_page_html
+    except ImportError:
+        from estimate.proposal_document_layout import render_proposal_preview_page_html  # type: ignore
 
-    if not docx_bytes:
-        inner = (
-            '<p class="ips-proposal-preview-error">'
-            "<strong>No proposal document was generated.</strong> "
-            "Confirm **assets/estimate_template_autofill_logo_updated.docx** is present, then open the "
-            "<strong>Proposal</strong> tab again.</p>"
-        )
-        return f"{desk}{page_open}{inner}{page_close}"
-
-    inner = _best_preview_inner_html_from_docx_bytes(docx_bytes)
-    wrapped = _wrap_docx_preview(inner)
-    if not wrapped.strip():
-        inner = (
-            '<p class="ips-proposal-preview-error">'
-            "The Word file was built but no preview text could be extracted from this template. "
-            "Use <strong>Download Proposal (Word)</strong> for the full layout.</p>"
-        )
-        return f"{desk}{page_open}{inner}{page_close}"
-
-    return f"{desk}{page_open}{wrapped}{page_close}"
+    return render_proposal_preview_page_html(view_model)
 
 
-def proposal_preview_html(docx_bytes: bytes | None, *, fallback_vals: dict[str, str]) -> str:
-    """
-    Backward-compatible wrapper. ``fallback_vals`` is ignored; preview is **docx-only**
-    (see :func:`proposal_preview_page_html`).
-    """
+def proposal_preview_html(view_model=None, *, fallback_vals: dict[str, str] | None = None) -> str:
+    """Backward-compatible wrapper; ``fallback_vals`` is ignored."""
     _ = fallback_vals
-    return proposal_preview_page_html(docx_bytes)
+    return proposal_preview_page_html(view_model)
 
 
 def proposal_values(
@@ -488,36 +464,36 @@ def proposal_values(
     customer_name: str = "",
     job_name: str = "",
     *,
-    customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
 ) -> dict[str, str]:
     """
     Placeholder values for the estimate proposal DOCX (and PDF derived from it).
 
+    Built from :func:`app.estimate.proposal_document_layout.build_proposal_view_model` so ordering matches preview HTML.
+
     Money: $X,XXX.XX. Date: full US month name. Missing fields -> empty string (or sensible default for title).
     """
-    cust = _s(customer_name or est.get("customer_name"))
-    pt = _money(totals.get("proposal_total", 0) or 0)
-    prepared = _proposal_prepared_by_display(est)
-    jn = _s(job_name or est.get("job_name"))
-    if not jn:
-        jn = "Project"
-    # Template title line is ``{{JOB_NAME}} – Quote`` — supply only the parenthesized job title portion.
-    job_title_token = f"({jn})"
-    return {
-        "JOB_NAME": job_title_token,
-        "QUOTE_NUMBER": _s(est.get("quote_number")),
-        "CUSTOMER_NAME": cust,
-        "CUSTOMER_LOCATION": _s(customer_location),
-        "CONTACT_NAME": _s_contact(contact_name),
-        "PROPOSAL_AMOUNT": pt,
-        "SCOPE_OF_WORK": _s(est.get("scope_of_work")),
-        "CUSTOMER_RESPONSIBILITIES": _s(est.get("customer_responsibilities")),
-        "DATE": datetime.now().strftime("%B %d, %Y"),
-        "PREPARED_BY": _s(prepared),
-        "PREPARED_BY_PHONE": _s(prepared_by_phone),
-    }
+    try:
+        from app.estimate.proposal_document_layout import (
+            build_proposal_view_model,
+            proposal_placeholder_map_from_view_model,
+        )
+    except ImportError:
+        from estimate.proposal_document_layout import (  # type: ignore
+            build_proposal_view_model,
+            proposal_placeholder_map_from_view_model,
+        )
+
+    vm = build_proposal_view_model(
+        est,
+        totals,
+        customer_name=customer_name,
+        job_name=job_name,
+        contact_name=contact_name,
+        prepared_by_phone=prepared_by_phone,
+    )
+    return proposal_placeholder_map_from_view_model(vm)
 
 
 def _proposal_assets_dir() -> Path:
@@ -638,7 +614,6 @@ def _normalize_placeholder_tokens(text: str) -> str:
     s = text
     explicit: list[tuple[str, str]] = [
         (r"\{\{\s*Customer\s+Name\s*\}\}", "{{CUSTOMER_NAME}}"),
-        (r"\{\{\s*Customer\s+Location\s*\}\}", "{{CUSTOMER_LOCATION}}"),
         (r"\{\{\s*Scope\s+of\s+Work\s*\}\}", "{{SCOPE_OF_WORK}}"),
         (r"\{\{\s*Customer\s+Responsibilities\s*\}\}", "{{CUSTOMER_RESPONSIBILITIES}}"),
         (r"\{\{\s*Job\s*Name\s*\}\}", "{{JOB_NAME}}"),
@@ -750,11 +725,37 @@ def _replace_placeholders_doc(doc: Document, replacements: dict[str, str]) -> No
     _apply_to_paragraph_text(doc, replace)
 
 
+def _remove_customer_location_paragraphs(doc: Document) -> None:
+    """Strip legacy ``Customer Location: …`` blocks so quotes never show site lines."""
+    kill: list = []
+    for p in _iter_all_paragraphs(doc):
+        t = (_paragraph_full_text(p) or "").strip()
+        if re.match(r"^Customer Location\s*:", t, flags=re.IGNORECASE):
+            kill.append(p._element)
+    for el in kill:
+        parent = el.getparent()
+        if parent is not None:
+            parent.remove(el)
+
+
+def _strip_legacy_customer_location_tokens(text: str) -> str:
+    """Remove spaced variants of ``{{CUSTOMER_LOCATION}}`` left in older templates."""
+    if not text:
+        return text
+    return re.sub(r"\{\{\s*CUSTOMER_LOCATION\s*\}\}", "", text, flags=re.IGNORECASE)
+
+
 def _fill_proposal_docx_from_bytes(raw: bytes, vals: dict[str, str]) -> bytes:
     repl = _docx_placeholder_replacements(vals)
     doc = Document(BytesIO(raw))
     _normalize_docx_placeholders(doc)
+
+    def _strip_tokens(paragraph_text: str) -> str:
+        return _strip_legacy_customer_location_tokens(paragraph_text)
+
+    _apply_to_paragraph_text(doc, _strip_tokens)
     _replace_placeholders_doc(doc, repl)
+    _remove_customer_location_paragraphs(doc)
     _apply_standard_proposal_branding(doc)
     bio = BytesIO()
     doc.save(bio)
@@ -821,7 +822,6 @@ def try_build_proposal_pdf(
     customer_name: str = "",
     job_name: str = "",
     *,
-    customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
     docx_bytes: bytes | None = None,
@@ -841,7 +841,6 @@ def try_build_proposal_pdf(
                 totals,
                 customer_name=customer_name,
                 job_name=job_name,
-                customer_location=customer_location,
                 contact_name=contact_name,
                 prepared_by_phone=prepared_by_phone,
             )
@@ -862,7 +861,6 @@ def build_proposal_docx(
     customer_name: str = "",
     job_name: str = "",
     *,
-    customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
     placeholder_values: dict[str, str] | None = None,
@@ -883,7 +881,6 @@ def build_proposal_docx(
             totals,
             customer_name=customer_name,
             job_name=job_name,
-            customer_location=customer_location,
             contact_name=contact_name,
             prepared_by_phone=prepared_by_phone,
         )
@@ -897,7 +894,6 @@ def build_proposal_pdf(
     customer_name: str = "",
     job_name: str = "",
     *,
-    customer_location: str = "",
     contact_name: str = "",
     prepared_by_phone: str = "",
 ) -> bytes:
@@ -912,7 +908,6 @@ def build_proposal_pdf(
         totals,
         customer_name=customer_name,
         job_name=job_name,
-        customer_location=customer_location,
         contact_name=contact_name,
         prepared_by_phone=prepared_by_phone,
         docx_bytes=None,
