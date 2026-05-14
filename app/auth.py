@@ -24,14 +24,28 @@ _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this devic
 
 
 def init_session() -> None:
-    """Initialize auth-related session keys. Access control is enforced only from ``main.py``."""
-    st.session_state.setdefault("auth_user", None)
-    st.session_state.setdefault("auth_session", None)
-    st.session_state.setdefault("auth_profile", None)
-    # Back-compat aliases used throughout the app
-    st.session_state.setdefault("user", None)
-    st.session_state.setdefault("user_email", None)
-    st.session_state.setdefault("auth_employee", None)
+    """
+    One-time defaults for auth-related session keys (do not overwrite existing values).
+
+    Call at the very start of each run so downstream auth / cookie logic sees stable keys.
+    Access control is enforced only from ``main.py``.
+    """
+    defaults: dict[str, Any] = {
+        "auth_user": None,
+        "auth_profile": None,
+        "auth_checked": False,
+        "is_authenticated": False,
+        "auth_session": None,
+        # Back-compat aliases used throughout the app
+        "user": None,
+        "user_email": None,
+        "auth_employee": None,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+    # Keep flag aligned (covers sessions created before ``is_authenticated`` existed).
+    st.session_state["is_authenticated"] = st.session_state.get("auth_user") is not None
 
 
 def _cookie_secure_flag() -> bool:
@@ -153,6 +167,8 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
         _sync_auth_session_from_client(get_client())
     except Exception:
         st.session_state["auth_session"] = None
+
+    st.session_state["is_authenticated"] = True
 
 
 def try_restore_supabase_session_from_cookies() -> None:
@@ -280,7 +296,9 @@ def run_auth_browser_cookie_effects() -> None:
     """
     One-shot browser bridges: clear cookies after sign-out, or persist tokens after sign-in.
 
-    Uses a full page reload so ``st.context.cookies`` picks up new values on the next run.
+    When the user is already authenticated in this Streamlit run, tokens are written with
+    ``_silent_write_auth_cookies`` (no full-page reload). Otherwise a full reload is used
+    so ``st.context.cookies`` can pick up tokens on the next cold load.
     """
     if st.session_state.pop("_ips_auth_clear_pending", False):
         st.info("Signing out — refreshing the page…")
@@ -295,6 +313,12 @@ def run_auth_browser_cookie_effects() -> None:
     rt = str(pending.get("refresh_token") or "").strip()
     remember = bool(pending.get("remember_device"))
     if not at or not rt:
+        return
+    # User is already authenticated in this Streamlit session: write cookies without a full
+    # browser reload. A reload here often clears server session before ``st.context.cookies``
+    # sees the new tokens, which forces a second login.
+    if st.session_state.get("auth_user") is not None:
+        _silent_write_auth_cookies(at, rt, remember_device=remember)
         return
     st.info("Saving your session — refreshing the page…")
     script = _js_cookie_set_reload(
@@ -425,6 +449,8 @@ def sign_out() -> None:
     st.session_state["auth_session"] = None
     st.session_state["auth_profile"] = None
     st.session_state["auth_employee"] = None
+    st.session_state["is_authenticated"] = False
+    st.session_state["auth_checked"] = False
     st.session_state["_ips_auth_clear_pending"] = True
 
 

@@ -113,9 +113,11 @@ def main() -> None:
     )
 
     init_session()
-    # Persisted Supabase tokens (browser cookies): clear after sign-out, write after sign-in (reloads once).
+    # Persisted Supabase tokens (browser cookies): clear after sign-out; after sign-in prefer silent write
+    # when already authenticated (see ``run_auth_browser_cookie_effects``) to avoid a double login.
     run_auth_browser_cookie_effects()
     try_restore_supabase_session_from_cookies()
+    st.session_state["auth_checked"] = True
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
     try:
         inventory_scan.merge_inventory_scan_deeplink_from_query()
