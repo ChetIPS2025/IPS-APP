@@ -425,16 +425,30 @@ def render_job_database_detail_view_page(
                     continue
                 url = create_signed_url(sp, expires_in=3600) if not sp.startswith("http") else sp
                 ext = fnm.rsplit(".", 1)[-1].lower() if "." in fnm else ""
+                rid = str(r.get("id") or "").strip() or fnm
+                load_key = f"jdv_ref_preview_loaded_{jid}_{rid}"
                 if ext in ("jpg", "jpeg", "png", "webp") and url:
-                    try:
-                        st.image(url, use_container_width=True)
-                    except Exception:
-                        st.link_button("Open image", url)
+                    if not st.session_state.get(load_key):
+                        st.caption("Image preview not loaded (faster page).")
+                        if st.button("Load preview", key=f"jdv_load_img_{jid}_{rid}", use_container_width=True):
+                            st.session_state[load_key] = True
+                            st.rerun()
+                    else:
+                        try:
+                            st.image(url, use_container_width=True)
+                        except Exception:
+                            st.link_button("Open image", url)
                 elif ext == "pdf" and url:
-                    try:
-                        components.iframe(url, height=520, scrolling=True)
-                    except Exception:
-                        st.link_button("Open PDF", url, use_container_width=True)
+                    if not st.session_state.get(load_key):
+                        st.caption("PDF preview not loaded (faster page).")
+                        if st.button("Load preview", key=f"jdv_load_pdf_{jid}_{rid}", use_container_width=True):
+                            st.session_state[load_key] = True
+                            st.rerun()
+                    else:
+                        try:
+                            components.iframe(url, height=520, scrolling=True)
+                        except Exception:
+                            st.link_button("Open PDF", url, use_container_width=True)
                 else:
                     st.link_button(f"Download / open {ext or 'file'}", url, use_container_width=True)
 

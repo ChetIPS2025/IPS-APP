@@ -1976,10 +1976,17 @@ def render() -> None:
     # --- Tool Trailer: kit + expenses + replacement history ---
     if _is_tool_trailer(asset):
         st.markdown("### Tool trailer")
-        tab_ov, tab_kit, tab_rep, tab_hist = st.tabs(
-            ["Overview", "Tool Kits", "Repairs / Expenses", "Replacement History"]
+        _tt_key = f"ad_tool_trailer_panel_{aid}"
+        st.session_state.setdefault(_tt_key, "Overview")
+        st.radio(
+            "Tool trailer sections",
+            ["Overview", "Tool Kits", "Repairs / Expenses", "Replacement History"],
+            horizontal=True,
+            key=_tt_key,
+            label_visibility="collapsed",
         )
-        with tab_ov:
+        tt_panel = str(st.session_state.get(_tt_key) or "Overview")
+        if tt_panel == "Overview":
             st.caption("Tool trailer summary (asset + kit value).")
             _render_tool_trailer_kit(
                 asset_row=asset,
@@ -1989,7 +1996,7 @@ def render() -> None:
                 jobs=jobs,
                 can_edit=can_edit,
             )
-        with tab_kit:
+        elif tt_panel == "Tool Kits":
             _render_tool_trailer_kit(
                 asset_row=asset,
                 kits=kits,
@@ -1998,22 +2005,28 @@ def render() -> None:
                 jobs=jobs,
                 can_edit=can_edit,
             )
-        with tab_rep:
+        elif tt_panel == "Repairs / Expenses":
             _render_asset_expenses(
                 asset_row=asset,
                 expenses=asset_expenses,
                 can_edit=can_edit,
                 profiles=[],
             )
-        with tab_hist:
+        elif tt_panel == "Replacement History":
             _render_tool_trailer_replacement_history(replacements=kit_replacements, jobs=jobs)
 
     st.markdown("### History & records")
-    tab_doc, tab_maint, tab_asg, tab_insp, tab_notes = st.tabs(
-        ["Documents", "Maintenance", "Assignments", "Inspections", "Notes"]
+    _hist_key = f"ad_hist_panel_{aid}"
+    st.session_state.setdefault(_hist_key, "Documents")
+    st.radio(
+        "History sections",
+        ["Documents", "Maintenance", "Assignments", "Inspections", "Notes"],
+        horizontal=True,
+        key=_hist_key,
+        label_visibility="collapsed",
     )
-
-    with tab_doc:
+    hp = str(st.session_state.get(_hist_key) or "Documents")
+    if hp == "Documents":
         st.markdown("##### Documents library")
         st.caption("Same as **Documents** above · signed links expire in about one hour.")
         _render_asset_documents_list(
@@ -2023,7 +2036,7 @@ def render() -> None:
             mobile_layout=is_narrow,
         )
 
-    with tab_maint:
+    elif hp == "Maintenance":
         if maintenance:
             show = pd.DataFrame(maintenance)
             drop = [c for c in ("id", "asset_id", "created_by") if c in show.columns]
@@ -2033,7 +2046,7 @@ def render() -> None:
         else:
             st.caption("No maintenance records.")
 
-    with tab_asg:
+    elif hp == "Assignments":
         if assignments:
             show = pd.DataFrame(assignments)
             drop = [c for c in ("id", "asset_id", "created_by") if c in show.columns]
@@ -2043,7 +2056,7 @@ def render() -> None:
         else:
             st.caption("No assignment history.")
 
-    with tab_insp:
+    elif hp == "Inspections":
         if inspections:
             show = pd.DataFrame(inspections)
             drop = [c for c in ("id", "asset_id", "created_by") if c in show.columns]
@@ -2053,7 +2066,7 @@ def render() -> None:
         else:
             st.caption("No inspections.")
 
-    with tab_notes:
+    else:
         if can_edit:
             new_notes = st.text_area("Notes", value=str(asset.get("notes") or ""), height=120, key=f"notes_ed_{aid}")
             if is_narrow:

@@ -7,7 +7,7 @@ import streamlit as st
 _FIELD_LIGHT_CSS = """
 <style>
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-    background-color: #d1d5db !important;
+    background-color: #c5cad3 !important;
   }
   [data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] div[data-testid="stExpander"],
   section[data-testid="stSidebar"],

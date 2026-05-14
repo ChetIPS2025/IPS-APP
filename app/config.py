@@ -70,6 +70,15 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _bool_env(name: str, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
 def _publishable_key() -> str:
     """Prefer ``SUPABASE_PUBLISHABLE_KEY``; fall back to legacy ``SUPABASE_ANON_KEY``."""
     return _first_nonempty("SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY")
@@ -152,6 +161,10 @@ class Settings:
 
     # Operations
     log_level: str = field(default_factory=lambda: _strip_env("LOG_LEVEL", "INFO"))
+    # When true, logs ``[perf] … ms`` for major blocks (see ``app.perf_debug``). Env: IPS_DEBUG_PERFORMANCE or DEBUG_PERFORMANCE.
+    debug_performance: bool = field(
+        default_factory=lambda: _bool_env("IPS_DEBUG_PERFORMANCE") or _bool_env("DEBUG_PERFORMANCE")
+    )
     reference_cache_ttl_seconds: int = field(
         default_factory=lambda: _int_env("REFERENCE_CACHE_TTL_SECONDS", 120)
     )

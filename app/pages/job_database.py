@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import html
 import logging
 from typing import Any
@@ -1185,7 +1184,7 @@ def _render_job_form_panel(
     estimate_detail: dict[str, Any] | None = None,
     show_main_heading: bool = True,
 ) -> None:
-    """Full-width job detail card: add/edit form and tabs (list view uses a separate header)."""
+    """Full-width job detail card: add/edit form with section navigation (no st.tabs)."""
     with st.container(border=True):
         st.markdown('<span class="ips-job-edit-panel-anchor"></span>', unsafe_allow_html=True)
         if show_main_heading:
@@ -1198,7 +1197,11 @@ def _render_job_form_panel(
             )
 
         use_job_tabs = mode == "edit" and bool(selected_job)
-        tab_overview_ctx = contextlib.nullcontext()
+        _job_detail_panel = "Overview"
+        edit_jid = ""
+        jl = ""
+        admin_rd = False
+        can_tasks = False
         if use_job_tabs and selected_job:
             edit_jid = str(selected_job.get("id") or "").strip()
             jl = job_row_select_label(selected_job)
@@ -1214,13 +1217,23 @@ def _render_job_form_panel(
                     render_job_cost_tab,
                     render_job_tasks_tab,
                 )
-            t_ov, t_ts, t_co = st.tabs(["Overview", "Tasks", "Cost"])
-            with t_ts:
+            st.session_state.setdefault("job_db_detail_panel", "Overview")
+            st.radio(
+                "Job sections",
+                ["Overview", "Tasks", "Cost"],
+                horizontal=True,
+                key="job_db_detail_panel",
+                label_visibility="collapsed",
+            )
+            _job_detail_panel = str(st.session_state.get("job_db_detail_panel") or "Overview").strip()
+
+        if use_job_tabs and selected_job:
+            if _job_detail_panel == "Tasks":
                 render_job_tasks_tab(job_id=edit_jid, job_label=jl, can_edit_tasks=can_tasks, admin_read=admin_rd)
-            with t_co:
+            elif _job_detail_panel == "Cost":
                 render_job_cost_tab(job_id=edit_jid, job_row=selected_job)
-            tab_overview_ctx = t_ov
-        with tab_overview_ctx:
+
+        if (not use_job_tabs) or _job_detail_panel == "Overview":
             linked_estimate = ""
             estimate_options = _build_job_form_estimate_options(
                 estimates=estimates,
@@ -2075,36 +2088,6 @@ def _render_job_db_top_bar(
                             st.error(res.message)
 
 
-def _render_job_db_debug_expander(*, jobs: list[dict[str, Any]], admin_read: bool) -> None:
-    with st.expander("Database debug & checklist", expanded=False):
-        st.write("DEBUG - Job Count:", len(jobs))
-        preview = jobs[:12] if jobs else []
-        st.write("DEBUG - Jobs Raw (first rows):", preview)
-        st.checkbox(
-            "Bypass customer / status / source filters (search still applies)",
-            key="job_db_bypass_filters",
-        )
-        try:
-            from app.config import settings
-
-            url = (getattr(settings, "supabase_url", "") or "").strip()
-            pk = (
-                (getattr(settings, "supabase_publishable_key", "") or "").strip()
-                or (getattr(settings, "supabase_anon_key", "") or "").strip()
-            )
-            st.caption(
-                f"Supabase URL set: {bool(url)} · Public key set: {bool(pk)} · "
-                f"Admin/service reads for this page: {admin_read} · Table: public.jobs"
-            )
-        except Exception:
-            st.caption("Could not read local settings for debug summary.")
-
-        st.caption(
-            "If the count is zero but Supabase shows rows: check RLS policies for `authenticated`, "
-            "or ensure `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` is set for admin/pm reads."
-        )
-
-
 def render() -> None:
     render_header("Job Database")
     inject_ips_crud_list_styles()
@@ -2113,6 +2096,11 @@ def render() -> None:
 
     can_edit = current_role() in {"admin", "manager"}
     st.session_state.setdefault("job_db_bypass_filters", True)
+    st.session_state.setdefault("job_db_fetch_limit", 500)
+    _job_fetch_lim = max(100, min(int(st.session_state.get("job_db_fetch_limit") or 500), 8000))
+    _list_shell = st.empty()
+    with _list_shell.container():
+        st.caption("Loading job data…")
 
     customers: list[dict[str, Any]] = []
     estimates: list[dict[str, Any]] = []
@@ -2131,12 +2119,12 @@ def render() -> None:
     jobs: list[dict[str, Any]] = []
     has_job_number_column = False
     try:
-        jobs, has_job_number_column = fetch_jobs_for_job_database(limit=5000, admin_read=admin_read)
+        jobs, has_job_number_column = fetch_jobs_for_job_database(limit=_job_fetch_lim, admin_read=admin_read)
     except Exception as exc:
         _LOG.exception("Job Database: fetch_jobs_for_job_database failed")
         st.error(f"Database error (jobs): {exc}")
         try:
-            jobs = list(fetch_jobs_with_order_fallback(limit=5000, use_admin=admin_read) or [])
+            jobs = list(fetch_jobs_with_order_fallback(limit=_job_fetch_lim, use_admin=admin_read) or [])
             has_job_number_column = bool(jobs) and any("job_number" in (r or {}) for r in jobs)
             if jobs:
                 st.info("Loaded jobs using a relaxed query (typed column list failed).")
@@ -2196,6 +2184,7 @@ def render() -> None:
         location_by_id = fetch_all_locations_indexed(admin_read=admin_read)
 
     jobs_df = pd.DataFrame(jobs)
+    _list_shell.empty()
 
     if "job_view_mode" not in st.session_state:
         st.session_state["job_view_mode"] = "list"
@@ -2333,8 +2322,6 @@ def render() -> None:
     )
 
     _render_job_db_top_bar(can_edit=can_edit, estimates=estimates, estimate_label_map=estimate_label_map)
-    _render_job_db_debug_expander(jobs=jobs, admin_read=admin_read)
-
     st.markdown("### Jobs overview")
     st.caption(
         "**Source** shows estimate links; **Quote (estimate)**, **customer**, **Contact**, and **Location** summarize linked data."
@@ -2419,6 +2406,18 @@ def render() -> None:
                         help="Estimate = rows linked to an estimate (same rule as the **Linked estimate** column).",
                         key="job_filt_source",
                     )
+
+                if len(jobs) >= _job_fetch_lim and _job_fetch_lim < 8000:
+                    _lm_l, _lm_r = st.columns([2, 1])
+                    with _lm_l:
+                        st.caption(
+                            f"Server fetch is capped at **{_job_fetch_lim}** jobs (for speed). "
+                            "Use **Search** within this set, or raise the cap."
+                        )
+                    with _lm_r:
+                        if st.button("Load more (+500)", key="job_db_load_more_jobs"):
+                            st.session_state["job_db_fetch_limit"] = _job_fetch_lim + 500
+                            st.rerun()
 
             bypass = st.session_state.get("job_db_bypass_filters", True)
             filtered = _filter_jobs_overview_dataframe(

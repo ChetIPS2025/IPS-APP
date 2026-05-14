@@ -19,15 +19,22 @@ def render() -> None:
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     inspections = fetch_table("asset_inspections", limit=5000, order_by="inspection_date")
 
-    tab1, tab2 = st.tabs(["Inspection Log", "New Inspection"])
-
-    with tab1:
+    st.session_state.setdefault("asset_insp_panel", "Inspection Log")
+    st.radio(
+        "Inspections view",
+        ["Inspection Log", "New Inspection"],
+        horizontal=True,
+        key="asset_insp_panel",
+        label_visibility="collapsed",
+    )
+    _ip = str(st.session_state.get("asset_insp_panel") or "Inspection Log")
+    if _ip == "Inspection Log":
         if inspections:
             st.dataframe(pd.DataFrame(inspections), use_container_width=True, hide_index=True)
         else:
             st.info("No inspections found.")
 
-    with tab2:
+    else:
         if current_role() not in {"admin", "pm"}:
             st.info("Only admin or pm users can add inspections.")
             return

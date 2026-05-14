@@ -1613,6 +1613,8 @@ def render_job_tasks_tab(
                                 use_container_width=True,
                             ):
                                 st.session_state[expand_key] = not is_expanded
+                                if not is_expanded:
+                                    st.session_state[f"jdt_ref_preview_loaded_{job_id}_{tid}"] = True
                                 st.rerun()
                         else:
                             st.caption(" ")
@@ -1630,19 +1632,40 @@ def render_job_tasks_tab(
                                 st.session_state["reference_url"] = signed_pv.strip()
                                 st.rerun()
 
-                    # Render preview only once (either right column, or expanded full-width below).
+                    # Collapsed: defer heavy iframe until user clicks Load preview (or expands).
                     if not is_expanded:
+                        _pv_loaded_key = f"jdt_ref_preview_loaded_{job_id}_{tid}"
                         if isinstance(pref_row, dict) and signed_pv.strip():
-                            pv_html = _jdt_work_card_preview_html(signed_url=signed_pv.strip(), row=pref_row)
+                            if not st.session_state.get(_pv_loaded_key):
+                                st.caption("Preview not loaded (faster list).")
+                                if st.button(
+                                    "Load preview",
+                                    key=f"jdt_load_pv_{job_id}_{tid}",
+                                    use_container_width=True,
+                                ):
+                                    st.session_state[_pv_loaded_key] = True
+                                    st.rerun()
+                            else:
+                                pv_html = _jdt_work_card_preview_html(signed_url=signed_pv.strip(), row=pref_row)
+                                components.html(
+                                    pv_html,
+                                    height=_JDT_CARD_PREVIEW_COMPONENT_H,
+                                    scrolling=False,
+                                )
                         elif isinstance(pref_row, dict):
                             pv_html = _jdt_work_card_preview_unavailable_html()
+                            components.html(
+                                pv_html,
+                                height=_JDT_CARD_PREVIEW_COMPONENT_H,
+                                scrolling=False,
+                            )
                         else:
                             pv_html = _jdt_work_card_preview_placeholder_html()
-                        components.html(
-                            pv_html,
-                            height=_JDT_CARD_PREVIEW_COMPONENT_H,
-                            scrolling=False,
-                        )
+                            components.html(
+                                pv_html,
+                                height=_JDT_CARD_PREVIEW_COMPONENT_H,
+                                scrolling=False,
+                            )
 
                 if is_expanded:
                     if isinstance(pref_row, dict) and signed_pv.strip():

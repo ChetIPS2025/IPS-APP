@@ -25,8 +25,6 @@ from db import (
     update_rows_admin,
     upload_bytes,
 )
-from proposal import try_convert_proposal_docx_to_pdf
-
 try:
     from services.job_service import job_number_display, job_row_select_label
 except ImportError:
@@ -94,11 +92,20 @@ from app.estimate.persistence import (
     validate_import_customer_id,
 )
 from app.estimate.proposal_exports import (
-    PROPOSAL_PDF_UNAVAILABLE_SHORT,
     build_proposal_view_bundle,
     _proposal_export_kwargs,
 )
-from app.estimate.proposal_preview_tab import build_proposal_tab_estimate_data, build_proposal_html, render_proposal_tab
+from app.estimate.proposal_preview_tab import (
+    build_proposal_tab_estimate_data,
+    build_proposal_html,
+    render_proposal_export_actions,
+    render_proposal_tab,
+)
+
+try:
+    from app.perf_debug import perf_span
+except ImportError:
+    from perf_debug import perf_span  # type: ignore
 
 _LOG = logging.getLogger(__name__)
 
@@ -415,7 +422,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     ensure_state()
     est = st.session_state["estimate_editor_state"]
 
-    customers = _fetch_customers_for_editor()
+    with perf_span("editor.fetch_customers"):
+        customers = _fetch_customers_for_editor()
     cur_cust_id = str(est.get("customer_id") or "").strip()
     ids_have = {str(c["id"]) for c in customers if c.get("id")}
     if cur_cust_id and cur_cust_id not in ids_have:
@@ -427,11 +435,20 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 {"id": cur_cust_id, "customer_name": "[Customer not found — check Customers tab]"},
             ] + list(customers)
 
-    jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=1000, order_by="job_number")
-    materials_catalog = _cached_merged_materials_catalog_rows()
-    labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
-    equipment_pricing = load_estimate_equipment_from_assets()
-    existing_estimates = fetch_table("estimates", columns="id,quote_number,status,updated_at,revision_number", limit=1000, order_by="updated_at")
+    with perf_span("editor.fetch_jobs"):
+        jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=600, order_by="job_number")
+    with perf_span("editor.fetch_materials_catalog"):
+        materials_catalog = _cached_merged_materials_catalog_rows()
+    with perf_span("editor.fetch_labor_rates"):
+        labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
+    with perf_span("editor.fetch_equipment_pricing"):
+        equipment_pricing = load_estimate_equipment_from_assets()
+    existing_estimates: list[dict[str, Any]] = []
+    if not embedded:
+        with perf_span("editor.fetch_existing_estimates"):
+            existing_estimates = fetch_table(
+                "estimates", columns="id,quote_number,status,updated_at,revision_number", limit=1000, order_by="updated_at"
+            )
 
     customer_name_by_id = {str(c["id"]): str(c.get("customer_name") or "").strip() for c in customers if c.get("id")}
     jobs_by_customer = {}
@@ -465,12 +482,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
 
     if not embedded:
         render_header("Estimate Editor")
-        st.caption(
-            "Supabase-backed estimator logic with proposal export and approval workflow."
-        )
     else:
-        # Estimates page already called render_header; avoid duplicate logo/title.
-        st.caption("Tabs below · list on the Estimates page opens other quotes.")
         st.markdown('<span class="ips-estimate-editor-root"></span>', unsafe_allow_html=True)
 
     current_status = est.get("status", "draft")
@@ -525,17 +537,10 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 st.rerun()
     else:
         if st.session_state.get("estimate_pending_import_pdf"):
-            st.info(
-                "PDF import — edit **Materials**, **Labor**, and **Equipment** in the tabs below, "
-                "then **Review / Save → Save Estimate**."
-            )
+            st.info("PDF import: edit line items, then **Review / Save → Save Estimate**.")
         sug = st.session_state.get("estimate_pdf_suggestions") or {}
         if sug:
-            st.markdown("##### PDF import — customer & job suggestions")
-            st.caption(
-                "Fuzzy matches from your PDF text. Nothing is saved until you **Accept** a suggestion "
-                "or choose a **Customer** / **Job** below, then **Save Estimate**."
-            )
+            st.markdown("##### PDF import suggestions")
             g1, g2 = st.columns(2)
             with g1:
                 st.text_input(
@@ -609,13 +614,29 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 est["quote_number"] = next_quote_number()
                 st.rerun()
 
-    totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
+    with perf_span("editor.compute_totals"):
+        totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
     _pe_shared = _proposal_export_kwargs(est, customer_name_by_id, jobs)
-    _, proposal_docx_bytes, proposal_word_error, proposal_live_html, proposal_pdf_bytes = (
-        build_proposal_view_bundle(est, totals, _pe_shared)
-    )
+    proposal_docx_bytes: bytes | None = None
+    proposal_word_error = ""
+    proposal_live_html: str | None = None
+    proposal_pdf_bytes: bytes | None = None
+    if embedded:
+        with perf_span("editor.build_proposal_bundle_embedded"):
+            _, proposal_docx_bytes, proposal_word_error, proposal_live_html, proposal_pdf_bytes = (
+                build_proposal_view_bundle(est, totals, _pe_shared)
+            )
 
-    with st.container(border=True):
+    def _ensure_proposal_bundle_for_proposal_tab() -> None:
+        nonlocal proposal_docx_bytes, proposal_word_error, proposal_live_html, proposal_pdf_bytes
+        if proposal_docx_bytes is not None:
+            return
+        with perf_span("editor.build_proposal_bundle_lazy"):
+            _, proposal_docx_bytes, proposal_word_error, proposal_live_html, proposal_pdf_bytes = (
+                build_proposal_view_bundle(est, totals, _pe_shared)
+            )
+
+    with st.container():
         st.markdown('<span class="ips-estimate-metrics-strip"></span>', unsafe_allow_html=True)
         m1, m2, m3, m4, m5 = st.columns(5, gap="small")
         m1.metric("Materials", money(totals["material_sell_basis"]))
@@ -624,44 +645,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         m4.metric("Travel", money(totals["travel_total"]))
         m5.metric("Proposal", money(totals["proposal_total"]))
 
-    if embedded:
-        _, _emb_actions, _ = st.columns([0.2, 1.0, 0.2])
-        eb1, eb2 = _emb_actions.columns([1, 1], gap="small")
-        with eb1:
-            if proposal_docx_bytes is not None:
-                st.download_button(
-                    "Download Proposal (Word)",
-                    data=proposal_docx_bytes,
-                    file_name=f"{est.get('quote_number') or 'proposal'}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    type="primary",
-                    key="est_embed_dl_docx_main",
-                )
-        with eb2:
-            if proposal_docx_bytes is not None:
-                if st.button("Export PDF", use_container_width=True, key="est_embed_export_btn"):
-                    eid = st.session_state.get("loaded_estimate_id")
-                    if not eid:
-                        st.caption("Save the estimate first to store the PDF on this quote.")
-                    else:
-                        epdf = proposal_pdf_bytes
-                        if epdf is None and proposal_docx_bytes is not None:
-                            epdf, _conv = try_convert_proposal_docx_to_pdf(proposal_docx_bytes)
-                        if epdf is None:
-                            st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
-                        else:
-                            upload_generated_export(
-                                str(eid),
-                                f"{est.get('quote_number') or 'proposal'}.pdf",
-                                epdf,
-                                "application/pdf",
-                                "generated_pdf",
-                            )
-                            st.success("PDF saved to storage and linked to this estimate.")
-
-        if proposal_word_error and proposal_docx_bytes is None:
-            st.error(proposal_word_error)
+    if embedded and proposal_word_error and proposal_docx_bytes is None:
+        st.error(proposal_word_error)
 
     if _imported_estimate_missing_customer(
         est,
@@ -986,20 +971,35 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     if linked_job_id:
         _jn = job_number_display((linked_job_row or {}).get("job_number"))
         _jnm = str((linked_job_row or {}).get("job_name") or "").strip()
-        with st.container(border=True):
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            _parts = ["**Linked job**"]
-            if _jn:
-                _parts.append(f"**{_jn}**")
-            if _jnm:
-                _parts.append(_jnm)
-            st.markdown(" · ".join(_parts), unsafe_allow_html=True)
+        _parts = ["**Linked job**"]
+        if _jn:
+            _parts.append(f"**{_jn}**")
+        if _jnm:
+            _parts.append(_jnm)
+        st.markdown(" · ".join(_parts), unsafe_allow_html=True)
 
     ensure_scope_widgets_bound(est, _loaded_eid)
 
-    tabs = st.tabs(["Materials", "Labor", "Equipment", "Travel", "Job Scope", "Attachments / P.O.", "Proposal", "Review / Save"])
+    _EST_SECTION_LABELS = (
+        "Materials",
+        "Labor",
+        "Equipment",
+        "Travel",
+        "Job Scope",
+        "Attachments / P.O.",
+        "Proposal",
+        "Review / Save",
+    )
+    st.session_state.setdefault("estimate_editor_section", _EST_SECTION_LABELS[0])
+    section = st.radio(
+        "Worksheet",
+        options=list(_EST_SECTION_LABELS),
+        horizontal=True,
+        key="estimate_editor_section",
+        label_visibility="collapsed",
+    )
 
-    with tabs[0]:
+    if section == "Materials":
         # Materials row cards + add/edit. Category/material pickers live OUTSIDE ``st.form`` so
         # changing category triggers an immediate rerun and refreshes material options (forms defer updates).
         est.setdefault("materials", [])
@@ -1045,9 +1045,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.session_state.get("selected_material"),
         )
 
-        st.caption("Category → material (search) → qty → Add.")
-
-        ma1, ma2, ma3 = st.columns([0.58, 1.0, 2.42], gap="medium")
         with ma1:
             cat_ix = (
                 cat_options.index(str(st.session_state.get("selected_material_category") or "All"))
@@ -1192,7 +1189,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 ) not in edit_keys:
                     st.session_state.pop("est_material_edit_material", None)
 
-                st.caption(f"Editing material line #{mat_edit_idx + 1}")
+                st.markdown(f"**Line {mat_edit_idx + 1}**")
                 ee1, ee2, ee3 = st.columns([0.58, 1.0, 2.42], gap="medium")
                 with ee1:
                     ec_ix = (
@@ -1298,7 +1295,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 base_sell = sell_d if sell_d > _D0 else purchase_d * (Decimal("1") + material_markup_dec)
                 subtotal = _q2(qty_d * base_sell)
 
-                with st.container(border=True):
+                with st.container():
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{item_key or 'Unknown material'}**")
@@ -1327,7 +1324,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                                 st.session_state["est_material_edit_idx"] = None
                             st.rerun()
 
-    with tabs[1]:
+    elif section == "Labor":
         # Labor row cards + form-based add/edit to avoid "enter twice" UX.
         est.setdefault("labor", [])
         labor_map = {r.get("classification"): r for r in labor_rates if isinstance(r, dict) and r.get("classification")}
@@ -1521,7 +1518,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 ot_rate = _dec((lr or {}).get("ot_rate", 0) or 0)
                 subtotal = _q2(headcount * days * ((st_hrs * st_rate) + (ot_hrs * ot_rate)))
 
-                with st.container(border=True):
+                with st.container():
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{classification or 'Unknown labor'}**")
@@ -1550,7 +1547,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                                 st.session_state["est_labor_edit_idx"] = None
                             st.rerun()
 
-    with tabs[2]:
+    elif section == "Equipment":
         st.caption("Search → pick equipment → qty / basis / duration → add. Edit or remove from cards below.")
         eq_top1, eq_top2 = st.columns([3.0, 0.95], gap="small")
         with eq_top1:
@@ -1760,7 +1757,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     "Month": _dec(meta.get("monthly_rate", 0) or 0),
                 }.get(basis, _D0)
                 subtotal = _q2(qty_d * duration_d * rate)
-                with st.container(border=True):
+                with st.container():
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{name or 'Unknown equipment'}**")
@@ -1813,7 +1810,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             else:
                 st.caption("Select equipment with a name that matches an Asset Database **Equipment** row to see rates.")
 
-    with tabs[3]:
+    elif section == "Travel":
         st.caption("Quick add travel charges, then edit/remove from cards below.")
         travel = est.get("travel", {}) or {}
         est["travel"] = travel
@@ -1953,7 +1950,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.info("No travel charges set yet.")
         else:
             for k, detail, val in cards:
-                with st.container(border=True):
+                with st.container():
                     left, right = st.columns([1.65, 1], gap="small")
                     with left:
                         st.markdown(f"**{k}**")
@@ -2058,11 +2055,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 }
                 st.rerun()
 
-    with tabs[4]:
-        st.caption(
-            "Saved estimates: text is written to **Supabase** (debounced autosave + manual save). "
-            "Line breaks and characters you type are preserved as plain text."
-        )
+    elif section == "Job Scope":
         loaded_scope_eid = st.session_state.get("loaded_estimate_id")
         st.slider(
             "Editor height (px)",
@@ -2160,9 +2153,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             maybe_autosave_scope(est, _scope_eid)
             render_scope_autosave_poller(est, _scope_eid)
 
-    with tabs[5]:
-        st.caption("Add attachments to the draft (they upload when you Save/Submit/Approve/Award).")
-
+    elif section == "Attachments / P.O.":
         # Quote attachments (pending)
         pending_quotes: list[dict] = list(st.session_state.get("est_pending_quote_attachments") or [])
         with st.form(key="est_quote_attach_add_form", clear_on_submit=True):
@@ -2174,7 +2165,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 key="est_quote_attach_uploader",
                 help="Files are staged in the draft until you Save.",
             )
-            if st.form_submit_button("Add attachment(s) to draft", disabled=is_locked):
+                if st.form_submit_button("Add to draft", disabled=is_locked):
                 if not up_files:
                     st.warning("Choose one or more files first.")
                     st.stop()
@@ -2193,7 +2184,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.markdown("**Pending quote attachments**")
             for i, f in enumerate(pending_quotes):
                 nm = str(f.get("file_name") or "file")
-                with st.container(border=True):
+                with st.container():
                     st.markdown(f"**{nm}**")
                     if st.button(
                         "Remove",
@@ -2254,7 +2245,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         if st.session_state.get("est_pending_po_attachment"):
             po = st.session_state["est_pending_po_attachment"] or {}
             st.markdown("**Pending PO attachment**")
-            with st.container(border=True):
+            with st.container():
                 st.markdown(f"**{po.get('file_name') or 'po'}**")
                 if st.button(
                     "Remove PO attachment",
@@ -2265,7 +2256,8 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                     st.session_state["est_pending_po_attachment"] = None
                     st.rerun()
 
-    with tabs[6]:
+    elif section == "Proposal":
+        _ensure_proposal_bundle_for_proposal_tab()
         pdata = build_proposal_tab_estimate_data(
             est,
             totals,
@@ -2278,24 +2270,36 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         )
         render_proposal_tab(pdata)
 
-    with tabs[7]:
-        totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
-        with st.container(border=True):
-            rc1, rc2, rc3, rc4 = st.columns(4)
-            rc1.metric("Final Bid", money(totals["final_bid"]))
-            rc2.metric("Overhead", money(totals["overhead_total"]))
-            rc3.metric("Profit", money(totals["profit_total"]))
-            rc4.metric("Sales Tax", money(totals["sales_tax_total"]))
+    elif section == "Review / Save":
+        with st.container():
+            rc1, rc2, rc3 = st.columns(3)
+            rc1.metric("Final bid", money(totals["final_bid"]))
+            rc2.metric("Proposal", money(totals["proposal_total"]))
+            rc3.metric("Tax", money(totals["sales_tax_total"]))
 
             with st.form(key="est_revision_note_form", clear_on_submit=False):
                 revision_note = st.text_input(
-                    "Revision Note",
+                    "Revision note",
                     value=str(st.session_state.get("est_revision_note") or ""),
                     key="est_revision_note_input",
                 )
                 if st.form_submit_button("Update revision note"):
                     st.session_state["est_revision_note"] = str(revision_note or "")
                     st.rerun()
+
+            st.markdown("**Proposal export**")
+            _ensure_proposal_bundle_for_proposal_tab()
+            _pdata_review = build_proposal_tab_estimate_data(
+                est,
+                totals,
+                _pe_shared,
+                docx_bytes=proposal_docx_bytes,
+                pdf_bytes=proposal_pdf_bytes,
+                word_error=str(proposal_word_error or ""),
+                loaded_estimate_id=str(st.session_state.get("loaded_estimate_id") or "").strip() or None,
+                is_locked=is_locked,
+            )
+            render_proposal_export_actions(_pdata_review)
 
         customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "")
         loaded_id = st.session_state.get("loaded_estimate_id")
@@ -2615,8 +2619,6 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.session_state.pop("estimate_pdf_suggestions", None)
             st.rerun()
 
-        st.caption("Use the **status** dropdown above, then click **Save Estimate** to write changes to the database.")
-
         _, _save_mid, _ = st.columns([0.12, 1.0, 0.12], gap="small")
         if _save_mid.button("Save Estimate", type="primary", use_container_width=True, disabled=(is_locked or not can_save), key="est_save_estimate_primary"):
             # Allocate quote number only for brand-new estimates when blank.
@@ -2716,9 +2718,14 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         _ = (_editor_submit_for_approval_flow, _editor_approve_flow, _editor_mark_awarded_flow)
 
         if st.session_state.get("loaded_estimate_id"):
-            attachments = fetch_by_match("attachments", {"estimate_id": st.session_state["loaded_estimate_id"]}, columns="category,file_name,storage_path,uploaded_at", limit=200)
+            attachments = fetch_by_match(
+                "attachments",
+                {"estimate_id": st.session_state["loaded_estimate_id"]},
+                columns="category,file_name,storage_path,uploaded_at",
+                limit=200,
+            )
             if attachments:
-                st.markdown("### Saved Files")
+                st.markdown("**Saved files**")
                 for att in attachments:
                     signed = create_signed_url(att["storage_path"])
                     if signed:
@@ -2738,34 +2745,26 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         st.sidebar.caption(str(exc))
 
     with st.sidebar:
-        st.markdown("### Estimate Summary")
-        st.caption(
-            f"Quote: {est.get('quote_number') or '—'} · Status: {est.get('status') or 'draft'}"
-        )
+        st.markdown("#### Totals")
+        qn = str(est.get("quote_number") or "—").strip() or "—"
+        st.caption(f"{qn} · {est.get('status') or 'draft'}")
         customer_name = customer_name_by_id.get(str(est.get("customer_id") or "").strip(), "") if "customer_name_by_id" in locals() else ""
         if customer_name:
-            st.caption(f"Customer: {customer_name}")
+            st.caption(customer_name)
 
         if totals_preview:
-            st.metric("Final Bid", money(totals_preview.get("final_bid", 0.0)))
-            st.metric("Proposal Total", money(totals_preview.get("proposal_total", 0.0)))
-            st.metric("Overhead", money(totals_preview.get("overhead_total", 0.0)))
-            st.metric("Profit", money(totals_preview.get("profit_total", 0.0)))
-            st.metric("Sales Tax", money(totals_preview.get("sales_tax_total", 0.0)))
-
+            s1, s2 = st.columns(2)
+            s1.metric("Final", money(totals_preview.get("final_bid", 0.0)))
+            s2.metric("Proposal", money(totals_preview.get("proposal_total", 0.0)))
             st.caption(
-                "Breakdown: "
-                f"Materials {money(totals_preview.get('material_sell_basis', 0))} · "
-                f"Labor {money(totals_preview.get('labor_total', 0))} · "
-                f"Equipment {money(totals_preview.get('equipment_total', 0))} · "
-                f"Travel {money(totals_preview.get('travel_total', 0))}"
+                f"M {money(totals_preview.get('material_sell_basis', 0))} · "
+                f"L {money(totals_preview.get('labor_total', 0))} · "
+                f"E {money(totals_preview.get('equipment_total', 0))}"
             )
-
-        # Line-item counts for quick context (no inputs).
         mats_n = len(est.get("materials", []) or [])
         labor_n = len(est.get("labor", []) or [])
         eq_n = len(est.get("equipment", []) or [])
-        st.caption(f"Lines: Materials {mats_n} · Labor {labor_n} · Equipment {eq_n}")
+        st.caption(f"Lines: {mats_n} mat · {labor_n} lab · {eq_n} eq")
 
 
 def render() -> None:

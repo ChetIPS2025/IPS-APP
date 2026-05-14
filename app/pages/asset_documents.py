@@ -23,15 +23,22 @@ def render() -> None:
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     documents = fetch_table_admin("asset_documents", limit=5000, order_by="created_at")
 
-    tab1, tab2 = st.tabs(["Documents", "Upload Document"])
-
-    with tab1:
+    st.session_state.setdefault("asset_doc_panel", "Documents")
+    st.radio(
+        "Documents view",
+        ["Documents", "Upload Document"],
+        horizontal=True,
+        key="asset_doc_panel",
+        label_visibility="collapsed",
+    )
+    _dp = str(st.session_state.get("asset_doc_panel") or "Documents")
+    if _dp == "Documents":
         if documents:
             st.dataframe(pd.DataFrame(documents), use_container_width=True, hide_index=True)
         else:
             st.info("No asset documents found.")
 
-    with tab2:
+    else:
         if current_role() not in {"admin", "pm"}:
             st.info("Only admin or pm users can upload documents.")
             return

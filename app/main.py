@@ -7,6 +7,11 @@ try:
 except ImportError:
     from config import settings  # type: ignore
 
+try:
+    from app.perf_debug import perf_span
+except ImportError:
+    from perf_debug import perf_span  # type: ignore
+
 from auth import (
     current_role,
     init_session,
@@ -112,20 +117,23 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
 
-    init_session()
-    # Persisted Supabase tokens (browser cookies): clear after sign-out; after sign-in prefer silent write
-    # when already authenticated (see ``run_auth_browser_cookie_effects``) to avoid a double login.
-    run_auth_browser_cookie_effects()
-    try_restore_supabase_session_from_cookies()
-    st.session_state["auth_checked"] = True
+    with perf_span("main.auth_session"):
+        init_session()
+        # Persisted Supabase tokens (browser cookies): clear after sign-out; after sign-in prefer silent write
+        # when already authenticated (see ``run_auth_browser_cookie_effects``) to avoid a double login.
+        run_auth_browser_cookie_effects()
+        try_restore_supabase_session_from_cookies()
+        st.session_state["auth_checked"] = True
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
-    try:
-        inventory_scan.merge_inventory_scan_deeplink_from_query()
-    except Exception:
-        pass
-    apply_branding()
-    inject_ips_app_shell_styles()
-    inject_pwa_support()
+    with perf_span("main.deeplink_query"):
+        try:
+            inventory_scan.merge_inventory_scan_deeplink_from_query()
+        except Exception:
+            pass
+    with perf_span("main.shell_branding"):
+        apply_branding()
+        inject_ips_app_shell_styles()
+        inject_pwa_support()
 
     # Public customer signing flow (no login): `?tsign=<uuid>`
     try:
@@ -156,7 +164,15 @@ def main() -> None:
         if _pend:
             st.info("You opened an **inventory scan** link. Sign in below, then we will take you to **Scan Inventory** for that code.")
 
-        tab_email, tab_phone = st.tabs(["Email login", "Phone login (OTP)"])
+        st.session_state.setdefault("login_method", "Email login")
+        st.radio(
+            "Sign-in method",
+            ["Email login", "Phone login (OTP)"],
+            horizontal=True,
+            key="login_method",
+            label_visibility="visible",
+        )
+        _login_tab = str(st.session_state.get("login_method") or "Email login")
 
         remember_device = st.checkbox(
             "Remember this device",
@@ -164,7 +180,7 @@ def main() -> None:
             help="Keeps you signed in on this phone or browser after refresh (uses secure cookies).",
         )
 
-        with tab_email:
+        if _login_tab.startswith("Email"):
             email = st.text_input("Email", key="login_email")
             password = st.text_input("Password", type="password", key="login_password")
             if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
@@ -174,7 +190,7 @@ def main() -> None:
                 except Exception as exc:
                     show_auth_error(exc)
 
-        with tab_phone:
+        else:
             st.caption("Enter your phone number to receive a one-time code via SMS.")
             phone = st.text_input("Phone number", placeholder="+1 555 123 4567", key="login_phone")
             c1, c2 = st.columns([1, 1], gap="small")
@@ -226,20 +242,22 @@ def main() -> None:
 
         st.stop()
 
-    apply_pending_navigation()
-    # Align ``st.session_state["page"]`` slug (Office & reports) with ``ips_nav_page`` before sidebar.
-    sync_session_route_slug_to_nav_page()
-    # After auth: ``?page=Scan%20Inventory`` and/or ``?code=INV-…`` from QR / camera links.
-    _want_scan = bool(st.session_state.get("_ips_query_wants_scan_inventory"))
-    _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
-    if (
-        (_want_scan or _inv_deeplink)
-        and not st.session_state.get(IPS_ACTIVE_PAGE_KEY)
-        and role_can_open_page(current_role(), "Scan Inventory")
-    ):
-        st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-        st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
-    sidebar_page = render_sidebar()
+    with perf_span("main.page_routing"):
+        apply_pending_navigation()
+        # Align ``st.session_state["page"]`` slug (Office & reports) with ``ips_nav_page`` before sidebar.
+        sync_session_route_slug_to_nav_page()
+        # After auth: ``?page=Scan%20Inventory`` and/or ``?code=INV-…`` from QR / camera links.
+        _want_scan = bool(st.session_state.get("_ips_query_wants_scan_inventory"))
+        _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
+        if (
+            (_want_scan or _inv_deeplink)
+            and not st.session_state.get(IPS_ACTIVE_PAGE_KEY)
+            and role_can_open_page(current_role(), "Scan Inventory")
+        ):
+            st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
+            st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
+    with perf_span("main.sidebar"):
+        sidebar_page = render_sidebar()
     if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
         prev = st.session_state.get("_ips_last_nav_page")
         if prev is not None and sidebar_page != prev:
@@ -261,10 +279,11 @@ def main() -> None:
         st.error(f"Unknown page: {page}")
         return
 
-    try:
-        render_fn()
-    except Exception as exc:
-        show_page_error(exc, context=f"page:{page}")
+    with perf_span(f"main.page_render:{page}"):
+        try:
+            render_fn()
+        except Exception as exc:
+            show_page_error(exc, context=f"page:{page}")
 
 
 if __name__ == "__main__":

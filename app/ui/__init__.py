@@ -57,22 +57,8 @@ _PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.item
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
 _NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
 
-# Jobs (sidebar)
-_NAV_JOBS_SIDEBAR: tuple[str, ...] = (
-    "Job Database",
-    "Assign Tasks (PM)",
-    "Work & Plan (Supervisor)",
-    "Estimates",
-    "Job Costing",
-)
-
-# Assets expander (sidebar): route keys match ``IPS_NAV_PAGE_KEY`` / main page map.
+# Jobs (routable; sidebar layout is built in ``_render_sidebar_office``).
 _NAV_ASSETS_EXPANDER_PAGES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
-# Legacy name kept for grep/docs alignment with asset-area routes.
-_NAV_ASSETS_SIDEBAR: tuple[str, ...] = _NAV_ASSETS_EXPANDER_PAGES
-
-# Inventory expander (sidebar)
-_NAV_INVENTORY_SIDEBAR: tuple[str, ...] = ("Inventory List", "Scan Inventory", "Inventory Usage")
 
 # Admin / office tools (sidebar)
 _NAV_ADMIN_SIDEBAR: tuple[str, ...] = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses")
@@ -281,10 +267,9 @@ def _sidebar_brand() -> None:
     logo_path = _find_round_logo()
 
     if logo_path and logo_path.exists():
-        st.sidebar.image(str(logo_path), width=72)
+        st.sidebar.image(str(logo_path), width=64)
 
-    st.sidebar.markdown("### IPS Estimating")
-    st.sidebar.caption("Industrial Plant Solutions")
+    st.sidebar.markdown("**IPS** Estimating")
 
 
 def _inject_sidebar_nav_css() -> None:
@@ -295,9 +280,11 @@ def _inject_sidebar_nav_css() -> None:
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"] > div,
 [data-testid="stSidebar"] {
-  background-color: #cbd5e1 !important;
-  background: #cbd5e1 !important;
-  color: #111827 !important;
+  background-color: #b8c2ce !important;
+  background: #b8c2ce !important;
+  color: #0f172a !important;
+  max-width: 15.5rem !important;
+  min-width: 14rem !important;
 }
 section[data-testid="stSidebar"] .block-container {
   background: transparent !important;
@@ -341,8 +328,8 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
   line-height: 1.3;
 }
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
-  margin-top: 16px !important;
-  padding-top: 14px !important;
+  margin-top: 8px !important;
+  padding-top: 8px !important;
   border-top: 1px solid #94a3b8 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
@@ -359,8 +346,8 @@ section[data-testid="stSidebar"] div.stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
-  min-height: 3rem !important;
-  padding: 0.45rem 0.75rem !important;
+  min-height: 2.5rem !important;
+  padding: 0.4rem 0.65rem !important;
   border-radius: 10px !important;
   line-height: 1.25 !important;
   box-sizing: border-box !important;
@@ -387,7 +374,7 @@ section[data-testid="stSidebar"] div.stButton > button p {
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button {
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
-  min-height: 3rem !important;
+  min-height: 2.5rem !important;
   padding: 0.45rem 0.65rem !important;
   border-radius: 10px !important;
   box-sizing: border-box !important;
@@ -449,7 +436,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-secondary"] {
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
-  min-height: 3rem !important;
+  min-height: 2.5rem !important;
   padding: 0.4rem 0.6rem !important;
   border-radius: 10px !important;
   background: #e5e7eb !important;
@@ -467,7 +454,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-primary"] {
   font-size: 0.875rem !important;
   font-weight: 700 !important;
-  min-height: 3rem !important;
+  min-height: 2.5rem !important;
   padding: 0.4rem 0.75rem !important;
   border-radius: 10px !important;
   background: #2563eb !important;
@@ -593,13 +580,13 @@ def _visible_assets_expander_pages(role: str) -> tuple[str, ...]:
 
 
 def _render_assets_sidebar_group(*, role: str) -> None:
-    """Collapsible **Assets** group: main asset list, Who Has What, Tool Trailer Audits."""
+    """Collapsible **ASSETS** group."""
     visible = _visible_assets_expander_pages(role)
     if not visible:
         return
     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
     expanded = cur in visible
-    with st.sidebar.expander("Assets", expanded=expanded, key="ips_sidebar_assets_group"):
+    with st.sidebar.expander("ASSETS", expanded=expanded, key="ips_sidebar_assets_group"):
         _, inner = st.columns([0.08, 0.92])
         with inner:
             for page in visible:
@@ -626,46 +613,51 @@ def _sidebar_nav_title(extra_class: str, text: str) -> None:
 
 
 def _render_sidebar_office(*, role: str) -> None:
-    """PM / admin / manager — jobs, packages, inventory, assets, office tools."""
-    _sidebar_nav_title("", "Dashboard")
+    _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Jobs")
-    st.sidebar.caption("Job records, estimates, and costing.")
-    for p in _NAV_JOBS_SIDEBAR:
-        if not role_can_open_page(role, p):
-            continue
-        if p == "Assign Tasks (PM)":
-            _render_nav_button_route(
-                label="Assign work (PM)",
-                route="Assign Tasks (PM)",
-                indent=True,
-                key_suffix="pm",
-            )
-        elif p == "Work & Plan (Supervisor)":
-            _render_nav_button_route(
-                label="Work & plan (supervisor)",
-                route="Work & Plan (Supervisor)",
-                indent=True,
-                key_suffix="sup",
-            )
-        else:
+    _sidebar_nav_title("ips-nav-group-spaced", "JOBS")
+    for p in ("Job Database", "Job Costing"):
+        if role_can_open_page(role, p):
             _render_nav_button(p, indent=True)
-    st.sidebar.caption(
-        "**Assign work (PM)** — PM lines up today’s work packages. "
-        "**Work & plan** — supervisor plans the shift, updates tasks and photos, and submits end-of-day review."
-    )
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Assets")
+    _sidebar_nav_title("ips-nav-group-spaced", "ESTIMATES")
+    if role_can_open_page(role, "Estimates"):
+        _render_nav_button("Estimates", indent=True)
+
+    _sidebar_nav_title("ips-nav-group-spaced", "WORK / PLANNING")
+    if role_can_open_page(role, "Assign Tasks (PM)"):
+        _render_nav_button_route(
+            label="Assign tasks (PM)",
+            route="Assign Tasks (PM)",
+            indent=True,
+            key_suffix="pm",
+        )
+    if role_can_open_page(role, "Work & Plan (Supervisor)"):
+        _render_nav_button_route(
+            label="Work & plan (field)",
+            route="Work & Plan (Supervisor)",
+            indent=True,
+            key_suffix="sup",
+        )
+
     _render_assets_sidebar_group(role=role)
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
     nav_page = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
     inv_expanded = nav_page in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
     if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
-        with st.sidebar.expander("Inventory", expanded=inv_expanded):
+        with st.sidebar.expander("INVENTORY", expanded=inv_expanded):
             _, inv_inner = st.columns([0.06, 0.94])
             with inv_inner:
+                if role_can_open_page(role, "Inventory"):
+                    if st.button(
+                        "Estimate materials",
+                        key=_nav_btn_key("Inventory__est_materials"),
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        _set_sidebar_nav_page("Inventory")
+                        st.session_state["inv_f_cat"] = "Materials"
                 _inv_focus = _sidebar_inventory_category_focus_norm()
                 inv_list_active = nav_page == "Inventory" and _inv_focus == "All"
                 if role_can_open_page(role, "Inventory"):
@@ -694,7 +686,7 @@ def _render_sidebar_office(*, role: str) -> None:
                     ):
                         _set_sidebar_nav_page("Inventory Usage")
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
+    _sidebar_nav_title("ips-nav-group-spaced", "REPORTS")
     for p in _NAV_ADMIN_SIDEBAR:
         if role_can_open_page(role, p):
             _render_nav_button(p, indent=True)
@@ -703,22 +695,20 @@ def _render_sidebar_office(*, role: str) -> None:
 
 
 def _render_sidebar_field(*, role: str) -> None:
-    """Field supervisor / crew — one primary workflow plus scan and tools."""
-    _sidebar_nav_title("", "Dashboard")
+    _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Today’s work")
-    st.sidebar.caption("Plan the shift, tasks, photos, and end-of-day review — one screen.")
+    _sidebar_nav_title("ips-nav-group-spaced", "WORK / PLANNING")
     if role_can_open_page(role, "Work & Plan (Supervisor)"):
         _render_nav_button_route(
-            label="Work & plan (supervisor)",
+            label="Work & plan (field)",
             route="Work & Plan (Supervisor)",
             indent=True,
             key_suffix="sup",
         )
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
     if role_can_open_page(role, "Scan Inventory"):
+        _sidebar_nav_title("ips-nav-group-spaced", "INVENTORY")
         _render_nav_button_route(
             label="Scan inventory",
             route="Scan Inventory",
@@ -726,7 +716,6 @@ def _render_sidebar_field(*, role: str) -> None:
             key_suffix="scan",
         )
 
-    _sidebar_nav_title("ips-nav-group-spaced", "Tools & assets")
     _render_assets_sidebar_group(role=role)
     if role_can_open_page(role, "Employee Toolbox"):
         _render_nav_button_route(
@@ -740,7 +729,7 @@ def _render_sidebar_field(*, role: str) -> None:
 
 
 def _render_sidebar_viewer(*, role: str) -> None:
-    _sidebar_nav_title("", "Dashboard")
+    _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
     _render_assets_sidebar_group(role=role)
     if role_can_open_page(role, "Inventory Usage"):
@@ -751,8 +740,7 @@ def render_sidebar() -> str:
     _sidebar_brand()
 
     profile = current_profile()
-    st.sidebar.caption(f"Logged in as: {profile.get('email', '—')}")
-    st.sidebar.caption(f"Role: {profile.get('role', 'viewer')}")
+    st.sidebar.caption(f"{profile.get('email', '—')} · {profile.get('role', 'viewer')}")
 
     render_install_app_sidebar_block()
 

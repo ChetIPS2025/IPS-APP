@@ -35,9 +35,16 @@ def render() -> None:
         if label and label != "—":
             job_options[label] = job.get("id")
 
-    tab1, tab2 = st.tabs(["Assign Asset", "History"])
-
-    with tab1:
+    st.session_state.setdefault("asset_asg_panel", "Assign Asset")
+    st.radio(
+        "Assignments view",
+        ["Assign Asset", "History"],
+        horizontal=True,
+        key="asset_asg_panel",
+        label_visibility="collapsed",
+    )
+    _ap = str(st.session_state.get("asset_asg_panel") or "Assign Asset")
+    if _ap == "Assign Asset":
         selected_label = st.selectbox("Asset", list(asset_options.keys()))
         selected_asset = asset_options[selected_label]
         employee = st.text_input("Assign To")
@@ -97,7 +104,7 @@ def render() -> None:
             st.success("Asset checked in.")
             st.rerun()
 
-    with tab2:
+    else:
         if assignments:
             st.dataframe(pd.DataFrame(assignments), use_container_width=True, hide_index=True)
         else:

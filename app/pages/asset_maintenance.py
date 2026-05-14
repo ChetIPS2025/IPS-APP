@@ -28,9 +28,16 @@ def render() -> None:
         if record.get("asset_id") not in latest_maintenance_by_asset:
             latest_maintenance_by_asset[record.get("asset_id")] = record
 
-    tab1, tab2 = st.tabs(["Due Status", "Log Service"])
-
-    with tab1:
+    st.session_state.setdefault("asset_maint_panel", "Due Status")
+    st.radio(
+        "Maintenance view",
+        ["Due Status", "Log Service"],
+        horizontal=True,
+        key="asset_maint_panel",
+        label_visibility="collapsed",
+    )
+    _mp = str(st.session_state.get("asset_maint_panel") or "Due Status")
+    if _mp == "Due Status":
         rows = []
         for asset in assets:
             last_pm = latest_maintenance_by_asset.get(asset.get("id"))
@@ -52,7 +59,7 @@ def render() -> None:
         else:
             st.info("No assets found.")
 
-    with tab2:
+    else:
         if current_role() not in {"admin", "pm"}:
             st.info("Only admin or pm users can log maintenance.")
             return

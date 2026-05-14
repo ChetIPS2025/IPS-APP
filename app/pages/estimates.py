@@ -992,7 +992,7 @@ def render() -> None:
     inject_table_action_styles()
 
     if view == "list":
-        render_crud_list_subtitle("Search and open estimates, create new rows, or import JSON / PDF vendor quotes.")
+        render_crud_list_subtitle("Open estimates, import quotes, or start a new quote.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
@@ -1021,7 +1021,7 @@ def render() -> None:
         _render_estimate_list()
 
     elif view == "import":
-        render_crud_list_subtitle("Upload PDF vendor quotes or JSON estimate exports, then return to the editor.")
+        render_crud_list_subtitle("PDF or JSON import — return to the list when done.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
@@ -1037,7 +1037,7 @@ def render() -> None:
 
     else:
         # view == "edit"
-        render_crud_list_subtitle("Line items, proposal export, and approval — use **Back to list** when finished.")
+        render_crud_list_subtitle("Line items and save — **Back to list** when done.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',

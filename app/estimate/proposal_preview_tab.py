@@ -138,13 +138,8 @@ def render_proposal_document_preview(estimate_data: dict[str, Any]) -> None:
         st.markdown(raw, unsafe_allow_html=True)
 
 
-def render_proposal_tab(estimate_data: dict[str, Any]) -> None:
-    """
-    Render Proposal tab controls and preview (single session key ``proposal_preview_open``).
-    """
-    if "proposal_preview_open" not in st.session_state:
-        st.session_state["proposal_preview_open"] = False
-
+def render_proposal_export_actions(estimate_data: dict[str, Any]) -> None:
+    """Downloads and cloud saves — single place (**Review / Save**)."""
     docx = estimate_data.get("_docx_bytes")
     pdf_b = estimate_data.get("_pdf_bytes")
     err = str(estimate_data.get("_word_error") or "")
@@ -152,85 +147,80 @@ def render_proposal_tab(estimate_data: dict[str, Any]) -> None:
     locked = bool(estimate_data.get("_is_locked"))
     slug = str(estimate_data.get("quote_file_slug") or "proposal")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Preview", key="proposal_preview_btn", use_container_width=True):
-            st.session_state["proposal_preview_open"] = True
-            st.rerun()
-    with c2:
+    r1, r2 = st.columns(2, gap="small")
+    with r1:
         st.download_button(
-            "Export Word",
+            "Download Word",
             data=docx if isinstance(docx, (bytes, bytearray)) and docx else b"",
             file_name=f"{slug}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True,
             type="primary",
             disabled=not docx,
-            key="proposal_export_word_btn",
+            key="proposal_export_word_review",
         )
-
-    row2 = st.columns([1, 1, 1, 1], gap="small")
-    with row2[0]:
+    with r2:
         st.download_button(
-            "Export PDF",
+            "Download PDF",
             data=pdf_b if pdf_b else b"",
             file_name=f"{slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
             disabled=not pdf_b,
-            key="proposal_export_pdf_btn",
+            key="proposal_export_pdf_review",
         )
-    if loaded_id:
-        with row2[1]:
-            if st.button(
-                "Save Word to cloud",
-                use_container_width=True,
-                key="proposal_save_word_cloud_btn",
-                disabled=locked,
-            ):
-                if not docx:
-                    st.caption("Build the Word proposal first (check the standard template file).")
+
+    if loaded_id and docx and not locked:
+        u1, u2 = st.columns(2, gap="small")
+        with u1:
+            if st.button("Save Word to library", use_container_width=True, key="proposal_save_word_cloud_review"):
+                upload_generated_export(
+                    str(loaded_id),
+                    f"{slug}.docx",
+                    docx,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "generated_docx",
+                )
+                st.success("Word saved to storage.")
+        with u2:
+            if st.button("Save PDF to library", use_container_width=True, key="proposal_save_pdf_cloud_review"):
+                try:
+                    from proposal import try_convert_proposal_docx_to_pdf
+                except ImportError:
+                    from app.proposal import try_convert_proposal_docx_to_pdf  # type: ignore
+
+                epdf = pdf_b
+                if epdf is None and docx is not None:
+                    epdf, _conv = try_convert_proposal_docx_to_pdf(docx)
+                if epdf is None:
+                    st.warning(PROPOSAL_PDF_UNAVAILABLE_SHORT)
                 else:
                     upload_generated_export(
                         str(loaded_id),
-                        f"{slug}.docx",
-                        docx,
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "generated_docx",
-                    )
-                    st.success("Word proposal saved to Supabase Storage.")
-        with row2[2]:
-            if st.button(
-                "Save PDF to cloud",
-                use_container_width=True,
-                key="proposal_save_pdf_cloud_btn",
-                disabled=locked or not pdf_b,
-            ):
-                if pdf_b:
-                    upload_generated_export(
-                        str(loaded_id),
                         f"{slug}.pdf",
-                        pdf_b,
+                        epdf,
                         "application/pdf",
                         "generated_pdf",
                     )
-                    st.success("PDF saved to storage and linked to this estimate.")
+                    st.success("PDF saved to storage.")
 
     if err:
         st.error(err)
     elif not pdf_b and docx:
         st.caption(PROPOSAL_PDF_UNAVAILABLE_SHORT)
-    if not docx:
-        st.caption("Ensure **assets/estimate_template_autofill_logo_updated.docx** exists in the app bundle.")
 
-    with st.expander("Template & export notes", expanded=False):
-        st.caption(
-            "Downloads use the same **estimate_template_autofill_logo_updated.docx** pipeline as before. "
-            "The **Preview** above is a single HTML summary aligned to the same field values."
-        )
+
+def render_proposal_tab(estimate_data: dict[str, Any]) -> None:
+    """Proposal tab: on-screen preview only. Exports live under **Review / Save**."""
+    if "proposal_preview_open" not in st.session_state:
+        st.session_state["proposal_preview_open"] = False
+
+    if st.button("Show preview", key="proposal_preview_btn", use_container_width=True):
+        st.session_state["proposal_preview_open"] = True
+        st.rerun()
 
     if st.session_state["proposal_preview_open"]:
-        if st.button("Hide Preview", key="proposal_hide_preview_btn", use_container_width=True):
+        if st.button("Hide preview", key="proposal_hide_preview_btn", use_container_width=True):
             st.session_state["proposal_preview_open"] = False
             st.rerun()
         render_proposal_document_preview(estimate_data)
