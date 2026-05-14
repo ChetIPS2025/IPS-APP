@@ -359,6 +359,13 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
 
     _apply_user_and_profile_from_auth_user(user, email_hint=email)
 
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+
+    clear_streamlit_db_read_cache()
+
     toks = _auth_session_tokens(client)
     if toks:
         at, rt = toks
@@ -427,6 +434,13 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
 
     _apply_user_and_profile_from_auth_user(user, phone_hint=ph)
 
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+
+    clear_streamlit_db_read_cache()
+
     toks = _auth_session_tokens(client)
     if toks:
         at, rt = toks
@@ -452,6 +466,12 @@ def sign_out() -> None:
     st.session_state["is_authenticated"] = False
     st.session_state["auth_checked"] = False
     st.session_state["_ips_auth_clear_pending"] = True
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+
+    clear_streamlit_db_read_cache()
 
 
 def require_login() -> bool:

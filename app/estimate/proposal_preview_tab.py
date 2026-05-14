@@ -7,7 +7,7 @@ from typing import Any
 import streamlit as st
 
 from app.estimate.persistence import upload_generated_export
-from app.estimate.proposal_document_layout import build_proposal_view_model
+from app.estimate.proposal_document_layout import _logo_data_uri, build_proposal_view_model
 from app.estimate.proposal_exports import PROPOSAL_PDF_UNAVAILABLE_SHORT
 
 
@@ -54,7 +54,7 @@ def build_proposal_tab_estimate_data(
 
 def build_proposal_html(estimate_data: dict[str, Any]) -> str:
     """
-    One HTML document card for the on-screen preview (inline styles; no logo; no st.columns).
+    One HTML document card for the on-screen preview (inline styles; centered logo when assets ship it).
     """
     title = html.escape(str(estimate_data.get("estimate_description") or "Project"))
     qn = html.escape(str(estimate_data.get("quote_number") or ""))
@@ -77,8 +77,17 @@ def build_proposal_html(estimate_data: dict[str, Any]) -> str:
             <div style="line-height:1.45;">{resp_esc}</div>
         </div>"""
 
+    logo_uri = _logo_data_uri()
+    logo_row = ""
+    if logo_uri:
+        logo_row = f"""
+    <div style="text-align:center;margin:0 auto 18px auto;padding:0 8px;">
+        <img src="{logo_uri}" alt="Industrial Plant Solutions" style="max-width:520px;width:100%;height:auto;display:inline-block;margin:0 auto;" />
+    </div>"""
+
     return f"""
 <div style="max-width:850px;margin:16px auto;background:#ffffff;color:#000000;padding:40px 44px;border:1px solid #d0d0d0;box-shadow:0 2px 10px rgba(0,0,0,0.12);font-family:Arial,Calibri,sans-serif;line-height:1.45;">
+    {logo_row}
     <div style="background:#0b5f9e;color:#ffffff;text-align:center;padding:14px 20px;margin-bottom:22px;">
         <div style="color:#ffffff;font-weight:800;font-size:22px;margin-bottom:8px;">{title} – Quote</div>
         <div style="color:#ffffff;font-weight:800;font-size:18px;">Quote #: {qn}</div>
@@ -109,9 +118,24 @@ def render_proposal_document_preview(estimate_data: dict[str, Any]) -> None:
     """
     Render the on-screen proposal preview using the same field values as the Word export.
     This is the only preview renderer for the Proposal tab.
+
+    Uses ``st.html`` so scope text cannot break Markdown (e.g. backticks would otherwise show
+    the footer as a raw code block under ``st.markdown``).
     """
     h = build_proposal_html(estimate_data)
-    st.markdown(h, unsafe_allow_html=True)
+    raw = (h or "").strip()
+    if not raw:
+        st.info("No preview content for this estimate.")
+        return
+    try:
+        st.html(raw, width=880)
+    except TypeError:
+        try:
+            st.html(raw)
+        except Exception:
+            st.markdown(raw, unsafe_allow_html=True)
+    except Exception:
+        st.markdown(raw, unsafe_allow_html=True)
 
 
 def render_proposal_tab(estimate_data: dict[str, Any]) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -106,7 +107,12 @@ def _admin_api_key_and_source() -> tuple[str, str]:
 
 
 def get_client() -> Client:
-    """Supabase client with the **publishable / anon** key only (RLS applies)."""
+    """
+    Supabase client with the **publishable / anon** key only (RLS applies).
+
+    The underlying ``create_client`` is wrapped with ``streamlit.cache_resource`` so the
+    heavy client is built once per process per (url, key) pair.
+    """
     public_key = _public_api_key()
     url = (settings.supabase_url or "").strip()
     if not url or not public_key:
@@ -165,22 +171,187 @@ def allocate_next_shared_sequence_int() -> int:
     return get_next_sequence_number()
 
 
+def _auth_fp_for_streamlit_cache() -> str:
+    """Auth partition for cached reads (RLS); avoids cross-user cache hits in Streamlit."""
+    if _st_for_cache is None:
+        return "__no_st__"
+    try:
+        u = _st_for_cache.session_state.get("auth_user")
+        if u is None:
+            return "__anon__"
+        uid = getattr(u, "id", None)
+        if uid is None and isinstance(u, dict):
+            uid = u.get("id")
+        s = str(uid or "").strip()
+        return s or "__anon__"
+    except Exception:
+        return "__anon__"
+
+
+def _match_json_for_cache(match: dict[str, Any]) -> str:
+    return json.dumps(match or {}, sort_keys=True, default=str)
+
+
+def _fetch_table_query(
+    table_name: str,
+    columns: str,
+    limit: int,
+    order_by: str | None,
+    *,
+    use_admin: bool,
+) -> list[dict[str, Any]]:
+    if table_name == "jobs":
+        columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
+    client = get_admin_client() if use_admin else get_client()
+    query = client.table(table_name).select(columns).limit(limit)
+    if order_by:
+        query = query.order(order_by)
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        tag = "fetch_table_admin" if use_admin else "fetch_table"
+        raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+    return resp.data or []
+
+
+def _fetch_by_match_query(
+    table_name: str,
+    match: dict[str, Any],
+    columns: str,
+    limit: int,
+    *,
+    use_admin: bool,
+) -> list[dict[str, Any]]:
+    if table_name == "jobs":
+        columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
+    client = get_admin_client() if use_admin else get_client()
+    query = client.table(table_name).select(columns).limit(limit)
+    for key, value in match.items():
+        query = query.eq(key, value)
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        tag = "fetch_by_match_admin" if use_admin else "fetch_by_match"
+        raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+    return resp.data or []
+
+
+if _st_for_cache is not None:
+
+    @_st_for_cache.cache_data(ttl=30)
+    def _fetch_table_cached(
+        table_name: str,
+        columns: str,
+        limit: int,
+        order_by: str | None,
+        _auth_fp: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_table_query(table_name, columns, limit, order_by, use_admin=False)
+
+    @_st_for_cache.cache_data(ttl=30)
+    def _fetch_table_admin_cached(
+        table_name: str,
+        columns: str,
+        limit: int,
+        order_by: str | None,
+        _admin_partition: str,
+    ) -> list[dict[str, Any]]:
+        _ = _admin_partition
+        return _fetch_table_query(table_name, columns, limit, order_by, use_admin=True)
+
+    @_st_for_cache.cache_data(ttl=30)
+    def _fetch_by_match_cached(
+        table_name: str,
+        match_json: str,
+        columns: str,
+        limit: int,
+        _auth_fp: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_by_match_query(
+            table_name, json.loads(match_json), columns, limit, use_admin=False
+        )
+
+    @_st_for_cache.cache_data(ttl=30)
+    def _fetch_by_match_admin_cached(
+        table_name: str,
+        match_json: str,
+        columns: str,
+        limit: int,
+        _admin_partition: str,
+    ) -> list[dict[str, Any]]:
+        _ = _admin_partition
+        return _fetch_by_match_query(
+            table_name, json.loads(match_json), columns, limit, use_admin=True
+        )
+
+else:
+
+    def _fetch_table_cached(
+        table_name: str,
+        columns: str,
+        limit: int,
+        order_by: str | None,
+        _auth_fp: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_table_query(table_name, columns, limit, order_by, use_admin=False)
+
+    def _fetch_table_admin_cached(
+        table_name: str,
+        columns: str,
+        limit: int,
+        order_by: str | None,
+        _admin_partition: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_table_query(table_name, columns, limit, order_by, use_admin=True)
+
+    def _fetch_by_match_cached(
+        table_name: str,
+        match_json: str,
+        columns: str,
+        limit: int,
+        _auth_fp: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_by_match_query(
+            table_name, json.loads(match_json), columns, limit, use_admin=False
+        )
+
+    def _fetch_by_match_admin_cached(
+        table_name: str,
+        match_json: str,
+        columns: str,
+        limit: int,
+        _admin_partition: str,
+    ) -> list[dict[str, Any]]:
+        return _fetch_by_match_query(
+            table_name, json.loads(match_json), columns, limit, use_admin=True
+        )
+
+
+def clear_streamlit_db_read_cache() -> None:
+    """Invalidate short-TTL read caches after writes (Streamlit ``cache_data`` only)."""
+    if _st_for_cache is None:
+        return
+    for fn in (
+        _fetch_table_cached,
+        _fetch_table_admin_cached,
+        _fetch_by_match_cached,
+        _fetch_by_match_admin_cached,
+    ):
+        cl = getattr(fn, "clear", None)
+        if callable(cl):
+            try:
+                cl()
+            except Exception:
+                pass
+
+
 def fetch_table_admin(
     table_name: str,
     columns: str = "*",
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
-    if table_name == "jobs":
-        columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
-    query = get_admin_client().table(table_name).select(columns).limit(limit)
-    if order_by:
-        query = query.order(order_by)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"fetch_table_admin({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    return _fetch_table_admin_cached(table_name, columns, limit, order_by, "__admin__")
 
 
 def fetch_table(
@@ -189,16 +360,9 @@ def fetch_table(
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
-    if table_name == "jobs":
-        columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
-    query = get_client().table(table_name).select(columns).limit(limit)
-    if order_by:
-        query = query.order(order_by)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"fetch_table({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    return _fetch_table_cached(
+        table_name, columns, limit, order_by, _auth_fp_for_streamlit_cache()
+    )
 
 
 def fetch_table_with_order_fallback(
@@ -264,16 +428,13 @@ def fetch_by_match(
     columns: str = "*",
     limit: int = 1000,
 ) -> list[dict[str, Any]]:
-    if table_name == "jobs":
-        columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
-    query = get_client().table(table_name).select(columns).limit(limit)
-    for key, value in match.items():
-        query = query.eq(key, value)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"fetch_by_match({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    return _fetch_by_match_cached(
+        table_name,
+        _match_json_for_cache(match),
+        columns,
+        limit,
+        _auth_fp_for_streamlit_cache(),
+    )
 
 
 def fetch_by_match_admin(
@@ -282,16 +443,13 @@ def fetch_by_match_admin(
     columns: str = "*",
     limit: int = 1000,
 ) -> list[dict[str, Any]]:
-    if table_name == "jobs":
-        columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
-    query = get_admin_client().table(table_name).select(columns).limit(limit)
-    for key, value in match.items():
-        query = query.eq(key, value)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"fetch_by_match_admin({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    return _fetch_by_match_admin_cached(
+        table_name,
+        _match_json_for_cache(match),
+        columns,
+        limit,
+        "__admin__",
+    )
 
 
 def fetch_one(
@@ -316,6 +474,7 @@ def insert_row(
         raise RuntimeError(
             f"Insert into {table_name!r} returned no rows; check RLS and table permissions. response={resp!r}"
         )
+    clear_streamlit_db_read_cache()
     return rows[0]
 
 
@@ -331,6 +490,7 @@ def update_rows(
         resp = query.execute()
     except Exception as exc:
         raise RuntimeError(f"update_rows({table_name!r}) failed: {exc!r}") from exc
+    clear_streamlit_db_read_cache()
     return resp.data or []
 
 
@@ -345,6 +505,7 @@ def delete_rows(
         resp = query.execute()
     except Exception as exc:
         raise RuntimeError(f"delete_rows({table_name!r}) failed: {exc!r}") from exc
+    clear_streamlit_db_read_cache()
     return resp.data or []
 
 
@@ -362,6 +523,7 @@ def insert_row_admin(
             f"Insert into {table_name!r} returned no rows; check schema and service-role permissions. "
             f"response={resp!r}"
         )
+    clear_streamlit_db_read_cache()
     return rows[0]
 
 
@@ -377,6 +539,7 @@ def update_rows_admin(
         resp = query.execute()
     except Exception as exc:
         raise RuntimeError(f"update_rows_admin({table_name!r}) failed: {exc!r}") from exc
+    clear_streamlit_db_read_cache()
     return resp.data or []
 
 
@@ -391,6 +554,7 @@ def delete_rows_admin(
         resp = query.execute()
     except Exception as exc:
         raise RuntimeError(f"delete_rows_admin({table_name!r}) failed: {exc!r}") from exc
+    clear_streamlit_db_read_cache()
     return resp.data or []
 
 

@@ -1479,6 +1479,35 @@ def render() -> None:
         render_asset_intake_form()
         return
 
+    panel_mode = st.session_state.get("asset_panel_mode")
+    panel_id = st.session_state.get("asset_panel_id")
+    panel_row: dict | None = None
+    if panel_mode in ("view", "edit") and panel_id:
+        panel_row = fetch_one("assets", {"id": panel_id})
+        if not panel_row:
+            _clear_asset_panel()
+            panel_mode = None
+            panel_id = None
+
+    edit_only = bool(panel_row and str(panel_mode or "") == "edit")
+
+    if edit_only:
+        jobs_raw = fetch_table("jobs", limit=5000, order_by="job_number")
+        jobs = sort_jobs_by_number_then_name(jobs_raw)
+        job_label_by_id = {str(j.get("id")): job_row_select_label(j) for j in jobs if j.get("id")}
+        job_options = {
+            job_row_select_label(j): j.get("id")
+            for j in jobs
+            if job_row_select_label(j) and job_row_select_label(j) != "—"
+        }
+        _render_asset_panel_edit(
+            panel_row,
+            can_add=can_add,
+            job_options=job_options,
+            job_label_by_id=job_label_by_id,
+        )
+        return
+
     rows = fetch_table("assets", limit=5000, order_by="asset_name")
     jobs_raw = fetch_table("jobs", limit=5000, order_by="job_number")
     jobs = sort_jobs_by_number_then_name(jobs_raw)
@@ -1492,17 +1521,7 @@ def render() -> None:
         emp_rows = fetch_table("employees", columns="id,name", limit=4000, order_by="name")
     except Exception:
         emp_rows = []
-    emp_by_id: dict[str, str] = {str(e["id"]): str(e.get("name") or "").strip() for e in emp_rows if e.get("id")}
-
-    panel_mode = st.session_state.get("asset_panel_mode")
-    panel_id = st.session_state.get("asset_panel_id")
-    panel_row = None
-    if panel_mode in ("view", "edit") and panel_id:
-        panel_row = fetch_one("assets", {"id": panel_id})
-        if not panel_row:
-            _clear_asset_panel()
-            panel_mode = None
-            panel_id = None
+    emp_by_id = {str(e["id"]): str(e.get("name") or "").strip() for e in emp_rows if e.get("id")}
 
     panel_open = bool(panel_row and panel_mode in ("view", "edit"))
 

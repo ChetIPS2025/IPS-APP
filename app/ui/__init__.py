@@ -551,7 +551,8 @@ def _ensure_valid_nav_page() -> None:
         st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
 
 
-def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
+def _render_nav_button(page: str, *, indent: bool) -> None:
+    current = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
     active = current == page
     btn_type = "primary" if active else "secondary"
     key = _nav_btn_key(page)
@@ -560,15 +561,13 @@ def _render_nav_button(page: str, *, current: str, indent: bool) -> None:
         with c2:
             if st.button(page, key=key, type=btn_type, use_container_width=True):
                 _set_sidebar_nav_page(page)
-                st.rerun()
     else:
         if st.sidebar.button(page, key=key, type=btn_type, use_container_width=True):
             _set_sidebar_nav_page(page)
-            st.rerun()
 
 
-def _render_nav_button_route(*, label: str, route: str, current: str, indent: bool, key_suffix: str) -> None:
-    """Render a nav button whose label differs from its route key."""
+def _render_nav_button_route(*, label: str, route: str, indent: bool, key_suffix: str) -> None:
+    current = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
     active = current == route
     btn_type = "primary" if active else "secondary"
     key = _nav_btn_key(route + "__" + key_suffix)
@@ -577,11 +576,9 @@ def _render_nav_button_route(*, label: str, route: str, current: str, indent: bo
         with c2:
             if st.button(label, key=key, type=btn_type, use_container_width=True):
                 _set_sidebar_nav_page(route)
-                st.rerun()
     else:
         if st.sidebar.button(label, key=key, type=btn_type, use_container_width=True):
             _set_sidebar_nav_page(route)
-            st.rerun()
 
 
 def _sidebar_inventory_category_focus_norm() -> str:
@@ -595,29 +592,29 @@ def _visible_assets_expander_pages(role: str) -> tuple[str, ...]:
     return tuple(p for p in _NAV_ASSETS_EXPANDER_PAGES if role_can_open_page(role, p))
 
 
-def _render_assets_sidebar_group(*, current: str, role: str) -> None:
+def _render_assets_sidebar_group(*, role: str) -> None:
     """Collapsible **Assets** group: main asset list, Who Has What, Tool Trailer Audits."""
     visible = _visible_assets_expander_pages(role)
     if not visible:
         return
-    expanded = current in visible
+    cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
+    expanded = cur in visible
     with st.sidebar.expander("Assets", expanded=expanded, key="ips_sidebar_assets_group"):
         _, inner = st.columns([0.08, 0.92])
         with inner:
             for page in visible:
-                active = current == page
+                cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
+                active = cur == page
                 btn_type = "primary" if active else "secondary"
                 if page == "Asset Database":
                     key = _nav_btn_key("Asset_Database__sidebar_assets")
                     if st.button("Assets", key=key, type=btn_type, use_container_width=True):
                         _set_sidebar_nav_page("Asset Database")
                         st.session_state["asset_db_f_asset_category"] = "All"
-                        st.rerun()
                 else:
                     key = _nav_btn_key(page)
                     if st.button(page, key=key, type=btn_type, use_container_width=True):
                         _set_sidebar_nav_page(page)
-                        st.rerun()
 
 
 def _sidebar_nav_title(extra_class: str, text: str) -> None:
@@ -628,10 +625,10 @@ def _sidebar_nav_title(extra_class: str, text: str) -> None:
     )
 
 
-def _render_sidebar_office(*, current: str, role: str) -> None:
+def _render_sidebar_office(*, role: str) -> None:
     """PM / admin / manager — jobs, packages, inventory, assets, office tools."""
     _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
+    _render_nav_button("Dashboard", indent=False)
 
     _sidebar_nav_title("ips-nav-group-spaced", "Jobs")
     st.sidebar.caption("Job records, estimates, and costing.")
@@ -642,7 +639,6 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
             _render_nav_button_route(
                 label="Assign work (PM)",
                 route="Assign Tasks (PM)",
-                current=current,
                 indent=True,
                 key_suffix="pm",
             )
@@ -650,28 +646,28 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
             _render_nav_button_route(
                 label="Work & plan (supervisor)",
                 route="Work & Plan (Supervisor)",
-                current=current,
                 indent=True,
                 key_suffix="sup",
             )
         else:
-            _render_nav_button(p, current=current, indent=True)
+            _render_nav_button(p, indent=True)
     st.sidebar.caption(
         "**Assign work (PM)** — PM lines up today’s work packages. "
         "**Work & plan** — supervisor plans the shift, updates tasks and photos, and submits end-of-day review."
     )
 
     _sidebar_nav_title("ips-nav-group-spaced", "Assets")
-    _render_assets_sidebar_group(current=current, role=role)
+    _render_assets_sidebar_group(role=role)
 
     _sidebar_nav_title("ips-nav-group-spaced", "Inventory")
-    inv_expanded = current in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
+    nav_page = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
+    inv_expanded = nav_page in ("Inventory", *_NAV_INVENTORY_SUBPAGES)
     if role_can_open_page(role, "Inventory") or any(role_can_open_page(role, p) for p in _NAV_INVENTORY_SUBPAGES):
         with st.sidebar.expander("Inventory", expanded=inv_expanded):
             _, inv_inner = st.columns([0.06, 0.94])
             with inv_inner:
                 _inv_focus = _sidebar_inventory_category_focus_norm()
-                inv_list_active = current == "Inventory" and _inv_focus == "All"
+                inv_list_active = nav_page == "Inventory" and _inv_focus == "All"
                 if role_can_open_page(role, "Inventory"):
                     if st.button(
                         "Inventory list",
@@ -681,38 +677,35 @@ def _render_sidebar_office(*, current: str, role: str) -> None:
                     ):
                         _set_sidebar_nav_page("Inventory")
                         st.session_state["inv_f_cat"] = "All"
-                        st.rerun()
                 if role_can_open_page(role, "Scan Inventory"):
                     if st.button(
                         "Scan inventory",
                         key=_nav_btn_key("Scan Inventory"),
-                        type="primary" if current == "Scan Inventory" else "secondary",
+                        type="primary" if nav_page == "Scan Inventory" else "secondary",
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Scan Inventory")
-                        st.rerun()
                 if role_can_open_page(role, "Inventory Usage"):
                     if st.button(
                         "Inventory usage",
                         key=_nav_btn_key("Inventory Usage"),
-                        type="primary" if current == "Inventory Usage" else "secondary",
+                        type="primary" if nav_page == "Inventory Usage" else "secondary",
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Inventory Usage")
-                        st.rerun()
 
     _sidebar_nav_title("ips-nav-group-spaced", "Office & reports")
     for p in _NAV_ADMIN_SIDEBAR:
         if role_can_open_page(role, p):
-            _render_nav_button(p, current=current, indent=True)
+            _render_nav_button(p, indent=True)
     if role == "admin" and role_can_open_page(role, "Admin"):
-        _render_nav_button("Admin", current=current, indent=True)
+        _render_nav_button("Admin", indent=True)
 
 
-def _render_sidebar_field(*, current: str, role: str) -> None:
+def _render_sidebar_field(*, role: str) -> None:
     """Field supervisor / crew — one primary workflow plus scan and tools."""
     _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
+    _render_nav_button("Dashboard", indent=False)
 
     _sidebar_nav_title("ips-nav-group-spaced", "Today’s work")
     st.sidebar.caption("Plan the shift, tasks, photos, and end-of-day review — one screen.")
@@ -720,7 +713,6 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
         _render_nav_button_route(
             label="Work & plan (supervisor)",
             route="Work & Plan (Supervisor)",
-            current=current,
             indent=True,
             key_suffix="sup",
         )
@@ -730,31 +722,29 @@ def _render_sidebar_field(*, current: str, role: str) -> None:
         _render_nav_button_route(
             label="Scan inventory",
             route="Scan Inventory",
-            current=current,
             indent=True,
             key_suffix="scan",
         )
 
     _sidebar_nav_title("ips-nav-group-spaced", "Tools & assets")
-    _render_assets_sidebar_group(current=current, role=role)
+    _render_assets_sidebar_group(role=role)
     if role_can_open_page(role, "Employee Toolbox"):
         _render_nav_button_route(
             label="My tools",
             route="Employee Toolbox",
-            current=current,
             indent=True,
             key_suffix="tb",
         )
     if role_can_open_page(role, "Time Tracking"):
-        _render_nav_button("Time Tracking", current=current, indent=True)
+        _render_nav_button("Time Tracking", indent=True)
 
 
-def _render_sidebar_viewer(*, current: str, role: str) -> None:
+def _render_sidebar_viewer(*, role: str) -> None:
     _sidebar_nav_title("", "Dashboard")
-    _render_nav_button("Dashboard", current=current, indent=False)
-    _render_assets_sidebar_group(current=current, role=role)
+    _render_nav_button("Dashboard", indent=False)
+    _render_assets_sidebar_group(role=role)
     if role_can_open_page(role, "Inventory Usage"):
-        _render_nav_button("Inventory Usage", current=current, indent=True)
+        _render_nav_button("Inventory Usage", indent=True)
 
 
 def render_sidebar() -> str:
@@ -771,18 +761,17 @@ def render_sidebar() -> str:
     inject_ips_global_mobile_css()
     inject_sidebar_mobile_auto_collapse_once()
 
-    current = st.session_state[IPS_NAV_PAGE_KEY]
     role = current_role()
     r = str(role or "viewer").strip().lower()
     if r in ("pm", "estimator"):
         r = "manager"
     if r in ("admin", "manager"):
-        _render_sidebar_office(current=current, role=role)
+        _render_sidebar_office(role=role)
     elif r == "employee":
-        _render_sidebar_field(current=current, role=role)
+        _render_sidebar_field(role=role)
     else:
-        _render_sidebar_viewer(current=current, role=role)
+        _render_sidebar_viewer(role=role)
 
     st.sidebar.markdown('<div class="ips-nav-signout-spacer"></div>', unsafe_allow_html=True)
     st.sidebar.button("Sign Out", on_click=sign_out, use_container_width=True)
-    return current
+    return str(st.session_state.get(IPS_NAV_PAGE_KEY) or "Dashboard")
