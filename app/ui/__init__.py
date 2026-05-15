@@ -55,7 +55,7 @@ _PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.item
 
 # ---- Sidebar structure (simple, field + office friendly) ----
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
-_NAV_PRIMARY: tuple[str, ...] = ("Dashboard",)
+_NAV_PRIMARY: tuple[str, ...] = ("Dashboard", "Company Updates")
 
 # Jobs (routable; sidebar layout is built in ``_render_sidebar_office``).
 _NAV_ASSETS_EXPANDER_PAGES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
@@ -137,6 +137,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "manager": frozenset(
         {
             "Dashboard",
+            "Company Updates",
             "Job Database",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
@@ -154,6 +155,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "employee": frozenset(
         {
             "Dashboard",
+            "Company Updates",
             "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
@@ -163,7 +165,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Employee Toolbox",
         }
     ),
-    "viewer": frozenset({"Dashboard", "Inventory Usage", "Who Has What", "Asset Database"}),
+    "viewer": frozenset({"Dashboard", "Company Updates", "Inventory Usage", "Who Has What", "Asset Database"}),
 }
 
 
@@ -641,6 +643,8 @@ def _render_sidebar_office(*, role: str) -> None:
 
     _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
+    if role_can_open_page(role, "Company Updates"):
+        _render_nav_button("Company Updates", indent=False)
 
     jobs_visible = any(role_can_open_page(role, p) for p in _NAV_JOBS_SIDEBAR_PAGES)
     if jobs_visible:
@@ -803,6 +807,8 @@ def _render_sidebar_office(*, role: str) -> None:
 def _render_sidebar_field(*, role: str) -> None:
     _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
+    if role_can_open_page(role, "Company Updates"):
+        _render_nav_button("Company Updates", indent=False)
 
     _sidebar_nav_title("ips-nav-group-spaced", "WORK / PLANNING")
     if role_can_open_page(role, "Work & Plan (Supervisor)"):
@@ -841,6 +847,8 @@ def _render_sidebar_field(*, role: str) -> None:
 def _render_sidebar_viewer(*, role: str) -> None:
     _sidebar_nav_title("", "HOME")
     _render_nav_button("Dashboard", indent=False)
+    if role_can_open_page(role, "Company Updates"):
+        _render_nav_button("Company Updates", indent=False)
     _render_assets_sidebar_group(role=role)
     if role_can_open_page(role, "Inventory Usage"):
         _render_nav_button("Inventory Usage", indent=True)

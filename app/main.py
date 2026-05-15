@@ -72,10 +72,12 @@ from pages import people
 from pages import po_expenses
 from pages import admin
 from pages import users
+from pages import company_updates
 
 
 PAGES = {
     "Dashboard": dashboard.render,
+    "Company Updates": company_updates.render,
     # Estimates UI: app/pages/estimates.py → estimates.render
     "Estimates": estimates.render,
     "Estimate Materials": estimate_materials.render,
