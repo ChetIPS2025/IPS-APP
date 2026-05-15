@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 from auth import current_profile, current_role
 from branding import render_header
-from data_cache import fetch_table_for_session
+from data_cache import clear_session_table_cache, fetch_table_for_session
 
 try:
     from app.db import create_signed_url, delete_rows_admin, fetch_table_admin, insert_row_admin, update_rows_admin
@@ -461,7 +461,9 @@ def _estimates_display_df(rows: list[dict]) -> pd.DataFrame:
         )
     return pd.DataFrame(out)
 
-_TODO_STATUSES = ("Open", "In Progress", "Complete")
+_TODO_STATUSES = ("Open", "In Progress", "Pending", "Waiting", "Complete", "Closed")
+_TODO_VIEW_OPTIONS = ("Active Tasks", "Completed Tasks", "All Tasks")
+_TODO_TERMINAL_STATUS_SLUGS = frozenset({"complete", "completed", "closed"})
 _TODO_PRIORITIES = ("Low", "Normal", "High", "Urgent")
 _TODO_PRIORITY_RANK = {"Urgent": 0, "High": 1, "Normal": 2, "Low": 3}
 
@@ -476,6 +478,44 @@ def _todo_due_sort_key(v) -> tuple[int, str]:
         return (1, "9999-12-31")
     s = str(v).strip()
     return (0, s)
+
+
+def _todo_status_slug(status: Any) -> str:
+    return str(status or "").strip().lower()
+
+
+def _todo_is_terminal(status: Any) -> bool:
+    """Hide from Active view when status is Complete/Completed/Closed (case-insensitive)."""
+    return _todo_status_slug(status) in _TODO_TERMINAL_STATUS_SLUGS
+
+
+def _todo_sort_rows(rows: list[dict]) -> list[dict]:
+    rows.sort(
+        key=lambda r: (
+            _todo_priority_rank(str(r.get("priority") or "Normal")),
+            _todo_due_sort_key(r.get("due_date")),
+            str(r.get("created_at") or ""),
+        )
+    )
+    return rows
+
+
+def _todo_filter_for_view(todos: list[dict], view: str) -> tuple[list[dict], int]:
+    """
+    Filter todos for the selected view. Returns (display_rows, active_count).
+
+    Active = any status except Complete/Completed/Closed; missing status counts as active.
+    """
+    valid = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
+    active_count = sum(1 for t in valid if not _todo_is_terminal(t.get("status")))
+    view_l = str(view or _TODO_VIEW_OPTIONS[0]).strip()
+    if view_l == "Completed Tasks":
+        shown = [t for t in valid if _todo_is_terminal(t.get("status"))]
+    elif view_l == "All Tasks":
+        shown = list(valid)
+    else:
+        shown = [t for t in valid if not _todo_is_terminal(t.get("status"))]
+    return _todo_sort_rows(shown), active_count
 
 
 def _profiles_for_todo_assign(session_key: str, *, use_admin: bool) -> tuple[dict[str, str], list[str]]:
@@ -509,19 +549,8 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
     me = str(prof.get("id") or "").strip()
 
     with st.container(border=True):
-        st.markdown("##### To-Do List")
-
-        # Filters
-        f1, f2 = st.columns([1.2, 1.8], gap="small")
-        scope = f1.selectbox("Filter", ["My tasks", "All open tasks", "Completed"], key="dash_todo_scope")
-        show_completed = scope == "Completed"
-
         id_to_label, ordered_ids = _profiles_for_todo_assign(session_key, use_admin=use_admin)
-        assignee_pick = None
-        if scope == "My tasks" and me:
-            assignee_pick = me
 
-        # Fetch todos (prefer admin for office roles; falls back through db helper if needed)
         try:
             todos = fetch_table_for_session(
                 "todos",
@@ -533,31 +562,22 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
         except Exception:
             todos = []
 
-        rows: list[dict] = []
-        for t in todos or []:
-            if not isinstance(t, dict):
-                continue
-            status = str(t.get("status") or "Open").strip() or "Open"
-            if show_completed:
-                if status != "Complete":
-                    continue
-            else:
-                if status == "Complete":
-                    continue
-            if assignee_pick and str(t.get("assigned_to") or "").strip() != assignee_pick:
-                continue
-            rows.append(t)
+        valid_todos = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
+        active_count = sum(1 for t in valid_todos if not _todo_is_terminal(t.get("status")))
 
-        # Sort: urgent first, then due date
-        rows.sort(
-            key=lambda r: (
-                _todo_priority_rank(str(r.get("priority") or "Normal")),
-                _todo_due_sort_key(r.get("due_date")),
-                str(r.get("created_at") or ""),
+        hdr_l, hdr_r = st.columns([2.4, 1], gap="small")
+        with hdr_l:
+            st.markdown(f"##### To-Do List ({active_count})")
+        with hdr_r:
+            view = st.selectbox(
+                "Show",
+                list(_TODO_VIEW_OPTIONS),
+                index=0,
+                key="dash_todo_view",
+                label_visibility="collapsed",
             )
-        )
+        rows, _ = _todo_filter_for_view(valid_todos, view)
 
-        # Add task UI
         with st.expander("Add task", expanded=False):
             title = st.text_input("Title", key="dash_todo_add_title")
             desc = st.text_area("Description", key="dash_todo_add_desc", height=72)
@@ -589,15 +609,28 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                 }
                 if due is not None:
                     payload["due_date"] = str(due)
+                if _todo_is_terminal(payload["status"]):
+                    payload["completed_at"] = datetime.now(timezone.utc).isoformat()
                 insert_row_admin("todos", payload)
+                clear_session_table_cache()
                 st.success("Task added.")
                 st.rerun()
 
         if not rows:
-            st.caption("No tasks to show.")
+            if view == "Completed Tasks":
+                st.caption("No completed tasks.")
+            elif view == "All Tasks":
+                st.caption("No tasks.")
+            else:
+                st.caption("No active tasks.")
             return
 
-        st.caption("Urgent tasks sort first. Completed tasks are hidden by default.")
+        if view == "Active Tasks":
+            st.caption("Showing all active tasks (Open, In Progress, Pending, Waiting, and other non-completed statuses). Urgent first.")
+        elif view == "Completed Tasks":
+            st.caption("Completed and closed tasks.")
+        else:
+            st.caption("All tasks. Urgent tasks sort first.")
 
         for t in rows:
             tid = str(t.get("id") or "").strip()
@@ -609,13 +642,14 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
             due = str(t.get("due_date") or "").strip() or "—"
             assigned_to = str(t.get("assigned_to") or "").strip()
             assigned_lbl = id_to_label.get(assigned_to, "—")
+            is_terminal = _todo_is_terminal(status)
 
             r1, r2, r3, r4, r5 = st.columns([0.55, 3.4, 1.1, 1.3, 1.7], gap="small")
             with r1:
-                done = st.checkbox(" ", value=False, key=f"todo_done_{tid}")
+                done = st.checkbox(" ", value=is_terminal, key=f"todo_done_{tid}")
             with r2:
                 st.markdown(f"**{title}**")
-                if status and status != "Open":
+                if status and _todo_status_slug(status) != "open":
                     st.caption(status)
             with r3:
                 st.caption(priority)
@@ -624,22 +658,31 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
             with r5:
                 st.caption(assigned_lbl)
 
-            if done and status != "Complete":
+            if done and not is_terminal:
                 update_rows_admin(
                     "todos",
-                    {"status": "Complete", "completed_at": datetime.utcnow().isoformat()},
+                    {"status": "Complete", "completed_at": datetime.now(timezone.utc).isoformat()},
                     {"id": tid},
                 )
+                clear_session_table_cache()
+                st.rerun()
+            if not done and is_terminal:
+                update_rows_admin(
+                    "todos",
+                    {"status": "Open", "completed_at": None},
+                    {"id": tid},
+                )
+                clear_session_table_cache()
                 st.rerun()
 
             with st.expander("Edit / details", expanded=False):
                 et = st.text_input("Title", value=title, key=f"todo_edit_title_{tid}")
                 ed = st.text_area("Description", value=str(t.get("description") or ""), key=f"todo_edit_desc_{tid}", height=72)
                 c1, c2, c3 = st.columns(3, gap="small")
-                # date_input can't take an arbitrary string; keep it optional via text to avoid crash
                 due_s = c1.text_input("Due date (YYYY-MM-DD)", value="" if due == "—" else due, key=f"todo_edit_due_{tid}")
                 epri = c2.selectbox("Priority", list(_TODO_PRIORITIES), index=max(0, list(_TODO_PRIORITIES).index(priority)) if priority in _TODO_PRIORITIES else 1, key=f"todo_edit_pri_{tid}")
-                estat = c3.selectbox("Status", list(_TODO_STATUSES), index=max(0, list(_TODO_STATUSES).index(status)) if status in _TODO_STATUSES else 0, key=f"todo_edit_status_{tid}")
+                status_ix = list(_TODO_STATUSES).index(status) if status in _TODO_STATUSES else 0
+                estat = c3.selectbox("Status", list(_TODO_STATUSES), index=status_ix, key=f"todo_edit_status_{tid}")
                 assignee_opts = ["— Unassigned —"] + [id_to_label[i] for i in ordered_ids]
                 cur_assignee_lbl = id_to_label.get(assigned_to, "— Unassigned —") if assigned_to else "— Unassigned —"
                 assignee_label = st.selectbox("Assigned to", assignee_opts, index=max(0, assignee_opts.index(cur_assignee_lbl)) if cur_assignee_lbl in assignee_opts else 0, key=f"todo_edit_asg_{tid}")
@@ -653,23 +696,28 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                 b1, b2 = st.columns(2, gap="small")
                 with b1:
                     if st.button("Save", type="primary", use_container_width=True, key=f"todo_save_{tid}"):
+                        new_status = str(estat or "Open").strip() or "Open"
                         payload: dict = {
                             "title": str(et or "").strip() or "—",
                             "description": str(ed or "").strip() or None,
                             "priority": str(epri or "Normal").strip() or "Normal",
-                            "status": str(estat or "Open").strip() or "Open",
+                            "status": new_status,
                             "assigned_to": new_assigned_to,
                         }
                         ds = str(due_s or "").strip()
                         payload["due_date"] = ds if ds else None
-                        if payload["status"] == "Complete":
-                            payload["completed_at"] = datetime.utcnow().isoformat()
+                        if _todo_is_terminal(new_status):
+                            payload["completed_at"] = datetime.now(timezone.utc).isoformat()
+                        else:
+                            payload["completed_at"] = None
                         update_rows_admin("todos", payload, {"id": tid})
+                        clear_session_table_cache()
                         st.success("Saved.")
                         st.rerun()
                 with b2:
                     if st.button("Delete", type="secondary", use_container_width=True, key=f"todo_del_{tid}"):
                         delete_rows_admin("todos", {"id": tid})
+                        clear_session_table_cache()
                         st.success("Deleted.")
                         st.rerun()
 
@@ -740,7 +788,11 @@ def render() -> None:
     )
     try:
         todos = fetch_table_for_session("todos", session_key=sk, limit=2000, order_by="created_at", use_admin=use_admin)
-        open_todos = sum(1 for t in (todos or []) if str((t or {}).get("status") or "Open").strip() != "Complete")
+        open_todos = sum(
+            1
+            for t in (todos or [])
+            if isinstance(t, dict) and not _todo_is_terminal((t or {}).get("status"))
+        )
     except Exception:
         open_todos = 0
 
