@@ -517,7 +517,8 @@ def _todo_filter_for_view(todos: list[dict], view: str) -> tuple[list[dict], int
 
     Active = any status except Complete/Completed/Closed; missing status counts as active.
     """
-    valid = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
+    deduped = _todo_dedupe_rows([t for t in (todos or []) if isinstance(t, dict)])
+    valid = [t for t in deduped if str(t.get("id") or "").strip()]
     active_count = sum(1 for t in valid if not _todo_is_terminal(t.get("status")))
     view_l = str(view or _TODO_VIEW_OPTIONS[0]).strip()
     if view_l == "Completed Tasks":
@@ -529,18 +530,36 @@ def _todo_filter_for_view(todos: list[dict], view: str) -> tuple[list[dict], int
     return _todo_sort_rows(shown), active_count
 
 
-def _todo_dedupe_by_id(rows: list[dict]) -> list[dict]:
-    seen: set[str] = set()
-    out: list[dict] = []
+def _todo_norm_id(val: Any) -> str:
+    s = str(val or "").strip()
+    return s.lower() if s else ""
+
+
+def _todo_composite_key(r: dict) -> str:
+    """Stable key when ``id`` is missing (dedupe logical duplicates)."""
+    return "cmp:" + "|".join(
+        [
+            str(r.get("title") or "").strip().lower(),
+            str(r.get("due_date") or "").strip(),
+            str(r.get("assigned_to") or "").strip(),
+            _todo_status_slug(r.get("status")),
+        ]
+    )
+
+
+def _todo_dedupe_rows(rows: list[dict]) -> list[dict]:
+    """
+    Deduplicate tasks by primary key (case-normalized UUID string), else by
+    title + due_date + assigned_to + status. Last row wins for each key.
+    """
+    merged: dict[str, dict] = {}
     for r in rows or []:
         if not isinstance(r, dict):
             continue
-        tid = str(r.get("id") or "").strip()
-        if not tid or tid in seen:
-            continue
-        seen.add(tid)
-        out.append(r)
-    return out
+        nid = _todo_norm_id(r.get("id"))
+        key = f"id:{nid}" if nid else _todo_composite_key(r)
+        merged[key] = r
+    return list(merged.values())
 
 
 def _todo_apply_search(rows: list[dict], q: str, id_to_label: dict[str, str]) -> list[dict]:
@@ -566,7 +585,7 @@ def _todo_apply_search(rows: list[dict], q: str, id_to_label: dict[str, str]) ->
     return out
 
 
-_TODO_LIST_CSS_KEY = "dash_todo_list_css_v4"
+_TODO_LIST_CSS_KEY = "dash_todo_list_css_v5"
 
 
 def _inject_todo_list_css() -> None:
@@ -576,6 +595,33 @@ def _inject_todo_list_css() -> None:
     st.markdown(
         """
         <style>
+        .ips-todo-list-zone {
+          position: absolute;
+          width: 0;
+          height: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        /* Scoped to the bordered To-Do block (contains hidden zone marker) */
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) div.stButton > button,
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) div.stButton > button[data-testid="baseButton-secondary"],
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) div.stButton > button[data-testid="baseButton-primary"] {
+          white-space: nowrap !important;
+          min-width: 54px;
+          max-width: 72px;
+          min-height: 36px;
+          padding: 4px 8px !important;
+          font-size: 12px !important;
+          line-height: 1.15 !important;
+        }
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) div.stButton > button p {
+          white-space: nowrap !important;
+          font-size: 12px !important;
+          line-height: 1.15 !important;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0 !important;
+        }
         .ips-todo-sep {
           border: none;
           border-top: 1px solid #e2e8f0;
@@ -592,14 +638,12 @@ def _inject_todo_list_css() -> None:
           margin: 0 !important;
           line-height: 1.25 !important;
         }
-        .ips-todo-ellipsis {
-          display: inline-block;
-          max-width: 100%;
+        .ips-todo-assignee-wrap {
+          display: block;
+          max-width: 11rem;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 0.78rem;
-          color: #334155;
         }
         .ips-todo-badge {
           display: inline-block;
@@ -860,6 +904,10 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
     me = str(prof.get("id") or "").strip()
 
     with st.container(border=True):
+        st.markdown(
+            '<div class="ips-todo-list-zone" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
         _inject_todo_list_css()
         id_to_label, ordered_ids = _profiles_for_todo_assign(session_key, use_admin=use_admin)
 
@@ -875,7 +923,7 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
             todos = []
 
         raw_list = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
-        valid_todos = _todo_dedupe_by_id(raw_list)
+        valid_todos = _todo_sort_rows(_todo_dedupe_rows(raw_list))
         active_count = sum(1 for t in valid_todos if not _todo_is_terminal(t.get("status")))
 
         h1, h2, h3 = st.columns([1.35, 1.25, 1], gap="small")
@@ -899,6 +947,7 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
         rows_base, _ = _todo_filter_for_view(valid_todos, view)
         q = str(st.session_state.get("dash_todo_search_q") or "")
         rows = _todo_apply_search(rows_base, q, id_to_label)
+        rows = _todo_sort_rows(_todo_dedupe_rows(rows))
 
         with st.expander("Add task", expanded=False):
             title = st.text_input("Title", key="dash_todo_add_title")
@@ -962,11 +1011,11 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                 is_terminal = _todo_is_terminal(status)
                 title_esc = html.escape(_todo_trunc(title, 80))
                 full_title_esc = html.escape(title)
-                asg_esc = html.escape(_todo_trunc(assigned_lbl, 28))
+                asg_esc = html.escape(_todo_trunc(assigned_lbl, 40))
                 asg_full_esc = html.escape(assigned_lbl)
 
                 with st.container(border=False):
-                    c1, c2, c3, c4, c5, c6 = st.columns([2.15, 0.9, 0.72, 1.05, 0.95, 1.2], gap="small")
+                    c1, c2, c3, c4, c5, c6 = st.columns([2.05, 0.88, 0.62, 1.0, 0.82, 2.65], gap="small")
                     with c1:
                         st.markdown(
                             f'<p class="ips-todo-title" title="{full_title_esc}">{title_esc}</p>',
@@ -978,7 +1027,7 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                         st.caption(due if due != "—" else "—")
                     with c4:
                         st.markdown(
-                            f'<span class="ips-todo-ellipsis" title="{asg_full_esc}">{asg_esc}</span>',
+                            f'<span class="ips-todo-assignee-wrap" title="{asg_full_esc}">{asg_esc}</span>',
                             unsafe_allow_html=True,
                         )
                     with c5:
@@ -986,16 +1035,31 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                     with c6:
                         a1, a2, a3, a4 = st.columns(4, gap="small")
                         with a1:
-                            if st.button("View", key=f"dash_todo_v_{tid}", help="Details"):
+                            if st.button(
+                                "View",
+                                key=f"dash_todo_v_{tid}",
+                                help="Details",
+                                use_container_width=False,
+                            ):
                                 st.session_state["dash_todo_dlg_view"] = tid
                                 st.rerun()
                         with a2:
-                            if st.button("Edit", key=f"dash_todo_e_{tid}", help="Edit task"):
+                            if st.button(
+                                "Edit",
+                                key=f"dash_todo_e_{tid}",
+                                help="Edit task",
+                                use_container_width=False,
+                            ):
                                 st.session_state["dash_todo_dlg_edit"] = tid
                                 st.rerun()
                         with a3:
                             if is_terminal:
-                                if st.button("Reopen", key=f"dash_todo_c_{tid}", help="Mark not complete"):
+                                if st.button(
+                                    "Reopen",
+                                    key=f"dash_todo_reopen_{tid}",
+                                    help="Mark not complete",
+                                    use_container_width=False,
+                                ):
                                     update_rows_admin(
                                         "todos",
                                         {"status": "Open", "completed_at": None},
@@ -1004,7 +1068,12 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                                     clear_session_table_cache()
                                     st.rerun()
                             else:
-                                if st.button("Done", key=f"dash_todo_c_{tid}", help="Mark complete"):
+                                if st.button(
+                                    "Done",
+                                    key=f"dash_todo_done_{tid}",
+                                    help="Mark complete",
+                                    use_container_width=False,
+                                ):
                                     update_rows_admin(
                                         "todos",
                                         {
@@ -1016,25 +1085,37 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                                     clear_session_table_cache()
                                     st.rerun()
                         with a4:
-                            if st.button("Del", key=f"dash_todo_d_{tid}", help="Delete task"):
+                            if st.button(
+                                "Del",
+                                key=f"dash_todo_d_{tid}",
+                                help="Delete task",
+                                use_container_width=False,
+                            ):
                                 st.session_state["dash_todo_dlg_del"] = tid
                                 st.rerun()
 
-        by_id = {str(x.get("id")): x for x in valid_todos if str(x.get("id") or "").strip()}
+        by_id: dict[str, dict] = {}
+        for x in valid_todos:
+            nk = _todo_norm_id(x.get("id"))
+            if nk:
+                by_id[nk] = x
         v = str(st.session_state.get("dash_todo_dlg_view") or "").strip()
         e = str(st.session_state.get("dash_todo_dlg_edit") or "").strip()
         d = str(st.session_state.get("dash_todo_dlg_del") or "").strip()
-        if v and v in by_id:
-            _dash_todo_view_dialog(row=dict(by_id[v]), id_to_label=id_to_label)
-        elif e and e in by_id:
+        vn = _todo_norm_id(v)
+        en = _todo_norm_id(e)
+        dn = _todo_norm_id(d)
+        if vn and vn in by_id:
+            _dash_todo_view_dialog(row=dict(by_id[vn]), id_to_label=id_to_label)
+        elif en and en in by_id:
             _dash_todo_edit_dialog(
-                row=dict(by_id[e]),
+                row=dict(by_id[en]),
                 id_to_label=id_to_label,
                 ordered_ids=ordered_ids,
                 me=me,
             )
-        elif d and d in by_id:
-            _dash_todo_delete_dialog(tid=d, title=str(by_id[d].get("title") or "—"))
+        elif dn and dn in by_id:
+            _dash_todo_delete_dialog(tid=str(by_id[dn].get("id") or "").strip(), title=str(by_id[dn].get("title") or "—"))
 
 
 def render() -> None:
@@ -1102,11 +1183,12 @@ def render() -> None:
         or str((a or {}).get("current_holder_employee_id") or "").strip()
     )
     try:
-        todos = fetch_table_for_session("todos", session_key=sk, limit=2000, order_by="created_at", use_admin=use_admin)
+        todos_raw = fetch_table_for_session("todos", session_key=sk, limit=2000, order_by="created_at", use_admin=use_admin)
+        todos_deduped = _todo_dedupe_rows([t for t in (todos_raw or []) if isinstance(t, dict)])
         open_todos = sum(
             1
-            for t in (todos or [])
-            if isinstance(t, dict) and not _todo_is_terminal((t or {}).get("status"))
+            for t in todos_deduped
+            if not _todo_is_terminal((t or {}).get("status"))
         )
     except Exception:
         open_todos = 0
