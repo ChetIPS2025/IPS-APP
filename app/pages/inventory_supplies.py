@@ -4,6 +4,19 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.ui.catalog_inventory_display import (
+        drop_hidden_system_columns,
+        order_display_columns,
+        rename_display_headers,
+    )
+except ImportError:
+    from ui.catalog_inventory_display import (  # type: ignore
+        drop_hidden_system_columns,
+        order_display_columns,
+        rename_display_headers,
+    )
+
+try:
     from app.auth import current_role
     from app.branding import render_header
     from app.db import (
@@ -307,6 +320,8 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     out = df.copy()
+    if "is_active" in out.columns and "status" not in out.columns:
+        out["status"] = out["is_active"].map(lambda x: "Active" if bool(x) else "Inactive")
     out["alert"] = out.apply(lambda r: "⚠ Low" if _row_is_low_stock(r.to_dict()) else "", axis=1)
     if "unit_cost" in out.columns:
         out["unit_cost"] = out["unit_cost"].apply(_money)
@@ -316,6 +331,15 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
                 lambda x: f"{float(x or 0):,.2f}" if pd.notna(x) else "0.00",
             )
     return out
+
+
+def _inventory_supplies_visible_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop system columns (keep ``id`` for selection), order and rename for display/editor."""
+    if df.empty:
+        return df
+    vis = drop_hidden_system_columns(df, keep=frozenset({"id"}))
+    vis = order_display_columns(vis)
+    return rename_display_headers(vis)
 
 
 def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool) -> None:
@@ -392,23 +416,6 @@ def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool
         mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
         filtered = filtered[mask.any(axis=1)]
 
-    show_cols = [
-        c
-        for c in [
-            "item_name",
-            "category",
-            "unit",
-            "quantity_on_hand",
-            "reorder_point",
-            "unit_cost",
-            "vendor",
-            "storage_location",
-            "alert",
-            "is_active",
-        ]
-        if c in filtered.columns
-    ]
-
     if filtered.empty:
         st.warning("No items match your filters.")
         if can_edit:
@@ -419,19 +426,21 @@ def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool
                 st.rerun()
         return
 
-    display_df = _prepare_display_df(filtered)
+    display_df = _inventory_supplies_visible_df(_prepare_display_df(filtered))
 
     if "id" not in filtered.columns:
-        st.dataframe(display_df[show_cols], use_container_width=True, hide_index=True)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
         return
 
     bar_ph = st.empty()
+    editor_cols = [c for c in display_df.columns if c != "id"]
     _, sel = render_selectable_dataframe(
         display_df,
         table_key=TABLE_KEY_INVENTORY_SUPPLIES,
         id_column="id",
-        columns=show_cols,
+        columns=editor_cols,
         editor_key="inv_sel_editor",
+        hide_id_column=True,
     )
     with bar_ph.container():
         _render_action_buttons(sel=sel, can_edit=can_edit)

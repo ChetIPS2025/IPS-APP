@@ -9,6 +9,11 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.ui.catalog_inventory_display import prepare_catalog_inventory_display_df
+except ImportError:
+    from ui.catalog_inventory_display import prepare_catalog_inventory_display_df  # type: ignore
+
+try:
     from app.auth import current_role
     from app.branding import render_header
     from app.db import (
@@ -98,7 +103,14 @@ def render() -> None:
         except Exception:
             rows = []
         if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(
+                prepare_catalog_inventory_display_df(
+                    pd.DataFrame(rows),
+                    extra_hidden=frozenset({"created_at"}),
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
         return
 
     st.markdown(
@@ -308,6 +320,11 @@ def render() -> None:
         return
 
     st.markdown("##### Catalog")
-    show = pd.DataFrame(rows)
-    show = show.drop(columns=[c for c in ("created_at",) if c in show.columns], errors="ignore")
-    st.dataframe(show, use_container_width=True, hide_index=True)
+    st.dataframe(
+        prepare_catalog_inventory_display_df(
+            pd.DataFrame(rows),
+            extra_hidden=frozenset({"created_at"}),
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )

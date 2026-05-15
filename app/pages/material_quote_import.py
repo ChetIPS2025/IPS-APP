@@ -38,6 +38,30 @@ SESSION_QUEUE = "mq_upload_queue"
 SESSION_ROWS = "mq_analysis_rows"
 SESSION_IMPORTED = "mq_session_imported_total"
 
+# Internal-only keys: omitted from the data editor; merged back from session after edits.
+_MQ_EDITOR_HIDDEN = frozenset({"row_id", "vendor_item_number"})
+
+
+def _material_quote_seed_row() -> dict[str, Any]:
+    return {
+        "row_id": str(uuid.uuid4()),
+        "include": True,
+        "vendor": "",
+        "quote_number": "",
+        "source_file": "",
+        "item_description": "",
+        "quantity": 0.0,
+        "unit_cost": 0.0,
+        "total": 0.0,
+        "category": "",
+        "subgroup": "",
+        "unit": "EA",
+        "material_item_key": "",
+        "vendor_item_number": "",
+        "notes": "",
+        "duplicate_note": "",
+    }
+
 
 def clean_item_key(text: str) -> str:
     text = str(text).strip().upper()
@@ -471,52 +495,64 @@ def render_material_quote_import_form(return_to_materials: bool = False) -> None
     df = pd.DataFrame(rows)
     editor_key = "mq_editor_embed" if return_to_materials else "mq_editor_main"
 
-    edited = st.data_editor(
-        df,
+    vis_cols = [c for c in df.columns if c not in _MQ_EDITOR_HIDDEN]
+    mq_column_order = [
+        "include",
+        "vendor",
+        "source_file",
+        "quote_number",
+        "item_description",
+        "quantity",
+        "unit_cost",
+        "total",
+        "category",
+        "material_item_key",
+        "notes",
+        "duplicate_note",
+        "subgroup",
+        "unit",
+    ]
+    editor_order = [c for c in mq_column_order if c in vis_cols]
+
+    mq_column_config = {
+        "include": st.column_config.CheckboxColumn("Include", default=True),
+        "vendor": st.column_config.TextColumn("Vendor"),
+        "source_file": st.column_config.TextColumn("Source file", disabled=True),
+        "quote_number": st.column_config.TextColumn("Quote #"),
+        "item_description": st.column_config.TextColumn("Description", width="medium"),
+        "quantity": st.column_config.NumberColumn("Qty", format="%.4f"),
+        "unit_cost": st.column_config.NumberColumn("Unit cost", format="%.2f"),
+        "total": st.column_config.NumberColumn("Total", format="%.2f"),
+        "category": st.column_config.SelectboxColumn("Category", options=cat_options),
+        "material_item_key": st.column_config.SelectboxColumn("Material", options=mat_options),
+        "notes": st.column_config.TextColumn("Notes"),
+        "duplicate_note": st.column_config.TextColumn("Duplicates", disabled=True, width="small"),
+        "subgroup": st.column_config.TextColumn("Subgroup", disabled=True, width="small"),
+        "unit": st.column_config.TextColumn("Unit", disabled=True, width="small"),
+    }
+    editor_cfg = {k: v for k, v in mq_column_config.items() if k in vis_cols}
+
+    edited_vis = st.data_editor(
+        df[vis_cols],
         num_rows="dynamic",
         use_container_width=True,
         hide_index=True,
         key=editor_key,
-        column_order=[
-            "include",
-            "vendor",
-            "source_file",
-            "quote_number",
-            "item_description",
-            "quantity",
-            "unit_cost",
-            "total",
-            "category",
-            "material_item_key",
-            "notes",
-            "duplicate_note",
-            "row_id",
-            "subgroup",
-            "unit",
-            "vendor_item_number",
-        ],
-        column_config={
-            "include": st.column_config.CheckboxColumn("Include", default=True),
-            "vendor": st.column_config.TextColumn("Vendor"),
-            "source_file": st.column_config.TextColumn("Source file", disabled=True),
-            "quote_number": st.column_config.TextColumn("Quote #"),
-            "item_description": st.column_config.TextColumn("Description", width="medium"),
-            "quantity": st.column_config.NumberColumn("Qty", format="%.4f"),
-            "unit_cost": st.column_config.NumberColumn("Unit cost", format="%.2f"),
-            "total": st.column_config.NumberColumn("Total", format="%.2f"),
-            "category": st.column_config.SelectboxColumn("Category", options=cat_options),
-            "material_item_key": st.column_config.SelectboxColumn("Material", options=mat_options),
-            "notes": st.column_config.TextColumn("Notes"),
-            "duplicate_note": st.column_config.TextColumn("Duplicates", disabled=True, width="small"),
-            "row_id": st.column_config.TextColumn("", disabled=True, width="small"),
-            "subgroup": st.column_config.TextColumn("", disabled=True, width="small"),
-            "unit": st.column_config.TextColumn("", disabled=True, width="small"),
-            "vendor_item_number": st.column_config.TextColumn("Vend #", width="small"),
-        },
+        column_order=editor_order,
+        column_config=editor_cfg,
     )
+    if edited_vis is None or edited_vis.empty:
+        edited_vis = df[vis_cols].copy()
 
-    recs = edited.fillna("").to_dict("records")
-    for r in recs:
+    prev_rows = list(st.session_state[SESSION_ROWS])
+    merged_recs: list[dict[str, Any]] = []
+    ev = edited_vis.fillna("")
+    for i, er in enumerate(ev.to_dict("records")):
+        base = dict(prev_rows[i]) if i < len(prev_rows) else _material_quote_seed_row()
+        base.update(er)
+        merged_recs.append(base)
+
+    for r in merged_recs:
         try:
             qv = float(r.get("quantity", 0) or 0)
             uc = float(r.get("unit_cost", 0) or 0)
@@ -535,9 +571,9 @@ def render_material_quote_import_form(return_to_materials: bool = False) -> None
         r.setdefault("category", "")
         r.setdefault("notes", "")
         r.setdefault("include", True)
-    _mark_duplicate_flags(recs, inv_dup_keys)
-    st.session_state[SESSION_ROWS] = recs
-    df2 = pd.DataFrame(recs)
+    _mark_duplicate_flags(merged_recs, inv_dup_keys)
+    st.session_state[SESSION_ROWS] = merged_recs
+    df2 = pd.DataFrame(merged_recs)
 
     save_quote_only = st.checkbox("Save quote record only (no new inventory lines)", value=False)
     import_to_inventory = st.checkbox(

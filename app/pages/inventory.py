@@ -7,6 +7,17 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.ui.catalog_inventory_display import (
+        prepare_catalog_inventory_display_df,
+        sanitize_catalog_inventory_export_df,
+    )
+except ImportError:
+    from ui.catalog_inventory_display import (  # type: ignore
+        prepare_catalog_inventory_display_df,
+        sanitize_catalog_inventory_export_df,
+    )
+
+try:
     from app.auth import current_role
     from app.branding import render_header
     from app.confirm_delete import (
@@ -297,7 +308,7 @@ def _render_inventory_action_bar(
     csv_bytes = b""
     if exp_ok:
         sub = df_all[df_all["id"].astype(str).isin([str(x) for x in sel])]
-        csv_bytes = sub.to_csv(index=False).encode("utf-8")
+        csv_bytes = sanitize_catalog_inventory_export_df(sub).to_csv(index=False).encode("utf-8")
 
     vis_ids: list[str] = []
     if not visible_df.empty and "id" in visible_df.columns:
@@ -774,7 +785,8 @@ def _render_edit_panel(row: dict) -> None:
 def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
     """Filters → low stock banner → main table → action bar. Called once per page run."""
     inject_table_action_styles()
-    st.caption(f"Selected IDs: {st.session_state.get(selected_key)}")
+    _sel_n = len([x for x in (st.session_state.get(selected_key) or []) if str(x).strip()])
+    st.caption(f"{_sel_n} row(s) selected")
 
     if df.empty:
         st.selectbox("Filter Category", ["All", "Materials"], key="inv_f_cat")
@@ -850,17 +862,21 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
                     sub["suggest_qty"] = gap
                     sub.loc[sub["suggest_qty"] <= 0, "suggest_qty"] = pd.NA
                 if "image_url" in filtered.columns:
-                    sub["Photo"] = filtered.loc[low_mask, "image_url"].map(_thumb_display_url).values
+                    sub["image_url"] = filtered.loc[low_mask, "image_url"].map(_thumb_display_url).values
                 else:
-                    sub["Photo"] = _PLACEHOLDER_THUMB
-                show_low = ["Photo"] + [c for c in cols_show if c in sub.columns]
+                    sub["image_url"] = _PLACEHOLDER_THUMB
+                disp = prepare_catalog_inventory_display_df(
+                    sub,
+                    extra_hidden=frozenset(),
+                )
+                img_cfg = {}
+                if "Photo" in disp.columns:
+                    img_cfg["Photo"] = st.column_config.ImageColumn("Photo", width="small")
                 st.dataframe(
-                    sub[show_low],
+                    disp,
                     use_container_width=True,
                     hide_index=True,
-                    column_config={
-                        "Photo": st.column_config.ImageColumn("Photo", width="small"),
-                    },
+                    column_config=img_cfg or {},
                 )
                 st.caption("**Suggest qty** = shortfall to reorder point (informational).")
 

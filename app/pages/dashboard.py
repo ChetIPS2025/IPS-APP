@@ -27,6 +27,11 @@ except ImportError:
     from ui import IPS_NAV_PENDING_KEY, role_can_open_page  # type: ignore
 
 try:
+    from app.ui.catalog_inventory_display import prepare_catalog_inventory_display_df
+except ImportError:
+    from ui.catalog_inventory_display import prepare_catalog_inventory_display_df  # type: ignore
+
+try:
     from app.ui.modal import inject_ips_modal_styles
 except ImportError:
     from ui.modal import inject_ips_modal_styles  # type: ignore
@@ -1132,18 +1137,8 @@ def render() -> None:
             qoh2 = pd.to_numeric(df_inv2.get("quantity_on_hand", 0), errors="coerce").fillna(0)
             rp2 = pd.to_numeric(df_inv2.get("reorder_point", 0), errors="coerce").fillna(0)
             low_df = df_inv2.loc[qoh2 <= rp2, :].copy()
-            show_cols = [c for c in ("item_name", "sku", "category", "quantity_on_hand", "reorder_point") if c in low_df.columns]
-            if show_cols:
-                disp = low_df[show_cols].copy()
-                disp = disp.rename(
-                    columns={
-                        "item_name": "Item",
-                        "quantity_on_hand": "On Hand",
-                        "reorder_point": "Reorder",
-                        "unit_cost": "Unit Cost",
-                        "qr_code_value": "QR Code",
-                    }
-                )
+            if not low_df.empty:
+                disp = prepare_catalog_inventory_display_df(low_df)
                 with st.container(border=True):
                     st.markdown("##### Low Stock Alerts")
                     st.caption("Items at or below reorder point (based on current on-hand vs reorder settings).")
