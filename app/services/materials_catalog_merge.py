@@ -24,6 +24,51 @@ def _item_key_from_inventory_row(row: dict[str, Any]) -> str:
     return base or str(row.get("id") or "")[:12].upper()
 
 
+def item_key_from_inventory_row(row: dict[str, Any]) -> str:
+    """Public alias for catalog / import code."""
+    return _item_key_from_inventory_row(row)
+
+
+def estimate_materials_payload_from_inventory(
+    row: dict[str, Any],
+    *,
+    item_key: str | None = None,
+) -> dict[str, Any]:
+    """
+    Map ``inventory_items`` → column payload for ``estimate_materials`` insert/update.
+
+    Preserves inventory **category** when set; otherwise ``Quote Catalog``.
+    ``inventory_ref_id`` is always the inventory row id (UUID string).
+    """
+    pc = float(row.get("unit_cost") or 0)
+    raw_sell = row.get("sell_price")
+    if raw_sell is not None and str(raw_sell).strip() != "":
+        try:
+            sp = float(raw_sell)
+        except (TypeError, ValueError):
+            sp = round(pc * 1.25, 2) if pc else 0.0
+    else:
+        sp = round(pc * 1.25, 2) if pc else 0.0
+
+    ik = (item_key or _item_key_from_inventory_row(row)).strip()
+    desc = str(row.get("item_name") or "").strip() or str(row.get("sku") or "").strip() or ik
+    cat = str(row.get("category") or "").strip() or "Quote Catalog"
+    iid = str(row.get("id") or "").strip()
+
+    return {
+        "item_key": ik[:500],
+        "description": desc[:2000],
+        "category": cat[:200],
+        "subgroup": str(row.get("subgroup") or "")[:500],
+        "unit": str(row.get("unit") or "EA").strip()[:32] or "EA",
+        "purchase_price": float(pc),
+        "sell_price": float(sp),
+        "vendor_item_number": str(row.get("vendor_item_number") or "")[:200],
+        "is_active": True,
+        "inventory_ref_id": iid or None,
+    }
+
+
 def inventory_row_to_material_catalog_shape(row: dict[str, Any]) -> dict[str, Any]:
     """
     Map ``inventory_items`` → shape expected by estimate ``compute_totals`` / material quote matching.
