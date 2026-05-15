@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -24,6 +25,11 @@ try:
     from app.ui import IPS_NAV_PENDING_KEY, role_can_open_page
 except ImportError:
     from ui import IPS_NAV_PENDING_KEY, role_can_open_page  # type: ignore
+
+try:
+    from app.ui.modal import inject_ips_modal_styles
+except ImportError:
+    from ui.modal import inject_ips_modal_styles  # type: ignore
 
 try:
     from app.services import task_photos as _dash_task_photos
@@ -518,6 +524,306 @@ def _todo_filter_for_view(todos: list[dict], view: str) -> tuple[list[dict], int
     return _todo_sort_rows(shown), active_count
 
 
+def _todo_dedupe_by_id(rows: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    out: list[dict] = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        tid = str(r.get("id") or "").strip()
+        if not tid or tid in seen:
+            continue
+        seen.add(tid)
+        out.append(r)
+    return out
+
+
+def _todo_apply_search(rows: list[dict], q: str, id_to_label: dict[str, str]) -> list[dict]:
+    qq = str(q or "").strip().lower()
+    if not qq:
+        return list(rows)
+    out: list[dict] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        aid = str(r.get("assigned_to") or "").strip()
+        blob = " ".join(
+            [
+                str(r.get("title") or ""),
+                str(r.get("description") or ""),
+                str(r.get("status") or ""),
+                str(r.get("priority") or ""),
+                id_to_label.get(aid, ""),
+            ]
+        ).lower()
+        if qq in blob:
+            out.append(r)
+    return out
+
+
+_TODO_LIST_CSS_KEY = "dash_todo_list_css_v4"
+
+
+def _inject_todo_list_css() -> None:
+    if st.session_state.get(_TODO_LIST_CSS_KEY):
+        return
+    st.session_state[_TODO_LIST_CSS_KEY] = True
+    st.markdown(
+        """
+        <style>
+        .ips-todo-sep {
+          border: none;
+          border-top: 1px solid #e2e8f0;
+          margin: 0.35rem 0 0.45rem 0;
+        }
+        .ips-todo-title {
+          font-weight: 700;
+          font-size: 0.92rem;
+          color: #0f172a;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 100%;
+          margin: 0 !important;
+          line-height: 1.25 !important;
+        }
+        .ips-todo-ellipsis {
+          display: inline-block;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 0.78rem;
+          color: #334155;
+        }
+        .ips-todo-badge {
+          display: inline-block;
+          font-size: 0.65rem;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
+          padding: 2px 7px;
+          border-radius: 6px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          line-height: 1.2;
+          white-space: nowrap;
+        }
+        .ips-todo-badge-pri-low, .ips-todo-badge-pri-normal {
+          background: #e2e8f0;
+          color: #1e3a5f;
+          border-color: #94a3b8;
+        }
+        .ips-todo-badge-pri-high {
+          background: #fef3c7;
+          color: #92400e;
+          border-color: #fcd34d;
+        }
+        .ips-todo-badge-pri-urgent {
+          background: #fee2e2;
+          color: #991b1b;
+          border-color: #f87171;
+        }
+        .ips-todo-badge-st-open {
+          background: #dbeafe;
+          color: #1e40af;
+          border-color: #93c5fd;
+        }
+        .ips-todo-badge-st-in_progress {
+          background: #ffedd5;
+          color: #9a3412;
+          border-color: #fdba74;
+        }
+        .ips-todo-badge-st-pending {
+          background: #ede9fe;
+          color: #5b21b6;
+          border-color: #c4b5fd;
+        }
+        .ips-todo-badge-st-waiting {
+          background: #f1f5f9;
+          color: #475569;
+          border-color: #cbd5e1;
+        }
+        .ips-todo-badge-st-terminal {
+          background: #dcfce7;
+          color: #166534;
+          border-color: #86efac;
+        }
+        .ips-todo-badge-st-default {
+          background: #f1f5f9;
+          color: #334155;
+          border-color: #cbd5e1;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _todo_pri_badge_html(priority: str) -> str:
+    p = str(priority or "Normal").strip().title()
+    slug = str(priority or "normal").strip().lower().replace(" ", "_")
+    if slug in ("urgent",):
+        cls = "ips-todo-badge ips-todo-badge-pri-urgent"
+    elif slug in ("high",):
+        cls = "ips-todo-badge ips-todo-badge-pri-high"
+    else:
+        cls = "ips-todo-badge ips-todo-badge-pri-normal"
+    return f'<span class="{cls}">{html.escape(p)}</span>'
+
+
+def _todo_status_badge_html(status: str) -> str:
+    s = str(status or "Open").strip()
+    slug = _todo_status_slug(s).replace(" ", "_")
+    if _todo_is_terminal(s):
+        cls = "ips-todo-badge ips-todo-badge-st-terminal"
+    elif slug in ("open",):
+        cls = "ips-todo-badge ips-todo-badge-st-open"
+    elif slug in ("in_progress",):
+        cls = "ips-todo-badge ips-todo-badge-st-in_progress"
+    elif slug in ("waiting",):
+        cls = "ips-todo-badge ips-todo-badge-st-waiting"
+    elif slug in ("pending",):
+        cls = "ips-todo-badge ips-todo-badge-st-pending"
+    else:
+        cls = "ips-todo-badge ips-todo-badge-st-default"
+    return f'<span class="{cls}">{html.escape(s)}</span>'
+
+
+def _todo_trunc(s: str, n: int) -> str:
+    t = str(s or "").strip()
+    return t if len(t) <= n else (t[: max(0, n - 1)] + "…")
+
+
+@st.dialog("Task details", width="small")
+def _dash_todo_view_dialog(*, row: dict[str, Any], id_to_label: dict[str, str]) -> None:
+    inject_ips_modal_styles()
+    tid = str(row.get("id") or "").strip()
+    st.markdown(f"### {html.escape(str(row.get('title') or '—'))}")
+    aid = str(row.get("assigned_to") or "").strip()
+    st.markdown(
+        "<p style='font-size:0.82rem;color:#475569;margin:0 0 0.5rem 0'>"
+        f"<strong>Status</strong> {html.escape(str(row.get('status') or 'Open'))} · "
+        f"<strong>Priority</strong> {html.escape(str(row.get('priority') or 'Normal'))} · "
+        f"<strong>Due</strong> {html.escape(str(row.get('due_date') or '—'))} · "
+        f"<strong>Assigned</strong> {html.escape(id_to_label.get(aid, '—'))}"
+        "</p>",
+        unsafe_allow_html=True,
+    )
+    desc = str(row.get("description") or "").strip()
+    if desc:
+        st.markdown("**Description**")
+        st.markdown(f"<div style='white-space:pre-wrap;font-size:0.9rem;color:#1e293b'>{html.escape(desc)}</div>", unsafe_allow_html=True)
+    else:
+        st.caption("No description.")
+    if st.button("Close", use_container_width=True, key=f"dash_todo_dlg_view_close_{tid}"):
+        st.session_state.pop("dash_todo_dlg_view", None)
+        st.rerun()
+
+
+@st.dialog("Edit task", width="small")
+def _dash_todo_edit_dialog(
+    *,
+    row: dict[str, Any],
+    id_to_label: dict[str, str],
+    ordered_ids: list[str],
+    me: str,
+) -> None:
+    inject_ips_modal_styles()
+    tid = str(row.get("id") or "").strip()
+    title = str(row.get("title") or "").strip() or "—"
+    priority = str(row.get("priority") or "Normal").strip() or "Normal"
+    status = str(row.get("status") or "Open").strip() or "Open"
+    due = str(row.get("due_date") or "").strip() or "—"
+    assigned_to = str(row.get("assigned_to") or "").strip()
+    assignee_opts = ["— Unassigned —"] + [id_to_label[i] for i in ordered_ids]
+    cur_assignee_lbl = id_to_label.get(assigned_to, "— Unassigned —") if assigned_to else "— Unassigned —"
+    st.markdown(f"### {html.escape(title)}")
+
+    with st.form(f"dash_todo_edit_f_{tid}", clear_on_submit=False):
+        et = st.text_input("Title", value=title, key=f"dash_todo_ed_title_{tid}")
+        ed = st.text_area("Description", value=str(row.get("description") or ""), height=88, key=f"dash_todo_ed_desc_{tid}")
+        c1, c2, c3 = st.columns(3, gap="small")
+        with c1:
+            due_s = st.text_input("Due date (YYYY-MM-DD)", value="" if due == "—" else due, key=f"dash_todo_ed_due_{tid}")
+        with c2:
+            epri = st.selectbox(
+                "Priority",
+                list(_TODO_PRIORITIES),
+                index=max(0, list(_TODO_PRIORITIES).index(priority)) if priority in _TODO_PRIORITIES else 1,
+                key=f"dash_todo_ed_pri_{tid}",
+            )
+        with c3:
+            status_ix = list(_TODO_STATUSES).index(status) if status in _TODO_STATUSES else 0
+            estat = st.selectbox("Status", list(_TODO_STATUSES), index=status_ix, key=f"dash_todo_ed_stat_{tid}")
+        st.selectbox(
+            "Assigned to",
+            assignee_opts,
+            index=max(0, assignee_opts.index(cur_assignee_lbl)) if cur_assignee_lbl in assignee_opts else 0,
+            key=f"dash_todo_ed_asg_{tid}",
+        )
+        save = st.form_submit_button("Save", type="primary", use_container_width=True)
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"dash_todo_ed_cancel_{tid}"):
+        st.session_state.pop("dash_todo_dlg_edit", None)
+        st.rerun()
+
+    if save:
+        et = str(st.session_state.get(f"dash_todo_ed_title_{tid}") or "").strip()
+        ed = str(st.session_state.get(f"dash_todo_ed_desc_{tid}") or "").strip()
+        due_s = str(st.session_state.get(f"dash_todo_ed_due_{tid}") or "").strip()
+        epri = str(st.session_state.get(f"dash_todo_ed_pri_{tid}") or "Normal").strip()
+        estat = str(st.session_state.get(f"dash_todo_ed_stat_{tid}") or "Open").strip()
+        assignee_label = str(st.session_state.get(f"dash_todo_ed_asg_{tid}") or "")
+        new_assigned_to = None
+        if assignee_label and not assignee_label.startswith("—"):
+            for pid, lbl in id_to_label.items():
+                if lbl == assignee_label:
+                    new_assigned_to = pid
+                    break
+        new_status = str(estat or "Open").strip() or "Open"
+        payload: dict[str, Any] = {
+            "title": et or "—",
+            "description": ed or None,
+            "priority": str(epri or "Normal").strip() or "Normal",
+            "status": new_status,
+            "assigned_to": new_assigned_to,
+        }
+        ds = str(due_s or "").strip()
+        payload["due_date"] = ds if ds else None
+        if _todo_is_terminal(new_status):
+            payload["completed_at"] = datetime.now(timezone.utc).isoformat()
+        else:
+            payload["completed_at"] = None
+        try:
+            update_rows_admin("todos", payload, {"id": tid})
+            clear_session_table_cache()
+            st.session_state.pop("dash_todo_dlg_edit", None)
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
+
+
+@st.dialog("Delete task?", width="small")
+def _dash_todo_delete_dialog(*, tid: str, title: str) -> None:
+    inject_ips_modal_styles()
+    st.markdown(f"Permanently delete **{html.escape(title)}**?")
+    c1, c2 = st.columns(2, gap="small")
+    with c1:
+        if st.button("Delete", type="primary", use_container_width=True, key=f"dash_todo_del_go_{tid}"):
+            try:
+                delete_rows_admin("todos", {"id": tid})
+                clear_session_table_cache()
+                st.session_state.pop("dash_todo_dlg_del", None)
+                st.success("Deleted.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+    with c2:
+        if st.button("Cancel", type="secondary", use_container_width=True, key=f"dash_todo_del_no_{tid}"):
+            st.session_state.pop("dash_todo_dlg_del", None)
+            st.rerun()
+
+
 def _profiles_for_todo_assign(session_key: str, *, use_admin: bool) -> tuple[dict[str, str], list[str]]:
     """Return (id->label, ordered_ids) for assigned_to choices."""
     try:
@@ -549,6 +855,7 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
     me = str(prof.get("id") or "").strip()
 
     with st.container(border=True):
+        _inject_todo_list_css()
         id_to_label, ordered_ids = _profiles_for_todo_assign(session_key, use_admin=use_admin)
 
         try:
@@ -562,25 +869,35 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
         except Exception:
             todos = []
 
-        valid_todos = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
+        raw_list = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
+        valid_todos = _todo_dedupe_by_id(raw_list)
         active_count = sum(1 for t in valid_todos if not _todo_is_terminal(t.get("status")))
 
-        hdr_l, hdr_r = st.columns([2.4, 1], gap="small")
-        with hdr_l:
+        h1, h2, h3 = st.columns([1.35, 1.25, 1], gap="small")
+        with h1:
             st.markdown(f"##### To-Do List ({active_count})")
-        with hdr_r:
+        with h2:
+            st.text_input(
+                "Search",
+                key="dash_todo_search_q",
+                placeholder="Search…",
+                label_visibility="collapsed",
+            )
+        with h3:
             view = st.selectbox(
                 "Show",
                 list(_TODO_VIEW_OPTIONS),
-                index=0,
                 key="dash_todo_view",
                 label_visibility="collapsed",
             )
-        rows, _ = _todo_filter_for_view(valid_todos, view)
+
+        rows_base, _ = _todo_filter_for_view(valid_todos, view)
+        q = str(st.session_state.get("dash_todo_search_q") or "")
+        rows = _todo_apply_search(rows_base, q, id_to_label)
 
         with st.expander("Add task", expanded=False):
             title = st.text_input("Title", key="dash_todo_add_title")
-            desc = st.text_area("Description", key="dash_todo_add_desc", height=72)
+            desc = st.text_area("Description", key="dash_todo_add_desc", height=64)
             c1, c2, c3 = st.columns(3, gap="small")
             due = c1.date_input("Due date", value=None, key="dash_todo_add_due")
             priority = c2.selectbox("Priority", list(_TODO_PRIORITIES), index=1, key="dash_todo_add_pri")
@@ -623,103 +940,96 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
                 st.caption("No tasks.")
             else:
                 st.caption("No active tasks.")
-            return
-
-        if view == "Active Tasks":
-            st.caption("Showing all active tasks (Open, In Progress, Pending, Waiting, and other non-completed statuses). Urgent first.")
-        elif view == "Completed Tasks":
-            st.caption("Completed and closed tasks.")
         else:
-            st.caption("All tasks. Urgent tasks sort first.")
+            st.caption("Urgent / high priority sort first · row actions for details, edit, or delete.")
+            for idx, t in enumerate(rows):
+                tid = str(t.get("id") or "").strip()
+                if not tid:
+                    continue
+                if idx:
+                    st.markdown('<hr class="ips-todo-sep" />', unsafe_allow_html=True)
+                title = str(t.get("title") or "").strip() or "—"
+                priority = str(t.get("priority") or "Normal").strip() or "Normal"
+                status = str(t.get("status") or "Open").strip() or "Open"
+                due = str(t.get("due_date") or "").strip() or "—"
+                assigned_to = str(t.get("assigned_to") or "").strip()
+                assigned_lbl = id_to_label.get(assigned_to, "—")
+                is_terminal = _todo_is_terminal(status)
+                title_esc = html.escape(_todo_trunc(title, 80))
+                full_title_esc = html.escape(title)
+                asg_esc = html.escape(_todo_trunc(assigned_lbl, 28))
+                asg_full_esc = html.escape(assigned_lbl)
 
-        for t in rows:
-            tid = str(t.get("id") or "").strip()
-            if not tid:
-                continue
-            title = str(t.get("title") or "").strip() or "—"
-            priority = str(t.get("priority") or "Normal").strip() or "Normal"
-            status = str(t.get("status") or "Open").strip() or "Open"
-            due = str(t.get("due_date") or "").strip() or "—"
-            assigned_to = str(t.get("assigned_to") or "").strip()
-            assigned_lbl = id_to_label.get(assigned_to, "—")
-            is_terminal = _todo_is_terminal(status)
+                with st.container(border=False):
+                    c1, c2, c3, c4, c5, c6 = st.columns([2.15, 0.9, 0.72, 1.05, 0.95, 1.2], gap="small")
+                    with c1:
+                        st.markdown(
+                            f'<p class="ips-todo-title" title="{full_title_esc}">{title_esc}</p>',
+                            unsafe_allow_html=True,
+                        )
+                    with c2:
+                        st.markdown(_todo_pri_badge_html(priority), unsafe_allow_html=True)
+                    with c3:
+                        st.caption(due if due != "—" else "—")
+                    with c4:
+                        st.markdown(
+                            f'<span class="ips-todo-ellipsis" title="{asg_full_esc}">{asg_esc}</span>',
+                            unsafe_allow_html=True,
+                        )
+                    with c5:
+                        st.markdown(_todo_status_badge_html(status), unsafe_allow_html=True)
+                    with c6:
+                        a1, a2, a3, a4 = st.columns(4, gap="small")
+                        with a1:
+                            if st.button("View", key=f"dash_todo_v_{tid}", help="Details"):
+                                st.session_state["dash_todo_dlg_view"] = tid
+                                st.rerun()
+                        with a2:
+                            if st.button("Edit", key=f"dash_todo_e_{tid}", help="Edit task"):
+                                st.session_state["dash_todo_dlg_edit"] = tid
+                                st.rerun()
+                        with a3:
+                            if is_terminal:
+                                if st.button("Reopen", key=f"dash_todo_c_{tid}", help="Mark not complete"):
+                                    update_rows_admin(
+                                        "todos",
+                                        {"status": "Open", "completed_at": None},
+                                        {"id": tid},
+                                    )
+                                    clear_session_table_cache()
+                                    st.rerun()
+                            else:
+                                if st.button("Done", key=f"dash_todo_c_{tid}", help="Mark complete"):
+                                    update_rows_admin(
+                                        "todos",
+                                        {
+                                            "status": "Complete",
+                                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                                        },
+                                        {"id": tid},
+                                    )
+                                    clear_session_table_cache()
+                                    st.rerun()
+                        with a4:
+                            if st.button("Del", key=f"dash_todo_d_{tid}", help="Delete task"):
+                                st.session_state["dash_todo_dlg_del"] = tid
+                                st.rerun()
 
-            r1, r2, r3, r4, r5 = st.columns([0.55, 3.4, 1.1, 1.3, 1.7], gap="small")
-            with r1:
-                done = st.checkbox(" ", value=is_terminal, key=f"todo_done_{tid}")
-            with r2:
-                st.markdown(f"**{title}**")
-                if status and _todo_status_slug(status) != "open":
-                    st.caption(status)
-            with r3:
-                st.caption(priority)
-            with r4:
-                st.caption(due)
-            with r5:
-                st.caption(assigned_lbl)
-
-            if done and not is_terminal:
-                update_rows_admin(
-                    "todos",
-                    {"status": "Complete", "completed_at": datetime.now(timezone.utc).isoformat()},
-                    {"id": tid},
-                )
-                clear_session_table_cache()
-                st.rerun()
-            if not done and is_terminal:
-                update_rows_admin(
-                    "todos",
-                    {"status": "Open", "completed_at": None},
-                    {"id": tid},
-                )
-                clear_session_table_cache()
-                st.rerun()
-
-            with st.expander("Edit / details", expanded=False):
-                et = st.text_input("Title", value=title, key=f"todo_edit_title_{tid}")
-                ed = st.text_area("Description", value=str(t.get("description") or ""), key=f"todo_edit_desc_{tid}", height=72)
-                c1, c2, c3 = st.columns(3, gap="small")
-                due_s = c1.text_input("Due date (YYYY-MM-DD)", value="" if due == "—" else due, key=f"todo_edit_due_{tid}")
-                epri = c2.selectbox("Priority", list(_TODO_PRIORITIES), index=max(0, list(_TODO_PRIORITIES).index(priority)) if priority in _TODO_PRIORITIES else 1, key=f"todo_edit_pri_{tid}")
-                status_ix = list(_TODO_STATUSES).index(status) if status in _TODO_STATUSES else 0
-                estat = c3.selectbox("Status", list(_TODO_STATUSES), index=status_ix, key=f"todo_edit_status_{tid}")
-                assignee_opts = ["— Unassigned —"] + [id_to_label[i] for i in ordered_ids]
-                cur_assignee_lbl = id_to_label.get(assigned_to, "— Unassigned —") if assigned_to else "— Unassigned —"
-                assignee_label = st.selectbox("Assigned to", assignee_opts, index=max(0, assignee_opts.index(cur_assignee_lbl)) if cur_assignee_lbl in assignee_opts else 0, key=f"todo_edit_asg_{tid}")
-                new_assigned_to = None
-                if assignee_label and not assignee_label.startswith("—"):
-                    for pid, lbl in id_to_label.items():
-                        if lbl == assignee_label:
-                            new_assigned_to = pid
-                            break
-
-                b1, b2 = st.columns(2, gap="small")
-                with b1:
-                    if st.button("Save", type="primary", use_container_width=True, key=f"todo_save_{tid}"):
-                        new_status = str(estat or "Open").strip() or "Open"
-                        payload: dict = {
-                            "title": str(et or "").strip() or "—",
-                            "description": str(ed or "").strip() or None,
-                            "priority": str(epri or "Normal").strip() or "Normal",
-                            "status": new_status,
-                            "assigned_to": new_assigned_to,
-                        }
-                        ds = str(due_s or "").strip()
-                        payload["due_date"] = ds if ds else None
-                        if _todo_is_terminal(new_status):
-                            payload["completed_at"] = datetime.now(timezone.utc).isoformat()
-                        else:
-                            payload["completed_at"] = None
-                        update_rows_admin("todos", payload, {"id": tid})
-                        clear_session_table_cache()
-                        st.success("Saved.")
-                        st.rerun()
-                with b2:
-                    if st.button("Delete", type="secondary", use_container_width=True, key=f"todo_del_{tid}"):
-                        delete_rows_admin("todos", {"id": tid})
-                        clear_session_table_cache()
-                        st.success("Deleted.")
-                        st.rerun()
+        by_id = {str(x.get("id")): x for x in valid_todos if str(x.get("id") or "").strip()}
+        v = str(st.session_state.get("dash_todo_dlg_view") or "").strip()
+        e = str(st.session_state.get("dash_todo_dlg_edit") or "").strip()
+        d = str(st.session_state.get("dash_todo_dlg_del") or "").strip()
+        if v and v in by_id:
+            _dash_todo_view_dialog(row=dict(by_id[v]), id_to_label=id_to_label)
+        elif e and e in by_id:
+            _dash_todo_edit_dialog(
+                row=dict(by_id[e]),
+                id_to_label=id_to_label,
+                ordered_ids=ordered_ids,
+                me=me,
+            )
+        elif d and d in by_id:
+            _dash_todo_delete_dialog(tid=d, title=str(by_id[d].get("title") or "—"))
 
 
 def render() -> None:
