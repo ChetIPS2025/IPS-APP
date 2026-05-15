@@ -251,13 +251,16 @@ def render_contact_quick_add_when_empty(
             unsafe_allow_html=True,
         )
         st.caption("No contacts yet — add someone for this customer.")
-        n1 = st.text_input("Name", key=f"{key_prefix}_qc_name_{suf}")
-        n2 = st.text_input("Title", key=f"{key_prefix}_qc_title_{suf}", help="Job title or role")
-        n3 = st.text_input("Email", key=f"{key_prefix}_qc_email_{suf}")
-        n4 = st.text_input("Phone", key=f"{key_prefix}_qc_phone_{suf}")
-        n5 = st.text_input("Mobile", key=f"{key_prefix}_qc_mobile_{suf}")
-        prim = st.checkbox("Set as primary contact", value=True, key=f"{key_prefix}_qc_prim_{suf}")
-        if st.button("Save contact", type="primary", use_container_width=True, key=f"{key_prefix}_qc_save_{suf}"):
+        with st.form(f"{key_prefix}_qc_contact_form_{suf}"):
+            n1 = st.text_input("Name", key=f"{key_prefix}_qc_name_{suf}")
+            n2 = st.text_input("Title", key=f"{key_prefix}_qc_title_{suf}", help="Job title or role")
+            n3 = st.text_input("Email", key=f"{key_prefix}_qc_email_{suf}")
+            n4 = st.text_input("Phone", key=f"{key_prefix}_qc_phone_{suf}")
+            n5 = st.text_input("Mobile", key=f"{key_prefix}_qc_mobile_{suf}")
+            prim = st.checkbox("Set as primary contact", value=True, key=f"{key_prefix}_qc_prim_{suf}")
+            submitted = st.form_submit_button("Save contact", type="primary", use_container_width=True)
+
+        if submitted:
             t = str(n1 or "").strip()
             if not t:
                 st.error("Name is required.")

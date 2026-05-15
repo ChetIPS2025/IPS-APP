@@ -61,8 +61,8 @@ _IPS_GLOBAL_MOBILE_CSS = """
 [data-testid="stSidebar"],
 section[data-testid="stSidebar"],
 .stSidebar {
-  width: 260px !important;
-  min-width: 260px !important;
+  width: 234px !important;
+  min-width: 234px !important;
   background-color: #cbd5e1 !important;
   background: #cbd5e1 !important;
   color: #111827 !important;

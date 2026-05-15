@@ -64,10 +64,10 @@ def fetch_merged_materials_catalog_rows(
     fetch_table: Callable[..., list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     """
-    Single materials list for estimates and quote import matching.
+    Legacy merge of inventory **Materials** rows plus non-colliding ``materials_catalog`` keys.
 
-    Primary: ``inventory_items`` with ``category`` = Materials (case-insensitive).
-    Legacy: ``materials_catalog`` rows whose ``item_key`` does not collide with inventory-derived keys.
+    **Estimates / editor** use ``estimate_materials`` only (see ``estimate_materials_catalog``).
+    Kept for scripts or imports that still expect a merged list.
     """
     inv_rows: list[dict[str, Any]] = []
     try:

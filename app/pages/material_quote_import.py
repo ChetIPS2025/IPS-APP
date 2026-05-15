@@ -11,26 +11,26 @@ import streamlit as st
 try:
     from auth import current_profile, current_role
     from branding import render_header
-    from db import fetch_by_match_admin, fetch_table, insert_row_admin, update_rows_admin, upload_bytes
+    from db import fetch_by_match_admin, fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin, upload_bytes
     from services.material_quote_import import DEFAULT_MARKUP_PCT, compute_sell_price, extract_material_quote
     from services.materials_catalog_merge import (
         INVENTORY_MATERIALS_CATEGORY,
-        fetch_merged_materials_catalog_rows,
         inventory_row_to_material_catalog_shape,
         is_inventory_materials_category,
     )
+    from services.estimate_materials_catalog import fetch_estimate_materials_catalog_rows
     from services.qr_codes import allocate_unique_inventory_qr_value, inventory_qr_from_item_id
 except ImportError:
     from app.auth import current_profile, current_role  # type: ignore
     from app.branding import render_header  # type: ignore
-    from app.db import fetch_by_match_admin, fetch_table, insert_row_admin, update_rows_admin, upload_bytes  # type: ignore
+    from app.db import fetch_by_match_admin, fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin, upload_bytes  # type: ignore
     from app.services.material_quote_import import DEFAULT_MARKUP_PCT, compute_sell_price, extract_material_quote  # type: ignore
     from app.services.materials_catalog_merge import (  # type: ignore
         INVENTORY_MATERIALS_CATEGORY,
-        fetch_merged_materials_catalog_rows,
         inventory_row_to_material_catalog_shape,
         is_inventory_materials_category,
     )
+    from app.services.estimate_materials_catalog import fetch_estimate_materials_catalog_rows  # type: ignore
     from app.services.qr_codes import allocate_unique_inventory_qr_value, inventory_qr_from_item_id  # type: ignore
 
 
@@ -408,7 +408,10 @@ def render_material_quote_import_form(return_to_materials: bool = False) -> None
     Multi-file vendor quote upload, batch AI extraction, combined grid, import to
     ``material_quotes`` / ``material_quote_items`` / ``inventory_items`` (Materials).
     """
-    materials = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
+    materials = fetch_estimate_materials_catalog_rows(
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+    )
     cat_options, mat_options = _category_material_options(materials)
     inv_dup_keys = _inventory_dup_keys_materials()
     _ensure_session_defaults()

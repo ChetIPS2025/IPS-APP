@@ -387,79 +387,75 @@ def _add_customer_dialog(
         ),
     )
 
-    # --- body: compact groups (2 columns where it fits) ---
-    r0a, r0b = st.columns([2, 1], gap="small")
-    with r0a:
-        customer_name = st.text_input("Customer name", key="dlg_cust_add_name")
-    with r0b:
-        is_active_customer = st.checkbox("Active", value=True, key="dlg_cust_add_active")
+    with st.form("dlg_customer_add_form_v1", clear_on_submit=False):
+        r0a, r0b = st.columns([2, 1], gap="small")
+        with r0a:
+            customer_name = st.text_input("Customer name", key="dlg_cust_add_name")
+        with r0b:
+            is_active_customer = st.checkbox("Active", value=True, key="dlg_cust_add_active")
 
-    a1, a2 = st.columns(2, gap="small")
-    with a1:
-        address = st.text_input("Address", key="dlg_cust_add_addr")
-        city = st.text_input("City", key="dlg_cust_add_city")
-    with a2:
-        state = st.text_input("State", key="dlg_cust_add_state")
-        zip_code = st.text_input("ZIP", key="dlg_cust_add_zip")
+        a1, a2 = st.columns(2, gap="small")
+        with a1:
+            address = st.text_input("Address", key="dlg_cust_add_addr")
+            city = st.text_input("City", key="dlg_cust_add_city")
+        with a2:
+            state = st.text_input("State", key="dlg_cust_add_state")
+            zip_code = st.text_input("ZIP", key="dlg_cust_add_zip")
 
-    # --- footer: spacer | Cancel (secondary) | Save (primary), right-aligned ---
-    st.divider()
-    sp, fc, fs = st.columns([4, 1, 1], gap="small")
-    with sp:
-        st.empty()
-    with fc:
-        if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_cust_add_cancel"):
-            st.rerun()
-    with fs:
-        if st.button("Save", type="primary", use_container_width=True, key="dlg_cust_add_save"):
-            err = _validate_customer_name_text(customer_name)
-            if err:
-                st.error(err)
-                st.stop()
-            name_upper = str(customer_name).strip().upper()
-            if name_upper in existing_customer_names:
-                st.error("A customer with this name already exists.")
-                st.stop()
-            for label, val in (
-                ("Address", address),
-                ("City", city),
-                ("State", state),
-                ("ZIP", zip_code),
-            ):
-                ve = _validate_address_field(label, str(val))
-                if ve:
-                    st.error(ve)
-                    st.stop()
+        save = st.form_submit_button("Save", type="primary", use_container_width=True)
 
-            active_val: bool | None = bool(is_active_customer) if resolved["is_active"] in available else None
-            try:
-                payload = _build_customer_write_payload(
-                    customer_name=str(customer_name).strip(),
-                    address=str(address).strip(),
-                    city=str(city).strip(),
-                    state=str(state).strip(),
-                    zip_value=str(zip_code).strip(),
-                    is_active=active_val,
-                    resolved=resolved,
-                    available=available,
-                )
-                inserted = insert_row_admin("customers", payload)
-            except Exception as exc:
-                st.error(_friendly_customer_db_message(exc))
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+    if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_cust_add_cancel"):
+        st.rerun()
+
+    if save:
+        err = _validate_customer_name_text(customer_name)
+        if err:
+            st.error(err)
+            st.stop()
+        name_upper = str(customer_name).strip().upper()
+        if name_upper in existing_customer_names:
+            st.error("A customer with this name already exists.")
+            st.stop()
+        for label, val in (
+            ("Address", address),
+            ("City", city),
+            ("State", state),
+            ("ZIP", zip_code),
+        ):
+            ve = _validate_address_field(label, str(val))
+            if ve:
+                st.error(ve)
                 st.stop()
 
-            new_id = str((inserted or {}).get("id") or "").strip()
-            st.session_state.pop("customer_contact_mode", None)
-            st.session_state.pop("customer_contact_edit_id", None)
-            st.session_state.pop("customer_contact_selected_id", None)
-            if new_id:
-                st.session_state["customer_mode"] = "edit"
-                st.session_state["customer_edit_id"] = new_id
-                set_selected_ids(TABLE_KEY_CUSTOMERS, [new_id])
-            st.toast("Customer added.", icon="✅")
-            st.rerun()
+        active_val: bool | None = bool(is_active_customer) if resolved["is_active"] in available else None
+        try:
+            payload = _build_customer_write_payload(
+                customer_name=str(customer_name).strip(),
+                address=str(address).strip(),
+                city=str(city).strip(),
+                state=str(state).strip(),
+                zip_value=str(zip_code).strip(),
+                is_active=active_val,
+                resolved=resolved,
+                available=available,
+            )
+            inserted = insert_row_admin("customers", payload)
+        except Exception as exc:
+            st.error(_friendly_customer_db_message(exc))
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+            st.stop()
+
+        new_id = str((inserted or {}).get("id") or "").strip()
+        st.session_state.pop("customer_contact_mode", None)
+        st.session_state.pop("customer_contact_edit_id", None)
+        st.session_state.pop("customer_contact_selected_id", None)
+        if new_id:
+            st.session_state["customer_mode"] = "edit"
+            st.session_state["customer_edit_id"] = new_id
+            set_selected_ids(TABLE_KEY_CUSTOMERS, [new_id])
+        st.toast("Customer added.", icon="✅")
+        st.rerun()
 
 
 @st.dialog("Add Contact", width="small")
@@ -487,131 +483,125 @@ def _add_contact_dialog(
     )
     _ips_modal_header(subtitle=sub)
 
-    # --- body: compact groups (2 columns) ---
-    r1a, r1b = st.columns(2, gap="small")
-    with r1a:
-        cn = st.text_input("Contact name", key=f"{pk}_name")
-    with r1b:
-        tl = st.text_input(
-            "Title",
-            key=f"{pk}_title",
-            help="Job title or role (saved to title + role when supported)",
-        )
-    r2a, r2b = st.columns(2, gap="small")
-    with r2a:
-        em = st.text_input("Email", key=f"{pk}_email")
-    with r2b:
-        ph = st.text_input("Phone", key=f"{pk}_phone")
-    r3a, r3b = st.columns(2, gap="small")
-    with r3a:
-        mob = st.text_input("Mobile", key=f"{pk}_mobile")
-    with r3b:
-        nt = st.text_area("Notes", key=f"{pk}_notes", height=56)
-    r4a, r4b = st.columns(2, gap="small")
-    with r4a:
-        pr = st.checkbox("Primary contact", value=False, key=f"{pk}_prim")
-    with r4b:
-        act = st.checkbox("Active", value=True, key=f"{pk}_act")
-
-    # --- footer: spacer | Cancel (secondary) | Save (primary), right-aligned ---
-    st.divider()
-    sp, fc, fs = st.columns([4, 1, 1], gap="small")
-    with sp:
-        st.empty()
-    with fc:
-        if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
-            st.rerun()
-    with fs:
-        if st.button("Save", type="primary", use_container_width=True, key=f"{pk}_save"):
-            t = str(cn or "").strip()
-            if not t:
-                st.error("Contact name is required.")
-                st.stop()
-            pr_b = bool(pr)
-            act_b = bool(act)
-            if pr_b and not act_b:
-                st.warning("Inactive contacts cannot be primary — saving without primary flag.")
-                pr_b = False
-            full, minimal = _build_contact_write_pair(
-                contact_name=t,
-                title_text=str(tl or ""),
-                email=str(em or ""),
-                phone=str(ph or ""),
-                mobile=str(mob or ""),
-                notes=str(nt or ""),
-                is_active=act_b,
-                is_primary=False,
-                customer_id=cid,
-                schema_keys=schema_keys,
-                customer_location_id=str(customer_location_id).strip() if customer_location_id else None,
-                set_customer_location_id=set_customer_location_id,
+    with st.form(f"dlg_contact_add_form_{cid}_{loc_part}", clear_on_submit=False):
+        r1a, r1b = st.columns(2, gap="small")
+        with r1a:
+            cn = st.text_input("Contact name", key=f"{pk}_name")
+        with r1b:
+            tl = st.text_input(
+                "Title",
+                key=f"{pk}_title",
+                help="Job title or role (saved to title + role when supported)",
             )
-            try:
-                inserted = _insert_contact_pair(full, minimal)
-            except Exception as exc:
-                st.error("Could not save the contact.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
-                st.stop()
-            new_id = str((inserted or {}).get("id") or "")
-            if pr_b and new_id:
-                set_primary_contact(customer_id=cid, contact_id=new_id)
-            st.session_state.pop("customer_contact_mode", None)
-            st.session_state.pop("customer_contact_edit_id", None)
-            if new_id:
-                st.session_state["customer_contact_selected_id"] = new_id
-            st.toast("Contact added.", icon="✅")
-            st.rerun()
+        r2a, r2b = st.columns(2, gap="small")
+        with r2a:
+            em = st.text_input("Email", key=f"{pk}_email")
+        with r2b:
+            ph = st.text_input("Phone", key=f"{pk}_phone")
+        r3a, r3b = st.columns(2, gap="small")
+        with r3a:
+            mob = st.text_input("Mobile", key=f"{pk}_mobile")
+        with r3b:
+            nt = st.text_area("Notes", key=f"{pk}_notes", height=56)
+        r4a, r4b = st.columns(2, gap="small")
+        with r4a:
+            pr = st.checkbox("Primary contact", value=False, key=f"{pk}_prim")
+        with r4b:
+            act = st.checkbox("Active", value=True, key=f"{pk}_act")
+
+        save = st.form_submit_button("Save", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
+        st.rerun()
+
+    if save:
+        t = str(cn or "").strip()
+        if not t:
+            st.error("Contact name is required.")
+            st.stop()
+        pr_b = bool(pr)
+        act_b = bool(act)
+        if pr_b and not act_b:
+            st.warning("Inactive contacts cannot be primary — saving without primary flag.")
+            pr_b = False
+        full, minimal = _build_contact_write_pair(
+            contact_name=t,
+            title_text=str(tl or ""),
+            email=str(em or ""),
+            phone=str(ph or ""),
+            mobile=str(mob or ""),
+            notes=str(nt or ""),
+            is_active=act_b,
+            is_primary=False,
+            customer_id=cid,
+            schema_keys=schema_keys,
+            customer_location_id=str(customer_location_id).strip() if customer_location_id else None,
+            set_customer_location_id=set_customer_location_id,
+        )
+        try:
+            inserted = _insert_contact_pair(full, minimal)
+        except Exception as exc:
+            st.error("Could not save the contact.")
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+            st.stop()
+        new_id = str((inserted or {}).get("id") or "")
+        if pr_b and new_id:
+            set_primary_contact(customer_id=cid, contact_id=new_id)
+        st.session_state.pop("customer_contact_mode", None)
+        st.session_state.pop("customer_contact_edit_id", None)
+        if new_id:
+            st.session_state["customer_contact_selected_id"] = new_id
+        st.toast("Contact added.", icon="✅")
+        st.rerun()
 
 
 @st.dialog("Add Location", width="small")
 def _add_location_dialog(cid: str) -> None:
     pk = f"dlg_loc_{cid}"
     _ips_modal_header(subtitle="Job site / ship-to address for this customer")
-    nm = st.text_input("Location name", key=f"{pk}_name")
-    ad = st.text_input("Address", key=f"{pk}_addr")
-    r1a, r1b = st.columns(2, gap="small")
-    with r1a:
-        city = st.text_input("City", key=f"{pk}_city")
-        stt = st.text_input("State", key=f"{pk}_state")
-    with r1b:
-        zip_c = st.text_input("ZIP", key=f"{pk}_zip")
-    act = st.checkbox("Active", value=True, key=f"{pk}_act")
-    st.divider()
-    sp, fc, fs = st.columns([4, 1, 1], gap="small")
-    with sp:
-        st.empty()
-    with fc:
-        if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
-            st.rerun()
-    with fs:
-        if st.button("Save", type="primary", use_container_width=True, key=f"{pk}_save"):
-            t = str(nm or "").strip()
-            if not t:
-                st.error("Location name is required.")
-                st.stop()
-            try:
-                insert_row_admin(
-                    "customer_locations",
-                    {
-                        "customer_id": str(cid).strip(),
-                        "location_name": t,
-                        "address": str(ad or "").strip(),
-                        "city": str(city or "").strip(),
-                        "state": str(stt or "").strip(),
-                        "zip": str(zip_c or "").strip(),
-                        "is_active": bool(act),
-                    },
-                )
-            except Exception as exc:
-                st.error("Could not save the location.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
-                st.stop()
-            st.session_state.pop("customer_location_mode", None)
-            st.session_state.pop("customer_location_edit_id", None)
-            st.toast("Location added.", icon="✅")
-            st.rerun()
+    with st.form(f"dlg_location_add_form_{cid}", clear_on_submit=False):
+        nm = st.text_input("Location name", key=f"{pk}_name")
+        ad = st.text_input("Address", key=f"{pk}_addr")
+        r1a, r1b = st.columns(2, gap="small")
+        with r1a:
+            city = st.text_input("City", key=f"{pk}_city")
+            stt = st.text_input("State", key=f"{pk}_state")
+        with r1b:
+            zip_c = st.text_input("ZIP", key=f"{pk}_zip")
+        act = st.checkbox("Active", value=True, key=f"{pk}_act")
+        save = st.form_submit_button("Save", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel"):
+        st.rerun()
+
+    if save:
+        t = str(nm or "").strip()
+        if not t:
+            st.error("Location name is required.")
+            st.stop()
+        try:
+            insert_row_admin(
+                "customer_locations",
+                {
+                    "customer_id": str(cid).strip(),
+                    "location_name": t,
+                    "address": str(ad or "").strip(),
+                    "city": str(city or "").strip(),
+                    "state": str(stt or "").strip(),
+                    "zip": str(zip_c or "").strip(),
+                    "is_active": bool(act),
+                },
+            )
+        except Exception as exc:
+            st.error("Could not save the location.")
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+            st.stop()
+        st.session_state.pop("customer_location_mode", None)
+        st.session_state.pop("customer_location_edit_id", None)
+        st.toast("Location added.", icon="✅")
+        st.rerun()
 
 
 def _fetch_locations_for_customer_row(
@@ -869,47 +859,48 @@ def _render_locations_section(*, customer_row: dict, can_edit: bool, admin_read:
         st.markdown("**Edit location**")
         pk = f"cust_loc_ed_{edit_id}"
         er = edit_row
-        nm = st.text_input("Location name", value=str(er.get("location_name") or ""), key=f"{pk}_name")
-        ad = st.text_input("Address", value=str(er.get("address") or ""), key=f"{pk}_addr")
-        c1, c2 = st.columns(2)
-        with c1:
-            city = st.text_input("City", value=str(er.get("city") or ""), key=f"{pk}_city")
-            stt = st.text_input("State", value=str(er.get("state") or ""), key=f"{pk}_state")
-        with c2:
-            zp = st.text_input("ZIP", value=str(er.get("zip") or ""), key=f"{pk}_zip")
-        act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
-        s1, s2 = st.columns(2)
-        with s1:
-            if st.button("Update location", type="primary", use_container_width=True, key=f"{pk}_save"):
-                t = str(nm or "").strip()
-                if not t:
-                    st.error("Location name is required.")
-                    st.stop()
-                try:
-                    update_rows_admin(
-                        "customer_locations",
-                        {
-                            "location_name": t,
-                            "address": str(ad or "").strip(),
-                            "city": str(city or "").strip(),
-                            "state": str(stt or "").strip(),
-                            "zip": str(zp or "").strip(),
-                            "is_active": bool(act),
-                        },
-                        {"id": er["id"]},
-                    )
-                except Exception as exc:
-                    st.error("Could not update the location.")
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-                    st.stop()
-                _clear_location_subpanel()
-                st.success("Location updated.")
-                st.rerun()
-        with s2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                _clear_location_subpanel()
-                st.rerun()
+        with st.form(f"cust_location_edit_form_{edit_id}", clear_on_submit=False):
+            nm = st.text_input("Location name", value=str(er.get("location_name") or ""), key=f"{pk}_name")
+            ad = st.text_input("Address", value=str(er.get("address") or ""), key=f"{pk}_addr")
+            c1, c2 = st.columns(2)
+            with c1:
+                city = st.text_input("City", value=str(er.get("city") or ""), key=f"{pk}_city")
+                stt = st.text_input("State", value=str(er.get("state") or ""), key=f"{pk}_state")
+            with c2:
+                zp = st.text_input("ZIP", value=str(er.get("zip") or ""), key=f"{pk}_zip")
+            act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
+            submitted = st.form_submit_button("Update location", type="primary", use_container_width=True)
+
+        if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+            _clear_location_subpanel()
+            st.rerun()
+
+        if submitted:
+            t = str(nm or "").strip()
+            if not t:
+                st.error("Location name is required.")
+                st.stop()
+            try:
+                update_rows_admin(
+                    "customer_locations",
+                    {
+                        "location_name": t,
+                        "address": str(ad or "").strip(),
+                        "city": str(city or "").strip(),
+                        "state": str(stt or "").strip(),
+                        "zip": str(zp or "").strip(),
+                        "is_active": bool(act),
+                    },
+                    {"id": er["id"]},
+                )
+            except Exception as exc:
+                st.error("Could not update the location.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+            _clear_location_subpanel()
+            st.success("Location updated.")
+            st.rerun()
 
 
 def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: bool) -> None:
@@ -1115,64 +1106,65 @@ def _render_contacts_section(*, customer_row: dict, can_edit: bool, admin_read: 
         st.markdown("**Edit contact**")
         pk = f"cust_ct_ed_{edit_ct}"
         er = edit_row
-        cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
-        tl = st.text_input(
-            "Title",
-            value=_contact_title_display(er),
-            key=f"{pk}_title",
-            help="Job title or role",
-        )
-        em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
-        cph1, cph2 = st.columns(2)
-        with cph1:
-            ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
-        with cph2:
-            mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
-        nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
-        pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
-        act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
-        s1, s2 = st.columns(2)
-        with s1:
-            if st.button("Update contact", type="primary", use_container_width=True, key=f"{pk}_save"):
-                t = str(cn or "").strip()
-                if not t:
-                    st.error("Contact name is required.")
-                    st.stop()
-                pr_b = bool(pr)
-                act_b = bool(act)
-                if pr_b and not act_b:
-                    st.warning("Inactive contacts cannot be primary — clearing primary flag.")
-                    pr_b = False
-                full, minimal = _build_contact_write_pair(
-                    contact_name=t,
-                    title_text=str(tl or ""),
-                    email=str(em or ""),
-                    phone=str(ph or ""),
-                    mobile=str(mob or ""),
-                    notes=str(nt or ""),
-                    is_active=act_b,
-                    is_primary=pr_b,
-                    customer_id=None,
-                    schema_keys=schema_keys,
-                    customer_location_id=str(er.get("customer_location_id") or "").strip() or None,
-                    set_customer_location_id=True,
-                )
-                try:
-                    _update_contact_pair(str(er["id"]), full, minimal)
-                except Exception as exc:
-                    st.error("Could not update the contact.")
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-                    st.stop()
-                if pr_b:
-                    set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
-                _clear_contact_subpanel()
-                st.success("Contact updated.")
-                st.rerun()
-        with s2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                _clear_contact_subpanel()
-                st.rerun()
+        with st.form(f"cust_contact_edit_form_{edit_ct}", clear_on_submit=False):
+            cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
+            tl = st.text_input(
+                "Title",
+                value=_contact_title_display(er),
+                key=f"{pk}_title",
+                help="Job title or role",
+            )
+            em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
+            cph1, cph2 = st.columns(2)
+            with cph1:
+                ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
+            with cph2:
+                mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
+            nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
+            pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
+            act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
+            submitted = st.form_submit_button("Update contact", type="primary", use_container_width=True)
+
+        if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+            _clear_contact_subpanel()
+            st.rerun()
+
+        if submitted:
+            t = str(cn or "").strip()
+            if not t:
+                st.error("Contact name is required.")
+                st.stop()
+            pr_b = bool(pr)
+            act_b = bool(act)
+            if pr_b and not act_b:
+                st.warning("Inactive contacts cannot be primary — clearing primary flag.")
+                pr_b = False
+            full, minimal = _build_contact_write_pair(
+                contact_name=t,
+                title_text=str(tl or ""),
+                email=str(em or ""),
+                phone=str(ph or ""),
+                mobile=str(mob or ""),
+                notes=str(nt or ""),
+                is_active=act_b,
+                is_primary=pr_b,
+                customer_id=None,
+                schema_keys=schema_keys,
+                customer_location_id=str(er.get("customer_location_id") or "").strip() or None,
+                set_customer_location_id=True,
+            )
+            try:
+                _update_contact_pair(str(er["id"]), full, minimal)
+            except Exception as exc:
+                st.error("Could not update the contact.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+            if pr_b:
+                set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
+            _clear_contact_subpanel()
+            st.success("Contact updated.")
+            st.rerun()
 
 
 def _on_loc_contact_pick_changed(cid: str, lid: str, ctid: str, wkey: str) -> None:
@@ -1357,66 +1349,67 @@ def _render_location_contacts_block(
         st.markdown("**Edit site contact**")
         pk = f"lc_ed_{cid}_{lid}_{edit_ct}"
         er = edit_row
-        cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
-        tl = st.text_input(
-            "Title",
-            value=_contact_title_display(er),
-            key=f"{pk}_title",
-            help="Job title or role",
-        )
-        em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
-        cph1, cph2 = st.columns(2)
-        with cph1:
-            ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
-        with cph2:
-            mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
-        nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
-        pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
-        act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
-        s1, s2 = st.columns(2)
-        with s1:
-            if st.button("Update contact", type="primary", use_container_width=True, key=f"{pk}_save"):
-                t = str(cn or "").strip()
-                if not t:
-                    st.error("Contact name is required.")
-                    st.stop()
-                pr_b = bool(pr)
-                act_b = bool(act)
-                if pr_b and not act_b:
-                    st.warning("Inactive contacts cannot be primary — clearing primary flag.")
-                    pr_b = False
-                full, minimal = _build_contact_write_pair(
-                    contact_name=t,
-                    title_text=str(tl or ""),
-                    email=str(em or ""),
-                    phone=str(ph or ""),
-                    mobile=str(mob or ""),
-                    notes=str(nt or ""),
-                    is_active=act_b,
-                    is_primary=pr_b,
-                    customer_id=None,
-                    schema_keys=schema_keys,
-                    customer_location_id=lid,
-                    set_customer_location_id=True,
-                )
-                try:
-                    _update_contact_pair(str(er["id"]), full, minimal)
-                except Exception as exc:
-                    st.error("Could not update the contact.")
-                    with st.expander("Technical details"):
-                        st.code(repr(exc), language="text")
-                    st.stop()
-                if pr_b:
-                    set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
-                st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
-                st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
-                st.success("Contact updated.")
-                st.rerun()
-        with s2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
-                st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
-                st.rerun()
+        with st.form(f"cust_site_contact_edit_form_{cid}_{lid}_{edit_ct}", clear_on_submit=False):
+            cn = st.text_input("Contact name", value=str(er.get("contact_name") or ""), key=f"{pk}_name")
+            tl = st.text_input(
+                "Title",
+                value=_contact_title_display(er),
+                key=f"{pk}_title",
+                help="Job title or role",
+            )
+            em = st.text_input("Email", value=str(er.get("email") or ""), key=f"{pk}_email")
+            cph1, cph2 = st.columns(2)
+            with cph1:
+                ph = st.text_input("Phone", value=str(er.get("phone") or ""), key=f"{pk}_phone")
+            with cph2:
+                mob = st.text_input("Mobile", value=str(er.get("mobile") or ""), key=f"{pk}_mobile")
+            nt = st.text_area("Notes", value=str(er.get("notes") or ""), height=56, key=f"{pk}_notes")
+            pr = st.checkbox("Primary contact", value=bool(er.get("is_primary")), key=f"{pk}_prim")
+            act = st.checkbox("Active", value=bool(er.get("is_active", True)), key=f"{pk}_act")
+            submitted = st.form_submit_button("Update contact", type="primary", use_container_width=True)
+
+        if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+            st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
+            st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
+            st.rerun()
+
+        if submitted:
+            t = str(cn or "").strip()
+            if not t:
+                st.error("Contact name is required.")
+                st.stop()
+            pr_b = bool(pr)
+            act_b = bool(act)
+            if pr_b and not act_b:
+                st.warning("Inactive contacts cannot be primary — clearing primary flag.")
+                pr_b = False
+            full, minimal = _build_contact_write_pair(
+                contact_name=t,
+                title_text=str(tl or ""),
+                email=str(em or ""),
+                phone=str(ph or ""),
+                mobile=str(mob or ""),
+                notes=str(nt or ""),
+                is_active=act_b,
+                is_primary=pr_b,
+                customer_id=None,
+                schema_keys=schema_keys,
+                customer_location_id=lid,
+                set_customer_location_id=True,
+            )
+            try:
+                _update_contact_pair(str(er["id"]), full, minimal)
+            except Exception as exc:
+                st.error("Could not update the contact.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+                st.stop()
+            if pr_b:
+                set_primary_contact(customer_id=cid, contact_id=str(er["id"]))
+            st.session_state.pop(f"lc_mode_{cid}_{lid}", None)
+            st.session_state.pop(f"lc_edit_{cid}_{lid}", None)
+            st.success("Contact updated.")
+            st.rerun()
 
 
 def _render_edit_form(
@@ -1432,90 +1425,91 @@ def _render_edit_form(
     pk = f"cust_ed_{cid}"
 
     st.markdown("##### Company")
-    c1 = st.columns(1)[0]
-    en = c1.text_input(
-        "Customer Name",
-        value=_get_customer_field(row, "customer_name", resolved),
-        key=f"{pk}_name",
-    )
+    with st.form(f"cust_customer_edit_form_{cid}", clear_on_submit=False):
+        c1 = st.columns(1)[0]
+        en = c1.text_input(
+            "Customer Name",
+            value=_get_customer_field(row, "customer_name", resolved),
+            key=f"{pk}_name",
+        )
 
-    c5, c6, c7, c8 = st.columns(4)
-    eaddr = c5.text_input(
-        "Address",
-        value=_get_customer_field(row, "address", resolved),
-        key=f"{pk}_addr",
-    )
-    ecity = c6.text_input(
-        "City",
-        value=_get_customer_field(row, "city", resolved),
-        key=f"{pk}_city",
-    )
-    est = c7.text_input(
-        "State",
-        value=_get_customer_field(row, "state", resolved),
-        key=f"{pk}_state",
-    )
-    ezip = c8.text_input(
-        "ZIP",
-        value=_get_customer_field(row, "zip", resolved),
-        key=f"{pk}_zip",
-    )
+        c5, c6, c7, c8 = st.columns(4)
+        eaddr = c5.text_input(
+            "Address",
+            value=_get_customer_field(row, "address", resolved),
+            key=f"{pk}_addr",
+        )
+        ecity = c6.text_input(
+            "City",
+            value=_get_customer_field(row, "city", resolved),
+            key=f"{pk}_city",
+        )
+        est = c7.text_input(
+            "State",
+            value=_get_customer_field(row, "state", resolved),
+            key=f"{pk}_state",
+        )
+        ezip = c8.text_input(
+            "ZIP",
+            value=_get_customer_field(row, "zip", resolved),
+            key=f"{pk}_zip",
+        )
 
-    if resolved["is_active"] in row:
-        default_active = bool(row.get(resolved["is_active"], True))
-    elif "is_active" in row:
-        default_active = bool(row.get("is_active", True))
-    else:
-        default_active = True
+        if resolved["is_active"] in row:
+            default_active = bool(row.get(resolved["is_active"], True))
+        elif "is_active" in row:
+            default_active = bool(row.get("is_active", True))
+        else:
+            default_active = True
 
-    ea = st.checkbox("Active", value=default_active, key=f"{pk}_active")
+        ea = st.checkbox("Active", value=default_active, key=f"{pk}_active")
+        submitted = st.form_submit_button("Update Customer", type="primary", use_container_width=True)
+
     if resolved["is_active"] not in available:
         st.caption("Note: this database has no `is_active` column; the Active toggle is shown for reference only.")
 
-    u1, u2 = st.columns(2)
-    with u1:
-        if st.button("Update Customer", type="primary", use_container_width=True, key=f"{pk}_save"):
-            err = _validate_customer_name_text(en)
-            if err:
-                st.error(err)
-                st.stop()
-            for label, val in (
-                ("Address", eaddr),
-                ("City", ecity),
-                ("State", est),
-                ("ZIP", ezip),
-            ):
-                ve = _validate_address_field(label, str(val))
-                if ve:
-                    st.error(ve)
-                    st.stop()
+    if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
+        _clear_customer_mode()
+        st.rerun()
 
-            active_val: bool | None = bool(ea) if resolved["is_active"] in available else None
-            try:
-                payload = _build_customer_write_payload(
-                    customer_name=str(en).strip(),
-                    address=str(eaddr).strip(),
-                    city=str(ecity).strip(),
-                    state=str(est).strip(),
-                    zip_value=str(ezip).strip(),
-                    is_active=active_val,
-                    resolved=resolved,
-                    available=available,
-                )
-                update_rows_admin("customers", payload, {"id": row["id"]})
-            except Exception as exc:
-                st.error(_friendly_customer_db_message(exc))
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+    if submitted:
+        err = _validate_customer_name_text(en)
+        if err:
+            st.error(err)
+            st.stop()
+        for label, val in (
+            ("Address", eaddr),
+            ("City", ecity),
+            ("State", est),
+            ("ZIP", ezip),
+        ):
+            ve = _validate_address_field(label, str(val))
+            if ve:
+                st.error(ve)
                 st.stop()
 
-            _clear_customer_mode()
-            st.success("Customer updated.")
-            st.rerun()
-    with u2:
-        if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-            _clear_customer_mode()
-            st.rerun()
+        active_val: bool | None = bool(ea) if resolved["is_active"] in available else None
+        try:
+            payload = _build_customer_write_payload(
+                customer_name=str(en).strip(),
+                address=str(eaddr).strip(),
+                city=str(ecity).strip(),
+                state=str(est).strip(),
+                zip_value=str(ezip).strip(),
+                is_active=active_val,
+                resolved=resolved,
+                available=available,
+            )
+            update_rows_admin("customers", payload, {"id": row["id"]})
+        except Exception as exc:
+            st.error(_friendly_customer_db_message(exc))
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+            st.stop()
+
+        _clear_customer_mode()
+        st.success("Customer updated.")
+        st.rerun()
 
     st.markdown("---")
     _render_contacts_section(customer_row=row, can_edit=can_edit, admin_read=admin_read)

@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+"""
+Estimate editor: subsection saves use ``st.form`` / ``st.form_submit_button`` where practical.
+
+The primary **Save Estimate** control stays a standalone ``st.button`` because Streamlit does not allow
+nested ``st.form`` blocks; this module already nests multiple forms (materials, labor, equipment, travel, …).
+"""
+
 import json
 import logging
 import re
@@ -72,7 +79,10 @@ from app.estimate.equipment import (
     _equipment_core_with_picker_labels,
     _equipment_rows_core_for_editor,
 )
-from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
+try:
+    from services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
+except ImportError:
+    from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows  # type: ignore
 from app.estimate.job_scope import (
     bump_scope_edit_clock,
     ensure_scope_widgets_bound,
@@ -110,12 +120,6 @@ except ImportError:
 _LOG = logging.getLogger(__name__)
 
 
-@st.cache_data(ttl=120, show_spinner=False)
-def _cached_merged_materials_catalog_rows() -> list[dict[str, Any]]:
-    """Cache merged materials (inventory Materials + legacy catalog) to avoid refetch every rerun."""
-    return fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
-
-
 def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str]) -> list[dict]:
     """
     Build rows with only ``item`` + ``qty`` for ``st.data_editor``.
@@ -149,13 +153,13 @@ def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str
 
 
 def _materials_catalog_to_add_dataframe(materials_catalog: list[dict[str, Any]]) -> pd.DataFrame:
-    """Normalize merged catalog to a deduped, sorted frame for category → material cascading."""
+    """Normalize ``estimate_materials`` catalog rows for category → material cascading."""
     rows: list[dict[str, Any]] = []
     for m in materials_catalog:
         if not isinstance(m, dict):
             continue
         src = str(m.get("_source") or "")
-        if src not in ("", "inventory_items", "materials_catalog"):
+        if src != "estimate_materials":
             continue
         ik = str(m.get("item_key") or "").strip()
         if not ik:
@@ -175,7 +179,7 @@ def _materials_catalog_to_add_dataframe(materials_catalog: list[dict[str, Any]])
                 "unit": str(m.get("unit") or "").strip(),
                 "vendor_item_number": str(m.get("vendor_item_number") or "").strip(),
                 "inventory_id": str(m.get("inventory_id") or "").strip(),
-                "source": src or "materials_catalog",
+                "source": "estimate_materials",
             }
         )
     cols = [
@@ -438,7 +442,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     with perf_span("editor.fetch_jobs"):
         jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=600, order_by="job_number")
     with perf_span("editor.fetch_materials_catalog"):
-        materials_catalog = _cached_merged_materials_catalog_rows()
+        materials_catalog = cached_estimate_materials_catalog_rows()
     with perf_span("editor.fetch_labor_rates"):
         labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     with perf_span("editor.fetch_equipment_pricing"):
@@ -1005,7 +1009,13 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         est.setdefault("materials", [])
         controls = est.get("controls", {}) or {}
         material_markup_dec = _dec(controls.get("material_markup_pct", 0) or 0)
-        material_map = {m.get("item_key"): m for m in materials_catalog if isinstance(m, dict) and m.get("item_key")}
+        material_map = {
+            m.get("item_key"): m
+            for m in materials_catalog
+            if isinstance(m, dict)
+            and m.get("item_key")
+            and str(m.get("_source") or "") == "estimate_materials"
+        }
 
         materials_df = materials_df_all
         cats_sorted = (
@@ -1045,6 +1055,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             st.session_state.get("selected_material"),
         )
 
+        ma1, ma2, ma3 = st.columns([0.58, 1.0, 2.42], gap="medium")
         with ma1:
             cat_ix = (
                 cat_options.index(str(st.session_state.get("selected_material_category") or "All"))

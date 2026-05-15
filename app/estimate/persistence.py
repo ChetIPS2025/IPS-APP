@@ -11,6 +11,7 @@ from db import (
     fetch_by_match_admin,
     fetch_one,
     fetch_table,
+    fetch_table_admin,
     insert_row_admin,
     next_quote_number,
     quote_number_in_use,
@@ -28,7 +29,7 @@ from app.estimate.defaults import (
     _payload_prepared_by_for_db,
 )
 from app.estimate.equipment import load_estimate_equipment_from_assets
-from app.services.materials_catalog_merge import fetch_merged_materials_catalog_rows
+from app.services.estimate_materials_catalog import fetch_estimate_materials_catalog_rows
 
 _LOG = logging.getLogger(__name__)
 
@@ -250,7 +251,10 @@ def insert_imported_estimate(
     Returns (estimate_id, note_suffix) where note_suffix describes quote# reassignment if any.
     """
     est = dict(est)
-    materials_catalog = fetch_merged_materials_catalog_rows(fetch_table=fetch_table)
+    materials_catalog = fetch_estimate_materials_catalog_rows(
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+    )
     labor_rates = fetch_table("labor_rates", limit=1000, order_by="classification")
     equipment_pricing = load_estimate_equipment_from_assets()
     totals = compute_totals(est, materials_catalog, labor_rates, equipment_pricing)
