@@ -68,18 +68,16 @@ except ImportError:
 
 try:
     from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
 except ImportError:
     from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 _TABLE = "inventory_items"
 _INV_DELETE_PREFIX = "inventory_supplies_delete"
@@ -97,6 +95,166 @@ def _money(v) -> str:
 def _clear_inventory_panel() -> None:
     st.session_state.pop("inv_panel_mode", None)
     st.session_state.pop("inv_panel_id", None)
+
+
+def _inv_supplies_add_on_dismiss() -> None:
+    _clear_inventory_panel()
+
+
+def _inv_supplies_edit_on_dismiss() -> None:
+    _clear_inventory_panel()
+
+
+@st.dialog("Add inventory item", width="large", on_dismiss=_inv_supplies_add_on_dismiss)
+def _inv_supplies_add_dialog() -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    st.markdown("### Add inventory item")
+    with st.container(border=True):
+        with st.form("inv_supplies_add_dlg_f", clear_on_submit=True):
+            t1 = st.text_input("Item name", key="inv_add_name")
+            c1, c2 = st.columns(2)
+            category = c1.text_input("Category", key="inv_add_cat", placeholder="e.g. Fasteners, PPE, Office")
+            unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
+
+            r1, r2, r3 = st.columns(3)
+            qty = r1.number_input(
+                "Quantity on hand", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_qty"
+            )
+            reorder = r2.number_input(
+                "Reorder point", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_reorder"
+            )
+            unit_cost = r3.number_input(
+                "Unit cost (optional)",
+                min_value=0.0,
+                value=0.0,
+                step=0.01,
+                format="%.2f",
+                key="inv_add_cost",
+            )
+
+            v1, v2 = st.columns(2)
+            vendor = v1.text_input("Vendor", key="inv_add_vendor")
+            location = v2.text_input("Storage location", key="inv_add_loc")
+
+            notes = st.text_area("Notes", key="inv_add_notes", height=72)
+            is_active = st.checkbox("Active", value=True, key="inv_add_active")
+            submitted = st.form_submit_button("Create item", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key="inv_supplies_add_cancel_dlg"):
+        _clear_inventory_panel()
+        st.rerun()
+
+    if submitted:
+        name = str(t1 or "").strip()
+        if not name:
+            st.error("Item name is required.")
+            return
+        payload = {
+            "item_name": name,
+            "category": str(category or "").strip(),
+            "unit": str(unit or "").strip() or "EA",
+            "quantity_on_hand": float(qty or 0),
+            "reorder_point": float(reorder or 0),
+            "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
+            "vendor": str(vendor or "").strip(),
+            "storage_location": str(location or "").strip(),
+            "notes": str(notes or "").strip(),
+            "is_active": bool(is_active),
+        }
+        try:
+            insert_row_admin(_TABLE, payload)
+        except Exception as exc:
+            st.error(f"Could not save: {exc}")
+            return
+        _clear_inventory_panel()
+        st.success("Item added.")
+        st.rerun()
+
+
+@st.dialog("Edit inventory item", width="large", on_dismiss=_inv_supplies_edit_on_dismiss)
+def _inv_supplies_edit_dialog(row: dict) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    rid = str(row.get("id") or "")
+    pk = f"inv_ed_{rid}"
+    st.markdown("### Edit inventory item")
+    st.caption(f"ID `{rid[:8]}…`")
+    with st.container(border=True):
+        with st.form(f"inv_supplies_edit_dlg_{rid}", clear_on_submit=False):
+            t1 = st.text_input("Item name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
+            c1, c2 = st.columns(2)
+            category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
+            unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
+
+            r1, r2, r3 = st.columns(3)
+            qty = r1.number_input(
+                "Quantity on hand",
+                min_value=0.0,
+                value=float(row.get("quantity_on_hand") or 0),
+                step=1.0,
+                format="%.2f",
+                key=f"{pk}_qty",
+            )
+            reorder = r2.number_input(
+                "Reorder point",
+                min_value=0.0,
+                value=float(row.get("reorder_point") or 0),
+                step=1.0,
+                format="%.2f",
+                key=f"{pk}_reorder",
+            )
+            uc_val = row.get("unit_cost")
+            try:
+                uc_default = float(uc_val) if uc_val is not None and str(uc_val).strip() != "" else 0.0
+            except (TypeError, ValueError):
+                uc_default = 0.0
+            unit_cost = r3.number_input(
+                "Unit cost (optional)",
+                min_value=0.0,
+                value=uc_default,
+                step=0.01,
+                format="%.2f",
+                key=f"{pk}_cost",
+            )
+
+            v1, v2 = st.columns(2)
+            vendor = v1.text_input("Vendor", value=str(row.get("vendor") or ""), key=f"{pk}_vendor")
+            location = v2.text_input("Storage location", value=str(row.get("storage_location") or ""), key=f"{pk}_loc")
+
+            notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
+            is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
+            submitted = st.form_submit_button("Save", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel_dlg"):
+        _clear_inventory_panel()
+        st.rerun()
+
+    if submitted:
+        name = str(t1 or "").strip()
+        if not name:
+            st.error("Item name is required.")
+            return
+        payload = {
+            "item_name": name,
+            "category": str(category or "").strip(),
+            "unit": str(unit or "").strip() or "EA",
+            "quantity_on_hand": float(qty or 0),
+            "reorder_point": float(reorder or 0),
+            "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
+            "vendor": str(vendor or "").strip(),
+            "storage_location": str(location or "").strip(),
+            "notes": str(notes or "").strip(),
+            "is_active": bool(is_active),
+        }
+        try:
+            update_rows_admin(_TABLE, payload, {"id": row["id"]})
+        except Exception as exc:
+            st.error(f"Could not update: {exc}")
+            return
+        _clear_inventory_panel()
+        st.success("Item updated.")
+        st.rerun()
 
 
 def _row_is_low_stock(row: dict) -> bool:
@@ -165,154 +323,6 @@ def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
             ):
                 open_destructive_confirmation(_INV_DELETE_PREFIX)
                 st.session_state["inv_pending_delete_ids"] = [str(x) for x in sel]
-                st.rerun()
-
-
-def _render_add_form() -> None:
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Add inventory item")
-
-        t1 = st.text_input("Item name", key="inv_add_name")
-        c1, c2 = st.columns(2)
-        category = c1.text_input("Category", key="inv_add_cat", placeholder="e.g. Fasteners, PPE, Office")
-        unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
-
-        r1, r2, r3 = st.columns(3)
-        qty = r1.number_input("Quantity on hand", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_qty")
-        reorder = r2.number_input("Reorder point", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_reorder")
-        unit_cost = r3.number_input(
-            "Unit cost (optional)",
-            min_value=0.0,
-            value=0.0,
-            step=0.01,
-            format="%.2f",
-            key="inv_add_cost",
-        )
-
-        v1, v2 = st.columns(2)
-        vendor = v1.text_input("Vendor", key="inv_add_vendor")
-        location = v2.text_input("Storage location", key="inv_add_loc")
-
-        notes = st.text_area("Notes", key="inv_add_notes", height=72)
-        is_active = st.checkbox("Active", value=True, key="inv_add_active")
-
-        u1, u2 = st.columns(2)
-        with u1:
-            if st.button("Save Item", type="primary", use_container_width=True, key="inv_add_save"):
-                name = str(t1 or "").strip()
-                if not name:
-                    st.error("Item name is required.")
-                    st.stop()
-                payload = {
-                    "item_name": name,
-                    "category": str(category or "").strip(),
-                    "unit": str(unit or "").strip() or "EA",
-                    "quantity_on_hand": float(qty or 0),
-                    "reorder_point": float(reorder or 0),
-                    "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
-                    "vendor": str(vendor or "").strip(),
-                    "storage_location": str(location or "").strip(),
-                    "notes": str(notes or "").strip(),
-                    "is_active": bool(is_active),
-                }
-                try:
-                    insert_row_admin(_TABLE, payload)
-                except Exception as exc:
-                    st.error(f"Could not save: {exc}")
-                    st.stop()
-                _clear_inventory_panel()
-                st.success("Item added.")
-                st.rerun()
-        with u2:
-            if st.button("Cancel", use_container_width=True, key="inv_add_cancel"):
-                _clear_inventory_panel()
-                st.rerun()
-
-
-def _render_edit_form(row: dict) -> None:
-    inject_ips_crud_list_styles()
-    rid = str(row.get("id") or "")
-    pk = f"inv_ed_{rid}"
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Edit inventory item")
-        st.caption(f"ID `{rid[:8]}…`")
-
-        t1 = st.text_input("Item name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
-        c1, c2 = st.columns(2)
-        category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
-        unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
-
-        r1, r2, r3 = st.columns(3)
-        qty = r1.number_input(
-            "Quantity on hand",
-            min_value=0.0,
-            value=float(row.get("quantity_on_hand") or 0),
-            step=1.0,
-            format="%.2f",
-            key=f"{pk}_qty",
-        )
-        reorder = r2.number_input(
-            "Reorder point",
-            min_value=0.0,
-            value=float(row.get("reorder_point") or 0),
-            step=1.0,
-            format="%.2f",
-            key=f"{pk}_reorder",
-        )
-        uc_val = row.get("unit_cost")
-        try:
-            uc_default = float(uc_val) if uc_val is not None and str(uc_val).strip() != "" else 0.0
-        except (TypeError, ValueError):
-            uc_default = 0.0
-        unit_cost = r3.number_input(
-            "Unit cost (optional)",
-            min_value=0.0,
-            value=uc_default,
-            step=0.01,
-            format="%.2f",
-            key=f"{pk}_cost",
-        )
-
-        v1, v2 = st.columns(2)
-        vendor = v1.text_input("Vendor", value=str(row.get("vendor") or ""), key=f"{pk}_vendor")
-        location = v2.text_input("Storage location", value=str(row.get("storage_location") or ""), key=f"{pk}_loc")
-
-        notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
-        is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
-
-        u1, u2 = st.columns(2)
-        with u1:
-            if st.button("Update Item", type="primary", use_container_width=True, key=f"{pk}_save"):
-                name = str(t1 or "").strip()
-                if not name:
-                    st.error("Item name is required.")
-                    st.stop()
-                payload = {
-                    "item_name": name,
-                    "category": str(category or "").strip(),
-                    "unit": str(unit or "").strip() or "EA",
-                    "quantity_on_hand": float(qty or 0),
-                    "reorder_point": float(reorder or 0),
-                    "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
-                    "vendor": str(vendor or "").strip(),
-                    "storage_location": str(location or "").strip(),
-                    "notes": str(notes or "").strip(),
-                    "is_active": bool(is_active),
-                }
-                try:
-                    update_rows_admin(_TABLE, payload, {"id": row["id"]})
-                except Exception as exc:
-                    st.error(f"Could not update: {exc}")
-                    st.stop()
-                _clear_inventory_panel()
-                st.success("Item updated.")
-                st.rerun()
-        with u2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                _clear_inventory_panel()
                 st.rerun()
 
 
@@ -550,19 +560,9 @@ def render() -> None:
             panel_mode = None
             panel_id = None
 
-    panel_open = bool(
-        (panel_mode == "add" and can_edit)
-        or (panel_mode == "edit" and can_edit and panel_row is not None)
-    )
+    _render_inventory_main(df=df, rows=rows, can_edit=can_edit)
 
-    if panel_open:
-        main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        with main_col:
-            _render_inventory_main(df=df, rows=rows, can_edit=can_edit)
-        with side_col:
-            if panel_mode == "add":
-                _render_add_form()
-            elif panel_mode == "edit" and panel_row:
-                _render_edit_form(panel_row)
-    else:
-        _render_inventory_main(df=df, rows=rows, can_edit=can_edit)
+    if panel_mode == "add" and can_edit:
+        _inv_supplies_add_dialog()
+    elif panel_mode == "edit" and can_edit and panel_row is not None:
+        _inv_supplies_edit_dialog(dict(panel_row))

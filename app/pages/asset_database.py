@@ -69,8 +69,10 @@ except ImportError:
 
 try:
     from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
 except ImportError:
     from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
 _ADB_TOP_ACTIONS_CSS_KEY = "ips_asset_db_top_actions_css_injected"
@@ -301,12 +303,14 @@ def _inject_asset_side_panel_css() -> None:
     )
 
 
-def _render_asset_panel_view(row: dict) -> None:
+def _render_asset_panel_view(row: dict, *, use_side_panel_style: bool = True) -> None:
     can_edit = current_role() in {"admin", "pm"}
-    _inject_asset_side_panel_css()
+    if use_side_panel_style:
+        _inject_asset_side_panel_css()
     with st.container(border=True):
-        st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### View asset")
+        if use_side_panel_style:
+            st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
+            st.markdown("### View asset")
         c_img, c_txt = st.columns([1, 2])
         with c_img:
             _render_asset_list_thumbnail(row)
@@ -333,7 +337,7 @@ def _render_asset_panel_view(row: dict) -> None:
                 st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                 st.rerun()
         with b2:
-            if st.button("Close", use_container_width=True, key="adb_panel_close_view"):
+            if st.button("Close", type="secondary", use_container_width=True, key="adb_panel_close_view"):
                 _clear_asset_panel()
                 st.rerun()
 
@@ -916,15 +920,17 @@ def _render_asset_panel_edit(
     can_add: bool,
     job_options: dict[str, str | None],
     job_label_by_id: dict,
+    use_side_panel_style: bool = True,
 ) -> None:
     if not can_add:
         st.warning("You do not have permission to edit assets.")
-        if st.button("Close", use_container_width=True, key="adb_panel_close_edit_ro"):
+        if st.button("Close", type="secondary", use_container_width=True, key="adb_panel_close_edit_ro"):
             _clear_asset_panel()
             st.rerun()
         return
 
-    _inject_asset_side_panel_css()
+    if use_side_panel_style:
+        _inject_asset_side_panel_css()
     rid = str(row.get("id") or "")
 
     def cv(field: str, default=""):
@@ -940,8 +946,9 @@ def _render_asset_panel_edit(
         return f"adb_p_{rid}_{s}"
 
     with st.container(border=True):
-        st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Edit asset")
+        if use_side_panel_style:
+            st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
+            st.markdown("### Edit asset")
         # Business asset id (e.g. EQCAT-…) kept for save payload — not shown in the UI.
         asset_id = str(cv("asset_id") or "").strip()
 
@@ -1034,7 +1041,7 @@ def _render_asset_panel_edit(
 
         u1, u2 = st.columns(2)
         with u1:
-            if st.button("Update Asset", type="primary", use_container_width=True, key=pk("save")):
+            if st.button("Save", type="primary", use_container_width=True, key=pk("save")):
                 if not str(asset_name).strip():
                     st.error("Asset Name required")
                     st.stop()
@@ -1078,9 +1085,39 @@ def _render_asset_panel_edit(
                     else:
                         st.error(f"Could not update: {exc}")
         with u2:
-            if st.button("Close", use_container_width=True, key=pk("close")):
+            if st.button("Cancel", type="secondary", use_container_width=True, key=pk("close")):
                 _clear_asset_panel()
                 st.rerun()
+
+
+def _adb_asset_panel_dialog_dismiss() -> None:
+    _clear_asset_panel()
+
+
+@st.dialog("View asset", width="large", on_dismiss=_adb_asset_panel_dialog_dismiss)
+def _asset_database_view_dialog(row: dict) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    _render_asset_panel_view(dict(row), use_side_panel_style=False)
+
+
+@st.dialog("Edit asset", width="large", on_dismiss=_adb_asset_panel_dialog_dismiss)
+def _asset_database_edit_dialog(
+    row: dict,
+    *,
+    can_add: bool,
+    job_options: dict[str, str | None],
+    job_label_by_id: dict,
+) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    _render_asset_panel_edit(
+        dict(row),
+        can_add=can_add,
+        job_options=job_options,
+        job_label_by_id=job_label_by_id,
+        use_side_panel_style=False,
+    )
 
 
 _ASSET_DB_LIST_CSS = """
@@ -1489,25 +1526,6 @@ def render() -> None:
             panel_mode = None
             panel_id = None
 
-    edit_only = bool(panel_row and str(panel_mode or "") == "edit")
-
-    if edit_only:
-        jobs_raw = fetch_table("jobs", limit=5000, order_by="job_number")
-        jobs = sort_jobs_by_number_then_name(jobs_raw)
-        job_label_by_id = {str(j.get("id")): job_row_select_label(j) for j in jobs if j.get("id")}
-        job_options = {
-            job_row_select_label(j): j.get("id")
-            for j in jobs
-            if job_row_select_label(j) and job_row_select_label(j) != "—"
-        }
-        _render_asset_panel_edit(
-            panel_row,
-            can_add=can_add,
-            job_options=job_options,
-            job_label_by_id=job_label_by_id,
-        )
-        return
-
     rows = fetch_table("assets", limit=5000, order_by="asset_name")
     jobs_raw = fetch_table("jobs", limit=5000, order_by="job_number")
     jobs = sort_jobs_by_number_then_name(jobs_raw)
@@ -1522,8 +1540,6 @@ def render() -> None:
     except Exception:
         emp_rows = []
     emp_by_id = {str(e["id"]): str(e.get("name") or "").strip() for e in emp_rows if e.get("id")}
-
-    panel_open = bool(panel_row and panel_mode in ("view", "edit"))
 
     df = prepare_assets_dataframe(rows)
 
@@ -1825,32 +1841,15 @@ def render() -> None:
                 emp_by_id=emp_by_id,
             )
 
-    if panel_open and panel_row is not None:
-        stack_panel = st.session_state.get("ips_viewport_narrow") is True
-        if stack_panel:
-            _render_main_column()
-            if panel_mode == "view":
-                _render_asset_panel_view(panel_row)
-            else:
-                _render_asset_panel_edit(
-                    panel_row,
-                    can_add=can_add,
-                    job_options=job_options,
-                    job_label_by_id=job_label_by_id,
-                )
-        else:
-            left, right = st.columns([2.2, 1.1], gap="medium")
-            with left:
-                _render_main_column()
-            with right:
-                if panel_mode == "view":
-                    _render_asset_panel_view(panel_row)
-                else:
-                    _render_asset_panel_edit(
-                        panel_row,
-                        can_add=can_add,
-                        job_options=job_options,
-                        job_label_by_id=job_label_by_id,
-                    )
-    else:
-        _render_main_column()
+    _render_main_column()
+
+    pm = str(panel_mode or "").strip()
+    if panel_row is not None and pm == "view":
+        _asset_database_view_dialog(dict(panel_row))
+    elif panel_row is not None and pm == "edit":
+        _asset_database_edit_dialog(
+            dict(panel_row),
+            can_add=can_add,
+            job_options=job_options,
+            job_label_by_id=job_label_by_id,
+        )

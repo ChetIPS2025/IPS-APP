@@ -47,18 +47,16 @@ except ImportError:
 
 try:
     from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
 except ImportError:
     from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 _EMP_DELETE_CONFIRM_PREFIX = "employees_delete"
 
@@ -95,31 +93,35 @@ def _clear_employee_mode() -> None:
     st.session_state.pop("employee_edit_id", None)
 
 
-@st.dialog("Add Employee")
+@st.dialog("Add Employee", on_dismiss=_clear_employee_mode)
 def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
+    ensure_modal_styles()
+    st.markdown("### Add employee")
     st.caption("Job info and pay rates · time tracking / roster")
-    n1, n2 = st.columns(2)
-    new_name = n1.text_input("Name", key="dlg_emp_add_name")
-    new_role = n2.text_input("Role", key="dlg_emp_add_role", placeholder="e.g. Foreman, Welder")
-    new_trade = st.text_input("Trade (optional)", key="dlg_emp_add_trade")
-    new_email = st.text_input("Email (optional)", key="dlg_emp_add_email")
-    r1, r2 = st.columns(2)
-    new_hr = r1.number_input("Hourly rate", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="dlg_emp_add_hr")
-    new_ot = r2.number_input(
-        "Overtime rate (optional)",
-        min_value=0.0,
-        value=0.0,
-        step=0.5,
-        format="%.2f",
-        key="dlg_emp_add_ot",
-        help="Leave 0 to use 1.5 × hourly rate for overtime.",
-    )
-    new_notes = st.text_area("Notes (optional)", key="dlg_emp_add_notes", height=56)
+    with st.container(border=True):
+        n1, n2 = st.columns(2)
+        new_name = n1.text_input("Name", key="dlg_emp_add_name")
+        new_role = n2.text_input("Role", key="dlg_emp_add_role", placeholder="e.g. Foreman, Welder")
+        new_trade = st.text_input("Trade (optional)", key="dlg_emp_add_trade")
+        new_email = st.text_input("Email (optional)", key="dlg_emp_add_email")
+        r1, r2 = st.columns(2)
+        new_hr = r1.number_input("Hourly rate", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="dlg_emp_add_hr")
+        new_ot = r2.number_input(
+            "Overtime rate (optional)",
+            min_value=0.0,
+            value=0.0,
+            step=0.5,
+            format="%.2f",
+            key="dlg_emp_add_ot",
+            help="Leave 0 to use 1.5 × hourly rate for overtime.",
+        )
+        new_notes = st.text_area("Notes (optional)", key="dlg_emp_add_notes", height=56)
 
     st.divider()
     bc, bs = st.columns(2, gap="small")
     with bc:
         if st.button("Cancel", type="secondary", use_container_width=True, key="dlg_emp_add_cancel"):
+            _clear_employee_mode()
             st.rerun()
     with bs:
         if st.button("Save", type="primary", use_container_width=True, key="dlg_emp_add_save"):
@@ -151,6 +153,93 @@ def add_employee_dialog(*, selection_table_key: str | None = None) -> None:
             _clear_employee_mode()
             st.toast("Employee added.", icon="✅")
             st.rerun()
+
+
+@st.dialog("Edit employee", width="large", on_dismiss=_clear_employee_mode)
+def edit_employee_dialog(row: dict) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    eid = str(row.get("id") or "")
+    st.markdown("### Edit employee")
+    st.caption(f"ID `{eid[:8]}…`")
+
+    pk = f"emp_ed_{eid}"
+    with st.container(border=True):
+        with st.form(f"emp_edit_dlg_{eid}", clear_on_submit=False):
+            ed_name = st.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
+            ed_email = st.text_input(
+                "Email",
+                value=str(row.get("email") or ""),
+                key=f"user_email_{eid}",
+                help=_employees_email_input_help(),
+            )
+            e2, e3 = st.columns(2)
+            ed_role = e2.text_input("Role", value=str(row.get("role") or ""), key=f"{pk}_role")
+            ed_trade = e3.text_input("Trade", value=str(row.get("trade") or ""), key=f"{pk}_trade")
+
+            u1, u2 = st.columns(2)
+            ot_val = row.get("overtime_rate")
+            try:
+                ot_default = float(ot_val) if ot_val is not None and str(ot_val).strip() != "" else 0.0
+            except (TypeError, ValueError):
+                ot_default = 0.0
+            ed_hr = u1.number_input(
+                "Hourly rate",
+                min_value=0.0,
+                value=float(row.get("hourly_rate", 0) or 0),
+                step=0.5,
+                format="%.2f",
+                key=f"{pk}_hr",
+            )
+            ed_ot = u2.number_input(
+                "Overtime rate (0 = use 1.5× hourly)",
+                min_value=0.0,
+                value=ot_default,
+                step=0.5,
+                format="%.2f",
+                key=f"{pk}_ot",
+            )
+            ed_notes = st.text_area(
+                "Notes",
+                value=str(row.get("notes") or ""),
+                height=56,
+                key=f"{pk}_notes",
+            )
+            ed_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
+            submitted = st.form_submit_button("Save", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_dlg_cancel"):
+        _clear_employee_mode()
+        st.rerun()
+
+    if submitted:
+        if not str(ed_name).strip():
+            st.error("Name is required.")
+            return
+        email_val = str(ed_email).strip()
+        if employees_table_has_email_column():
+            if email_val and "@" not in email_val:
+                st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
+                return
+        payload = {
+            "name": str(ed_name).strip(),
+            "role": str(ed_role).strip(),
+            "trade": str(ed_trade).strip(),
+            "hourly_rate": float(ed_hr or 0),
+            "overtime_rate": float(ed_ot) if float(ed_ot or 0) > 0 else None,
+            "notes": str(ed_notes).strip(),
+            "is_active": bool(ed_active),
+        }
+        if employees_table_has_email_column():
+            payload["email"] = email_val or None
+        try:
+            update_rows("employees", payload, {"id": row["id"]})
+        except Exception as exc:
+            st.error(str(exc))
+            return
+        _clear_employee_mode()
+        st.success("Employee updated.")
+        st.rerun()
 
 
 def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
@@ -210,100 +299,6 @@ def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
                 open_destructive_confirmation(_EMP_DELETE_CONFIRM_PREFIX)
                 st.session_state["employees_pending_delete_ids"] = [str(x) for x in sel]
                 st.rerun()
-
-
-def _render_edit_form(row: dict) -> None:
-    eid = str(row.get("id") or "")
-    st.caption(f"ID `{eid[:8]}…`")
-
-    pk = f"emp_ed_{eid}"
-    ed_name = st.text_input("Name", value=str(row.get("name") or ""), key=f"{pk}_name")
-    ed_email = st.text_input(
-        "Email",
-        value=str(row.get("email") or ""),
-        key=f"user_email_{eid}",
-        help=_employees_email_input_help(),
-    )
-    e2, e3 = st.columns(2)
-    ed_role = e2.text_input("Role", value=str(row.get("role") or ""), key=f"{pk}_role")
-    ed_trade = e3.text_input("Trade", value=str(row.get("trade") or ""), key=f"{pk}_trade")
-
-    u1, u2 = st.columns(2)
-    ot_val = row.get("overtime_rate")
-    try:
-        ot_default = float(ot_val) if ot_val is not None and str(ot_val).strip() != "" else 0.0
-    except (TypeError, ValueError):
-        ot_default = 0.0
-    ed_hr = u1.number_input(
-        "Hourly rate",
-        min_value=0.0,
-        value=float(row.get("hourly_rate", 0) or 0),
-        step=0.5,
-        format="%.2f",
-        key=f"{pk}_hr",
-    )
-    ed_ot = u2.number_input(
-        "Overtime rate (0 = use 1.5× hourly)",
-        min_value=0.0,
-        value=ot_default,
-        step=0.5,
-        format="%.2f",
-        key=f"{pk}_ot",
-    )
-    ed_notes = st.text_area(
-        "Notes",
-        value=str(row.get("notes") or ""),
-        height=56,
-        key=f"{pk}_notes",
-    )
-    ed_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Update Employee", type="primary", use_container_width=True, key=f"{pk}_save"):
-            if not str(ed_name).strip():
-                st.error("Name is required.")
-                st.stop()
-            email_val = str(ed_email).strip()
-            if employees_table_has_email_column():
-                if email_val and "@" not in email_val:
-                    st.warning("Email should contain '@'. Fix the address or clear the field before saving.")
-                    st.stop()
-            payload = {
-                "name": str(ed_name).strip(),
-                "role": str(ed_role).strip(),
-                "trade": str(ed_trade).strip(),
-                "hourly_rate": float(ed_hr or 0),
-                "overtime_rate": float(ed_ot) if float(ed_ot or 0) > 0 else None,
-                "notes": str(ed_notes).strip(),
-                "is_active": bool(ed_active),
-            }
-            if employees_table_has_email_column():
-                payload["email"] = email_val or None
-            update_rows("employees", payload, {"id": row["id"]})
-            _clear_employee_mode()
-            st.success("Employee updated.")
-            st.rerun()
-    with c2:
-        if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-            _clear_employee_mode()
-            st.rerun()
-
-
-def _render_employee_side_panel(*, mode: str) -> None:
-    """Right column: bordered panel for edit."""
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        if mode == "edit":
-            st.markdown("### Edit employee")
-            eid = st.session_state.get("employee_edit_id")
-            er = fetch_one("employees", {"id": eid}) if eid else None
-            if not er:
-                st.warning("Employee not found.")
-                _clear_employee_mode()
-            else:
-                _render_edit_form(er)
 
 
 def _render_employees_main(
@@ -473,16 +468,15 @@ def render_body() -> None:
             st.success("Selected employees deactivated.")
             st.rerun()
 
-    panel_open = bool(can_edit and mode == "edit")
+    _render_employees_main(df=df, can_edit=can_edit)
 
-    if panel_open:
-        main_col, side_col = st.columns(IPS_CRUD_LIST_PAGE_SPLIT, gap=IPS_CRUD_LIST_PAGE_GAP)
-        with main_col:
-            _render_employees_main(df=df, can_edit=can_edit)
-        with side_col:
-            _render_employee_side_panel(mode=str(mode))
-    else:
-        _render_employees_main(df=df, can_edit=can_edit)
+    if can_edit and mode == "edit":
+        eid = st.session_state.get("employee_edit_id")
+        er = fetch_one("employees", {"id": eid}) if eid else None
+        if er:
+            edit_employee_dialog(dict(er))
+        else:
+            _clear_employee_mode()
 
     if not can_edit:
         st.info("Only admin users can manage employees.")

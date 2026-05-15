@@ -92,6 +92,11 @@ except ImportError:
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
 
 try:
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
+except ImportError:
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
+
+try:
     from app.utils.formatters import job_display_label as _job_display_label
 except ImportError:
     from utils.formatters import job_display_label as _job_display_label  # type: ignore
@@ -1163,9 +1168,9 @@ def _render_add_task_autofill_from_attachment(*, job_id: str, admin_read: bool) 
     toast_k = f"jdt_af_applied_{job_id}"
     if st.session_state.pop(toast_k, None):
         try:
-            st.toast("Applied — review **Add task** below.")
+            st.toast("Applied — review fields in **Add task**.")
         except Exception:
-            st.success("Applied — review **Add task** below.")
+            st.success("Applied — review fields in **Add task**.")
     bucket = _jra_svc.reference_bucket()
     att_rows = _load_job_ref_attachments_cached(job_id, admin_read=admin_read)[:200]
     candidates = [
@@ -1334,6 +1339,82 @@ def _wrow(admin: bool) -> tuple[Callable, Callable, Callable]:
     return insert_row, update_rows, delete_rows
 
 
+_JDT_ADD_DLG_JOB_KEY = "_jdt_add_dialog_active_job"
+
+
+def _jdt_clear_add_task_dialog() -> None:
+    jid = str(st.session_state.pop(_JDT_ADD_DLG_JOB_KEY, "") or "").strip()
+    if jid:
+        st.session_state.pop(f"jdt_open_add_task_{jid}", None)
+
+
+@st.dialog("Add task", width="large", on_dismiss=_jdt_clear_add_task_dialog)
+def _task_add_dialog(*, job_id: str, admin_read: bool) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    st.markdown("### Add task")
+    ins, _upd, _dlt = _wrow(admin_read)
+    _inject_task_tab_add_form_css()
+    with st.container(border=True):
+        _render_add_task_autofill_from_attachment(job_id=job_id, admin_read=admin_read)
+        st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
+        with st.form(f"jdt_add_task_f_{job_id}", clear_on_submit=True):
+            tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
+            a1, a2 = st.columns(2, gap="small")
+            with a1:
+                pr = st.selectbox(
+                    "Priority",
+                    ("low", "normal", "high", "critical"),
+                    index=1,
+                    format_func=lambda x: x.title(),
+                    key=f"jdt_add_pr_{job_id}",
+                )
+            with a2:
+                pl = st.date_input(
+                    "Planned date",
+                    value=date.today(),
+                    key=f"jdt_add_pl_{job_id}",
+                )
+            a3, a4 = st.columns(2, gap="small")
+            with a3:
+                loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
+            with a4:
+                iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
+            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
+            submitted = st.form_submit_button("Create task", type="primary", use_container_width=True)
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"jdt_add_dlg_cancel_{job_id}"):
+        _jdt_clear_add_task_dialog()
+        st.rerun()
+
+    if submitted:
+        iss_s = str(iss or "").strip()
+        if not iss_s:
+            st.error("Enter an issue description.")
+            return
+        try:
+            ins(
+                "job_tasks",
+                {
+                    "job_id": str(job_id),
+                    "task_number": str(tn or "").strip()[:200],
+                    "priority": pr,
+                    "location": str(loc or "").strip()[:500],
+                    "issue": iss_s[:4000],
+                    "action_required": str(act or "").strip()[:4000],
+                    "status": "not_started",
+                    "planned_date": str(pl) if pl is not None else None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            _bump_jdt_job_data_cache(job_id)
+            _jdt_clear_add_task_dialog()
+            st.success("Task added.")
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
+
+
 def render_job_tasks_tab(
     *,
     job_id: str,
@@ -1393,7 +1474,7 @@ def render_job_tasks_tab(
 
     visible = [t for t in rows if isinstance(t, dict) and _match(t)]
     if not rows:
-        st.info("No tasks yet. Add tasks with **Add task** below.")
+        st.info("No tasks yet. Use **Add task** to create the first one.")
     elif not visible:
         st.caption("No tasks match this filter.")
 
@@ -1728,57 +1809,23 @@ def render_job_tasks_tab(
         render_job_photos_tab(job_id=job_id, admin_read=admin_read)
 
     if can_edit_tasks:
-        _inject_task_tab_add_form_css()
-        st.markdown("##### Add task")
-        _render_add_task_autofill_from_attachment(job_id=job_id, admin_read=admin_read)
-        st.markdown('<span class="ips-job-add-task-anchor"></span>', unsafe_allow_html=True)
-        with st.form(f"jdt_add_task_f_{job_id}", clear_on_submit=True):
-            tn = st.text_input("Task #", key=f"jdt_add_tn_{job_id}")
-            a1, a2 = st.columns(2, gap="small")
-            with a1:
-                pr = st.selectbox(
-                    "Priority",
-                    ("low", "normal", "high", "critical"),
-                    index=1,
-                    format_func=lambda x: x.title(),
-                    key=f"jdt_add_pr_{job_id}",
-                )
-            with a2:
-                pl = st.date_input(
-                    "Planned date",
-                    value=date.today(),
-                    key=f"jdt_add_pl_{job_id}",
-                )
-            a3, a4 = st.columns(2, gap="small")
-            with a3:
-                loc = st.text_input("Location", key=f"jdt_add_loc_{job_id}")
-            with a4:
-                iss = st.text_input("Issue (short)", key=f"jdt_add_iss_{job_id}")
-            act = st.text_input("Action required", key=f"jdt_add_act_{job_id}")
-            submitted = st.form_submit_button("Add task", type="primary", use_container_width=True)
-            if submitted:
-                if not str(iss or "").strip():
-                    st.error("Enter an issue description.")
-                else:
-                    try:
-                        ins(
-                            "job_tasks",
-                            {
-                                "job_id": str(job_id),
-                                "task_number": str(tn or "").strip()[:200],
-                                "priority": pr,
-                                "location": str(loc or "").strip()[:500],
-                                "issue": str(iss or "").strip()[:4000],
-                                "action_required": str(act or "").strip()[:4000],
-                                "status": "not_started",
-                                "planned_date": str(pl) if pl is not None else None,
-                                "updated_at": datetime.now(timezone.utc).isoformat(),
-                            },
-                        )
-                        _bump_jdt_job_data_cache(job_id)
-                        st.success("Task added.")
-                    except Exception as exc:
-                        st.error(str(exc))
+        c1, c2 = st.columns([1, 1.2], gap="small")
+        with c1:
+            if st.button(
+                "Add task",
+                type="primary",
+                use_container_width=True,
+                key=f"jdt_btn_open_add_{job_id}",
+            ):
+                jid = str(job_id).strip()
+                st.session_state[_JDT_ADD_DLG_JOB_KEY] = jid
+                st.session_state[f"jdt_open_add_task_{jid}"] = True
+                st.rerun()
+        with c2:
+            st.caption("Opens a form to add a task, optional **auto fill from attachment**, then **Create task**.")
+
+    if can_edit_tasks and st.session_state.get(f"jdt_open_add_task_{str(job_id).strip()}"):
+        _task_add_dialog(job_id=str(job_id).strip(), admin_read=admin_read)
 
 
 def render_job_daily_plan_tab(
