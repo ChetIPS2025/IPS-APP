@@ -23,6 +23,7 @@ from db import (
     create_signed_url,
     fetch_by_match,
     fetch_by_match_admin,
+    fetch_jobs_with_order_fallback,
     fetch_one,
     fetch_table,
     fetch_table_admin,
@@ -33,9 +34,9 @@ from db import (
     upload_bytes,
 )
 try:
-    from services.job_service import job_number_display, job_row_select_label
+    from services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
-    from app.services.job_service import job_number_display, job_row_select_label  # type: ignore
+    from app.services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
 from app.utils.formatters import job_display_label
 
@@ -118,6 +119,40 @@ except ImportError:
     from perf_debug import perf_span  # type: ignore
 
 _LOG = logging.getLogger(__name__)
+
+
+def _editor_load_jobs_rows(*, limit: int = 5000) -> list[dict[str, Any]]:
+    """Jobs for estimate linking: prefer service-role reads for office roles (RLS), then fallbacks."""
+    role = current_role()
+    prefer_admin = role in ("admin", "manager")
+    cols = "id,job_name,customer_id,job_number"
+
+    def _try_cols(use_admin: bool) -> list[dict[str, Any]]:
+        fn = fetch_table_admin if use_admin else fetch_table
+        for ob in ("job_number", "job_name", None):
+            try:
+                r = list(fn("jobs", columns=cols, limit=limit, order_by=ob) or [])
+            except Exception:
+                r = []
+            if r:
+                return sort_jobs_by_number_then_name(r)
+        return []
+
+    if prefer_admin:
+        out = _try_cols(True)
+        if out:
+            return out
+    out = _try_cols(False)
+    if out:
+        return out
+    for use_ad in (prefer_admin, True, False):
+        try:
+            r = list(fetch_jobs_with_order_fallback(limit=limit, use_admin=use_ad) or [])
+        except Exception:
+            r = []
+        if r:
+            return sort_jobs_by_number_then_name(r)
+    return []
 
 
 def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str]) -> list[dict]:
@@ -440,7 +475,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
             ] + list(customers)
 
     with perf_span("editor.fetch_jobs"):
-        jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=600, order_by="job_number")
+        jobs = _editor_load_jobs_rows(limit=5000)
     with perf_span("editor.fetch_materials_catalog"):
         materials_catalog = cached_estimate_materials_catalog_rows()
     with perf_span("editor.fetch_labor_rates"):

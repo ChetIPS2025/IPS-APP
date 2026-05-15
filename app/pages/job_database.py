@@ -1532,6 +1532,12 @@ def _render_job_form_panel(
                             st.stop()
                         payload["job_number"] = final_job_number
                     insert_row_admin("jobs", payload)
+                    try:
+                        from data_cache import clear_session_table_cache
+                    except ImportError:
+                        from app.data_cache import clear_session_table_cache  # type: ignore
+
+                    clear_session_table_cache()
                     _clear_job_mode()
                     st.success("Job created.")
                     st.rerun()
@@ -1561,6 +1567,12 @@ def _render_job_form_panel(
                     if has_customer_location_column:
                         payload["customer_location_id"] = selected_customer_location_id
                     update_rows_admin("jobs", payload, {"id": selected_job["id"]})
+                    try:
+                        from data_cache import clear_session_table_cache
+                    except ImportError:
+                        from app.data_cache import clear_session_table_cache  # type: ignore
+
+                    clear_session_table_cache()
                     _clear_job_mode()
                     st.success("Job updated.")
                     st.rerun()

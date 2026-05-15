@@ -45,12 +45,54 @@ def job_display_primary(j: dict[str, Any] | None) -> str:
 def job_row_select_label(j: dict[str, Any]) -> str:
     """
     Human-readable label for dropdowns: ``J00001 — Site name`` (legacy ``JOB-`` shown as ``J#####``).
+    Falls back to ``Job {id}…`` when name/number are missing so rows are never dropped from pickers.
     """
     num = job_number_display(j.get("job_number"))
     name = str(j.get("job_name") or "").strip()
+    jid = str(j.get("id") or "").strip()
     if num and name:
         return f"{num} — {name}"
-    return num or name or "—"
+    if num:
+        return num
+    if name:
+        return name
+    if jid:
+        return f"Job {jid[:8]}…"
+    return "—"
+
+
+def build_job_dropdown_label_maps(
+    jobs: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str], list[str]]:
+    """
+    Build unique labels for every job row with an ``id``.
+
+    Returns ``(options, label_to_id, labels_sorted)`` where each option is
+    ``{"id": "<uuid>", "label": "<unique label>"}`` and ``labels_sorted`` is the
+    lexicographic sort of labels for stable selectboxes.
+    """
+    rows = [j for j in (jobs or []) if isinstance(j, dict) and str(j.get("id") or "").strip()]
+    rows = sort_jobs_by_number_then_name(rows)
+    label_to_id: dict[str, str] = {}
+    options: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for j in rows:
+        jid = str(j.get("id")).strip()
+        base = job_row_select_label(j)
+        label = base
+        n = 0
+        while label in used:
+            n += 1
+            short = jid[:8]
+            if base and base != "—":
+                label = f"{base} ·{short}" + (f" ({n})" if n > 1 else "")
+            else:
+                label = f"Job {short}" + (f" ({n})" if n > 1 else "")
+        used.add(label)
+        label_to_id[label] = jid
+        options.append({"id": jid, "label": label})
+    labels_sorted = sorted(label_to_id.keys(), key=str.casefold)
+    return options, label_to_id, labels_sorted
 
 
 def sort_jobs_by_number_then_name(jobs: list[dict]) -> list[dict]:

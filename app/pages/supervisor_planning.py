@@ -16,6 +16,7 @@ try:
     from app.db import (
         fetch_by_match,
         fetch_by_match_admin,
+        fetch_jobs_with_order_fallback,
         insert_row,
         insert_row_admin,
         update_rows,
@@ -25,6 +26,7 @@ except ImportError:
     from db import (  # type: ignore
         fetch_by_match,
         fetch_by_match_admin,
+        fetch_jobs_with_order_fallback,
         insert_row,
         insert_row_admin,
         update_rows,
@@ -32,9 +34,9 @@ except ImportError:
     )
 
 try:
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from app.services.job_service import build_job_dropdown_label_maps, job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from services.job_service import build_job_dropdown_label_maps, job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
 try:
     from app.pages import job_database_task_photos_ui as tph
@@ -136,12 +138,33 @@ def _fetch_table(name: str, *, use_admin: bool) -> list[dict[str, Any]]:
         return []
 
 
+def _load_jobs_for_planning(*, use_admin: bool) -> list[dict[str, Any]]:
+    jobs: list[dict[str, Any]] = []
+    for ob in ("job_number", "job_name", None):
+        try:
+            jobs = list(
+                fetch_table_for_session(
+                    "jobs",
+                    session_key=_session_key(),
+                    limit=5000,
+                    order_by=ob,
+                    use_admin=use_admin,
+                )
+                or []
+            )
+        except Exception:
+            jobs = []
+        if jobs:
+            return sort_jobs_by_number_then_name(jobs)
+    try:
+        return sort_jobs_by_number_then_name(list(fetch_jobs_with_order_fallback(limit=5000, use_admin=use_admin) or []))
+    except Exception:
+        return []
+
+
 def _job_options(jobs: list[dict[str, Any]]) -> tuple[list[str], dict[str, str]]:
-    rows = [j for j in (jobs or []) if isinstance(j, dict) and str(j.get("id") or "").strip()]
-    rows = sort_jobs_by_number_then_name(rows)
-    labels = [job_row_select_label(j) for j in rows]
-    m = {job_row_select_label(j): str(j.get("id")) for j in rows}
-    return labels, m
+    _, label_to_id, labels_sorted = build_job_dropdown_label_maps(jobs)
+    return labels_sorted, label_to_id
 
 
 def _task_label(t: dict[str, Any]) -> str:
@@ -335,16 +358,7 @@ def render_pm() -> None:
 
     use_admin = True
     ins, upd = _w_writes(use_admin)
-    try:
-        jobs = fetch_table_for_session(
-            "jobs",
-            session_key=_session_key(),
-            limit=5000,
-            order_by="job_number",
-            use_admin=use_admin,
-        )
-    except Exception:
-        jobs = []
+    jobs = _load_jobs_for_planning(use_admin=use_admin)
 
     job_tasks = _fetch_table("job_tasks", use_admin=use_admin)
     if not job_tasks:
@@ -356,7 +370,12 @@ def render_pm() -> None:
 
     wdate = st.date_input("Planned work date (package day)", value=today, key="pm_dwp_date")
     w_iso = wdate.isoformat()[:10]
-    job_lb = st.selectbox("Job", options=labels or ["—"], key="pm_dwp_job", disabled=not labels)
+    job_lb = st.selectbox(
+        "Job",
+        options=labels or ["(No jobs found)"],
+        key="pm_dwp_job",
+        disabled=not bool(labels),
+    )
     jid = label_to_id.get(str(job_lb), "")
     sup = st.text_input("Supervisor (field lead)", key="pm_dwp_sup", placeholder="Name as crew knows them")
     pkg_notes = st.text_area("PM notes (whole package)", height=64, key="pm_dwp_pkg_notes")
@@ -445,16 +464,7 @@ def render_supervisor() -> None:
     use_admin = _is_pm()
     ins, upd = _w_writes(use_admin)
 
-    try:
-        jobs = fetch_table_for_session(
-            "jobs",
-            session_key=_session_key(),
-            limit=5000,
-            order_by="job_number",
-            use_admin=use_admin,
-        )
-    except Exception:
-        jobs = []
+    jobs = _load_jobs_for_planning(use_admin=use_admin)
 
     packages = _fetch_table("daily_work_packages", use_admin=use_admin)
     pkg_tasks = _fetch_table("daily_work_package_tasks", use_admin=use_admin)

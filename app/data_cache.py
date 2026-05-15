@@ -43,6 +43,15 @@ def _fetch_table_cached_admin(
         return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
 
 
+def clear_session_table_cache() -> None:
+    """Clear cached list reads (e.g. after **jobs** create/update so dropdowns refresh)."""
+    try:
+        _fetch_table_cached.clear()
+        _fetch_table_cached_admin.clear()
+    except Exception:
+        pass
+
+
 def fetch_table_for_session(
     table_name: str,
     *,

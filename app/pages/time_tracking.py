@@ -14,7 +14,12 @@ except ImportError:
 
 from auth import current_profile, current_role
 from branding import render_header
-from db import delete_rows, fetch_one, fetch_table, insert_row, update_rows
+from db import delete_rows, fetch_one, fetch_table, fetch_table_admin, insert_row, update_rows
+
+try:
+    from db import fetch_jobs_with_order_fallback
+except ImportError:
+    from app.db import fetch_jobs_with_order_fallback  # type: ignore
 
 try:
     from table_actions import (
@@ -34,9 +39,17 @@ except ImportError:
     )
 
 try:
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from services.job_service import (
+        build_job_dropdown_label_maps,
+        job_row_select_label,
+        sort_jobs_by_number_then_name,
+    )
 except ImportError:
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from app.services.job_service import (  # type: ignore
+        build_job_dropdown_label_maps,
+        job_row_select_label,
+        sort_jobs_by_number_then_name,
+    )
 
 try:
     from services.time_grid_service import (
@@ -186,6 +199,42 @@ def _tt_job_is_active_open(j: dict) -> bool:
     if not st:
         return True
     return st not in _TT_CLOSED_JOB_STATUSES
+
+
+def _tt_load_jobs_rows(*, limit: int = 5000) -> list[dict[str, Any]]:
+    """
+    Jobs for time-entry pickers: prefer service-role reads for office roles (RLS-safe),
+    then anon, then column/order fallbacks.
+    """
+    role = current_role()
+    prefer_admin = role in ("admin", "manager")
+
+    def _try_table(use_admin: bool) -> list[dict[str, Any]]:
+        fn = fetch_table_admin if use_admin else fetch_table
+        for ob in ("job_number", "job_name", None):
+            try:
+                r = list(fn("jobs", columns="*", limit=limit, order_by=ob) or [])
+            except Exception:
+                r = []
+            if r:
+                return sort_jobs_by_number_then_name(r)
+        return []
+
+    if prefer_admin:
+        out = _try_table(True)
+        if out:
+            return out
+    out = _try_table(False)
+    if out:
+        return out
+    for use_ad in (prefer_admin, True, False):
+        try:
+            r = list(fetch_jobs_with_order_fallback(limit=limit, use_admin=use_ad) or [])
+        except Exception:
+            r = []
+        if r:
+            return sort_jobs_by_number_then_name(r)
+    return []
 
 
 def _tt_day_column_totals(
@@ -1207,13 +1256,8 @@ def _tt_render_filters_section(*, fast: bool) -> _TTFiltersResult:
         all_employees = []
     active_employees = [e for e in all_employees if e.get("is_active", True) is not False]
 
-    jobs = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
-    job_label_to_id = {
-        job_row_select_label(j): str(j.get("id"))
-        for j in jobs
-        if j.get("id") and job_row_select_label(j) and job_row_select_label(j) != "—"
-    }
-    job_labels_sorted = sorted(job_label_to_id.keys(), key=str.casefold)
+    jobs = _tt_load_jobs_rows(limit=5000)
+    _, job_label_to_id, job_labels_sorted = build_job_dropdown_label_maps(jobs)
     job_id_to_label = {v: k for k, v in job_label_to_id.items()}
     st.session_state[TT_JOB_LABEL_TO_ID_KEY] = job_label_to_id
 
@@ -1345,20 +1389,17 @@ def _tt_render_simple_timesheet(
     """Compact per-employee entry: job + S/T|O/T + hours + save; list for selected day."""
     uid = current_profile().get("id")
     ts_now = datetime.now(timezone.utc).isoformat()
-    try:
-        jobs_raw = sort_jobs_by_number_then_name(fetch_table("jobs", limit=5000, order_by="job_number"))
-    except Exception:
-        jobs_raw = []
+    jobs_raw = _tt_load_jobs_rows(limit=5000)
+    _, row_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
     active_ids = {str(j.get("id")) for j in jobs_raw if j.get("id") and _tt_job_is_active_open(j)}
-    active_labels = [
-        lb
-        for lb in filt.job_labels_sorted
-        if str(filt.job_label_to_id.get(lb) or "") in active_ids
-    ]
+    active_labels = [lb for lb in all_job_labels if str(row_label_to_id.get(lb) or "") in active_ids]
     if not active_labels:
-        active_labels = [lb for lb in filt.job_labels_sorted if filt.job_label_to_id.get(lb)]
+        active_labels = list(all_job_labels)
     if fj_id:
-        active_labels = [lb for lb in active_labels if str(filt.job_label_to_id.get(lb) or "") == fj_id]
+        active_labels = [lb for lb in active_labels if str(row_label_to_id.get(lb) or "") == fj_id]
+
+    if not jobs_raw:
+        st.caption("**No jobs loaded** — check Supabase `jobs` table, RLS policies, and service role keys for admin/manager.")
 
     st.subheader("Time entry")
     wk_date_key = f"tt_simple_work_date_{week_start.isoformat()}"
@@ -1401,7 +1442,10 @@ def _tt_render_simple_timesheet(
             qn = str(q or "").strip().lower()
             job_opts = [lb for lb in active_labels if not qn or qn in lb.lower()]
             if not job_opts:
-                job_opts = ["(No match — clear search)"]
+                if not active_labels:
+                    job_opts = ["(No jobs found)"]
+                else:
+                    job_opts = ["(No jobs match search — clear filter)"]
 
             with st.form(key=f"tt_add_form_{week_start}_{eid}", clear_on_submit=False):
                 job_pick = st.selectbox("Job", job_opts, key=f"tt_job_pick_{week_start}_{eid}")
@@ -1421,12 +1465,14 @@ def _tt_render_simple_timesheet(
                 submitted = st.form_submit_button("Save / Add", use_container_width=True)
 
             if submitted:
-                if job_pick.startswith("(No match"):
+                if job_pick.startswith("(No jobs") or job_pick.startswith("(No match") or job_pick.startswith(
+                    "(No jobs match"
+                ):
                     st.warning("Pick a job or clear the search filter.")
                 elif not uid:
                     st.error("Not signed in; cannot save.")
                 else:
-                    jid = str(filt.job_label_to_id.get(job_pick) or "").strip()
+                    jid = str(row_label_to_id.get(job_pick) or "").strip()
                     if not jid:
                         st.error("Could not resolve job for that label.")
                     else:
