@@ -14,7 +14,7 @@ from __future__ import annotations
 import streamlit as st
 
 IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v2"
-IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v2"
+IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v3"
 
 # Main grid vs side panel — use everywhere (Customers, Labor, Employees) so widths stay identical.
 IPS_CRUD_LIST_PAGE_SPLIT: tuple[float, float] = (2.35, 1.0)
@@ -36,6 +36,10 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] {
             max-width: min(480px, 94vw) !important;
+        }
+        /* Wider catalog / inventory forms: add class ips-modal-wide inside dialog body */
+        div[data-testid="stDialog"]:has(.ips-modal-wide) {
+            max-width: min(960px, 96vw) !important;
         }
         div[data-testid="stDialog"] > div {
             background: #ffffff !important;
@@ -122,7 +126,8 @@ def inject_ips_modal_styles() -> None:
             background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
             border-color: rgba(96, 165, 250, 0.85) !important;
         }
-        div[data-testid="stDialog"] button[kind="secondary"] {
+        div[data-testid="stDialog"] button[kind="secondary"],
+        div[data-testid="stDialog"] button[data-testid="baseButton-secondary"] {
             background: #f3f4f6 !important;
             border: 1px solid #d1d5db !important;
             color: #1f2937 !important;
@@ -138,7 +143,8 @@ def inject_ips_modal_styles() -> None:
             text-overflow: clip !important;
             margin: 0 !important;
         }
-        div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled) {
+        div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled),
+        div[data-testid="stDialog"] button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
             background: #e5e7eb !important;
             border-color: #9ca3af !important;
             color: #111827 !important;

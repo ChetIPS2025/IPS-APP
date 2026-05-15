@@ -32,9 +32,9 @@ except ImportError:
     from ui.catalog_inventory_display import prepare_catalog_inventory_display_df  # type: ignore
 
 try:
-    from app.ui.modal import inject_ips_modal_styles
+    from app.ui.modal import ensure_modal_styles
 except ImportError:
-    from ui.modal import inject_ips_modal_styles  # type: ignore
+    from ui.modal import ensure_modal_styles  # type: ignore
 
 try:
     from app.services import task_photos as _dash_task_photos
@@ -743,9 +743,25 @@ def _todo_trunc(s: str, n: int) -> str:
     return t if len(t) <= n else (t[: max(0, n - 1)] + "…")
 
 
-@st.dialog("Task details", width="small")
+def _dash_todo_on_dismiss_view() -> None:
+    st.session_state.pop("dash_todo_dlg_view", None)
+
+
+def _dash_todo_on_dismiss_edit() -> None:
+    st.session_state.pop("dash_todo_dlg_edit", None)
+
+
+def _dash_todo_on_dismiss_del() -> None:
+    st.session_state.pop("dash_todo_dlg_del", None)
+
+
+def _dash_todo_on_dismiss_add() -> None:
+    st.session_state.pop("dash_todo_open_add", None)
+
+
+@st.dialog("Task details", width="small", on_dismiss=_dash_todo_on_dismiss_view)
 def _dash_todo_view_dialog(*, row: dict[str, Any], id_to_label: dict[str, str]) -> None:
-    inject_ips_modal_styles()
+    ensure_modal_styles()
     tid = str(row.get("id") or "").strip()
     st.markdown(f"### {html.escape(str(row.get('title') or '—'))}")
     aid = str(row.get("assigned_to") or "").strip()
@@ -764,12 +780,12 @@ def _dash_todo_view_dialog(*, row: dict[str, Any], id_to_label: dict[str, str]) 
         st.markdown(f"<div style='white-space:pre-wrap;font-size:0.9rem;color:#1e293b'>{html.escape(desc)}</div>", unsafe_allow_html=True)
     else:
         st.caption("No description.")
-    if st.button("Close", use_container_width=True, key=f"dash_todo_dlg_view_close_{tid}"):
+    if st.button("Close", type="secondary", use_container_width=True, key=f"dash_todo_dlg_view_close_{tid}"):
         st.session_state.pop("dash_todo_dlg_view", None)
         st.rerun()
 
 
-@st.dialog("Edit task", width="small")
+@st.dialog("Edit task", width="small", on_dismiss=_dash_todo_on_dismiss_edit)
 def _dash_todo_edit_dialog(
     *,
     row: dict[str, Any],
@@ -777,7 +793,7 @@ def _dash_todo_edit_dialog(
     ordered_ids: list[str],
     me: str,
 ) -> None:
-    inject_ips_modal_styles()
+    ensure_modal_styles()
     tid = str(row.get("id") or "").strip()
     title = str(row.get("title") or "").strip() or "—"
     priority = str(row.get("priority") or "Normal").strip() or "Normal"
@@ -852,9 +868,9 @@ def _dash_todo_edit_dialog(
             st.error(str(exc))
 
 
-@st.dialog("Delete task?", width="small")
+@st.dialog("Delete task?", width="small", on_dismiss=_dash_todo_on_dismiss_del)
 def _dash_todo_delete_dialog(*, tid: str, title: str) -> None:
-    inject_ips_modal_styles()
+    ensure_modal_styles()
     st.markdown(f"Permanently delete **{html.escape(title)}**?")
     c1, c2 = st.columns(2, gap="small")
     with c1:
@@ -871,6 +887,70 @@ def _dash_todo_delete_dialog(*, tid: str, title: str) -> None:
         if st.button("Cancel", type="secondary", use_container_width=True, key=f"dash_todo_del_no_{tid}"):
             st.session_state.pop("dash_todo_dlg_del", None)
             st.rerun()
+
+
+@st.dialog("Add task", width="small", on_dismiss=_dash_todo_on_dismiss_add)
+def _dash_todo_add_dialog(
+    *,
+    id_to_label: dict[str, str],
+    ordered_ids: list[str],
+    me: str,
+) -> None:
+    ensure_modal_styles()
+    st.markdown("### Add task")
+    with st.container(border=True):
+        with st.form("dash_todo_add_f", clear_on_submit=True):
+            st.text_input("Title", key="dash_todo_add_title_dlg")
+            st.text_area("Description", key="dash_todo_add_desc_dlg", height=64)
+            c1, c2, c3 = st.columns(3, gap="small")
+            with c1:
+                st.date_input("Due date", value=None, key="dash_todo_add_due_dlg")
+            with c2:
+                st.selectbox("Priority", list(_TODO_PRIORITIES), index=1, key="dash_todo_add_pri_dlg")
+            with c3:
+                st.selectbox("Status", list(_TODO_STATUSES), index=0, key="dash_todo_add_stat_dlg")
+            assignee_opts = ["— Unassigned —"] + [id_to_label[i] for i in ordered_ids]
+            st.selectbox("Assigned to", assignee_opts, key="dash_todo_add_asg_dlg")
+            save = st.form_submit_button("Create task", type="primary", use_container_width=True)
+    if st.button("Cancel", type="secondary", use_container_width=True, key="dash_todo_add_cancel_dlg"):
+        st.session_state.pop("dash_todo_open_add", None)
+        st.rerun()
+    if save:
+        t = str(st.session_state.get("dash_todo_add_title_dlg") or "").strip()
+        desc = str(st.session_state.get("dash_todo_add_desc_dlg") or "").strip()
+        due = st.session_state.get("dash_todo_add_due_dlg")
+        priority = str(st.session_state.get("dash_todo_add_pri_dlg") or "Normal").strip() or "Normal"
+        status = str(st.session_state.get("dash_todo_add_stat_dlg") or "Open").strip() or "Open"
+        assignee_label = str(st.session_state.get("dash_todo_add_asg_dlg") or "")
+        assigned_to = None
+        if assignee_label and not assignee_label.startswith("—"):
+            for pid, lbl in id_to_label.items():
+                if lbl == assignee_label:
+                    assigned_to = pid
+                    break
+        if not t:
+            st.error("Title is required.")
+            return
+        payload: dict[str, Any] = {
+            "title": t,
+            "description": desc or None,
+            "priority": priority,
+            "status": status,
+            "created_by": me or None,
+            "assigned_to": assigned_to,
+        }
+        if due is not None:
+            payload["due_date"] = str(due)
+        if _todo_is_terminal(payload["status"]):
+            payload["completed_at"] = datetime.now(timezone.utc).isoformat()
+        try:
+            insert_row_admin("todos", payload)
+            clear_session_table_cache()
+            st.session_state.pop("dash_todo_open_add", None)
+            st.success("Task added.")
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
 
 
 def _profiles_for_todo_assign(session_key: str, *, use_admin: bool) -> tuple[dict[str, str], list[str]]:
@@ -928,7 +1008,18 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
 
         h1, h2, h3 = st.columns([1.35, 1.25, 1], gap="small")
         with h1:
-            st.markdown(f"##### To-Do List ({active_count})")
+            ht1, ht2 = st.columns([1, 0.55], gap="small")
+            with ht1:
+                st.markdown(f"##### To-Do List ({active_count})")
+            with ht2:
+                if st.button(
+                    "Add task",
+                    type="primary",
+                    use_container_width=True,
+                    key="dash_todo_open_add_btn",
+                ):
+                    st.session_state["dash_todo_open_add"] = True
+                    st.rerun()
         with h2:
             st.text_input(
                 "Search",
@@ -948,44 +1039,6 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
         q = str(st.session_state.get("dash_todo_search_q") or "")
         rows = _todo_apply_search(rows_base, q, id_to_label)
         rows = _todo_sort_rows(_todo_dedupe_rows(rows))
-
-        with st.expander("Add task", expanded=False):
-            title = st.text_input("Title", key="dash_todo_add_title")
-            desc = st.text_area("Description", key="dash_todo_add_desc", height=64)
-            c1, c2, c3 = st.columns(3, gap="small")
-            due = c1.date_input("Due date", value=None, key="dash_todo_add_due")
-            priority = c2.selectbox("Priority", list(_TODO_PRIORITIES), index=1, key="dash_todo_add_pri")
-            status = c3.selectbox("Status", list(_TODO_STATUSES), index=0, key="dash_todo_add_status")
-            assignee_opts = ["— Unassigned —"] + [id_to_label[i] for i in ordered_ids]
-            assignee_label = st.selectbox("Assigned to", assignee_opts, key="dash_todo_add_assignee")
-            assigned_to = None
-            if assignee_label and not assignee_label.startswith("—"):
-                for pid, lbl in id_to_label.items():
-                    if lbl == assignee_label:
-                        assigned_to = pid
-                        break
-
-            if st.button("Add task", type="primary", use_container_width=True, key="dash_todo_add_btn"):
-                t = str(title or "").strip()
-                if not t:
-                    st.error("Title is required.")
-                    st.stop()
-                payload = {
-                    "title": t,
-                    "description": str(desc or "").strip() or None,
-                    "priority": str(priority or "Normal").strip() or "Normal",
-                    "status": str(status or "Open").strip() or "Open",
-                    "created_by": me or None,
-                    "assigned_to": assigned_to,
-                }
-                if due is not None:
-                    payload["due_date"] = str(due)
-                if _todo_is_terminal(payload["status"]):
-                    payload["completed_at"] = datetime.now(timezone.utc).isoformat()
-                insert_row_admin("todos", payload)
-                clear_session_table_cache()
-                st.success("Task added.")
-                st.rerun()
 
         if not rows:
             if view == "Completed Tasks":
@@ -1116,6 +1169,8 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
             )
         elif dn and dn in by_id:
             _dash_todo_delete_dialog(tid=str(by_id[dn].get("id") or "").strip(), title=str(by_id[dn].get("title") or "—"))
+        elif st.session_state.get("dash_todo_open_add"):
+            _dash_todo_add_dialog(id_to_label=id_to_label, ordered_ids=ordered_ids, me=me)
 
 
 def render() -> None:

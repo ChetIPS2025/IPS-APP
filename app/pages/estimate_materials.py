@@ -44,8 +44,108 @@ except ImportError:
         sync_estimate_material_pricing_from_inventory,
     )
 
-_EM_ACTION_PANEL_KEY = "em_action_panel"
+try:
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
+except ImportError:
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
+
+_EM_DLG_KEY = "em_catalog_dlg"
 _UUID_SPLIT = re.compile(r"[\s,;]+")
+
+
+def _em_on_dismiss_catalog_dlg() -> None:
+    st.session_state.pop(_EM_DLG_KEY, None)
+
+
+@st.dialog("Add material", width="large", on_dismiss=_em_on_dismiss_catalog_dlg)
+def _em_add_material_dialog() -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    st.markdown("### Add material")
+    with st.container(border=True):
+        with st.form("em_add_form_dlg", clear_on_submit=True):
+            ik = st.text_input("Item key", placeholder="Unique code or SKU")
+            desc = st.text_input("Description")
+            cat = st.text_input("Category", value="Quote Catalog")
+            unit = st.text_input("Unit", value="EA")
+            pp = st.number_input("Purchase price", min_value=0.0, value=0.0, step=0.01)
+            sp = st.number_input("Sell price", min_value=0.0, value=0.0, step=0.01)
+            vin = st.text_input("Vendor item #", value="")
+            inv_ref = st.text_input(
+                "Linked inventory row (optional UUID)",
+                value="",
+                help="When set, **Sync Pricing** can refresh purchase/sell from the matching inventory item.",
+            )
+            submitted = st.form_submit_button("Save material", type="primary", use_container_width=True)
+    if st.button("Cancel", type="secondary", use_container_width=True, key="em_add_dlg_cancel"):
+        st.session_state.pop(_EM_DLG_KEY, None)
+        st.rerun()
+    if submitted:
+        key = str(ik or "").strip()
+        if not key:
+            st.error("Item key is required.")
+            return
+        if fetch_by_match_admin("estimate_materials", {"item_key": key}, limit=1):
+            st.error("That item key already exists.")
+            return
+        payload: dict = {
+            "item_key": key[:500],
+            "description": str(desc or "")[:2000],
+            "category": str(cat or "Quote Catalog")[:200],
+            "subgroup": "",
+            "unit": str(unit or "EA")[:32],
+            "purchase_price": float(pp),
+            "sell_price": float(sp),
+            "vendor_item_number": str(vin or "")[:200],
+            "is_active": True,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        ref = str(inv_ref or "").strip()
+        if ref:
+            payload["inventory_ref_id"] = ref
+        insert_row_admin("estimate_materials", payload)
+        clear_estimate_materials_catalog_cache()
+        st.session_state.pop(_EM_DLG_KEY, None)
+        st.success("Material added.")
+        st.rerun()
+
+
+@st.dialog("Manage categories", width="large", on_dismiss=_em_on_dismiss_catalog_dlg)
+def _em_manage_categories_dialog() -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    st.markdown("### Manage categories")
+    st.caption("Bulk rename: exact **from** category → **to** category on all matching rows.")
+    with st.container(border=True):
+        with st.form("em_cat_rename_dlg"):
+            old_c = st.text_input("Rename from", placeholder="Exact category text")
+            new_c = st.text_input("Rename to", placeholder="New category text")
+            apply_sub = st.form_submit_button("Apply rename", type="primary", use_container_width=True)
+    if st.button("Cancel", type="secondary", use_container_width=True, key="em_cat_dlg_cancel"):
+        st.session_state.pop(_EM_DLG_KEY, None)
+        st.rerun()
+    if apply_sub:
+        o = str(old_c or "").strip()
+        n = str(new_c or "").strip()
+        if not o or not n:
+            st.error("Enter both values.")
+            return
+        rows = fetch_by_match_admin("estimate_materials", {"category": o}, limit=5000)
+        for r in rows or []:
+            rid = str((r or {}).get("id") or "").strip()
+            if rid:
+                update_rows_admin(
+                    "estimate_materials",
+                    {
+                        "category": n[:200],
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    {"id": rid},
+                )
+        clear_estimate_materials_catalog_cache()
+        st.session_state.pop(_EM_DLG_KEY, None)
+        st.success(f"Updated {len(rows or [])} row(s).")
+        st.rerun()
 
 
 def _parse_inventory_uuid_selection(text: str) -> frozenset[str]:
@@ -94,7 +194,7 @@ def render() -> None:
         "**Inventory** (sidebar) is **stock tracking** (on-hand, scan, usage)."
     )
 
-    st.session_state.setdefault(_EM_ACTION_PANEL_KEY, "")
+    st.session_state.setdefault(_EM_DLG_KEY, "")
 
     if current_role() not in {"admin", "manager"}:
         st.info("Only admin or manager can manage the estimate materials catalog.")
@@ -189,7 +289,7 @@ def render() -> None:
                             selected_inventory_ids=selected_ids,
                         )
                     clear_estimate_materials_catalog_cache()
-                    st.session_state[_EM_ACTION_PANEL_KEY] = ""
+                    st.session_state.pop(_EM_DLG_KEY, None)
                     st.success("Import finished.")
                     with st.expander("Import summary", expanded=True):
                         st.markdown(result.summary_text())
@@ -202,107 +302,33 @@ def render() -> None:
                 update_rows_admin=update_rows_admin,
             )
             clear_estimate_materials_catalog_cache()
-            st.session_state[_EM_ACTION_PANEL_KEY] = ""
+            st.session_state.pop(_EM_DLG_KEY, None)
             st.success(f"Updated pricing on {n} linked row(s).")
             st.rerun()
     with a3:
-        panel = str(st.session_state.get(_EM_ACTION_PANEL_KEY) or "")
-        add_primary = panel == "add"
         if st.button(
             "Add Material",
+            type="primary",
             use_container_width=True,
             key="em_btn_add",
-            type="primary" if add_primary else "secondary",
         ):
-            st.session_state[_EM_ACTION_PANEL_KEY] = "" if add_primary else "add"
+            st.session_state[_EM_DLG_KEY] = "add"
             st.rerun()
     with a4:
-        cat_primary = str(st.session_state.get(_EM_ACTION_PANEL_KEY) or "") == "cats"
         if st.button(
             "Manage Categories",
+            type="secondary",
             use_container_width=True,
             key="em_btn_cats",
-            type="primary" if cat_primary else "secondary",
         ):
-            st.session_state[_EM_ACTION_PANEL_KEY] = "" if cat_primary else "cats"
+            st.session_state[_EM_DLG_KEY] = "cats"
             st.rerun()
 
-    panel = str(st.session_state.get(_EM_ACTION_PANEL_KEY) or "")
-
-    if panel == "add":
-        with st.container():
-            st.markdown("##### Add material")
-            with st.form("em_add_form", clear_on_submit=True):
-                ik = st.text_input("Item key", placeholder="Unique code or SKU")
-                desc = st.text_input("Description")
-                cat = st.text_input("Category", value="Quote Catalog")
-                unit = st.text_input("Unit", value="EA")
-                pp = st.number_input("Purchase price", min_value=0.0, value=0.0, step=0.01)
-                sp = st.number_input("Sell price", min_value=0.0, value=0.0, step=0.01)
-                vin = st.text_input("Vendor item #", value="")
-                inv_ref = st.text_input(
-                    "Linked inventory row (optional UUID)",
-                    value="",
-                    help="When set, **Sync Pricing** can refresh purchase/sell from the matching inventory item.",
-                )
-                submitted = st.form_submit_button("Save material", type="primary")
-                if submitted:
-                    key = str(ik or "").strip()
-                    if not key:
-                        st.error("Item key is required.")
-                    elif fetch_by_match_admin("estimate_materials", {"item_key": key}, limit=1):
-                        st.error("That item key already exists.")
-                    else:
-                        payload: dict = {
-                            "item_key": key[:500],
-                            "description": str(desc or "")[:2000],
-                            "category": str(cat or "Quote Catalog")[:200],
-                            "subgroup": "",
-                            "unit": str(unit or "EA")[:32],
-                            "purchase_price": float(pp),
-                            "sell_price": float(sp),
-                            "vendor_item_number": str(vin or "")[:200],
-                            "is_active": True,
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                        ref = str(inv_ref or "").strip()
-                        if ref:
-                            payload["inventory_ref_id"] = ref
-                        insert_row_admin("estimate_materials", payload)
-                        clear_estimate_materials_catalog_cache()
-                        st.session_state[_EM_ACTION_PANEL_KEY] = ""
-                        st.success("Material added.")
-                        st.rerun()
-
-    if panel == "cats":
-        with st.container():
-            st.markdown("##### Manage categories")
-            st.caption("Bulk rename: exact **from** category → **to** category on all matching rows.")
-            with st.form("em_cat_rename"):
-                old_c = st.text_input("Rename from", placeholder="Exact category text")
-                new_c = st.text_input("Rename to", placeholder="New category text")
-                if st.form_submit_button("Apply rename", type="primary"):
-                    o = str(old_c or "").strip()
-                    n = str(new_c or "").strip()
-                    if not o or not n:
-                        st.error("Enter both values.")
-                    else:
-                        rows = fetch_by_match_admin("estimate_materials", {"category": o}, limit=5000)
-                        for r in rows or []:
-                            rid = str((r or {}).get("id") or "").strip()
-                            if rid:
-                                update_rows_admin(
-                                    "estimate_materials",
-                                    {
-                                        "category": n[:200],
-                                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                                    },
-                                    {"id": rid},
-                                )
-                        clear_estimate_materials_catalog_cache()
-                        st.session_state[_EM_ACTION_PANEL_KEY] = ""
-                        st.success(f"Updated {len(rows or [])} row(s).")
-                        st.rerun()
+    dlg = str(st.session_state.get(_EM_DLG_KEY) or "").strip()
+    if dlg == "add":
+        _em_add_material_dialog()
+    elif dlg == "cats":
+        _em_manage_categories_dialog()
 
     try:
         rows = list(fetch_table_admin("estimate_materials", limit=5000, order_by="item_key") or [])

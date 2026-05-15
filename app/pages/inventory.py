@@ -39,6 +39,7 @@ try:
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from app.ui.modal import ensure_modal_styles, modal_wide_marker
     from app.table_actions import (
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
@@ -67,6 +68,7 @@ except ImportError:
         inject_ips_crud_list_styles,
         render_crud_list_subtitle,
     )
+    from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
     from table_actions import (  # type: ignore
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
@@ -287,6 +289,361 @@ def _clear_panel() -> None:
     st.session_state.pop("inventory_panel_id", None)
 
 
+def _inv_add_dialog_on_dismiss() -> None:
+    _clear_panel()
+
+
+def _inv_edit_dialog_on_dismiss() -> None:
+    st.session_state["inventory_edit_popup_open"] = False
+    st.session_state["editing_inventory_id"] = None
+
+
+@st.dialog("Add inventory item", width="large", on_dismiss=_inv_add_dialog_on_dismiss)
+def _inventory_add_dialog() -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    st.markdown("### Add inventory item")
+
+    if str(st.session_state.get("inv_f_cat") or "").strip().lower() == "materials":
+        st.session_state.setdefault("inv_add_cat", "Materials")
+
+    with st.container(border=True):
+        with st.form("inv_add_item_form_v1", clear_on_submit=True):
+            name = st.text_input("Item Name", key="inv_add_name")
+            sku_add = st.text_input(
+                "SKU (optional)",
+                key="inv_add_sku",
+                help="Alternate lookup on **Scan Inventory** if QR is not used.",
+            )
+            c1, c2 = st.columns(2, gap="small")
+            category = c1.text_input("Category", key="inv_add_cat")
+            unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
+
+            r1, r2, r3 = st.columns(3, gap="small")
+            qty = r1.number_input(
+                "Quantity on Hand", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_qty"
+            )
+            reorder = r2.number_input(
+                "Reorder Point", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_reorder"
+            )
+            unit_cost = r3.number_input(
+                "Unit Cost",
+                min_value=0.0,
+                value=0.0,
+                step=0.01,
+                format="%.2f",
+                key="inv_add_cost",
+            )
+
+            v1, v2 = st.columns(2, gap="small")
+            vendor = v1.text_input("Vendor", key="inv_add_vendor")
+            storage_location = v2.text_input("Storage Location", key="inv_add_loc")
+
+            notes = st.text_area("Notes", key="inv_add_notes", height=72)
+            img_add = st.file_uploader(
+                "Item Image",
+                type=["png", "jpg", "jpeg"],
+                key="inv_img_add",
+                help="Optional thumbnail (resized on upload). PNG or JPEG.",
+            )
+            qr_scan = st.text_input(
+                "QR scan code (optional)",
+                key="inv_add_qr",
+                help="Unique value for **Scan Inventory**; leave blank to auto-assign after save.",
+            )
+            is_active = st.checkbox("Active", value=True, key="inv_add_active")
+
+            submitted = st.form_submit_button(
+                "Create item", type="primary", use_container_width=True
+            )
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key="inv_add_cancel_dlg"):
+        _clear_panel()
+        st.rerun()
+
+    if submitted:
+        t = str(name or "").strip()
+        if not t:
+            st.error("Item Name is required.")
+            return
+        qr_t = str(qr_scan or "").strip()
+        payload = {
+            "item_name": t,
+            "category": str(category or "").strip(),
+            "unit": str(unit or "").strip() or "EA",
+            "quantity_on_hand": float(qty or 0),
+            "reorder_point": float(reorder or 0),
+            "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
+            "vendor": str(vendor or "").strip(),
+            "storage_location": str(storage_location or "").strip(),
+            "notes": str(notes or "").strip(),
+            "is_active": bool(is_active),
+        }
+        if qr_t:
+            if _qr_value_in_use(value=qr_t, exclude_item_id=None):
+                st.error("That QR code value is already in use. Choose another or leave blank to auto-generate.")
+                return
+            payload["qr_code_value"] = qr_t
+        sku_t = str(sku_add or "").strip()
+        if sku_t:
+            payload["sku"] = sku_t
+        try:
+            row = insert_row_admin(_TABLE, payload)
+        except Exception as exc:
+            if "sku" in str(exc).lower():
+                st.error(
+                    f"Could not save: {exc} — run migration **`sql/028_inventory_sku_txn_created_by.sql`** if SKU column is missing."
+                )
+            else:
+                st.error(f"Could not save: {exc}")
+            return
+        rid = str(row.get("id") or "")
+        if rid:
+            qv = str(row.get("qr_code_value") or "").strip()
+            if not qv:
+                try:
+                    from app.services.qr_codes import inventory_qr_from_item_id
+                except ImportError:
+                    from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+                qv = _allocate_unique_qr(
+                    item_id=rid,
+                    preferred=inventory_qr_from_item_id(rid),
+                    exclude_item_id=rid,
+                )
+                update_rows_admin(_TABLE, {"qr_code_value": qv}, {"id": rid})
+            else:
+                qv = str(row.get("qr_code_value") or "").strip()
+            _sync_qr_image_to_storage(rid, qv)
+        if rid and img_add is not None:
+            try:
+                pth = _upload_item_image_from_upload(rid, img_add)
+                if pth:
+                    update_rows_admin(_TABLE, {"image_url": pth}, {"id": rid})
+            except Exception as exc:
+                if "image_url" in str(exc).lower() or "column" in str(exc).lower():
+                    st.warning(
+                        "Image was not saved — run migration **`sql/035_inventory_image_url.sql`** "
+                        f"then try again. ({exc})"
+                    )
+                else:
+                    st.warning(f"Image upload skipped: {exc}")
+        _clear_panel()
+        st.success("Inventory item added.")
+        st.rerun()
+
+
+@st.dialog("Edit inventory item", width="large", on_dismiss=_inv_edit_dialog_on_dismiss)
+def _inventory_edit_dialog(row: dict) -> None:
+    ensure_modal_styles()
+    modal_wide_marker()
+    rid = str(row.get("id") or "")
+    pk = f"inv_ed_{rid}"
+    st.markdown("### Edit inventory item")
+    st.caption(f"ID `{rid[:8]}…`")
+
+    with st.container(border=True):
+        with st.form(f"inv_edit_item_form_{rid}", clear_on_submit=False):
+            name = st.text_input("Item Name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
+            sku_ed = st.text_input(
+                "SKU (optional)",
+                value=str(row.get("sku") or ""),
+                key=f"{pk}_sku",
+                help="Alternate lookup on **Scan Inventory**.",
+            )
+            c1, c2 = st.columns(2, gap="small")
+            category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
+            unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
+
+            r1, r2, r3 = st.columns(3, gap="small")
+            qty = r1.number_input(
+                "Quantity on Hand",
+                min_value=0.0,
+                value=float(row.get("quantity_on_hand") or 0),
+                step=1.0,
+                format="%.2f",
+                key=f"{pk}_qty",
+            )
+            reorder = r2.number_input(
+                "Reorder Point",
+                min_value=0.0,
+                value=float(row.get("reorder_point") or 0),
+                step=1.0,
+                format="%.2f",
+                key=f"{pk}_reorder",
+            )
+            uc_val = row.get("unit_cost")
+            try:
+                uc_default = float(uc_val) if uc_val is not None and str(uc_val).strip() != "" else 0.0
+            except (TypeError, ValueError):
+                uc_default = 0.0
+            unit_cost = r3.number_input(
+                "Unit Cost",
+                min_value=0.0,
+                value=uc_default,
+                step=0.01,
+                format="%.2f",
+                key=f"{pk}_cost",
+            )
+
+            v1, v2 = st.columns(2, gap="small")
+            vendor = v1.text_input("Vendor", value=str(row.get("vendor") or ""), key=f"{pk}_vendor")
+            storage_location = v2.text_input(
+                "Storage Location", value=str(row.get("storage_location") or ""), key=f"{pk}_loc"
+            )
+
+            notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
+            st.caption("Item photo")
+            img_existing = _signed_url_for_inventory_image(str(row.get("image_url") or "").strip())
+            if img_existing:
+                st.image(img_existing, width=80)
+            else:
+                st.markdown('<p style="font-size:2rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+            img_ed = st.file_uploader(
+                "Item Image",
+                type=["png", "jpg", "jpeg"],
+                key=f"inv_img_{rid}",
+                help="Upload a new image to replace the thumbnail (resized on save).",
+            )
+            qr_in = st.text_input(
+                "QR scan code",
+                value=str(row.get("qr_code_value") or "").strip(),
+                key=f"{pk}_qr",
+                help="Printed / scanned value for **Scan Inventory**.",
+            )
+            is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
+
+            submitted = st.form_submit_button(
+                "Save",
+                type="primary",
+                use_container_width=True,
+            )
+
+        with st.expander("QR Label / Code", expanded=False):
+            qr_cur = str(row.get("qr_code_value") or "").strip()
+            if qr_cur:
+                st.caption("Label preview")
+                st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
+                html_doc = _inventory_label_html(
+                    item_name=str(row.get("item_name") or ""),
+                    sku=str(row.get("sku") or ""),
+                    qr_value=qr_cur,
+                    item_id=rid,
+                )
+                st.download_button(
+                    "Print QR label (HTML)",
+                    data=html_doc.encode("utf-8"),
+                    file_name=f"inventory_label_{rid[:8]}.html",
+                    mime="text/html",
+                    key=f"{pk}_dl_lbl",
+                )
+                png = _qr_png_bytes_or_none(qr_cur)
+                if png:
+                    st.download_button(
+                        "Download QR (PNG)",
+                        data=png,
+                        file_name=f"inventory_qr_{rid[:8]}.png",
+                        mime="image/png",
+                        key=f"{pk}_dl_png",
+                    )
+            if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new unique scan code"):
+                try:
+                    nv = _allocate_unique_qr(
+                        item_id=str(row.get("id") or ""),
+                        preferred=None,
+                        exclude_item_id=str(row.get("id") or ""),
+                    )
+                    update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
+                    _sync_qr_image_to_storage(str(row.get("id") or ""), nv)
+                except Exception as exc:
+                    st.error(f"Could not update QR: {exc}")
+                    return
+                st.rerun()
+
+    if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel_dlg"):
+        st.session_state["inventory_edit_popup_open"] = False
+        st.session_state["editing_inventory_id"] = None
+        st.session_state["selected_inventory_ids"] = []
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("inv_select_"):
+                del st.session_state[k]
+        clear_selected_ids(TABLE_KEY_INVENTORY)
+        _clear_panel()
+        st.rerun()
+
+    if submitted:
+        t = str(name or "").strip()
+        if not t:
+            st.error("Item Name is required.")
+            return
+        qr_t = str(qr_in or "").strip()
+        old_qr = str(row.get("qr_code_value") or "").strip()
+        if qr_t and qr_t != old_qr and _qr_value_in_use(value=qr_t, exclude_item_id=str(row.get("id") or "")):
+            st.error("That QR code value is already used by another item.")
+            return
+        payload = {
+            "item_name": t,
+            "category": str(category or "").strip(),
+            "unit": str(unit or "").strip() or "EA",
+            "quantity_on_hand": float(qty or 0),
+            "reorder_point": float(reorder or 0),
+            "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
+            "vendor": str(vendor or "").strip(),
+            "storage_location": str(storage_location or "").strip(),
+            "notes": str(notes or "").strip(),
+            "is_active": bool(is_active),
+            "qr_code_value": qr_t or None,
+            "sku": str(sku_ed or "").strip() or None,
+        }
+        try:
+            update_rows_admin(_TABLE, payload, {"id": row["id"]})
+        except Exception as exc:
+            if "sku" in str(exc).lower():
+                st.error(
+                    f"Could not update: {exc} — apply **`sql/028_inventory_sku_txn_created_by.sql`** for SKU support."
+                )
+            else:
+                st.error(f"Could not update: {exc}")
+            return
+        final_qr = str(qr_t or old_qr or "").strip()
+        if not final_qr:
+            try:
+                from app.services.qr_codes import inventory_qr_from_item_id
+            except ImportError:
+                from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+            final_qr = _allocate_unique_qr(
+                item_id=str(row.get("id") or ""),
+                preferred=inventory_qr_from_item_id(str(row.get("id") or "")),
+                exclude_item_id=str(row.get("id") or ""),
+            )
+            update_rows_admin(_TABLE, {"qr_code_value": final_qr}, {"id": row["id"]})
+        _sync_qr_image_to_storage(str(row.get("id") or ""), final_qr)
+        if img_ed is not None:
+            try:
+                pth = _upload_item_image_from_upload(str(row.get("id") or ""), img_ed)
+                if pth:
+                    update_rows_admin(_TABLE, {"image_url": pth}, {"id": row["id"]})
+            except Exception as exc:
+                if "image_url" in str(exc).lower() or "column" in str(exc).lower():
+                    st.warning(
+                        "Image was not saved — run **`sql/035_inventory_image_url.sql`**. "
+                        f"({exc})"
+                    )
+                else:
+                    st.warning(f"Image upload skipped: {exc}")
+        st.session_state["inventory_edit_mode"] = False
+        st.session_state["editing_inventory_id"] = None
+        st.session_state["selected_inventory_ids"] = []
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("inv_select_"):
+                del st.session_state[k]
+        clear_selected_ids(TABLE_KEY_INVENTORY)
+        _clear_panel()
+        st.session_state["inventory_success"] = "Inventory item updated."
+        st.session_state["inventory_edit_popup_open"] = False
+        st.session_state["editing_inventory_id"] = None
+        st.rerun()
+
+
 def _render_inventory_action_bar(
     *, df_all: pd.DataFrame, visible_df: pd.DataFrame, can_edit: bool, selected_key: str
 ) -> None:
@@ -432,354 +789,6 @@ def _render_inventory_action_bar(
                     except Exception as exc:
                         st.error(f"Regenerate failed: {exc}")
                     st.rerun()
-
-
-def _render_add_panel() -> None:
-    inject_ips_crud_list_styles()
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Add inventory item")
-
-        if str(st.session_state.get("inv_f_cat") or "").strip().lower() == "materials":
-            st.session_state.setdefault("inv_add_cat", "Materials")
-
-        with st.form("inv_add_item_form_v1", clear_on_submit=True):
-            name = st.text_input("Item Name", key="inv_add_name")
-            sku_add = st.text_input(
-                "SKU (optional)",
-                key="inv_add_sku",
-                help="Alternate lookup on **Scan Inventory** if QR is not used.",
-            )
-            c1, c2 = st.columns(2, gap="small")
-            category = c1.text_input("Category", key="inv_add_cat")
-            unit = c2.text_input("Unit", value="EA", key="inv_add_unit")
-
-            r1, r2, r3 = st.columns(3, gap="small")
-            qty = r1.number_input(
-                "Quantity on Hand", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_qty"
-            )
-            reorder = r2.number_input(
-                "Reorder Point", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="inv_add_reorder"
-            )
-            unit_cost = r3.number_input(
-                "Unit Cost",
-                min_value=0.0,
-                value=0.0,
-                step=0.01,
-                format="%.2f",
-                key="inv_add_cost",
-            )
-
-            v1, v2 = st.columns(2, gap="small")
-            vendor = v1.text_input("Vendor", key="inv_add_vendor")
-            storage_location = v2.text_input("Storage Location", key="inv_add_loc")
-
-            notes = st.text_area("Notes", key="inv_add_notes", height=72)
-            img_add = st.file_uploader(
-                "Item Image",
-                type=["png", "jpg", "jpeg"],
-                key="inv_img_add",
-                help="Optional thumbnail (resized on upload). PNG or JPEG.",
-            )
-            qr_scan = st.text_input(
-                "QR scan code (optional)",
-                key="inv_add_qr",
-                help="Unique value for **Scan Inventory**; leave blank to auto-assign after save.",
-            )
-            is_active = st.checkbox("Active", value=True, key="inv_add_active")
-
-            submitted = st.form_submit_button(
-                "Save Inventory Item", type="primary", use_container_width=True
-            )
-
-        if st.button("Cancel", use_container_width=True, key="inv_add_cancel"):
-            _clear_panel()
-            st.rerun()
-
-        if submitted:
-            t = str(name or "").strip()
-            if not t:
-                st.error("Item Name is required.")
-                st.stop()
-            qr_t = str(qr_scan or "").strip()
-            payload = {
-                "item_name": t,
-                "category": str(category or "").strip(),
-                "unit": str(unit or "").strip() or "EA",
-                "quantity_on_hand": float(qty or 0),
-                "reorder_point": float(reorder or 0),
-                "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
-                "vendor": str(vendor or "").strip(),
-                "storage_location": str(storage_location or "").strip(),
-                "notes": str(notes or "").strip(),
-                "is_active": bool(is_active),
-            }
-            if qr_t:
-                if _qr_value_in_use(value=qr_t, exclude_item_id=None):
-                    st.error("That QR code value is already in use. Choose another or leave blank to auto-generate.")
-                    st.stop()
-                payload["qr_code_value"] = qr_t
-            sku_t = str(sku_add or "").strip()
-            if sku_t:
-                payload["sku"] = sku_t
-            try:
-                row = insert_row_admin(_TABLE, payload)
-            except Exception as exc:
-                if "sku" in str(exc).lower():
-                    st.error(
-                        f"Could not save: {exc} — run migration **`sql/028_inventory_sku_txn_created_by.sql`** if SKU column is missing."
-                    )
-                else:
-                    st.error(f"Could not save: {exc}")
-                st.stop()
-            rid = str(row.get("id") or "")
-            if rid:
-                qv = str(row.get("qr_code_value") or "").strip()
-                if not qv:
-                    try:
-                        from app.services.qr_codes import inventory_qr_from_item_id
-                    except ImportError:
-                        from services.qr_codes import inventory_qr_from_item_id  # type: ignore
-                    qv = _allocate_unique_qr(
-                        item_id=rid,
-                        preferred=inventory_qr_from_item_id(rid),
-                        exclude_item_id=rid,
-                    )
-                    update_rows_admin(_TABLE, {"qr_code_value": qv}, {"id": rid})
-                else:
-                    qv = str(row.get("qr_code_value") or "").strip()
-                _sync_qr_image_to_storage(rid, qv)
-            if rid and img_add is not None:
-                try:
-                    pth = _upload_item_image_from_upload(rid, img_add)
-                    if pth:
-                        update_rows_admin(_TABLE, {"image_url": pth}, {"id": rid})
-                except Exception as exc:
-                    if "image_url" in str(exc).lower() or "column" in str(exc).lower():
-                        st.warning(
-                            "Image was not saved — run migration **`sql/035_inventory_image_url.sql`** "
-                            f"then try again. ({exc})"
-                        )
-                    else:
-                        st.warning(f"Image upload skipped: {exc}")
-            _clear_panel()
-            st.success("Inventory item added.")
-            st.rerun()
-
-
-def _render_edit_panel(row: dict) -> None:
-    inject_ips_crud_list_styles()
-    rid = str(row.get("id") or "")
-    pk = f"inv_ed_{rid}"
-    with st.container(border=True):
-        st.markdown('<span class="ips-crud-side-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("### Edit Inventory Item")
-        st.caption(f"ID `{rid[:8]}…`")
-
-        with st.form(f"inv_edit_item_form_{rid}", clear_on_submit=False):
-            name = st.text_input("Item Name", value=str(row.get("item_name") or ""), key=f"{pk}_name")
-            sku_ed = st.text_input(
-                "SKU (optional)",
-                value=str(row.get("sku") or ""),
-                key=f"{pk}_sku",
-                help="Alternate lookup on **Scan Inventory**.",
-            )
-            c1, c2 = st.columns(2, gap="small")
-            category = c1.text_input("Category", value=str(row.get("category") or ""), key=f"{pk}_cat")
-            unit = c2.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"{pk}_unit")
-
-            r1, r2, r3 = st.columns(3, gap="small")
-            qty = r1.number_input(
-                "Quantity on Hand",
-                min_value=0.0,
-                value=float(row.get("quantity_on_hand") or 0),
-                step=1.0,
-                format="%.2f",
-                key=f"{pk}_qty",
-            )
-            reorder = r2.number_input(
-                "Reorder Point",
-                min_value=0.0,
-                value=float(row.get("reorder_point") or 0),
-                step=1.0,
-                format="%.2f",
-                key=f"{pk}_reorder",
-            )
-            uc_val = row.get("unit_cost")
-            try:
-                uc_default = float(uc_val) if uc_val is not None and str(uc_val).strip() != "" else 0.0
-            except (TypeError, ValueError):
-                uc_default = 0.0
-            unit_cost = r3.number_input(
-                "Unit Cost",
-                min_value=0.0,
-                value=uc_default,
-                step=0.01,
-                format="%.2f",
-                key=f"{pk}_cost",
-            )
-
-            v1, v2 = st.columns(2, gap="small")
-            vendor = v1.text_input("Vendor", value=str(row.get("vendor") or ""), key=f"{pk}_vendor")
-            storage_location = v2.text_input(
-                "Storage Location", value=str(row.get("storage_location") or ""), key=f"{pk}_loc"
-            )
-
-            notes = st.text_area("Notes", value=str(row.get("notes") or ""), height=72, key=f"{pk}_notes")
-            st.caption("Item photo")
-            img_existing = _signed_url_for_inventory_image(str(row.get("image_url") or "").strip())
-            if img_existing:
-                st.image(img_existing, width=80)
-            else:
-                st.markdown('<p style="font-size:2rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
-            img_ed = st.file_uploader(
-                "Item Image",
-                type=["png", "jpg", "jpeg"],
-                key=f"inv_img_{rid}",
-                help="Upload a new image to replace the thumbnail (resized on save).",
-            )
-            qr_in = st.text_input(
-                "QR scan code",
-                value=str(row.get("qr_code_value") or "").strip(),
-                key=f"{pk}_qr",
-                help="Printed / scanned value for **Scan Inventory**.",
-            )
-            is_active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"{pk}_active")
-
-            submitted = st.form_submit_button(
-                "Update Inventory Item",
-                type="primary",
-                use_container_width=True,
-            )
-
-        with st.expander("QR Label / Code", expanded=False):
-            qr_cur = str(row.get("qr_code_value") or "").strip()
-            if qr_cur:
-                st.caption("Label preview")
-                st.markdown(_inv_qr_img_html(qr_cur), unsafe_allow_html=True)
-                html_doc = _inventory_label_html(
-                    item_name=str(row.get("item_name") or ""),
-                    sku=str(row.get("sku") or ""),
-                    qr_value=qr_cur,
-                    item_id=rid,
-                )
-                st.download_button(
-                    "Print QR label (HTML)",
-                    data=html_doc.encode("utf-8"),
-                    file_name=f"inventory_label_{rid[:8]}.html",
-                    mime="text/html",
-                    key=f"{pk}_dl_lbl",
-                )
-                png = _qr_png_bytes_or_none(qr_cur)
-                if png:
-                    st.download_button(
-                        "Download QR (PNG)",
-                        data=png,
-                        file_name=f"inventory_qr_{rid[:8]}.png",
-                        mime="image/png",
-                        key=f"{pk}_dl_png",
-                    )
-            if st.button("Generate new QR code", key=f"{pk}_qrgen", help="Assigns a new unique scan code"):
-                try:
-                    nv = _allocate_unique_qr(
-                        item_id=str(row.get("id") or ""),
-                        preferred=None,
-                        exclude_item_id=str(row.get("id") or ""),
-                    )
-                    update_rows_admin(_TABLE, {"qr_code_value": nv}, {"id": row["id"]})
-                    _sync_qr_image_to_storage(str(row.get("id") or ""), nv)
-                except Exception as exc:
-                    st.error(f"Could not update QR: {exc}")
-                    st.stop()
-                st.rerun()
-
-        u1, u2 = st.columns(2, gap="small")
-        with u1:
-            st.empty()
-        with u2:
-            if st.button("Cancel", use_container_width=True, key=f"{pk}_cancel"):
-                st.session_state["inventory_edit_popup_open"] = False
-                st.session_state["editing_inventory_id"] = None
-                st.session_state["selected_inventory_ids"] = []
-                for k in list(st.session_state.keys()):
-                    if str(k).startswith("inv_select_"):
-                        del st.session_state[k]
-                clear_selected_ids(TABLE_KEY_INVENTORY)
-                _clear_panel()
-                st.rerun()
-
-        if submitted:
-            t = str(name or "").strip()
-            if not t:
-                st.error("Item Name is required.")
-                st.stop()
-            qr_t = str(qr_in or "").strip()
-            old_qr = str(row.get("qr_code_value") or "").strip()
-            if qr_t and qr_t != old_qr and _qr_value_in_use(value=qr_t, exclude_item_id=str(row.get("id") or "")):
-                st.error("That QR code value is already used by another item.")
-                st.stop()
-            payload = {
-                "item_name": t,
-                "category": str(category or "").strip(),
-                "unit": str(unit or "").strip() or "EA",
-                "quantity_on_hand": float(qty or 0),
-                "reorder_point": float(reorder or 0),
-                "unit_cost": float(unit_cost) if float(unit_cost or 0) > 0 else None,
-                "vendor": str(vendor or "").strip(),
-                "storage_location": str(storage_location or "").strip(),
-                "notes": str(notes or "").strip(),
-                "is_active": bool(is_active),
-                "qr_code_value": qr_t or None,
-                "sku": str(sku_ed or "").strip() or None,
-            }
-            try:
-                update_rows_admin(_TABLE, payload, {"id": row["id"]})
-            except Exception as exc:
-                if "sku" in str(exc).lower():
-                    st.error(
-                        f"Could not update: {exc} — apply **`sql/028_inventory_sku_txn_created_by.sql`** for SKU support."
-                    )
-                else:
-                    st.error(f"Could not update: {exc}")
-                st.stop()
-            final_qr = str(qr_t or old_qr or "").strip()
-            if not final_qr:
-                try:
-                    from app.services.qr_codes import inventory_qr_from_item_id
-                except ImportError:
-                    from services.qr_codes import inventory_qr_from_item_id  # type: ignore
-                final_qr = _allocate_unique_qr(
-                    item_id=str(row.get("id") or ""),
-                    preferred=inventory_qr_from_item_id(str(row.get("id") or "")),
-                    exclude_item_id=str(row.get("id") or ""),
-                )
-                update_rows_admin(_TABLE, {"qr_code_value": final_qr}, {"id": row["id"]})
-            _sync_qr_image_to_storage(str(row.get("id") or ""), final_qr)
-            if img_ed is not None:
-                try:
-                    pth = _upload_item_image_from_upload(str(row.get("id") or ""), img_ed)
-                    if pth:
-                        update_rows_admin(_TABLE, {"image_url": pth}, {"id": row["id"]})
-                except Exception as exc:
-                    if "image_url" in str(exc).lower() or "column" in str(exc).lower():
-                        st.warning(
-                            "Image was not saved — run **`sql/035_inventory_image_url.sql`**. "
-                            f"({exc})"
-                        )
-                    else:
-                        st.warning(f"Image upload skipped: {exc}")
-            st.session_state["inventory_edit_mode"] = False
-            st.session_state["editing_inventory_id"] = None
-            st.session_state["selected_inventory_ids"] = []
-            for k in list(st.session_state.keys()):
-                if str(k).startswith("inv_select_"):
-                    del st.session_state[k]
-            clear_selected_ids(TABLE_KEY_INVENTORY)
-            _clear_panel()
-            st.session_state["inventory_success"] = "Inventory item updated."
-            st.session_state["inventory_edit_popup_open"] = False
-            st.session_state["editing_inventory_id"] = None
-            st.rerun()
 
 
 def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
@@ -950,23 +959,10 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
         )
 
     sel_ids = selected_ids
-    cur_mode = str(st.session_state.get("inventory_panel_mode") or "").strip().lower()
-    if len(sel_ids) == 1:
-        if cur_mode != "add":
-            need_rerun = False
-            if not bool(st.session_state.get("inventory_edit_popup_open")):
-                st.session_state["inventory_edit_popup_open"] = True
-                need_rerun = True
-            if str(st.session_state.get("editing_inventory_id") or "") != str(sel_ids[0]):
-                st.session_state["editing_inventory_id"] = str(sel_ids[0])
-                need_rerun = True
-            if need_rerun:
-                st.rerun()
-    else:
-        if bool(st.session_state.get("inventory_edit_popup_open")):
+    if len(sel_ids) != 1:
+        if st.session_state.get("inventory_edit_popup_open"):
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
-            st.rerun()
 
 
 def render() -> None:
@@ -1120,11 +1116,9 @@ def render() -> None:
     # Filters → low stock → table → action bar (single call). Details render below when open.
     _render_inventory_list(df=df, can_edit=can_edit, selected_key=selected_key)
 
-    # Add panel (kept as-is)
     if panel_mode == "add" and can_edit:
-        _render_add_panel()
+        _inventory_add_dialog()
 
-    # Edit popup (single selection opens it; clearing selection closes it)
     if st.session_state.get("inventory_edit_popup_open"):
         if not can_edit:
             st.session_state["inventory_edit_popup_open"] = False
@@ -1140,25 +1134,4 @@ def render() -> None:
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
             st.rerun()
-        st.markdown(
-            """
-            <style>
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.inventory-edit-popup-anchor) {
-              max-width: 520px !important;
-              width: 100% !important;
-              margin: 12px auto !important;
-              border: 1px solid rgba(120,150,200,.35) !important;
-              border-radius: 14px !important;
-              background: rgba(8,22,55,.96) !important;
-              box-shadow: 0 18px 50px rgba(0,0,0,.45) !important;
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.inventory-edit-popup-anchor) h3 {
-              margin-top: 0 !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-        with st.container(border=True):
-            st.markdown('<span class="inventory-edit-popup-anchor"></span>', unsafe_allow_html=True)
-            _render_edit_panel(panel_row)
+        _inventory_edit_dialog(dict(panel_row))
