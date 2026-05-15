@@ -2165,7 +2165,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 key="est_quote_attach_uploader",
                 help="Files are staged in the draft until you Save.",
             )
-                if st.form_submit_button("Add to draft", disabled=is_locked):
+            if st.form_submit_button("Add to draft", disabled=is_locked):
                 if not up_files:
                     st.warning("Choose one or more files first.")
                     st.stop()
