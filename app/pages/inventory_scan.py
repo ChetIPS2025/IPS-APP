@@ -654,7 +654,6 @@ def _render_inv_scan_asset_panel(
                     st.success("Holder updated.")
                     st.session_state.pop("inv_scan_asset", None)
                     st.rerun()
-        else:
     else:
         st.warning(
             f"Status is **{html.escape(status)}** — use **Asset Database** to move to **Available** before checkout, "
