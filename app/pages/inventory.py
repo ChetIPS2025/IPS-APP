@@ -35,6 +35,7 @@ try:
         upload_bytes_admin,
     )
     from app.ips_crud_list_styles import inject_ips_crud_list_styles
+    from app.ui.compact_forms import field_marker
     from app.ui.page_shell import render_page_header, render_section_header
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
     from app.ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun
@@ -62,6 +63,7 @@ except ImportError:
         upload_bytes_admin,
     )
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
+    from ui.compact_forms import field_marker  # type: ignore
     from ui.page_shell import render_page_header, render_section_header  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
     from ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun  # type: ignore
@@ -869,7 +871,8 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
             ips_app_rerun()
         return
 
-    filter_cols = st.columns([1, 2, 1], gap="small")
+    st.markdown('<span class="ips-compact-form" aria-hidden="true"></span>', unsafe_allow_html=True)
+    filter_cols = st.columns([0.9, 1.55, 0.9], gap="small")
     categories = sorted(
         set(
             ["Materials"]
@@ -884,14 +887,20 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
             ]
         )
     )
-    filter_cols[0].selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
-    filter_cols[1].text_input(
-        "Search Inventory",
-        placeholder="Name, SKU, QR, category, vendor, location, notes",
-        key="inv_f_search",
-    )
+    with filter_cols[0]:
+        field_marker("medium")
+        st.selectbox("Filter Category", ["All"] + categories, key="inv_f_cat")
+    with filter_cols[1]:
+        field_marker("search")
+        st.text_input(
+            "Search Inventory",
+            placeholder="Name, SKU, QR, category, vendor, location, notes",
+            key="inv_f_search",
+        )
     active_options = ["All", "Active Only", "Inactive Only"]
-    filter_cols[2].selectbox("Status", active_options, key="inv_f_active")
+    with filter_cols[2]:
+        field_marker("medium")
+        st.selectbox("Status", active_options, key="inv_f_active")
 
     selected_category = st.session_state.get("inv_f_cat", "All")
     search = st.session_state.get("inv_f_search", "")

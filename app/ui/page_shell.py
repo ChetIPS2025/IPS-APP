@@ -41,6 +41,11 @@ def inject_ips_dashboard_layout() -> None:
     except ImportError:
         from ui.streamlit_perf import inject_scroll_preserve  # type: ignore
     inject_scroll_preserve("ips_app")
+    try:
+        from app.ui.compact_forms import inject_compact_form_styles
+    except ImportError:
+        from ui.compact_forms import inject_compact_form_styles  # type: ignore
+    inject_compact_form_styles()
     st.markdown(
         """
         <style>
@@ -350,6 +355,10 @@ def render_filter_row(
 ) -> dict[str, Any]:
     """Horizontal filters; optional Clear button as last column."""
     inject_ips_dashboard_layout()
+    try:
+        from app.ui.compact_forms import field_marker
+    except ImportError:
+        from ui.compact_forms import field_marker  # type: ignore
     if clear_key:
         weights = [float(s.get("width", 1)) for s in specs] + [0.45]
         cols = st.columns(weights, gap=gap)
@@ -366,7 +375,9 @@ def render_filter_row(
         key = str(spec["key"])
         label = str(spec.get("label", ""))
         wtype = str(spec.get("widget", "selectbox"))
+        fkind = str(spec.get("field", "search" if wtype == "text_input" else "medium"))
         with col:
+            field_marker(fkind)
             if wtype == "text_input":
                 st.text_input(label, key=key, placeholder=str(spec.get("placeholder", "")))
                 out[key] = st.session_state.get(key, "")
@@ -376,10 +387,10 @@ def render_filter_row(
     if clear_col is not None and clear_key:
         with clear_col:
             st.markdown(
-                '<div aria-hidden="true" style="display:block;height:1.55rem"></motion>',
+                '<div aria-hidden="true" style="display:block;height:1.55rem"></div>',
                 unsafe_allow_html=True,
             )
-            if st.button("Clear", key=clear_key, use_container_width=True):
+            if st.button("Clear", key=clear_key, use_container_width=False):
                 if on_clear:
                     on_clear()
     return out

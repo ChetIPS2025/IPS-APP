@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v8"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v9"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -57,16 +57,16 @@ def inject_ips_app_shell_styles() -> None:
             --ips-ctrl-fs: 0.875rem;
             --ips-ctrl-lh: 1.32;
             --ips-ctrl-radius: 10px;
-            --ips-ctrl-pad-y: 0.45rem;
-            --ips-ctrl-pad-x: 0.7rem;
-            --ips-ctrl-h: 3rem;
+            --ips-ctrl-pad-y: 0.28rem;
+            --ips-ctrl-pad-x: 0.55rem;
+            --ips-ctrl-h: 2.125rem;
             --ips-ctrl-border: #9ca3af;
             --ips-ctrl-bg: #ffffff;
             --ips-ctrl-fg: var(--ips-text);
             --ips-ctrl-ph: #4b5563;
             --ips-label-fs: 0.875rem;
             --ips-label-color: #111827;
-            --ips-widget-gap: 0.2rem;
+            --ips-widget-gap: 0.12rem;
         }
 
         .stApp,
@@ -339,11 +339,15 @@ def inject_ips_app_shell_styles() -> None:
             color: var(--ips-label-color) !important;
             font-weight: 600 !important;
             line-height: 1.25 !important;
-            margin-bottom: 0.1rem !important;
+            margin-bottom: 0.05rem !important;
             letter-spacing: 0.01em;
         }
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stElementContainer"] {
             margin-bottom: var(--ips-widget-gap) !important;
+        }
+        :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stHorizontalBlock"] {
+            gap: 0.4rem !important;
+            align-items: flex-end !important;
         }
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextInput"] input {
@@ -366,8 +370,8 @@ def inject_ips_app_shell_styles() -> None:
 
         :is(section[data-testid="stMain"], section[data-testid="stSidebar"]) [data-testid="stTextArea"] textarea {
             border-radius: var(--ips-ctrl-radius) !important;
-            min-height: 3rem !important;
-            padding: 0.32rem 0.5rem !important;
+            min-height: 2.25rem !important;
+            padding: 0.28rem 0.5rem !important;
             font-size: var(--ips-ctrl-fs) !important;
             line-height: var(--ips-ctrl-lh) !important;
             background: var(--ips-ctrl-bg) !important;
@@ -400,7 +404,8 @@ def inject_ips_app_shell_styles() -> None:
             border: 1px solid #9ca3af !important;
             border-radius: 8px !important;
             box-shadow: none !important;
-            min-height: 48px !important;
+            min-height: var(--ips-ctrl-h) !important;
+            max-width: min(350px, 100%) !important;
             width: 100% !important;
             box-sizing: border-box !important;
         }
@@ -414,8 +419,8 @@ def inject_ips_app_shell_styles() -> None:
             border-radius: 0 !important;
             box-shadow: none !important;
             outline: none !important;
-            min-height: 48px !important;
-            padding: 10px 12px !important;
+            min-height: var(--ips-ctrl-h) !important;
+            padding: 0.28rem 0.55rem !important;
             font-size: var(--ips-ctrl-fs) !important;
             line-height: var(--ips-ctrl-lh) !important;
             color: #111827 !important;

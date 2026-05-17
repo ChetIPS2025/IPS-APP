@@ -11,8 +11,10 @@ import streamlit as st
 
 from auth import current_role
 try:
+    from app.ui.compact_forms import field_marker
     from app.ui.page_shell import action_bar_card, render_page_header, render_section_header
 except ImportError:
+    from ui.compact_forms import field_marker  # type: ignore
     from ui.page_shell import action_bar_card, render_page_header, render_section_header  # type: ignore
 from db import (
     fetch_by_match,
@@ -2453,12 +2455,13 @@ def render() -> None:
 
             with st.container(border=True):
                 st.markdown(
-                    '<span class="ips-list-top-anchor ips-job-filter-anchor ips-job-joblist-section-anchor"></span>',
+                    '<span class="ips-list-top-anchor ips-job-filter-anchor ips-job-joblist-section-anchor ips-compact-form"></span>',
                     unsafe_allow_html=True,
                 )
                 st.markdown('<p class="ips-jdb-section-title">Job list</p>', unsafe_allow_html=True)
-                f1, f2, f3, f4 = st.columns([1.05, 1.05, 2.35, 1.0], gap="small")
+                f1, f2, f3, f4 = st.columns([1.0, 1.0, 1.45, 0.95], gap="small")
                 with f1:
+                    field_marker("medium")
                     selected_customer = st.selectbox(
                         "Filter Customer",
                         ["All"] + customer_names,
@@ -2466,6 +2469,7 @@ def render() -> None:
                         key="job_filt_customer",
                     )
                 with f2:
+                    field_marker("medium")
                     selected_status = st.selectbox(
                         "Filter Status",
                         ["All"] + JOB_STATUSES,
@@ -2473,6 +2477,7 @@ def render() -> None:
                         key="job_filt_status",
                     )
                 with f3:
+                    field_marker("search")
                     _search_hint = (
                         "Source, quote, contact, location, job_number, job_name, customer, status, …"
                         if has_job_number_column
@@ -2484,6 +2489,7 @@ def render() -> None:
                         key="job_filt_search",
                     )
                 with f4:
+                    field_marker("medium")
                     selected_source = st.selectbox(
                         "Source",
                         ["All", "Estimate", "Other"],

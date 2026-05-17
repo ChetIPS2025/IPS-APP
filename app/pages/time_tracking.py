@@ -14,8 +14,10 @@ except ImportError:
 
 from auth import current_profile, current_role
 try:
+    from app.ui.compact_forms import field_marker
     from app.ui.page_shell import render_page_header
 except ImportError:
+    from ui.compact_forms import field_marker  # type: ignore
     from ui.page_shell import render_page_header  # type: ignore
 from db import delete_rows, fetch_one, fetch_table, fetch_table_admin, insert_row, update_rows
 
@@ -665,6 +667,17 @@ def _inject_tt_styles() -> None:
                 max-width: 420px !important;
             }
         }
+        /* Simple labor entry cards */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) [data-testid="stElementContainer"] {
+            margin-bottom: 0.1rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) {
+            padding: 0.45rem 0.55rem 0.5rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) [data-testid="stFormSubmitButton"] {
+            align-self: flex-end !important;
+            margin-top: 0.15rem !important;
+        }
         /* Table “Edit Entry” — compact strip above grid */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-edit-mini-popup) {
             max-width: 280px !important;
@@ -1222,7 +1235,7 @@ def _tt_render_toolbar_section(today: date) -> tuple[date, list[date], date]:
     with pm_row1:
         st.caption("One-day crew grid: **PM Matrix Time Entry** (sidebar).")
     with pm_row2:
-        if st.button("PM Matrix", key="tt_open_pm_matrix", use_container_width=True):
+        if st.button("PM Matrix", key="tt_open_pm_matrix", use_container_width=False):
             st.session_state[IPS_NAV_PENDING_KEY] = "PM Matrix Time Entry"
             st.rerun()
 
@@ -1412,13 +1425,16 @@ def _tt_render_simple_timesheet(
     day_isos = [d.isoformat() for d in days]
     if wk_date_key not in st.session_state or st.session_state[wk_date_key] not in day_isos:
         st.session_state[wk_date_key] = (today.isoformat() if today in days else days[0].isoformat())
-    sel_iso = st.selectbox(
-        "Working date",
-        day_isos,
-        format_func=lambda s: date.fromisoformat(s).strftime("%a %m/%d"),
-        key=wk_date_key,
-        help="New lines and the lists below use this date.",
-    )
+    _wd_col, _ = st.columns([0.28, 4], gap="small")
+    with _wd_col:
+        field_marker("date")
+        sel_iso = st.selectbox(
+            "Working date",
+            day_isos,
+            format_func=lambda s: date.fromisoformat(s).strftime("%a %m/%d"),
+            key=wk_date_key,
+            help="New lines and the lists below use this date.",
+        )
     work_d = date.fromisoformat(sel_iso)
     work_iso = work_d.isoformat()
 
@@ -1432,19 +1448,26 @@ def _tt_render_simple_timesheet(
         over_note = f" · over **{filt.ot_threshold:g}** h/week" if over else ""
 
         with st.container(border=True):
+            st.markdown(
+                '<span class="ips-compact-form ips-tt-simple-entry" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             st.markdown(f"**{html.escape(nm)}**")
             st.caption(
                 f"{work_d.strftime('%a %m/%d')}: S/T **{dst:.2f}** h · O/T **{dot:.2f}** h · "
                 f"Week: S/T **{wst:.2f}** · O/T **{wot:.2f}** · Σ **{wtot:.2f}** h{over_note}"
             )
 
-            q = st.text_input(
-                "Find job",
-                value="",
-                key=f"tt_job_q_{week_start}_{eid}",
-                placeholder="Search job # or name…",
-                label_visibility="collapsed",
-            )
+            _sq, _ = st.columns([1.35, 4], gap="small")
+            with _sq:
+                field_marker("search")
+                q = st.text_input(
+                    "Find job",
+                    value="",
+                    key=f"tt_job_q_{week_start}_{eid}",
+                    placeholder="Search job # or name…",
+                    label_visibility="collapsed",
+                )
             qn = str(q or "").strip().lower()
             job_opts = [lb for lb in active_labels if not qn or qn in lb.lower()]
             if not job_opts:
@@ -1454,11 +1477,19 @@ def _tt_render_simple_timesheet(
                     job_opts = ["(No jobs match search — clear filter)"]
 
             with st.form(key=f"tt_add_form_{week_start}_{eid}", clear_on_submit=False):
+                field_marker("job")
                 job_pick = st.selectbox("Job", job_opts, key=f"tt_job_pick_{week_start}_{eid}")
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns([1.05, 0.72, 0.48], gap="small")
                 with c1:
-                    tt_pick = st.selectbox("Time type", ["S/T", "O/T"], key=f"tt_tt_pick_{week_start}_{eid}")
+                    field_marker("time-type")
+                    tt_pick = st.selectbox(
+                        "Time type",
+                        ["S/T", "O/T"],
+                        key=f"tt_tt_pick_{week_start}_{eid}",
+                        label_visibility="collapsed",
+                    )
                 with c2:
+                    field_marker("hours")
                     hrs_in = st.number_input(
                         "Hours",
                         min_value=0.0,
@@ -1467,8 +1498,14 @@ def _tt_render_simple_timesheet(
                         step=0.25,
                         format="%.2f",
                         key=f"tt_hrs_add_{week_start}_{eid}",
+                        label_visibility="collapsed",
                     )
-                submitted = st.form_submit_button("Save / Add", use_container_width=True)
+                with c3:
+                    submitted = st.form_submit_button(
+                        "Save / Add",
+                        type="primary",
+                        use_container_width=False,
+                    )
 
             if submitted:
                 if job_pick.startswith("(No jobs") or job_pick.startswith("(No match") or job_pick.startswith(
@@ -1959,21 +1996,25 @@ def _render_minimal_table_edit_popup(
 
     with st.container(border=True):
         st.markdown(
-            '<span class="ips-tt-edit-mini-popup" aria-hidden="true"></span>'
+            '<span class="ips-compact-form ips-tt-edit-mini-popup" aria-hidden="true"></span>'
             '<p class="ips-tt-edit-mini-title">Edit entry</p>'
             f'<p class="ips-tt-edit-mini-sub">{sub_line}</p>',
             unsafe_allow_html=True,
         )
         tt_ix = 0 if _tt_entry_time_type(ent) == "ST" else 1
-        st.selectbox(
-            "Time type",
-            ["S/T", "O/T"],
-            index=tt_ix,
-            key=f"tt_tt_{te_id}",
-            **ch_as,
-        )
-        h1, h2 = st.columns(2, gap="small")
-        with h1:
+        r0 = st.columns([0.55, 0.45, 1.2], gap="small")
+        with r0[0]:
+            field_marker("time-type")
+            st.selectbox(
+                "Time type",
+                ["S/T", "O/T"],
+                index=tt_ix,
+                key=f"tt_tt_{te_id}",
+                label_visibility="collapsed",
+                **ch_as,
+            )
+        with r0[1]:
+            field_marker("hours")
             st.number_input(
                 "Hrs",
                 min_value=0.0,
@@ -1985,7 +2026,8 @@ def _render_minimal_table_edit_popup(
                 label_visibility="collapsed",
                 **ch_as,
             )
-        with h2:
+        with r0[2]:
+            field_marker("medium")
             st.text_input(
                 "Notes",
                 value=str(ent.get("notes") or ""),
@@ -1994,12 +2036,12 @@ def _render_minimal_table_edit_popup(
                 placeholder="Notes",
                 **ch_as,
             )
-        b1, b2 = st.columns(2, gap="small")
+        b1, b2 = st.columns([0.35, 0.35], gap="small")
         with b1:
             if st.button(
                 "Save",
                 key=f"tt_mini_sv_{te_id}",
-                use_container_width=True,
+                use_container_width=False,
             ):
                 ok, err = _persist_time_entry_row(te_id, job_label_to_id)
                 if ok:
@@ -2014,7 +2056,7 @@ def _render_minimal_table_edit_popup(
             if st.button(
                 "Close",
                 key=f"tt_mini_close_{te_id}",
-                use_container_width=True,
+                use_container_width=False,
             ):
                 st.session_state.pop(TT_EDIT_ID_KEY, None)
                 st.rerun()
