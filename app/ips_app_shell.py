@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v6"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v7"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -66,7 +66,7 @@ def inject_ips_app_shell_styles() -> None:
             --ips-ctrl-ph: #4b5563;
             --ips-label-fs: 0.875rem;
             --ips-label-color: #111827;
-            --ips-widget-gap: 0.28rem;
+            --ips-widget-gap: 0.2rem;
         }
 
         .stApp,
@@ -103,8 +103,28 @@ def inject_ips_app_shell_styles() -> None:
             margin-right: auto;
         }
         section[data-testid="stMain"] .block-container {
-            padding-top: 0.4rem !important;
-            padding-bottom: 1rem !important;
+            padding-top: 0.15rem !important;
+            padding-bottom: 0.85rem !important;
+        }
+        section[data-testid="stMain"] [data-testid="stVerticalBlock"] > div {
+            gap: 0.35rem !important;
+        }
+        /* Collapse zero-height custom components (PWA hooks) — no top banner gap */
+        section[data-testid="stMain"] iframe[title="streamlit_components_v1.iframe"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+        }
+
+        /* Dashboard: tighter vertical rhythm between cards */
+        section[data-testid="stMain"]:has(.ips-dashboard-page) [data-testid="stVerticalBlockBorderWrapper"] {
+            margin-bottom: 0.35rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-dashboard-page) [data-testid="stElementContainer"] {
+            margin-bottom: 0.18rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-dashboard-page) h5 {
+            margin: 0.2rem 0 0.15rem 0 !important;
         }
 
         /* ----- Typography hierarchy (Streamlit markdown + headers) ----- */
@@ -113,14 +133,14 @@ def inject_ips_app_shell_styles() -> None:
             font-size: 1.55rem !important;
             font-weight: 700 !important;
             letter-spacing: -0.02em;
-            margin: 0.1rem 0 0.28rem 0 !important;
+            margin: 0 0 0.2rem 0 !important;
         }
         section[data-testid="stMain"] h2,
         section[data-testid="stMain"] h3 {
             color: var(--ips-text) !important;
             font-size: 1.05rem !important;
             font-weight: 700 !important;
-            margin: 0.45rem 0 0.28rem 0 !important;
+            margin: 0.3rem 0 0.2rem 0 !important;
         }
         section[data-testid="stMain"] h4,
         section[data-testid="stMain"] h5 {
@@ -137,7 +157,7 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Dividers ----- */
         section[data-testid="stMain"] hr {
-            margin: 0.5rem 0 !important;
+            margin: 0.35rem 0 !important;
             border: none !important;
             border-top: 1px solid var(--ips-border) !important;
         }

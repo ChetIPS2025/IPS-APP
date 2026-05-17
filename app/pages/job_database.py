@@ -629,7 +629,8 @@ def _inject_job_database_responsive_styles() -> None:
             overflow-wrap: anywhere !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-edit-panel-anchor) [data-testid="column"],
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"] {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) [data-testid="column"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor) [data-testid="column"] {
             min-width: 0 !important;
         }
         /* Tablet / iPad: job detail full-width (list layout is chosen via View mode, not duplicate DOM). */
@@ -655,7 +656,39 @@ def _inject_job_database_responsive_styles() -> None:
                 font-size: 0.9rem !important;
             }
         }
-        /* Filters & search: full-width stack under 1100px */
+        /* Job list: compact header — filters + view mode attached to table */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor) h5 {
+            margin: 0 0 0.28rem 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor) .ips-job-list-view-label {
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+            color: #374151 !important;
+            line-height: 1.2 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor)
+            div[data-testid="stHorizontalBlock"]:has([data-testid="stRadio"]) {
+            margin-top: 0.05rem !important;
+            margin-bottom: 0.1rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor)
+            [data-testid="stElementContainer"] {
+            margin-bottom: 0.14rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor)
+            .ips-job-desktop-table-anchor {
+            display: block;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor)
+            [data-testid="stWidgetLabel"] p {
+            font-size: 0.78rem !important;
+            margin-bottom: 0.08rem !important;
+        }
+        /* Job list filters: full-width stack under 1100px */
         @media (max-width: 1100px) {
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor)
                 div[data-testid="stHorizontalBlock"] {
@@ -2377,16 +2410,25 @@ def render() -> None:
                 location_by_id=location_by_id,
             )
 
+            customer_names = sorted(
+                [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
+            )
+
+            ensure_narrow_viewport_detected()
+            if "job_db_view_mode_radio" not in st.session_state:
+                st.session_state["job_db_view_mode_radio"] = (
+                    "Cards" if st.session_state.get(IPS_VIEWPORT_NARROW_KEY) else "Table"
+                )
+
+            picked: list[str] = []
+
             with st.container(border=True):
                 st.markdown(
-                    '<span class="ips-list-top-anchor ips-job-filter-anchor"></span>',
+                    '<span class="ips-list-top-anchor ips-job-filter-anchor ips-job-joblist-section-anchor"></span>',
                     unsafe_allow_html=True,
                 )
-                st.markdown("##### Filters & search")
+                st.markdown("##### Job list")
                 f1, f2, f3, f4 = st.columns([1.05, 1.05, 2.35, 1.0], gap="small")
-                customer_names = sorted(
-                    [c.get("customer_name", "") for c in customers if str(c.get("customer_name", "")).strip()]
-                )
                 with f1:
                     selected_customer = st.selectbox(
                         "Filter Customer",
@@ -2422,84 +2464,68 @@ def render() -> None:
                     )
 
                 if len(jobs) >= _job_fetch_lim and _job_fetch_lim < 8000:
-                    _lm_l, _lm_r = st.columns([2, 1])
+                    _lm_l, _lm_r = st.columns([2.2, 1], gap="small")
                     with _lm_l:
                         st.caption(
-                            f"Server fetch is capped at **{_job_fetch_lim}** jobs (for speed). "
-                            "Use **Search** within this set, or raise the cap."
+                            f"Showing up to **{_job_fetch_lim}** jobs — use **Search** or load more."
                         )
                     with _lm_r:
                         if st.button("Load more (+500)", key="job_db_load_more_jobs"):
                             st.session_state["job_db_fetch_limit"] = _job_fetch_lim + 500
                             st.rerun()
 
-            bypass = st.session_state.get("job_db_bypass_filters", True)
-            filtered = _filter_jobs_overview_dataframe(
-                jobs_df,
-                selected_customer=selected_customer,
-                selected_status=selected_status,
-                selected_source=selected_source,
-                search=search,
-                bypass=bypass,
-            )
-
-            show_cols: list[str] = []
-            if has_job_number_column and "job_number" in filtered.columns:
-                show_cols.append("job_number")
-            for c in (
-                "Linked estimate",
-                "job_name",
-                "customer_name",
-                "Location",
-                "source_type",
-                "Quote (estimate)",
-                "Contact",
-                "status",
-            ):
-                if c in filtered.columns and c not in show_cols:
-                    show_cols.append(c)
-            show_cols.extend(
-                [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
-            )
-            df_display = filtered.copy()
-            df_display = df_display.drop(columns=[c for c in HIDDEN_COLUMNS if c in df_display.columns], errors="ignore")
-            visible_cols = _job_db_visible_table_columns([c for c in show_cols if c in df_display.columns])
-
-            ensure_narrow_viewport_detected()
-            if "job_db_view_mode_radio" not in st.session_state:
-                st.session_state["job_db_view_mode_radio"] = (
-                    "Cards" if st.session_state.get(IPS_VIEWPORT_NARROW_KEY) else "Table"
-                )
-
-            picked: list[str] = []
-            job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
-            if job_num_col not in df_display.columns:
-                job_num_col = "id"
-
-            with st.container(border=True):
-                st.markdown(
-                    '<span class="ips-list-top-anchor ips-job-joblist-section-anchor"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown("##### Job list")
-                st.radio(
-                    "View mode",
-                    ["Table", "Cards"],
-                    horizontal=True,
-                    key="job_db_view_mode_radio",
-                    help="**Table** — checkboxes and row delete. **Cards** — tap Open on a job (better on tablet/phone).",
-                )
+                _vm_lbl, _vm_ctrl = st.columns([0.42, 5], gap="small", vertical_alignment="center")
+                with _vm_lbl:
+                    st.markdown(
+                        '<p class="ips-job-list-view-label">View</p>',
+                        unsafe_allow_html=True,
+                    )
+                with _vm_ctrl:
+                    st.radio(
+                        "View mode",
+                        ["Table", "Cards"],
+                        horizontal=True,
+                        key="job_db_view_mode_radio",
+                        label_visibility="collapsed",
+                        help="**Table** — checkboxes and row delete. **Cards** — tap Open on a job (better on tablet/phone).",
+                    )
                 use_table = st.session_state.get("job_db_view_mode_radio", "Table") == "Table"
-                if use_table:
-                    st.caption(
-                        "Checkbox on the **left**; **👁** opens read-only job details; **Del** deletes one job (same rules as bulk). "
-                        "Jobs with labor, materials, equipment, or PO expenses cannot be deleted."
-                    )
-                else:
-                    st.caption(
-                        "**View** — read-only job portal. **Open** — edit job (admin/manager/employee). "
-                        "Use **🗑** on a card for a single-job delete, or switch to **Table** for checkbox selection."
-                    )
+
+                bypass = st.session_state.get("job_db_bypass_filters", True)
+                filtered = _filter_jobs_overview_dataframe(
+                    jobs_df,
+                    selected_customer=selected_customer,
+                    selected_status=selected_status,
+                    selected_source=selected_source,
+                    search=search,
+                    bypass=bypass,
+                )
+
+                show_cols: list[str] = []
+                if has_job_number_column and "job_number" in filtered.columns:
+                    show_cols.append("job_number")
+                for c in (
+                    "Linked estimate",
+                    "job_name",
+                    "customer_name",
+                    "Location",
+                    "source_type",
+                    "Quote (estimate)",
+                    "Contact",
+                    "status",
+                ):
+                    if c in filtered.columns and c not in show_cols:
+                        show_cols.append(c)
+                show_cols.extend(
+                    [c for c in JOBS_JOB_DATABASE_OVERVIEW_DISPLAY_ORDER if c in filtered.columns and c not in show_cols]
+                )
+                df_display = filtered.copy()
+                df_display = df_display.drop(columns=[c for c in HIDDEN_COLUMNS if c in df_display.columns], errors="ignore")
+                visible_cols = _job_db_visible_table_columns([c for c in show_cols if c in df_display.columns])
+
+                job_num_col = "job_number" if has_job_number_column and "job_number" in df_display.columns else "job_id"
+                if job_num_col not in df_display.columns:
+                    job_num_col = "id"
 
                 if "id" not in df_display.columns:
                     st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)

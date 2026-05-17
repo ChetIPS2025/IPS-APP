@@ -41,9 +41,9 @@ try:
 except ImportError:
     from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
 try:
-    from app.pwa import inject_pwa_support
+    from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
 except ImportError:
-    from pwa import inject_pwa_support  # type: ignore
+    from pwa import inject_pwa_support, trigger_pwa_install_prompt  # type: ignore
 
 from pages import dashboard
 from pages import estimates
@@ -262,6 +262,7 @@ def main() -> None:
             st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
     with perf_span("main.sidebar"):
         sidebar_page = render_sidebar()
+    trigger_pwa_install_prompt()
     if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
         prev = st.session_state.get("_ips_last_nav_page")
         if prev is not None and sidebar_page != prev:

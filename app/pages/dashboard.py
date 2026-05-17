@@ -1174,6 +1174,7 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
 
 
 def render() -> None:
+    st.markdown('<div class="ips-dashboard-page" aria-hidden="true"></div>', unsafe_allow_html=True)
     render_header(
         "IPS Dashboard",
         subtitle="Industrial Plant Solutions, LLC",

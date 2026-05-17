@@ -7,12 +7,18 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"
+_IPS_TRIGGER_INSTALL_KEY = "ips_trigger_install"
 
 _MANIFEST_HREF = "/app/static/manifest.json"
 _SW_HREF = "/app/static/sw.js"
 
 _THEME_COLOR = "#0b2247"
 _APP_NAME = "IPS App"
+
+_INSTALL_UNAVAILABLE_MSG = (
+    "Install prompt is not available yet. On iPhone use Share → Add to Home Screen. "
+    "On Android use Chrome menu → Install app."
+)
 
 
 def inject_pwa_support() -> None:
@@ -67,6 +73,19 @@ def inject_pwa_support() -> None:
 
   w.__ipsBipEvent = null;
 
+  w.__ipsTriggerInstall = async function() {{
+    if (!w.__ipsBipEvent) return false;
+    try {{
+      w.__ipsBipEvent.prompt();
+      await w.__ipsBipEvent.userChoice;
+      w.__ipsBipEvent = null;
+      return true;
+    }} catch (err) {{
+      console.warn('IPS install prompt failed:', err);
+      return false;
+    }}
+  }};
+
   w.addEventListener('beforeinstallprompt', function(e) {{
     e.preventDefault();
     w.__ipsBipEvent = e;
@@ -85,52 +104,40 @@ def inject_pwa_support() -> None:
     )
 
 
-def render_install_button(label: str = "Install App") -> None:
+def trigger_pwa_install_prompt() -> None:
+    """Run browser install prompt once (height-0 component; no main-area banner)."""
+    if not st.session_state.pop(_IPS_TRIGGER_INSTALL_KEY, False):
+        return
+    msg = json.dumps(_INSTALL_UNAVAILABLE_MSG)
     components.html(
         f"""
-<div id="installWrap" style="display:block;">
-  <button id="installBtn"
-    style="
-      width:100%;
-      padding:12px;
-      border-radius:10px;
-      background:#1d4ed8;
-      color:white;
-      border:1px solid rgba(255,255,255,.18);
-      font-weight:600;
-      cursor:pointer;
-    ">
-    {label}
-  </button>
-</div>
-
 <script>
 (function() {{
   const w = window.parent || window;
-  const btn = document.getElementById('installBtn');
-
-  btn.onclick = async () => {{
-    if (w.__ipsBipEvent) {{
-      w.__ipsBipEvent.prompt();
-      await w.__ipsBipEvent.userChoice;
-      w.__ipsBipEvent = null;
-    }} else {{
-      alert("Install prompt is not available yet. On iPhone use Share → Add to Home Screen. On Android use Chrome menu → Install app.");
-    }}
-  }};
+  const fallback = function() {{ alert({msg}); }};
+  if (typeof w.__ipsTriggerInstall === "function") {{
+    w.__ipsTriggerInstall().then(function(ok) {{ if (!ok) fallback(); }});
+  }} else {{
+    fallback();
+  }}
 }})();
 </script>
         """,
-        height=80,
+        height=0,
     )
 
 
 def render_install_app_sidebar_block() -> None:
-    st.sidebar.markdown("### Install App")
+    st.sidebar.markdown(
+        '<p class="ips-install-section-title">Install App</p>',
+        unsafe_allow_html=True,
+    )
     st.sidebar.caption("Add IPS to your home screen for quick access.")
 
     if st.sidebar.button("Install App", key="ips_sidebar_install_app", use_container_width=True):
+        st.session_state[_IPS_TRIGGER_INSTALL_KEY] = True
         st.session_state["show_install_help"] = True
+        st.rerun()
 
     if st.session_state.get("show_install_help"):
         st.sidebar.info(
@@ -140,5 +147,3 @@ def render_install_app_sidebar_block() -> None:
         if st.sidebar.button("Dismiss", key="ips_install_dismiss"):
             st.session_state["show_install_help"] = False
             st.rerun()
-
-    render_install_button("Install App")

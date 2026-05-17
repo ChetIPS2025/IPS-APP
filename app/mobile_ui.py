@@ -86,7 +86,7 @@ section[data-testid="stSidebar"],
   [data-testid="stMain"] main .block-container {
     padding-left: max(0.75rem, env(safe-area-inset-left)) !important;
     padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
-    padding-top: 0.35rem !important;
+    padding-top: 0.15rem !important;
   }
   /* Main buttons: match IPS shell tokens (slightly taller touch target, same rhythm) */
   [data-testid="stMain"] .stButton > button,

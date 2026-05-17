@@ -44,29 +44,36 @@ def apply_branding() -> None:
             display: block;
         }
 
+        section[data-testid="stMain"] [data-testid="stImage"] {
+            margin: 0 0 0.1rem 0 !important;
+        }
+        section[data-testid="stMain"] [data-testid="stImage"] img {
+            margin: 0 !important;
+        }
+
         .ips-page-title {
             color: #111827;
             font-size: 1.45rem;
             font-weight: 700;
             letter-spacing: -0.02em;
-            margin: 2px 0 2px 0;
-            line-height: 1.2;
+            margin: 0 0 0.12rem 0;
+            line-height: 1.15;
         }
 
         .ips-page-subtitle {
             color: #1f2937;
             font-size: 0.875rem;
             font-weight: 600;
-            margin-bottom: 0.45rem;
-            line-height: 1.45;
+            margin-bottom: 0.28rem;
+            line-height: 1.35;
         }
 
         .ips-page-help {
             color: #1f2937;
             font-size: 0.875rem;
             font-weight: 500;
-            line-height: 1.45;
-            margin: 0 0 0.55rem 0;
+            line-height: 1.4;
+            margin: 0 0 0.35rem 0;
             max-width: 920px;
         }
         </style>
