@@ -572,8 +572,13 @@ def render() -> None:
 
     left, right = st.columns([0.72, 0.28], gap="medium")
 
+    try:
+        from app.ui.page_shell import render_section_header
+    except ImportError:
+        from ui.page_shell import render_section_header  # type: ignore
+
     with left:
-        st.markdown("##### Announcements")
+        render_section_header("Announcements", "Newest posts first — filter or search below.")
         fc1, fc2, fc3, fc4, fc5 = st.columns([2.4, 1.05, 1.05, 0.95, 0.55], gap="small")
         with fc1:
             st.text_input(

@@ -132,11 +132,7 @@ def _render_task_progress_dashboard(*, today: date, session_key: str, use_admin:
     repeat = repeated_eod_delay_reasons(packages=list(packages or []), executions=list(executions or []), today=today)
     _dash_field_light_theme()
     with st.container(border=True):
-        st.markdown("##### Daily work packages (tasks)")
-        st.caption(
-            "Metrics only count tasks on a **Daily Work Package** dated today (idle jobs are excluded). "
-            "Run **`sql/055_daily_work_packages_workflow.sql`** and **`sql/053_task_photos.sql`** as needed."
-        )
+        render_section_header("Daily work packages", "Tasks on today's work packages.")
         c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
         c1.metric("Work packages today", f"{ts.get('work_packages_today', 0):,}")
         c2.metric("Tasks assigned today", f"{ts.get('tasks_assigned_today', 0):,}")
@@ -1179,8 +1175,8 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
 def render() -> None:
     st.markdown('<div class="ips-dashboard-page" aria-hidden="true"></div>', unsafe_allow_html=True)
     render_page_header(
-        "IPS Dashboard",
-        "Office and field snapshot: jobs, stock, tools, and to-dos.",
+        "Dashboard",
+        "Overview of jobs, tasks, inventory, and company activity.",
     )
 
     sk = str(current_profile().get("id") or "anonymous")
@@ -1240,24 +1236,93 @@ def render() -> None:
         if str((a or {}).get("status") or "").strip() == "Checked Out"
         or str((a or {}).get("current_holder_employee_id") or "").strip()
     )
+    todos_deduped: list[dict[str, Any]] = []
+    open_todos = 0
+    overdue_todos = 0
     try:
         todos_raw = fetch_table_for_session("todos", session_key=sk, limit=2000, order_by="created_at", use_admin=use_admin)
         todos_deduped = _todo_dedupe_rows([t for t in (todos_raw or []) if isinstance(t, dict)])
-        open_todos = sum(
-            1
-            for t in todos_deduped
-            if not _todo_is_terminal((t or {}).get("status"))
-        )
+        today_d = date.today()
+        for t in todos_deduped:
+            if _todo_is_terminal((t or {}).get("status")):
+                continue
+            open_todos += 1
+            ds = str((t or {}).get("due_date") or "").strip()[:10]
+            if ds:
+                try:
+                    if date.fromisoformat(ds) < today_d:
+                        overdue_todos += 1
+                except ValueError:
+                    pass
     except Exception:
         open_todos = 0
+        overdue_todos = 0
 
     _dash_field_light_theme()
+
+    active_jobs = sum(
+        1
+        for j in (jobs or [])
+        if str((j or {}).get("status") or "").strip().lower()
+        not in ("closed", "complete", "completed", "cancelled", "canceled")
+    )
+    pending_estimates = sum(
+        1
+        for e in (estimates or [])
+        if not str((e or {}).get("job_id") or "").strip()
+    )
+    unread_updates = 0
+    if role_can_open_page(current_role(), "Company Updates"):
+        try:
+            cu_rows = fetch_table_for_session(
+                "company_updates",
+                session_key=sk,
+                limit=500,
+                order_by="created_at",
+                use_admin=use_admin,
+            )
+            read_rows = fetch_table_for_session(
+                "company_update_reads",
+                session_key=sk,
+                limit=5000,
+                order_by=None,
+                use_admin=use_admin,
+            )
+            read_uids = {
+                str(r.get("update_id") or "")
+                for r in (read_rows or [])
+                if str(r.get("user_id") or "") == str(current_profile().get("id") or "")
+            }
+            for u in cu_rows or []:
+                uid = str((u or {}).get("id") or "").strip()
+                if uid and uid not in read_uids and bool((u or {}).get("is_active", True)):
+                    unread_updates += 1
+        except Exception:
+            unread_updates = 0
+
+    open_tasks = 0
+    try:
+        jtasks = fetch_table_for_session(
+            "job_tasks", session_key=sk, limit=8000, order_by="planned_date", use_admin=use_admin
+        )
+        open_tasks = sum(
+            1
+            for t in (jtasks or [])
+            if str((t or {}).get("status") or "").strip().lower()
+            not in ("done", "complete", "completed", "cancelled", "canceled")
+        )
+    except Exception:
+        open_tasks = 0
+
     with st.container(border=True):
-        render_section_header("Operations snapshot")
-        m3, m4, m5 = st.columns(3, gap="small")
-        m3.metric("Low stock items", f"{low_n:,}")
-        m4.metric("Checked out tools", f"{out_n:,}")
-        m5.metric("Open to-dos", f"{open_todos:,}")
+        render_section_header("At a glance")
+        k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
+        k1.metric("Active jobs", f"{active_jobs:,}")
+        k2.metric("Open tasks", f"{open_tasks:,}")
+        k3.metric("Low stock", f"{low_n:,}")
+        k4.metric("Unread updates", f"{unread_updates:,}")
+        k5.metric("Pending estimates", f"{pending_estimates:,}")
+        k6.metric("Overdue to-dos", f"{overdue_todos:,}")
 
     _render_task_progress_dashboard(today=date.today(), session_key=sk, use_admin=use_admin)
 
@@ -1280,15 +1345,14 @@ def render() -> None:
             if not low_df.empty:
                 disp = prepare_catalog_inventory_display_df(low_df)
                 with st.container(border=True):
-                    st.markdown("##### Low Stock Alerts")
-                    st.caption("Items at or below reorder point (based on current on-hand vs reorder settings).")
+                    render_section_header("Low stock alerts", "At or below reorder point.")
                     st.dataframe(disp, use_container_width=True, hide_index=True, height=min(360, 44 + 30 * len(disp)))
         except Exception:
             pass
 
     _render_todo_list(session_key=sk, use_admin=use_admin)
 
-    st.markdown("##### Recent jobs")
+    render_section_header("Recent jobs")
     rj = _recent_jobs_rows(list(jobs or []))
     if not rj:
         st.caption("No jobs loaded yet.")

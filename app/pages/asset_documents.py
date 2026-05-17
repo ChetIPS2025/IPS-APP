@@ -5,7 +5,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_table, fetch_table_admin
     from app.services.asset_constants import DOCUMENT_TYPES
     from app.services.asset_document_util import persist_asset_document_upload
@@ -18,7 +18,7 @@ except ImportError:
 
 
 def render() -> None:
-    render_header("Asset Documents")
+    render_page_header("Asset Documents", "Files linked to assets.")
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     documents = fetch_table_admin("asset_documents", limit=5000, order_by="created_at")

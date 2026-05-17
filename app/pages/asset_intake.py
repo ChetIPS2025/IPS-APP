@@ -4,7 +4,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_table
     from app.ui import IPS_NAV_PENDING_KEY
     from app.services.asset_constants import ASSET_CONDITIONS, ASSET_STATUSES, ASSET_TYPES
@@ -100,8 +100,6 @@ def _render_ai_extracted_summary(ai: dict) -> None:
 
     with st.container(border=True):
         st.markdown("##### Extracted equipment (AI)")
-        st.caption("These values are loaded into **Asset details** below — review and edit before saving.")
-
         a, b = st.columns(2)
         a.markdown(f"**Equipment name**  \n{name}")
         a.markdown(f"**Manufacturer**  \n{mfr}")
@@ -386,7 +384,7 @@ def render_asset_intake_form() -> None:
 
 
 def render() -> None:
-    render_header("Asset Intake")
+    render_page_header("Asset Intake", "Add new assets to the database.")
 
     if current_role() not in {"admin", "pm"}:
         st.info("Only admin or pm users can add assets.")

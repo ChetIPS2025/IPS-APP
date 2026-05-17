@@ -10,6 +10,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_profile, current_role
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 from branding import render_header
 
 try:
@@ -346,7 +350,7 @@ def render_daily_reports_for_job(
 
 
 def render() -> None:
-    render_header("Daily crew report", subtitle="Narrative crew summary by job and date — separate from task packages.")
+    render_page_header("Daily crew report", "Crew narrative summaries by job and date.")
     admin_read = _admin_read()
     jobs = []
     try:

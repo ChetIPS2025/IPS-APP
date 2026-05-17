@@ -5,7 +5,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_table
     from app.services.asset_service import save_maintenance_record
     from app.services.asset_maintenance_service import maintenance_due_status
@@ -18,7 +18,7 @@ except ImportError:
 
 
 def render() -> None:
-    render_header("Asset Maintenance")
+    render_page_header("Asset Maintenance", "Maintenance records and schedules.")
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     maintenance = fetch_table("asset_maintenance", limit=5000, order_by="service_date")

@@ -22,7 +22,7 @@ try:
     from services.qr_codes import allocate_unique_inventory_qr_value, inventory_qr_from_item_id
 except ImportError:
     from app.auth import current_profile, current_role  # type: ignore
-    from app.branding import render_header  # type: ignore
+    from app.ui.page_shell import render_page_header  # type: ignore
     from app.db import fetch_by_match_admin, fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin, upload_bytes  # type: ignore
     from app.services.material_quote_import import DEFAULT_MARKUP_PCT, compute_sell_price, extract_material_quote  # type: ignore
     from app.services.materials_catalog_merge import (  # type: ignore
@@ -335,7 +335,6 @@ def _category_material_options(materials: list[dict]) -> tuple[list[str], list[s
 def _render_compact_queue() -> None:
     q = st.session_state[SESSION_QUEUE]
     if not q:
-        st.caption("No files in queue.")
         return
     st.markdown(
         """
@@ -750,7 +749,7 @@ def render_material_quote_import_form(return_to_materials: bool = False) -> None
 
 
 def render() -> None:
-    render_header("Material Quote Import")
+    render_page_header("Material Quote Import", "Import vendor quotes into materials.")
     st.caption("Batch import vendor quotes (PDF / images). CSV and Excel are not supported in this uploader.")
 
     if current_role() not in {"admin", "pm"}:

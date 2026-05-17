@@ -5,7 +5,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_table, insert_row_admin
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
@@ -14,7 +14,7 @@ except ImportError:
 
 
 def render() -> None:
-    render_header("Asset Inspections")
+    render_page_header("Asset Inspections", "Inspection history and checklists.")
 
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     inspections = fetch_table("asset_inspections", limit=5000, order_by="inspection_date")

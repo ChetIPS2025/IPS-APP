@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 
 try:
     from app.asset_responsive import inject_asset_workflow_mobile_css
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.services.asset_qr import decode_qr_image_bytes, find_asset_id_by_scan
     from app.ui import IPS_NAV_PENDING_KEY
 except ImportError:
@@ -64,10 +64,8 @@ def _go_to_asset_detail(aid: str) -> None:
 
 
 def render() -> None:
-    render_header("Asset Scanner")
+    render_page_header("Asset Scanner", "Scan asset QR codes in the field.")
     inject_asset_workflow_mobile_css()
-    st.caption("Scan a printed asset QR label or type the code. Opens Asset Detail when matched.")
-
     qp = st.query_params
     if "qr" in qp:
         raw = qp.get("qr", "")

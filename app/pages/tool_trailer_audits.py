@@ -10,7 +10,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import (
         create_signed_url,
         fetch_by_match_admin,
@@ -245,7 +245,7 @@ def _render_audit_detail(*, audit: dict, items: list[dict], assets_by_id: dict[s
 
 
 def render() -> None:
-    render_header("Tool Trailer Audits")
+    render_page_header("Tool Trailer Audits", "Trailer audits and reconciliation.")
     can_manage = current_role() in {"admin", "pm"}
 
     try:

@@ -9,13 +9,13 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin
     from app.services.asset_maintenance_service import maintenance_due_status
     from app.services.job_service import job_number_display
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin  # type: ignore
     from services.asset_maintenance_service import maintenance_due_status  # type: ignore
     from services.job_service import job_number_display  # type: ignore
@@ -193,9 +193,7 @@ def _fetch_customers_map() -> dict[str, str]:
 
 
 def render() -> None:
-    render_header("Asset Dashboard")
-    st.caption("Business overview — activity, maintenance, and fleet status.")
-
+    render_page_header("Asset Dashboard", "Fleet activity, maintenance, and status.")
     jobs_all: list[dict[str, Any]] = []
     estimates_all: list[dict[str, Any]] = []
     customer_map: dict[str, str] = {}

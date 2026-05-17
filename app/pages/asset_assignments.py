@@ -7,7 +7,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_table, insert_row_admin, update_rows_admin
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
@@ -18,7 +18,7 @@ except ImportError:
 
 
 def render() -> None:
-    render_header("Asset Assignments")
+    render_page_header("Asset Assignments", "Who has which assets assigned.")
 
     if current_role() not in {"admin", "pm"}:
         st.info("Only admin or pm users can manage assignments.")

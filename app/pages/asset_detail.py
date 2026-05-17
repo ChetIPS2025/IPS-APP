@@ -11,7 +11,7 @@ try:
     from app.asset_responsive import inject_asset_workflow_mobile_css
     from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import (
         create_signed_url,
         fetch_by_match,
@@ -44,7 +44,7 @@ except ImportError:
     from asset_responsive import inject_asset_workflow_mobile_css  # type: ignore
     from mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected  # type: ignore
     from auth import current_profile, current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
         fetch_by_match,
@@ -472,7 +472,7 @@ def _render_asset_detail_qr_block(asset: dict, aid: str, *, compact: bool) -> No
                 use_container_width=True,
             )
         except Exception:
-            st.caption("Print label file could not be generated.")
+            pass
         try:
             st.download_button(
                 "Download 2x1 Sticker Label",
@@ -1367,7 +1367,7 @@ def _back_to_asset_list(*, aid: str | None) -> None:
 
 
 def render() -> None:
-    render_header("Asset Detail")
+    render_page_header("Asset Detail", "Asset profile, assignments, and documents.")
     inject_asset_workflow_mobile_css()
     ensure_narrow_viewport_detected()
     flash = st.session_state.pop("asset_detail_flash", None)

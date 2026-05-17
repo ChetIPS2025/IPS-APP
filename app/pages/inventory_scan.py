@@ -45,7 +45,7 @@ except ImportError:
 
 try:
     from app.auth import current_profile, current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.ui import role_can_open_page
     from app.db import (
         create_signed_url,
@@ -655,8 +655,6 @@ def _render_inv_scan_asset_panel(
                     st.session_state.pop("inv_scan_asset", None)
                     st.rerun()
         else:
-            st.caption("Add employees to reassign the holder from this screen.")
-
     else:
         st.warning(
             f"Status is **{html.escape(status)}** — use **Asset Database** to move to **Available** before checkout, "
@@ -678,7 +676,7 @@ def render() -> None:
 
 def _render_inventory_scan_inner() -> None:
     ensure_narrow_viewport_detected()
-    render_header("", subtitle="Industrial Plant Solutions, LLC")
+    render_page_header("Scan Inventory", "Issue or receive stock via QR scan.")
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 

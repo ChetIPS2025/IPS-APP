@@ -35,7 +35,7 @@ try:
         upload_bytes_admin,
     )
     from app.ips_crud_list_styles import inject_ips_crud_list_styles
-    from app.ui.page_shell import render_page_header
+    from app.ui.page_shell import render_page_header, render_section_header
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
     from app.ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun
     from app.table_actions import (
@@ -62,7 +62,7 @@ except ImportError:
         upload_bytes_admin,
     )
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
-    from ui.page_shell import render_page_header  # type: ignore
+    from ui.page_shell import render_page_header, render_section_header  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
     from ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun  # type: ignore
     from table_actions import (  # type: ignore
@@ -853,8 +853,10 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
         unsafe_allow_html=True,
     )
     st.markdown('<span class="ips-inventory-list-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
+    render_section_header("Inventory list", "Filter, select rows, and use the action bar below.")
     _sel_n = len([x for x in (st.session_state.get(selected_key) or []) if str(x).strip()])
-    st.caption(f"{_sel_n} row(s) selected")
+    if _sel_n:
+        st.caption(f"{_sel_n} row(s) selected")
 
     if df.empty:
         st.selectbox("Filter Category", ["All", "Materials"], key="inv_f_cat")
@@ -923,7 +925,8 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
     low_mask = qoh_s <= rp_s
     n_low = int(low_mask.sum()) if len(filtered) else 0
     if n_low > 0:
-        st.warning(f"**Low stock:** {n_low} visible row(s) at or below reorder point.")
+        with st.container(border=True):
+            render_section_header("Low stock alert", f"{n_low} visible item(s) at or below reorder point.")
         with st.expander("Low stock detail (visible filters)", expanded=False):
             cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
             if cols_show:

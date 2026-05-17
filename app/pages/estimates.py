@@ -988,13 +988,14 @@ def render() -> None:
     # Single branding header per request; each branch renders one body section only.
     inject_table_action_styles()
 
+    try:
+        from app.ui.page_shell import action_bar_card
+    except ImportError:
+        from ui.page_shell import action_bar_card  # type: ignore
+
     if view == "list":
         render_page_header("Estimates", "Quotes, imports, and customer-ready estimates.")
-        with st.container(border=True):
-            st.markdown(
-                '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
-                unsafe_allow_html=True,
-            )
+        with action_bar_card(title="Quick Actions"):
             a1, a2 = st.columns(2, gap="small")
             with a1:
                 if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):

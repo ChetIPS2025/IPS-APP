@@ -11,9 +11,9 @@ import streamlit as st
 
 from auth import current_role
 try:
-    from app.ui.page_shell import render_page_header
+    from app.ui.page_shell import action_bar_card, render_page_header, render_section_header
 except ImportError:
-    from ui.page_shell import render_page_header  # type: ignore
+    from ui.page_shell import action_bar_card, render_page_header, render_section_header  # type: ignore
 from db import (
     fetch_by_match,
     fetch_by_match_admin,
@@ -2128,12 +2128,7 @@ def _render_job_db_top_bar(
         e for e in estimates if e.get("id") is not None and not str(e.get("job_id") or "").strip()
     ]
 
-    with st.container(border=True):
-        st.markdown(
-            '<span class="ips-list-top-anchor ips-job-topbar ips-job-db-quick-actions"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown('<p class="ips-jdb-section-title">Quick Actions</p>', unsafe_allow_html=True)
+    with action_bar_card(title="Quick Actions"):
         c1, c2, c3 = st.columns(3, gap="small")
         with c1:
             if st.button(
@@ -2428,11 +2423,7 @@ def render() -> None:
 
     _render_job_db_top_bar(can_edit=can_edit, estimates=estimates, estimate_label_map=estimate_label_map)
 
-    st.markdown('<p class="ips-jdb-section-title">Jobs Overview</p>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="ips-jdb-section-desc">Search, filter, and manage active job records.</p>',
-        unsafe_allow_html=True,
-    )
+    render_section_header("Jobs Overview", "Search, filter, and manage active job records.")
 
     with st.container():
         if jobs_df.empty:
