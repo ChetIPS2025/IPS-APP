@@ -13,12 +13,12 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import create_signed_url, fetch_table_admin
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import create_signed_url, fetch_table_admin  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
@@ -113,8 +113,10 @@ def _txn_activity_line(t: dict, *, item_by_id: dict, job_by_id: dict) -> str:
 
 
 def render() -> None:
-    render_header("Inventory Usage")
-    st.caption("On-hand value, recent issues, and **low stock** visibility.")
+    render_page_header(
+        "Inventory Usage",
+        "On-hand value, recent issues, and low stock visibility.",
+    )
 
     if current_role() not in {"admin", "pm", "employee", "viewer"}:
         st.error("You do not have access to this page.")

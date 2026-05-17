@@ -6,13 +6,12 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
 from datetime import datetime
 
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 from db import (
     delete_rows_admin,
     fetch_one,
@@ -685,13 +684,11 @@ def _render_right_panel(
 
 def render() -> None:
     """Employee directory with attached login access (profiles matched by email)."""
-    render_header("Users")
+    render_page_header("Users", "Employee directory with login access by email.")
 
     if current_role() != "admin":
         st.error("Admin access required.")
         return
-
-    render_crud_list_subtitle("Employees are the primary rows. Login/access settings come from profiles by email.")
 
     if st.session_state.get(_PEOPLE_PANEL_KEY) in ("add_emp", "add_user"):
         st.session_state[_PEOPLE_PANEL_KEY] = "list"

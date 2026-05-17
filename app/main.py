@@ -41,6 +41,10 @@ try:
 except ImportError:
     from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
 try:
+    from app.ui.page_shell import inject_ips_dashboard_layout
+except ImportError:
+    from ui.page_shell import inject_ips_dashboard_layout  # type: ignore
+try:
     from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
 except ImportError:
     from pwa import inject_pwa_support, trigger_pwa_install_prompt  # type: ignore
@@ -137,6 +141,7 @@ def main() -> None:
     with perf_span("main.shell_branding"):
         apply_branding()
         inject_ips_app_shell_styles()
+        inject_ips_dashboard_layout()
         inject_pwa_support()
 
     # Public customer signing flow (no login): `?tsign=<uuid>`

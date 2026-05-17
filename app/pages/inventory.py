@@ -19,7 +19,6 @@ except ImportError:
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
     from app.confirm_delete import (
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -35,11 +34,10 @@ try:
         update_rows_admin,
         upload_bytes_admin,
     )
-    from app.ips_crud_list_styles import (
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles
+    from app.ui.page_shell import render_page_header
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
+    from app.ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun
     from app.table_actions import (
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
@@ -48,7 +46,6 @@ try:
     )
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
     from confirm_delete import (  # type: ignore
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -64,11 +61,10 @@ except ImportError:
         update_rows_admin,
         upload_bytes_admin,
     )
-    from ips_crud_list_styles import (  # type: ignore
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
+    from ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun  # type: ignore
     from table_actions import (  # type: ignore
         TABLE_KEY_INVENTORY,
         clear_selected_ids,
@@ -78,6 +74,8 @@ except ImportError:
 
 _TABLE = "inventory_items"
 _DELETE_CONFIRM_PREFIX = "inventory_delete"
+_INV_DATA_VERSION_KEY = "inv_data_version"
+_INV_PAGE_SIZE_DEFAULT = 75
 
 
 def _inventory_qr_embed_subject(qr_code_value: str) -> str:
@@ -213,7 +211,56 @@ def _signed_url_for_inventory_image(image_url: str | None) -> str | None:
 
 def _thumb_display_url(image_url: str | None) -> str:
     """URL for dataframe ImageColumn (never empty — use tiny placeholder)."""
-    return _signed_url_for_inventory_image(image_url) or _PLACEHOLDER_THUMB
+    return _signed_url_for_inventory_image_cached(str(image_url or "").strip()) or _PLACEHOLDER_THUMB
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_inventory_items_df(data_version: int) -> list[dict]:
+    """Cached inventory list; bump ``inv_data_version`` after writes."""
+    return fetch_table_admin(_TABLE, limit=5000, order_by="item_name")
+
+
+@st.cache_data(ttl=3300, show_spinner=False)
+def _signed_url_for_inventory_image_cached(image_url: str) -> str | None:
+    s = str(image_url or "").strip()
+    if not s:
+        return None
+    return _signed_url_for_inventory_image(s)
+
+
+def _bump_inventory_data_version() -> None:
+    st.session_state[_INV_DATA_VERSION_KEY] = int(st.session_state.get(_INV_DATA_VERSION_KEY, 0)) + 1
+    try:
+        _fetch_inventory_items_df.clear()
+        _signed_url_for_inventory_image_cached.clear()
+    except Exception:
+        pass
+    try:
+        from app.data_cache import clear_session_table_cache
+    except ImportError:
+        from data_cache import clear_session_table_cache  # type: ignore
+    try:
+        clear_session_table_cache()
+    except Exception:
+        pass
+
+
+def _clear_inv_checkbox_keys() -> None:
+    for k in list(st.session_state.keys()):
+        if str(k).startswith("inv_select_"):
+            del st.session_state[k]
+
+
+def _inv_thumb_html(image_url: str | None, *, size: int = 36) -> str:
+    raw = str(image_url or "").strip()
+    url = _signed_url_for_inventory_image_cached(raw) if raw else None
+    if not url:
+        return '<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>'
+    esc = html.escape(url, quote=True)
+    return (
+        f'<img src="{esc}" width="{size}" height="{size}" loading="lazy" '
+        f'decoding="async" alt="" style="object-fit:cover;border-radius:4px;display:block;"/>'
+    )
 
 
 def _upload_item_image_from_upload(item_id: str, uploaded) -> str | None:
@@ -359,7 +406,7 @@ def _inventory_add_dialog() -> None:
 
     if st.button("Cancel", type="secondary", use_container_width=True, key="inv_add_cancel_dlg"):
         _clear_panel()
-        st.rerun()
+        ips_app_rerun()
 
     if submitted:
         t = str(name or "").strip()
@@ -428,8 +475,9 @@ def _inventory_add_dialog() -> None:
                 else:
                     st.warning(f"Image upload skipped: {exc}")
         _clear_panel()
-        st.success("Inventory item added.")
-        st.rerun()
+        _bump_inventory_data_version()
+        st.session_state["inventory_success"] = "Inventory item added."
+        ips_app_rerun()
 
 
 @st.dialog("Edit inventory item", width="large", on_dismiss=_inv_edit_dialog_on_dismiss)
@@ -557,18 +605,16 @@ def _inventory_edit_dialog(row: dict) -> None:
                 except Exception as exc:
                     st.error(f"Could not update QR: {exc}")
                     return
-                st.rerun()
+                ips_app_rerun()
 
     if st.button("Cancel", type="secondary", use_container_width=True, key=f"{pk}_cancel_dlg"):
         st.session_state["inventory_edit_popup_open"] = False
         st.session_state["editing_inventory_id"] = None
         st.session_state["selected_inventory_ids"] = []
-        for k in list(st.session_state.keys()):
-            if str(k).startswith("inv_select_"):
-                del st.session_state[k]
+        _clear_inv_checkbox_keys()
         clear_selected_ids(TABLE_KEY_INVENTORY)
         _clear_panel()
-        st.rerun()
+        ips_app_rerun()
 
     if submitted:
         t = str(name or "").strip()
@@ -633,15 +679,14 @@ def _inventory_edit_dialog(row: dict) -> None:
         st.session_state["inventory_edit_mode"] = False
         st.session_state["editing_inventory_id"] = None
         st.session_state["selected_inventory_ids"] = []
-        for k in list(st.session_state.keys()):
-            if str(k).startswith("inv_select_"):
-                del st.session_state[k]
+        _clear_inv_checkbox_keys()
         clear_selected_ids(TABLE_KEY_INVENTORY)
         _clear_panel()
         st.session_state["inventory_success"] = "Inventory item updated."
         st.session_state["inventory_edit_popup_open"] = False
         st.session_state["editing_inventory_id"] = None
-        st.rerun()
+        _bump_inventory_data_version()
+        ips_app_rerun()
 
 
 def _render_inventory_action_bar(
@@ -692,7 +737,7 @@ def _render_inventory_action_bar(
             ):
                 st.session_state["inventory_panel_mode"] = "add"
                 st.session_state["inventory_panel_id"] = None
-                st.rerun()
+                ips_app_rerun()
         with b1:
             if st.button(
                 "Edit",
@@ -703,7 +748,7 @@ def _render_inventory_action_bar(
             ):
                 st.session_state["inventory_edit_popup_open"] = True
                 st.session_state["editing_inventory_id"] = str(sel[0])
-                st.rerun()
+                ips_app_rerun()
         with b2:
             if st.button(
                 "Deactivate",
@@ -713,7 +758,7 @@ def _render_inventory_action_bar(
                 key="inv_btn_deactivate",
             ):
                 st.session_state["_inv_do_deactivate"] = True
-                st.rerun()
+                ips_app_rerun()
         with b3:
             if st.button(
                 "Delete",
@@ -724,7 +769,7 @@ def _render_inventory_action_bar(
             ):
                 open_destructive_confirmation(_DELETE_CONFIRM_PREFIX)
                 st.session_state["inventory_pending_delete_ids"] = [str(x) for x in sel]
-                st.rerun()
+                ips_app_rerun()
         with b4:
             st.download_button(
                 "Export Selected",
@@ -743,9 +788,8 @@ def _render_inventory_action_bar(
                 key="inv_btn_sel_all",
             ):
                 st.session_state[selected_key] = list(vis_ids)
-                for vid in vis_ids:
-                    st.session_state[f"inv_select_{vid}"] = True
                 set_selected_ids(TABLE_KEY_INVENTORY, list(vis_ids))
+                _clear_inv_checkbox_keys()
                 st.rerun()
         with b6:
             if st.button(
@@ -755,9 +799,7 @@ def _render_inventory_action_bar(
                 key="inv_btn_clear",
             ):
                 st.session_state[selected_key] = []
-                for k in list(st.session_state.keys()):
-                    if str(k).startswith("inv_select_"):
-                        del st.session_state[k]
+                _clear_inv_checkbox_keys()
                 clear_selected_ids(TABLE_KEY_INVENTORY)
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.rerun()
@@ -775,7 +817,8 @@ def _render_inventory_action_bar(
                         st.success(f"Generated QR codes for {n} item(s).")
                     except Exception as exc:
                         st.error(f"Backfill failed: {exc}")
-                    st.rerun()
+                    _bump_inventory_data_version()
+                    ips_app_rerun()
             with q2:
                 if st.button(
                     "Regenerate QR codes (current app URL)",
@@ -788,12 +831,28 @@ def _render_inventory_action_bar(
                         st.success(f"Regenerated {n} QR image(s). Reprint any physical labels.")
                     except Exception as exc:
                         st.error(f"Regenerate failed: {exc}")
-                    st.rerun()
+                    _bump_inventory_data_version()
+                    ips_app_rerun()
 
 
-def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
-    """Filters → low stock banner → main table → action bar. Called once per page run."""
+def _render_inventory_list_body(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
+    """Filters → low stock banner → paginated table → action bar (runs inside ``@fragment``)."""
     inject_table_action_styles()
+    st.markdown(
+        """
+<style>
+section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stElementContainer"] {
+  margin-bottom: 0.12rem !important;
+}
+section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHorizontalBlock"] {
+  gap: 0.35rem !important;
+  align-items: center !important;
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<span class="ips-inventory-list-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
     _sel_n = len([x for x in (st.session_state.get(selected_key) or []) if str(x).strip()])
     st.caption(f"{_sel_n} row(s) selected")
 
@@ -805,7 +864,7 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
         ):
             st.session_state["inventory_panel_mode"] = "add"
             st.session_state["inventory_panel_id"] = None
-            st.rerun()
+            ips_app_rerun()
         return
 
     filter_cols = st.columns([1, 2, 1], gap="small")
@@ -850,6 +909,11 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
         s = search.strip().lower()
         mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
         filtered = filtered[mask.any(axis=1)]
+
+    _filt_sig = (selected_category, search, selected_active)
+    if st.session_state.get("inv_filter_sig") != _filt_sig:
+        st.session_state["inv_filter_sig"] = _filt_sig
+        st.session_state["inv_page"] = 0
 
     qoh_s = pd.to_numeric(filtered.get("quantity_on_hand", 0), errors="coerce").fillna(0)
     if "reorder_point" in filtered.columns:
@@ -896,8 +960,39 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
         ):
             st.session_state["inventory_panel_mode"] = "add"
             st.session_state["inventory_panel_id"] = None
-            st.rerun()
+            ips_app_rerun()
         return
+
+    page_size = int(st.session_state.get("inv_page_size", _INV_PAGE_SIZE_DEFAULT))
+    page_size = max(25, min(150, page_size))
+    total_rows = len(filtered)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
+    page = int(st.session_state.get("inv_page", 0))
+    page = max(0, min(page, total_pages - 1))
+    if page != int(st.session_state.get("inv_page", 0)):
+        st.session_state["inv_page"] = page
+
+    pg1, pg2, pg3, pg4 = st.columns([1.2, 1, 1, 2.2], gap="small")
+    with pg1:
+        if st.button("← Prev", key="inv_page_prev", disabled=page <= 0, use_container_width=True):
+            st.session_state["inv_page"] = page - 1
+            st.rerun()
+    with pg2:
+        if st.button(
+            "Next →",
+            key="inv_page_next",
+            disabled=page >= total_pages - 1,
+            use_container_width=True,
+        ):
+            st.session_state["inv_page"] = page + 1
+            st.rerun()
+    with pg3:
+        st.caption(f"Page **{page + 1}** / **{total_pages}**")
+    with pg4:
+        st.caption(f"**{total_rows:,}** matching · **{page_size}** per page")
+
+    page_df = filtered.iloc[page * page_size : (page + 1) * page_size]
+    page_ids = [str(x) for x in page_df.get("id", pd.Series(dtype=str)).astype(str).tolist() if str(x).strip()]
 
     cur_selected = [str(x) for x in (st.session_state.get(selected_key) or []) if str(x).strip()]
     sel_set = set(cur_selected)
@@ -912,42 +1007,30 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
     header[5].markdown("**Reorder**")
     header[6].markdown("**Status**")
 
-    max_rows = 350
-    for _, row in filtered.head(max_rows).iterrows():
+    for _, row in page_df.iterrows():
         item_id = str(row.get("id") or "").strip()
         if not item_id:
             continue
-        checked = item_id in sel_set
+        ck_key = f"inv_select_{item_id}"
+        if ck_key not in st.session_state:
+            st.session_state[ck_key] = item_id in sel_set
         cols = st.columns([0.38, 0.55, 2.05, 1.0, 0.9, 1.1, 1.0], gap="small")
         with cols[0]:
-            new_checked = st.checkbox(
-                "",
-                value=checked,
-                key=f"inv_select_{item_id}",
-                label_visibility="collapsed",
-            )
-        if new_checked and item_id not in sel_set:
-            sel_set.add(item_id)
-        if (not new_checked) and item_id in sel_set:
-            sel_set.remove(item_id)
+            st.checkbox("", key=ck_key, label_visibility="collapsed")
         with cols[1]:
-            raw_img = str(row.get("image_url") or "").strip()
-            img_url = _signed_url_for_inventory_image(raw_img) if raw_img else None
-            if img_url:
-                try:
-                    st.image(img_url, width=36)
-                except Exception:
-                    st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
-            else:
-                st.markdown('<p style="font-size:1.35rem;margin:0;line-height:1;">📦</p>', unsafe_allow_html=True)
+            st.markdown(_inv_thumb_html(str(row.get("image_url") or "")), unsafe_allow_html=True)
         cols[2].write(str(row.get("item_name") or "—"))
         cols[3].write(str(row.get("sku") or "—"))
         cols[4].write(str(row.get("quantity_on_hand") or "0"))
         cols[5].write(str(row.get("reorder_point") or "0"))
         cols[6].write("Active" if bool(row.get("is_active", True)) else "Inactive")
 
-    if len(filtered) > max_rows:
-        st.caption(f"Showing first {max_rows} rows (use filters/search to narrow).")
+    for iid in page_ids:
+        ck_key = f"inv_select_{iid}"
+        if st.session_state.get(ck_key):
+            sel_set.add(iid)
+        else:
+            sel_set.discard(iid)
 
     st.session_state[selected_key] = list(sel_set)
     selected_ids = list(st.session_state[selected_key])
@@ -965,16 +1048,15 @@ def _render_inventory_list(*, df: pd.DataFrame, can_edit: bool, selected_key: st
             st.session_state["editing_inventory_id"] = None
 
 
+@fragment
+def _render_inventory_list_fragment(*, df: pd.DataFrame, can_edit: bool, selected_key: str) -> None:
+    """Isolated rerun scope for filters, table selection, and action bar."""
+    inject_scroll_preserve("inventory")
+    _render_inventory_list_body(df=df, can_edit=can_edit, selected_key=selected_key)
+
+
 def render() -> None:
-    render_header("Inventory")
-    render_crud_list_subtitle(
-        "Stock tracking: on-hand quantities, locations, and reorder points. "
-        "Use **Scan Inventory** to issue stock; **Inventory Usage** for trends."
-    )
-    st.caption(
-        "Proposal line items and markup live under **Estimate Materials** (Quote catalog). "
-        "Use **Import From Inventory** there to copy stocked **Materials** rows and keep an optional link for pricing sync."
-    )
+    render_page_header("Inventory", "Manage stock levels, materials, vendors, and usage.")
 
     msg = st.session_state.pop("inventory_success", None)
     if msg:
@@ -992,8 +1074,9 @@ def render() -> None:
     st.session_state.setdefault("inventory_edit_popup_open", False)
     st.session_state.setdefault("editing_inventory_id", None)
 
+    st.session_state.setdefault(_INV_DATA_VERSION_KEY, 0)
     try:
-        rows = fetch_table_admin(_TABLE, limit=5000, order_by="item_name")
+        rows = _fetch_inventory_items_df(int(st.session_state.get(_INV_DATA_VERSION_KEY, 0)))
     except Exception:
         st.warning(
             "Inventory table is not available yet. Run migration **`sql/015_inventory_items.sql`** "
@@ -1033,7 +1116,7 @@ def render() -> None:
         if not pending:
             close_destructive_confirmation(_DELETE_CONFIRM_PREFIX)
             st.session_state.pop("inventory_pending_delete_ids", None)
-            st.rerun()
+            ips_app_rerun()
 
         id_to_label: dict[str, str] = {}
         for r in rows:
@@ -1055,13 +1138,12 @@ def render() -> None:
                     st.error(f"Could not delete {iid}: {exc}")
             st.session_state.pop("inventory_pending_delete_ids", None)
             st.session_state[selected_key] = []
-            for k in list(st.session_state.keys()):
-                if str(k).startswith("inv_select_"):
-                    del st.session_state[k]
+            _clear_inv_checkbox_keys()
             pid = st.session_state.get("inventory_panel_id")
             if pid and str(pid) in {str(x) for x in pending}:
                 _clear_panel()
-            st.success("Inventory item(s) deleted where permitted.")
+            _bump_inventory_data_version()
+            st.session_state["inventory_success"] = "Inventory item(s) deleted where permitted."
 
         def _on_cancel_delete() -> None:
             st.session_state.pop("inventory_pending_delete_ids", None)
@@ -1088,12 +1170,11 @@ def render() -> None:
                 except Exception as exc:
                     st.error(f"Could not deactivate {iid}: {exc}")
             st.session_state[selected_key] = []
-            for k in list(st.session_state.keys()):
-                if str(k).startswith("inv_select_"):
-                    del st.session_state[k]
+            _clear_inv_checkbox_keys()
             _clear_panel()
-            st.success("Selected inventory items deactivated.")
-            st.rerun()
+            _bump_inventory_data_version()
+            st.session_state["inventory_success"] = "Selected inventory items deactivated."
+            ips_app_rerun()
 
     if current_role() in {"admin", "pm"}:
         with st.expander("Import vendor quote (adds stocked Materials rows)", expanded=False):
@@ -1113,8 +1194,8 @@ def render() -> None:
         _clear_panel()
         panel_mode = None
 
-    # Filters → low stock → table → action bar (single call). Details render below when open.
-    _render_inventory_list(df=df, can_edit=can_edit, selected_key=selected_key)
+    # Filters → low stock → table → action bar (fragment-isolated reruns).
+    _render_inventory_list_fragment(df=df, can_edit=can_edit, selected_key=selected_key)
 
     if panel_mode == "add" and can_edit:
         _inventory_add_dialog()
@@ -1123,15 +1204,15 @@ def render() -> None:
         if not can_edit:
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
-            st.rerun()
+            ips_app_rerun()
         eid = str(st.session_state.get("editing_inventory_id") or "").strip()
         if not eid:
             st.session_state["inventory_edit_popup_open"] = False
-            st.rerun()
+            ips_app_rerun()
         pr = fetch_by_match_admin(_TABLE, {"id": eid}, limit=1)
         panel_row = pr[0] if pr else None
         if not panel_row:
             st.session_state["inventory_edit_popup_open"] = False
             st.session_state["editing_inventory_id"] = None
-            st.rerun()
+            ips_app_rerun()
         _inventory_edit_dialog(dict(panel_row))

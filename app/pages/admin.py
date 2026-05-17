@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
+
 from db import fetch_table
 
 
 def render() -> None:
-    render_header("Admin")
-    st.caption("Starter admin area")
+    render_page_header("Admin", "System settings and configuration.")
 
     st.session_state.setdefault("admin_main_panel", "Profiles")
     st.radio(

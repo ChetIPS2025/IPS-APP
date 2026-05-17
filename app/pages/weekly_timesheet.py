@@ -22,7 +22,6 @@ except ImportError:  # pragma: no cover
 
 try:
     from auth import current_profile, current_role
-    from branding import render_header
     from db import (
         delete_rows_admin,
         fetch_one,
@@ -33,7 +32,6 @@ try:
     )
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
-    from branding import render_header  # type: ignore
     from db import (  # type: ignore
         delete_rows_admin,
         fetch_one,
@@ -44,9 +42,9 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 
 try:
     from services.job_service import job_display_primary, job_row_select_label
@@ -230,18 +228,14 @@ def _signature_b64(canvas_result) -> str | None:
 
 
 def render() -> None:
-    render_header(
+    render_page_header(
         "Weekly Timesheet",
-        subtitle="Dense grid — same labor pool as Time Tracking",
+        "Dense grid by job — same labor pool as Time Tracking.",
     )
 
     if current_role() not in {"admin", "pm"}:
         st.info("Only admin or pm users can use the weekly timesheet.")
         return
-
-    render_crud_list_subtitle(
-        "Hours roll up under **jobs** (``job_id`` / job picker). Apply **sql/004_weekly_timesheets.sql** in Supabase before first save."
-    )
 
     customers = fetch_table("customers", limit=5000, order_by="customer_name")
     jobs = fetch_table(

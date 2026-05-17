@@ -10,7 +10,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 from db import (
     fetch_by_match,
     fetch_by_match_admin,
@@ -43,15 +46,9 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import (
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles
 except ImportError:
-    from ips_crud_list_styles import (  # type: ignore
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
 
 try:
     from app.ui.field_light_theme import inject_field_light_theme
@@ -239,7 +236,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v12"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v13"
 JOB_DB_DETAIL_VIEW_CSS_KEY = "job_db_detail_view_css_v1"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
@@ -260,6 +257,57 @@ def _inject_job_database_responsive_styles() -> None:
     st.markdown(
         """
         <style>
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stImage"] {
+            margin: 0 0 0.08rem 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-page-title {
+            margin: 0 0 0.1rem 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-page-subtitle {
+            margin-bottom: 0.35rem !important;
+        }
+        .ips-jdb-section-title {
+            color: #111827 !important;
+            font-size: 0.95rem !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.01em;
+            margin: 0 0 0.3rem 0 !important;
+            padding: 0 !important;
+            line-height: 1.25 !important;
+        }
+        .ips-jdb-section-desc {
+            color: #4b5563 !important;
+            font-size: 0.8125rem !important;
+            font-weight: 500 !important;
+            margin: 0 0 0.45rem 0 !important;
+            padding: 0 !important;
+            line-height: 1.4 !important;
+        }
+        .ips-jdb-muted {
+            color: #6b7280 !important;
+            font-size: 0.78rem !important;
+            font-weight: 500 !important;
+            margin: 0.28rem 0 0 0 !important;
+            line-height: 1.35 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions) {
+            padding: 0.5rem 0.65rem 0.55rem !important;
+            margin-bottom: 0.45rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions)
+            div[data-testid="stHorizontalBlock"] {
+            gap: 0.45rem !important;
+            align-items: stretch !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions) .stButton > button {
+            min-height: 2.35rem !important;
+            padding: 0.4rem 0.75rem !important;
+            font-size: 0.875rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor) {
+            padding-top: 0.45rem !important;
+            padding-bottom: 0.5rem !important;
+        }
         .ips-job-card-title {
             color: #111827 !important;
             font-size: 1rem;
@@ -2075,17 +2123,18 @@ def _render_job_db_top_bar(
     estimates: list[dict[str, Any]],
     estimate_label_map: dict[str, str],
 ) -> None:
-    """Primary actions: create job, refresh, convert from estimate (same rhythm as Estimates top bar)."""
+    """Compact quick actions: create, convert from estimate, refresh."""
+    ecandidates = [
+        e for e in estimates if e.get("id") is not None and not str(e.get("job_id") or "").strip()
+    ]
+
     with st.container(border=True):
         st.markdown(
-            '<span class="ips-list-top-anchor ips-job-topbar"></span>',
+            '<span class="ips-list-top-anchor ips-job-topbar ips-job-db-quick-actions"></span>',
             unsafe_allow_html=True,
         )
-        st.caption(
-            "**Create New Job** — standalone work (no estimate). "
-            "**Create job from estimate** — converts an approved quote and links the new job."
-        )
-        c1, c2, c3 = st.columns([1.0, 1.0, 1.45], gap="small")
+        st.markdown('<p class="ips-jdb-section-title">Quick Actions</p>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3, gap="small")
         with c1:
             if st.button(
                 "Create New Job",
@@ -2099,44 +2148,61 @@ def _render_job_db_top_bar(
                 st.session_state["job_mode"] = "add"
                 st.session_state.pop("job_edit_id", None)
                 st.session_state.pop("job_number_manual_input", None)
+                st.session_state.pop("job_db_show_convert", None)
                 st.rerun()
         with c2:
-            if st.button("Refresh", type="secondary", use_container_width=True, key="job_top_refresh"):
+            if st.button(
+                "Convert Estimate to Job",
+                type="secondary",
+                use_container_width=True,
+                disabled=not can_edit or not ecandidates,
+                key="job_top_convert",
+            ):
+                st.session_state["job_db_show_convert"] = True
                 st.rerun()
         with c3:
-            if not can_edit:
-                st.caption("Sign in as admin or estimator to convert estimates.")
-            else:
-                ecandidates = [e for e in estimates if e.get("id") is not None and not str(e.get("job_id") or "").strip()]
-                if not ecandidates:
-                    st.caption("No estimates without a linked job.")
-                else:
-                    labels = [estimate_label_map.get(str(e.get("id")), str(e.get("id"))) for e in ecandidates]
-                    idx_opts = list(range(len(ecandidates)))
-                    pick = st.selectbox(
-                        "Convert estimate → job",
-                        idx_opts,
-                        format_func=lambda i: labels[int(i)],
-                        key="job_conv_est",
-                        label_visibility="visible",
-                    )
-                    if st.button(
-                        "Create job from estimate",
-                        type="secondary",
-                        use_container_width=True,
-                        key="job_conv_go",
-                    ):
-                        eid = str(ecandidates[int(pick)].get("id") or "")
-                        res = create_job_from_estimate(eid)
-                        if res.ok:
-                            st.success(res.message)
-                            st.rerun()
-                        else:
-                            st.error(res.message)
+            if st.button("Refresh", type="secondary", use_container_width=True, key="job_top_refresh"):
+                st.session_state.pop("job_db_show_convert", None)
+                st.rerun()
+
+        if not can_edit:
+            pass
+        elif not ecandidates:
+            st.markdown(
+                '<p class="ips-jdb-muted">No approved estimates ready to convert.</p>',
+                unsafe_allow_html=True,
+            )
+        elif st.session_state.get("job_db_show_convert"):
+            labels = [estimate_label_map.get(str(e.get("id")), str(e.get("id"))) for e in ecandidates]
+            idx_opts = list(range(len(ecandidates)))
+            conv_a, conv_b = st.columns([4, 1], gap="small")
+            with conv_a:
+                pick = st.selectbox(
+                    "Estimate to convert",
+                    idx_opts,
+                    format_func=lambda i: labels[int(i)],
+                    key="job_conv_est",
+                    label_visibility="collapsed",
+                )
+            with conv_b:
+                if st.button("Convert", type="primary", use_container_width=True, key="job_conv_go"):
+                    eid = str(ecandidates[int(pick)].get("id") or "")
+                    res = create_job_from_estimate(eid)
+                    if res.ok:
+                        st.session_state.pop("job_db_show_convert", None)
+                        st.success(res.message)
+                        st.rerun()
+                    else:
+                        st.error(res.message)
 
 
 def render() -> None:
-    render_header("Job Database")
+    st.markdown('<span class="ips-job-db-page" aria-hidden="true"></span>', unsafe_allow_html=True)
+    render_page_header(
+        "Job Database",
+        "Manage jobs, customers, contacts, and linked estimates.",
+        logo_width=180,
+    )
     inject_ips_crud_list_styles()
     inject_table_action_styles()
     _inject_job_database_responsive_styles()
@@ -2360,46 +2426,18 @@ def render() -> None:
         )
         return
 
-    render_crud_list_subtitle(
-        "Search and maintain jobs — standalone or estimate-linked — and keep customer contacts aligned."
-    )
-    st.caption(
-        "**Standalone jobs** use **Create New Job** (no quote). **Estimate-linked jobs** use **Convert estimate → job** "
-        "or **Job Received** on the Estimates list once the quote is customer-approved."
-    )
-
     _render_job_db_top_bar(can_edit=can_edit, estimates=estimates, estimate_label_map=estimate_label_map)
-    st.markdown("### Jobs overview")
-    st.caption(
-        "**Source** shows estimate links; **Quote (estimate)**, **customer**, **Contact**, and **Location** summarize linked data."
+
+    st.markdown('<p class="ips-jdb-section-title">Jobs Overview</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="ips-jdb-section-desc">Search, filter, and manage active job records.</p>',
+        unsafe_allow_html=True,
     )
 
     with st.container():
         if jobs_df.empty:
             st.warning("No jobs found in database.")
-            if can_edit and not panel_open:
-                with st.container(border=True):
-                    st.markdown(
-                        '<span class="ips-list-top-anchor ips-job-topbar"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(
-                        "Create New Job",
-                        key="job_add_btn_empty",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        st.session_state["job_view_mode"] = "create"
-                        st.session_state["selected_job_id"] = None
-                        st.session_state["job_mode"] = "add"
-                        st.session_state.pop("job_edit_id", None)
-                        st.session_state.pop("job_number_manual_input", None)
-                        st.rerun()
-                return
-            if not panel_open:
-                return
-
-            st.caption("Use **Create New Job** in the top bar, or **Convert estimate → job**.")
+            return
         else:
             jobs_df = _build_jobs_overview_dataframe(
                 jobs_df,
@@ -2427,7 +2465,7 @@ def render() -> None:
                     '<span class="ips-list-top-anchor ips-job-filter-anchor ips-job-joblist-section-anchor"></span>',
                     unsafe_allow_html=True,
                 )
-                st.markdown("##### Job list")
+                st.markdown('<p class="ips-jdb-section-title">Job list</p>', unsafe_allow_html=True)
                 f1, f2, f3, f4 = st.columns([1.05, 1.05, 2.35, 1.0], gap="small")
                 with f1:
                     selected_customer = st.selectbox(

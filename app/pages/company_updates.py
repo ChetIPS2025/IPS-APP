@@ -12,7 +12,10 @@ from typing import Any
 import streamlit as st
 
 from auth import current_profile, current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 
 try:
     from app.data_cache import clear_session_table_cache, fetch_table_for_session
@@ -510,9 +513,9 @@ def render() -> None:
     sk = me or "anonymous"
     use_admin = _norm_role(role) in ("admin", "manager")
 
-    render_header(
+    render_page_header(
         "Company Updates",
-        subtitle="Announcements, safety notices, and schedule changes — your internal bulletin board.",
+        "Announcements, safety notices, and schedule changes.",
     )
 
     st.session_state.setdefault("cu_sf_search_raw", "")

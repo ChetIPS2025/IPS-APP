@@ -11,7 +11,6 @@ try:
     from app.asset_responsive import inject_asset_workflow_mobile_css
     from app.mobile_ui import ensure_narrow_viewport_detected
     from app.auth import current_profile, current_role
-    from app.branding import render_header
     from app.db import (
         create_signed_url,
         delete_rows_admin,
@@ -31,7 +30,6 @@ except ImportError:
     from asset_responsive import inject_asset_workflow_mobile_css  # type: ignore
     from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
     from auth import current_profile, current_role  # type: ignore
-    from branding import render_header  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
         delete_rows_admin,
@@ -68,11 +66,11 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 
 _ASSET_PANEL_CSS_KEY = "ips_asset_db_side_panel_css_injected"
 _ADB_TOP_ACTIONS_CSS_KEY = "ips_asset_db_top_actions_css_injected"
@@ -1498,9 +1496,9 @@ def render() -> None:
     inject_asset_workflow_mobile_css()
     ensure_narrow_viewport_detected()
     _inject_asset_database_mobile_css()
-    render_header("Asset Database")
-    render_crud_list_subtitle(
-        "Filter and browse assets. Use Table for checkboxes, export, and bulk delete; Cards when you want photo-first browsing."
+    render_page_header(
+        "Asset Database",
+        "Filter and browse assets — table or card views.",
     )
 
     can_add = current_role() in {"admin", "manager"}

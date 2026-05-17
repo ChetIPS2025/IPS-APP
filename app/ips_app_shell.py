@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v7"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v8"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -103,8 +103,8 @@ def inject_ips_app_shell_styles() -> None:
             margin-right: auto;
         }
         section[data-testid="stMain"] .block-container {
-            padding-top: 0.15rem !important;
-            padding-bottom: 0.85rem !important;
+            padding-top: 0.1rem !important;
+            padding-bottom: 0.75rem !important;
         }
         section[data-testid="stMain"] [data-testid="stVerticalBlock"] > div {
             gap: 0.35rem !important;

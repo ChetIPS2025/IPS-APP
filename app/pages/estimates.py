@@ -6,12 +6,10 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from branding import render_header
-
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 from auth import current_role
 from db import (
     fetch_by_match_admin,
@@ -988,11 +986,10 @@ def render() -> None:
         view = "list"
 
     # Single branding header per request; each branch renders one body section only.
-    render_header("Estimates")
     inject_table_action_styles()
 
     if view == "list":
-        render_crud_list_subtitle("Open estimates, import quotes, or start a new quote.")
+        render_page_header("Estimates", "Quotes, imports, and customer-ready estimates.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
@@ -1021,7 +1018,7 @@ def render() -> None:
         _render_estimate_list()
 
     elif view == "import":
-        render_crud_list_subtitle("PDF or JSON import — return to the list when done.")
+        render_page_header("Estimates", "PDF or JSON import — return to the list when done.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
@@ -1037,7 +1034,7 @@ def render() -> None:
 
     else:
         # view == "edit"
-        render_crud_list_subtitle("Line items and save — **Back to list** when done.")
+        render_page_header("Estimates", "Line items and save — Back to list when done.")
         with st.container(border=True):
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',

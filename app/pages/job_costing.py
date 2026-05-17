@@ -19,12 +19,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
-
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 
 from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
@@ -249,10 +247,9 @@ def _render_bordered_section(title: str) -> Any:
 
 
 def render() -> None:
-    render_header("Job Costing")
-    render_crud_list_subtitle(
-        "Phase 1: costing by **job** (``job_id``). Labor from **time_entries**; add materials and equipment below. "
-        "Quote totals compare to the linked **estimate** when present."
+    render_page_header(
+        "Job Costing",
+        "Costing by job — labor, materials, equipment, and estimate comparison.",
     )
 
     admin = _job_costing_admin_read()

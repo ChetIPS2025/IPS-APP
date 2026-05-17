@@ -27,13 +27,13 @@ except ImportError:
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import fetch_by_match_admin, fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
     from app.ui import IPS_NAV_PENDING_KEY
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import fetch_by_match_admin, fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
@@ -181,14 +181,9 @@ def _perform_checkin(tool_id: str, *, txn_ok: bool) -> tuple[bool, str]:
 
 def render() -> None:
     ensure_narrow_viewport_detected()
-    render_header("Who Has What")
+    render_page_header("Who Has What", "Checked-out tools and who has them.")
     _inject_tool_dash_css()
     st.markdown('<span class="ips-tool-dash-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-    st.caption(
-        "Checkout tools only — possession on **assets** / **tool_transactions**. "
-        "For scan workflow use **Scan Inventory**."
-    )
 
     if current_role() not in {"admin", "pm", "employee", "viewer"}:
         st.error("You do not have access to this page.")

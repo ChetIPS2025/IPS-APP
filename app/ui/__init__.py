@@ -298,10 +298,10 @@ section[data-testid="stSidebar"] > div,
 }
 section[data-testid="stSidebar"] .block-container {
   background: transparent !important;
-  padding-top: 0.35rem !important;
-  padding-bottom: 0.35rem !important;
-  padding-left: 0.45rem !important;
-  padding-right: 0.45rem !important;
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.3rem !important;
+  padding-left: 0.4rem !important;
+  padding-right: 0.4rem !important;
 }
 section[data-testid="stSidebar"] .stMarkdown,
 section[data-testid="stSidebar"] .stMarkdown p,
@@ -356,7 +356,7 @@ section[data-testid="stSidebar"] .ips-nav-expander-hint {
   opacity: 0.92 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
-  margin: 28px 0 14px 0;
+  margin: 16px 0 10px 0;
   padding: 0;
   border: none;
   border-top: 1px solid #94a3b8 !important;

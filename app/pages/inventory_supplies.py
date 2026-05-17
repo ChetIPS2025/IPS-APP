@@ -18,7 +18,7 @@ except ImportError:
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import (
         delete_rows_admin,
         fetch_by_match_admin,
@@ -35,7 +35,7 @@ try:
     )
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import (  # type: ignore
         delete_rows_admin,
         fetch_by_match_admin,
@@ -67,16 +67,10 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import (
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
 except ImportError:
-    from ips_crud_list_styles import (  # type: ignore
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 _TABLE = "inventory_items"
@@ -457,9 +451,9 @@ def _render_inventory_main(*, df: pd.DataFrame, rows: list[dict], can_edit: bool
 
 
 def render() -> None:
-    render_header("Inventory / Supplies")
-    render_crud_list_subtitle(
-        "Stocked consumables and supplies — separate from individually tracked assets in Asset Database."
+    render_page_header(
+        "Inventory / Supplies",
+        "Stocked consumables and supplies — separate from tracked assets.",
     )
 
     can_edit = current_role() == "admin"

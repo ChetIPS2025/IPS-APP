@@ -13,7 +13,10 @@ except ImportError:
     from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected  # type: ignore
 
 from auth import current_profile, current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 from db import delete_rows, fetch_one, fetch_table, fetch_table_admin, insert_row, update_rows
 
 try:
@@ -1194,7 +1197,10 @@ def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> No
 
 def _tt_render_header_section() -> tuple[bool, bool]:
     """Branding, styles, viewport. Returns (can_edit, fast); fast is always False (legacy)."""
-    render_header("Time Tracking", subtitle="Log hours by employee, job, and day — S/T vs O/T")
+    render_page_header(
+        "Time Tracking",
+        "Log hours by employee, job, and day — S/T vs O/T.",
+    )
 
     _inject_tt_styles()
     ensure_narrow_viewport_detected()

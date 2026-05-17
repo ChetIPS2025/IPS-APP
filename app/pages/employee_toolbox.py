@@ -15,7 +15,7 @@ _streamlit = st
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected
     from app.confirm_delete import (
         close_destructive_confirmation,
@@ -42,7 +42,7 @@ try:
     from app.table_actions import inject_table_action_styles
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected  # type: ignore
     from confirm_delete import (  # type: ignore
         close_destructive_confirmation,
@@ -1540,8 +1540,10 @@ def _render_tools_hub(rows: list[dict]) -> None:
 
 
 def render() -> None:
-    render_header("Employee Toolbox")
-    st.caption("Industrial Plant Solutions, LLC — curated links and documents for everyday work.")
+    render_page_header(
+        "Employee Toolbox",
+        "Curated links and documents for field and office.",
+    )
 
     can_manage = current_role() == "admin"
     panel_mode = st.session_state.get(_PANEL_MODE_KEY)

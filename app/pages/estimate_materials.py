@@ -15,7 +15,7 @@ except ImportError:
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import (
         fetch_by_match_admin,
         fetch_table,
@@ -30,7 +30,7 @@ try:
     )
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import (  # type: ignore
         fetch_by_match_admin,
         fetch_table,
@@ -185,13 +185,9 @@ def _dialog_em_inventory_import_preview() -> None:
 
 
 def render() -> None:
-    render_header(
+    render_page_header(
         "Estimate Materials",
-        subtitle="Quote catalog — proposals, bundles, markup, and vendor pricing (not stock on hand).",
-    )
-    st.caption(
-        "**Estimates** pull line items only from this catalog. "
-        "**Inventory** (sidebar) is **stock tracking** (on-hand, scan, usage)."
+        "Quote catalog for proposals — separate from stock on hand.",
     )
 
     st.session_state.setdefault(_EM_DLG_KEY, "")

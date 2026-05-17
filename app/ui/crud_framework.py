@@ -4,13 +4,12 @@ from collections.abc import Callable
 
 import streamlit as st
 
-from app.branding import render_header
 from app.ips_crud_list_styles import (
     IPS_CRUD_LIST_PAGE_GAP,
     IPS_CRUD_LIST_PAGE_SPLIT,
     inject_ips_crud_list_styles,
-    render_crud_list_subtitle,
 )
+from app.ui.page_shell import render_page_header
 
 
 def render_crud_page(
@@ -26,9 +25,8 @@ def render_crud_page(
     Branded CRUD shell: header, IPS list styles, subtitle, optional full-width block (e.g. delete
     confirmations), then main vs split columns when the side panel is open.
     """
-    render_header(title)
+    render_page_header(title, subtitle)
     inject_ips_crud_list_styles()
-    render_crud_list_subtitle(subtitle)
     if before_main is not None:
         before_main()
 

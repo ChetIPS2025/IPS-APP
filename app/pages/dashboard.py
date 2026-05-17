@@ -8,7 +8,10 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 from auth import current_profile, current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header, render_section_header
+except ImportError:
+    from ui.page_shell import render_page_header, render_section_header  # type: ignore
 from data_cache import clear_session_table_cache, fetch_table_for_session
 
 try:
@@ -1175,10 +1178,9 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
 
 def render() -> None:
     st.markdown('<div class="ips-dashboard-page" aria-hidden="true"></div>', unsafe_allow_html=True)
-    render_header(
+    render_page_header(
         "IPS Dashboard",
-        subtitle="Industrial Plant Solutions, LLC",
-        help_text="A simple snapshot for office + field: jobs, low stock, checked-out tools, and your to-dos.",
+        "Office and field snapshot: jobs, stock, tools, and to-dos.",
     )
 
     sk = str(current_profile().get("id") or "anonymous")
@@ -1251,7 +1253,7 @@ def render() -> None:
 
     _dash_field_light_theme()
     with st.container(border=True):
-        st.markdown("##### Operations snapshot")
+        render_section_header("Operations snapshot")
         m3, m4, m5 = st.columns(3, gap="small")
         m3.metric("Low stock items", f"{low_n:,}")
         m4.metric("Checked out tools", f"{out_n:,}")

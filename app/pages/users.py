@@ -16,7 +16,6 @@ except ImportError:
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
     from app.db import (
         delete_rows_admin,
         fetch_by_match_admin,
@@ -32,7 +31,6 @@ try:
     )
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
     from db import (  # type: ignore
         delete_rows_admin,
         fetch_by_match_admin,
@@ -48,9 +46,11 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import inject_ips_crud_list_styles, render_crud_list_subtitle  # type: ignore
+    from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 
 _ROLE_OPTIONS: tuple[str, ...] = ("viewer", "employee", "manager", "admin")
 
@@ -106,14 +106,13 @@ def _fmt_ts(v: object) -> str:
 
 
 def render() -> None:
-    render_header("Users")
+    render_page_header("Users", "Invite users, manage roles, and resend invites.")
 
     if current_role() != "admin":
         st.error("Unauthorized. Admin access required.")
         return
 
     inject_ips_crud_list_styles()
-    render_crud_list_subtitle("Invite users, manage roles, deactivate accounts, and resend invites.")
 
     with st.container(border=True):
         # Prefer employee-linked invites to prevent "unlinked login accounts".

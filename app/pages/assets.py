@@ -5,7 +5,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 from db import delete_rows_admin, fetch_one, fetch_table, insert_row_admin, update_rows_admin
 from ui import IPS_NAV_PENDING_KEY
 
@@ -428,7 +431,7 @@ def _render_asset_create_update_form(
 
 
 def render() -> None:
-    render_header("Asset Manager")
+    render_page_header("Asset Manager", "Overview and status of tools and equipment.")
 
     can_edit = current_role() in {"admin", "manager"}
 

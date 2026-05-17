@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v2"
+IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v3"
 IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v3"
 
 # Main grid vs side panel — use everywhere (Customers, Labor, Employees) so widths stay identical.
@@ -292,11 +292,9 @@ def inject_ips_crud_list_styles() -> None:
 
 
 def render_crud_list_subtitle(text: str) -> None:
-    """Same subtitle spacing/styling for Employees, Customers, etc."""
-    import html
-
-    inject_ips_crud_list_styles()
-    st.markdown(
-        f'<p class="ips-crud-page-subtitle">{html.escape(text)}</p>',
-        unsafe_allow_html=True,
-    )
+    """One-line section description (prefer :func:`page_shell.render_page_header` subtitle instead)."""
+    try:
+        from app.ui.page_shell import render_section_desc_only
+    except ImportError:
+        from ui.page_shell import render_section_desc_only  # type: ignore
+    render_section_desc_only(text)

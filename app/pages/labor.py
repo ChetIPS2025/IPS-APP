@@ -5,7 +5,7 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.branding import render_header
+    from app.ui.page_shell import render_page_header
     from app.db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows_admin
     from app.table_actions import (
         TABLE_KEY_LABOR,
@@ -16,7 +16,7 @@ try:
     )
 except ImportError:
     from auth import current_role  # type: ignore
-    from branding import render_header  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
     from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows_admin  # type: ignore
     from table_actions import (  # type: ignore
         TABLE_KEY_LABOR,
@@ -46,14 +46,12 @@ try:
         IPS_CRUD_LIST_PAGE_GAP,
         IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
     )
 except ImportError:
     from ips_crud_list_styles import (  # type: ignore
         IPS_CRUD_LIST_PAGE_GAP,
         IPS_CRUD_LIST_PAGE_SPLIT,
         inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
     )
 
 _LABOR_DELETE_CONFIRM_PREFIX = "labor_delete"
@@ -404,9 +402,9 @@ def _render_labor_table_block(*, filtered: pd.DataFrame, df: pd.DataFrame, can_a
 def render() -> None:
     _migrate_legacy_labor_session()
 
-    render_header("Labor Rates")
-    render_crud_list_subtitle(
-        "Manage straight-time and overtime classification rates used in estimates and job costing."
+    render_page_header(
+        "Labor Rates",
+        "Straight-time and overtime rates for estimates and job costing.",
     )
 
     can_add = current_role() == "admin"

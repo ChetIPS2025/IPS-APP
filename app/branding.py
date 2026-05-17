@@ -87,11 +87,12 @@ def render_header(
     subtitle: str = "Industrial Plant Solutions, LLC",
     *,
     help_text: str | None = None,
+    logo_width: int = 180,
 ) -> None:
     logo_path = _find_wide_logo()
 
     if logo_path and logo_path.exists():
-        st.image(str(logo_path), width=260)
+        st.image(str(logo_path), width=int(logo_width))
 
     if title:
         st.markdown(f'<div class="ips-page-title">{html.escape(title)}</div>', unsafe_allow_html=True)

@@ -6,7 +6,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_role
-from branding import render_header
+try:
+    from app.ui.page_shell import render_page_header
+except ImportError:
+    from ui.page_shell import render_page_header  # type: ignore
 from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows
 
 try:
@@ -46,16 +49,10 @@ except ImportError:
     )
 
 try:
-    from app.ips_crud_list_styles import (
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from app.ips_crud_list_styles import inject_ips_crud_list_styles
     from app.ui.modal import ensure_modal_styles, modal_wide_marker
 except ImportError:
-    from ips_crud_list_styles import (  # type: ignore
-        inject_ips_crud_list_styles,
-        render_crud_list_subtitle,
-    )
+    from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
     from ui.modal import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 _EMP_DELETE_CONFIRM_PREFIX = "employees_delete"
@@ -483,6 +480,5 @@ def render_body() -> None:
 
 
 def render() -> None:
-    render_header("Employees")
-    render_crud_list_subtitle("Search, filter, and manage employee records, roles, and pay rates.")
+    render_page_header("Employees", "Search, filter, and manage employee records.")
     render_body()

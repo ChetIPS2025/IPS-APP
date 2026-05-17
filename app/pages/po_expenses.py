@@ -4,12 +4,10 @@ import pandas as pd
 import streamlit as st
 
 from auth import current_profile, current_role
-from branding import render_header
-
 try:
-    from app.ips_crud_list_styles import render_crud_list_subtitle
+    from app.ui.page_shell import render_page_header
 except ImportError:
-    from ips_crud_list_styles import render_crud_list_subtitle  # type: ignore
+    from ui.page_shell import render_page_header  # type: ignore
 from db import delete_rows_admin, fetch_one, fetch_table, insert_row, update_rows
 
 try:
@@ -63,10 +61,7 @@ def _safe_date_value(value):
 
 
 def render() -> None:
-    render_header("PO / Expenses")
-    render_crud_list_subtitle(
-        "Expenses and PO lines tied to **jobs** (``job_id``) — the work/costing record; pick a job, then add or edit."
-    )
+    render_page_header("PO / Expenses", "Expenses and PO lines tied to jobs.")
 
     can_add = current_role() in {"admin", "pm"}
     can_approve = current_role() == "admin"
