@@ -342,7 +342,26 @@ def render_job_database_detail_view_page(
     )
     st.markdown(hero_inner, unsafe_allow_html=True)
 
-    with st.container(border=True):
+    try:
+        from app.ui.activity import render_activity_panel
+        from app.ui.page_shell import render_card
+    except ImportError:
+        from ui.activity import render_activity_panel  # type: ignore
+        from ui.page_shell import render_card  # type: ignore
+
+    with render_card(title="Activity"):
+        render_activity_panel(
+            title="Job activity",
+            created_at=job_row.get("created_at"),
+            updated_at=job_row.get("updated_at"),
+            status=status,
+            extra_lines=[
+                ("Job #", jn or "—"),
+                ("Customer", cust),
+            ],
+        )
+
+    with render_card(title="Job information"):
         st.markdown('<p class="ips-job-detail-section-title">Job information</p>', unsafe_allow_html=True)
         desc = str(job_row.get("description") or job_row.get("scope") or "").strip()
         st.markdown(f"**Description**  \n{html.escape(desc) if desc else '—'}")
@@ -356,7 +375,7 @@ def render_job_database_detail_view_page(
         with st.expander("Notes", expanded=bool(notes)):
             st.text(notes or "—")
 
-    with st.container(border=True):
+    with render_card(title="Customer information"):
         st.markdown('<p class="ips-job-detail-section-title">Customer information</p>', unsafe_allow_html=True)
         phone = email = "—"
         if ccid:
@@ -370,7 +389,7 @@ def render_job_database_detail_view_page(
         st.markdown(f"**Email**  \n{html.escape(email)}")
         st.markdown(f"**Site / location**  \n{html.escape(loc_txt or '—')}")
 
-    with st.container(border=True):
+    with render_card(title="Financial summary"):
         st.markdown('<p class="ips-job-detail-section-title">Financial summary</p>', unsafe_allow_html=True)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Awarded", _money(awarded))
@@ -383,7 +402,7 @@ def render_job_database_detail_view_page(
         m7.metric("Profit (awarded − cost)", _jc._money_str(profit) if profit is not None else "—")
         m8.metric("Margin %", f"{margin_pct:.1f}%" if margin_pct is not None else "—")
 
-    with st.container(border=True):
+    with render_card(title="Assigned employees"):
         st.markdown('<p class="ips-job-detail-section-title">Assigned employees (from time entries)</p>', unsafe_allow_html=True)
         if uniq_emp:
             for nm in sorted(uniq_emp.keys()):
@@ -391,7 +410,7 @@ def render_job_database_detail_view_page(
         else:
             st.caption("No time booked to this job yet.")
 
-    with st.container(border=True):
+    with render_card(title="Assigned assets"):
         st.markdown('<p class="ips-job-detail-section-title">Assigned assets / equipment</p>', unsafe_allow_html=True)
         if not assets_on_job:
             st.caption("No assets are assigned to this job.")
@@ -401,16 +420,16 @@ def render_job_database_detail_view_page(
                 an = str(a.get("asset_name") or "").strip()
                 st.markdown(f"- **{html.escape(aid or '—')}** — {html.escape(an or '—')}")
 
-    with st.container(border=True):
+    with render_card(title="Tasks"):
         st.markdown('<p class="ips-job-detail-section-title">Tasks</p>', unsafe_allow_html=True)
         jl = job_row_select_label(job_row)
         render_job_tasks_tab(job_id=jid, job_label=jl, can_edit_tasks=False, admin_read=admin_read)
 
-    with st.container(border=True):
+    with render_card(title="Costing & estimates"):
         st.markdown('<p class="ips-job-detail-section-title">Costing & estimates</p>', unsafe_allow_html=True)
         render_job_cost_tab(job_id=jid, job_row=job_row)
 
-    with st.container(border=True):
+    with render_card(title="Files & references"):
         st.markdown('<p class="ips-job-detail-section-title">Uploaded files & references</p>', unsafe_allow_html=True)
         if not ref_rows:
             st.caption("No reference attachments on this job yet. Add files from **Edit Job → Tasks**.")

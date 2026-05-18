@@ -305,7 +305,11 @@ def _render_asset_panel_view(row: dict, *, use_side_panel_style: bool = True) ->
     can_edit = current_role() in {"admin", "pm"}
     if use_side_panel_style:
         _inject_asset_side_panel_css()
-    with st.container(border=True):
+    try:
+        from app.ui.page_shell import render_card
+    except ImportError:
+        from ui.page_shell import render_card  # type: ignore
+    with render_card(title="View asset" if use_side_panel_style else None):
         if use_side_panel_style:
             st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
             st.markdown("### View asset")
@@ -943,7 +947,11 @@ def _render_asset_panel_edit(
     def pk(s: str) -> str:
         return f"adb_p_{rid}_{s}"
 
-    with st.container(border=True):
+    try:
+        from app.ui.page_shell import render_card
+    except ImportError:
+        from ui.page_shell import render_card  # type: ignore
+    with render_card(title="Edit asset" if use_side_panel_style else None):
         if use_side_panel_style:
             st.markdown('<span class="ips-asset-panel-anchor"></span>', unsafe_allow_html=True)
             st.markdown("### Edit asset")

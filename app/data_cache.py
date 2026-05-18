@@ -48,8 +48,40 @@ def clear_session_table_cache() -> None:
     try:
         _fetch_table_cached.clear()
         _fetch_table_cached_admin.clear()
+        fetch_table_admin_cached.clear()
+        fetch_table_cached.clear()
     except Exception:
         pass
+
+
+@st.cache_data(ttl=_ttl, show_spinner=False)
+def fetch_table_admin_cached(
+    table_name: str,
+    *,
+    columns: str = "*",
+    limit: int = 1000,
+    order_by: str | None = None,
+    cache_version: int = 0,
+) -> list[dict[str, Any]]:
+    """Cached service-role list read; bump ``cache_version`` after writes."""
+    from db import fetch_table_admin
+
+    return fetch_table_admin(table_name, columns=columns, limit=limit, order_by=order_by)
+
+
+@st.cache_data(ttl=_ttl, show_spinner=False)
+def fetch_table_cached(
+    table_name: str,
+    *,
+    columns: str = "*",
+    limit: int = 1000,
+    order_by: str | None = None,
+    cache_version: int = 0,
+) -> list[dict[str, Any]]:
+    """Cached anon/RLS list read; bump ``cache_version`` after writes."""
+    from db import fetch_table
+
+    return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
 
 
 def fetch_table_for_session(

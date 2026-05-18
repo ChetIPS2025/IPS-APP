@@ -340,27 +340,26 @@ def _cu_post_dialog(*, me: str) -> None:
     ensure_modal_styles()
     modal_wide_marker()
     st.markdown("### Post announcement")
-    with st.container(border=True):
-        with st.form("cu_post_dlg", clear_on_submit=True):
-            pt = st.text_input("Title", key="cu_post_title_dlg", placeholder="Headline")
-            pm = st.text_area("Message", height=88, key="cu_post_msg_dlg", placeholder="Details…")
-            p1, p2 = st.columns(2)
-            with p1:
-                pcat = st.selectbox("Category", list(_CATEGORIES), key="cu_post_cat_dlg")
-            with p2:
-                ppri = st.selectbox("Priority", list(_PRIORITIES), index=0, key="cu_post_pri_dlg")
-            exp = st.date_input("Expires (optional)", value=None, key="cu_post_exp_dlg")
-            att_url = st.text_input(
-                "Attachment URL (optional)",
-                key="cu_post_att_url_dlg",
-                placeholder="https://…",
-            )
-            up = st.file_uploader(
-                "Or upload",
-                type=["png", "jpg", "jpeg", "webp", "gif", "pdf"],
-                key="cu_post_file_dlg",
-            )
-            posted = st.form_submit_button("Post", type="primary", use_container_width=True)
+    with st.form("cu_post_dlg", clear_on_submit=True):
+        pt = st.text_input("Title", key="cu_post_title_dlg", placeholder="Headline")
+        pm = st.text_area("Message", height=88, key="cu_post_msg_dlg", placeholder="Details…")
+        p1, p2 = st.columns(2)
+        with p1:
+            pcat = st.selectbox("Category", list(_CATEGORIES), key="cu_post_cat_dlg")
+        with p2:
+            ppri = st.selectbox("Priority", list(_PRIORITIES), index=0, key="cu_post_pri_dlg")
+        exp = st.date_input("Expires (optional)", value=None, key="cu_post_exp_dlg")
+        att_url = st.text_input(
+            "Attachment URL (optional)",
+            key="cu_post_att_url_dlg",
+            placeholder="https://…",
+        )
+        up = st.file_uploader(
+            "Or upload",
+            type=["png", "jpg", "jpeg", "webp", "gif", "pdf"],
+            key="cu_post_file_dlg",
+        )
+        posted = st.form_submit_button("Post", type="primary", use_container_width=True)
     if st.button("Cancel", type="secondary", use_container_width=True, key="cu_post_cancel_dlg"):
         st.session_state.pop("cu_open_post_dialog", None)
         st.rerun()
@@ -605,9 +604,34 @@ def render() -> None:
         st.caption(f"{len(filtered)} matching · showing {len(filtered_visible)} newest")
 
         if not filtered and not rows_all:
-            st.info("No company updates yet.")
+            try:
+                from app.ui.components.empty_states import render_empty_state
+            except ImportError:
+                from ui.components.empty_states import render_empty_state  # type: ignore
+            if render_empty_state(
+                "No company updates yet",
+                "Post the first announcement for your team.",
+                icon="📢",
+                action_label="Post update",
+                action_key="cu_feed_empty_post",
+            ):
+                st.session_state["cu_open_post"] = True
+                st.rerun()
         elif not filtered:
-            st.caption("No updates match these filters.")
+            try:
+                from app.ui.components.empty_states import render_empty_state
+            except ImportError:
+                from ui.components.empty_states import render_empty_state  # type: ignore
+            if render_empty_state(
+                "No updates match filters",
+                "Try clearing search or category filters.",
+                icon="🔍",
+                action_label="Clear filters",
+                action_key="cu_feed_empty_clear",
+            ):
+                _clear_filter_keys()
+                st.session_state["cu_feed_limit"] = 30
+                st.rerun()
         else:
             for r in filtered_visible:
                 uid = str(r.get("id") or "").strip()

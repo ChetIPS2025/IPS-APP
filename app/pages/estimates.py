@@ -97,10 +97,16 @@ def _fetch_one_estimate_row(estimate_id: str) -> dict[str, Any] | None:
     return fetch_one("estimates", {"id": eid})
 
 
-def _fetch_estimates_list_rows() -> list[dict[str, Any]]:
-    if _estimates_page_admin_read():
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_estimates_list_rows_cached(_admin: bool, _v: int) -> list[dict[str, Any]]:
+    if _admin:
         return fetch_table_admin("estimates", limit=1000, order_by="updated_at")
     return fetch_table("estimates", limit=1000, order_by="updated_at")
+
+
+def _fetch_estimates_list_rows() -> list[dict[str, Any]]:
+    v = int(st.session_state.get("est_data_version", 0))
+    return _fetch_estimates_list_rows_cached(_estimates_page_admin_read(), v)
 
 
 def _fetch_customers_for_import() -> list[dict[str, Any]]:
@@ -423,7 +429,24 @@ def _render_estimate_list() -> None:
         df["Linked job"] = df.apply(_linked_job_display_cell, axis=1)
 
     if df.empty:
-        st.info("No estimates found.")
+        try:
+            from app.ui.components.empty_states import render_empty_state
+        except ImportError:
+            from ui.components.empty_states import render_empty_state  # type: ignore
+        if render_empty_state(
+            "No estimates found",
+            "Create a new estimate or import existing quotes to get started.",
+            icon="📄",
+            action_label="New estimate",
+            action_key="est_list_empty_new",
+        ):
+            _reset_estimate_editor_transients(clear_import_hints=True)
+            st.session_state["estimate_editor_state"] = blank_estimate()
+            st.session_state["loaded_estimate_id"] = None
+            st.session_state["estimate_editor_quote_ready"] = False
+            ensure_state()
+            st.session_state["estimates_view"] = "edit"
+            st.rerun()
         return
 
     location_by_id: dict[str, dict[str, Any]] = {}
@@ -704,7 +727,11 @@ def _render_estimate_list() -> None:
                 job_row = job_by_id[str(open_jid)]
                 linked_jn = job_number_display(job_row.get("job_number"))
                 linked_jnm = str(job_row.get("job_name") or "").strip()
-        with st.container(border=True):
+        try:
+            from app.ui.page_shell import render_card
+        except ImportError:
+            from ui.page_shell import render_card  # type: ignore
+        with render_card():
             st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
             if open_jid:
                 jdisp = job_display_label(linked_jn, linked_jnm)
@@ -1020,7 +1047,11 @@ def render() -> None:
 
     elif view == "import":
         render_page_header("Estimates", "PDF or JSON import — return to the list when done.")
-        with st.container(border=True):
+        try:
+            from app.ui.page_shell import render_card
+        except ImportError:
+            from ui.page_shell import render_card  # type: ignore
+        with render_card():
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
                 unsafe_allow_html=True,
@@ -1036,7 +1067,7 @@ def render() -> None:
     else:
         # view == "edit"
         render_page_header("Estimates", "Line items and save — Back to list when done.")
-        with st.container(border=True):
+        with render_card():
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
                 unsafe_allow_html=True,
@@ -1057,4 +1088,21 @@ def render() -> None:
                     _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimates_view"] = "import"
                     st.rerun()
+        eid_edit = str(st.session_state.get("loaded_estimate_id") or "").strip()
+        if eid_edit:
+            try:
+                from app.ui.activity import render_activity_panel
+            except ImportError:
+                from ui.activity import render_activity_panel  # type: ignore
+            erow = _fetch_one_estimate_row(eid_edit)
+            if erow:
+                render_activity_panel(
+                    title="Estimate activity",
+                    created_at=erow.get("created_at"),
+                    updated_at=erow.get("updated_at"),
+                    status=erow.get("status"),
+                    extra_lines=[
+                        ("Quote #", str(erow.get("quote_number") or "—")),
+                    ],
+                )
         render_estimate_editor(embedded=True)

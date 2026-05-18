@@ -20,9 +20,9 @@ import streamlit as st
 
 from auth import current_role
 try:
-    from app.ui.page_shell import render_page_header
+    from app.ui.page_shell import render_card, render_page_header
 except ImportError:
-    from ui.page_shell import render_page_header  # type: ignore
+    from ui.page_shell import render_card, render_page_header  # type: ignore
 
 from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
@@ -238,12 +238,12 @@ def _equipment_total(rows: list[dict]) -> float:
 
 
 def _render_bordered_section(title: str) -> Any:
-    """Match Job Database / Estimates: bordered container + anchor for dark IPS CSS."""
-    c = st.container(border=True)
-    with c:
-        st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-        st.markdown(f"**{title}**")
-    return c
+    """Flat section with title (Job Costing / reports-style layout)."""
+    try:
+        from app.ui.page_shell import render_card
+    except ImportError:
+        from ui.page_shell import render_card  # type: ignore
+    return render_card(title=title)
 
 
 def render() -> None:
@@ -384,9 +384,8 @@ def render() -> None:
     variance = (est_amt - total_job_cost) if est_amt is not None else None
 
     # --- Summary cards ---
-    with st.container(border=True):
+    with render_card(title="Summary"):
         st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("**Summary**")
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("Labor cost", _money_str(labor_total))
         c2.metric("Material cost", _money_str(material_total))
@@ -536,9 +535,8 @@ def render() -> None:
         st.markdown(f"**Equipment total:** {_money_str(equipment_total)}")
 
     # --- Variance recap (compact) ---
-    with st.container(border=True):
+    with render_card(title="Totals & variance"):
         st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-        st.markdown("**Totals & variance**")
         recap = pd.DataFrame(
             {
                 "Item": [

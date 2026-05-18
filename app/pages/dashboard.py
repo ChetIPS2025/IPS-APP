@@ -1047,12 +1047,32 @@ def _render_todo_list(*, session_key: str, use_admin: bool) -> None:
         rows = _todo_sort_rows(_todo_dedupe_rows(rows))
 
         if not rows:
+            try:
+                from app.ui.components.empty_states import render_empty_state
+            except ImportError:
+                from ui.components.empty_states import render_empty_state  # type: ignore
             if view == "Completed Tasks":
-                st.caption("No completed tasks.")
+                render_empty_state("No completed tasks", "Completed tasks will appear here.", icon="✓")
             elif view == "All Tasks":
-                st.caption("No tasks.")
+                if render_empty_state(
+                    "No tasks yet",
+                    "Add a task to track follow-ups and priorities.",
+                    icon="☑",
+                    action_label="Add task",
+                    action_key="dash_todo_empty_add",
+                ):
+                    st.session_state["dash_todo_open_add"] = True
+                    st.rerun()
             else:
-                st.caption("No active tasks.")
+                if render_empty_state(
+                    "No active tasks",
+                    "Add a task or switch to All Tasks to see everything.",
+                    icon="☑",
+                    action_label="Add task",
+                    action_key="dash_todo_empty_add_active",
+                ):
+                    st.session_state["dash_todo_open_add"] = True
+                    st.rerun()
         else:
             st.caption("Urgent / high priority sort first · row actions for details, edit, or delete.")
             for idx, t in enumerate(rows):

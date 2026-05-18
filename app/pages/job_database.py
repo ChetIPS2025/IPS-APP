@@ -12,10 +12,12 @@ import streamlit as st
 from auth import current_role
 try:
     from app.ui.compact_forms import field_marker
-    from app.ui.page_shell import action_bar_card, render_page_header, render_section_header
+    from app.ui.components.empty_states import render_empty_state
+    from app.ui.page_shell import action_bar_card, render_card, render_page_header, render_section_header
 except ImportError:
     from ui.compact_forms import field_marker  # type: ignore
-    from ui.page_shell import action_bar_card, render_page_header, render_section_header  # type: ignore
+    from ui.components.empty_states import render_empty_state  # type: ignore
+    from ui.page_shell import action_bar_card, render_card, render_page_header, render_section_header  # type: ignore
 from db import (
     fetch_by_match,
     fetch_by_match_admin,
@@ -793,8 +795,9 @@ def _job_db_admin_read() -> bool:
     return current_role() in {"admin", "manager"}
 
 
-def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
-    if _job_db_admin_read():
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_customers_for_job_db_cached(_admin: bool, _v: int) -> list[dict[str, Any]]:
+    if _admin:
         try:
             return fetch_table_admin("customers", limit=5000, order_by="customer_name")
         except Exception:
@@ -802,9 +805,15 @@ def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
     return fetch_table("customers", limit=5000, order_by="customer_name")
 
 
-def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
+def _fetch_customers_for_job_db() -> list[dict[str, Any]]:
+    v = int(st.session_state.get("job_db_data_version", 0))
+    return _fetch_customers_for_job_db_cached(_job_db_admin_read(), v)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_estimates_for_job_db_cached(_admin: bool, _v: int) -> list[dict[str, Any]]:
     """Columns for labels + overview card; fall back if a column is missing."""
-    if _job_db_admin_read():
+    if _admin:
         for cols in (
             "id,quote_number,customer_id,customer_contact_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount,po_number,estimate_description",
             "id,quote_number,customer_id,proposal_total,final_bid,status,job_id,scope_of_work,po_amount",
@@ -840,6 +849,11 @@ def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
         except Exception:
             continue
     return fetch_table("estimates", limit=5000, order_by="quote_number")
+
+
+def _fetch_estimates_for_job_db() -> list[dict[str, Any]]:
+    v = int(st.session_state.get("job_db_data_version", 0))
+    return _fetch_estimates_for_job_db_cached(_job_db_admin_read(), v)
 
 
 def _fetch_contacts_for_job_database(
@@ -2015,7 +2029,11 @@ def _render_job_card_list(
     st.markdown('<span class="ips-job-card-list-anchor"></span>', unsafe_allow_html=True)
 
     if df_display.empty:
-        st.caption("No jobs match these filters.")
+        render_empty_state(
+            "No jobs match filters",
+            "Clear search or adjust customer, status, or source filters.",
+            icon="🔍",
+        )
         return
 
     allow_open = bool(can_edit or current_role() == "employee")
@@ -2442,7 +2460,18 @@ def render() -> None:
 
     with st.container():
         if jobs_df.empty:
-            st.warning("No jobs found in database.")
+            if render_empty_state(
+                "No jobs found",
+                "Create a job or convert an approved estimate to get started.",
+                icon="📋",
+                action_label="Create New Job",
+                action_key="job_db_empty_create",
+            ):
+                st.session_state["job_view_mode"] = "create"
+                st.session_state["selected_job_id"] = None
+                st.session_state["job_mode"] = "add"
+                st.session_state.pop("job_edit_id", None)
+                st.rerun()
             return
         else:
             jobs_df = _build_jobs_overview_dataframe(
@@ -2466,7 +2495,7 @@ def render() -> None:
 
             picked: list[str] = []
 
-            with st.container(border=True):
+            with render_card():
                 st.markdown(
                     '<span class="ips-list-top-anchor ips-job-filter-anchor ips-job-joblist-section-anchor ips-compact-form"></span>',
                     unsafe_allow_html=True,

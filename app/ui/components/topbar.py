@@ -17,23 +17,37 @@ except ImportError:
 
 
 def _unread_updates_count() -> int:
-    if not role_can_open_page(current_role(), "Company Updates"):
-        return 0
+    """Unread company updates for current user; never raises."""
     try:
-        from app.db import fetch_table_for_session
-    except ImportError:
-        from db import fetch_table_for_session  # type: ignore
-    sk = str(current_profile().get("id") or "anonymous")
-    use_admin = current_role() in {"admin", "manager"}
-    try:
+        if not role_can_open_page(current_role(), "Company Updates"):
+            return 0
+        try:
+            from app.data_cache import fetch_table_for_session
+        except ImportError:
+            from data_cache import fetch_table_for_session  # type: ignore
+
+        sk = str(current_profile().get("id") or "anonymous")
+        use_admin = current_role() in {"admin", "manager"}
         cu_rows = fetch_table_for_session(
-            "company_updates", session_key=sk, limit=300, order_by="created_at", use_admin=use_admin
+            "company_updates",
+            session_key=sk,
+            limit=300,
+            order_by="created_at",
+            use_admin=use_admin,
         )
         read_rows = fetch_table_for_session(
-            "company_update_reads", session_key=sk, limit=5000, order_by=None, use_admin=use_admin
+            "company_update_reads",
+            session_key=sk,
+            limit=5000,
+            order_by=None,
+            use_admin=use_admin,
         )
         uid = str(current_profile().get("id") or "")
-        read_uids = {str(r.get("update_id") or "") for r in (read_rows or []) if str(r.get("user_id") or "") == uid}
+        read_uids = {
+            str(r.get("update_id") or "")
+            for r in (read_rows or [])
+            if str(r.get("user_id") or "") == uid
+        }
         return sum(
             1
             for u in cu_rows or []
