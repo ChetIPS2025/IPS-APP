@@ -934,8 +934,8 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
     low_mask = qoh_s <= rp_s
     n_low = int(low_mask.sum()) if len(filtered) else 0
     if n_low > 0:
-        with st.container(border=True):
-            render_section_header("Low stock alert", f"{n_low} visible item(s) at or below reorder point.")
+        st.markdown('<span class="ips-surface-soft" aria-hidden="true"></span>', unsafe_allow_html=True)
+        render_section_header("Low stock alert", f"{n_low} visible item(s) at or below reorder point.")
         with st.expander("Low stock detail (visible filters)", expanded=False):
             cols_show = [c for c in ("item_name", "sku", "quantity_on_hand", "reorder_point", "vendor") if c in filtered.columns]
             if cols_show:

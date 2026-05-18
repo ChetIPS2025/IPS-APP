@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v9"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v10"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -28,8 +28,6 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-sm: 0.45rem;
             --ips-space-md: 0.65rem;
             --ips-space-lg: 0.9rem;
-            --ips-radius: 10px;
-            --ips-radius-lg: 12px;
             /* Field-ready: darker grey chrome, high-contrast text (outdoor / iPad) */
             --ips-bg-main: #d1d5db;
             --ips-bg-secondary: #ffffff;
@@ -41,9 +39,11 @@ def inject_ips_app_shell_styles() -> None:
             --ips-text-secondary: #1f2937;
             --ips-text-muted: #374151;
 
-            --ips-border: #cbd5e1;
-            --ips-border-strong: #9ca3af;
-            --ips-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
+            --ips-border: rgba(15, 23, 42, 0.1);
+            --ips-border-strong: rgba(15, 23, 42, 0.16);
+            --ips-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            --ips-radius: 8px;
+            --ips-radius-lg: 10px;
             --ips-surface: #ffffff;
             /* Buttons: 48px touch target, semibold */
             --ips-btn-height: 3rem;
@@ -187,9 +187,9 @@ def inject_ips_app_shell_styles() -> None:
         /* ----- Expanders ----- */
         section[data-testid="stMain"] [data-testid="stExpander"] details {
             border: 1px solid var(--ips-border) !important;
-            border-radius: var(--ips-radius-lg) !important;
+            border-radius: var(--ips-radius) !important;
             background: var(--ips-bg-card) !important;
-            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
+            box-shadow: none !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] summary {
             font-weight: 600 !important;
@@ -198,13 +198,24 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Cards / containers (Streamlit "border=True") ----- */
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 12px !important;
+            border-radius: var(--ips-radius) !important;
             border: 1px solid var(--ips-border) !important;
             background: #ffffff !important;
             box-shadow: var(--ips-shadow) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"] > div {
-            padding: 12px 16px !important;
+            padding: 8px 10px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-flat-section),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor) {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-flat-section) > div,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor) > div {
+            padding: 0 0 0.15rem 0 !important;
         }
 
         /* ----- IPS button system (main): primary / secondary / tertiary + downloads + link buttons ----- */
@@ -604,18 +615,22 @@ def inject_ips_app_shell_styles() -> None:
 
         /* ----- Dashboard / summary strips ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-dash-metrics) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 8px !important;
-            background: #ffffff !important;
-            border-color: var(--ips-border) !important;
+            padding: 0.12rem 0 0.28rem 0 !important;
+            margin-bottom: 0.3rem !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
         }
 
         /* ----- Estimate editor: totals strip + document-style proposal surface ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-estimate-metrics-strip) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 0.45rem !important;
+            padding: 0.32rem 0.45rem 0.38rem !important;
+            margin-bottom: 0.32rem !important;
             background: #ffffff !important;
-            border-color: var(--ips-border) !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            box-shadow: none !important;
+            border-radius: 8px !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-proposal-doc-surface) {
             background: #ffffff !important;

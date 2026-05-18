@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v3"
-IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v3"
+IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v4"
+IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v4"
 
 # Main grid vs side panel — use everywhere (Customers, Labor, Employees) so widths stay identical.
 IPS_CRUD_LIST_PAGE_SPLIT: tuple[float, float] = (2.35, 1.0)
@@ -43,9 +43,9 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] > div {
             background: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 14px !important;
-            box-shadow: 0 18px 40px rgba(17, 24, 39, 0.12) !important;
+            border: 1px solid rgba(15, 23, 42, 0.1) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 12px 28px rgba(17, 24, 39, 0.1) !important;
             overflow: hidden !important;
         }
         div[data-testid="stDialog"] h1,
@@ -187,8 +187,12 @@ def inject_ips_crud_list_styles() -> None:
 
         /* ----- Action toolbar (Add / Edit / Deactivate / Delete) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-toolbar-root) {
-            padding: 6px 8px 8px 8px !important;
-            margin-bottom: 8px !important;
+            padding: 0.32rem 0.45rem 0.38rem !important;
+            margin-bottom: 0.3rem !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
         }
         .ips-crud-toolbar-root ~ div[data-testid="stHorizontalBlock"] {
             align-items: stretch;
@@ -246,11 +250,11 @@ def inject_ips_crud_list_styles() -> None:
         /* ----- Side panel (add / edit) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) {
             background: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 12px !important;
-            padding: 8px 10px 10px 10px !important;
-            margin-bottom: 6px !important;
-            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
+            border: 1px solid rgba(15, 23, 42, 0.09) !important;
+            border-radius: 8px !important;
+            padding: 0.42rem 0.5rem 0.48rem !important;
+            margin-bottom: 0.32rem !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-side-anchor) h3 {
             color: #111827 !important;

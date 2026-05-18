@@ -238,7 +238,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v13"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v14"
 JOB_DB_DETAIL_VIEW_CSS_KEY = "job_db_detail_view_css_v1"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
@@ -292,23 +292,35 @@ def _inject_job_database_responsive_styles() -> None:
             margin: 0.28rem 0 0 0 !important;
             line-height: 1.35 !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions) {
-            padding: 0.5rem 0.65rem 0.55rem !important;
-            margin-bottom: 0.45rem !important;
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-action-bar-anchor.ips-job-db-quick-actions {
+            margin-bottom: 0.28rem !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions)
-            div[data-testid="stHorizontalBlock"] {
-            gap: 0.45rem !important;
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-action-bar-anchor.ips-job-db-quick-actions
+            ~ div[data-testid="stHorizontalBlock"] {
+            gap: 0.4rem !important;
             align-items: stretch !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-db-quick-actions) .stButton > button {
-            min-height: 2.35rem !important;
-            padding: 0.4rem 0.75rem !important;
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-action-bar-anchor.ips-job-db-quick-actions
+            ~ div[data-testid="stHorizontalBlock"] .stButton > button {
+            min-height: 2.25rem !important;
+            padding: 0.36rem 0.7rem !important;
             font-size: 0.875rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor) {
-            padding-top: 0.45rem !important;
-            padding-bottom: 0.5rem !important;
+            padding-top: 0.15rem !important;
+            padding-bottom: 0.35rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page) .ips-job-action-bar-anchor {
+            display: block;
+            border-top: 1px solid rgba(15, 23, 42, 0.07);
+            margin: 0.22rem 0 0.12rem 0;
+            padding-top: 0.28rem;
+        }
+        p.ips-job-list-view-label {
+            margin: 0.35rem 0 0.1rem 0 !important;
+            font-size: 0.76rem !important;
+            font-weight: 600 !important;
+            color: #6b7280 !important;
         }
         .ips-job-card-title {
             color: #111827 !important;
@@ -497,11 +509,11 @@ def _inject_job_database_responsive_styles() -> None:
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) {
             background: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 12px !important;
-            margin-bottom: 0.65rem !important;
-            padding: 0.75rem !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
+            margin-bottom: 0.28rem !important;
+            padding: 0.4rem 0.52rem !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-card-anchor) .stButton > button,
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) .stButton > button,
@@ -2131,6 +2143,7 @@ def _render_job_db_top_bar(
     ]
 
     with action_bar_card(title="Quick Actions"):
+        st.markdown('<span class="ips-job-db-quick-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3, gap="small")
         with c1:
             if st.button(
@@ -2709,54 +2722,53 @@ def render() -> None:
             none = n_sel == 0
 
             if "id" in filtered.columns and use_table:
-                with st.container(border=True):
+                st.markdown(
+                    '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor ips-flat-section"></span>',
+                    unsafe_allow_html=True,
+                )
+                left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
+                with left:
                     st.markdown(
-                        '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor"></span>',
+                        f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
                         unsafe_allow_html=True,
                     )
-                    left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
-                    with left:
-                        st.markdown(
-                            f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
-                            unsafe_allow_html=True,
-                        )
-                    with b1:
-                        if st.button(
-                            "Edit",
-                            key="job_edit_btn",
-                            type="secondary",
-                            use_container_width=True,
-                            disabled=not (can_edit or current_role() == "employee"),
-                        ):
-                            if not one:
-                                if none:
-                                    st.warning("Please select a job first.")
-                                else:
-                                    st.warning("Please select exactly one job to edit.")
-                            else:
-                                st.session_state["job_view_mode"] = "edit"
-                                st.session_state["selected_job_id"] = str(sel_ids[0])
-                                st.session_state["job_mode"] = "edit"
-                                st.session_state["job_edit_id"] = str(sel_ids[0])
-                                st.session_state.pop("job_number_manual_input", None)
-                                st.rerun()
-                    with b2:
-                        if st.button(
-                            "Delete",
-                            key="job_delete_btn",
-                            type="secondary",
-                            use_container_width=True,
-                            disabled=not can_edit,
-                        ):
+                with b1:
+                    if st.button(
+                        "Edit",
+                        key="job_edit_btn",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=not (can_edit or current_role() == "employee"),
+                    ):
+                        if not one:
                             if none:
                                 st.warning("Please select a job first.")
                             else:
-                                pending = st.session_state.get(IPS_PENDING_DELETE)
-                                if not isinstance(pending, dict):
-                                    pending = {}
-                                    st.session_state[IPS_PENDING_DELETE] = pending
-                                pending[TABLE_KEY_JOBS] = list(sel_ids)
-                                st.rerun()
+                                st.warning("Please select exactly one job to edit.")
+                        else:
+                            st.session_state["job_view_mode"] = "edit"
+                            st.session_state["selected_job_id"] = str(sel_ids[0])
+                            st.session_state["job_mode"] = "edit"
+                            st.session_state["job_edit_id"] = str(sel_ids[0])
+                            st.session_state.pop("job_number_manual_input", None)
+                            st.rerun()
+                with b2:
+                    if st.button(
+                        "Delete",
+                        key="job_delete_btn",
+                        type="secondary",
+                        use_container_width=True,
+                        disabled=not can_edit,
+                    ):
+                        if none:
+                            st.warning("Please select a job first.")
+                        else:
+                            pending = st.session_state.get(IPS_PENDING_DELETE)
+                            if not isinstance(pending, dict):
+                                pending = {}
+                                st.session_state[IPS_PENDING_DELETE] = pending
+                            pending[TABLE_KEY_JOBS] = list(sel_ids)
+                            st.rerun()
 
             pend = st.session_state.get(IPS_PENDING_DELETE) or {}
             if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):

@@ -584,7 +584,7 @@ def _todo_apply_search(rows: list[dict], q: str, id_to_label: dict[str, str]) ->
     return out
 
 
-_TODO_LIST_CSS_KEY = "dash_todo_list_css_v5"
+_TODO_LIST_CSS_KEY = "dash_todo_list_css_v6"
 
 
 def _inject_todo_list_css() -> None:
@@ -600,6 +600,13 @@ def _inject_todo_list_css() -> None:
           height: 0;
           overflow: hidden;
           pointer-events: none;
+        }
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) {
+          border: 1px solid rgba(15, 23, 42, 0.08) !important;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+          border-radius: 8px !important;
+          padding: 0.4rem 0.5rem 0.48rem !important;
+          margin-bottom: 0.32rem !important;
         }
         /* Scoped to the bordered To-Do block (contains hidden zone marker) */
         [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-todo-list-zone) div.stButton > button,
@@ -1315,6 +1322,7 @@ def render() -> None:
         open_tasks = 0
 
     with st.container(border=True):
+        st.markdown('<span class="ips-dash-metrics ips-flat-section" aria-hidden="true"></span>', unsafe_allow_html=True)
         render_section_header("At a glance")
         k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
         k1.metric("Active jobs", f"{active_jobs:,}")
@@ -1344,9 +1352,9 @@ def render() -> None:
             low_df = df_inv2.loc[qoh2 <= rp2, :].copy()
             if not low_df.empty:
                 disp = prepare_catalog_inventory_display_df(low_df)
-                with st.container(border=True):
-                    render_section_header("Low stock alerts", "At or below reorder point.")
-                    st.dataframe(disp, use_container_width=True, hide_index=True, height=min(360, 44 + 30 * len(disp)))
+                st.markdown('<span class="ips-surface-soft" aria-hidden="true"></span>', unsafe_allow_html=True)
+                render_section_header("Low stock alerts", "At or below reorder point.")
+                st.dataframe(disp, use_container_width=True, hide_index=True, height=min(360, 44 + 30 * len(disp)))
         except Exception:
             pass
 

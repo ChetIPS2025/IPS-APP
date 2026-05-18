@@ -67,7 +67,7 @@ _CATEGORIES = (
 )
 _PRIORITIES = ("Normal", "Important", "Urgent")
 
-_STYLE_KEY = "ips_company_updates_styles_v4"
+_STYLE_KEY = "ips_company_updates_styles_v5"
 _CU_CARD = "ips-cu-card"
 
 
@@ -206,18 +206,18 @@ def _inject_page_styles() -> None:
         f"""
         <style>
         .{_CU_CARD} {{
-          border: 1px solid rgba(148, 163, 184, 0.55);
-          border-radius: 12px;
-          padding: 14px 16px;
-          margin-bottom: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 8px;
+          padding: 10px 12px;
+          margin-bottom: 8px;
           background: var(--ips-cu-card-bg, #ffffff);
           color: var(--ips-cu-card-fg, #0f172a);
-          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-          transition: box-shadow 0.15s ease, border-color 0.15s ease;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+          transition: box-shadow 0.12s ease, border-color 0.12s ease;
         }}
         .{_CU_CARD}:hover {{
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
-          border-color: rgba(100, 116, 139, 0.65);
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+          border-color: rgba(15, 23, 42, 0.12);
         }}
         .{_CU_CARD}.ips-cu-card-urgent {{
           border-left: 4px solid #ef4444;

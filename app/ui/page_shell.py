@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v2"
+IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v3"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 try:
@@ -62,7 +62,7 @@ def inject_ips_dashboard_layout() -> None:
             max-width: 1680px !important;
         }
         section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {
-            margin-bottom: 0.14rem !important;
+            margin-bottom: 0.1rem !important;
         }
 
         /* ----- Typography ----- */
@@ -92,19 +92,60 @@ def inject_ips_dashboard_layout() -> None:
             margin: 0.2rem 0 0 0 !important;
         }
 
-        /* ----- White cards ----- */
+        /* ----- Surfaces: subtle cards (modern flat) ----- */
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
             background: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 12px !important;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
         }
-        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor),
-        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor),
-        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-toolbar-root),
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > div {
+            padding: 0.42rem 0.55rem 0.48rem !important;
+        }
+        /* Flat sections: no boxed chrome (quick actions, toolbars, filter strips) */
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-flat-section),
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin-bottom: 0.28rem !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-flat-section) > div,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor) > div {
+            padding: 0 0 0.18rem 0 !important;
+        }
+        /* List / filter panels: light separation, not heavy boxes */
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.ips-surface-card)) {
+            background: transparent !important;
+            border: none !important;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.07) !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin-bottom: 0.32rem !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.ips-surface-card)) > div {
+            padding: 0.12rem 0 0.38rem 0 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-surface-card),
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-content-card-anchor) {
-            padding: 0.48rem 0.62rem 0.52rem !important;
-            margin-bottom: 0.42rem !important;
+            padding: 0.38rem 0.5rem 0.44rem !important;
+            margin-bottom: 0.32rem !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-toolbar-root) {
+            background: #ffffff !important;
+            border: 1px solid rgba(15, 23, 42, 0.07) !important;
+            box-shadow: none !important;
+            border-radius: 8px !important;
+            padding: 0.32rem 0.45rem 0.38rem !important;
+            margin-bottom: 0.3rem !important;
+        }
+        /* Soft surface marker (no Streamlit border wrapper) */
+        section[data-testid="stMain"] .ips-surface-soft {
+            display: block;
+            margin: 0 0 0.32rem 0;
+            padding: 0 0 0.28rem 0;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.06);
         }
         p.ips-action-bar-title {
             color: #111827 !important;
@@ -117,10 +158,10 @@ def inject_ips_dashboard_layout() -> None:
         section[data-testid="stMain"] div[data-testid="metric-container"],
         section[data-testid="stMain"] div[data-testid="stMetric"] {
             background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 10px !important;
-            padding: 0.42rem 0.52rem !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
+            padding: 0.34rem 0.46rem !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
         }
         section[data-testid="stMain"] div[data-testid="stMetric"] label {
             font-size: 0.76rem !important;
@@ -184,9 +225,10 @@ def inject_ips_dashboard_layout() -> None:
         /* ----- Tables / dataframes ----- */
         section[data-testid="stMain"] [data-testid="stDataFrame"],
         section[data-testid="stMain"] [data-testid="stDataEditor"] {
-            border: 1px solid #e5e7eb !important;
-            border-radius: 10px !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
             background: #ffffff !important;
+            box-shadow: none !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] thead tr th {
             position: sticky !important;
@@ -214,11 +256,13 @@ def inject_ips_dashboard_layout() -> None:
             color: #6b7280 !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] details {
-            border-radius: 10px !important;
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 8px !important;
             background: #ffffff !important;
+            box-shadow: none !important;
         }
         section[data-testid="stMain"] [data-testid="stExpander"] summary {
-            padding: 0.4rem 0.6rem !important;
+            padding: 0.32rem 0.5rem !important;
             font-size: 0.875rem !important;
             font-weight: 600 !important;
         }
@@ -289,11 +333,17 @@ def render_section_desc_only(text: str) -> None:
 
 
 @contextmanager
-def render_card(*, title: str | None = None) -> Iterator[None]:
-    """Compact white bordered content card."""
+def render_card(*, title: str | None = None, bordered: bool = False) -> Iterator[None]:
+    """Content section; default is flat (subtle divider), optional bordered card."""
     inject_ips_dashboard_layout()
-    with st.container(border=True):
-        st.markdown('<span class="ips-content-card-anchor"></span>', unsafe_allow_html=True)
+    if bordered:
+        with st.container(border=True):
+            st.markdown('<span class="ips-content-card-anchor ips-surface-card"></span>', unsafe_allow_html=True)
+            if title:
+                render_section_header(title)
+            yield
+    else:
+        st.markdown('<span class="ips-content-card-anchor ips-surface-soft"></span>', unsafe_allow_html=True)
         if title:
             render_section_header(title)
         yield
@@ -301,19 +351,18 @@ def render_card(*, title: str | None = None) -> Iterator[None]:
 
 @contextmanager
 def action_bar_card(*, title: str | None = "Quick Actions") -> Iterator[None]:
-    """Compact horizontal action button row inside a card."""
+    """Compact horizontal action row — flat, no heavy bordered box."""
     inject_ips_dashboard_layout()
-    with st.container(border=True):
+    st.markdown(
+        '<span class="ips-action-bar-anchor ips-flat-section"></span>',
+        unsafe_allow_html=True,
+    )
+    if title:
         st.markdown(
-            '<span class="ips-list-top-anchor ips-action-bar-anchor"></span>',
+            f'<p class="ips-action-bar-title">{html.escape(str(title))}</p>',
             unsafe_allow_html=True,
         )
-        if title:
-            st.markdown(
-                f'<p class="ips-action-bar-title">{html.escape(str(title))}</p>',
-                unsafe_allow_html=True,
-            )
-        yield
+    yield
 
 
 def render_action_bar(
