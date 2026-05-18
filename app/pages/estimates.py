@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
+import html as _html
 import pandas as pd
 import streamlit as st
 
@@ -22,22 +23,12 @@ from db import (
 try:
     from table_actions import (
         IPS_PENDING_DELETE,
-        TABLE_KEY_ESTIMATES,
-        clear_selected_ids,
-        get_selected_ids,
         inject_table_action_styles,
-        render_selection_action_bar,
-        set_selected_ids,
     )
 except ImportError:
     from app.table_actions import (  # type: ignore
         IPS_PENDING_DELETE,
-        TABLE_KEY_ESTIMATES,
-        clear_selected_ids,
-        get_selected_ids,
         inject_table_action_styles,
-        render_selection_action_bar,
-        set_selected_ids,
     )
 
 try:
@@ -80,6 +71,462 @@ from pages.estimate_editor import (
 )
 from app.estimate.defaults import merge_estimate_narrative_scalars_from_row
 from app.estimate.job_scope import ensure_scope_widgets_bound
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Estimates list — Jobs-style table with clickable rows and inline detail panel
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ESTIMATES_STYLES_KEY = "est_page_styles_v3"
+
+_EST_STATUS_COLORS: dict[str, str] = {
+    "draft": "#64748b",
+    "sent": "#2563eb",
+    "submitted": "#2563eb",
+    "in review": "#f59e0b",
+    "approved": "#16a34a",
+    "accepted": "#16a34a",
+    "awarded": "#16a34a",
+    "rejected": "#dc2626",
+    "declined": "#dc2626",
+    "converted": "#7c3aed",
+    "po_received": "#7c3aed",
+    "closed": "#7c3aed",
+}
+
+# Column weights: Est# | Description | Customer | Job# | Status | Created | Updated | Total | View | Edit | Del
+_EST_COL_WEIGHTS = [1.05, 2.4, 1.6, 1.0, 1.0, 1.0, 1.0, 1.1, 0.45, 0.45, 0.45]
+
+
+def _inject_estimates_page_styles() -> None:
+    """Inject Jobs-matching CSS for the Estimates list and detail panel."""
+    if st.session_state.get(_ESTIMATES_STYLES_KEY):
+        return
+    st.session_state[_ESTIMATES_STYLES_KEY] = True
+    st.markdown(
+        """
+        <style>
+        /* ─── Estimates page marker ─── */
+        .ips-est-page-anchor { display: none !important; }
+
+        /* ─── Table header row ─── */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-hdr-anchor) {
+            background: #f8fafc !important;
+            border: none !important;
+            border-bottom: 2px solid rgba(15,23,42,0.09) !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 0.25rem 0.5rem 0.2rem !important;
+            margin-bottom: 1px !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-hdr-anchor) [data-testid="stCaptionContainer"] p {
+            color: #6b7280 !important;
+            font-size: 0.7rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+        }
+
+        /* ─── Data rows ─── */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) {
+            background: #ffffff !important;
+            border: 1px solid rgba(15,23,42,0.07) !important;
+            border-left: 3px solid transparent !important;
+            border-radius: 6px !important;
+            margin-bottom: 2px !important;
+            padding: 0.1rem 0.4rem !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+            cursor: pointer !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor):hover {
+            background: #f8fafc !important;
+            border-left-color: #93c5fd !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-sel) {
+            background: #eff6ff !important;
+            border-left-color: #2563eb !important;
+        }
+
+        /* Row text colours */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) .stMarkdown,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) .stMarkdown p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) .stMarkdown span {
+            color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="stCaptionContainer"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="stCaptionContainer"] p {
+            color: #6b7280 !important;
+        }
+
+        /* nowrap column layout in rows */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            column-gap: 0.45rem !important;
+            width: 100% !important;
+            min-width: 960px !important;
+            box-sizing: border-box !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            min-width: 0 !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Cell text style */
+        .ips-est-cell {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #111827 !important;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .ips-est-cell-muted { color: #6b7280 !important; font-size: 0.8rem; }
+        .ips-est-cell-money {
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        /* Estimate # button styled as plain cell text */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="column"]:first-child .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+            font-size: 0.875rem !important;
+            text-align: left !important;
+            padding: 0.1rem 0.25rem !important;
+            min-height: 0 !important;
+            height: auto !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-sel) [data-testid="column"]:first-child .stButton > button {
+            font-weight: 800 !important;
+            color: #1d4ed8 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) [data-testid="column"]:first-child .stButton > button:hover {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        /* Small action buttons inside rows */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-row-anchor) .stButton > button {
+            min-height: 1.7rem !important;
+            padding: 0.18rem 0.38rem !important;
+            font-size: 0.78rem !important;
+        }
+
+        /* Status badge — shared with Jobs */
+        .ips-est-status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.22rem 0.52rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+            background: color-mix(in srgb, var(--estc) 12%, white);
+            border: 1px solid color-mix(in srgb, var(--estc) 30%, white);
+            color: var(--estc);
+        }
+
+        /* ─── Detail panel — matches ips-job-edit-panel-anchor ─── */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) {
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
+            color: #111827 !important;
+            padding: 0.75rem !important;
+            margin-top: 0.2rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) h2,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) h3,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) h4 {
+            color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) .stMarkdown,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) .stMarkdown p,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) .stMarkdown span {
+            color: #111827 !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stCaptionContainer"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stCaptionContainer"] p {
+            color: #4b5563 !important;
+        }
+
+        /* Detail panel tabs — identical to Jobs page segmented tabs */
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"],
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tablist"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 6px !important;
+            margin: 0 0 0.75rem 0 !important;
+            background: #d1d5db !important;
+            border: none !important;
+            border-bottom: none !important;
+            border-radius: 10px !important;
+            box-shadow: inset 0 1px 2px rgba(15,23,42,0.05) !important;
+            overflow-x: auto !important;
+            overflow-y: visible !important;
+            scrollbar-width: thin;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tablist"] button,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tab"] {
+            flex: 0 1 auto !important;
+            min-height: 0 !important;
+            height: auto !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 8px 14px !important;
+            border-radius: 10px !important;
+            white-space: nowrap !important;
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+            color: #111827 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tab"] p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button p {
+            color: #111827 !important;
+            font-weight: 500 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tab"][aria-selected="true"],
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-bottom-color: #cbd5e1 !important;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04) !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tab"][aria-selected="true"] p,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button[aria-selected="true"] p {
+            color: #111827 !important;
+            font-weight: 600 !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [role="tab"]:hover:not([aria-selected="true"]),
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"] button:hover:not([aria-selected="true"]) {
+            background: rgba(255,255,255,0.42) !important;
+        }
+
+        /* Info card layout inside detail panel */
+        .ips-est-info-card {
+            background: #f8fafc;
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 10px;
+            padding: 0.75rem 1rem 0.65rem;
+            height: 100%;
+        }
+        .ips-est-card-title {
+            color: #374151 !important;
+            font-size: 0.75rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            margin: 0 0 0.55rem 0 !important;
+            padding-bottom: 0.4rem !important;
+            border-bottom: 1px solid rgba(15,23,42,0.07) !important;
+        }
+        .ips-est-field-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.2rem 0;
+            border-bottom: 1px solid rgba(15,23,42,0.04);
+        }
+        .ips-est-field-row:last-child { border-bottom: none; }
+        .ips-est-field-lbl {
+            color: #6b7280;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            min-width: 110px;
+        }
+        .ips-est-field-val {
+            color: #111827;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+        .ips-est-pricing-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.22rem 0;
+            border-bottom: 1px solid rgba(15,23,42,0.04);
+        }
+        .ips-est-pricing-row:last-child { border-bottom: none; }
+        .ips-est-pricing-lbl { color: #374151; font-size: 0.875rem; }
+        .ips-est-pricing-val {
+            color: #111827;
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        .ips-est-pricing-total {
+            border-top: 2px solid rgba(15,23,42,0.12) !important;
+            margin-top: 0.3rem !important;
+            padding-top: 0.35rem !important;
+        }
+        .ips-est-pricing-total .ips-est-pricing-lbl { font-weight: 700; color: #0f172a; }
+        .ips-est-pricing-total .ips-est-pricing-val { font-size: 1.05rem; color: #0f172a; }
+
+        /* Detail hero header */
+        .ips-est-hero {
+            margin: 0 0 0.75rem 0;
+            padding-bottom: 0.65rem;
+            border-bottom: 1px solid rgba(15,23,42,0.08);
+        }
+        .ips-est-hero h2 {
+            font-size: 1.35rem !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            margin: 0 0 0.2rem 0 !important;
+            line-height: 1.2 !important;
+        }
+        .ips-est-hero-sub {
+            color: #475569;
+            font-size: 0.9rem;
+            margin: 0 0 0.4rem 0;
+        }
+        .ips-est-hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem 1.1rem;
+            align-items: center;
+            margin-top: 0.4rem;
+        }
+        .ips-est-hero-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.82rem;
+        }
+        .ips-est-hero-meta-lbl { color: #6b7280; font-weight: 600; }
+        .ips-est-hero-meta-val { color: #111827; font-weight: 500; }
+
+        /* Scroll wrapper for table */
+        div[data-testid="stVerticalBlock"]:has(.ips-est-scroll-anchor) {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
+        }
+
+        /* Tab content text colours */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="column"],
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) [data-testid="stVerticalBlock"] {
+            min-width: 0 !important;
+        }
+        @media (max-width: 900px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor)
+                div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 0.65rem !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor)
+                div[data-testid="stHorizontalBlock"] > [data-testid="column"] {
+                flex: 1 1 calc(50% - 0.65rem) !important;
+                max-width: 100% !important;
+                min-width: min(240px, 100%) !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _est_status_badge(status: Any) -> str:
+    """Return inline HTML status pill matching Jobs page style."""
+    label = str(status or "").strip() or "—"
+    color = _EST_STATUS_COLORS.get(label.lower(), "#64748b")
+    return (
+        f'<span class="ips-est-status-badge" style="--estc:{_html.escape(color)};">'
+        f"{_html.escape(label)}</span>"
+    )
+
+
+def _fmt_date(val: Any, *, short: bool = True) -> str:
+    """Format ISO date/datetime for compact table display."""
+    if val is None:
+        return "—"
+    s = str(val).strip()
+    if not s or s.lower() in ("none", "null", "nan"):
+        return "—"
+    return s[:10] if short and len(s) >= 10 else s
+
+
+def _money_disp(val: Any) -> str:
+    """Format a numeric value as $X,XXX.XX or —."""
+    if val is None:
+        return "—"
+    try:
+        import math
+        f = float(val)
+        if math.isnan(f):
+            return "—"
+        return f"${f:,.2f}"
+    except Exception:
+        s = str(val).strip()
+        return s if s else "—"
+
+
+def _num0(val: Any) -> float:
+    try:
+        if val is None:
+            return 0.0
+        return float(val)
+    except Exception:
+        return 0.0
+
+
+def _field_row_html(label: str, value: str) -> str:
+    return (
+        f'<div class="ips-est-field-row">'
+        f'<span class="ips-est-field-lbl">{_html.escape(label)}</span>'
+        f'<span class="ips-est-field-val">{_html.escape(value)}</span>'
+        f"</div>"
+    )
+
+
+def _pricing_row_html(label: str, value: str, *, total: bool = False) -> str:
+    extra = ' ips-est-pricing-total' if total else ''
+    return (
+        f'<div class="ips-est-pricing-row{extra}">'
+        f'<span class="ips-est-pricing-lbl">{_html.escape(label)}</span>'
+        f'<span class="ips-est-pricing-val">{_html.escape(value)}</span>'
+        f"</div>"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cached data fetchers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _fetch_customers_list_cached(_admin: bool, _v: int) -> list[dict[str, Any]]:
+    fn = fetch_table_admin if _admin else fetch_table
+    return fn("customers", columns="id,customer_name", limit=5000, order_by="customer_name")
+
+
+def _fetch_customers_list() -> list[dict[str, Any]]:
+    from auth import current_role as _cr
+    admin = _cr() in {"admin", "pm"}
+    v = int(st.session_state.get("est_data_version", 0))
+    return _fetch_customers_list_cached(admin, v)
 
 
 def _estimates_page_admin_read() -> bool:
@@ -280,154 +727,718 @@ def _load_estimate_into_session(selected_id: str) -> None:
     ensure_scope_widgets_bound(loaded, selected_id)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Detail panel sub-components
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def render_estimate_activity_feed(est_row: dict[str, Any]) -> None:
+    """Recent activity card for the Overview tab."""
+    lines: list[tuple[str, str]] = []
+    created = _fmt_date(est_row.get("created_at"), short=False)
+    updated = _fmt_date(est_row.get("updated_at"), short=False)
+    status = str(est_row.get("status") or "").strip()
+    qn = str(est_row.get("quote_number") or "").strip()
+    if updated and updated != "—":
+        lines.append(("Last updated", updated[:19]))
+    if created and created != "—":
+        lines.append(("Created", created[:19]))
+    if status:
+        lines.append(("Status", status))
+    if qn:
+        lines.append(("Quote #", qn))
+    rows_html = "".join(_field_row_html(lbl, val) for lbl, val in lines) if lines else "<p style='color:#6b7280;font-size:0.85rem;'>No activity data available.</p>"
+    st.markdown(
+        f'<div class="ips-est-info-card">'
+        f'<p class="ips-est-card-title">Recent Activity</p>'
+        f"{rows_html}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_estimate_scope_summary(full_row: dict[str, Any]) -> None:
+    """Scope summary card for the Overview tab."""
+    scope = str(full_row.get("scope_of_work") or "").strip()
+    if not scope:
+        ej = full_row.get("estimate_json")
+        if isinstance(ej, dict):
+            scope = str(ej.get("scope_of_work") or ej.get("scope") or "").strip()
+    excl = ""
+    ej2 = full_row.get("estimate_json")
+    if isinstance(ej2, dict):
+        excl = str(ej2.get("exclusions") or "").strip()
+
+    scope_disp = _html.escape(scope[:500] + ("…" if len(scope) > 500 else "")) if scope else "<em style='color:#9ca3af;'>No scope entered.</em>"
+    excl_block = (
+        f'<p class="ips-est-card-title" style="margin-top:0.5rem;">Exclusions</p>'
+        f"<p style='font-size:0.85rem;color:#374151;'>{_html.escape(excl[:300])}</p>"
+        if excl else ""
+    )
+    st.markdown(
+        f'<div class="ips-est-info-card">'
+        f'<p class="ips-est-card-title">Scope Summary</p>'
+        f"<p style='font-size:0.875rem;color:#111827;line-height:1.55;white-space:pre-wrap;'>{scope_disp}</p>"
+        f"{excl_block}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_estimate_pricing_summary(full_row: dict[str, Any]) -> None:
+    """Pricing summary card for the Overview tab."""
+    ej = full_row.get("estimate_json") or {}
+    controls = ej.get("controls", {}) if isinstance(ej, dict) else {}
+
+    # Compute component totals from estimate_json items
+    labor_items = ej.get("labor", []) if isinstance(ej, dict) else []
+    mat_items = ej.get("materials", []) if isinstance(ej, dict) else []
+    eq_items = ej.get("equipment", []) if isinstance(ej, dict) else []
+
+    # Attempt to read pre-computed totals from JSON first
+    labor_total = _num0(ej.get("labor_total") if isinstance(ej, dict) else None)
+    mat_total = _num0(ej.get("material_total") if isinstance(ej, dict) else None)
+    eq_total = _num0(ej.get("equipment_total") if isinstance(ej, dict) else None)
+
+    # Fall back to scanning line items if totals are zero
+    if labor_total == 0 and labor_items:
+        for r in labor_items:
+            if isinstance(r, dict):
+                labor_total += _num0(r.get("line_total") or r.get("total") or 0)
+    if mat_total == 0 and mat_items:
+        for r in mat_items:
+            if isinstance(r, dict):
+                mat_total += _num0(r.get("line_total") or r.get("total") or 0)
+    if eq_total == 0 and eq_items:
+        for r in eq_items:
+            if isinstance(r, dict):
+                eq_total += _num0(r.get("line_total") or r.get("total") or 0)
+
+    overhead_pct = _num0(controls.get("overhead_pct") if isinstance(controls, dict) else None)
+    profit_pct = _num0(controls.get("profit_pct") if isinstance(controls, dict) else None)
+    tax_pct = _num0(controls.get("sales_tax_pct") if isinstance(controls, dict) else None)
+    markup_pct = overhead_pct + profit_pct
+
+    subtotal = labor_total + mat_total + eq_total
+    markup_amt = subtotal * (markup_pct / 100.0) if markup_pct else 0.0
+    tax_amt = (subtotal + markup_amt) * (tax_pct / 100.0) if tax_pct else 0.0
+    proposal_total = _num0(full_row.get("proposal_total") or full_row.get("final_bid") or 0)
+    grand = proposal_total if proposal_total else (subtotal + markup_amt + tax_amt)
+
+    markup_label = f"Markup / Overhead ({markup_pct:.1f}%)" if markup_pct else "Markup / Overhead"
+    tax_label = f"Tax ({tax_pct:.1f}%)" if tax_pct else "Tax"
+
+    rows_html = (
+        _pricing_row_html("Labor Total", _money_disp(labor_total))
+        + _pricing_row_html("Material Total", _money_disp(mat_total))
+        + _pricing_row_html("Equipment Total", _money_disp(eq_total))
+        + _pricing_row_html("Subtotal", _money_disp(subtotal))
+        + _pricing_row_html(markup_label, _money_disp(markup_amt) if markup_amt else "—")
+        + _pricing_row_html(tax_label, _money_disp(tax_amt) if tax_amt else "—")
+        + _pricing_row_html("Grand Total", _money_disp(grand), total=True)
+    )
+    st.markdown(
+        f'<div class="ips-est-info-card">'
+        f'<p class="ips-est-card-title">Pricing Summary</p>'
+        f"{rows_html}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_estimate_overview_tab(
+    full_row: dict[str, Any],
+    *,
+    customer_name: str,
+    job_display: str,
+) -> None:
+    """Overview tab: 2-column cards (Estimate Details + Pricing Summary) + scope + activity."""
+    qn = str(full_row.get("quote_number") or "").strip() or "—"
+    status = str(full_row.get("status") or "").strip() or "—"
+    desc = str(full_row.get("estimate_description") or "").strip()
+    if not desc:
+        ej = full_row.get("estimate_json")
+        if isinstance(ej, dict):
+            desc = str(ej.get("estimate_description") or ej.get("job") or "").strip()
+    created_by = ""
+    ej2 = full_row.get("estimate_json")
+    if isinstance(ej2, dict):
+        created_by = str(ej2.get("prepared_by_name") or ej2.get("prepared_by") or "").strip()
+
+    details_html = (
+        _field_row_html("Estimate #", qn)
+        + _field_row_html("Customer", customer_name or "—")
+        + _field_row_html("Job #", job_display or "—")
+        + _field_row_html("Status", status)
+        + _field_row_html("Description", desc or "—")
+        + _field_row_html("Created By", created_by or "—")
+        + _field_row_html("Created", _fmt_date(full_row.get("created_at"), short=False)[:10] if full_row.get("created_at") else "—")
+        + _field_row_html("Last Updated", _fmt_date(full_row.get("updated_at"), short=False)[:10] if full_row.get("updated_at") else "—")
+    )
+
+    col_l, col_r = st.columns(2, gap="medium")
+    with col_l:
+        st.markdown(
+            f'<div class="ips-est-info-card">'
+            f'<p class="ips-est-card-title">Estimate Details</p>'
+            f"{details_html}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with col_r:
+        render_estimate_pricing_summary(full_row)
+
+    st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+
+    col_bl, col_br = st.columns(2, gap="medium")
+    with col_bl:
+        render_estimate_scope_summary(full_row)
+    with col_br:
+        render_estimate_activity_feed(full_row)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab renderers for line-item detail tabs
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _render_line_items_tab(
+    items: list[dict[str, Any]],
+    columns: list[str],
+    *,
+    empty_msg: str = "No items found.",
+) -> None:
+    if not items:
+        st.caption(empty_msg)
+        return
+    import pandas as _pd
+    df = _pd.DataFrame(items)
+    show_cols = [c for c in columns if c in df.columns]
+    if show_cols:
+        st.dataframe(df[show_cols], use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+def _render_labor_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json")
+    items = ej.get("labor", []) if isinstance(ej, dict) else []
+    _render_line_items_tab(
+        items,
+        ["classification", "headcount", "st_hours_per_day", "ot_hours_per_day", "days", "line_total"],
+        empty_msg="No labor items in this estimate.",
+    )
+
+
+def _render_materials_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json")
+    items = ej.get("materials", []) if isinstance(ej, dict) else []
+    _render_line_items_tab(
+        items,
+        ["item", "description", "qty", "unit", "unit_price", "line_total"],
+        empty_msg="No material items in this estimate.",
+    )
+
+
+def _render_equipment_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json")
+    items = ej.get("equipment", []) if isinstance(ej, dict) else []
+    _render_line_items_tab(
+        items,
+        ["equipment_item", "description", "qty", "days", "rate", "line_total"],
+        empty_msg="No equipment items in this estimate.",
+    )
+
+
+def _render_financials_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json") or {}
+    controls = ej.get("controls", {}) if isinstance(ej, dict) else {}
+    travel = ej.get("travel", {}) if isinstance(ej, dict) else {}
+
+    col1, col2 = st.columns(2, gap="medium")
+    with col1:
+        render_estimate_pricing_summary(full_row)
+    with col2:
+        # Controls
+        ctrl_html = (
+            _field_row_html("Material Markup %", f"{_num0(controls.get('material_markup_pct')):.2f}%")
+            + _field_row_html("Overhead %", f"{_num0(controls.get('overhead_pct')):.2f}%")
+            + _field_row_html("Profit %", f"{_num0(controls.get('profit_pct')):.2f}%")
+            + _field_row_html("Contingency %", f"{_num0(controls.get('contingency_pct')):.2f}%")
+            + _field_row_html("Sales Tax %", f"{_num0(controls.get('sales_tax_pct')):.2f}%")
+        )
+        st.markdown(
+            f'<div class="ips-est-info-card"><p class="ips-est-card-title">Pricing Controls</p>{ctrl_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+    if travel and isinstance(travel, dict):
+        travel_total = _num0(travel.get("line_total") or 0)
+        if travel_total:
+            st.caption(f"Travel / field expenses: {_money_disp(travel_total)}")
+
+
+def _render_scope_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json") or {}
+    scope = str(full_row.get("scope_of_work") or (ej.get("scope_of_work") if isinstance(ej, dict) else "") or "").strip()
+    excl = str((ej.get("exclusions") if isinstance(ej, dict) else "") or "").strip()
+    addl = str((ej.get("additional_charges") if isinstance(ej, dict) else "") or "").strip()
+    cust_resp = str((ej.get("customer_responsibilities") if isinstance(ej, dict) else "") or "").strip()
+
+    if scope:
+        st.markdown("**Scope of Work**")
+        st.markdown(scope)
+    else:
+        st.caption("No scope of work entered.")
+
+    if excl:
+        st.markdown("---")
+        st.markdown("**Exclusions**")
+        st.markdown(excl)
+    if addl:
+        st.markdown("---")
+        st.markdown("**Additional Charges**")
+        st.markdown(addl)
+    if cust_resp:
+        st.markdown("---")
+        st.markdown("**Customer Responsibilities**")
+        st.markdown(cust_resp)
+
+
+def _render_notes_tab(full_row: dict[str, Any]) -> None:
+    ej = full_row.get("estimate_json") or {}
+    notes = str((ej.get("notes") if isinstance(ej, dict) else "") or "").strip()
+    if notes:
+        st.markdown(notes)
+    else:
+        st.caption("No notes on this estimate.")
+
+
+def _render_documents_tab(full_row: dict[str, Any]) -> None:
+    """Show attached PDF source if available; otherwise placeholder."""
+    source_path = str(full_row.get("source_pdf_path") or "").strip()
+    if source_path:
+        st.caption(f"Source file: `{source_path}`")
+    else:
+        st.caption("No documents attached to this estimate. Use the full editor to manage attachments.")
+
+
+def _render_activity_tab(full_row: dict[str, Any]) -> None:
+    lines: list[str] = []
+    created = full_row.get("created_at")
+    updated = full_row.get("updated_at")
+    status = str(full_row.get("status") or "").strip()
+    qn = str(full_row.get("quote_number") or "").strip()
+
+    if created:
+        lines.append(f"**Created** — {str(created)[:19]}")
+    if updated:
+        lines.append(f"**Last Updated** — {str(updated)[:19]}")
+    if status:
+        lines.append(f"**Current Status** — {status}")
+    if qn:
+        lines.append(f"**Quote #** — {qn}")
+
+    if lines:
+        for line in lines:
+            st.markdown(line)
+    else:
+        st.caption("No activity data available.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Detail panel
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def render_estimate_detail_panel(
+    full_row: dict[str, Any],
+    *,
+    customer_name: str,
+    job_display: str,
+    linked_job_id: str | None,
+    can_edit: bool,
+    on_edit: Any,
+    on_collapse: Any,
+) -> None:
+    """Inline detail panel rendered below the selected estimate row."""
+    try:
+        from services.job_from_estimate import (
+            create_job_from_estimate,
+            estimate_status_allows_job_creation,
+        )
+    except ImportError:
+        from app.services.job_from_estimate import (  # type: ignore
+            create_job_from_estimate,
+            estimate_status_allows_job_creation,
+        )
+
+    eid = str(full_row.get("id") or "").strip()
+    qn = str(full_row.get("quote_number") or "").strip() or "—"
+    desc = str(full_row.get("estimate_description") or "").strip()
+    if not desc:
+        ej0 = full_row.get("estimate_json")
+        if isinstance(ej0, dict):
+            desc = str(ej0.get("estimate_description") or ej0.get("job") or "").strip()
+    status = str(full_row.get("status") or "").strip()
+    proposal_total = _num0(full_row.get("proposal_total") or full_row.get("final_bid") or 0)
+    created_at = _fmt_date(full_row.get("created_at"))
+    updated_at = _fmt_date(full_row.get("updated_at"))
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-est-detail-anchor"></span>', unsafe_allow_html=True)
+
+        # ── Hero header ─────────────────────────────────────────────────────
+        hero_meta = (
+            f'<div class="ips-est-hero-meta">'
+            f'<span class="ips-est-hero-meta-item"><span class="ips-est-hero-meta-lbl">Customer</span>&nbsp;<span class="ips-est-hero-meta-val">{_html.escape(customer_name or "—")}</span></span>'
+            f'<span class="ips-est-hero-meta-item">{_est_status_badge(status)}</span>'
+            + (f'<span class="ips-est-hero-meta-item"><span class="ips-est-hero-meta-lbl">Job #</span>&nbsp;<span class="ips-est-hero-meta-val">{_html.escape(job_display)}</span></span>' if job_display else "")
+            + f'<span class="ips-est-hero-meta-item"><span class="ips-est-hero-meta-lbl">Created</span>&nbsp;<span class="ips-est-hero-meta-val">{_html.escape(created_at)}</span></span>'
+            + f'<span class="ips-est-hero-meta-item"><span class="ips-est-hero-meta-lbl">Updated</span>&nbsp;<span class="ips-est-hero-meta-val">{_html.escape(updated_at)}</span></span>'
+            + f'<span class="ips-est-hero-meta-item"><span class="ips-est-hero-meta-lbl">Total</span>&nbsp;<span class="ips-est-hero-meta-val">{_html.escape(_money_disp(proposal_total) if proposal_total else "—")}</span></span>'
+            + f"</div>"
+        )
+        title_html = (
+            f'<div class="ips-est-hero">'
+            f'<h2>{_html.escape(qn)}</h2>'
+            f'<p class="ips-est-hero-sub">{_html.escape(desc or "No description")}</p>'
+            f"{hero_meta}"
+            f"</div>"
+        )
+
+        hdr_left, hdr_right = st.columns([3, 2], gap="small")
+        with hdr_left:
+            st.markdown(title_html, unsafe_allow_html=True)
+        with hdr_right:
+            btn_cols = st.columns(4, gap="small")
+            with btn_cols[0]:
+                if st.button("✏ Edit", key=f"est_detail_edit_{eid}", use_container_width=True, type="primary"):
+                    on_edit(eid)
+            with btn_cols[1]:
+                st.button("👁 Preview", key=f"est_detail_preview_{eid}", use_container_width=True, help="Open full estimate editor for preview")
+            with btn_cols[2]:
+                _can_convert = bool(
+                    can_edit
+                    and not linked_job_id
+                    and estimate_status_allows_job_creation(status)
+                )
+                if st.button(
+                    "→ Job",
+                    key=f"est_detail_convert_{eid}",
+                    use_container_width=True,
+                    disabled=not _can_convert,
+                    help="Convert approved estimate to a Job" if _can_convert else "Only approved estimates without a linked job can be converted",
+                ):
+                    res = create_job_from_estimate(eid)
+                    if res.ok:
+                        st.success(res.message)
+                        st.session_state["est_data_version"] = int(st.session_state.get("est_data_version", 0)) + 1
+                        st.rerun()
+                    elif res.message:
+                        st.error(res.message)
+            with btn_cols[3]:
+                if st.button("✕ Close", key=f"est_detail_collapse_{eid}", use_container_width=True):
+                    on_collapse()
+
+        # ── Delete confirmation ──────────────────────────────────────────────
+        pending_del = st.session_state.get("est_pending_delete")
+        if pending_del == eid:
+            st.warning("Delete this estimate permanently? Linked jobs will be preserved but unlinked.")
+            dc1, dc2, _ = st.columns([1, 1, 3], gap="small")
+            with dc1:
+                if st.button("Confirm Delete", type="primary", key=f"est_del_confirm_{eid}", use_container_width=True):
+                    try:
+                        from services.delete_safety import delete_estimate_unlink_first
+                    except ImportError:
+                        from app.services.delete_safety import delete_estimate_unlink_first  # type: ignore
+                    try:
+                        delete_estimate_unlink_first(eid, admin_read=_estimates_page_admin_read())
+                        st.session_state.pop("est_pending_delete", None)
+                        st.session_state["selected_estimate_id"] = None
+                        st.session_state["est_data_version"] = int(st.session_state.get("est_data_version", 0)) + 1
+                        st.success("Estimate deleted.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Could not delete: {exc}")
+            with dc2:
+                if st.button("Cancel", key=f"est_del_cancel_{eid}", use_container_width=True):
+                    st.session_state.pop("est_pending_delete", None)
+                    st.rerun()
+
+        # ── Tabs ─────────────────────────────────────────────────────────────
+        tab_names = ["Overview", "Scope", "Labor", "Materials", "Equipment", "Financials", "Documents", "Notes", "Activity"]
+        tabs = st.tabs(tab_names)
+
+        with tabs[0]:
+            render_estimate_overview_tab(full_row, customer_name=customer_name, job_display=job_display)
+        with tabs[1]:
+            _render_scope_tab(full_row)
+        with tabs[2]:
+            _render_labor_tab(full_row)
+        with tabs[3]:
+            _render_materials_tab(full_row)
+        with tabs[4]:
+            _render_equipment_tab(full_row)
+        with tabs[5]:
+            _render_financials_tab(full_row)
+        with tabs[6]:
+            _render_documents_tab(full_row)
+        with tabs[7]:
+            _render_notes_tab(full_row)
+        with tabs[8]:
+            _render_activity_tab(full_row)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Table row renderer
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def render_estimate_row(
+    est_row: Any,
+    *,
+    idx: int,
+    job_by_id: dict[str, Any],
+    job_by_estimate_id: dict[str, Any],
+    customer_name_by_id: dict[str, str],
+    full_row_cache: dict[str, dict[str, Any]],
+    can_edit: bool,
+) -> None:
+    """Render a single estimate table row inside a border container, and if selected, the detail panel below."""
+    eid = str(est_row.get("id") or "").strip()
+    if not eid:
+        return
+
+    is_sel = st.session_state.get("selected_estimate_id") == eid
+
+    # Resolve linked job
+    jid = str(est_row.get("job_id") or "").strip()
+    linked_job: dict[str, Any] | None = None
+    if jid and jid in job_by_id:
+        linked_job = job_by_id[jid]
+    elif eid in job_by_estimate_id:
+        linked_job = job_by_estimate_id[eid]
+    linked_job_id: str | None = str(linked_job.get("id") or "") if linked_job else None
+
+    try:
+        from app.utils.formatters import job_display_label
+    except ImportError:
+        from utils.formatters import job_display_label  # type: ignore
+
+    job_display = ""
+    if linked_job:
+        job_display = job_display_label(linked_job.get("job_number"), linked_job.get("job_name"))
+
+    # Customer name
+    cid = str(est_row.get("customer_id") or "").strip()
+    customer_name = customer_name_by_id.get(cid, "")
+
+    # Display values
+    qn = str(est_row.get("quote_number") or "").strip() or "—"
+    status = str(est_row.get("status") or "").strip()
+    proposal_total = _num0(est_row.get("proposal_total") or est_row.get("final_bid") or 0)
+    created = _fmt_date(est_row.get("created_at"))
+    updated = _fmt_date(est_row.get("updated_at"))
+
+    # Description
+    desc = str(est_row.get("estimate_description") or "").strip()
+    if not desc:
+        ej = est_row.get("estimate_json")
+        if isinstance(ej, dict):
+            desc = str(ej.get("estimate_description") or ej.get("job") or "").strip()
+    if not desc:
+        sow = str(est_row.get("scope_of_work") or "").strip()
+        if sow:
+            desc = sow.splitlines()[0].strip()
+    desc_disp = desc[:55] + ("…" if len(desc) > 55 else "") if desc else "—"
+
+    sel_cls = "ips-est-row-sel" if is_sel else ""
+
+    with st.container(border=True):
+        st.markdown(
+            f'<span class="ips-est-row-anchor {sel_cls}"></span>',
+            unsafe_allow_html=True,
+        )
+        rc = st.columns(_EST_COL_WEIGHTS, gap="small")
+
+        # Col 0 — Estimate # (acts as click-to-select)
+        with rc[0]:
+            if st.button(
+                qn,
+                key=f"est_row_sel_{eid}_{idx}",
+                use_container_width=True,
+                help="Click to view details",
+            ):
+                if is_sel:
+                    st.session_state["selected_estimate_id"] = None
+                else:
+                    st.session_state["selected_estimate_id"] = eid
+                st.rerun()
+
+        # Col 1 — Description
+        with rc[1]:
+            st.markdown(
+                f'<span class="ips-est-cell" title="{_html.escape(desc, quote=True)}">{_html.escape(desc_disp)}</span>',
+                unsafe_allow_html=True,
+            )
+
+        # Col 2 — Customer
+        with rc[2]:
+            st.markdown(
+                f'<span class="ips-est-cell" title="{_html.escape(customer_name, quote=True)}">'
+                f"{_html.escape(customer_name[:28] + ('…' if len(customer_name) > 28 else ''))}</span>",
+                unsafe_allow_html=True,
+            )
+
+        # Col 3 — Job #
+        with rc[3]:
+            jdisp = job_display[:18] + ("…" if len(job_display) > 18 else "") if job_display else "—"
+            st.markdown(
+                f'<span class="ips-est-cell" title="{_html.escape(job_display, quote=True)}">{_html.escape(jdisp)}</span>',
+                unsafe_allow_html=True,
+            )
+
+        # Col 4 — Status
+        with rc[4]:
+            st.markdown(_est_status_badge(status), unsafe_allow_html=True)
+
+        # Col 5 — Created
+        with rc[5]:
+            st.markdown(
+                f'<span class="ips-est-cell ips-est-cell-muted">{_html.escape(created)}</span>',
+                unsafe_allow_html=True,
+            )
+
+        # Col 6 — Last Updated
+        with rc[6]:
+            st.markdown(
+                f'<span class="ips-est-cell ips-est-cell-muted">{_html.escape(updated)}</span>',
+                unsafe_allow_html=True,
+            )
+
+        # Col 7 — Total
+        with rc[7]:
+            total_str = _money_disp(proposal_total) if proposal_total else "—"
+            st.markdown(
+                f'<span class="ips-est-cell ips-est-cell-money">{_html.escape(total_str)}</span>',
+                unsafe_allow_html=True,
+            )
+
+        # Col 8 — View
+        with rc[8]:
+            if st.button("👁", key=f"est_row_view_{eid}_{idx}", use_container_width=True, help="View details"):
+                st.session_state["selected_estimate_id"] = eid if not is_sel else None
+                st.rerun()
+
+        # Col 9 — Edit
+        with rc[9]:
+            if st.button("✏", key=f"est_row_edit_{eid}_{idx}", use_container_width=True, help="Edit estimate", disabled=not can_edit):
+                _load_estimate_into_session(eid)
+                st.session_state["estimates_view"] = "edit"
+                st.rerun()
+
+        # Col 10 — Delete
+        with rc[10]:
+            if st.button("🗑", key=f"est_row_del_{eid}_{idx}", use_container_width=True, help="Delete estimate", disabled=not can_edit):
+                st.session_state["selected_estimate_id"] = eid
+                st.session_state["est_pending_delete"] = eid
+                st.rerun()
+
+    # ── Inline detail panel ──────────────────────────────────────────────────
+    if is_sel:
+        # Fetch full row (with estimate_json) if not yet cached
+        if eid not in full_row_cache:
+            full_row_cache[eid] = _fetch_one_estimate_row(eid) or est_row
+        full_row = full_row_cache[eid]
+
+        def _on_edit(e: str) -> None:
+            _load_estimate_into_session(e)
+            st.session_state["estimates_view"] = "edit"
+            st.rerun()
+
+        def _on_collapse() -> None:
+            st.session_state["selected_estimate_id"] = None
+            st.session_state.pop("est_pending_delete", None)
+            st.rerun()
+
+        render_estimate_detail_panel(
+            full_row,
+            customer_name=customer_name,
+            job_display=job_display,
+            linked_job_id=linked_job_id,
+            can_edit=can_edit,
+            on_edit=_on_edit,
+            on_collapse=_on_collapse,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Table renderer
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def render_estimates_table(
+    df: pd.DataFrame,
+    *,
+    job_by_id: dict[str, Any],
+    job_by_estimate_id: dict[str, Any],
+    customer_name_by_id: dict[str, str],
+    can_edit: bool,
+) -> None:
+    """Render the full estimates table: header row + data rows + inline detail panel."""
+    st.markdown('<span class="ips-est-scroll-anchor"></span>', unsafe_allow_html=True)
+
+    # Header row
+    with st.container(border=True):
+        st.markdown('<span class="ips-est-hdr-anchor"></span>', unsafe_allow_html=True)
+        hc = st.columns(_EST_COL_WEIGHTS, gap="small")
+        for col_i, label in enumerate(["Estimate #", "Description", "Customer", "Job #", "Status", "Created", "Last Updated", "Total", " ", " ", " "]):
+            with hc[col_i]:
+                st.caption(label)
+
+    # Per-row full-data cache (populated lazily on first expand)
+    full_row_cache: dict[str, dict[str, Any]] = {}
+
+    for idx, (_, row) in enumerate(df.iterrows()):
+        render_estimate_row(
+            row,
+            idx=idx,
+            job_by_id=job_by_id,
+            job_by_estimate_id=job_by_estimate_id,
+            customer_name_by_id=customer_name_by_id,
+            full_row_cache=full_row_cache,
+            can_edit=can_edit,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Refactored list view
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def _render_estimate_list() -> None:
+    _inject_estimates_page_styles()
     can_edit = current_role() in {"admin", "pm"}
+
+    # ── Data fetching ────────────────────────────────────────────────────────
     rows = _fetch_estimates_list_rows()
+    job_rows = _fetch_jobs_for_estimate_links()
+    job_by_id: dict[str, Any] = {str(r["id"]): r for r in job_rows if r.get("id")}
+    job_by_estimate_id: dict[str, Any] = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
+
+    customer_rows = _fetch_customers_list()
+    customer_name_by_id: dict[str, str] = {
+        str(c.get("id") or ""): str(c.get("customer_name") or "")
+        for c in customer_rows if c.get("id")
+    }
+
     df = pd.DataFrame(rows)
 
-    def _norm_customer_id(v: Any) -> str:
-        if v is None:
-            return ""
-        try:
-            if pd.isna(v):
-                return ""
-        except Exception:
-            pass
-        s = str(v).strip()
-        return s if s and s.lower() != "nan" else ""
+    # ── Initialise session state ──────────────────────────────────────────────
+    st.session_state.setdefault("selected_estimate_id", None)
 
-    eid_to_customer: dict[str, str] = {}
-    for r in rows:
-        rid = str(r.get("id") or "").strip()
-        if rid:
-            eid_to_customer[rid] = _norm_customer_id(r.get("customer_id"))
-
-    job_rows = _fetch_jobs_for_estimate_links()
-    job_by_id = {str(r["id"]): r for r in job_rows if r.get("id")}
-    job_by_estimate_id = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
-
-    def _linked_job_display_cell(row: pd.Series) -> str:
-        jid = row.get("job_id")
-        eid = row.get("id")
-        if jid is not None and pd.notna(jid) and str(jid).strip():
-            sj = str(jid)
-            if sj in job_by_id:
-                job = job_by_id[sj]
-                return job_display_label(job.get("job_number"), job.get("job_name"))
-        if eid is not None and pd.notna(eid):
-            se = str(eid)
-            if se in job_by_estimate_id:
-                job = job_by_estimate_id[se]
-                return job_display_label(job.get("job_number"), job.get("job_name"))
-        return ""
-
-    def _linked_job_id_for_row(row: pd.Series) -> str | None:
-        jid = row.get("job_id")
-        eid = row.get("id")
-        if jid is not None and pd.notna(jid) and str(jid).strip():
-            return str(jid)
-        if eid is not None and pd.notna(eid):
-            se = str(eid)
-            if se in job_by_estimate_id:
-                return str(job_by_estimate_id[se].get("id"))
-        return None
-
-    def _series_truthy_job_received(row: pd.Series) -> bool:
-        v = row.get("job_received")
-        if v is None:
-            return False
-        try:
-            if pd.isna(v):
-                return False
-        except Exception:
-            pass
-        if isinstance(v, bool):
-            return v
-        if isinstance(v, (int, float)):
-            try:
-                return float(v) != 0.0
-            except (TypeError, ValueError):
-                return False
-        s = str(v).strip().lower()
-        return s in ("true", "1", "yes", "t")
-
-    def _row_estimate_id(est_row: pd.Series) -> str:
-        """Primary key for API calls — always the estimate ``id`` column, never quote text."""
-        if "id" not in est_row.index:
-            return ""
-        raw = est_row["id"]
-        if raw is None:
-            return ""
-        try:
-            if pd.isna(raw):
-                return ""
-        except Exception:
-            pass
-        return str(raw).strip()
-
-    def _estimate_description_display(est_row: pd.Series) -> str:
-        """
-        Row-level description shown in the Estimates list.
-        Prefer explicit short estimate description; fall back to older compatibility keys.
-        Avoid using Scope of Work unless nothing else exists.
-        """
-        desc = est_row.get("estimate_description")
-        if desc is None or (isinstance(desc, float) and pd.isna(desc)):
-            desc = ""
-        if not str(desc).strip():
-            ej = est_row.get("estimate_json")
-            if isinstance(ej, dict):
-                desc = ej.get("estimate_description") or ""
-        if not str(desc).strip():
-            ej = est_row.get("estimate_json")
-            if isinstance(ej, dict):
-                desc = ej.get("job") or ej.get("job_name") or ""
-        if not str(desc).strip():
-            # Absolute last resort: first line of Scope of Work (can be long proposal text).
-            desc = est_row.get("scope_of_work") or ""
-        s = str(desc or "").strip()
-        if not s:
-            return ""
-        # Keep list rows scannable: first line, capped length.
-        s = s.splitlines()[0].strip()
-        return s[:60] + ("…" if len(s) > 60 else "")
-
-    if not df.empty:
-        keep = [
-            c
-            for c in [
-                "quote_number",
-                "status",
-                "proposal_total",
-                "job_received",
-                "po_number",
-                "scope_of_work",
-                "estimate_json",
-                "customer_location_id",
-            ]
-            if c in df.columns
-        ]
-        if "id" in df.columns:
-            keep = ["id"] + [c for c in keep if c != "id"]
-        if "job_id" in df.columns and "job_id" not in keep:
-            keep.insert(1, "job_id")
-        df = df[keep]
-
-        if "status" in df.columns:
-            statuses = ["All"] + sorted(df["status"].dropna().astype(str).unique().tolist())
-            selected = st.selectbox("Filter Status", statuses, key="est_list_status")
-            if selected != "All":
-                df = df[df["status"] == selected]
-
-        search = st.text_input("Search Quote / PO Number", key="est_list_search")
-        if search.strip():
-            s = search.strip().lower()
-            mask = df.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            df = df[mask.any(axis=1)]
-
-        df = df.copy()
-        df["Linked job"] = df.apply(_linked_job_display_cell, axis=1)
-
+    # ── Empty state ──────────────────────────────────────────────────────────
     if df.empty:
         try:
             from app.ui.components.empty_states import render_empty_state
@@ -449,358 +1460,39 @@ def _render_estimate_list() -> None:
             st.rerun()
         return
 
-    location_by_id: dict[str, dict[str, Any]] = {}
+    # ── Filters ───────────────────────────────────────────────────────────────
+    f1, f2 = st.columns([1, 3], gap="small")
+    with f1:
+        status_opts = ["All"] + sorted(
+            df["status"].dropna().astype(str).unique().tolist()
+        ) if "status" in df.columns else ["All"]
+        sel_status = st.selectbox("Status", status_opts, key="est_list_status")
+    with f2:
+        search = st.text_input("Search estimates", placeholder="Quote #, customer, description, status…", key="est_list_search")
 
-    def _site_line_for_estimate(est_row: pd.Series) -> str:
-        if "customer_location_id" not in est_row.index:
-            return ""
-        raw = est_row.get("customer_location_id")
-        if raw is None:
-            return ""
-        try:
-            if pd.isna(raw):
-                return ""
-        except Exception:
-            pass
-        lid = str(raw).strip()
-        if not lid:
-            return ""
-        try:
-            from services.customer_locations import location_display_name_city_state
-        except ImportError:
-            from app.services.customer_locations import location_display_name_city_state  # type: ignore
+    filtered = df.copy()
+    if sel_status != "All" and "status" in filtered.columns:
+        filtered = filtered[filtered["status"] == sel_status]
+    if search.strip():
+        s = search.strip().lower()
+        mask = filtered.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
+        filtered = filtered[mask.any(axis=1)]
 
-        row = location_by_id.get(lid)
-        return location_display_name_city_state(row) if row else ""
-
-    if "customer_location_id" in df.columns:
-        try:
-            from services.customer_locations import fetch_all_locations_indexed
-        except ImportError:
-            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
-
-        location_by_id = fetch_all_locations_indexed(admin_read=_estimates_page_admin_read())
-
-    # Visible columns: fixed order handled explicitly in the row layout below.
-    if "id" not in df.columns:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    if filtered.empty:
+        st.caption("No estimates match the current filter.")
         return
 
-    try:
-        from services.job_from_estimate import (
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
-    except ImportError:
-        from app.services.job_from_estimate import (  # type: ignore
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
+    st.caption(f"{len(filtered)} estimate{'s' if len(filtered) != 1 else ''}")
 
-    try:
-        from ui import IPS_NAV_PENDING_KEY
-    except ImportError:
-        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-
-    def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
-        """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
-        if not can_edit:
-            return "Only admin or pm can run this action."
-        if _series_truthy_job_received(est_row):
-            return "This estimate is already marked as job received."
-        if not cust_id:
-            return "Choose a customer on the estimate before creating a job."
-        st_raw = str(est_row.get("status") or "")
-        if not estimate_status_allows_job_creation(st_raw):
-            return (
-                f"Estimate status {st_raw!r} does not allow creating a job from this page. "
-                "Job creation is only allowed after customer approval (approved/accepted/awarded/po_received). "
-                "Update status first, or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
-            )
-        return ""
-
-    st.caption(
-        "**Estimates = quotes / proposals** (pricing and approval live here). "
-        "**Jobs = costing / work records** in Job Database — create from an accepted estimate or standalone for field work."
-    )
-    st.caption(
-        "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "
-        "Use the **action bar** below for view, edit, delete, and export."
-    )
-    nav1, nav2 = st.columns([1.15, 3])
-    with nav1:
-        st.checkbox(
-            "Open new job in Job Database",
-            value=True,
-            key="est_job_recv_open_job_db",
-            help="After Job Received success, go to Job Database with that job open.",
-        )
-    with nav2:
-        st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
-
-    # Visible order (exact):
-    # Blank | Job | quote | Estimate Description | proposal | status | linked job | po | approve | delete
-    col_weights = [
-        0.4,  # checkbox
-        1.3,  # job
-        1.1,  # quote
-        2.4,  # description
-        1.0,  # proposal
-        0.9,  # status
-        1.8,  # linked job
-        1.0,  # po
-        0.8,  # approve
-        0.5,  # delete
-    ]
-    head = st.columns(col_weights)
-    with head[0]:
-        st.caption(" ")
-    with head[1]:
-        st.caption("Job")
-    with head[2]:
-        st.caption("Quote")
-    with head[3]:
-        st.caption("Estimate Description")
-    with head[4]:
-        st.caption("Proposal total")
-    with head[5]:
-        st.caption("Status")
-    with head[6]:
-        st.caption("Linked job")
-    with head[7]:
-        st.caption("PO #")
-    with head[8]:
-        st.caption("Approve")
-    with head[9]:
-        st.caption("Del")
-
-    picked: list[str] = []
-    for _, est_row in df.iterrows():
-        eid = _row_estimate_id(est_row)
-        if not eid:
-            continue
-        linked_id = _linked_job_id_for_row(est_row)
-        cust_id = eid_to_customer.get(eid, "")
-        row_status = str(est_row.get("status") or "").strip().lower()
-        rc = st.columns(col_weights)
-        with rc[0]:
-            ck = f"est_list_pick_{eid}"
-            if ck not in st.session_state:
-                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
-            checked = st.checkbox("", key=ck, label_visibility="collapsed")
-            if checked:
-                picked.append(eid)
-        with rc[1]:
-            if linked_id:
-                st.button(
-                    "Job Created",
-                    key=f"job_created_{eid}",
-                    disabled=True,
-                    use_container_width=True,
-                    help="A job is already linked to this estimate.",
-                )
-            else:
-                reason = _job_received_disabled_reason(est_row, cust_id=cust_id)
-                ready = not reason
-                clicked = st.button(
-                    "Job Received",
-                    key=f"job_received_{eid}",
-                    disabled=not ready,
-                    use_container_width=True,
-                    help=(
-                        "Create a job from this estimate, link it, and mark job received."
-                        if ready
-                        else reason
-                    ),
-                )
-                if clicked and ready:
-                    res = create_job_from_estimate(str(eid), mark_job_received=True)
-                    if res.ok and res.job:
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_job_recv_open_job_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_view_mode"] = "edit"
-                            st.session_state["selected_job_id"] = jid
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.success(res.message)
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        elif res.error_code == "job_received":
-                            st.info(res.message)
-                        else:
-                            st.error(res.message)
-        with rc[2]:
-            st.text(_estimate_list_cell_text(est_row.get("quote_number"), col="quote_number"))
-        with rc[3]:
-            st.text(_estimate_description_display(est_row))
-            site_ln = _site_line_for_estimate(est_row)
-            if site_ln:
-                st.caption(f"Site: {site_ln}")
-        with rc[4]:
-            st.text(_estimate_list_cell_text(est_row.get("proposal_total"), col="proposal_total"))
-        with rc[5]:
-            st.text(_estimate_list_cell_text(est_row.get("status"), col="status"))
-        with rc[6]:
-            st.text(_estimate_list_cell_text(est_row.get("Linked job"), col="Linked job"))
-        with rc[7]:
-            st.text(_estimate_list_cell_text(est_row.get("po_number"), col="po_number"))
-        with rc[8]:
-            is_approved = row_status == "approved"
-            can_approve = can_edit and row_status in ["draft", "submitted"]
-            approve_label = "Approved ✓" if is_approved else "Approve"
-            anchor_cls = "ips-est-approve-anchor" + (" ips-est-approve-done" if is_approved else "")
-            st.markdown(f'<span class="{anchor_cls}"></span>', unsafe_allow_html=True)
-            approve_btn_type = "primary" if (can_approve or is_approved) else "secondary"
-
-            if st.button(
-                approve_label,
-                key=f"est_row_approve_{eid}",
-                type=approve_btn_type,
-                disabled=not can_approve,
-                use_container_width=True,
-                help=(
-                    "Approve this estimate"
-                    if can_approve
-                    else ("Estimate is already approved" if is_approved else "Only draft/submitted estimates can be approved")
-                ),
-            ):
-                try:
-                    update_rows_admin("estimates", {"status": "approved"}, {"id": eid})
-                    st.success("Estimate approved.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Could not approve: {exc}")
-        with rc[9]:
-            del_enabled = bool(can_edit)
-            if not can_edit:
-                del_help = "Only admin or pm can delete estimates."
-            else:
-                del_help = (
-                    "Delete this estimate (quote). Linked jobs are kept; the job is unlinked from this quote."
-                )
-            if st.button(
-                "🗑",
-                key=f"est_row_del_{eid}",
-                disabled=not del_enabled,
-                use_container_width=True,
-                help=del_help,
-            ):
-                # Trigger the same confirmation flow the bulk action bar uses.
-                st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
-                st.rerun()
-
-    set_selected_ids(TABLE_KEY_ESTIMATES, picked)
-    sel = picked
-
-    df_export = df.copy()
-    for _mc in _MONEY_LIST_COLUMNS:
-        if _mc in df_export.columns:
-            df_export[_mc] = df_export[_mc].map(_estimate_money_csv)
-
-    actions = render_selection_action_bar(
-        TABLE_KEY_ESTIMATES,
-        sel,
-        can_view=True,
+    # ── Table ─────────────────────────────────────────────────────────────────
+    render_estimates_table(
+        filtered,
+        job_by_id=job_by_id,
+        job_by_estimate_id=job_by_estimate_id,
+        customer_name_by_id=customer_name_by_id,
         can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df_export,
-        visible_df=df,
-        id_column="id",
-        export_filename="estimates_export.csv",
-        on_bulk_selection_change=_cleanup_est_list_row_pick_keys,
     )
 
-    if can_edit and sel and len(sel) == 1:
-        row_one = df[df["id"].astype(str) == str(sel[0])]
-        open_jid: str | None = None
-        linked_jn = ""
-        linked_jnm = ""
-        qn = ""
-        if not row_one.empty:
-            r0 = row_one.iloc[0]
-            open_jid = _linked_job_id_for_row(r0)
-            qn = str(r0.get("quote_number") or "").strip()
-            if open_jid and str(open_jid) in job_by_id:
-                job_row = job_by_id[str(open_jid)]
-                linked_jn = job_number_display(job_row.get("job_number"))
-                linked_jnm = str(job_row.get("job_name") or "").strip()
-        try:
-            from app.ui.page_shell import render_card
-        except ImportError:
-            from ui.page_shell import render_card  # type: ignore
-        with render_card():
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            if open_jid:
-                jdisp = job_display_label(linked_jn, linked_jnm)
-                if jdisp:
-                    st.markdown(f"**Linked job** · **{jdisp}**", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "**Linked job** · _This estimate is linked to a job, but the job details could not be loaded._",
-                        unsafe_allow_html=True,
-                    )
-                if qn:
-                    st.caption(f"Source estimate quote · {qn}")
-                if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                    st.session_state["job_view_mode"] = "edit"
-                    st.session_state["selected_job_id"] = str(open_jid)
-                    st.session_state["job_mode"] = "edit"
-                    st.session_state["job_edit_id"] = str(open_jid)
-                    st.rerun()
-            else:
-                lc1, lc2, lc3 = st.columns([1, 1, 2], gap="small")
-                with lc1:
-                    run_cj = st.button(
-                        "Create Job from Estimate",
-                        key="est_list_create_job_btn",
-                        use_container_width=True,
-                    )
-                with lc2:
-                    st.checkbox(
-                        "Open Job Database after create",
-                        value=True,
-                        key="est_list_create_job_open_db",
-                    )
-                with lc3:
-                    st.caption("Creates a **J#####** job once the estimate is customer-approved (approved/accepted/awarded/po_received).")
-                if run_cj:
-                    res = create_job_from_estimate(str(sel[0]))
-                    if res.ok and res.job:
-                        st.success(res.message)
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_list_create_job_open_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_view_mode"] = "edit"
-                            st.session_state["selected_job_id"] = jid
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        else:
-                            st.error(res.message)
-    if (actions.get("view") or actions.get("edit")) and sel and len(sel) == 1:
-        _load_estimate_into_session(str(sel[0]))
-        st.session_state["estimates_view"] = "edit"
-        st.rerun()
-    pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-    if actions.get("confirm_delete") and pend.get(TABLE_KEY_ESTIMATES):
-        _est_admin_read = _estimates_page_admin_read()
-        for eid in pend[TABLE_KEY_ESTIMATES]:
-            try:
-                delete_estimate_unlink_first(str(eid), admin_read=_est_admin_read)
-            except Exception as exc:
-                st.error(f"Could not delete {eid}: {exc}")
-        pend.pop(TABLE_KEY_ESTIMATES, None)
-        clear_selected_ids(TABLE_KEY_ESTIMATES)
-        _cleanup_est_list_row_pick_keys()
-        st.success("Delete completed where permitted.")
-        st.rerun()
 
 
 def _import_customer_status_short(cls: dict[str, Any] | None) -> str:
@@ -1000,6 +1692,8 @@ def _render_estimate_import() -> None:
 
 
 def render() -> None:
+    st.markdown('<span class="ips-est-page-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
+
     if "estimates_view" not in st.session_state:
         st.session_state["estimates_view"] = "list"
 
@@ -1012,8 +1706,8 @@ def render() -> None:
         st.session_state["estimates_view"] = "list"
         view = "list"
 
-    # Single branding header per request; each branch renders one body section only.
     inject_table_action_styles()
+    _inject_estimates_page_styles()
 
     try:
         from app.ui.page_shell import action_bar_card
@@ -1021,11 +1715,11 @@ def render() -> None:
         from ui.page_shell import action_bar_card  # type: ignore
 
     if view == "list":
-        render_page_header("Estimates", "Quotes, imports, and customer-ready estimates.")
+        render_page_header("Estimates", "Quotes, proposals, and approvals.")
         with action_bar_card(title="Quick Actions"):
             a1, a2 = st.columns(2, gap="small")
             with a1:
-                if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):
+                if st.button("New Estimate", type="primary", use_container_width=True, key="est_list_new"):
                     _reset_estimate_editor_transients(clear_import_hints=True)
                     st.session_state["estimate_editor_state"] = blank_estimate()
                     st.session_state["loaded_estimate_id"] = None
