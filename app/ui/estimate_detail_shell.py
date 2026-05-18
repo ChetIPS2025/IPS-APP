@@ -145,7 +145,7 @@ def inject_estimate_detail_styles() -> None:
             font-size: 0.8125rem;
         }
         .ips-est-mat-table thead th {
-            background: #f8fafc;
+            background: #ffffff;
             color: #475569;
             font-weight: 700;
             text-align: left;
@@ -159,7 +159,7 @@ def inject_estimate_detail_styles() -> None:
             color: #0f172a;
             vertical-align: middle;
         }
-        .ips-est-mat-table tbody tr:hover td { background: #f8fafc; }
+        .ips-est-mat-table tbody tr:hover td { background: #F8FAFC; }
         .ips-est-item-link { color: #2563eb; font-weight: 600; }
         .ips-est-drag { color: #cbd5e1; font-size: 1rem; user-select: none; }
         .ips-est-summary-card {
@@ -181,7 +181,7 @@ def inject_estimate_detail_styles() -> None:
             margin: 0.45rem 0;
         }
         .ips-est-markup-box {
-            background: #f8fafc;
+            background: #ffffff;
             border: 1px solid #e5eaf2;
             border-radius: 10px;
             padding: 0.75rem 0.85rem;

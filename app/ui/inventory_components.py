@@ -143,7 +143,7 @@ def inject_inventory_page_styles() -> None:
 
         /* Table */
         .ips-inv-table-head-row {
-            background: #f9fafb;
+            background: #ffffff;
             border-bottom: 1px solid #e5eaf2;
             padding: 0.55rem 0.65rem 0.45rem;
             margin: 0 !important;
@@ -187,7 +187,7 @@ def inject_inventory_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-inventory-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-table-anchor)
         div[data-testid="column"]:has(.ips-inv-link-anchor) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #2563eb !important;
@@ -328,7 +328,7 @@ def inject_inventory_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-inventory-page)
         div[data-testid="column"]:has(.ips-inv-tab-cell) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #6b7280 !important;
@@ -349,7 +349,7 @@ def inject_inventory_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-inventory-page)
         div[data-testid="column"]:has(.ips-inv-tab-cell) .stButton > button:hover {
             color: #2563eb !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
         /* Search icon hint */
         section[data-testid="stMain"]:has(.ips-inventory-page)
@@ -399,7 +399,7 @@ def inject_inventory_page_styles() -> None:
             border: 1px solid #f1f5f9;
             border-radius: 8px;
             padding: 0.35rem 0.5rem 0.25rem;
-            background: #fafbfc;
+            background: #ffffff;
             margin-bottom: 0.5rem;
         }
         .ips-inv-usage-metrics {
@@ -451,7 +451,7 @@ def inject_inventory_page_styles() -> None:
             letter-spacing: 0.04em;
             padding: 0.45rem 0.5rem;
             border-bottom: 1px solid #e5eaf2;
-            background: #fafbfc;
+            background: #ffffff;
         }
         .ips-inv-txn-table tbody td {
             padding: 0.5rem 0.5rem;

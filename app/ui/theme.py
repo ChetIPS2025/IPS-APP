@@ -51,7 +51,7 @@ def set_density(value: str) -> None:
 
 
 def apply_global_app_styles() -> None:
-    """Inject unified app canvas, sidebar, and base card chrome (once per session)."""
+    """Inject unified white app canvas, surfaces, tables, tabs, dialogs (once per session)."""
     if st.session_state.get(IPS_GLOBAL_APP_STYLES_KEY):
         return
     st.session_state[IPS_GLOBAL_APP_STYLES_KEY] = True
@@ -63,25 +63,41 @@ def apply_global_app_styles() -> None:
             --ips-bg-main: {APP_BG};
             --ips-bg-sidebar: {SIDEBAR_BG};
             --ips-bg-card: {CARD_BG};
+            --ips-bg-hover: {HOVER_BG};
             --ips-border: {BORDER_COLOR};
             --ips-text: {COLORS["text"]};
             --ips-text-secondary: {COLORS["text_secondary"]};
             --ips-text-muted: {COLORS["text_muted"]};
         }}
 
-        body,
-        .stApp,
+        html, body, .stApp {{
+            background: {APP_BG} !important;
+            background-color: {APP_BG} !important;
+        }}
         [data-testid="stAppViewContainer"],
-        [data-testid="stHeader"] {{
-            background-color: var(--ips-bg-main) !important;
-            background: var(--ips-bg-main) !important;
+        [data-testid="stHeader"],
+        [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"],
+        section[data-testid="stMain"],
+        section[data-testid="stMain"] > div,
+        section.main,
+        main,
+        .block-container {{
+            background: {APP_BG} !important;
+            background-color: {APP_BG} !important;
+        }}
+
+        div[data-testid="stVerticalBlock"],
+        div[data-testid="stHorizontalBlock"],
+        [data-testid="stVerticalBlock"],
+        [data-testid="stHorizontalBlock"] {{
+            background: {APP_BG} !important;
+            background-color: {APP_BG} !important;
         }}
 
         section[data-testid="stMain"] {{
-            background: transparent !important;
             color: var(--ips-text) !important;
         }}
-
         section[data-testid="stMain"] .block-container {{
             padding-top: 0.35rem !important;
             padding-bottom: 0.85rem !important;
@@ -91,14 +107,123 @@ def apply_global_app_styles() -> None:
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] > div,
         [data-testid="stSidebar"] {{
-            background: var(--ips-bg-sidebar) !important;
-            background-color: var(--ips-bg-sidebar) !important;
+            background: {SIDEBAR_BG} !important;
+            background-color: {SIDEBAR_BG} !important;
             border-right: 1px solid var(--ips-border) !important;
             color: var(--ips-text) !important;
         }}
         section[data-testid="stSidebar"] .block-container {{
-            background: transparent !important;
+            background: {SIDEBAR_BG} !important;
         }}
+
+        /* Cards, panels, bordered wrappers */
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stForm"],
+        [data-testid="stMetric"],
+        div[data-testid="metric-container"] {{
+            background: {CARD_BG} !important;
+            background-color: {CARD_BG} !important;
+        }}
+
+        /* Tables */
+        [data-testid="stDataFrame"],
+        [data-testid="stDataEditor"],
+        [data-testid="stTable"],
+        [data-testid="stDataFrame"] > div,
+        [data-testid="stDataEditor"] > div {{
+            background: {CARD_BG} !important;
+            background-color: {CARD_BG} !important;
+        }}
+        [data-testid="stDataFrame"] [data-testid="stTable"] thead tr th,
+        [data-testid="stDataEditor"] [data-testid="stTable"] thead tr th {{
+            background: {CARD_BG} !important;
+            border-bottom: 1px solid {BORDER_COLOR} !important;
+        }}
+        [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr td,
+        [data-testid="stDataEditor"] [data-testid="stTable"] tbody tr td {{
+            background: {CARD_BG} !important;
+        }}
+        [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:nth-child(even) td,
+        [data-testid="stDataEditor"] [data-testid="stTable"] tbody tr:nth-child(even) td {{
+            background: {CARD_BG} !important;
+        }}
+        [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:hover td,
+        [data-testid="stDataEditor"] [data-testid="stTable"] tbody tr:hover td {{
+            background: {HOVER_BG} !important;
+        }}
+
+        /* Tabs */
+        [data-testid="stTabs"],
+        [data-testid="stTabs"] [data-baseweb="tab-list"],
+        [data-testid="stTabs"] [data-baseweb="tab-panel"],
+        [data-testid="stTabs"] [role="tablist"],
+        [data-testid="stTabs"] [role="tabpanel"] {{
+            background: {CARD_BG} !important;
+            background-color: {CARD_BG} !important;
+        }}
+
+        /* Expanders */
+        [data-testid="stExpander"] details,
+        [data-testid="stExpander"] summary {{
+            background: {CARD_BG} !important;
+            background-color: {CARD_BG} !important;
+        }}
+
+        /* Dialogs / modals */
+        div[data-testid="stDialog"],
+        div[data-testid="stDialog"] > div,
+        div[data-testid="stModal"],
+        [data-testid="stDialog"] [data-testid="stVerticalBlockBorderWrapper"] {{
+            background: {CARD_BG} !important;
+            background-color: {CARD_BG} !important;
+        }}
+
+        /* Top bar sticky wrap — no gray gradient */
+        .ips-topbar-wrap {{
+            background: {APP_BG} !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def inject_force_white_final_override() -> None:
+    """Last CSS in the cascade — wins over page-specific background rules."""
+    st.markdown(
+        """
+        <style id="ips-force-white-final">
+        html,
+        body,
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        [data-testid="stMainBlockContainer"],
+        [data-testid="stVerticalBlock"],
+        [data-testid="stHorizontalBlock"],
+        section.main,
+        main,
+        .block-container,
+        .ips-page,
+        .ips-shell,
+        .page-shell,
+        .content-shell {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+        }
+        div[class*="page"],
+        div[class*="shell"],
+        div[class*="container"],
+        div[class*="wrapper"] {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+        }
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] > div,
+        [data-testid="stSidebar"] {
+            background-color: #FFFFFF !important;
+            background: #FFFFFF !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -127,11 +252,9 @@ def apply_global_css() -> None:
         from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
     inject_ips_app_shell_styles()
 
-    if st.session_state.get(IPS_THEME_CSS_KEY):
-        return
-    st.session_state[IPS_THEME_CSS_KEY] = True
-
-    st.markdown(
+    if not st.session_state.get(IPS_THEME_CSS_KEY):
+        st.session_state[IPS_THEME_CSS_KEY] = True
+        st.markdown(
         f"""
         <style>
         /* ----- Display density ----- */
@@ -167,20 +290,20 @@ def apply_global_css() -> None:
             position: sticky !important;
             top: 0 !important;
             z-index: 3 !important;
-            background: #f1f5f9 !important;
+            background: {CARD_BG} !important;
             color: {COLORS["text"]} !important;
             font-size: 0.74rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.03em !important;
             padding: var(--ips-row-pad, 5px 8px) !important;
-            border-bottom: 1px solid {COLORS["border_strong"]} !important;
+            border-bottom: 1px solid {BORDER_COLOR} !important;
         }}
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:nth-child(even) td {{
-            background: #f9fafb !important;
+            background: {CARD_BG} !important;
         }}
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:hover td {{
-            background: #eff6ff !important;
+            background: {HOVER_BG} !important;
         }}
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] td {{
             font-size: 0.8125rem !important;
@@ -238,7 +361,7 @@ def apply_global_css() -> None:
             padding: 1.25rem 0.75rem;
             border: 1px dashed {COLORS["border_strong"]};
             border-radius: 8px;
-            background: #fafbfc;
+            background: {CARD_BG};
             margin: 0.35rem 0;
         }}
         .ips-empty-icon {{
@@ -303,7 +426,7 @@ def apply_global_css() -> None:
             z-index: 50;
             margin: -0.35rem 0 0.45rem 0;
             padding: 0.35rem 0;
-            background: linear-gradient(180deg, {APP_BG} 0%, rgba(248,250,252,0.92) 70%, transparent 100%);
+            background: {APP_BG} !important;
         }}
         .ips-topbar {{
             display: flex;
@@ -337,7 +460,7 @@ def apply_global_css() -> None:
             color: {COLORS["text_secondary"]};
             padding: 0.2rem 0.45rem;
             border-radius: 6px;
-            background: #f8fafc;
+            background: {CARD_BG};
             border: 1px solid {COLORS["border"]};
         }}
         .ips-topbar-pill .ips-dot {{
@@ -359,9 +482,11 @@ def apply_global_css() -> None:
 
         /* Hide default Streamlit chrome noise on main */
         section[data-testid="stMain"] header[data-testid="stHeader"] {{
-            background: transparent !important;
+            background: {APP_BG} !important;
         }}
         </style>
         """,
         unsafe_allow_html=True,
-    )
+        )
+
+    inject_force_white_final_override()

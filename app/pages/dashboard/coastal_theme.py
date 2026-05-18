@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 COASTAL_MARKER = "ips-coastal-dashboard"
-THEME_KEY = "ips_coastal_theme_v4"
+THEME_KEY = "ips_coastal_theme_v5"
 
 
 def inject_coastal_theme() -> None:
@@ -16,13 +16,31 @@ def inject_coastal_theme() -> None:
     st.markdown(
         f"""
         <style>
-        /* App canvas: theme.apply_global_app_styles() */
+        /* ============================================================
+           IPS Coastal Dashboard – visual system
+           All rules scoped with :has(.{c}) beat the global
+           ips_app_shell rules (higher specificity + !important).
+        ============================================================ */
+
+        /* App canvas */
         section[data-testid="stMain"]:has(.{c}) .block-container {{
           padding: 1.25rem 1.75rem 2rem !important;
           max-width: 100% !important;
+          background: #f8fafc !important;
         }}
         section[data-testid="stMain"]:has(.{c}) [data-testid="stVerticalBlock"] > div {{
-          gap: 0.75rem !important;
+          gap: 0.65rem !important;
+        }}
+
+        /* ── CRITICAL: reset the global ".stMarkdown p" color override ──
+           The app shell forces color:#334155 !important on all stMarkdown p.
+           This scoped rule has higher specificity and sets our custom
+           elements back to their own color values. */
+        section[data-testid="stMain"]:has(.{c}) .stMarkdown p,
+        section[data-testid="stMain"]:has(.{c}) .stMarkdown li,
+        section[data-testid="stMain"]:has(.{c}) .stMarkdown span {{
+          color: inherit !important;
+          font-weight: inherit !important;
         }}
 
         /* Bordered Streamlit cards */
@@ -45,7 +63,7 @@ def inject_coastal_theme() -> None:
         section[data-testid="stMain"]:has(.{c}) [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-coastal-inner) {{
           border: none !important;
           box-shadow: none !important;
-          background: transparent !important;
+          background: #ffffff !important;
           padding: 0 !important;
         }}
 
@@ -64,7 +82,7 @@ def inject_coastal_theme() -> None:
           border-radius: 8px !important;
           min-height: 2.25rem !important;
           padding: 0.35rem 0.65rem !important;
-          background: transparent !important;
+          background: #ffffff !important;
           border: none !important;
           color: #475569 !important;
           box-shadow: none !important;
@@ -72,7 +90,7 @@ def inject_coastal_theme() -> None:
           justify-content: flex-start !important;
         }}
         .stApp:has(.{c}) section[data-testid="stSidebar"] div.stButton > button:hover {{
-          background: #f8fafc !important;
+          background: #ffffff !important;
         }}
         .stApp:has(.{c}) section[data-testid="stSidebar"] button[kind="primary"] {{
           background: #eff6ff !important;
@@ -314,7 +332,7 @@ def inject_coastal_theme() -> None:
         }}
         section[data-testid="stMain"]:has(.{c}) .ips-qa-grid div.stButton > button:hover {{
           border-color: #bfdbfe !important;
-          background: #f8fafc !important;
+          background: #ffffff !important;
         }}
         section[data-testid="stMain"]:has(.{c}) .ips-qa-grid div.stButton > button p {{
           font-size: 0.72rem !important;
@@ -332,7 +350,7 @@ def inject_coastal_theme() -> None:
           text-align: right;
         }}
         section[data-testid="stMain"]:has(.{c}) .ips-coastal-view-all-wrap div.stButton > button {{
-          background: transparent !important;
+          background: #ffffff !important;
           border: none !important;
           color: #2563eb !important;
           font-size: 0.78rem !important;
@@ -343,7 +361,7 @@ def inject_coastal_theme() -> None:
         }}
         section[data-testid="stMain"]:has(.{c}) .ips-coastal-view-all-wrap div.stButton > button:hover {{
           text-decoration: underline !important;
-          background: transparent !important;
+          background: #ffffff !important;
         }}
 
         /* Date / customize controls */
@@ -456,6 +474,239 @@ def inject_coastal_theme() -> None:
           border-color: #bfdbfe;
           background: #eff6ff;
           color: #1d4ed8;
+        }}
+
+        /* ============================================================
+           SCOPED TEXT OVERRIDES
+           Wins over global "section .stMarkdown p { color !important }"
+           by using the :has(.{c}) ancestor selector (higher specificity).
+        ============================================================ */
+
+        /* Dashboard header */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-dash-title,
+        section[data-testid="stMain"]:has(.{c}) .stMarkdown .ips-coastal-dash-title {{
+          color: #0f172a !important;
+          font-size: 1.65rem !important;
+          font-weight: 700 !important;
+          line-height: 1.2 !important;
+          margin: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-dash-sub,
+        section[data-testid="stMain"]:has(.{c}) .stMarkdown .ips-coastal-dash-sub {{
+          color: #64748b !important;
+          font-size: 0.9rem !important;
+          font-weight: 400 !important;
+          margin: 0.15rem 0 0 !important;
+        }}
+
+        /* KPI card labels, values, trends */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-label {{
+          color: #64748b !important;
+          font-size: 0.78rem !important;
+          font-weight: 500 !important;
+          margin: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-value {{
+          color: #0f172a !important;
+          font-size: 1.38rem !important;
+          font-weight: 700 !important;
+          letter-spacing: -0.02em !important;
+          line-height: 1.15 !important;
+          margin: 0.2rem 0 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend {{
+          font-size: 0.72rem !important;
+          font-weight: 600 !important;
+          margin: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend.up {{
+          color: #059669 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend.down {{
+          color: #dc2626 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend.bad-up {{
+          color: #dc2626 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend.good-down {{
+          color: #059669 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi-trend.flat {{
+          color: #94a3b8 !important;
+        }}
+
+        /* Card headers */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-card-title {{
+          color: #0f172a !important;
+          font-size: 0.92rem !important;
+          font-weight: 700 !important;
+          margin: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-view-link {{
+          color: #2563eb !important;
+          font-size: 0.78rem !important;
+          font-weight: 600 !important;
+        }}
+
+        /* Activity rows */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-act-title {{
+          color: #0f172a !important;
+          font-size: 0.8rem !important;
+          font-weight: 600 !important;
+          margin: 0 !important;
+          line-height: 1.3 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-act-desc {{
+          color: #94a3b8 !important;
+          font-size: 0.72rem !important;
+          font-weight: 400 !important;
+          margin: 0.12rem 0 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-act-time {{
+          color: #94a3b8 !important;
+          font-size: 0.72rem !important;
+          font-weight: 400 !important;
+        }}
+
+        /* Deadline rows */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-deadline-title {{
+          color: #0f172a !important;
+          font-size: 0.8rem !important;
+          font-weight: 600 !important;
+          margin: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-deadline-date {{
+          color: #94a3b8 !important;
+          font-size: 0.72rem !important;
+          font-weight: 400 !important;
+          margin: 0.1rem 0 0 !important;
+        }}
+
+        /* Aging rows */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-aging-row {{
+          color: #334155 !important;
+          font-size: 0.78rem !important;
+          font-weight: 500 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-aging-amt {{
+          color: #0f172a !important;
+          font-weight: 600 !important;
+        }}
+
+        /* Pills */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-pill-red {{
+          background: #fee2e2 !important;
+          color: #b91c1c !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-pill-orange {{
+          background: #ffedd5 !important;
+          color: #c2410c !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-pill-blue {{
+          background: #dbeafe !important;
+          color: #1d4ed8 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-pill-green {{
+          background: #dcfce7 !important;
+          color: #166534 !important;
+        }}
+
+        /* Chart legend & date pill */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-chart-legend,
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-chart-legend span {{
+          color: #64748b !important;
+          font-size: 0.72rem !important;
+          font-weight: 500 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-date-pill {{
+          color: #334155 !important;
+          font-size: 0.8rem !important;
+          font-weight: 600 !important;
+        }}
+
+        /* Donut legend text */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-donut-legend,
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-donut-legend span {{
+          color: #334155 !important;
+          font-size: 0.75rem !important;
+          font-weight: 400 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-donut-legend strong {{
+          color: #0f172a !important;
+          font-weight: 700 !important;
+        }}
+
+        /* Jobs table */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-jobs-table th {{
+          color: #94a3b8 !important;
+          font-weight: 600 !important;
+          font-size: 0.68rem !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-jobs-table td {{
+          color: #334155 !important;
+          font-size: 0.74rem !important;
+          font-weight: 400 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-progress-wrap > span {{
+          color: #64748b !important;
+          font-size: 0.68rem !important;
+          font-weight: 600 !important;
+        }}
+
+        /* Alert chips */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-alert-chip.warn {{
+          color: #c2410c !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-alert-chip.info {{
+          color: #1d4ed8 !important;
+        }}
+
+        /* Sidebar text overrides */
+        .stApp:has(.{c}) .ips-coastal-sidebar-title {{
+          color: #0f172a !important;
+          font-size: 0.95rem !important;
+          font-weight: 800 !important;
+        }}
+        .stApp:has(.{c}) .ips-coastal-sidebar-sub {{
+          color: #64748b !important;
+          font-size: 0.62rem !important;
+          font-weight: 700 !important;
+        }}
+        .stApp:has(.{c}) .ips-coastal-profile-name {{
+          color: #0f172a !important;
+          font-weight: 700 !important;
+          margin: 0 !important;
+        }}
+        .stApp:has(.{c}) .ips-coastal-profile-role {{
+          color: #64748b !important;
+          font-size: 0.75rem !important;
+          font-weight: 400 !important;
+          margin: 0 !important;
+        }}
+        .stApp:has(.{c}) .ips-coastal-collapse-hint {{
+          color: #94a3b8 !important;
+          font-size: 0.72rem !important;
+          font-weight: 400 !important;
+        }}
+
+        /* Quick-action button text */
+        section[data-testid="stMain"]:has(.{c}) .ips-qa-grid div.stButton > button p {{
+          color: #334155 !important;
+          font-size: 0.72rem !important;
+          font-weight: 600 !important;
+        }}
+
+        /* ── Additional polish ── */
+
+        /* KPI card background must stay white even when stVerticalBlock is #f8fafc */
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-kpi {{
+          background: #ffffff !important;
+        }}
+
+        /* Ensure chart area backgrounds stay white */
+        section[data-testid="stMain"]:has(.{c}) .stPlotlyChart,
+        section[data-testid="stMain"]:has(.{c}) .stPyplotChart {{
+          background: transparent !important;
         }}
 
         @media (max-width: 1100px) {{

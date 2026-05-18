@@ -309,7 +309,7 @@ section[data-testid="stSidebar"] > div,
   min-width: 13rem !important;
 }
 section[data-testid="stSidebar"] .block-container {
-  background: transparent !important;
+  background: #ffffff !important;
   padding-top: 0.25rem !important;
   padding-bottom: 0.3rem !important;
   padding-left: 0.4rem !important;
@@ -386,7 +386,7 @@ section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-s
   border-radius: 8px !important;
   line-height: 1.2 !important;
   box-sizing: border-box !important;
-  background: #F8FAFC !important;
+  background: #FFFFFF !important;
   border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
@@ -394,7 +394,7 @@ section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-s
 section[data-testid="stSidebar"] div.stButton > button:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
-  background: #F1F5F9 !important;
+  background: #F8FAFC !important;
   border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
@@ -413,12 +413,12 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.28rem 0.5rem !important;
   border-radius: 8px !important;
   box-sizing: border-box !important;
-  background: #F8FAFC !important;
+  background: #FFFFFF !important;
   border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
-  background: #F1F5F9 !important;
+  background: #F8FAFC !important;
   border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
@@ -446,7 +446,7 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
   border: 1px solid #E5EAF2 !important;
   border-radius: 6px !important;
-  background: #F8FAFC !important;
+  background: #FFFFFF !important;
   margin-top: 1px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -465,7 +465,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpa
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
   padding: 2px 6px 8px 6px !important;
-  background: transparent !important;
+  background: #ffffff !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-secondary"] {
@@ -474,14 +474,14 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   min-height: 2.1rem !important;
   padding: 0.26rem 0.45rem !important;
   border-radius: 8px !important;
-  background: #F8FAFC !important;
+  background: #FFFFFF !important;
   border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
   opacity: 1 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover:not(:disabled) {
-  background: #F1F5F9 !important;
+  background: #F8FAFC !important;
   border-color: #CBD5E1 !important;
   color: #111827 !important;
 }

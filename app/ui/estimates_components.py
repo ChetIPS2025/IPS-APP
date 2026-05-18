@@ -139,7 +139,7 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         .ips-est-thead-bar {
-            background: #f9fafb;
+            background: #ffffff;
             border-bottom: 1px solid #e5eaf2;
             padding: 0.5rem 0.75rem 0.4rem;
             margin: 0;
@@ -163,7 +163,7 @@ def inject_estimates_page_styles() -> None:
             grid-template-columns: 1fr 2fr 1.2fr 1fr 1fr 0.9fr 0.85fr 1fr 0.7fr;
             gap: 0.35rem;
             padding: 0.55rem 0.75rem 0.45rem;
-            background: #f9fafb;
+            background: #ffffff;
             border-bottom: 1px solid #e5eaf2;
         }
         .ips-est-th {
@@ -201,7 +201,7 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         div[data-testid="column"]:has(.ips-est-quote-anchor) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #2563eb !important;
@@ -215,13 +215,13 @@ def inject_estimates_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         div[data-testid="column"]:has(.ips-est-quote-anchor) .stButton > button:hover {
             text-decoration: underline !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
         /* Sort header buttons → look like labels */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         div[data-testid="column"]:has(.ips-est-sort-anchor) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #6b7280 !important;
@@ -236,7 +236,7 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         div[data-testid="column"]:has(.ips-est-act-anchor) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
             border-radius: 8px !important;
             min-height: 1.85rem !important;
@@ -437,11 +437,11 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page) .stTabs [data-baseweb="tab-list"] {
             gap: 0.25rem !important;
             border-bottom: 1px solid #e5eaf2 !important;
-            background: transparent !important;
+            background: #ffffff !important;
             padding: 0 0 0.15rem !important;
         }
         section[data-testid="stMain"]:has(.ips-estimates-page) .stTabs [data-baseweb="tab"] {
-            background: transparent !important;
+            background: #ffffff !important;
             color: #6b7280 !important;
             font-weight: 600 !important;
             font-size: 0.8125rem !important;
@@ -451,7 +451,7 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page) .stTabs [aria-selected="true"] {
             color: #2563eb !important;
             border-bottom: 2px solid #2563eb !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
 
         /* Header action buttons in header card */

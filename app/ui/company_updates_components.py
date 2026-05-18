@@ -215,7 +215,7 @@ def inject_company_updates_page_styles() -> None:
             color: #2563eb !important;
             border-bottom: 2px solid #2563eb !important;
             border-radius: 0 !important;
-            background: transparent !important;
+            background: #ffffff !important;
             border-top: none !important;
             border-left: none !important;
             border-right: none !important;
@@ -224,7 +224,7 @@ def inject_company_updates_page_styles() -> None:
         }}
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="column"]:has(.ips-cu-tab-cell) .stButton > button {{
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #6b7280 !important;
@@ -511,7 +511,7 @@ def inject_company_updates_page_styles() -> None:
         }}
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="column"]:has(.ips-cu-menu-col) .stButton > button {{
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #9ca3af !important;
@@ -522,7 +522,7 @@ def inject_company_updates_page_styles() -> None:
         }}
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="column"]:has(.ips-cu-kpi-link-btn) .stButton > button {{
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             color: #2563eb !important;
@@ -536,7 +536,7 @@ def inject_company_updates_page_styles() -> None:
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="column"]:has(.ips-cu-kpi-link-btn) .stButton > button:hover {{
             text-decoration: underline !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }}
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="column"]:has(.ips-cu-feed-item) {{
@@ -548,7 +548,7 @@ def inject_company_updates_page_styles() -> None:
         }}
         section[data-testid="stMain"]:has(.{p})
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-toolbar-row) {{
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
         }}

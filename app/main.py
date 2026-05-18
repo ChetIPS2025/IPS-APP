@@ -39,10 +39,18 @@ from ui import role_can_open_page
 from branding import apply_branding, render_header
 
 try:
-    from app.ui.theme import apply_global_app_styles, apply_global_css
+    from app.ui.theme import (
+        apply_global_app_styles,
+        apply_global_css,
+        inject_force_white_final_override,
+    )
     from app.ui.components.topbar import render_top_bar
 except ImportError:
-    from ui.theme import apply_global_app_styles, apply_global_css  # type: ignore
+    from ui.theme import (  # type: ignore
+        apply_global_app_styles,
+        apply_global_css,
+        inject_force_white_final_override,
+    )
     from ui.components.topbar import render_top_bar  # type: ignore
 try:
     from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
@@ -310,6 +318,7 @@ def main() -> None:
     with perf_span(f"main.page_render:{page}"):
         try:
             render_fn()
+            inject_force_white_final_override()
         except Exception as exc:
             show_page_error(exc, context=f"page:{page}")
 

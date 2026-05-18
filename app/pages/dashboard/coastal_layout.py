@@ -22,6 +22,10 @@ from .coastal_theme import COASTAL_MARKER, inject_coastal_theme
 from .services import DashboardContext, DashboardTables
 from .utils import STATE_DATE_END, STATE_DATE_START, is_open_job, recent_rows
 
+# Right-column weight kept constant across all rows so the sidebar lines up.
+_MAIN_WEIGHT = 3.40
+_SIDE_WEIGHT = 1.05
+
 try:
     from app.services.job_service import job_number_display
     from app.ui import IPS_NAV_PENDING_KEY, role_can_open_page
@@ -35,9 +39,10 @@ except ImportError:
     from ui.components.empty_states import render_empty_state  # type: ignore
 
 try:
-    from .coastal_sidebar import inject_coastal_sidebar_footer
+    from .coastal_sidebar import inject_coastal_sidebar_footer, inject_coastal_sidebar_header
 except ImportError:
     inject_coastal_sidebar_footer = None  # type: ignore
+    inject_coastal_sidebar_header = None  # type: ignore
 
 
 def _nav(page: str) -> None:
@@ -148,29 +153,32 @@ def _card_header(title: str, *, view_key: str | None = None, page: str | None = 
 def render_coastal_header() -> tuple[date, date]:
     st.markdown(f'<div class="{COASTAL_MARKER} ips-dashboard-page" aria-hidden="true"></div>', unsafe_allow_html=True)
     inject_coastal_theme()
+    if inject_coastal_sidebar_header:
+        inject_coastal_sidebar_header()
     if inject_coastal_sidebar_footer:
         inject_coastal_sidebar_footer()
     start, end = _date_range()
-    left, right = st.columns([1.55, 1], gap="medium")
+    left, right = st.columns([1.8, 1], gap="medium")
     with left:
-        st.markdown('<p class="ips-coastal-dash-title">Dashboard</p>', unsafe_allow_html=True)
         st.markdown(
+            f'<p class="ips-coastal-dash-title">Dashboard</p>'
             f'<p class="ips-coastal-dash-sub">Welcome back, <strong>{html.escape(_welcome_name())}</strong>!</p>',
             unsafe_allow_html=True,
         )
     with right:
         st.markdown('<div class="ips-coastal-controls">', unsafe_allow_html=True)
-        st.markdown(
-            f'<p class="ips-coastal-date-pill">📅 {html.escape(format_period_range(start, end))}</p>',
-            unsafe_allow_html=True,
-        )
-        c1, c2 = st.columns([1.25, 0.55], gap="small")
+        c1, c2, c3 = st.columns([1.6, 1.1, 0.75], gap="small")
         with c1:
+            st.markdown(
+                f'<p class="ips-coastal-date-pill">📅&nbsp;{html.escape(format_period_range(start, end))}</p>',
+                unsafe_allow_html=True,
+            )
+        with c2:
             dr = st.date_input("Range", value=(start, end), key="coastal_dash_dr", label_visibility="collapsed")
             if isinstance(dr, tuple) and len(dr) == 2:
                 st.session_state[STATE_DATE_START], st.session_state[STATE_DATE_END] = dr[0], dr[1]
                 start, end = dr[0], dr[1]
-        with c2:
+        with c3:
             if st.button("⚙ Customize", key="coastal_customize", use_container_width=True):
                 st.session_state["coastal_customize_open"] = not st.session_state.get("coastal_customize_open", False)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -273,13 +281,15 @@ def render_coastal_dashboard(ctx: DashboardContext, tables: DashboardTables) -> 
         )
         return
 
-    # Row 2: Sales overview | Sales by category | Recent activity
+    # ── Row 2: Sales overview | Sales by category | Recent activity ──
+    # Right column (_SIDE_WEIGHT) stays constant across all rows for a
+    # consistent vertical sidebar alignment.
     if show_sales and show_side:
-        r2a, r2b, r2c = st.columns([2.35, 1.05, 1.05], gap="medium")
+        r2a, r2b, r2c = st.columns([2.1, 1.3, _SIDE_WEIGHT], gap="medium")
         sales_cols = (r2a, r2b)
         activity_col = r2c
     elif show_sales:
-        r2a, r2b = st.columns([1.35, 1], gap="medium")
+        r2a, r2b = st.columns([1.6, 1.0], gap="medium")
         sales_cols = (r2a, r2b)
         activity_col = None
     elif show_side:
@@ -304,9 +314,10 @@ def render_coastal_dashboard(ctx: DashboardContext, tables: DashboardTables) -> 
                 _card_header("Recent Activity", view_key="coastal_all_act", page="PO / Expenses", ctx=ctx)
                 _activity(metrics.activity)
 
-    # Row 3: Job status | Aging | Deadlines
+    # ── Row 3: Job status | Aging Invoices | Upcoming Deadlines ──
+    # Right column matches row 2 for visual alignment.
     if show_sales and show_side:
-        r3a, r3b, r3c = st.columns(3, gap="medium")
+        r3a, r3b, r3c = st.columns([1.7, 1.7, _SIDE_WEIGHT], gap="medium")
         with r3a:
             with st.container(border=True):
                 st.markdown('<p class="ips-coastal-card-title">Job Status Overview</p>', unsafe_allow_html=True)
@@ -334,9 +345,10 @@ def render_coastal_dashboard(ctx: DashboardContext, tables: DashboardTables) -> 
             _card_header("Upcoming Deadlines", view_key="coastal_all_dl", page="Job Database", ctx=ctx)
             _deadlines(metrics.deadlines)
 
-    # Row 4: Recent jobs | Quick actions
+    # ── Row 4: Recent Jobs table | Quick Actions ──
+    # Right column matches rows 2–3 for consistent sidebar width.
     if show_side:
-        r4a, r4b = st.columns([2.45, 1], gap="medium")
+        r4a, r4b = st.columns([_MAIN_WEIGHT, _SIDE_WEIGHT], gap="medium")
     else:
         r4a, r4b = st.columns([1]), None
     with r4a:

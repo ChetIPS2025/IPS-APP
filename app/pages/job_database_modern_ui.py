@@ -28,7 +28,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v13"
+_CSS_KEY = "jdb_modern_v14"
 
 # ── Status pill colours ─────────────────────────────────────────────────────
 _PILL: dict[str, tuple[str, str]] = {
@@ -224,6 +224,28 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
     padding: 0 !important;
     overflow: hidden !important;
 }
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) > div {
+    padding: 0 !important;
+    gap: 0 !important;
+}
+/* Nested BorderWrappers inside table → flat rows (not cards) */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.jdb-tbl-host)) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.jdb-tbl-host)) > div {
+    padding: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    [data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+}
 
 /* ── HTML header row ─────────────────────────────── */
 .jdb-thead {
@@ -259,11 +281,18 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
 ═══════════════════════════════════════════════════ */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)) {
+    display: block !important;
+    width: 100% !important;
     background: #ffffff !important;
+    border: none !important;
     border-bottom: 1px solid #e5eaf2 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
     padding: 0 1rem !important;
     transition: background 0.12s ease !important;
     position: relative !important;
+    gap: 0 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)):last-child {
@@ -302,7 +331,17 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host))
     [data-testid="stElementContainer"] {
-    margin: 0 !important; padding: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host))
+    [data-testid="stElementContainer"]:empty {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row) .jdb-actcol,
@@ -341,25 +380,24 @@ div[data-testid="stVerticalBlock"]:has(.jdb-row-sel) .jdb-cell-num {
     font-weight: 800 !important;
 }
 
-/* ── Invisible full-row select hit target ──────────── */
+/* ── Invisible full-row select (rendered after columns; out of flow) ─ */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)) {
-    position: relative !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row)
     > div[data-testid="stElementContainer"]:has(.stButton) {
     position: absolute !important;
-    top: 0 !important; left: 0 !important; right: 5.75rem !important; bottom: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 5.75rem !important;
+    bottom: 0 !important;
     z-index: 1 !important;
-    height: auto !important;
-    min-height: 3rem !important;
+    height: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     pointer-events: auto !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row)
     > div[data-testid="stElementContainer"]:has(.stButton) .stButton {
     width: 100% !important;
     height: 100% !important;
@@ -367,7 +405,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     margin: 0 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row)
     > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button {
     width: 100% !important;
     height: 100% !important;
@@ -381,10 +419,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     margin: 0 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row)
     > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button:hover,
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row)
     > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button:focus {
     opacity: 0 !important;
     background: transparent !important;
@@ -406,7 +444,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     .jdb-actcol .stButton > button:hover {
-    background: #f1f5f9 !important; border-color: #cbd5e1 !important;
+    background: #F8FAFC !important; border-color: #E5EAF2 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     .jdb-actcol .stButton > button:disabled { opacity: 0.38 !important; }
@@ -549,8 +587,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
     [data-testid="stCaptionContainer"] p { color:#6b7280 !important; }
 
 /* hide helper markers */
-.jdb-tbl-host, .jdb-panel-host, .jdb-panel-outer, .jdb-row, .jdb-row-sel,
-.jdb-row-select-hit, .jdb-actcol, .jdb-ph-btns { display:none !important; }
+.jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
+.jdb-row, .jdb-row-sel, .jdb-actcol, .jdb-ph-btns { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -890,14 +928,11 @@ def render_job_row(
     sd   = _date_table(full_row.get("start_date"))
     ed   = _date_table(full_row.get("target_completion_date") or full_row.get("due_date"))
 
-    # Row marker + invisible select layer (whole row clickable except actions)
+    # Row marker (CSS targets parent stVerticalBlock for flat table row chrome)
     st.markdown(
         f'<span class="{"jdb-row-sel" if is_selected else "jdb-row"}"></span>',
         unsafe_allow_html=True,
     )
-    st.markdown('<span class="jdb-row-select-hit" aria-hidden="true"></span>', unsafe_allow_html=True)
-    if st.button("\u200b", key=f"jrow_sel_{jid}", use_container_width=True, help=f"Select {jnum}"):
-        on_select()
 
     # Columns: job# | name | customer | est# | supervisor | status | start | end | actions
     weights = [0.65, 2.0, 1.35, 0.75, 1.0, 0.85, 0.9, 0.9, 0.9]
@@ -974,6 +1009,10 @@ def render_job_row(
                          help="Delete job" if can_edit else "Admin/manager only"):
                 on_delete()
 
+    # Invisible row select — after columns so it does not create a gray bar above the row
+    if st.button("\u200b", key=f"jrow_sel_{jid}", use_container_width=True, help=f"Select {jnum}"):
+        on_select()
+
 
 # ── Main table ───────────────────────────────────────────────────────────────
 
@@ -1013,6 +1052,8 @@ def render_jobs_table(
             '</div>',
             unsafe_allow_html=True,
         )
+
+        st.markdown('<span class="jdb-tbody-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
 
         for _, row in df_display.iterrows():
             jid = str(row.get("id") or "").strip()

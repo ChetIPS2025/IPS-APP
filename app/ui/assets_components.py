@@ -114,7 +114,7 @@ def inject_assets_page_styles() -> None:
         /* Table header row — light gray band */
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-th-row) {
-            background: #f8fafc !important;
+            background: #ffffff !important;
             border-bottom: 1px solid #e5eaf2 !important;
             margin: 0 -0.35rem 0.15rem -0.35rem !important;
             padding: 0.2rem 0.35rem !important;
@@ -154,7 +154,7 @@ def inject_assets_page_styles() -> None:
             min-height: 1.35rem !important;
             height: auto !important;
             border: none !important;
-            background: transparent !important;
+            background: #ffffff !important;
             box-shadow: none !important;
             text-align: left !important;
             justify-content: flex-start !important;
@@ -251,7 +251,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-tabs-anchor) .stButton > button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
@@ -266,7 +266,7 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-tabs-anchor) .stButton > button[kind="primary"] {
             color: #2563eb !important;
             border-bottom: 2px solid #2563eb !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-tabs-anchor) .stButton > button p {
@@ -305,7 +305,7 @@ def inject_assets_page_styles() -> None:
             border-radius: 10px;
             overflow: hidden;
             border: 1px solid #e5eaf2;
-            background: #f8fafc;
+            background: #ffffff;
             min-height: 160px;
         }
         .ips-assets-img-empty {
@@ -395,7 +395,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-filter-anchor) input {
-            background: #f8fafc !important;
+            background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important;
             min-height: 2.1rem !important;
@@ -404,13 +404,13 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-filter-anchor)
         [data-baseweb="select"] > div {
-            background: #f8fafc !important;
+            background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important;
             min-height: 2.1rem !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-view-all-maint button {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             color: #2563eb !important;
             font-weight: 600 !important;
@@ -424,7 +424,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-table-head-row) {
-            background: #f8fafc !important;
+            background: #ffffff !important;
             border-bottom: 1px solid #e5eaf2 !important;
             margin: 0 -0.35rem 0.12rem -0.35rem !important;
             padding: 0.22rem 0.35rem !important;

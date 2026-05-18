@@ -301,7 +301,7 @@ def _inject_job_database_responsive_styles() -> None:
         }
         .stApp:has(.ips-job-db-page)
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.jdb-tbl-host)) {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
         }
@@ -400,7 +400,7 @@ def _inject_job_database_responsive_styles() -> None:
             border: 1px solid #cbd5e1;
             border-radius: 999px;
             color: #334155 !important;
-            background: #f8fafc;
+            background: #ffffff;
             font-size: 0.78rem;
             font-weight: 650;
             line-height: 1;
@@ -645,7 +645,8 @@ def _inject_job_database_responsive_styles() -> None:
             gap: 6px !important;
             padding: 6px !important;
             margin: 0 0 0.75rem 0 !important;
-            background: #d1d5db !important;
+            background: #ffffff !important;
+            border: 1px solid #E5EAF2 !important;
             border: none !important;
             border-bottom: none !important;
             border-radius: 10px !important;
@@ -702,7 +703,8 @@ def _inject_job_database_responsive_styles() -> None:
         }
         /* Job overview: estimate summary (grey tray + white inner card) */
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-estimate-summary-host) {
-            background: #d1d5db !important;
+            background: #ffffff !important;
+            border: 1px solid #E5EAF2 !important;
             border: 1px solid #c4c4cc !important;
             border-radius: 12px !important;
             padding: 0.65rem 0.75rem 0.75rem !important;
@@ -1048,7 +1050,7 @@ def _inject_job_detail_view_page_css() -> None:
             position: sticky;
             top: 0.5rem;
             z-index: 50;
-            background: linear-gradient(180deg, #f8fafc 92%, transparent);
+            background: #ffffff;
             padding-bottom: 0.35rem;
             margin-bottom: 0.25rem;
         }

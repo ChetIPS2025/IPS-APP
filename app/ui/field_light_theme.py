@@ -109,7 +109,7 @@ _FIELD_LIGHT_CSS = """
     gap: 6px !important;
   }
   section[data-testid="stMain"] [data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"] {
-    background: #e5e7eb !important;
+    background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
     border-radius: 6px !important;
     color: #111827 !important;
@@ -172,8 +172,8 @@ _FIELD_LIGHT_CSS = """
   section[data-testid="stMain"] .stButton > button[data-testid="baseButton-secondary"],
   section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"],
   button[kind="secondary"] {
-    background-color: #e5e7eb !important;
-    background: #e5e7eb !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
     color: #111827 !important;
     border: 1px solid #9ca3af !important;
     border-radius: 10px !important;
@@ -183,7 +183,7 @@ _FIELD_LIGHT_CSS = """
   section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
   section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover,
   button[kind="secondary"]:hover {
-    background: #d1d5db !important;
+    background: #F8FAFC !important;
     border-color: #6b7280 !important;
     color: #111827 !important;
   }

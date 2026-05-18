@@ -1,7 +1,7 @@
 """
 IPS application shell: one cohesive visual system for Streamlit main content.
 
-- Light gray canvas (#F8FAFC), white sidebar/cards, high-contrast text, 48px touch buttons
+- White canvas (#FFFFFF), white sidebar/cards, high-contrast text, 48px touch buttons
 - Intended to be injected once per session from ``main`` after :func:`branding.apply_branding`
 
 Does not replace page-specific markers (``ips-crud-toolbar-root``, ``ips-list-top-anchor``, etc.);
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v11"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v12"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -28,11 +28,11 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-sm: 0.45rem;
             --ips-space-md: 0.65rem;
             --ips-space-lg: 0.9rem;
-            --ips-bg-main: #F8FAFC;
+            --ips-bg-main: #FFFFFF;
             --ips-bg-secondary: #ffffff;
             --ips-bg-card: #ffffff;
             --ips-bg-sidebar: #ffffff;
-            --ips-bg-hover: #F1F5F9;
+            --ips-bg-hover: #F8FAFC;
 
             --ips-text: #0F172A;
             --ips-text-secondary: #334155;
@@ -258,12 +258,12 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
             color: #111827 !important;
             border: 1px solid #9ca3af !important;
-            background: #e5e7eb !important;
+            background: #ffffff !important;
             font-weight: 600 !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
-            background: #e5e7eb !important;
+            background: #F8FAFC !important;
             border-color: #9ca3af !important;
             color: #111827 !important;
         }

@@ -68,7 +68,7 @@ def inject_users_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
         div[data-testid="stHorizontalBlock"]:has(.ips-users-th-row) {
-            background: #f9fafb !important;
+            background: #ffffff !important;
             border-bottom: 1px solid #e5eaf2 !important;
             margin: 0 -0.35rem 0.15rem !important;
             padding: 0 0.35rem !important;
@@ -153,14 +153,14 @@ def inject_users_page_styles() -> None:
             min-height: 1.35rem !important;
             height: auto !important;
             border: none !important;
-            background: transparent !important;
+            background: #ffffff !important;
             box-shadow: none !important;
             text-align: left !important;
             justify-content: flex-start !important;
         }
         section[data-testid="stMain"]:has(.ips-users-page) .ips-users-link-btn button:hover {
             color: #1d4ed8 !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-users-page) .ips-users-action-btn button {
             min-height: 1.65rem !important;
@@ -381,7 +381,7 @@ def inject_users_page_styles() -> None:
             border-radius: 999px;
             font-size: 0.72rem;
             font-weight: 600;
-            background: #f1f5f9;
+            background: #ffffff;
             color: #475569;
             border: 1px solid #e2e8f0;
             margin: 0.1rem 0.25rem 0.1rem 0;
@@ -400,10 +400,10 @@ def inject_users_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-users-page) .stTabs [data-baseweb="tab-list"] {
             gap: 0.25rem !important;
             border-bottom: 1px solid #e5eaf2 !important;
-            background: transparent !important;
+            background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-users-page) .stTabs [data-baseweb="tab"] {
-            background: transparent !important;
+            background: #ffffff !important;
             color: #6b7280 !important;
             font-weight: 600 !important;
             font-size: 0.8rem !important;

@@ -82,7 +82,7 @@ _CSS = """
 
 /* App canvas: theme.apply_global_app_styles() */
 section[data-testid="stMain"] > div.block-container {
-    background: transparent !important;
+    background: #ffffff !important;
     padding-top: 0.75rem !important;
 }
 
@@ -179,7 +179,7 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-filter) {
 div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-testid="stWidgetLabel"] { display: none !important; }
 div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
 div[data-testid="stHorizontalBlock"]:has(span.tk-filter) input {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border: 1px solid #e5e7eb !important;
     border-radius: 7px !important;
     min-height: 1.85rem !important;
@@ -187,7 +187,7 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-filter) input {
     color: #374151 !important;
 }
 div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-baseweb="select"] > div {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border: 1px solid #e5e7eb !important;
     border-radius: 7px !important;
     min-height: 1.85rem !important;
@@ -195,7 +195,7 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-baseweb="select"]
     color: #374151 !important;
 }
 div[data-testid="stHorizontalBlock"]:has(span.tk-filter) button {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border: 1px solid #e5e7eb !important;
     color: #374151 !important;
     border-radius: 7px !important;
@@ -219,7 +219,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-tbl) {
 }
 /* Table header */
 div[data-testid="stHorizontalBlock"]:has(span.tk-th) {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border-bottom: 1px solid #e5e7eb !important;
     padding: 7px 18px !important;
 }
@@ -231,8 +231,8 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-tr) {
     align-items: center !important;
 }
 div[data-testid="stHorizontalBlock"]:has(span.tk-tr.r0) { background: #ffffff !important; }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tr.r1) { background: #f9fafb !important; }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tr):hover { background: #f0f7ff !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr.r1) { background: #ffffff !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr):hover { background: #F8FAFC !important; }
 div[data-testid="stHorizontalBlock"]:has(span.tk-tr.rs) {
     background: #eff6ff !important;
     border-left: 3px solid #2563eb !important;
@@ -267,7 +267,7 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-tr) button:hover {
 }
 /* Table footer */
 div[data-testid="stHorizontalBlock"]:has(span.tk-tf) {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border-top: 1px solid #e5e7eb !important;
     padding: 6px 18px !important;
     border-radius: 0 0 12px 12px !important;
@@ -351,7 +351,7 @@ div[data-testid="stHorizontalBlock"]:has(span.tk-da) button[data-testid="stBaseB
 
 /* Daily rows header */
 div[data-testid="stHorizontalBlock"]:has(span.tk-dh) {
-    background: #f9fafb !important;
+    background: #ffffff !important;
     border-radius: 7px 7px 0 0 !important;
     padding: 5px 8px !important;
     border-bottom: 1px solid #e5e7eb !important;

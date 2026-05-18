@@ -285,7 +285,7 @@ def inject_table_action_styles() -> None:
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:has(span.ips-est-approve-anchor:not(.ips-est-approve-done))
             .stButton > button:disabled {
-            background: #f1f5f9 !important;
+            background: #ffffff !important;
             border: 1px solid #cbd5e1 !important;
             color: #64748b !important;
             opacity: 1 !important;

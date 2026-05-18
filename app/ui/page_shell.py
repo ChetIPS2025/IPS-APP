@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v5"
+IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v7"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 try:
@@ -99,7 +99,7 @@ def inject_ips_dashboard_layout() -> None:
         /* Flat sections: no boxed chrome (quick actions, toolbars, filter strips) */
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-flat-section),
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-action-bar-anchor) {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
             border-radius: 0 !important;
@@ -111,9 +111,9 @@ def inject_ips_dashboard_layout() -> None:
         }
         /* List / filter panels: light separation, not heavy boxes */
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.ips-surface-card)) {
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
-            border-bottom: 1px solid rgba(15, 23, 42, 0.07) !important;
+            border-bottom: 1px solid #E5EAF2 !important;
             box-shadow: none !important;
             border-radius: 0 !important;
             margin-bottom: 0.32rem !important;
@@ -228,13 +228,13 @@ def inject_ips_dashboard_layout() -> None:
             position: sticky !important;
             top: 0 !important;
             z-index: 2 !important;
-            background: #f8fafc !important;
+            background: #ffffff !important;
             color: #111827 !important;
             font-size: 0.76rem !important;
             font-weight: 700 !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] tbody tr:hover td {
-            background: #f1f5f9 !important;
+            background: #F8FAFC !important;
         }
         section[data-testid="stMain"] [data-testid="stDataFrame"] [data-testid="stTable"] td {
             font-size: 0.8125rem !important;
