@@ -160,7 +160,20 @@ def _render_view_toggle(vm: str, *, can_add: bool) -> None:
 # Delete handler
 # ---------------------------------------------------------------------------
 
-def _handle_pending_delete(sel: list[str], *, can_edit: bool) -> None:
+def _handle_pending_delete(
+    actions: dict,
+    sel: list[str],
+    *,
+    can_edit: bool,
+) -> None:
+    """Execute the confirmed delete/deactivate pass.
+
+    Must only run when the action bar has emitted ``confirm_delete=True``
+    (two-step confirmation).  Running on every rerun while pending ids exist
+    would trigger immediate destructive deletes before the user confirms.
+    """
+    if not actions.get("confirm_delete"):
+        return
     pend = st.session_state.get(IPS_PENDING_DELETE) or {}
     if not (pend.get(TABLE_KEY_ASSET_MANAGER) and can_edit):
         return
@@ -212,7 +225,8 @@ def render() -> None:
     _init_state()
     render_assets_header()
 
-    can_edit = current_role() in {"admin", "manager"}
+    # pm mirrors the write permissions used in asset_detail.py and asset_database.py.
+    can_edit = current_role() in {"admin", "manager", "pm"}
 
     # ── Fetch data ───────────────────────────────────────────────────────
     assets = get_assets()
@@ -298,7 +312,10 @@ def render() -> None:
     # ── Table view ───────────────────────────────────────────────────────
     inject_table_action_styles()
 
-    from app.pages.assets.components import render_assets_table  # local import avoids top-level cycle
+    try:
+        from app.pages.assets.components import render_assets_table
+    except ImportError:
+        from pages.assets.components import render_assets_table  # type: ignore
 
     _, sel = render_assets_table(
         filtered,
@@ -333,8 +350,10 @@ def render() -> None:
         st.session_state["assets_edit_mode"] = True
         st.session_state["selected_asset_id"] = str(sel[0])
         st.session_state.pop("asset_return_to", None)
+        # Clear any open view dialog so it doesn't reappear after editing.
+        st.session_state.pop("assets_view_asset_id", None)
         clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
         st.session_state.pop("am_sel_editor", None)
         st.rerun()
 
-    _handle_pending_delete(sel, can_edit=can_edit)
+    _handle_pending_delete(actions, sel, can_edit=can_edit)

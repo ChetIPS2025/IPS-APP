@@ -325,15 +325,19 @@ def render_assets_filters(
         st.selectbox("Filter Type", ["All"] + ASSET_TYPES, key="assets_filter_type")
         st.selectbox("Filter Active", ["All", "Active Only", "Inactive Only"], key="assets_filter_active")
     else:
-        fc1, fc2, fc3, fc4 = st.columns([2, 1, 1, 1])
+        # Row 1: Search (wide) + Status + Active
+        fc1, fc2, fc3 = st.columns([3, 1, 1])
         fc1.text_input(
             "Search Assets",
             placeholder="Name, serial, manufacturer, model, status…",
             key="assets_search_query",
         )
         fc2.selectbox("Status", statuses, key="assets_filter_status")
-        fc3.selectbox("Category", categories, key="assets_filter_category")
-        fc4.selectbox("Active", ["All", "Active Only", "Inactive Only"], key="assets_filter_active")
+        fc3.selectbox("Active", ["All", "Active Only", "Inactive Only"], key="assets_filter_active")
+        # Row 2: Category + Type
+        fc4, fc5 = st.columns([1, 1])
+        fc4.selectbox("Category", categories, key="assets_filter_category")
+        fc5.selectbox("Type", ["All"] + ASSET_TYPES, key="assets_filter_type")
 
     return {
         "search": st.session_state.get("assets_search_query", ""),

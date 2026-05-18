@@ -144,7 +144,10 @@ def check_asset_dependencies(row_id: str) -> tuple[bool, bool]:
     recs = fetch_by_match_admin("assets", {"id": aid}, limit=1)
     asset = recs[0] if recs else {}
 
-    from app.pages.assets.utils import is_checkout_tool_flag  # local import avoids cycle
+    try:
+        from app.pages.assets.utils import is_checkout_tool_flag
+    except ImportError:
+        from pages.assets.utils import is_checkout_tool_flag  # type: ignore
     is_tool = is_checkout_tool_flag(asset.get("is_checkout_item"))
     stt = str(asset.get("status") or "").strip()
     holder = str(asset.get("current_holder_employee_id") or "").strip()

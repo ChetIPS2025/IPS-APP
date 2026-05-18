@@ -11,10 +11,10 @@ import pandas as pd
 import streamlit as st
 
 try:
-    from app.db import fetch_one, fetch_table, fetch_by_match_admin
+    from app.db import fetch_one, fetch_table
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
 except ImportError:
-    from db import fetch_one, fetch_table, fetch_by_match_admin  # type: ignore
+    from db import fetch_one, fetch_table  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
 
 

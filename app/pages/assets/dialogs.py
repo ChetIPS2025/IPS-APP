@@ -51,6 +51,8 @@ def _clear_edit_state() -> None:
     st.session_state["selected_asset_id"] = None
     st.session_state.pop("asset_form_data", None)
     st.session_state.pop("asset_return_to", None)
+    # Also clear view state so the view dialog doesn't re-open after editing.
+    st.session_state.pop("assets_view_asset_id", None)
 
 
 def _cv(asset: dict | None, field: str, default: str = "") -> str:
@@ -72,7 +74,10 @@ def _asset_form_fields(
 
     Returns a flat dict ready to pass to create_asset() / update_asset().
     """
-    from app.pages.assets.queries import build_job_options, build_job_label_by_id  # lazy import
+    try:
+        from app.pages.assets.queries import build_job_options, build_job_label_by_id
+    except ImportError:
+        from pages.assets.queries import build_job_options, build_job_label_by_id  # type: ignore
     job_options = build_job_options(jobs)
     job_label_by_id = build_job_label_by_id(jobs)
 
@@ -195,10 +200,26 @@ def _asset_form_fields(
 
 
 # ---------------------------------------------------------------------------
+# Dismiss callbacks (called when the user closes a dialog via the X button)
+# ---------------------------------------------------------------------------
+
+def _dismiss_create_dialog() -> None:
+    st.session_state.pop("assets_show_create_dialog", None)
+
+
+def _dismiss_edit_dialog() -> None:
+    _clear_edit_state()
+
+
+def _dismiss_view_dialog() -> None:
+    st.session_state.pop("assets_view_asset_id", None)
+
+
+# ---------------------------------------------------------------------------
 # Create dialog
 # ---------------------------------------------------------------------------
 
-@st.dialog("New Asset", width="large")
+@st.dialog("New Asset", width="large", on_dismiss=_dismiss_create_dialog)
 def show_create_asset_dialog(*, jobs: list[dict], can_edit: bool = True) -> None:
     """Full-page dialog for adding a new asset."""
     if not can_edit:
@@ -238,7 +259,7 @@ def show_create_asset_dialog(*, jobs: list[dict], can_edit: bool = True) -> None
 # Edit dialog
 # ---------------------------------------------------------------------------
 
-@st.dialog("Edit Asset", width="large")
+@st.dialog("Edit Asset", width="large", on_dismiss=_dismiss_edit_dialog)
 def show_edit_asset_dialog(
     asset_row: dict,
     *,
@@ -294,7 +315,7 @@ def show_edit_asset_dialog(
 # View dialog
 # ---------------------------------------------------------------------------
 
-@st.dialog("Asset Details", width="large")
+@st.dialog("Asset Details", width="large", on_dismiss=_dismiss_view_dialog)
 def show_view_asset_dialog(
     asset_row: dict,
     *,
