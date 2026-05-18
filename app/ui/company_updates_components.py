@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-IPS_CU_PAGE_STYLES_KEY = "ips_company_updates_page_styles_v1"
+IPS_CU_PAGE_STYLES_KEY = "ips_company_updates_page_styles_v2"
 PAGE_MARKER = "ips-company-updates-page"
 
 DISPLAY_TABS: tuple[str, ...] = (
@@ -57,6 +57,45 @@ def display_category(raw: str) -> str:
     return _CATEGORY_DISPLAY.get(c, c or "Announcements")
 
 
+def display_department(display_cat: str) -> str:
+    return {
+        "HR Updates": "HR Department",
+        "Safety Alerts": "Safety Department",
+        "Events": "Events Team",
+        "Announcements": "Corporate Communications",
+        "Project Updates": "Operations",
+    }.get(display_cat, "IPS Communications")
+
+
+# KPI icon SVGs (mockup: purple megaphone, green bell, orange calendar, blue doc)
+_KPI_SVG_UNREAD = (
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    '<path d="M12 3L4 8v5c0 4.4 3.6 8 8 8s8-3.6 8-8V8l-8-5z" stroke="#7c3aed" stroke-width="1.6"/>'
+    '<path d="M9 18c0 1.7 1.3 3 3 3s3-1.3 3-3" stroke="#7c3aed" stroke-width="1.6"/></svg>'
+)
+_KPI_SVG_PINNED = (
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    '<path d="M12 3a2 2 0 0 1 2 2v1h2v2h-2v9l3 2v1H7v-1l3-2V8H8V6h2V5a2 2 0 0 1 2-2z" stroke="#16a34a" stroke-width="1.5"/></svg>'
+)
+_KPI_SVG_EVENTS = (
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    '<rect x="4" y="5" width="16" height="15" rx="2" stroke="#ea580c" stroke-width="1.5"/>'
+    '<path d="M8 3v4M16 3v4M4 10h16" stroke="#ea580c" stroke-width="1.5"/></svg>'
+)
+_KPI_SVG_ALL = (
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    '<path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" stroke="#2563eb" stroke-width="1.5"/>'
+    '<path d="M14 2v6h6M9 13h6M9 17h4" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/></svg>'
+)
+
+KPI_SPECS: tuple[tuple[str, str, str, str], ...] = (
+    ("unread", "#ede9fe", _KPI_SVG_UNREAD, "Unread Updates"),
+    ("pinned", "#dcfce7", _KPI_SVG_PINNED, "Pinned Updates"),
+    ("events", "#ffedd5", _KPI_SVG_EVENTS, "Upcoming Events"),
+    ("all", "#dbeafe", _KPI_SVG_ALL, "All Updates"),
+)
+
+
 def inject_company_updates_page_styles() -> None:
     if st.session_state.get(IPS_CU_PAGE_STYLES_KEY):
         return
@@ -72,25 +111,14 @@ def inject_company_updates_page_styles() -> None:
         <style>
         section[data-testid="stMain"]:has(.{p}),
         section[data-testid="stMain"]:has(.{p}) [data-testid="stAppViewContainer"] {{
-            background: #f3f4f6 !important;
+            background: #f8f9fa !important;
         }}
         section[data-testid="stMain"]:has(.{p}) .block-container {{
             max-width: 1680px !important;
-            padding-top: 0.35rem !important;
+            padding-top: 0.5rem !important;
         }}
-
-        /* Header */
-        section[data-testid="stMain"]:has(.{p})
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-header-anchor) {{
-            background: #ffffff !important;
-            border: 1px solid #e5eaf2 !important;
-            border-radius: 14px !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-            margin-bottom: 0.65rem !important;
-        }}
-        section[data-testid="stMain"]:has(.{p})
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-header-anchor) > div {{
-            padding: 1rem 1.1rem !important;
+        section[data-testid="stMain"]:has(.{p}) .ips-cu-header-flat {{
+            margin-bottom: 1rem;
         }}
         .ips-cu-page-title {{
             margin: 0;
@@ -121,9 +149,9 @@ def inject_company_updates_page_styles() -> None:
         .ips-cu-kpi-card {{
             background: #ffffff;
             border: 1px solid #e5eaf2;
-            border-radius: 14px;
-            padding: 0.85rem 1rem 0.75rem;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            border-radius: 10px;
+            padding: 0.9rem 1rem 0.7rem;
+            box-shadow: none;
             height: 100%;
             box-sizing: border-box;
         }}
@@ -134,15 +162,15 @@ def inject_company_updates_page_styles() -> None:
             gap: 0.5rem;
         }}
         .ips-cu-kpi-icon {{
-            width: 2.35rem;
-            height: 2.35rem;
+            width: 2.5rem;
+            height: 2.5rem;
             border-radius: 999px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
             flex-shrink: 0;
         }}
+        .ips-cu-kpi-icon svg {{ display: block; }}
         .ips-cu-kpi-value {{
             font-size: 1.65rem;
             font-weight: 700;
@@ -171,8 +199,8 @@ def inject_company_updates_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-feed-panel) {{
             background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
-            border-radius: 14px !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
             margin-bottom: 0.65rem !important;
         }}
         section[data-testid="stMain"]:has(.{p})
@@ -213,20 +241,28 @@ def inject_company_updates_page_styles() -> None:
         }}
 
         /* Feed cards */
+        .ips-cu-feed-card-wrap {{
+            margin-bottom: 0.65rem;
+        }}
         .ips-cu-feed-card {{
             display: flex;
             gap: 0.85rem;
             align-items: flex-start;
             border: 1px solid #e5eaf2;
-            border-radius: 14px;
-            padding: 0.9rem 1rem;
-            margin-bottom: 0.55rem;
+            border-radius: 10px;
+            padding: 0.85rem 0.75rem 0.85rem 1rem;
             background: #ffffff;
-            transition: box-shadow 0.12s ease, border-color 0.12s ease;
+            transition: border-color 0.12s ease;
         }}
         .ips-cu-feed-card:hover {{
-            border-color: #cbd5e1;
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            border-color: #d1d5db;
+        }}
+        .ips-cu-feed-inner {{
+            display: flex;
+            gap: 0.85rem;
+            align-items: flex-start;
+            flex: 1;
+            min-width: 0;
         }}
         .ips-cu-feed-card.urgent {{
             border-left: 4px solid #ef4444;
@@ -257,14 +293,18 @@ def inject_company_updates_page_styles() -> None:
             line-height: 1.3;
         }}
         .ips-cu-pin-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
             font-size: 0.62rem;
             font-weight: 700;
-            letter-spacing: 0.05em;
-            color: #b45309;
-            background: #fef3c7;
-            border: 1px solid #fcd34d;
-            padding: 0.12rem 0.4rem;
+            letter-spacing: 0.04em;
+            color: #15803d;
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
+            padding: 0.15rem 0.45rem;
             border-radius: 4px;
+            margin-bottom: 0.35rem;
         }}
         .ips-cu-feed-preview {{
             margin: 0.2rem 0 0.45rem;
@@ -288,10 +328,21 @@ def inject_company_updates_page_styles() -> None:
             font-weight: 600;
             border: 1px solid transparent;
         }}
-        .ips-cu-feed-status {{
+        .ips-cu-feed-actions {{
             flex-shrink: 0;
-            text-align: right;
-            min-width: 4.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.65rem;
+            padding-top: 0.1rem;
+            min-width: 3.5rem;
+        }}
+        .ips-cu-menu-dots {{
+            color: #9ca3af;
+            font-size: 1.15rem;
+            line-height: 1;
+            letter-spacing: 0.05em;
+            user-select: none;
         }}
         .ips-cu-status-new {{
             display: inline-flex;
@@ -321,8 +372,8 @@ def inject_company_updates_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-sidebar-widget) {{
             background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
-            border-radius: 14px !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
             margin-bottom: 0.65rem !important;
         }}
         section[data-testid="stMain"]:has(.{p})
@@ -356,18 +407,22 @@ def inject_company_updates_page_styles() -> None:
         }}
         .ips-cu-event-row:last-child {{ border-bottom: none; }}
         .ips-cu-event-date {{
-            width: 2.5rem;
+            width: 2.65rem;
             text-align: center;
             flex-shrink: 0;
+            background: #faf5ff;
+            border: 1px solid #e9d5ff;
+            border-radius: 8px;
+            padding: 0.25rem 0.2rem;
         }}
         .ips-cu-event-date .mo {{
-            font-size: 0.62rem;
+            font-size: 0.58rem;
             font-weight: 700;
-            color: #2563eb;
+            color: #7c3aed;
             text-transform: uppercase;
         }}
         .ips-cu-event-date .dy {{
-            font-size: 1.05rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #111827;
             line-height: 1.1;
@@ -463,10 +518,56 @@ def inject_company_updates_page_styles() -> None:
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            color: #6b7280 !important;
-            font-size: 1.1rem !important;
+            color: #9ca3af !important;
+            font-size: 1.2rem !important;
             min-height: auto !important;
-            padding: 0 !important;
+            padding: 0.15rem 0.25rem !important;
+            letter-spacing: 0.08em !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-kpi-link-btn) .stButton > button {{
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #2563eb !important;
+            font-size: 0.8125rem !important;
+            font-weight: 600 !important;
+            min-height: auto !important;
+            padding: 0.35rem 0 0 !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-kpi-link-btn) .stButton > button:hover {{
+            text-decoration: underline !important;
+            background: transparent !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-feed-item) {{
+            align-items: flex-start !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-feed-menu-col) {{
+            margin-top: 0.15rem !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-toolbar-row) {{
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-cu-toolbar-row) > div {{
+            padding: 0 0 0.5rem 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-hdr-actions) .stButton > button[kind="secondary"],
+        section[data-testid="stMain"]:has(.{p})
+        div[data-testid="column"]:has(.ips-cu-hdr-actions) [data-testid="stPopover"] > button {{
+            background: #fff !important;
+            border: 1px solid #e5eaf2 !important;
+            color: #374151 !important;
+            font-weight: 600 !important;
         }}
         </style>
         """,
@@ -481,36 +582,36 @@ def page_marker() -> None:
     )
 
 
+
 def render_page_header_html() -> None:
     st.markdown(
         """
         <div>
           <p class="ips-cu-page-title">Company Updates</p>
           <p class="ips-cu-page-sub">Stay informed with the latest company news, announcements and important updates.</p>
-        </motion.div>
-        """.replace("</motion.div>", "</div>"),
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
 
+
 def kpi_stat_card_html(
     *,
-    icon: str,
+    icon_svg: str,
     icon_bg: str,
     value: int | str,
     label: str,
-    link_label: str,
 ) -> str:
     return (
-        f'<motion.div class="ips-cu-kpi-card">'
+        f'<div class="ips-cu-kpi-card">'
         f'<div class="ips-cu-kpi-top">'
         f'<div class="ips-cu-kpi-icon" style="background:{html.escape(icon_bg)};">'
-        f"{html.escape(icon)}</div></div>"
+        f"{icon_svg}</div></div>"
         f'<p class="ips-cu-kpi-value">{html.escape(str(value))}</p>'
         f'<p class="ips-cu-kpi-label">{html.escape(label)}</p>'
-        f'<span class="ips-cu-kpi-link">{html.escape(link_label)}</span>'
         f"</div>"
-    ).replace("<motion.", "<").replace("</motion.", "</")
+    )
 
 
 def _cat_pill_style(display_cat: str) -> tuple[str, str, str]:
@@ -548,19 +649,22 @@ def feed_card_html(
     bg, fg, border = _cat_pill_style(display_cat)
     av_bg, _ = _CATEGORY_ICON.get(display_cat, ("#e0e7ff", "#2563eb"))
     glyph = _avatar_glyph(display_cat)
-    pin = '<span class="ips-cu-pin-badge">PINNED</span>' if is_pinned else ""
+    pin_row = (
+        '<div class="ips-cu-pin-badge">&#128204; PINNED</div>' if is_pinned else ""
+    )
     status = (
-        '<div class="ips-cu-status-read"><span>✓</span> Read</motion.div>'
+        '<div class="ips-cu-status-read"><span>✓</span> Read</div>'
         if is_read
-        else '<motion.div class="ips-cu-status-new"><span class="dot"></span> New</div>'
-    ).replace("<motion.", "<").replace("</motion.", "</")
+        else '<div class="ips-cu-status-new"><span class="dot"></span> New</div>'
+    )
     urgent_cls = " urgent" if urgent else ""
     return (
         f'<div class="ips-cu-feed-card{urgent_cls}">'
-        f'<div class="ips-cu-feed-avatar" style="background:{html.escape(av_bg)};">{glyph}</motion.div>'
+        f"{pin_row}"
+        f'<div class="ips-cu-feed-inner">'
+        f'<div class="ips-cu-feed-avatar" style="background:{html.escape(av_bg)};">{glyph}</div>'
         f'<div class="ips-cu-feed-body">'
-        f'<div class="ips-cu-feed-title-row">'
-        f'<p class="ips-cu-feed-title">{html.escape(title)}</p>{pin}</div>'
+        f'<p class="ips-cu-feed-title">{html.escape(title)}</p>'
         f'<p class="ips-cu-feed-preview">{html.escape(preview)}</p>'
         f'<div class="ips-cu-feed-meta">'
         f'<span class="ips-cu-cat-pill" style="background:{bg};color:{fg};border-color:{border};">'
@@ -568,9 +672,10 @@ def feed_card_html(
         f"<span>{html.escape(date_label)}</span>"
         f"<span>· {html.escape(department)}</span>"
         f"</div></div>"
-        f'<div class="ips-cu-feed-status">{status}</div>'
-        f"</div>"
-    ).replace("<motion.div", "<div", 1)
+        f'<div class="ips-cu-feed-actions">{status}'
+        f'<span class="ips-cu-menu-dots" aria-hidden="true">&#8943;</span></div>'
+        f"</div></div>"
+    )
 
 
 def upcoming_events_widget_html(events: list[dict[str, str]]) -> str:
@@ -619,19 +724,19 @@ def recent_updates_widget_html(items: list[dict[str, str]]) -> str:
         rows += (
             f'<div class="ips-cu-recent-row">'
             f'<div class="ips-cu-recent-ico">📄</div>'
-            f"<motion.div>"
+            f"<div>"
             f'<p class="ips-cu-recent-title">{html.escape(it.get("title", "—"))}</p>'
             f'<p class="ips-cu-recent-date">{html.escape(it.get("date", ""))}</p>'
-            f"</motion.div></div>"
+            f"</div></div>"
         )
     if not rows:
         rows = '<p style="margin:0;font-size:0.78rem;color:#9ca3af;">No recent updates.</p>'
     return (
         f'<div class="ips-cu-widget-head">'
         f'<p class="ips-cu-widget-title">Recent Updates</p>'
-        f'<span class="ips-cu-widget-link">View All</span></motion.div>'
+        f'<span class="ips-cu-widget-link">View All</span></div>'
         f"{rows}"
-    ).replace("<motion.", "<").replace("</motion.", "</")
+    )
 
 
 def pagination_info_html(start: int, end: int, total: int) -> str:

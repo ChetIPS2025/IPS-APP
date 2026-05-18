@@ -13,9 +13,41 @@ import streamlit as st
 
 from auth import current_profile, current_role
 try:
-    from app.ui.page_shell import render_page_header
+    from app.ui.company_updates_components import (
+        DISPLAY_TABS,
+        KPI_SPECS,
+        TAB_TO_CATEGORIES,
+        display_category,
+        display_department,
+        feed_card_html,
+        inject_company_updates_page_styles,
+        kpi_stat_card_html,
+        page_marker,
+        pagination_info_html,
+        parse_event_date,
+        quick_links_widget_html,
+        recent_updates_widget_html,
+        render_page_header_html,
+        upcoming_events_widget_html,
+    )
 except ImportError:
-    from ui.page_shell import render_page_header  # type: ignore
+    from ui.company_updates_components import (  # type: ignore
+        DISPLAY_TABS,
+        KPI_SPECS,
+        TAB_TO_CATEGORIES,
+        display_category,
+        display_department,
+        feed_card_html,
+        inject_company_updates_page_styles,
+        kpi_stat_card_html,
+        page_marker,
+        pagination_info_html,
+        parse_event_date,
+        quick_links_widget_html,
+        recent_updates_widget_html,
+        render_page_header_html,
+        upcoming_events_widget_html,
+    )
 
 try:
     from app.data_cache import clear_session_table_cache, fetch_table_for_session
@@ -67,8 +99,8 @@ _CATEGORIES = (
 )
 _PRIORITIES = ("Normal", "Important", "Urgent")
 
-_STYLE_KEY = "ips_company_updates_styles_v5"
-_CU_CARD = "ips-cu-card"
+_PAGE_SIZE = 5
+_PRIORITY_RANK = {"Urgent": 0, "Important": 1, "Normal": 2}
 
 
 def _norm_role(role: str) -> str:
@@ -106,7 +138,8 @@ def _profile_label_map(session_key: str, *, use_admin: bool) -> dict[str, str]:
     return out
 
 
-def _load_updates(*, session_key: str, use_admin: bool) -> list[dict[str, Any]]:
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_load_updates(session_key: str, use_admin: bool) -> list[dict[str, Any]]:
     try:
         rows = list(
             fetch_table_for_session(
@@ -124,6 +157,88 @@ def _load_updates(*, session_key: str, use_admin: bool) -> list[dict[str, Any]]:
     rows = [r for r in rows if isinstance(r, dict) and str(r.get("id") or "").strip()]
     rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     return rows
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_read_ids(user_id: str) -> frozenset[str]:
+    return frozenset(_read_update_ids(user_id=user_id))
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_profile_labels(session_key: str, use_admin: bool) -> dict[str, str]:
+    return _profile_label_map(session_key, use_admin=use_admin)
+
+
+def _invalidate_cu_cache() -> None:
+    clear_session_table_cache()
+    _cached_load_updates.clear()
+    _cached_read_ids.clear()
+    _cached_profile_labels.clear()
+
+
+def _is_pinned(row: dict[str, Any]) -> bool:
+    pri = str(row.get("priority") or "Normal").strip()
+    return pri in ("Important", "Urgent")
+
+
+def _sort_updates(rows: list[dict[str, Any]], sort_mode: str) -> list[dict[str, Any]]:
+    mode = str(sort_mode or "Newest First").strip()
+    if mode == "Oldest First":
+        return sorted(rows, key=lambda r: str(r.get("created_at") or ""))
+    if mode == "Priority":
+        by_date = sorted(rows, key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        return sorted(
+            by_date,
+            key=lambda r: _PRIORITY_RANK.get(str(r.get("priority") or "Normal").strip(), 9),
+        )
+    return sorted(rows, key=lambda r: str(r.get("created_at") or ""), reverse=True)
+
+
+def _active_rows(
+    rows: list[dict[str, Any]], *, show_retired: bool
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if not show_retired:
+            if not bool(r.get("is_active", True)):
+                continue
+            if _is_expired(r):
+                continue
+        out.append(r)
+    return out
+
+
+def _build_upcoming_events(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    events: list[tuple[str, dict[str, Any]]] = []
+    now = datetime.now(timezone.utc)
+    for r in rows:
+        if str(r.get("category") or "").strip() != "Schedule":
+            continue
+        raw = r.get("expires_at") or r.get("created_at")
+        parsed = parse_event_date(raw)
+        if not parsed:
+            continue
+        month, day, iso = parsed
+        try:
+            dt = datetime.fromisoformat(iso + "T12:00:00").replace(tzinfo=timezone.utc)
+            if dt < now.replace(hour=0, minute=0, second=0, microsecond=0):
+                continue
+        except Exception:
+            pass
+        events.append(
+            (
+                iso,
+                {
+                    "month": month,
+                    "day": day,
+                    "title": str(r.get("title") or "—")[:56],
+                    "time": "All day",
+                    "location": "Company",
+                },
+            )
+        )
+    events.sort(key=lambda x: x[0])
+    return [ev for _, ev in events[:6]]
 
 
 def _read_update_ids(*, user_id: str) -> set[str]:
@@ -198,87 +313,6 @@ def _is_expired(row: dict[str, Any]) -> bool:
     return ex < datetime.now(timezone.utc)
 
 
-def _inject_page_styles() -> None:
-    if st.session_state.get(_STYLE_KEY):
-        return
-    st.session_state[_STYLE_KEY] = True
-    st.markdown(
-        f"""
-        <style>
-        .{_CU_CARD} {{
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 8px;
-          padding: 10px 12px;
-          margin-bottom: 8px;
-          background: var(--ips-cu-card-bg, #ffffff);
-          color: var(--ips-cu-card-fg, #0f172a);
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-          transition: box-shadow 0.12s ease, border-color 0.12s ease;
-        }}
-        .{_CU_CARD}:hover {{
-          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
-          border-color: rgba(15, 23, 42, 0.12);
-        }}
-        .{_CU_CARD}.ips-cu-card-urgent {{
-          border-left: 4px solid #ef4444;
-          background: linear-gradient(90deg, rgba(254, 226, 226, 0.35) 0%, var(--ips-cu-card-bg, #fff) 14%);
-        }}
-        .ips-cu-badge {{
-          display: inline-flex;
-          align-items: center;
-          font-size: 0.65rem;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          padding: 3px 8px;
-          border-radius: 6px;
-          margin-right: 6px;
-          margin-bottom: 4px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          white-space: nowrap;
-        }}
-        .ips-cu-badge-cat {{ background: #e0e7ff; color: #312e81; border-color: #a5b4fc; }}
-        .ips-cu-badge-pri-normal {{ background: #f1f5f9; color: #334155; }}
-        .ips-cu-badge-pri-important {{ background: #fef3c7; color: #92400e; border-color: #fcd34d; }}
-        .ips-cu-badge-pri-urgent {{ background: #fee2e2; color: #991b1b; border-color: #f87171; }}
-        .ips-cu-badge-read {{ background: #dcfce7; color: #14532d; border-color: #86efac; }}
-        .ips-cu-card-title {{
-          font-size: 1.08rem;
-          font-weight: 700;
-          margin: 0 0 8px 0;
-          line-height: 1.3;
-          color: var(--ips-cu-card-fg, #0f172a);
-        }}
-        .ips-cu-meta {{
-          font-size: 0.8rem;
-          color: #64748b;
-          margin: 0 0 10px 0;
-        }}
-        .ips-cu-preview {{
-          font-size: 0.92rem;
-          line-height: 1.5;
-          color: #334155;
-          margin: 0;
-        }}
-        .ips-cu-img {{
-          max-width: 100%;
-          max-height: 220px;
-          object-fit: cover;
-          border-radius: 8px;
-          margin-top: 10px;
-          border: 1px solid #e2e8f0;
-        }}
-        /* Compact company-updates action row */
-        section.main div[data-testid="column"] div.stButton > button p {{
-          white-space: nowrap !important;
-          font-size: 0.78rem !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def _attachment_display_url(raw: str | None) -> str:
     u = str(raw or "").strip()
     if not u:
@@ -306,19 +340,13 @@ def _preview_text(msg: str, max_len: int = 220) -> str:
     return t[: max(0, max_len - 1)] + "…"
 
 
-def _badge_pri_class(pri: str) -> str:
-    p = str(pri or "Normal").strip()
-    if p == "Important":
-        return "ips-cu-badge ips-cu-badge-pri-important"
-    if p == "Urgent":
-        return "ips-cu-badge ips-cu-badge-pri-urgent"
-    return "ips-cu-badge ips-cu-badge-pri-normal"
-
-
 def _clear_filter_keys() -> None:
     st.session_state["cu_sf_search_raw"] = ""
     st.session_state["cu_sf_category"] = "All"
     st.session_state["cu_sf_priority"] = "All"
+    st.session_state["cu_kpi_filter"] = "all"
+    st.session_state["cu_tab_active"] = "All Updates"
+    st.session_state["cu_page"] = 1
     if "cu_sf_show_retired" in st.session_state:
         st.session_state["cu_sf_show_retired"] = False
 
@@ -402,7 +430,7 @@ def _cu_post_dialog(*, me: str) -> None:
         payload["attachment_url"] = url_final
         try:
             insert_row_admin("company_updates", payload)
-            clear_session_table_cache()
+            _invalidate_cu_cache()
             st.session_state.pop("cu_open_post_dialog", None)
             st.success("Posted.")
             st.rerun()
@@ -483,7 +511,7 @@ def _company_update_admin_dialog(*, row: dict[str, Any], sel: str) -> None:
                 pl["expires_at"] = None
             try:
                 update_rows_admin("company_updates", pl, {"id": sel})
-                clear_session_table_cache()
+                _invalidate_cu_cache()
                 st.session_state.pop("cu_admin_modal_id", None)
                 st.success("Saved.")
                 st.rerun()
@@ -492,7 +520,7 @@ def _company_update_admin_dialog(*, row: dict[str, Any], sel: str) -> None:
         elif del_sub:
             try:
                 delete_rows_admin("company_updates", {"id": sel})
-                clear_session_table_cache()
+                _invalidate_cu_cache()
                 st.session_state.pop("cu_admin_modal_id", None)
                 st.success("Deleted.")
                 st.rerun()
@@ -503,47 +531,105 @@ def _company_update_admin_dialog(*, row: dict[str, Any], sel: str) -> None:
         st.rerun()
 
 
+
+def _render_cu_tab_bar(active: str) -> None:
+    st.markdown('<span class="ips-cu-tab-bar"></span>', unsafe_allow_html=True)
+    tab_cols = st.columns(len(DISPLAY_TABS), gap="small")
+    for col, tab in zip(tab_cols, DISPLAY_TABS):
+        cell_cls = "ips-cu-tab-active" if tab == active else "ips-cu-tab-cell"
+        with col:
+            st.markdown(f'<span class="{cell_cls}"></span>', unsafe_allow_html=True)
+            if st.button(tab, key=f"cu_tab_{tab}", use_container_width=True):
+                st.session_state["cu_tab_active"] = tab
+                st.session_state["cu_page"] = 1
+                st.rerun()
+
+
+def _render_cu_toolbar() -> None:
+    st.markdown('<span class="ips-cu-toolbar-row"></span>', unsafe_allow_html=True)
+    sort_c, search_c = st.columns([0.34, 0.66], gap="small")
+    with sort_c:
+        st.selectbox(
+            "Sort by",
+            ("Newest First", "Oldest First", "Priority"),
+            key="cu_sort",
+        )
+    with search_c:
+        st.text_input(
+            "Search updates",
+            key="cu_sf_search_raw",
+            placeholder="Search updates...",
+            label_visibility="collapsed",
+        )
+
+
+def _format_feed_date(raw: Any) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return "—"
+    try:
+        if "T" in s:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        else:
+            dt = datetime.fromisoformat(s[:10] + "T12:00:00")
+        return dt.strftime("%b %d, %Y")
+    except Exception:
+        return s[:10] if len(s) >= 10 else s
+
+
 def render() -> None:
     inject_field_light_theme()
-    _inject_page_styles()
+    inject_company_updates_page_styles()
+    page_marker()
+
     role = current_role()
     prof = current_profile()
     me = str(prof.get("id") or "").strip()
     sk = me or "anonymous"
     use_admin = _norm_role(role) in ("admin", "manager")
-
-    render_page_header(
-        "Company Updates",
-        "Announcements, safety notices, and schedule changes.",
-    )
+    can_manage = _can_manage_updates(role)
 
     st.session_state.setdefault("cu_sf_search_raw", "")
     st.session_state.setdefault("cu_sf_category", "All")
     st.session_state.setdefault("cu_sf_priority", "All")
     st.session_state.setdefault("cu_sf_show_retired", False)
-    st.session_state.setdefault("cu_feed_limit", 30)
+    st.session_state.setdefault("cu_tab_active", "All Updates")
+    st.session_state.setdefault("cu_sort", "Newest First")
+    st.session_state.setdefault("cu_page", 1)
+    st.session_state.setdefault("cu_kpi_filter", "all")
 
-    labels = _profile_label_map(sk, use_admin=use_admin)
-    rows_all = _load_updates(session_key=sk, use_admin=use_admin)
-    read_ids = _read_update_ids(user_id=me)
-    read_counts = _read_counts_by_update(use_admin=use_admin)
-    title_by_id = {str(r.get("id")): str(r.get("title") or "—") for r in rows_all if str(r.get("id") or "").strip()}
+    labels = _cached_profile_labels(sk, use_admin)
+    rows_all = _cached_load_updates(sk, use_admin)
+    read_ids = set(_cached_read_ids(me)) if me else set()
+
+    show_retired = bool(st.session_state.get("cu_sf_show_retired")) and can_manage
+    active_rows = _active_rows(rows_all, show_retired=show_retired)
+
+    unread_all = sum(
+        1 for r in active_rows if str(r.get("id") or "").strip() not in read_ids
+    )
+    pinned_all = sum(1 for r in active_rows if _is_pinned(r))
+    events_all = len(_build_upcoming_events(active_rows))
 
     cat_f = str(st.session_state.get("cu_sf_category") or "All")
     pri_f = str(st.session_state.get("cu_sf_priority") or "All")
-    show_retired = bool(st.session_state.get("cu_sf_show_retired")) and _can_manage_updates(role)
     q_low = str(st.session_state.get("cu_sf_search_raw") or "").strip().lower()
+    tab_active = str(st.session_state.get("cu_tab_active") or "All Updates")
+    kpi_filter = str(st.session_state.get("cu_kpi_filter") or "all")
+    tab_cats = TAB_TO_CATEGORIES.get(tab_active)
 
     filtered: list[dict[str, Any]] = []
-    for r in rows_all:
-        if not show_retired:
-            if not bool(r.get("is_active", True)):
-                continue
-            if _is_expired(r):
-                continue
+    for r in active_rows:
+        rid = str(r.get("id") or "").strip()
+        if tab_cats is not None and str(r.get("category") or "").strip() not in tab_cats:
+            continue
         if cat_f != "All" and str(r.get("category") or "").strip() != cat_f:
             continue
         if pri_f != "All" and str(r.get("priority") or "").strip() != pri_f:
+            continue
+        if kpi_filter == "unread" and rid in read_ids:
+            continue
+        if kpi_filter == "pinned" and not _is_pinned(r):
             continue
         if q_low:
             blob = (str(r.get("title") or "") + " " + str(r.get("message") or "")).lower()
@@ -551,14 +637,23 @@ def render() -> None:
                 continue
         filtered.append(r)
 
-    lim = int(st.session_state.get("cu_feed_limit") or 30)
-    filtered_visible = filtered[: max(10, lim)]
+    filtered = _sort_updates(filtered, str(st.session_state.get("cu_sort") or "Newest First"))
+
+    total = len(filtered)
+    page_size = _PAGE_SIZE
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(int(st.session_state.get("cu_page") or 1), total_pages))
+    st.session_state["cu_page"] = page
+    start_ix = (page - 1) * page_size
+    page_rows = filtered[start_ix : start_ix + page_size]
+    show_start = start_ix + 1 if total else 0
+    show_end = min(start_ix + page_size, total)
 
     modal_id = str(st.session_state.get("cu_admin_modal_id") or "").strip()
     view_id = str(st.session_state.get("cu_view_id") or "").strip()
-    post_open = bool(_can_manage_updates(role) and st.session_state.get("cu_open_post_dialog"))
+    post_open = bool(can_manage and st.session_state.get("cu_open_post_dialog"))
 
-    if modal_id and _can_manage_updates(role):
+    if modal_id and can_manage:
         by_id_all = {str(r.get("id")): r for r in rows_all if str(r.get("id") or "").strip()}
         if modal_id in by_id_all:
             _company_update_admin_dialog(row=dict(by_id_all[modal_id]), sel=modal_id)
@@ -569,222 +664,227 @@ def render() -> None:
     elif post_open:
         _cu_post_dialog(me=me)
 
-    left, right = st.columns([0.72, 0.28], gap="medium")
-
-    try:
-        from app.ui.page_shell import render_section_header
-    except ImportError:
-        from ui.page_shell import render_section_header  # type: ignore
-
-    with left:
-        render_section_header("Announcements", "Newest posts first — filter or search below.")
-        fc1, fc2, fc3, fc4, fc5 = st.columns([2.4, 1.05, 1.05, 0.95, 0.55], gap="small")
-        with fc1:
-            st.text_input(
-                "Search",
-                key="cu_sf_search_raw",
-                placeholder="Search title or message…",
-                label_visibility="collapsed",
-            )
-        with fc2:
-            st.selectbox("Category", ["All"] + list(_CATEGORIES), key="cu_sf_category", label_visibility="collapsed")
-        with fc3:
-            st.selectbox("Priority", ["All"] + list(_PRIORITIES), key="cu_sf_priority", label_visibility="collapsed")
-        with fc4:
-            if _can_manage_updates(role):
-                st.checkbox("Inactive", key="cu_sf_show_retired", help="Show retired / expired")
-            else:
-                st.caption("")
-        with fc5:
-            if st.button("Clear", key="cu_filters_clear", help="Reset filters"):
-                _clear_filter_keys()
-                st.session_state["cu_feed_limit"] = 30
-                st.rerun()
-
-        st.caption(f"{len(filtered)} matching · showing {len(filtered_visible)} newest")
-
-        if not filtered and not rows_all:
-            try:
-                from app.ui.components.empty_states import render_empty_state
-            except ImportError:
-                from ui.components.empty_states import render_empty_state  # type: ignore
-            if render_empty_state(
-                "No company updates yet",
-                "Post the first announcement for your team.",
-                icon="📢",
-                action_label="Post update",
-                action_key="cu_feed_empty_post",
+    st.markdown('<span class="ips-cu-header-flat"></span>', unsafe_allow_html=True)
+    hdr_l, hdr_r = st.columns([0.68, 0.32], gap="medium")
+    with hdr_l:
+        render_page_header_html()
+    with hdr_r:
+        st.markdown('<span class="ips-cu-hdr-actions"></span>', unsafe_allow_html=True)
+        act1, act2 = st.columns(2, gap="small")
+        with act1:
+            if can_manage and st.button(
+                "+ New Update", type="primary", use_container_width=True, key="cu_hdr_new"
             ):
-                st.session_state["cu_open_post"] = True
-                st.rerun()
-        elif not filtered:
-            try:
-                from app.ui.components.empty_states import render_empty_state
-            except ImportError:
-                from ui.components.empty_states import render_empty_state  # type: ignore
-            if render_empty_state(
-                "No updates match filters",
-                "Try clearing search or category filters.",
-                icon="🔍",
-                action_label="Clear filters",
-                action_key="cu_feed_empty_clear",
-            ):
-                _clear_filter_keys()
-                st.session_state["cu_feed_limit"] = 30
-                st.rerun()
-        else:
-            for r in filtered_visible:
-                uid = str(r.get("id") or "").strip()
-                if not uid:
-                    continue
-                title = str(r.get("title") or "—").strip()
-                body = str(r.get("message") or "")
-                cat = str(r.get("category") or "General").strip()
-                pri = str(r.get("priority") or "Normal").strip() or "Normal"
-                posted = str(r.get("posted_by") or "").strip()
-                by_lbl = labels.get(posted, "—")
-                created = str(r.get("created_at") or "")[:16].replace("T", " ")
-                att = _attachment_display_url(str(r.get("attachment_url") or "").strip() or None)
-                is_read = uid in read_ids
-                if use_admin:
-                    n_ack = int(read_counts.get(uid, 0))
-                    ack_line = f"{n_ack} acknowledged"
-                else:
-                    ack_line = "You acknowledged" if is_read else "Not read yet"
-                urgent = pri == "Urgent" or cat == "Urgent"
-                card_cls = f"{_CU_CARD} ips-cu-card-urgent" if urgent else _CU_CARD
-
-                read_badge_html = (
-                    '<span class="ips-cu-badge ips-cu-badge-read">Read</span>' if is_read else ""
-                )
-                cat_esc = html.escape(cat)
-                pri_esc = html.escape(pri)
-                title_esc = html.escape(title)
-                preview_esc = html.escape(_preview_text(body))
-                by_esc = html.escape(by_lbl)
-
-                st.markdown(
-                    f'<div class="{card_cls}">'
-                    f'<div><span class="ips-cu-badge ips-cu-badge-cat">{cat_esc}</span>'
-                    f'<span class="{_badge_pri_class(pri)}">{pri_esc}</span>{read_badge_html}</div>'
-                    f'<p class="ips-cu-card-title">{title_esc}</p>'
-                    f'<p class="ips-cu-meta">Posted by <strong>{by_esc}</strong> · {html.escape(created)} · {html.escape(ack_line)}</p>'
-                    f'<p class="ips-cu-preview">{preview_esc}</p>'
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                if att:
-                    low = att.lower()
-                    if low.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
-                        st.image(att, use_container_width=True)
-                    else:
-                        st.markdown(f"[Attachment]({html.escape(att)})", unsafe_allow_html=True)
-
-                b1, b2, b3 = st.columns([0.65, 0.65, 0.65], gap="small")
-                with b1:
-                    if st.button("View", key=f"cu_view_{uid}", help="Full message", use_container_width=True):
-                        st.session_state["cu_view_id"] = uid
-                        st.rerun()
-                with b2:
-                    if me and not is_read:
-                        if st.button("Ack", key=f"cu_ack1_{uid}", help="Mark read", use_container_width=True):
-                            try:
-                                insert_row("company_update_reads", {"update_id": uid, "user_id": me})
-                            except Exception:
-                                pass
-                            clear_session_table_cache()
-                            st.rerun()
-                with b3:
-                    if _can_manage_updates(role):
-                        if st.button("Edit", key=f"cu_edit_{uid}", use_container_width=True):
-                            st.session_state["cu_admin_modal_id"] = uid
-                            st.rerun()
-
-        if len(filtered) > len(filtered_visible):
-            if st.button("Load more", key="cu_load_more"):
-                st.session_state["cu_feed_limit"] = lim + 25
-                st.rerun()
-
-    with right:
-        st.markdown("##### At a glance")
-
-        # Quick stats
-        s1, s2 = st.columns(2)
-        with s1:
-            st.metric("In feed", len(filtered))
-        with s2:
-            unread_n = sum(1 for x in filtered if str(x.get("id") or "").strip() not in read_ids)
-            st.metric("Your unread", unread_n)
-        urgent_n = sum(
-            1
-            for x in filtered
-            if str(x.get("priority") or "") == "Urgent" or str(x.get("category") or "") == "Urgent"
-        )
-        st.caption(f"**Urgent in view:** {urgent_n}")
-
-        st.markdown("---")
-
-        # Acknowledge (compact)
-        st.markdown("###### Acknowledge")
-        if me and unread_n > 0:
-            unread_rows = [x for x in filtered if str(x.get("id") or "").strip() not in read_ids]
-            opts = [str(u.get("id")) for u in unread_rows if str(u.get("id") or "").strip()]
-
-            def _fmt_ack(i: str) -> str:
-                for u in unread_rows:
-                    if str(u.get("id")) == i:
-                        return str(u.get("title") or "—")[:56]
-                return i
-
-            st.multiselect(
-                "Unread",
-                options=opts,
-                format_func=_fmt_ack,
-                key="cu_ack_multi",
-            )
-            a1, a2 = st.columns(2)
-            with a1:
-                if st.button("Mark read", type="primary", key="cu_ack_sel", use_container_width=True):
-                    pick = list(st.session_state.get("cu_ack_multi") or [])
-                    for uid in pick:
-                        uid = str(uid or "").strip()
-                        if not uid:
-                            continue
-                        try:
-                            insert_row("company_update_reads", {"update_id": uid, "user_id": me})
-                        except Exception:
-                            pass
-                    clear_session_table_cache()
-                    st.success("Recorded.")
-                    st.rerun()
-            with a2:
-                if st.button("Mark all", key="cu_ack_all", use_container_width=True):
-                    for u in unread_rows:
-                        uid = str(u.get("id") or "").strip()
-                        if not uid:
-                            continue
-                        try:
-                            insert_row("company_update_reads", {"update_id": uid, "user_id": me})
-                        except Exception:
-                            pass
-                    clear_session_table_cache()
-                    st.success("All marked.")
-                    st.rerun()
-        else:
-            st.caption("You're caught up.")
-
-        recent = _recent_reads_for_user(user_id=me, title_by_id=title_by_id)
-        if recent:
-            st.caption("**Recent (you)**")
-            for rr in recent:
-                st.caption(f"· {rr['read_at']} — {rr['title']}")
-
-        st.markdown("---")
-
-        # Post update (admin) — modal
-        if _can_manage_updates(role):
-            if st.button("New update", type="primary", use_container_width=True, key="cu_btn_new_post"):
                 st.session_state["cu_open_post_dialog"] = True
                 st.rerun()
+            elif not can_manage:
+                st.empty()
+        with act2:
+            with st.popover("🔽 Filters", use_container_width=True):
+                st.selectbox("Category", ["All"] + list(_CATEGORIES), key="cu_sf_category")
+                st.selectbox("Priority", ["All"] + list(_PRIORITIES), key="cu_sf_priority")
+                if can_manage:
+                    st.checkbox("Show inactive / expired", key="cu_sf_show_retired")
+                if st.button("Clear filters", key="cu_pop_clear", use_container_width=True):
+                    _clear_filter_keys()
+                    st.rerun()
 
-            st.caption("Use **Edit** on a card to change or retire posts.")
+    st.markdown('<span class="ips-cu-kpi-row"></span>', unsafe_allow_html=True)
+    kpi_vals = {
+        "unread": unread_all,
+        "pinned": pinned_all,
+        "events": events_all,
+        "all": len(active_rows),
+    }
+    kpi_links = {
+        "unread": "View all",
+        "pinned": "View all",
+        "events": "View calendar",
+        "all": "View all",
+    }
+    kcols = st.columns(4, gap="small")
+    for col, (kpi_key, icon_bg, icon_svg, label) in zip(kcols, KPI_SPECS):
+        with col:
+            st.markdown(
+                kpi_stat_card_html(
+                    icon_svg=icon_svg,
+                    icon_bg=icon_bg,
+                    value=kpi_vals.get(kpi_key, 0),
+                    label=label,
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown('<span class="ips-cu-kpi-link-btn"></span>', unsafe_allow_html=True)
+            link_lbl = kpi_links[kpi_key]
+            if st.button(link_lbl, key=f"cu_kpi_btn_{kpi_key}", use_container_width=True):
+                if kpi_key == "events":
+                    st.session_state["cu_tab_active"] = "Events"
+                    st.session_state["cu_kpi_filter"] = "all"
+                else:
+                    st.session_state["cu_kpi_filter"] = kpi_key
+                st.session_state["cu_page"] = 1
+                st.rerun()
+
+    main_l, main_r = st.columns([0.7, 0.3], gap="medium")
+
+    with main_l:
+        with st.container(border=True):
+            st.markdown('<span class="ips-cu-feed-panel"></span>', unsafe_allow_html=True)
+            tab_row_l, tab_row_r = st.columns([0.58, 0.42], gap="small")
+            with tab_row_l:
+                _render_cu_tab_bar(tab_active)
+            with tab_row_r:
+                _render_cu_toolbar()
+
+            if not filtered and not rows_all:
+                try:
+                    from app.ui.components.empty_states import render_empty_state
+                except ImportError:
+                    from ui.components.empty_states import render_empty_state  # type: ignore
+                if render_empty_state(
+                    "No company updates yet",
+                    "Post the first announcement for your team.",
+                    icon="📢",
+                    action_label="Post update",
+                    action_key="cu_feed_empty_post",
+                ):
+                    if can_manage:
+                        st.session_state["cu_open_post_dialog"] = True
+                        st.rerun()
+            elif not filtered:
+                try:
+                    from app.ui.components.empty_states import render_empty_state
+                except ImportError:
+                    from ui.components.empty_states import render_empty_state  # type: ignore
+                if render_empty_state(
+                    "No updates match filters",
+                    "Try clearing search or category filters.",
+                    icon="🔍",
+                    action_label="Clear filters",
+                    action_key="cu_feed_empty_clear",
+                ):
+                    _clear_filter_keys()
+                    st.rerun()
+            else:
+                for r in page_rows:
+                    uid = str(r.get("id") or "").strip()
+                    if not uid:
+                        continue
+                    title = str(r.get("title") or "—").strip()
+                    body = str(r.get("message") or "")
+                    raw_cat = str(r.get("category") or "General").strip()
+                    disp_cat = display_category(raw_cat)
+                    pri = str(r.get("priority") or "Normal").strip() or "Normal"
+                    created = _format_feed_date(r.get("created_at"))
+                    is_read = uid in read_ids
+                    urgent = pri == "Urgent" or raw_cat == "Urgent"
+                    dept = display_department(disp_cat)
+
+                    st.markdown('<span class="ips-cu-feed-item"></span>', unsafe_allow_html=True)
+                    card_row_l, card_row_r = st.columns([0.97, 0.03], gap="small")
+                    with card_row_l:
+                        st.markdown(
+                            feed_card_html(
+                                title=title,
+                                preview=_preview_text(body, 180),
+                                display_cat=disp_cat,
+                                date_label=created,
+                                department=dept,
+                                is_pinned=_is_pinned(r),
+                                is_read=is_read,
+                                urgent=urgent,
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        att = _attachment_display_url(str(r.get("attachment_url") or "").strip() or None)
+                        if att:
+                            low = att.lower()
+                            if low.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+                                st.image(att, use_container_width=True)
+                            else:
+                                st.markdown(f"[Attachment]({html.escape(att)})", unsafe_allow_html=True)
+                    with card_row_r:
+                        st.markdown('<span class="ips-cu-feed-menu-col"></span>', unsafe_allow_html=True)
+                        with st.popover("⋯", key=f"cu_pop_{uid}"):
+                            if st.button("View", key=f"cu_view_{uid}", use_container_width=True):
+                                st.session_state["cu_view_id"] = uid
+                                st.rerun()
+                            if me and not is_read and st.button(
+                                "Mark read", key=f"cu_ack_{uid}", use_container_width=True
+                            ):
+                                try:
+                                    insert_row(
+                                        "company_update_reads",
+                                        {"update_id": uid, "user_id": me},
+                                    )
+                                except Exception:
+                                    pass
+                                _invalidate_cu_cache()
+                                st.rerun()
+                            if can_manage and st.button(
+                                "Edit", key=f"cu_edit_{uid}", use_container_width=True
+                            ):
+                                st.session_state["cu_admin_modal_id"] = uid
+                                st.rerun()
+
+            st.markdown(
+                f'<div class="ips-cu-pagination">{pagination_info_html(show_start, show_end, total)}</div>',
+                unsafe_allow_html=True,
+            )
+            if total_pages > 1:
+                nav_l, nav_pages, nav_r = st.columns([0.12, 0.76, 0.12], gap="small")
+                with nav_l:
+                    st.markdown('<span class="ips-cu-page-btn"></span>', unsafe_allow_html=True)
+                    if st.button("‹", key="cu_page_prev", disabled=page <= 1, use_container_width=True):
+                        st.session_state["cu_page"] = page - 1
+                        st.rerun()
+                with nav_pages:
+                    pcols = st.columns(min(total_pages, 7), gap="small")
+                    window_start = max(1, min(page - 3, total_pages - 6))
+                    window_end = min(total_pages, window_start + 6)
+                    for i, pnum in enumerate(range(window_start, window_end + 1)):
+                        with pcols[i]:
+                            cls = "ips-cu-page-active" if pnum == page else "ips-cu-page-btn"
+                            st.markdown(f'<span class="{cls}"></span>', unsafe_allow_html=True)
+                            if st.button(str(pnum), key=f"cu_page_{pnum}", use_container_width=True):
+                                st.session_state["cu_page"] = pnum
+                                st.rerun()
+                with nav_r:
+                    st.markdown('<span class="ips-cu-page-btn"></span>', unsafe_allow_html=True)
+                    if st.button("›", key="cu_page_next", disabled=page >= total_pages, use_container_width=True):
+                        st.session_state["cu_page"] = page + 1
+                        st.rerun()
+
+    with main_r:
+        upcoming = _build_upcoming_events(active_rows)
+        with st.container(border=True):
+            st.markdown('<span class="ips-cu-sidebar-widget"></span>', unsafe_allow_html=True)
+            st.markdown(upcoming_events_widget_html(upcoming), unsafe_allow_html=True)
+            cal_l, cal_r = st.columns([0.7, 0.3])
+            with cal_r:
+                if st.button("View Calendar", key="cu_sidebar_cal", type="secondary"):
+                    st.session_state["cu_tab_active"] = "Events"
+                    st.session_state["cu_page"] = 1
+                    st.rerun()
+
+        with st.container(border=True):
+            st.markdown('<span class="ips-cu-sidebar-widget"></span>', unsafe_allow_html=True)
+            st.markdown(quick_links_widget_html(), unsafe_allow_html=True)
+
+        recent_items = [
+            {
+                "title": str(r.get("title") or "—")[:48],
+                "date": _format_feed_date(r.get("created_at")),
+            }
+            for r in active_rows[:5]
+        ]
+        with st.container(border=True):
+            st.markdown('<span class="ips-cu-sidebar-widget"></span>', unsafe_allow_html=True)
+            st.markdown(recent_updates_widget_html(recent_items), unsafe_allow_html=True)
+            va_l, va_r = st.columns([0.7, 0.3])
+            with va_r:
+                if st.button("View All", key="cu_sidebar_all", type="secondary"):
+                    st.session_state["cu_tab_active"] = "All Updates"
+                    st.session_state["cu_kpi_filter"] = "all"
+                    st.session_state["cu_page"] = 1
+                    st.rerun()
