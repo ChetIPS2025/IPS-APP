@@ -17,6 +17,7 @@ def render_data_table(
     session_select_key: str,
     col_fr: list[str] | None = None,
     cell_renderer: Callable[[str, dict[str, Any]], str] | None = None,
+    hide_select: bool = False,
 ) -> str | None:
     n = len(columns)
     if not col_fr:
@@ -48,10 +49,11 @@ def render_data_table(
             f'<{open_tag} class="ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>',
             unsafe_allow_html=True,
         )
-        st.markdown(f'<{open_tag} class="ips-row-select-btn">', unsafe_allow_html=True)
-        if st.button("Select", key=f"sel_{session_select_key}_{rid}", type="secondary"):
-            st.session_state[session_select_key] = rid
-        st.markdown(f"<{close_tag}>", unsafe_allow_html=True)
+        if not hide_select:
+            st.markdown(f'<{open_tag} class="ips-row-select-btn">', unsafe_allow_html=True)
+            if st.button("Select", key=f"sel_{session_select_key}_{rid}", type="secondary"):
+                st.session_state[session_select_key] = rid
+            st.markdown(f"<{close_tag}>", unsafe_allow_html=True)
     st.markdown(f"<{close_tag}><{close_tag}>", unsafe_allow_html=True)
     sel = st.session_state.get(session_select_key) or selected_id
     return str(sel) if sel else None

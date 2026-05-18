@@ -5,12 +5,36 @@ from __future__ import annotations
 import streamlit as st
 
 try:
-    from app.pages.modules import assets, dashboard, estimate_materials, estimates, inventory, jobs
+    from app.pages.modules import (
+        assets,
+        company_updates,
+        dashboard,
+        employee_certifications,
+        employee_documents,
+        employees,
+        estimate_materials,
+        estimates,
+        inventory,
+        jobs,
+        timekeeping,
+    )
     from app.pages.modules._session import clear_all_module_selections, nav_slug
     from app.utils.constants import SESSION_NAV_KEY
     from app.utils.permissions import role_can_access_page
 except ImportError:
-    from pages.modules import assets, dashboard, estimate_materials, estimates, inventory, jobs  # type: ignore
+    from pages.modules import (  # type: ignore
+        assets,
+        company_updates,
+        dashboard,
+        employee_certifications,
+        employee_documents,
+        employees,
+        estimate_materials,
+        estimates,
+        inventory,
+        jobs,
+        timekeeping,
+    )
     from pages.modules._session import clear_all_module_selections, nav_slug  # type: ignore
     from utils.constants import SESSION_NAV_KEY  # type: ignore
     from utils.permissions import role_can_access_page  # type: ignore
@@ -27,12 +51,14 @@ BUILT_MODULES: dict[str, object] = {
     "estimate_materials": estimate_materials.render,
     "inventory": inventory.render,
     "assets": assets.render,
+    "timekeeping": timekeeping.render,
+    "employees": employees.render,
+    "employee_certifications": employee_certifications.render,
+    "employee_documents": employee_documents.render,
+    "company_updates": company_updates.render,
 }
 
 COMING_SOON_LABELS: dict[str, str] = {
-    "timekeeping": "Timekeeping",
-    "employees": "Employees",
-    "company_updates": "Company Updates",
     "tasks": "Tasks",
     "documents": "Documents",
     "reports": "Reports",

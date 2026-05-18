@@ -453,3 +453,250 @@ def load_assets() -> list[dict[str, Any]]:
         out = [_normalize_asset(r) for r in rows if r]
         return [r for r in out if r.get("asset_number")]
     return list(_DEMO_ASSETS)
+
+
+ACTIVE_EMPLOYEE_KEY = "ips_active_employee_id"
+
+_DEMO_EMPLOYEES: list[dict[str, Any]] = [
+    {
+        "id": "emp-chance",
+        "name": "Chance Burgess",
+        "email": "chance.burgess@industrialplantsolution.com",
+        "role": "Field Employee",
+        "department": "Field Operations",
+        "status": "Active",
+        "last_login": "2025-05-18 08:12",
+        "phone": "(337) 555-0142",
+        "username": "cburgess",
+        "member_since": "2021-03-15",
+    },
+    {
+        "id": "emp-mark",
+        "name": "Mark Johnson",
+        "email": "mark.johnson@industrialplantsolution.com",
+        "role": "Supervisor",
+        "department": "Field Operations",
+        "status": "Active",
+        "last_login": "2025-05-18 07:45",
+        "phone": "(337) 555-0198",
+        "username": "mjohnson",
+        "member_since": "2019-06-01",
+    },
+    {
+        "id": "emp-leland",
+        "name": "Leland Daigle",
+        "email": "leland@industrialplantsolution.com",
+        "role": "Administrator",
+        "department": "Administration",
+        "status": "Active",
+        "last_login": "2025-05-18 09:01",
+        "phone": "(337) 555-0100",
+        "username": "ldaigle",
+        "member_since": "2015-01-10",
+    },
+    {
+        "id": "emp-sarah",
+        "name": "Sarah Chen",
+        "email": "sarah.chen@industrialplantsolution.com",
+        "role": "Project Manager",
+        "department": "Project Management",
+        "status": "Active",
+        "last_login": "2025-05-17 16:22",
+        "phone": "(337) 555-0165",
+        "username": "schen",
+        "member_since": "2020-08-20",
+    },
+    {
+        "id": "emp-inactive",
+        "name": "James Ortiz",
+        "email": "jortiz@industrialplantsolution.com",
+        "role": "Field Employee",
+        "department": "Field Operations",
+        "status": "Inactive",
+        "last_login": "2025-02-01 11:00",
+        "phone": "(337) 555-0133",
+        "username": "jortiz",
+        "member_since": "2018-11-05",
+    },
+]
+
+_DEMO_CERTIFICATIONS: list[dict[str, Any]] = [
+    {"id": "cert1", "employee_id": "emp-chance", "cert_type": "TWIC", "cert_number": "TWIC-88421", "issuer": "TSA", "issue_date": "2023-01-15", "expiration_date": "2028-01-14", "status": "Active", "notes": ""},
+    {"id": "cert2", "employee_id": "emp-chance", "cert_type": "OSHA 30", "cert_number": "OSHA-9921", "issuer": "OSHA", "issue_date": "2022-06-01", "expiration_date": "2025-06-15", "status": "Expiring Soon", "notes": "Renewal scheduled"},
+    {"id": "cert3", "employee_id": "emp-mark", "cert_type": "Forklift", "cert_number": "FL-4412", "issuer": "IPS Safety", "issue_date": "2021-03-10", "expiration_date": "2024-03-09", "status": "Expired", "notes": "Retest required"},
+    {"id": "cert4", "employee_id": "emp-leland", "cert_type": "First Aid / CPR", "cert_number": "FA-2201", "issuer": "Red Cross", "issue_date": "2024-01-20", "expiration_date": "2026-01-19", "status": "Active", "notes": ""},
+]
+
+_DEMO_EMPLOYEE_DOCUMENTS: list[dict[str, Any]] = [
+    {"id": "doc1", "employee_id": "emp-chance", "doc_type": "Driver's License", "upload_date": "2024-08-01", "uploaded_by": "HR Admin", "expiration_date": "2027-08-01", "is_restricted": False, "file_name": "license_chance.pdf"},
+    {"id": "doc2", "employee_id": "emp-chance", "doc_type": "OSHA Card", "upload_date": "2022-06-05", "uploaded_by": "HR Admin", "expiration_date": "2025-06-01", "is_restricted": False, "file_name": "osha_chance.pdf"},
+    {"id": "doc3", "employee_id": "emp-mark", "doc_type": "HR Document", "upload_date": "2023-02-10", "uploaded_by": "HR Admin", "expiration_date": "", "is_restricted": True, "file_name": "performance_review.pdf"},
+    {"id": "doc4", "employee_id": "emp-leland", "doc_type": "Employment Form", "upload_date": "2015-01-10", "uploaded_by": "HR Admin", "expiration_date": "", "is_restricted": True, "file_name": "i9_leland.pdf"},
+]
+
+_DEMO_COMPANY_UPDATES: list[dict[str, Any]] = [
+    {"id": "cu1", "category": "HR Updates", "title": "New Health Insurance Coverage Effective June 1", "body": "Updated medical plan options and enrollment deadlines.", "date": "2025-05-15", "pinned": True, "is_new": True},
+    {"id": "cu2", "category": "Safety Alerts", "title": "Heat Stress Prevention Reminder", "body": "Mandatory hydration breaks when heat index exceeds 90°F.", "date": "2025-05-14", "pinned": True, "is_new": True},
+    {"id": "cu3", "category": "Events", "title": "Company BBQ — May 20", "body": "Join us at the shop at 5 PM. Families welcome.", "date": "2025-05-12", "pinned": False, "is_new": False},
+    {"id": "cu4", "category": "Announcements", "title": "Q2 Safety Award Winners", "body": "Congratulations to the Field Operations crew.", "date": "2025-05-10", "pinned": False, "is_new": False},
+    {"id": "cu5", "category": "Project Updates", "title": "J26047 Milestone Complete", "body": "Rough-in inspection passed on schedule.", "date": "2025-05-08", "pinned": False, "is_new": False},
+]
+
+_DEMO_EVENTS: list[dict[str, Any]] = [
+    {"id": "ev1", "title": "Company BBQ", "date": "2025-05-20", "time": "5:00 PM", "location": "IPS Shop"},
+    {"id": "ev2", "title": "Safety Stand-down", "date": "2025-05-22", "time": "7:00 AM", "location": "Yard 1"},
+]
+
+
+def load_employees() -> list[dict[str, Any]]:
+    rows = _fetch_table("employees", order_by="name", limit=500)
+    if rows:
+        out = []
+        for r in rows:
+            eid = str(r.get("id") or "").strip()
+            out.append({
+                "id": eid,
+                "name": str(r.get("name") or r.get("full_name") or "—"),
+                "email": str(r.get("email") or "—"),
+                "role": str(r.get("role") or "Employee"),
+                "department": str(r.get("department") or "—"),
+                "status": str(r.get("status") or "Active"),
+                "last_login": str(r.get("last_login") or "—"),
+                "phone": str(r.get("phone") or "—"),
+                "username": str(r.get("username") or eid[:8]),
+                "member_since": str(r.get("created_at") or "")[:10],
+            })
+        if out:
+            return out
+    return list(_DEMO_EMPLOYEES)
+
+
+def get_employee(employee_id: str) -> dict[str, Any] | None:
+    eid = str(employee_id or "").strip()
+    for e in load_employees():
+        if str(e.get("id")) == eid:
+            return e
+    return None
+
+
+def load_certifications(employee_id: str) -> list[dict[str, Any]]:
+    eid = str(employee_id or "").strip()
+    rows = _fetch_table("certifications", limit=500)
+    if rows:
+        out = [r for r in rows if str(r.get("employee_id") or "") == eid]
+        if out:
+            return out
+    demo = [c for c in _DEMO_CERTIFICATIONS if c.get("employee_id") == eid]
+    return demo if demo else [c for c in _DEMO_CERTIFICATIONS if eid == "emp-chance"][:2]
+
+
+def load_employee_documents(employee_id: str, *, role: str = "admin") -> list[dict[str, Any]]:
+    eid = str(employee_id or "").strip()
+    rows = _fetch_table("employee_documents", limit=500)
+    out: list[dict[str, Any]] = []
+    if rows:
+        out = [r for r in rows if str(r.get("employee_id") or "") == eid]
+    if not out:
+        out = [d for d in _DEMO_EMPLOYEE_DOCUMENTS if d.get("employee_id") == eid]
+        if not out and eid:
+            out = [d for d in _DEMO_EMPLOYEE_DOCUMENTS if d.get("employee_id") == "emp-chance"]
+    if role != "admin":
+        out = [d for d in out if not bool(d.get("is_restricted"))]
+    return out
+
+
+def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any]]:
+    rows = _fetch_table("company_updates", limit=100)
+    if rows:
+        out = rows
+    else:
+        out = list(_DEMO_COMPANY_UPDATES)
+    if category and category != "All Updates":
+        out = [u for u in out if str(u.get("category") or "") == category]
+    return out
+
+
+def demo_update_metrics() -> dict[str, int]:
+    updates = load_company_updates()
+    return {
+        "unread": sum(1 for u in updates if u.get("is_new")),
+        "pinned": sum(1 for u in updates if u.get("pinned")),
+        "events": len(load_upcoming_events()),
+        "all": len(updates),
+    }
+
+
+def load_upcoming_events() -> list[dict[str, Any]]:
+    rows = _fetch_table("company_events", limit=50)
+    if rows:
+        return rows
+    return list(_DEMO_EVENTS)
+
+
+def load_all_certifications() -> list[dict[str, Any]]:
+    rows = _fetch_table("certifications", limit=500)
+    if rows:
+        out = []
+        for r in rows:
+            eid = str(r.get("employee_id") or "")
+            emp = get_employee(eid) or {}
+            out.append({**r, "employee_name": str(emp.get("name") or "—")})
+        if out:
+            return out
+    out = []
+    for c in _DEMO_CERTIFICATIONS:
+        emp = get_employee(str(c.get("employee_id") or "")) or {}
+        out.append({**c, "employee_name": str(emp.get("name") or "—")})
+    return out
+
+
+def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
+    expired = sum(1 for c in certs if str(c.get("status", "")).lower() == "expired")
+    expiring = sum(1 for c in certs if str(c.get("status", "")).lower() == "expiring soon")
+    return expired, expiring
+
+
+def job_options_for_timekeeping() -> list[str]:
+    jobs = load_jobs()
+    opts = ["— No job —"]
+    for j in jobs:
+        num = str(j.get("job_number") or "")
+        name = str(j.get("job_name") or "")
+        if num:
+            opts.append(f"{num} — {name}")
+    if len(opts) == 1:
+        opts.append("J26047 — Maintenance Shop Bathroom Remodel")
+    return opts
+
+
+def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
+    _ = week_start
+    rows = _fetch_table("timekeeping", limit=500)
+    if rows:
+        return rows
+    return [
+        {"id": "emp-chance", "name": "Chance Burgess", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 38.5, "ot_total": 4.0, "dt_total": 0.0, "status": "Pending"},
+        {"id": "emp-mark", "name": "Mark Johnson", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 2.5, "dt_total": 0.0, "status": "Approved"},
+        {"id": "emp-sarah", "name": "Sarah Chen", "department": "Project Management", "week_start": week_start.isoformat(), "st_total": 32.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
+        {"id": "emp-leland", "name": "Leland Daigle", "department": "Administration", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
+    ]
+
+
+def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
+    days = week_dates(week_start)
+    job_opts = job_options_for_timekeeping()
+    default_job = job_opts[1] if len(job_opts) > 1 else job_opts[0]
+    grid = []
+    for i, d in enumerate(days):
+        grid.append({
+            "day": d.strftime("%A"),
+            "date": d.isoformat(),
+            "job": default_job if i < 5 else "— No job —",
+            "st": 8.0 if i < 5 else 0.0,
+            "ot": 0.0 if i < 4 else (4.0 if i == 4 else 0.0),
+            "dt": 0.0,
+            "notes": "" if i != 0 else "Shop mobilization",
+        })
+    if employee_id == "emp-mark":
+        grid[4]["ot"] = 2.5
+    return grid

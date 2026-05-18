@@ -610,6 +610,102 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
 .ips-status-in-service {{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }}
 .ips-status-out-of-service {{ background:#fee2e2; color:#dc2626; border-color:#fecaca; }}
 .ips-status-scheduled {{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }}
+
+.ips-week-nav {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}}
+.ips-week-label {{
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: {TEXT};
+  min-width: 12rem;
+  text-align: center;
+}}
+.ips-time-detail-header {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-left: 3px solid {PRIMARY};
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin: 0.65rem 0;
+}}
+.ips-time-grid-table {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.65rem;
+}}
+.ips-update-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.5rem;
+}}
+.ips-update-card.pinned {{
+  border-left: 3px solid {PRIMARY};
+}}
+.ips-update-card-title {{
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: {TEXT};
+  margin: 0 0 0.25rem;
+}}
+.ips-update-card-meta {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  margin-top: 0.35rem;
+}}
+.ips-event-block {{
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+}}
+.ips-event-date {{
+  background: #eff6ff;
+  color: {PRIMARY};
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  min-width: 2.75rem;
+  line-height: 1.2;
+}}
+.ips-quick-link {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+  color: {TEXT};
+}}
+.ips-alert-banner {{
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #c2410c;
+  margin-bottom: 0.65rem;
+}}
+.ips-restricted-tag {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  margin-left: 0.35rem;
+}}
 </style>
 """,
         unsafe_allow_html=True,

@@ -108,7 +108,7 @@ FIELD_NAV_PAGES: list[tuple[str, str]] = [
     ("jobs", "My Jobs"),
     ("timekeeping", "Log Time"),
     ("assets", "Assets"),
-    ("employees", "Certifications"),
+    ("employee_certifications", "Certifications"),
 ]
 
 SESSION_NAV_KEY = "ips_nav_page"
