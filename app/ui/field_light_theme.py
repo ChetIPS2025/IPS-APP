@@ -6,15 +6,7 @@ import streamlit as st
 
 _FIELD_LIGHT_CSS = """
 <style>
-  .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-    background-color: #c5cad3 !important;
-  }
-  [data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] div[data-testid="stExpander"],
-  section[data-testid="stSidebar"],
-  [data-testid="stSidebar"] {
-    background-color: #cbd5e1 !important;
-    background: #cbd5e1 !important;
-  }
+  /* App/sidebar background: theme.apply_global_app_styles() */
   div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #ffffff !important;
     border: 1px solid #cbd5e1 !important;

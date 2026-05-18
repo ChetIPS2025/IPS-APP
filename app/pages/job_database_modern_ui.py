@@ -27,7 +27,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v9"
+_CSS_KEY = "jdb_modern_v10"
 
 # ── Status pill colours ─────────────────────────────────────────────────────
 _PILL: dict[str, tuple[str, str]] = {
@@ -92,6 +92,23 @@ def _date_panel(val: Any) -> str:
             return raw[:10] if len(raw) > 10 else raw
 
 
+def _merge_job_row(
+    full: dict[str, Any],
+    display: Any,
+    customer_name_by_id: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Overlay overview DataFrame fields onto the canonical jobs row."""
+    out = dict(full or {})
+    disp = display.to_dict() if hasattr(display, "to_dict") else dict(display or {})
+    for k, v in disp.items():
+        if v is not None and str(v).strip().lower() not in ("", "none", "nan"):
+            out[k] = v
+    cid = str(out.get("customer_id") or "").strip()
+    if customer_name_by_id and cid and not str(out.get("customer_name") or "").strip():
+        out["customer_name"] = customer_name_by_id.get(cid, "")
+    return out
+
+
 def _pill(status: Any, sm: bool = False) -> str:
     label = _v(status)
     fg, bg = _PILL.get(label.lower(), _PILL_DF)
@@ -113,13 +130,17 @@ def inject_modern_jobs_css() -> None:
     st.session_state[_CSS_KEY] = True
     st.markdown("""
 <style>
+section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
+    max-width: 1680px !important;
+}
+
 /* ═══════════════════════════════════════════════════
    TABLE CARD  (outer stVerticalBlockBorderWrapper)
 ═══════════════════════════════════════════════════ */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
     background: #ffffff !important;
     border: 1px solid #e5eaf2 !important;
-    border-radius: 12px !important;
+    border-radius: 14px !important;
     box-shadow: 0 1px 6px rgba(15,23,42,0.06) !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -255,18 +276,21 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 /* ═══════════════════════════════════════════════════
    DETAIL PANEL
 ═══════════════════════════════════════════════════ */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host) {
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host),
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer) {
     background: #ffffff !important;
     border: 1.5px solid #2563eb !important;
     border-radius: 14px !important;
     box-shadow: 0 4px 20px rgba(37,99,235,0.09) !important;
     padding: 1.35rem 1.5rem 1.1rem !important;
-    margin: 0.35rem 0 0.85rem !important;
+    margin: 0.65rem 0 0.85rem !important;
 }
 
 /* panel header typography */
-.jdb-ph-num   { font-size:1rem; font-weight:800; color:#111827; margin:0 0 0.1rem; }
-.jdb-ph-title { font-size:1.3rem; font-weight:800; color:#111827; margin:0 0 0.18rem; word-break:break-word; line-height:1.2; }
+.jdb-ph-headline {
+    font-size: 1.3rem; font-weight: 800; color: #111827; margin: 0 0 0.18rem;
+    word-break: break-word; line-height: 1.2;
+}
 .jdb-ph-cust  { font-size:.875rem; color:#6b7280; margin:0; }
 
 /* inline meta row (pill + supervisor + created + updated) */
@@ -279,18 +303,38 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host) {
 .jdb-ph-mval { color:#374151; font-weight:500; }
 
 /* panel header buttons */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
-    .jdb-ph-btns .stButton > button {
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host) .jdb-ph-btns .stButton > button,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer) .jdb-ph-btns .stButton > button {
     min-height: 2rem !important; height: 2rem !important;
     padding: 0 0.75rem !important; font-size: 0.8rem !important;
     font-weight: 600 !important; border-radius: 8px !important;
     line-height: 1 !important; white-space: nowrap !important;
 }
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
+    .jdb-ph-btns [data-testid="stButton"]:first-of-type button,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer)
+    .jdb-ph-btns [data-testid="stButton"]:first-of-type button {
+    background: #ffffff !important;
+    color: #2563eb !important;
+    border: 1.5px solid #2563eb !important;
+    box-shadow: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
+    .jdb-ph-btns [data-testid="stButton"]:nth-of-type(2) button,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer)
+    .jdb-ph-btns [data-testid="stButton"]:nth-of-type(2) button {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border: 1px solid #2563eb !important;
+}
 
 /* tabs */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host),
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer)
     [data-testid="stTabs"] [role="tablist"],
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
+    [data-testid="stTabs"] [data-baseweb="tab-list"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer)
     [data-testid="stTabs"] [data-baseweb="tab-list"] {
     background: transparent !important; padding: 0 !important;
     border-radius: 0 !important; box-shadow: none !important; gap: 0 !important;
@@ -366,7 +410,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
     [data-testid="stCaptionContainer"] p { color:#6b7280 !important; }
 
 /* hide helper markers */
-.jdb-tbl-host, .jdb-panel-host, .jdb-row, .jdb-row-sel,
+.jdb-tbl-host, .jdb-panel-host, .jdb-panel-outer, .jdb-row, .jdb-row-sel,
 .jdb-numcol,   .jdb-actcol,    .jdb-ph-btns { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -525,7 +569,10 @@ def render_job_detail_panel(
     on_collapse: Any,
 ) -> None:
     with st.container(border=True):
-        st.markdown('<span class="jdb-panel-host"></span>', unsafe_allow_html=True)
+        st.markdown(
+            '<span class="jdb-panel-host"></span><span class="jdb-panel-outer"></span>',
+            unsafe_allow_html=True,
+        )
 
         jid     = str(job_row.get("id") or "").strip()
         jnum    = _v(job_row.get("job_number") or job_row.get("job_id") or jid[:8])
@@ -541,8 +588,7 @@ def render_job_detail_panel(
 
         with col_info:
             st.markdown(
-                f'<div class="jdb-ph-num">{html.escape(jnum)}</div>'
-                f'<div class="jdb-ph-title">{html.escape(jname)}</div>'
+                f'<div class="jdb-ph-headline">{html.escape(jnum)} — {html.escape(jname)}</div>'
                 f'<div class="jdb-ph-cust">{html.escape(cust)}</div>',
                 unsafe_allow_html=True,
             )
@@ -572,7 +618,7 @@ def render_job_detail_panel(
             st.markdown('<span class="jdb-ph-btns"></span>', unsafe_allow_html=True)
             b1, b2, b3 = st.columns([1, 1.5, 0.6], gap="small")
             with b1:
-                if st.button("✏ Edit", key=f"jpan_edit_{jid}",
+                if st.button("✏ Edit", key=f"jpan_edit_{jid}", type="secondary",
                              use_container_width=True, disabled=not can_edit):
                     on_edit()
             with b2:
@@ -802,6 +848,7 @@ def render_jobs_table(
         str(j.get("id") or ""): j for j in jobs if j.get("id")
     }
     sel = str(st.session_state.get("selected_job_id") or "").strip()
+    panel_row: dict[str, Any] | None = None
 
     with st.container(border=True):
         # Marker on the outer card — used by CSS to scope all inner selectors
@@ -827,7 +874,7 @@ def render_jobs_table(
             jid = str(row.get("id") or "").strip()
             if not jid:
                 continue
-            full_row    = by_id.get(jid, dict(row))
+            full_row = _merge_job_row(by_id.get(jid, {}), row, customer_name_by_id)
             is_selected = jid == sel
 
             # ── Per-row container — REQUIRED for CSS :has() to work per row ──
@@ -861,27 +908,34 @@ def render_jobs_table(
                     on_select=_toggle, on_view=_open_view, on_delete=_del,
                 )
 
-            # Detail panel renders OUTSIDE the per-row container so it spans full width
             if is_selected:
-                def _pv(j=jid):
-                    st.session_state.update({"job_view_mode": "view", "selected_job_id": j})
-                    st.session_state.pop("job_mode", None)
-                    st.session_state.pop("job_edit_id", None)
-                    st.rerun()
+                panel_row = full_row
+    if sel and panel_row:
+        def _pv():
+            st.session_state.update({"job_view_mode": "view", "selected_job_id": sel})
+            st.session_state.pop("job_mode", None)
+            st.session_state.pop("job_edit_id", None)
+            st.rerun()
 
-                def _pe(j=jid):
-                    st.session_state.update({
-                        "job_view_mode": "edit", "selected_job_id": j,
-                        "job_mode": "edit",      "job_edit_id": j,
-                    })
-                    st.session_state.pop("job_number_manual_input", None)
-                    st.rerun()
+        def _pe():
+            st.session_state.update({
+                "job_view_mode": "edit",
+                "selected_job_id": sel,
+                "job_mode": "edit",
+                "job_edit_id": sel,
+            })
+            st.session_state.pop("job_number_manual_input", None)
+            st.rerun()
 
-                def _pc():
-                    st.session_state["selected_job_id"] = None
-                    st.rerun()
+        def _pc():
+            st.session_state["selected_job_id"] = None
+            st.rerun()
 
-                render_job_detail_panel(
-                    job_row=full_row, can_edit=can_edit, admin_read=admin_read,
-                    on_view=_pv, on_edit=_pe, on_collapse=_pc,
-                )
+        render_job_detail_panel(
+            job_row=panel_row,
+            can_edit=can_edit,
+            admin_read=admin_read,
+            on_view=_pv,
+            on_edit=_pe,
+            on_collapse=_pc,
+        )

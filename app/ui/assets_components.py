@@ -38,9 +38,6 @@ def inject_assets_page_styles() -> None:
     st.markdown(
         """
         <style>
-        section[data-testid="stMain"]:has(.ips-assets-page) {
-            background: #f4f6f9 !important;
-        }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-header-anchor),
         section[data-testid="stMain"]:has(.ips-assets-page)

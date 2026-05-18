@@ -297,12 +297,13 @@ def _inject_sidebar_nav_css() -> None:
     st.sidebar.markdown(
         """
 <style>
-/* --- Sidebar: slightly darker than main (#d1d5db), high-contrast ink --- */
+/* --- Sidebar: white panel (canvas from theme.apply_global_app_styles) --- */
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"] > div,
 [data-testid="stSidebar"] {
-  background-color: #b0bac7 !important;
-  background: #b0bac7 !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-right: 1px solid #E5EAF2 !important;
   color: #0f172a !important;
   max-width: 14rem !important;
   min-width: 13rem !important;
@@ -355,7 +356,7 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 6px !important;
   padding-top: 6px !important;
-  border-top: 1px solid #94a3b8 !important;
+  border-top: 1px solid #E5EAF2 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-expander-hint {
   color: #1e293b !important;
@@ -370,7 +371,7 @@ section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   margin: 16px 0 10px 0;
   padding: 0;
   border: none;
-  border-top: 1px solid #94a3b8 !important;
+  border-top: 1px solid #E5EAF2 !important;
   box-shadow: none !important;
   opacity: 1;
 }
@@ -385,16 +386,16 @@ section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-s
   border-radius: 8px !important;
   line-height: 1.2 !important;
   box-sizing: border-box !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #F8FAFC !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] div.stButton > button:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div.stButton > button p {
@@ -412,13 +413,13 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.28rem 0.5rem !important;
   border-radius: 8px !important;
   box-sizing: border-box !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #F8FAFC !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 /* Active page: blue highlight */
@@ -443,9 +444,9 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
 }
 /* TOOLS expander */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid #94a3b8 !important;
+  border: 1px solid #E5EAF2 !important;
   border-radius: 6px !important;
-  background: #d8dee8 !important;
+  background: #F8FAFC !important;
   margin-top: 1px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -473,15 +474,15 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   min-height: 2.1rem !important;
   padding: 0.26rem 0.45rem !important;
   border-radius: 8px !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #F8FAFC !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
   opacity: 1 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"],
@@ -718,10 +719,8 @@ def _render_sidebar_office(*, role: str) -> None:
                     '<p class="ips-nav-expander-hint">Quote catalog — proposals and pricing</p>',
                     unsafe_allow_html=True,
                 )
-                est_nav_active = nav_page in ("Estimates", "Estimate Materials")
                 if role_can_open_page(role, "Estimates"):
-                    cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
-                    active = est_nav_active
+                    active = nav_page == "Estimates"
                     if st.button(
                         "Estimates",
                         key=_nav_btn_key("Estimates__est_exp"),
@@ -729,28 +728,6 @@ def _render_sidebar_office(*, role: str) -> None:
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Estimates")
-                    _, est_sub = st.columns([0.08, 0.92])
-                    with est_sub:
-                        sub_list_active = nav_page == "Estimates" and str(
-                            st.session_state.get("estimates_view") or "list"
-                        ) == "list"
-                        if st.button(
-                            "All Estimates",
-                            key=_nav_btn_key("Estimates__all_est"),
-                            type="primary" if sub_list_active else "secondary",
-                            use_container_width=True,
-                        ):
-                            _set_sidebar_nav_page("Estimates")
-                            st.session_state["estimates_view"] = "list"
-                        if st.button(
-                            "Templates",
-                            key=_nav_btn_key("Estimates__templates"),
-                            type="secondary",
-                            use_container_width=True,
-                        ):
-                            _set_sidebar_nav_page("Estimates")
-                            st.session_state["estimates_view"] = "list"
-                            st.session_state["est_list_filter_templates"] = True
                 if role_can_open_page(role, "Estimate Materials"):
                     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
                     active = cur == "Estimate Materials"

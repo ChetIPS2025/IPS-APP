@@ -35,10 +35,6 @@ def inject_estimates_page_styles() -> None:
     st.markdown(
         """
         <style>
-        section[data-testid="stMain"]:has(.ips-estimates-page),
-        section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="stAppViewContainer"] {
-            background: #f3f4f6 !important;
-        }
         section[data-testid="stMain"]:has(.ips-estimates-page) .block-container {
             max-width: 1680px !important;
             padding-top: 0.35rem !important;
@@ -49,7 +45,7 @@ def inject_estimates_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-header-anchor) {
             background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
-            border-radius: 12px !important;
+            border-radius: 14px !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
             margin-bottom: 0.65rem !important;
         }
@@ -533,6 +529,7 @@ def summary_card_html(*, title: str, rows: list[tuple[str, str]], grand_row: tup
             f"<td class='v'>{html.escape(gv)}</td></tr>"
         )
 
+    body = "".join(body_parts)
     return (
         f'<div class="ips-est-summary-card">'
         f"<h4>{html.escape(title)}</h4>"

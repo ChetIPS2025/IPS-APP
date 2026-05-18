@@ -41,12 +41,6 @@ def inject_users_page_styles() -> None:
     st.markdown(
         """
         <style>
-        section[data-testid="stMain"]:has(.ips-users-page) {
-            background: #f4f6f9 !important;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stAppViewContainer"] {
-            background: #f4f6f9 !important;
-        }
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-header-anchor),
         section[data-testid="stMain"]:has(.ips-users-page)
@@ -55,7 +49,7 @@ def inject_users_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor) {
             background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
-            border-radius: 12px !important;
+            border-radius: 14px !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
             margin-bottom: 0.5rem !important;
         }

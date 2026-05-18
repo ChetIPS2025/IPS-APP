@@ -109,10 +109,6 @@ def inject_company_updates_page_styles() -> None:
     st.markdown(
         f"""
         <style>
-        section[data-testid="stMain"]:has(.{p}),
-        section[data-testid="stMain"]:has(.{p}) [data-testid="stAppViewContainer"] {{
-            background: #f8f9fa !important;
-        }}
         section[data-testid="stMain"]:has(.{p}) .block-container {{
             max-width: 1680px !important;
             padding-top: 0.5rem !important;

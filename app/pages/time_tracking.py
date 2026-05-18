@@ -80,9 +80,7 @@ _CSS = """
    Timekeeping  —  light professional theme
    ========================================================== */
 
-/* 1. Page background ---------------------------------------- */
-[data-testid="stAppViewContainer"] { background: #f3f4f6 !important; }
-[data-testid="stMain"]              { background: #f3f4f6 !important; }
+/* App canvas: theme.apply_global_app_styles() */
 section[data-testid="stMain"] > div.block-container {
     background: transparent !important;
     padding-top: 0.75rem !important;

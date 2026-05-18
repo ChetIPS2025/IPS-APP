@@ -47,9 +47,6 @@ def inject_estimate_detail_styles() -> None:
     st.markdown(
         """
         <style>
-        section[data-testid="stMain"]:has(.ips-estimate-detail-marker) {
-            background: #f4f6f9 !important;
-        }
         section[data-testid="stMain"]:has(.ips-estimate-detail-marker) .block-container {
             padding: 1.25rem 1.5rem 1.5rem !important;
             max-width: 1680px !important;

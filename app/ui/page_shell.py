@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v4"
+IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v5"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 try:
@@ -49,13 +49,7 @@ def inject_ips_dashboard_layout() -> None:
     st.markdown(
         """
         <style>
-        /* ----- App canvas: light industrial gray ----- */
-        .stApp, [data-testid="stAppViewContainer"] {
-            background-color: #d1d5db !important;
-        }
-        section[data-testid="stMain"] {
-            background: transparent !important;
-        }
+        /* App canvas background: see theme.apply_global_app_styles() */
         section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {
             padding-top: 0.08rem !important;
             padding-bottom: 0.7rem !important;
@@ -95,9 +89,9 @@ def inject_ips_dashboard_layout() -> None:
         /* ----- Surfaces: subtle cards (modern flat) ----- */
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
             background: #ffffff !important;
-            border: 1px solid rgba(15, 23, 42, 0.08) !important;
-            border-radius: 8px !important;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+            border: 1px solid #E5EAF2 !important;
+            border-radius: 14px !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
         }
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] > div {
             padding: 0.42rem 0.55rem 0.48rem !important;
@@ -134,9 +128,9 @@ def inject_ips_dashboard_layout() -> None:
         }
         section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-crud-toolbar-root) {
             background: #ffffff !important;
-            border: 1px solid rgba(15, 23, 42, 0.07) !important;
+            border: 1px solid #E5EAF2 !important;
             box-shadow: none !important;
-            border-radius: 8px !important;
+            border-radius: 14px !important;
             padding: 0.32rem 0.45rem 0.38rem !important;
             margin-bottom: 0.3rem !important;
         }
@@ -158,8 +152,8 @@ def inject_ips_dashboard_layout() -> None:
         section[data-testid="stMain"] div[data-testid="metric-container"],
         section[data-testid="stMain"] div[data-testid="stMetric"] {
             background: #ffffff !important;
-            border: 1px solid rgba(15, 23, 42, 0.08) !important;
-            border-radius: 8px !important;
+            border: 1px solid #E5EAF2 !important;
+            border-radius: 14px !important;
             padding: 0.34rem 0.46rem !important;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
         }

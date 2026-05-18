@@ -16,14 +16,7 @@ def inject_coastal_theme() -> None:
     st.markdown(
         f"""
         <style>
-        /* ---- App canvas ---- */
-        .stApp:has(.{c}),
-        .stApp:has(.{c}) [data-testid="stAppViewContainer"] {{
-          background: #f8fafc !important;
-        }}
-        section[data-testid="stMain"]:has(.{c}) {{
-          background: #f8fafc !important;
-        }}
+        /* App canvas: theme.apply_global_app_styles() */
         section[data-testid="stMain"]:has(.{c}) .block-container {{
           padding: 1.25rem 1.75rem 2rem !important;
           max-width: 100% !important;

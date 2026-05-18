@@ -1,7 +1,7 @@
 """
 IPS design system — tokens, density, and global CSS injection.
 
-Call :func:`apply_global_css` once per authenticated session from ``main``.
+Call :func:`apply_global_app_styles` once per authenticated session from ``main``.
 """
 
 from __future__ import annotations
@@ -9,21 +9,28 @@ from __future__ import annotations
 import streamlit as st
 
 IPS_THEME_CSS_KEY = "ips_theme_global_v1"
+IPS_GLOBAL_APP_STYLES_KEY = "ips_global_app_styles_v1"
 IPS_DENSITY_KEY = "ips_display_density"
 
 DENSITY_CHOICES = ("compact", "comfortable", "spacious")
 DEFAULT_DENSITY = "compact"
 
+# Global canvas tokens (single source of truth for app background)
+APP_BG = "#F8FAFC"
+SIDEBAR_BG = "#FFFFFF"
+CARD_BG = "#FFFFFF"
+BORDER_COLOR = "#E5EAF2"
+
 # Design tokens (industrial SaaS)
 COLORS = {
-    "bg_app": "#d1d5db",
-    "bg_surface": "#ffffff",
-    "bg_muted": "#f8fafc",
-    "border": "rgba(15, 23, 42, 0.08)",
-    "border_strong": "rgba(15, 23, 42, 0.14)",
-    "text": "#111827",
-    "text_secondary": "#4b5563",
-    "text_muted": "#6b7280",
+    "bg_app": APP_BG,
+    "bg_surface": CARD_BG,
+    "bg_muted": "#F9FBFD",
+    "border": BORDER_COLOR,
+    "border_strong": "#CBD5E1",
+    "text": "#0F172A",
+    "text_secondary": "#334155",
+    "text_muted": "#64748B",
     "primary": "#2563eb",
     "primary_hover": "#1d4ed8",
     "success": "#059669",
@@ -42,8 +49,65 @@ def set_density(value: str) -> None:
     st.session_state[IPS_DENSITY_KEY] = v if v in DENSITY_CHOICES else DEFAULT_DENSITY
 
 
+def apply_global_app_styles() -> None:
+    """Inject unified app canvas, sidebar, and base card chrome (once per session)."""
+    if st.session_state.get(IPS_GLOBAL_APP_STYLES_KEY):
+        return
+    st.session_state[IPS_GLOBAL_APP_STYLES_KEY] = True
+
+    st.markdown(
+        f"""
+        <style>
+        :root {{
+            --ips-bg-main: {APP_BG};
+            --ips-bg-sidebar: {SIDEBAR_BG};
+            --ips-bg-card: {CARD_BG};
+            --ips-border: {BORDER_COLOR};
+            --ips-text: {COLORS["text"]};
+            --ips-text-secondary: {COLORS["text_secondary"]};
+            --ips-text-muted: {COLORS["text_muted"]};
+        }}
+
+        body,
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stHeader"] {{
+            background-color: var(--ips-bg-main) !important;
+            background: var(--ips-bg-main) !important;
+        }}
+
+        section[data-testid="stMain"] {{
+            background: transparent !important;
+            color: var(--ips-text) !important;
+        }}
+
+        section[data-testid="stMain"] .block-container {{
+            padding-top: 0.35rem !important;
+            padding-bottom: 0.85rem !important;
+            max-width: 1680px !important;
+        }}
+
+        section[data-testid="stSidebar"],
+        section[data-testid="stSidebar"] > div,
+        [data-testid="stSidebar"] {{
+            background: var(--ips-bg-sidebar) !important;
+            background-color: var(--ips-bg-sidebar) !important;
+            border-right: 1px solid var(--ips-border) !important;
+            color: var(--ips-text) !important;
+        }}
+        section[data-testid="stSidebar"] .block-container {{
+            background: transparent !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def apply_global_css() -> None:
     """Inject IPS global theme (layout, tables, topbar, density, toasts)."""
+    apply_global_app_styles()
+
     density = get_density()
     st.markdown(
         f'<div class="ips-density-root ips-density-{density}" aria-hidden="true"></div>',
@@ -238,7 +302,7 @@ def apply_global_css() -> None:
             z-index: 50;
             margin: -0.35rem 0 0.45rem 0;
             padding: 0.35rem 0;
-            background: linear-gradient(180deg, #e5e7eb 0%, rgba(229,231,235,0.92) 70%, transparent 100%);
+            background: linear-gradient(180deg, {APP_BG} 0%, rgba(248,250,252,0.92) 70%, transparent 100%);
         }}
         .ips-topbar {{
             display: flex;
