@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import urllib.parse
 from typing import Any
 
@@ -22,6 +24,34 @@ _COOKIE_ACCESS = "ips_auth_at"
 _COOKIE_REFRESH = "ips_auth_rt"
 _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this device"
 
+_log = logging.getLogger(__name__)
+
+
+def _auth_debug_enabled() -> bool:
+    if os.getenv("IPS_AUTH_DEBUG", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    return str(getattr(settings, "log_level", "") or "").upper() == "DEBUG"
+
+
+def log_auth_state(reason: str) -> None:
+    """Temporary diagnostics: set ``IPS_AUTH_DEBUG=1`` or log level DEBUG."""
+    if not _auth_debug_enabled():
+        return
+    page = st.session_state.get("ips_nav_page") or st.session_state.get("page")
+    _log.debug(
+        "auth [%s] auth_checked=%s authenticated=%s is_authenticated=%s "
+        "auth_user_set=%s email=%r page=%r pending_persist=%s pending_clear=%s",
+        reason,
+        st.session_state.get("auth_checked"),
+        st.session_state.get("authenticated"),
+        st.session_state.get("is_authenticated"),
+        st.session_state.get("auth_user") is not None,
+        st.session_state.get("user_email"),
+        page,
+        "_ips_auth_persist_pending" in st.session_state,
+        bool(st.session_state.get("_ips_auth_clear_pending")),
+    )
+
 
 def init_session() -> None:
     """
@@ -34,6 +64,7 @@ def init_session() -> None:
         "auth_user": None,
         "auth_profile": None,
         "auth_checked": False,
+        "authenticated": False,
         "is_authenticated": False,
         "auth_session": None,
         # Back-compat aliases used throughout the app
@@ -44,8 +75,19 @@ def init_session() -> None:
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-    # Keep flag aligned (covers sessions created before ``is_authenticated`` existed).
-    st.session_state["is_authenticated"] = st.session_state.get("auth_user") is not None
+    sync_auth_flags()
+
+
+def sync_auth_flags() -> None:
+    """Keep boolean auth flags aligned with ``auth_user`` (never clears ``auth_user``)."""
+    authed = st.session_state.get("auth_user") is not None
+    st.session_state["is_authenticated"] = authed
+    st.session_state["authenticated"] = authed
+
+
+def is_authenticated() -> bool:
+    """True when a Supabase user is present. Only ``main.py`` should gate on this."""
+    return st.session_state.get("auth_user") is not None
 
 
 def _cookie_secure_flag() -> bool:
@@ -168,7 +210,46 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     except Exception:
         st.session_state["auth_session"] = None
 
-    st.session_state["is_authenticated"] = True
+    sync_auth_flags()
+
+
+def _try_hydrate_auth_from_supabase_client() -> bool:
+    """
+    If the Supabase Python client already has a session (e.g. right after sign-in),
+    copy it into ``st.session_state`` without a browser reload.
+    """
+    if is_authenticated():
+        return True
+    client = get_client()
+    user: Any = None
+    try:
+        gu = client.auth.get_user()
+        user = getattr(gu, "user", None)
+        if user is None and isinstance(gu, dict):
+            user = gu.get("user")
+    except Exception:
+        return False
+    if not user:
+        return False
+    try:
+        _apply_user_and_profile_from_auth_user(user)
+        return True
+    except Exception:
+        return False
+
+
+def bootstrap_auth_at_startup() -> None:
+    """
+    Single startup auth restore (cookies + Supabase client). Call once from ``main.py``.
+
+    Does not write browser cookies; use :func:`persist_auth_cookies_if_pending` after the login gate.
+    """
+    process_auth_browser_sign_out()
+    try_restore_supabase_session_from_cookies()
+    _try_hydrate_auth_from_supabase_client()
+    sync_auth_flags()
+    st.session_state["auth_checked"] = True
+    log_auth_state("bootstrap")
 
 
 def try_restore_supabase_session_from_cookies() -> None:
@@ -177,7 +258,7 @@ def try_restore_supabase_session_from_cookies() -> None:
 
     Skips when already logged in. Clears invalid cookie pairs by scheduling a clear bridge.
     """
-    if require_login():
+    if is_authenticated():
         return
     try:
         cookies = st.context.cookies
@@ -292,20 +373,22 @@ def _js_cookie_set_reload(*, access_token: str, refresh_token: str, remember_dev
 """
 
 
-def run_auth_browser_cookie_effects() -> None:
-    """
-    One-shot browser bridges: clear cookies after sign-out, or persist tokens after sign-in.
-
-    When the user is already authenticated in this Streamlit run, tokens are written with
-    ``_silent_write_auth_cookies`` (no full-page reload). Otherwise a full reload is used
-    so ``st.context.cookies`` can pick up tokens on the next cold load.
-    """
+def process_auth_browser_sign_out() -> None:
+    """Clear browser auth cookies after sign-out (full reload is intentional here)."""
     if st.session_state.pop("_ips_auth_clear_pending", False):
         st.info("Signing out — refreshing the page…")
         script = _js_cookie_clear_reload(secure=_cookie_secure_flag())
         components_html(f"<script>{script}</script>", height=8, width=1)
         st.stop()
 
+
+def persist_auth_cookies_if_pending() -> None:
+    """
+    Write Supabase tokens to browser cookies after the user is authenticated.
+
+    Never triggers a full-page reload — reloads were clearing Streamlit session and causing
+    a second login prompt.
+    """
     pending = st.session_state.pop("_ips_auth_persist_pending", None)
     if not pending:
         return
@@ -314,21 +397,21 @@ def run_auth_browser_cookie_effects() -> None:
     remember = bool(pending.get("remember_device"))
     if not at or not rt:
         return
-    # User is already authenticated in this Streamlit session: write cookies without a full
-    # browser reload. A reload here often clears server session before ``st.context.cookies``
-    # sees the new tokens, which forces a second login.
-    if st.session_state.get("auth_user") is not None:
-        _silent_write_auth_cookies(at, rt, remember_device=remember)
+    if not is_authenticated():
+        _try_hydrate_auth_from_supabase_client()
+    if not is_authenticated():
+        # Re-queue for a later run after login succeeds (do not reload the page).
+        st.session_state["_ips_auth_persist_pending"] = pending
+        log_auth_state("persist_deferred_not_authenticated")
         return
-    st.info("Saving your session — refreshing the page…")
-    script = _js_cookie_set_reload(
-        access_token=at,
-        refresh_token=rt,
-        remember_device=remember,
-        secure=_cookie_secure_flag(),
-    )
-    components_html(f"<script>{script}</script>", height=8, width=1)
-    st.stop()
+    _silent_write_auth_cookies(at, rt, remember_device=remember)
+    log_auth_state("persist_cookies_written")
+
+
+def run_auth_browser_cookie_effects() -> None:
+    """Back-compat: sign-out clear + cookie persist. Prefer explicit bootstrap/persist calls."""
+    process_auth_browser_sign_out()
+    persist_auth_cookies_if_pending()
 
 
 def sign_in(email: str, password: str, *, remember_device: bool = False) -> None:
@@ -463,8 +546,10 @@ def sign_out() -> None:
     st.session_state["auth_session"] = None
     st.session_state["auth_profile"] = None
     st.session_state["auth_employee"] = None
+    st.session_state["authenticated"] = False
     st.session_state["is_authenticated"] = False
-    st.session_state["auth_checked"] = False
+    # Keep auth_checked True so bootstrap does not re-show login during sign-out reload.
+    st.session_state["auth_checked"] = True
     st.session_state["_ips_auth_clear_pending"] = True
     try:
         from app.db import clear_streamlit_db_read_cache
@@ -475,8 +560,8 @@ def sign_out() -> None:
 
 
 def require_login() -> bool:
-    """True when a Supabase user is present. Do not use in pages for gating — only ``main.py`` should."""
-    return st.session_state.get("auth_user") is not None
+    """Deprecated alias for :func:`is_authenticated`. Do not use for page gating."""
+    return is_authenticated()
 
 
 def current_profile() -> dict:

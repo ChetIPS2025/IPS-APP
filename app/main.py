@@ -13,13 +13,15 @@ except ImportError:
     from perf_debug import perf_span  # type: ignore
 
 from auth import (
+    bootstrap_auth_at_startup,
     current_role,
     init_session,
+    is_authenticated,
+    log_auth_state,
     must_reset_password,
-    run_auth_browser_cookie_effects,
+    persist_auth_cookies_if_pending,
     sign_in,
     start_phone_otp,
-    try_restore_supabase_session_from_cookies,
     update_password,
     verify_phone_otp,
 )
@@ -125,11 +127,7 @@ def main() -> None:
 
     with perf_span("main.auth_session"):
         init_session()
-        # Persisted Supabase tokens (browser cookies): clear after sign-out; after sign-in prefer silent write
-        # when already authenticated (see ``run_auth_browser_cookie_effects``) to avoid a double login.
-        run_auth_browser_cookie_effects()
-        try_restore_supabase_session_from_cookies()
-        st.session_state["auth_checked"] = True
+        bootstrap_auth_at_startup()
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
     with perf_span("main.deeplink_query"):
         try:
@@ -159,7 +157,7 @@ def main() -> None:
         return
 
     # Single gate for the whole app: pages must not duplicate login checks.
-    if st.session_state.get("auth_user") is None:
+    if not is_authenticated():
         render_header("Login")
         st.caption("Supabase-backed multi-user estimator for Industrial Plant Solutions, LLC")
         _pend = str(
@@ -192,7 +190,7 @@ def main() -> None:
             if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
                 try:
                     sign_in(email, password, remember_device=remember_device)
-                    st.rerun()
+                    log_auth_state("email_login_success")
                 except Exception as exc:
                     show_auth_error(exc)
 
@@ -221,11 +219,16 @@ def main() -> None:
                         verify_phone_otp(phone_number=phone, code=code, remember_device=remember_device)
                         st.session_state.pop("login_phone_otp_sent", None)
                         st.session_state.pop("login_phone_code", None)
-                        st.rerun()
+                        log_auth_state("phone_login_success")
                     except Exception as exc:
                         show_auth_error(exc)
 
-        st.stop()
+        if not is_authenticated():
+            log_auth_state("login_gate_stop")
+            st.stop()
+
+    persist_auth_cookies_if_pending()
+    log_auth_state("app_authenticated")
 
     if must_reset_password():
         render_header("Set New Password")
@@ -237,16 +240,15 @@ def main() -> None:
         if st.button("Update password", type="primary", use_container_width=True):
             if str(p1 or "").strip() != str(p2 or "").strip():
                 st.error("Passwords do not match.")
-                st.stop()
-            try:
-                update_password(str(p1 or ""))
-                st.success("Password updated.")
-                st.rerun()
-            except Exception as exc:
-                show_auth_error(exc)
-                st.stop()
+            else:
+                try:
+                    update_password(str(p1 or ""))
+                    st.success("Password updated.")
+                except Exception as exc:
+                    show_auth_error(exc)
 
-        st.stop()
+        if must_reset_password():
+            st.stop()
 
     with perf_span("main.page_routing"):
         apply_pending_navigation()
