@@ -1196,6 +1196,155 @@ def _inject_tt_styles() -> None:
                 font-size: 0.8rem !important;
             }
         }
+
+        /* ── Timekeeping: Employee table + detail panel ── */
+
+        /* Table header row */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-table-hdr) {
+            background: linear-gradient(180deg, rgba(51,65,85,0.85) 0%, rgba(30,41,59,0.80) 100%) !important;
+            border: 1px solid rgba(148,163,184,0.35) !important;
+            border-radius: 6px 6px 0 0 !important;
+            padding: 5px 6px !important;
+            margin-bottom: 0 !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-table-hdr) > div[data-testid="column"] {
+            border-right: 1px solid rgba(71,85,105,0.5) !important;
+            padding: 4px 6px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-table-hdr) > div[data-testid="column"]:last-child {
+            border-right: none !important;
+        }
+        .ips-tc-hdr-cell {
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #94a3b8 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Table data rows */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) {
+            border-left: 1px solid rgba(71,85,105,0.5) !important;
+            border-right: 1px solid rgba(71,85,105,0.5) !important;
+            border-bottom: 1px solid rgba(71,85,105,0.35) !important;
+            margin-top: -1px !important;
+            padding: 0 !important;
+            cursor: pointer;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row.ips-tc-zebra-0) {
+            background: rgba(22,32,48,0.68) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row.ips-tc-zebra-1) {
+            background: rgba(17,26,39,0.72) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row):hover {
+            background: rgba(59,130,246,0.10) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row.ips-tc-selected) {
+            background: rgba(59,130,246,0.14) !important;
+            border-left: 3px solid #3b82f6 !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) > div[data-testid="column"] {
+            padding: 5px 6px !important;
+            border-right: 1px solid rgba(71,85,105,0.35) !important;
+            align-self: center !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) > div[data-testid="column"]:last-child {
+            border-right: none !important;
+        }
+        /* Compact row: hide number input labels, shrink buttons */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) button {
+            min-height: 1.4rem !important;
+            max-height: 1.65rem !important;
+            padding: 0.06rem 0.5rem !important;
+            font-size: 0.78rem !important;
+            border-radius: 5px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) label[data-testid="stWidgetLabel"] {
+            display: none !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) p {
+            font-size: 0.82rem !important;
+            margin: 0 !important;
+            line-height: 1.25 !important;
+        }
+
+        /* Row cells: name + metrics */
+        .ips-tc-emp-name-cell {
+            font-size: 0.86rem !important;
+            font-weight: 600 !important;
+            color: #f1f5f9 !important;
+            margin: 0 !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ips-tc-emp-name-cell.ips-tc-name-selected {
+            color: #93c5fd !important;
+        }
+        .ips-tc-metric-cell {
+            font-size: 0.82rem !important;
+            color: #cbd5e1 !important;
+            font-variant-numeric: tabular-nums;
+            margin: 0 !important;
+        }
+        .ips-tc-metric-cell.ips-tc-ot-warn {
+            color: #fbbf24 !important;
+            font-weight: 600 !important;
+        }
+
+        /* Table footer row */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-table-footer) {
+            background: rgba(51,65,85,0.45) !important;
+            border: 1px solid rgba(148,163,184,0.3) !important;
+            border-top: 2px solid rgba(100,116,139,0.4) !important;
+            border-radius: 0 0 6px 6px !important;
+            margin-top: -1px !important;
+            padding: 4px 6px !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-table-footer) p {
+            font-size: 0.78rem !important;
+            margin: 0 !important;
+        }
+
+        /* Detail panel */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tc-detail-panel) {
+            border-left: 3px solid #3b82f6 !important;
+            border-radius: 0 8px 8px 8px !important;
+            background: rgba(59,130,246,0.03) !important;
+            padding: 10px 12px 12px 12px !important;
+            margin-top: 0 !important;
+        }
+        .ips-tc-detail-hdr {
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            color: #f1f5f9 !important;
+            margin: 0 0 0.1rem 0 !important;
+        }
+        .ips-tc-hint {
+            font-size: 0.82rem !important;
+            color: #64748b !important;
+            font-style: italic;
+            margin: 0.6rem 0 0.25rem 0 !important;
+            text-align: center;
+        }
+        /* Shrink close button in detail panel header */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-tc-detail-hdr-row) button {
+            min-height: 1.5rem !important;
+            max-height: 1.8rem !important;
+            padding: 0.1rem 0.5rem !important;
+            font-size: 0.75rem !important;
+            border-radius: 5px !important;
+        }
+
+        @media (max-width: 768px) {
+            .ips-tc-emp-name-cell { font-size: 0.9rem !important; }
+            div[data-testid="stHorizontalBlock"]:has(span.ips-tc-row) button {
+                min-height: 2.2rem !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1705,78 +1854,71 @@ def _tt_render_grid_section(
     filt: _TTFiltersResult,
     week_data: _TTWeekDataResult,
 ) -> tuple[list[float], list[float]] | None:
-    """Weekly timecard cards + flat table expander (or read-only pivot). Returns footer data or None."""
+    """Table + detail panel layout (Jobs style). Returns footer data or None."""
     fj_id = filt.job_label_to_id.get(filt.default_job_label) if filt.default_job_label else None
+
+    # Sync week state key for timekeeping
+    st.session_state["selected_timekeeping_week_start"] = week_start.isoformat()
 
     if not can_edit:
         st.info("View-only mode. Sign in as admin, manager, pm, or employee to log time.")
         _render_readonly_pivot(week_data.visible_emps, days, week_data.idx, filt.job_id_to_label)
         return None
 
-    # ── Primary UI: compact per-employee weekly timecard cards ──────────────
-    result = _render_weekly_timecard_grid(
-        today=today,
-        week_start=week_start,
+    # ── Employee selection table (click a row to open detail panel) ──────────
+    selected_eid = _render_timekeeping_employee_table(
+        visible_emps=week_data.visible_emps,
         days=days,
+        idx=week_data.idx,
         filt=filt,
-        week_data=week_data,
+        week_start=week_start,
         fj_id=fj_id,
+        can_edit=can_edit,
     )
 
-    # ── Secondary: flat entries table in expander (export / bulk delete) ────
+    # ── Detail panel (below table, only when an employee is selected) ────────
+    if selected_eid:
+        # Build job options for the detail panel
+        jobs_raw = _tt_load_jobs_rows(limit=5000)
+        _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
+        full_job_labels = _build_full_job_options(list(all_job_labels))
+
+        uid = current_profile().get("id")
+        ts_now = datetime.now(timezone.utc).isoformat()
+
+        _render_timekeeping_detail_panel(
+            selected_eid=selected_eid,
+            visible_emps=week_data.visible_emps,
+            days=days,
+            week_start=week_start,
+            today=today,
+            idx=week_data.idx,
+            filt=filt,
+            fj_id=fj_id,
+            full_job_labels=full_job_labels,
+            job_label_to_id=job_label_to_id,
+            uid=uid,
+            ts_now=ts_now,
+        )
+        st.session_state["timekeeping_view_mode"] = "detail"
+        st.session_state["timekeeping_edit_mode"] = True
+    else:
+        st.markdown(
+            '<p class="ips-tc-hint">▶ Click an employee row to view and edit their weekly timecard.</p>',
+            unsafe_allow_html=True,
+        )
+        st.session_state["timekeeping_view_mode"] = "table"
+        st.session_state["timekeeping_edit_mode"] = False
+
+    # ── Entries table expander (export / bulk delete — kept for admin use) ───
     flat_rows = _tt_flat_entry_rows(
-        week_data.grid_rows,
-        filt.show_emp_ids,
-        fj_id,
-        week_data.emp_id_to_name,
-        filt.job_id_to_label,
+        week_data.grid_rows, filt.show_emp_ids, fj_id,
+        week_data.emp_id_to_name, filt.job_id_to_label,
     )
     entries_df = pd.DataFrame(flat_rows)
-
-    # View detail popup (opened from table row select)
-    tv_id = st.session_state.get("tt_entry_view_id")
-    if tv_id:
-        vr = fetch_one("time_entries", {"id": tv_id})
-        if not vr:
-            st.session_state.pop("tt_entry_view_id", None)
-        else:
-            with st.container(border=True):
-                st.subheader("Time entry detail")
-                e_nm = week_data.emp_id_to_name.get(str(vr.get("employee_id") or ""), "—")
-                j_nm = filt.job_id_to_label.get(str(vr.get("job_id") or ""), "—")
-                st.markdown(
-                    f"**Employee:** {e_nm}  \n"
-                    f"**Work date:** {vr.get('work_date') or '—'}  \n"
-                    f"**Job:** {j_nm}  \n"
-                    f"**Type:** {_tt_time_type_label(vr)}  \n"
-                    f"**Hours:** {float(vr.get('hours') or 0):.2f}  \n"
-                    f"**Notes:** {vr.get('notes') or '—'}"
-                )
-                if st.button("← Close", key="tt_entry_view_back"):
-                    st.session_state.pop("tt_entry_view_id", None)
-                    st.rerun()
-
-    # Inline edit popup (opened from table Edit action)
-    if can_edit:
-        te_tbl = st.session_state.get(TT_EDIT_ID_KEY)
-        if te_tbl:
-            erw = fetch_one("time_entries", {"id": str(te_tbl)})
-            if not erw:
-                st.session_state.pop(TT_EDIT_ID_KEY, None)
-            else:
-                _render_minimal_table_edit_popup(
-                    erw,
-                    job_labels_sorted=filt.job_labels_sorted,
-                    job_label_to_id=filt.job_label_to_id,
-                    job_id_to_label=filt.job_id_to_label,
-                    emp_id_to_name=week_data.emp_id_to_name,
-                    fast=fast,
-                )
-
-    # Entries table expander (for export / bulk delete)
     n_entries = len(flat_rows)
     with st.expander(
-        f"Entries table ({n_entries} rows this week) — Export / Bulk delete",
+        f"All entries this week ({n_entries} rows) — Export / Bulk delete",
         expanded=False,
     ):
         st.markdown('<span class="ips-wc-entries-expander" aria-hidden="true"></span>', unsafe_allow_html=True)
@@ -1793,27 +1935,30 @@ def _tt_render_grid_section(
             )
             with bar_ph.container():
                 actions = render_selection_action_bar(
-                    TABLE_KEY_TIME_ENTRIES,
-                    sel,
-                    can_view=True,
-                    can_edit=can_edit,
-                    can_delete=can_edit,
-                    export_df=entries_df,
-                    visible_df=entries_df,
-                    id_column="id",
+                    TABLE_KEY_TIME_ENTRIES, sel,
+                    can_view=True, can_edit=can_edit, can_delete=can_edit,
+                    export_df=entries_df, visible_df=entries_df, id_column="id",
                     export_filename="time_entries_week_export.csv",
-                    view_label="View Entry",
-                    edit_label="Edit Entry",
-                    delete_label="Delete Entry",
-                    delete_selected_label="Delete Selected",
+                    view_label="View Entry", edit_label="Edit Entry",
+                    delete_label="Delete Entry", delete_selected_label="Delete Selected",
                 )
-            if actions.get("view") and sel and len(sel) == 1:
-                st.session_state["tt_entry_view_id"] = str(sel[0])
-                st.session_state.pop(TT_EDIT_ID_KEY, None)
-                st.rerun()
+            # Edit popup from table
+            te_tbl = st.session_state.get(TT_EDIT_ID_KEY)
+            if te_tbl:
+                erw = fetch_one("time_entries", {"id": str(te_tbl)})
+                if not erw:
+                    st.session_state.pop(TT_EDIT_ID_KEY, None)
+                else:
+                    _render_minimal_table_edit_popup(
+                        erw,
+                        job_labels_sorted=filt.job_labels_sorted,
+                        job_label_to_id=filt.job_label_to_id,
+                        job_id_to_label=filt.job_id_to_label,
+                        emp_id_to_name=week_data.emp_id_to_name,
+                        fast=fast,
+                    )
             if actions.get("edit") and sel and len(sel) == 1 and can_edit:
                 st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
-                st.session_state.pop("tt_entry_view_id", None)
                 st.rerun()
             pend = st.session_state.get(IPS_PENDING_DELETE) or {}
             if actions.get("confirm_delete") and pend.get(TABLE_KEY_TIME_ENTRIES) and can_edit:
@@ -1824,12 +1969,18 @@ def _tt_render_grid_section(
                         st.error(f"Could not delete {tid}: {exc}")
                 pend.pop(TABLE_KEY_TIME_ENTRIES, None)
                 clear_selected_ids(TABLE_KEY_TIME_ENTRIES)
-                st.success("Delete completed where permitted.")
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+                st.success("Delete completed.")
                 st.rerun()
         else:
             st.caption("No entries for this week matching current filters.")
 
-    return result
+    day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
+    grid_ratios = _week_grid_column_ratios(fast=False)
+    return day_col_totals, grid_ratios
 
 
 def _tt_render_footer_section(day_col_totals: list[float], days: list[date], grid_ratios: list[float]) -> None:
@@ -3114,6 +3265,276 @@ def _render_weekly_timecard_grid(
     day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
     grid_ratios = _week_grid_column_ratios(fast=False)
     return day_col_totals, grid_ratios
+
+
+# ─── Timekeeping: table + detail panel (new Jobs-style layout) ───────────────
+
+_TC_COL_RATIOS = [2.8, 0.9, 0.9, 0.95, 0.85]  # name, st, ot, total, action
+
+
+def _build_employee_summary_df(
+    visible_emps: list[dict],
+    days: list[date],
+    idx: dict,
+    fj_id: str | None,
+) -> pd.DataFrame:
+    """Employee summary rows: name, S/T h, O/T h, total h, entry count."""
+    rows = []
+    for emp in visible_emps:
+        eid = str(emp.get("id"))
+        nm = str(emp.get("name", "") or "—").strip()
+        st_h = ot_h = 0.0
+        n_entries = 0
+        for d in days:
+            for ent in idx.get((eid, d.isoformat()), []):
+                if fj_id and str(ent.get("job_id") or "") != fj_id:
+                    continue
+                h = float(ent.get("hours") or 0)
+                if _tt_entry_time_type(ent) == "OT":
+                    ot_h += h
+                else:
+                    st_h += h
+                if h > 0:
+                    n_entries += 1
+        rows.append({
+            "_eid": eid,
+            "Employee": nm,
+            "S/T h": round(st_h, 1),
+            "O/T h": round(ot_h, 1),
+            "Total h": round(st_h + ot_h, 1),
+            "_entries": n_entries,
+        })
+    return pd.DataFrame(rows) if rows else pd.DataFrame(
+        columns=["_eid", "Employee", "S/T h", "O/T h", "Total h", "_entries"]
+    )
+
+
+def _render_timekeeping_employee_table(
+    *,
+    visible_emps: list[dict],
+    days: list[date],
+    idx: dict,
+    filt: _TTFiltersResult,
+    week_start: date,
+    fj_id: str | None,
+    can_edit: bool,
+) -> str | None:
+    """Compact click-to-select employee table. Returns selected employee_id or None."""
+    df = _build_employee_summary_df(visible_emps, days, idx, fj_id)
+    if df.empty:
+        st.caption("No employees found.")
+        return None
+
+    selected_eid = str(st.session_state.get("selected_timekeeping_employee_id") or "")
+
+    # ── Table header row ─────────────────────────────────────────────────────
+    hcols = st.columns(_TC_COL_RATIOS, gap="small")
+    with hcols[0]:
+        st.markdown(
+            '<span class="ips-tc-table-hdr" aria-hidden="true"></span>'
+            '<p class="ips-tc-hdr-cell">Employee</p>',
+            unsafe_allow_html=True,
+        )
+    for lbl, col in zip(["S/T h", "O/T h", "Total h", ""], hcols[1:]):
+        with col:
+            st.markdown(f'<p class="ips-tc-hdr-cell">{html.escape(lbl)}</p>', unsafe_allow_html=True)
+
+    # ── Data rows ─────────────────────────────────────────────────────────────
+    new_sel: str | None = selected_eid or None
+    for ri, row in df.iterrows():
+        eid = str(row["_eid"])
+        nm = str(row["Employee"])
+        st_h = float(row["S/T h"])
+        ot_h = float(row["O/T h"])
+        tot_h = float(row["Total h"])
+        is_sel = eid == selected_eid
+        is_over = tot_h > filt.ot_threshold
+        zebra = "ips-tc-zebra-0" if int(ri) % 2 == 0 else "ips-tc-zebra-1"
+        sel_cls = " ips-tc-selected" if is_sel else ""
+
+        rcols = st.columns(_TC_COL_RATIOS, gap="small")
+        with rcols[0]:
+            name_cls = "ips-tc-emp-name-cell" + (" ips-tc-name-selected" if is_sel else "")
+            st.markdown(
+                f'<span class="ips-tc-row {zebra}{sel_cls}" aria-hidden="true"></span>'
+                f'<p class="{name_cls}" title="{html.escape(nm, quote=True)}">{html.escape(nm)}</p>',
+                unsafe_allow_html=True,
+            )
+        with rcols[1]:
+            st.markdown(
+                f'<p class="ips-tc-metric-cell">{st_h:.1f}</p>',
+                unsafe_allow_html=True,
+            )
+        with rcols[2]:
+            ot_cls = "ips-tc-metric-cell ips-tc-ot-warn" if is_over and ot_h > 0 else "ips-tc-metric-cell"
+            st.markdown(f'<p class="{ot_cls}">{ot_h:.1f}</p>', unsafe_allow_html=True)
+        with rcols[3]:
+            tot_cls = "ips-tc-metric-cell" + (" ips-tc-ot-warn" if is_over else "")
+            st.markdown(f'<p class="{tot_cls}">{tot_h:.1f}</p>', unsafe_allow_html=True)
+        with rcols[4]:
+            btn_lbl = "▼ Open" if is_sel else "▶ View"
+            btn_tp = "primary" if is_sel else "secondary"
+            if st.button(
+                btn_lbl,
+                key=f"tc_sel_{eid}_{week_start.isoformat()}",
+                type=btn_tp,
+                use_container_width=True,
+                help=f"{'Close' if is_sel else 'Open'} {nm}'s timecard",
+            ):
+                if is_sel:
+                    new_sel = None  # toggle off
+                else:
+                    new_sel = eid
+
+    # ── Footer totals row ─────────────────────────────────────────────────────
+    total_st = float(df["S/T h"].sum())
+    total_ot = float(df["O/T h"].sum())
+    total_all = float(df["Total h"].sum())
+    fcols = st.columns(_TC_COL_RATIOS, gap="small")
+    with fcols[0]:
+        st.markdown(
+            '<span class="ips-tc-table-footer" aria-hidden="true"></span>'
+            f'<p style="font-size:0.78rem;font-weight:700;color:#94a3b8;margin:0">'
+            f'{len(df)} employee{"s" if len(df) != 1 else ""}</p>',
+            unsafe_allow_html=True,
+        )
+    for val, col in zip([total_st, total_ot, total_all], fcols[1:4]):
+        with col:
+            st.markdown(
+                f'<p style="font-size:0.78rem;font-weight:700;color:#e2e8f0;font-variant-numeric:tabular-nums;margin:0">'
+                f'{val:.1f}</p>',
+                unsafe_allow_html=True,
+            )
+    with fcols[4]:
+        st.markdown("", unsafe_allow_html=False)
+
+    # Apply selection change (only update after rendering all buttons)
+    if new_sel != (selected_eid or None):
+        if new_sel:
+            st.session_state["selected_timekeeping_employee_id"] = new_sel
+        else:
+            st.session_state.pop("selected_timekeeping_employee_id", None)
+        st.rerun()
+
+    return selected_eid if selected_eid else None
+
+
+def _render_timekeeping_detail_panel(
+    *,
+    selected_eid: str,
+    visible_emps: list[dict],
+    days: list[date],
+    week_start: date,
+    today: date,
+    idx: dict,
+    filt: _TTFiltersResult,
+    fj_id: str | None,
+    full_job_labels: list[str],
+    job_label_to_id: dict[str, str],
+    uid: Any,
+    ts_now: str,
+) -> None:
+    """Detail panel for selected employee — weekly timecard below the table."""
+    emp = next((e for e in visible_emps if str(e.get("id")) == selected_eid), None)
+    if not emp:
+        st.warning("Selected employee not found — they may no longer be active.")
+        return
+
+    nm = str(emp.get("name", "") or "—").strip()
+    week_end = days[-1]
+
+    # Compute weekly totals for header display
+    wk_st = wk_ot = 0.0
+    for d in days:
+        for ent in idx.get((selected_eid, d.isoformat()), []):
+            if fj_id and str(ent.get("job_id") or "") != fj_id:
+                continue
+            h = float(ent.get("hours") or 0)
+            if _tt_entry_time_type(ent) == "OT":
+                wk_ot += h
+            else:
+                wk_st += h
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-tc-detail-panel" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+        # Detail panel header: name + stats + close button
+        dh1, dh2, dh3 = st.columns([3.2, 2.5, 0.7], gap="small")
+        with dh1:
+            st.markdown(
+                '<span class="ips-tc-detail-hdr-row" aria-hidden="true"></span>'
+                f'<p class="ips-tc-detail-hdr">📋 {html.escape(nm)}</p>',
+                unsafe_allow_html=True,
+            )
+        with dh2:
+            over = (wk_st + wk_ot) > filt.ot_threshold
+            ot_note = f"  ⚠ >{filt.ot_threshold:g}h" if over else ""
+            st.caption(
+                f"{week_start.strftime('%b %d')} – {week_end.strftime('%b %d')}  ·  "
+                f"S/T **{wk_st:.1f}** · O/T **{wk_ot:.1f}** · **{wk_st + wk_ot:.1f}** h{ot_note}"
+            )
+        with dh3:
+            if st.button("✕ Close", key="tc_close_detail_panel", type="secondary", help="Close detail panel"):
+                st.session_state.pop("selected_timekeeping_employee_id", None)
+                st.session_state["timekeeping_view_mode"] = "table"
+                st.rerun()
+
+        # Quick-actions popup for this employee
+        open_emp = str(st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) or "")
+        if open_emp == selected_eid:
+            _render_quick_actions_popup(
+                eid=selected_eid, emp_name=nm, days=days,
+                week_start=week_start, week_end=week_end, today=today,
+                idx=idx, fj_id=fj_id,
+                job_labels_sorted=filt.job_labels_sorted,
+                job_label_to_id=filt.job_label_to_id,
+                default_job_label=filt.default_job_label,
+                fast=False, user_id=uid, ts_iso=ts_now,
+            )
+
+        # Inline weekly timecard (no extra card wrapper since we're inside the detail panel)
+        # Reuse the per-day rendering from _render_employee_timecard_card but
+        # without the outer container (we already have one)
+        week_iso = week_start.isoformat()
+
+        # Card sub-header for the timecard section
+        st.markdown("---")
+        _render_wc_col_headers()
+
+        for di, d in enumerate(days):
+            day_iso = d.isoformat()
+            entries_for_day = list(idx.get((selected_eid, day_iso), []))
+            if fj_id:
+                entries_for_day = [e for e in entries_for_day if str(e.get("job_id") or "") == fj_id]
+
+            groups = _group_day_entries(entries_for_day, filt.job_id_to_label)
+
+            if di > 0:
+                sep_cols = st.columns(_WC_COL_RATIOS, gap="small")
+                with sep_cols[0]:
+                    st.markdown('<span class="ips-wc-day-sep" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+            is_first_row = True
+            for g in groups:
+                _render_wc_existing_row(
+                    eid=selected_eid, d=d, week_start=week_start, today=today,
+                    g=g,
+                    full_job_labels=list(full_job_labels),
+                    job_label_to_id=job_label_to_id,
+                    job_id_to_label=filt.job_id_to_label,
+                    uid=uid, ts_now=ts_now,
+                    show_day_label=is_first_row,
+                )
+                is_first_row = False
+
+            _render_wc_add_row(
+                eid=selected_eid, d=d, week_start=week_start, today=today,
+                has_existing_rows=bool(groups),
+                full_job_labels=full_job_labels,
+                job_label_to_id=job_label_to_id,
+                fj_default_label=filt.default_job_label,
+                uid=uid, ts_now=ts_now,
+            )
 
 
 def _render_readonly_pivot(
