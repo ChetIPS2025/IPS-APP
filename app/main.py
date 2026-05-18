@@ -77,6 +77,7 @@ from pages import po_expenses
 from pages import admin
 from pages import users
 from pages import company_updates
+from pages import reports as reports_page
 
 
 PAGES = {
@@ -109,6 +110,7 @@ PAGES = {
     "Users": users.render,
     "Asset Detail": asset_detail.render,
     "Asset Manager": assets_page.render,
+    "Reports": reports_page.render,
 }
 
 # Catalog pages (Labor, Inventory) gate writes inside each page;

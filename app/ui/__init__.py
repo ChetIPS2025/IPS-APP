@@ -50,6 +50,7 @@ _ROUTE_SLUG_BY_PAGE: dict[str, str] = {
     "Weekly Timesheet": "weekly_timesheet",
     "PO / Expenses": "po_expenses",
     "Admin": "admin",
+    "Reports": "reports",
 }
 _PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.items()}
 
@@ -132,6 +133,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Customers",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
+            "Reports",
         }
     ),
     "manager": frozenset(
@@ -150,6 +152,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Who Has What",
             "Asset Database",
             "Tool Trailer Audits",
+            "Reports",
         }
     ),
     "employee": frozenset(
@@ -185,6 +188,7 @@ IPS_SIDEBAR_PAGES: tuple[str, ...] = (
     + _NAV_RESOURCES
     + _NAV_ADMIN_SIDEBAR
     + _NAV_HIDDEN_ROUTES
+    + ("Reports",)
 )
 
 # Keep Inventory sub-pages routable even though they are nested under "Inventory" in the sidebar.
@@ -765,11 +769,11 @@ def _render_sidebar_office(*, role: str) -> None:
                     ):
                         _set_sidebar_nav_page("Inventory Usage")
 
-    rep_pages = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses", "Admin")
+    rep_pages = ("Users", "Time Tracking", "Weekly Timesheet", "PO / Expenses", "Admin", "Reports")
     rep_expanded = nav_page in rep_pages
     if any(role_can_open_page(role, p) for p in _NAV_ADMIN_SIDEBAR) or (
         role == "admin" and role_can_open_page(role, "Admin")
-    ):
+    ) or role_can_open_page(role, "Reports"):
         with st.sidebar.expander("REPORTS", expanded=rep_expanded, key="ips_sidebar_reports_group"):
             _, r_inner = st.columns([0.03, 0.97])
             with r_inner:
@@ -777,6 +781,16 @@ def _render_sidebar_office(*, role: str) -> None:
                     '<p class="ips-nav-expander-hint">Time, expenses, and admin</p>',
                     unsafe_allow_html=True,
                 )
+                if role_can_open_page(role, "Reports"):
+                    cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
+                    active = cur == "Reports"
+                    if st.button(
+                        "Reports",
+                        key=_nav_btn_key("Reports__reports_exp"),
+                        type="primary" if active else "secondary",
+                        use_container_width=True,
+                    ):
+                        _set_sidebar_nav_page("Reports")
                 for p in _NAV_ADMIN_SIDEBAR:
                     if not role_can_open_page(role, p):
                         continue
