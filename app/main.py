@@ -37,13 +37,11 @@ from ui import role_can_open_page
 from branding import apply_branding, render_header
 
 try:
-    from app.ips_app_shell import inject_ips_app_shell_styles
+    from app.ui.theme import apply_global_css
+    from app.ui.components.topbar import render_top_bar
 except ImportError:
-    from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
-try:
-    from app.ui.page_shell import inject_ips_dashboard_layout
-except ImportError:
-    from ui.page_shell import inject_ips_dashboard_layout  # type: ignore
+    from ui.theme import apply_global_css  # type: ignore
+    from ui.components.topbar import render_top_bar  # type: ignore
 try:
     from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
 except ImportError:
@@ -140,8 +138,7 @@ def main() -> None:
             pass
     with perf_span("main.shell_branding"):
         apply_branding()
-        inject_ips_app_shell_styles()
-        inject_ips_dashboard_layout()
+        apply_global_css()
         inject_pwa_support()
 
     # Public customer signing flow (no login): `?tsign=<uuid>`
@@ -267,6 +264,8 @@ def main() -> None:
             st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
     with perf_span("main.sidebar"):
         sidebar_page = render_sidebar()
+    with perf_span("main.topbar"):
+        render_top_bar(page_label=str(sidebar_page))
     trigger_pwa_install_prompt()
     if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
         prev = st.session_state.get("_ips_last_nav_page")

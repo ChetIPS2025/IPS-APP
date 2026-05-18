@@ -1321,16 +1321,89 @@ def render() -> None:
     except Exception:
         open_tasks = 0
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-dash-metrics ips-flat-section" aria-hidden="true"></span>', unsafe_allow_html=True)
-        render_section_header("At a glance")
-        k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
-        k1.metric("Active jobs", f"{active_jobs:,}")
-        k2.metric("Open tasks", f"{open_tasks:,}")
-        k3.metric("Low stock", f"{low_n:,}")
-        k4.metric("Unread updates", f"{unread_updates:,}")
-        k5.metric("Pending estimates", f"{pending_estimates:,}")
-        k6.metric("Overdue to-dos", f"{overdue_todos:,}")
+    draft_estimates = sum(
+        1
+        for e in (estimates or [])
+        if str((e or {}).get("status") or "").strip().lower() in ("draft", "open", "pending", "")
+        or not str((e or {}).get("status") or "").strip()
+    )
+    awarded_month = 0
+    try:
+        from datetime import datetime
+
+        ym = date.today().strftime("%Y-%m")
+        for j in jobs or []:
+            if _job_status_bucket((j or {}).get("status")) != "awarded":
+                continue
+            raw = str((j or {}).get("updated_at") or (j or {}).get("created_at") or "")[:7]
+            if raw == ym:
+                awarded_month += 1
+    except Exception:
+        awarded_month = count_awarded_jobs(list(jobs or []))
+
+    labor_hours_today = 0.0
+    try:
+        from datetime import date as _d
+
+        te_rows = fetch_table_for_session(
+            "time_entries",
+            session_key=sk,
+            limit=8000,
+            order_by="work_date",
+            use_admin=use_admin,
+        )
+        today_s = _d.today().isoformat()
+        for row in te_rows or []:
+            if str((row or {}).get("work_date") or "")[:10] != today_s:
+                continue
+            labor_hours_today += float((row or {}).get("hours") or 0)
+    except Exception:
+        labor_hours_today = 0.0
+
+    pending_pos = 0
+    if role_can_open_page(current_role(), "PO / Expenses"):
+        try:
+            po_rows = fetch_table_for_session(
+                "po_expenses", session_key=sk, limit=3000, order_by="created_at", use_admin=use_admin
+            )
+            pending_pos = sum(
+                1
+                for p in po_rows or []
+                if str((p or {}).get("status") or "").strip().lower()
+                in ("pending", "open", "submitted", "draft")
+            )
+        except Exception:
+            pending_pos = 0
+
+    try:
+        from app.ui.components.cards import render_kpi_grid
+    except ImportError:
+        from ui.components.cards import render_kpi_grid  # type: ignore
+
+    render_section_header("At a glance")
+    kpi_specs: list[dict] = [
+        {"label": "Active Jobs", "value": f"{active_jobs:,}", "key": "jobs", "nav_page": "Job Database"},
+        {"label": "Draft Estimates", "value": f"{draft_estimates:,}", "key": "draft_est", "nav_page": "Estimates"},
+        {"label": "Awarded (month)", "value": f"{awarded_month:,}", "key": "awarded", "nav_page": "Job Database"},
+        {"label": "Open Tasks", "value": f"{open_tasks:,}", "key": "tasks", "nav_page": "Assign Tasks (PM)"},
+        {"label": "Overdue Tasks", "value": f"{overdue_todos:,}", "key": "od_todo"},
+        {"label": "Low Stock", "value": f"{low_n:,}", "key": "low", "nav_page": "Inventory"},
+        {"label": "Labor Hrs Today", "value": f"{labor_hours_today:.1f}", "key": "labor", "nav_page": "Time Tracking"},
+    ]
+    if role_can_open_page(current_role(), "PO / Expenses"):
+        kpi_specs.append(
+            {"label": "Pending POs", "value": f"{pending_pos:,}", "key": "po", "nav_page": "PO / Expenses"}
+        )
+    if role_can_open_page(current_role(), "Company Updates"):
+        kpi_specs.append(
+            {
+                "label": "Unread Updates",
+                "value": f"{unread_updates:,}",
+                "key": "cu",
+                "nav_page": "Company Updates",
+            }
+        )
+    render_kpi_grid(kpi_specs, columns=5)
 
     _render_task_progress_dashboard(today=date.today(), session_key=sk, use_admin=use_admin)
 

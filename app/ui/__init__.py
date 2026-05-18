@@ -277,9 +277,7 @@ def _sidebar_brand() -> None:
     logo_path = _find_round_logo()
 
     if logo_path and logo_path.exists():
-        st.sidebar.image(str(logo_path), width=64)
-
-    st.sidebar.markdown("**IPS** Estimating")
+        st.sidebar.image(str(logo_path), width=52)
 
 
 def _inject_sidebar_nav_css() -> None:
@@ -857,13 +855,15 @@ def _render_sidebar_viewer(*, role: str) -> None:
 def render_sidebar() -> str:
     _sidebar_brand()
 
-    profile = current_profile()
-    st.sidebar.caption(f"{profile.get('email', '—')} · {profile.get('role', 'viewer')}")
-
     render_install_app_sidebar_block()
 
     _ensure_valid_nav_page()
     _inject_sidebar_nav_css()
+    try:
+        from app.ui.components.sidebar import inject_sidebar_theme
+    except ImportError:
+        from ui.components.sidebar import inject_sidebar_theme  # type: ignore
+    inject_sidebar_theme()
     inject_ips_global_mobile_css()
     inject_sidebar_mobile_auto_collapse_once()
 

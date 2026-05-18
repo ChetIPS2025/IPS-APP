@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v3"
+IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v4"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 try:
@@ -455,6 +455,7 @@ def render_table(
 ) -> None:
     """Display a professional dataframe with optional internal column stripping."""
     inject_ips_dashboard_layout()
+    st.markdown('<span class="ips-table-surface" aria-hidden="true"></span>', unsafe_allow_html=True)
     disp = hide_internal_columns(df) if hide_internal else df
     kwargs: dict[str, Any] = {"use_container_width": True, "hide_index": True}
     kwargs.update(dataframe_kwargs)
@@ -476,3 +477,17 @@ def ensure_modal_styles() -> None:
 
 # Backward-compatible alias
 render_modal = ensure_modal_styles
+
+
+def apply_global_css() -> None:
+    """Design-system entry: theme tokens, layout, tables, density."""
+    try:
+        from app.ui.theme import apply_global_css as _apply
+    except ImportError:
+        from ui.theme import apply_global_css as _apply  # type: ignore
+    _apply()
+
+
+def render_filters(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Alias for :func:`render_filter_row`."""
+    return render_filter_row(*args, **kwargs)
