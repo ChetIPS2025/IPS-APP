@@ -55,6 +55,13 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
 
 try:
+    from app.pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css
+    from app.pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table
+except ImportError:
+    from pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css  # type: ignore
+    from pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table  # type: ignore
+
+try:
     from app.ui.field_light_theme import inject_field_light_theme
 except ImportError:
     from ui.field_light_theme import inject_field_light_theme  # type: ignore
@@ -2493,7 +2500,6 @@ def render() -> None:
                     "Cards" if st.session_state.get(IPS_VIEWPORT_NARROW_KEY) else "Table"
                 )
 
-            picked: list[str] = []
 
             with render_card():
                 st.markdown(
@@ -2607,135 +2613,15 @@ def render() -> None:
                 if "id" not in df_display.columns:
                     st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)
                 elif use_table:
-                    st.markdown(
-                        '<span class="ips-job-desktop-table-anchor"></span>',
-                        unsafe_allow_html=True,
+                    _jmod_inject_css()
+                    _render_modern_jobs_table(
+                        df_display=df_display,
+                        job_num_col=job_num_col,
+                        can_edit=can_edit,
+                        jobs=jobs,
+                        admin_read=admin_read,
+                        customer_name_by_id=customer_name_by_id,
                     )
-                    inject_table_action_styles()
-                    with st.container():
-                        st.markdown(
-                            '<span class="ips-job-table-scroll-anchor"></span>',
-                            unsafe_allow_html=True,
-                        )
-                        # Match Estimates table rhythm: fixed columns + explicit weights.
-
-                        # Visible order (exact):
-                        # Blank | Job Number | Job Name | Customer | Location | Contact | Status | Linked Estimate | Quote/PO | Awarded | View | Del
-                        col_weights = [
-                            0.40,  # checkbox
-                            1.00,  # job number
-                            2.30,  # job name
-                            1.70,  # customer
-                            1.25,  # location
-                            1.25,  # contact
-                            0.95,  # status
-                            1.10,  # linked estimate
-                            1.00,  # quote/po
-                            1.05,  # awarded amount
-                            0.48,  # view
-                            0.50,  # delete
-                        ]
-
-                        head = st.columns(col_weights, gap="medium")
-                        with head[0]:
-                            st.caption(" ")
-                        with head[1]:
-                            st.caption("Job #")
-                        with head[2]:
-                            st.caption("Job Name")
-                        with head[3]:
-                            st.caption("Customer")
-                        with head[4]:
-                            st.caption("Location")
-                        with head[5]:
-                            st.caption("Contact")
-                        with head[6]:
-                            st.caption("Status")
-                        with head[7]:
-                            st.caption("Linked Estimate")
-                        with head[8]:
-                            st.caption("Quote / PO")
-                        with head[9]:
-                            st.caption("Awarded")
-                        with head[10]:
-                            st.caption("View")
-                        with head[11]:
-                            st.caption("Del")
-
-                        for _, row in df_display.iterrows():
-                            jid = str(row.get("id") or "").strip()
-                            if not jid:
-                                continue
-                            rc = st.columns(col_weights, gap="medium")
-                            with rc[0]:
-                                ck = f"job_list_pick_{jid}"
-                                if ck not in st.session_state:
-                                    st.session_state[ck] = jid in get_selected_ids(TABLE_KEY_JOBS)
-                                if st.checkbox("", key=ck, label_visibility="collapsed"):
-                                    picked.append(jid)
-                            with rc[1]:
-                                _render_short_cell_with_tooltip(rc[1], row.get(job_num_col), max_len=14)
-                            with rc[2]:
-                                _render_job_db_job_name_cell(rc[2], row.get("job_name"))
-                            with rc[3]:
-                                _render_short_cell_with_tooltip(rc[3], row.get("customer_name"), max_len=28)
-                            with rc[4]:
-                                _render_short_cell_with_tooltip(rc[4], row.get("Location"), max_len=24)
-                            with rc[5]:
-                                _render_short_cell_with_tooltip(rc[5], row.get("Contact"), max_len=24)
-                            with rc[6]:
-                                _render_short_cell_with_tooltip(rc[6], row.get("status"), max_len=18)
-                            with rc[7]:
-                                _render_short_cell_with_tooltip(rc[7], row.get("Linked estimate"), max_len=18)
-                            with rc[8]:
-                                # Quote (estimate) is the current visible “quote/po” signal in this UI.
-                                _render_short_cell_with_tooltip(rc[8], row.get("Quote (estimate)"), max_len=18)
-                            with rc[9]:
-                                raw_aw = row.get("awarded_amount")
-                                amt = _job_db_money_cell(raw_aw)
-                                aw_title = ""
-                                if raw_aw is not None and str(raw_aw).strip() != "":
-                                    aw_title = f' title="{html.escape(str(raw_aw).strip(), quote=True)}"'
-                                rc[9].markdown(
-                                    f'<span class="ips-job-list-cell ips-job-money-cell"{aw_title} '
-                                    f'style="color:#111827;">{html.escape(amt)}</span>',
-                                    unsafe_allow_html=True,
-                                )
-
-                            with rc[10]:
-                                if st.button(
-                                    "👁",
-                                    key=f"job_row_view_{jid}",
-                                    use_container_width=True,
-                                    help="View job details",
-                                ):
-                                    clear_selected_ids(TABLE_KEY_JOBS)
-                                    st.session_state["job_view_mode"] = "view"
-                                    st.session_state["selected_job_id"] = jid
-                                    st.session_state.pop("job_mode", None)
-                                    st.session_state.pop("job_edit_id", None)
-                                    st.rerun()
-
-                            del_help = (
-                                "Only admin or pm can delete jobs."
-                                if not can_edit
-                                else "Delete this job (blocked if costing data exists)."
-                            )
-                            with rc[11]:
-                                if st.button(
-                                    "🗑",
-                                    key=f"job_row_del_{jid}",
-                                    disabled=not can_edit,
-                                    use_container_width=True,
-                                    help=del_help,
-                                ):
-                                    pending = st.session_state.get(IPS_PENDING_DELETE)
-                                    if not isinstance(pending, dict):
-                                        pending = {}
-                                        st.session_state[IPS_PENDING_DELETE] = pending
-                                    pending[TABLE_KEY_JOBS] = [jid]
-                                    st.rerun()
-                    set_selected_ids(TABLE_KEY_JOBS, picked)
                 else:
                     clear_selected_ids(TABLE_KEY_JOBS)
                     _render_job_card_list(
@@ -2743,61 +2629,6 @@ def render() -> None:
                         job_num_col=job_num_col,
                         can_edit=can_edit,
                     )
-
-            use_table = st.session_state.get("job_db_view_mode_radio", "Table") == "Table"
-            sel_ids = picked if ("id" in filtered.columns and use_table) else []
-            n_sel = len(sel_ids)
-            one = n_sel == 1
-            none = n_sel == 0
-
-            if "id" in filtered.columns and use_table:
-                st.markdown(
-                    '<span class="ips-ta-bar-anchor ips-job-action-bar-anchor ips-flat-section"></span>',
-                    unsafe_allow_html=True,
-                )
-                left, b1, b2 = st.columns([1.35, 1, 1], gap="small")
-                with left:
-                    st.markdown(
-                        f'<span class="ips-ta-summary"><span class="ips-ta-num">{n_sel}</span> selected</span>',
-                        unsafe_allow_html=True,
-                    )
-                with b1:
-                    if st.button(
-                        "Edit",
-                        key="job_edit_btn",
-                        type="secondary",
-                        use_container_width=True,
-                        disabled=not (can_edit or current_role() == "employee"),
-                    ):
-                        if not one:
-                            if none:
-                                st.warning("Please select a job first.")
-                            else:
-                                st.warning("Please select exactly one job to edit.")
-                        else:
-                            st.session_state["job_view_mode"] = "edit"
-                            st.session_state["selected_job_id"] = str(sel_ids[0])
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = str(sel_ids[0])
-                            st.session_state.pop("job_number_manual_input", None)
-                            st.rerun()
-                with b2:
-                    if st.button(
-                        "Delete",
-                        key="job_delete_btn",
-                        type="secondary",
-                        use_container_width=True,
-                        disabled=not can_edit,
-                    ):
-                        if none:
-                            st.warning("Please select a job first.")
-                        else:
-                            pending = st.session_state.get(IPS_PENDING_DELETE)
-                            if not isinstance(pending, dict):
-                                pending = {}
-                                st.session_state[IPS_PENDING_DELETE] = pending
-                            pending[TABLE_KEY_JOBS] = list(sel_ids)
-                            st.rerun()
 
             pend = st.session_state.get(IPS_PENDING_DELETE) or {}
             if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):
