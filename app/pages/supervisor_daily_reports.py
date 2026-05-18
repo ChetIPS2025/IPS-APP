@@ -33,8 +33,11 @@ try:
         fetch_photos_for_report,
         fetch_report_for_job_date,
         fetch_reports_for_job,
+        review_daily_report,
+        submit_daily_report,
         upsert_supervisor_daily_report,
     )
+    from app.ui.components.badges import render_badge
 except ImportError:
     from services.supervisor_daily_reports import (  # type: ignore
         delay_labels_map,
@@ -42,8 +45,11 @@ except ImportError:
         fetch_photos_for_report,
         fetch_report_for_job_date,
         fetch_reports_for_job,
+        review_daily_report,
+        submit_daily_report,
         upsert_supervisor_daily_report,
     )
+    from ui.components.badges import render_badge  # type: ignore
 
 _LOG = logging.getLogger(__name__)
 
@@ -84,6 +90,12 @@ def _apply_prefill_if_any(job_id: str) -> None:
         st.session_state[f"sdr_not_done_why_{jid}"] = str(p.get("not_completed_reason") or "")
         st.session_state[f"sdr_tomorrow_{jid}"] = str(p.get("tomorrows_plan") or "")
         st.session_state[f"sdr_delay_other_notes_{jid}"] = str(p.get("delay_other_notes") or "")
+        st.session_state[f"sdr_weather_{jid}"] = str(p.get("weather") or "")
+        st.session_state[f"sdr_hours_worked_{jid}"] = float(p.get("hours_worked") or 0)
+        st.session_state[f"sdr_safety_{jid}"] = str(p.get("safety_notes") or "")
+        st.session_state[f"sdr_equipment_{jid}"] = str(p.get("equipment_used") or "")
+        st.session_state[f"sdr_materials_{jid}"] = str(p.get("materials_used") or "")
+        st.session_state[f"sdr_customer_{jid}"] = str(p.get("customer_conversations") or "")
         for fk in delay_labels_map().keys():
             st.session_state[f"sdr_{fk}_{jid}"] = bool(p.get(fk))
     crew = payload.get("crew")
@@ -129,6 +141,7 @@ def render_daily_reports_for_job(
                 [
                     {
                         "Date": str(r.get("report_date") or "")[:10],
+                        "Status": str(r.get("status") or "Draft"),
                         "Supervisor": str(r.get("supervisor_name") or "").strip() or "—",
                         "Crew": int(r.get("crew_size") or 0),
                         "On track": "Yes" if r.get("midday_on_track") else "No",
@@ -194,6 +207,9 @@ def render_daily_reports_for_job(
         existing = fetch_report_for_job_date(jid, rd, admin=admin_read)
         if existing:
             st.info(f"Saving will **update** the report for **{rd.isoformat()}**.")
+            rep_status = str(existing.get("status") or "Draft").strip()
+            tone = "success" if rep_status == "Reviewed" else "warning" if rep_status == "Submitted" else "neutral"
+            render_badge(rep_status, tone=tone)
 
         with st.expander("Basics", expanded=True):
             st.text_input("Supervisor", key=f"sdr_supervisor_{jid}", placeholder="Name")
@@ -213,6 +229,20 @@ def render_daily_reports_for_job(
                 height=70,
                 placeholder="Only if you selected No",
             )
+
+        with st.expander("Weather & field notes", expanded=False):
+            st.text_input("Weather", key=f"sdr_weather_{jid}", placeholder="Clear, rain, heat…")
+            st.number_input(
+                "Total hours worked (crew)",
+                min_value=0.0,
+                max_value=999.0,
+                step=0.25,
+                key=f"sdr_hours_worked_{jid}",
+            )
+            st.text_area("Safety notes", key=f"sdr_safety_{jid}", height=56)
+            st.text_area("Equipment used", key=f"sdr_equipment_{jid}", height=56)
+            st.text_area("Materials used", key=f"sdr_materials_{jid}", height=56)
+            st.text_area("Customer conversations", key=f"sdr_customer_{jid}", height=56)
 
         with st.expander("Completed & carryover", expanded=False):
             st.text_area("Completed today", key=f"sdr_done_{jid}", height=80)
@@ -318,6 +348,13 @@ def render_daily_reports_for_job(
             body: dict[str, Any] = {
                 "supervisor_name": str(st.session_state.get(f"sdr_supervisor_{jid}") or "").strip(),
                 "crew_size": int(st.session_state.get(f"sdr_crew_size_{jid}") or 0),
+                "weather": str(st.session_state.get(f"sdr_weather_{jid}") or "").strip(),
+                "hours_worked": float(st.session_state.get(f"sdr_hours_worked_{jid}") or 0),
+                "safety_notes": str(st.session_state.get(f"sdr_safety_{jid}") or "").strip(),
+                "equipment_used": str(st.session_state.get(f"sdr_equipment_{jid}") or "").strip(),
+                "materials_used": str(st.session_state.get(f"sdr_materials_{jid}") or "").strip(),
+                "customer_conversations": str(st.session_state.get(f"sdr_customer_{jid}") or "").strip(),
+                "status": str((existing or {}).get("status") or "Draft"),
                 "main_goal": str(st.session_state.get(f"sdr_main_goal_{jid}") or "").strip(),
                 "midday_on_track": midday_ok,
                 "midday_reason": str(st.session_state.get(f"sdr_midday_reason_{jid}") or "").strip(),
@@ -347,6 +384,34 @@ def render_daily_reports_for_job(
                 st.success("Report saved.")
                 st.session_state.pop(f"sdr_photos_{jid}", None)
                 st.rerun()
+
+        if existing and existing.get("id"):
+            rid = str(existing["id"])
+            b1, b2, b3 = st.columns(3, gap="small")
+            with b1:
+                if str(existing.get("status") or "Draft") == "Draft" and st.button(
+                    "Submit report", use_container_width=True, key=f"sdr_submit_{jid}"
+                ):
+                    try:
+                        submit_daily_report(rid, admin=admin_read)
+                        st.success("Submitted to office.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+            with b2:
+                if current_role() in {"admin", "manager"} and str(existing.get("status") or "") == "Submitted":
+                    if st.button("Mark reviewed", use_container_width=True, key=f"sdr_review_{jid}"):
+                        try:
+                            prof = current_profile() or {}
+                            review_daily_report(
+                                rid,
+                                reviewed_by=str(prof.get("id") or "").strip() or None,
+                                admin=admin_read,
+                            )
+                            st.success("Marked reviewed.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
 
 
 def render() -> None:
