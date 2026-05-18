@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import html
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
+from urllib.parse import urlencode
 
 import pandas as pd
 import streamlit as st
@@ -18,39 +20,12 @@ from db import (
     fetch_one,
     fetch_table,
     fetch_table_admin,
-    update_rows_admin,
 )
-
-try:
-    from table_actions import (
-        IPS_PENDING_DELETE,
-        TABLE_KEY_ESTIMATES,
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selection_action_bar,
-        set_selected_ids,
-    )
-except ImportError:
-    from app.table_actions import (  # type: ignore
-        IPS_PENDING_DELETE,
-        TABLE_KEY_ESTIMATES,
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selection_action_bar,
-        set_selected_ids,
-    )
 
 try:
     from services.delete_safety import delete_estimate_unlink_first
 except ImportError:
     from app.services.delete_safety import delete_estimate_unlink_first  # type: ignore
-
-try:
-    from services.job_service import job_number_display
-except ImportError:
-    from app.services.job_service import job_number_display  # type: ignore
 
 from app.utils.formatters import job_display_label
 
@@ -84,7 +59,40 @@ from pages.estimate_editor import (
 
 def _estimates_page_admin_read() -> bool:
     """Internal roles use service-role reads so admin-written rows stay visible under RLS."""
-    return current_role() in {"admin", "pm"}
+    return current_role() in {"admin", "manager", "pm"}
+
+
+def _estimates_page_can_edit() -> bool:
+    return current_role() in {"admin", "manager", "pm"}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_estimates_list_rows_cached(admin_read: bool) -> list[dict[str, Any]]:
+    if admin_read:
+        return fetch_table_admin("estimates", limit=1000, order_by="updated_at")
+    return fetch_table("estimates", limit=1000, order_by="updated_at")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_estimate_customer_rows_cached(admin_read: bool) -> list[dict[str, Any]]:
+    columns = "id,customer_name"
+    if admin_read:
+        return fetch_table_admin("customers", columns=columns, limit=3000, order_by="customer_name")
+    return fetch_table("customers", columns=columns, limit=3000, order_by="customer_name")
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _fetch_jobs_for_estimate_links_cached(admin_read: bool) -> list[dict[str, Any]]:
+    columns = "id,job_number,job_name,estimate_id"
+    if admin_read:
+        return fetch_table_admin("jobs", columns=columns, limit=5000, order_by="job_number")
+    return fetch_table("jobs", columns=columns, limit=5000, order_by="job_number")
+
+
+def _clear_estimates_page_cache() -> None:
+    _fetch_estimates_list_rows_cached.clear()
+    _fetch_estimate_customer_rows_cached.clear()
+    _fetch_jobs_for_estimate_links_cached.clear()
 
 
 def _fetch_one_estimate_row(estimate_id: str) -> dict[str, Any] | None:
@@ -98,49 +106,17 @@ def _fetch_one_estimate_row(estimate_id: str) -> dict[str, Any] | None:
 
 
 def _fetch_estimates_list_rows() -> list[dict[str, Any]]:
-    if _estimates_page_admin_read():
-        return fetch_table_admin("estimates", limit=1000, order_by="updated_at")
-    return fetch_table("estimates", limit=1000, order_by="updated_at")
+    return _fetch_estimates_list_rows_cached(_estimates_page_admin_read())
 
 
 def _fetch_customers_for_import() -> list[dict[str, Any]]:
     """Directory rows for matching imported quotes to real customers."""
-    if _estimates_page_admin_read():
-        return fetch_table_admin(
-            "customers",
-            columns="id,customer_name",
-            limit=3000,
-            order_by="customer_name",
-        )
-    return fetch_table(
-        "customers",
-        columns="id,customer_name",
-        limit=3000,
-        order_by="customer_name",
-    )
+    return _fetch_estimate_customer_rows_cached(_estimates_page_admin_read())
 
 
 def _fetch_jobs_for_estimate_links() -> list[dict[str, Any]]:
-    if _estimates_page_admin_read():
-        return fetch_table_admin(
-            "jobs",
-            columns="id,job_number,estimate_id",
-            limit=5000,
-            order_by="job_number",
-        )
-    return fetch_table(
-        "jobs",
-        columns="id,job_number,estimate_id",
-        limit=5000,
-        order_by="job_number",
-    )
+    return _fetch_jobs_for_estimate_links_cached(_estimates_page_admin_read())
 
-
-def _cleanup_est_list_row_pick_keys() -> None:
-    """Clear per-row list checkbox keys after Select All / Clear so widgets resync to stored IDs."""
-    for k in list(st.session_state.keys()):
-        if str(k).startswith("est_list_pick_"):
-            st.session_state.pop(k, None)
 
 
 _MONEY_LIST_COLUMNS: frozenset[str] = frozenset({"proposal_total", "final_bid"})
@@ -274,500 +250,1073 @@ def _load_estimate_into_session(selected_id: str) -> None:
     ensure_state()
 
 
-def _render_estimate_list() -> None:
-    can_edit = current_role() in {"admin", "pm"}
-    rows = _fetch_estimates_list_rows()
-    df = pd.DataFrame(rows)
+def _new_estimate() -> None:
+    _reset_estimate_editor_transients(clear_import_hints=True)
+    st.session_state["estimate_editor_state"] = blank_estimate()
+    st.session_state["loaded_estimate_id"] = None
+    st.session_state["estimate_editor_quote_ready"] = False
+    ensure_state()
+    st.session_state["estimates_view"] = "edit"
+    st.rerun()
 
-    def _norm_customer_id(v: Any) -> str:
-        if v is None:
-            return ""
-        try:
-            if pd.isna(v):
-                return ""
-        except Exception:
-            pass
-        s = str(v).strip()
-        return s if s and s.lower() != "nan" else ""
 
-    eid_to_customer: dict[str, str] = {}
-    for r in rows:
-        rid = str(r.get("id") or "").strip()
-        if rid:
-            eid_to_customer[rid] = _norm_customer_id(r.get("customer_id"))
+def _open_estimate_editor(estimate_id: str) -> None:
+    _load_estimate_into_session(estimate_id)
+    st.session_state["estimates_view"] = "edit"
+    st.rerun()
 
-    job_rows = _fetch_jobs_for_estimate_links()
-    job_by_id = {str(r["id"]): r for r in job_rows if r.get("id")}
-    job_by_estimate_id = {str(r["estimate_id"]): r for r in job_rows if r.get("estimate_id")}
 
-    def _linked_job_display_cell(row: pd.Series) -> str:
-        jid = row.get("job_id")
-        eid = row.get("id")
-        if jid is not None and pd.notna(jid) and str(jid).strip():
-            sj = str(jid)
-            if sj in job_by_id:
-                job = job_by_id[sj]
-                return job_display_label(job.get("job_number"), job.get("job_name"))
-        if eid is not None and pd.notna(eid):
-            se = str(eid)
-            if se in job_by_estimate_id:
-                job = job_by_estimate_id[se]
-                return job_display_label(job.get("job_number"), job.get("job_name"))
-        return ""
+def _select_estimate(estimate_id: str) -> None:
+    st.session_state["est_selected_id"] = str(estimate_id or "").strip()
 
-    def _linked_job_id_for_row(row: pd.Series) -> str | None:
-        jid = row.get("job_id")
-        eid = row.get("id")
-        if jid is not None and pd.notna(jid) and str(jid).strip():
-            return str(jid)
-        if eid is not None and pd.notna(eid):
-            se = str(eid)
-            if se in job_by_estimate_id:
-                return str(job_by_estimate_id[se].get("id"))
-        return None
 
-    def _series_truthy_job_received(row: pd.Series) -> bool:
-        v = row.get("job_received")
-        if v is None:
-            return False
-        try:
-            if pd.isna(v):
-                return False
-        except Exception:
-            pass
-        if isinstance(v, bool):
-            return v
-        if isinstance(v, (int, float)):
-            try:
-                return float(v) != 0.0
-            except (TypeError, ValueError):
-                return False
-        s = str(v).strip().lower()
-        return s in ("true", "1", "yes", "t")
+def _consume_estimate_query_selection() -> None:
+    try:
+        raw = st.query_params.get("est")
+    except Exception:
+        raw = None
+    eid = raw[0] if isinstance(raw, list) and raw else raw
+    eid = str(eid or "").strip()
+    if not eid:
+        return
+    st.session_state["est_selected_id"] = eid
+    try:
+        action = str(st.query_params.get("est_action") or "").strip()
+        if action == "more":
+            st.session_state["est_ref_show_more"] = eid
+        for key in ("est", "est_action"):
+            if key in st.query_params:
+                del st.query_params[key]
+    except Exception:
+        pass
 
-    def _row_estimate_id(est_row: pd.Series) -> str:
-        """Primary key for API calls — always the estimate ``id`` column, never quote text."""
-        if "id" not in est_row.index:
-            return ""
-        raw = est_row["id"]
-        if raw is None:
-            return ""
-        try:
-            if pd.isna(raw):
-                return ""
-        except Exception:
-            pass
-        return str(raw).strip()
 
-    def _estimate_description_display(est_row: pd.Series) -> str:
+def _estimate_select_href(estimate_id: str, *, action: str | None = None) -> str:
+    params = {"est": str(estimate_id or "").strip()}
+    if action:
+        params["est_action"] = action
+    return "?" + urlencode(params)
+
+
+def _estimate_text(val: Any, fallback: str = "—") -> str:
+    if val is None:
+        return fallback
+    try:
+        if pd.isna(val):
+            return fallback
+    except Exception:
+        pass
+    s = str(val).strip()
+    return s if s else fallback
+
+
+def _estimate_money_zero(val: Any) -> str:
+    s = _estimate_money_display(val)
+    return s if s else "$0.00"
+
+
+def _estimate_decimal(val: Any) -> Decimal:
+    if val is None:
+        return Decimal("0")
+    try:
+        if pd.isna(val):
+            return Decimal("0")
+    except Exception:
+        pass
+    try:
+        return Decimal(str(val).replace("$", "").replace(",", "").strip() or "0")
+    except Exception:
+        return Decimal("0")
+
+
+def _estimate_percent(part: Decimal, total: Decimal) -> str:
+    if total <= 0:
+        return "0%"
+    pct = (part / total * Decimal("100")).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return f"{pct}%"
+
+
+def _estimate_date_display(val: Any) -> str:
+    s = _estimate_text(val, "")
+    if not s:
+        return "—"
+    return s[:10]
+
+
+def _estimate_json(row: pd.Series | dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("estimate_json") if hasattr(row, "get") else None
+    return raw if isinstance(raw, dict) else {}
+
+
+def _estimate_description(row: pd.Series | dict[str, Any], *, max_len: int = 90) -> str:
+    ej = _estimate_json(row)
+    candidates = [
+        row.get("estimate_description") if hasattr(row, "get") else "",
+        ej.get("estimate_description"),
+        ej.get("job"),
+        ej.get("job_name"),
+        row.get("scope_of_work") if hasattr(row, "get") else "",
+    ]
+    for raw in candidates:
+        s = str(raw or "").strip()
+        if s:
+            s = s.splitlines()[0].strip()
+            return s[:max_len] + ("…" if len(s) > max_len else "")
+    return "No description"
+
+
+def _estimate_project_title(row: pd.Series | dict[str, Any]) -> str:
+    ej = _estimate_json(row)
+    for raw in (
+        ej.get("project_title"),
+        ej.get("project_name"),
+        ej.get("job_name"),
+        ej.get("job"),
+        row.get("estimate_description") if hasattr(row, "get") else "",
+    ):
+        s = str(raw or "").strip()
+        if s:
+            return s[:90] + ("…" if len(s) > 90 else "")
+    return "Untitled project"
+
+
+def _estimate_project_type(row: pd.Series | dict[str, Any]) -> str:
+    ej = _estimate_json(row)
+    row_type = row.get("project_type") if hasattr(row, "get") else ""
+    return _estimate_text(ej.get("project_type") or row_type, "—")
+
+
+def _estimate_created_by(row: pd.Series | dict[str, Any]) -> str:
+    if not hasattr(row, "get"):
+        return "—"
+    ej = _estimate_json(row)
+    for key in ("created_by", "created_by_name", "created_by_email", "salesperson", "prepared_by"):
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+        val = ej.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return "—"
+
+
+def _estimate_expiration_date(row: pd.Series | dict[str, Any]) -> str:
+    if not hasattr(row, "get"):
+        return "—"
+    ej = _estimate_json(row)
+    for key in ("expiration_date", "expires_at", "valid_until", "expiry_date"):
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return _estimate_date_display(val)
+        val = ej.get(key)
+        if val is not None and str(val).strip():
+            return _estimate_date_display(val)
+    return "—"
+
+
+def _estimate_date(row: pd.Series | dict[str, Any]) -> str:
+    if not hasattr(row, "get"):
+        return "—"
+    ej = _estimate_json(row)
+    for key in ("estimate_date", "created_at", "updated_at", "date"):
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return _estimate_date_display(val)
+        val = ej.get(key)
+        if val is not None and str(val).strip():
+            return _estimate_date_display(val)
+    return "—"
+
+
+def _customer_name_maps(customers: list[dict[str, Any]]) -> tuple[dict[str, str], dict[str, str]]:
+    by_id: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    for row in customers:
+        cid = str(row.get("id") or "").strip()
+        name = str(row.get("customer_name") or "").strip()
+        if cid and name:
+            by_id[cid] = name
+            by_name[name] = cid
+    return by_id, by_name
+
+
+def _estimate_customer_name(row: pd.Series | dict[str, Any], customer_by_id: dict[str, str]) -> str:
+    cid = str(row.get("customer_id") or "").strip() if hasattr(row, "get") else ""
+    if cid and cid in customer_by_id:
+        return customer_by_id[cid]
+    ej = _estimate_json(row)
+    row_customer = row.get("customer_name") if hasattr(row, "get") else ""
+    return _estimate_text(ej.get("customer_name") or row_customer, "—")
+
+
+def _status_key(status: Any) -> str:
+    s = str(status or "").strip().lower()
+    if s in {"submitted", "sent_to_customer"}:
+        return "sent"
+    if s in {"accepted", "awarded", "po_received"}:
+        return "approved"
+    if s in {"waiting", "in_review", "review"}:
+        return "pending"
+    return s or "draft"
+
+
+def _status_label(status: Any) -> str:
+    key = _status_key(status)
+    return {
+        "approved": "Approved",
+        "draft": "Draft",
+        "sent": "Sent",
+        "pending": "Pending",
+        "rejected": "Rejected",
+    }.get(key, key.replace("_", " ").title())
+
+
+def _status_pill_html(status: Any) -> str:
+    key = _status_key(status)
+    palette = {
+        "approved": ("#DCFCE7", "#15803D", "#86EFAC"),
+        "draft": ("#F3F4F6", "#374151", "#D1D5DB"),
+        "sent": ("#DBEAFE", "#1D4ED8", "#93C5FD"),
+        "pending": ("#FEF3C7", "#B45309", "#FCD34D"),
+        "rejected": ("#FEE2E2", "#B91C1C", "#FCA5A5"),
+    }
+    bg, fg, border = palette.get(key, ("#F3F4F6", "#374151", "#D1D5DB"))
+    return (
+        f'<span class="ips-est-status-pill" style="background:{bg};color:{fg};border-color:{border};">'
+        f"{html.escape(_status_label(status))}</span>"
+    )
+
+
+def _line_item_rows(row: pd.Series | dict[str, Any], *, limit: int | None = None) -> list[dict[str, Any]]:
+    ej = _estimate_json(row)
+    out: list[dict[str, Any]] = []
+    for item in ej.get("materials", []) or []:
+        name = str(item.get("item") or item.get("description") or "Material").strip()
+        qty = item.get("qty") or item.get("quantity") or 0
+        unit_price = item.get("unit_price") or item.get("sell_price") or item.get("purchase_cost") or 0
+        out.append({
+            "Item": name,
+            "Description": str(item.get("description") or name),
+            "Qty": qty,
+            "Unit": str(item.get("unit") or "ea"),
+            "Unit Price": _estimate_money_zero(unit_price),
+            "Total": _estimate_money_zero(_estimate_decimal(qty) * _estimate_decimal(unit_price)),
+        })
+    for item in ej.get("labor", []) or []:
+        name = str(item.get("classification") or "Labor").strip()
+        qty = _estimate_decimal(item.get("headcount")) * _estimate_decimal(item.get("days") or 1)
+        rate = item.get("rate") or item.get("st_rate") or item.get("hourly_rate") or 0
+        out.append({
+            "Item": name,
+            "Description": "Labor crew / classification",
+            "Qty": qty,
+            "Unit": "crew day",
+            "Unit Price": _estimate_money_zero(rate),
+            "Total": _estimate_money_zero(_estimate_decimal(qty) * _estimate_decimal(rate)),
+        })
+    for item in ej.get("equipment", []) or []:
+        name = str(item.get("equipment_item") or "Equipment").strip()
+        qty = _estimate_decimal(item.get("qty") or 0) * _estimate_decimal(item.get("duration") or 1)
+        rate = item.get("rate") or item.get("daily_rate") or item.get("weekly_rate") or 0
+        out.append({
+            "Item": name,
+            "Description": str(item.get("basis") or "Equipment rental/tool"),
+            "Qty": qty,
+            "Unit": str(item.get("basis") or "day"),
+            "Unit Price": _estimate_money_zero(rate),
+            "Total": _estimate_money_zero(_estimate_decimal(qty) * _estimate_decimal(rate)),
+        })
+    return out[:limit] if limit is not None else out
+
+
+def _estimate_breakdown(row: pd.Series | dict[str, Any]) -> dict[str, Decimal]:
+    ej = _estimate_json(row)
+    labor = _estimate_decimal(row.get("labor_total") if hasattr(row, "get") else None)
+    equipment = _estimate_decimal(row.get("equipment_total") if hasattr(row, "get") else None)
+    material = _estimate_decimal(row.get("material_total") if hasattr(row, "get") else None)
+    if labor <= 0:
+        for item in ej.get("labor", []) or []:
+            labor += _estimate_decimal(item.get("headcount")) * _estimate_decimal(item.get("days") or 1) * _estimate_decimal(item.get("rate") or item.get("st_rate"))
+    if equipment <= 0:
+        for item in ej.get("equipment", []) or []:
+            equipment += _estimate_decimal(item.get("qty")) * _estimate_decimal(item.get("duration") or 1) * _estimate_decimal(item.get("rate") or item.get("daily_rate"))
+    if material <= 0:
+        for item in ej.get("materials", []) or []:
+            material += _estimate_decimal(item.get("qty")) * _estimate_decimal(item.get("unit_price") or item.get("sell_price") or item.get("purchase_cost"))
+    grand = _estimate_decimal(row.get("proposal_total") if hasattr(row, "get") else None)
+    other = grand - labor - equipment - material
+    if other < 0:
+        other = Decimal("0")
+    return {"Labor": labor, "Materials": material, "Equipment": equipment, "Other": other}
+
+
+def _donut_svg_html(parts: dict[str, Decimal]) -> str:
+    colors = {"Labor": "#2563EB", "Materials": "#10B981", "Equipment": "#F59E0B", "Other": "#94A3B8"}
+    total = sum(parts.values(), Decimal("0"))
+    if total <= 0:
+        total = Decimal("1")
+    circumference = Decimal("100")
+    offset = Decimal("25")
+    circles: list[str] = []
+    for name, value in parts.items():
+        pct = max(Decimal("0"), value) / total * circumference
+        circles.append(
+            f'<circle class="ips-est-donut-seg" r="15.9155" cx="18" cy="18" '
+            f'fill="transparent" stroke="{colors[name]}" stroke-width="4" '
+            f'stroke-dasharray="{pct:.3f} {circumference - pct:.3f}" '
+            f'stroke-dashoffset="{offset:.3f}"></circle>'
+        )
+        offset -= pct
+    legend = "".join(
+        f'<div class="ips-est-donut-legend-row"><span><i style="background:{colors[name]}"></i>{html.escape(name)}</span>'
+        f'<strong>{html.escape(_estimate_money_zero(value))} · {html.escape(_estimate_percent(value, sum(parts.values(), Decimal("0"))))}</strong></div>'
+        for name, value in parts.items()
+    )
+    return (
+        '<div class="ips-est-donut-wrap"><svg viewBox="0 0 36 36" class="ips-est-donut">'
+        '<circle r="15.9155" cx="18" cy="18" fill="transparent" stroke="#E5EAF2" stroke-width="4"></circle>'
+        + "".join(circles)
+        + "</svg><div class=\"ips-est-donut-legend\">"
+        + legend
+        + f'<div class="ips-est-donut-total"><span>Total</span><strong>{html.escape(_estimate_money_zero(sum(parts.values(), Decimal("0"))))}</strong></div>'
+        + "</div></div>"
+    )
+
+
+def _inject_estimates_page_styles() -> None:
+    key = "ips_estimates_refactor_styles_v1"
+    if st.session_state.get(key):
+        return
+    st.session_state[key] = True
+    st.markdown(
         """
-        Row-level description shown in the Estimates list.
-        Prefer explicit short estimate description; fall back to older compatibility keys.
-        Avoid using Scope of Work unless nothing else exists.
-        """
-        desc = est_row.get("estimate_description")
-        if desc is None or (isinstance(desc, float) and pd.isna(desc)):
-            desc = ""
-        if not str(desc).strip():
-            ej = est_row.get("estimate_json")
-            if isinstance(ej, dict):
-                desc = ej.get("estimate_description") or ""
-        if not str(desc).strip():
-            ej = est_row.get("estimate_json")
-            if isinstance(ej, dict):
-                desc = ej.get("job") or ej.get("job_name") or ""
-        if not str(desc).strip():
-            # Absolute last resort: first line of Scope of Work (can be long proposal text).
-            desc = est_row.get("scope_of_work") or ""
-        s = str(desc or "").strip()
-        if not s:
-            return ""
-        # Keep list rows scannable: first line, capped length.
-        s = s.splitlines()[0].strip()
-        return s[:60] + ("…" if len(s) > 60 else "")
+        <style>
+        section[data-testid="stMain"] {
+            background: #F6F8FB !important;
+        }
+        .ips-est-header-card,
+        .ips-est-filter-card,
+        .ips-est-table-card,
+        .ips-est-detail-panel,
+        .ips-est-summary-card {
+            background: #FFFFFF;
+            border: 1px solid #E5EAF2;
+            border-radius: 14px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .ips-est-header-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.1rem;
+            margin: 0 0 0.75rem;
+        }
+        .ips-est-header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        .ips-est-icon {
+            align-items: center;
+            background: #EFF6FF;
+            border-radius: 12px;
+            color: #2563EB;
+            display: inline-flex;
+            font-size: 1.35rem;
+            height: 44px;
+            justify-content: center;
+            width: 44px;
+        }
+        .ips-est-title {
+            color: #111827;
+            font-size: 1.35rem;
+            font-weight: 750;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+        .ips-est-subtitle {
+            color: #64748B;
+            font-size: 0.92rem;
+            margin: 0.08rem 0 0;
+        }
+        .ips-est-filter-card {
+            padding: 0.8rem;
+            margin-bottom: 0.85rem;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-detail-anchor) {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+        .ips-est-table-card {
+            overflow: hidden;
+            margin-bottom: 0.9rem;
+        }
+        .ips-est-table-head,
+        .ips-est-table-row {
+            display: grid;
+            grid-template-columns: 1.05fr 2.15fr 1.25fr 1fr 1fr 0.9fr 0.8fr 1fr 0.65fr;
+            gap: 0;
+            align-items: center;
+        }
+        .ips-est-table-head {
+            background: #F8FAFC;
+            border-bottom: 1px solid #E5EAF2;
+            color: #64748B;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            padding: 0.65rem 0.85rem;
+            text-transform: uppercase;
+        }
+        .ips-est-table-head span::after {
+            color: #CBD5E1;
+            content: " ↕";
+            font-size: 0.7rem;
+        }
+        .ips-est-table-row {
+            border-left: 4px solid transparent;
+            border-bottom: 1px solid #EEF2F7;
+            color: #111827;
+            min-height: 56px;
+            padding: 0.48rem 0.85rem 0.48rem calc(0.85rem - 4px);
+        }
+        .ips-est-table-row.is-selected {
+            background: #EFF6FF;
+            border-left-color: #2563EB;
+        }
+        .ips-est-quote-link {
+            color: #2563EB;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .ips-est-project-title {
+            color: #111827;
+            font-size: 0.9rem;
+            font-weight: 700;
+            line-height: 1.25;
+            margin: 0;
+        }
+        .ips-est-project-desc {
+            color: #64748B;
+            font-size: 0.78rem;
+            line-height: 1.25;
+            margin: 0.1rem 0 0;
+        }
+        .ips-est-cell {
+            color: #334155;
+            font-size: 0.84rem;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+        .ips-est-status-pill {
+            border: 1px solid;
+            border-radius: 999px;
+            display: inline-flex;
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0.28rem 0.55rem;
+            white-space: nowrap;
+        }
+        .ips-est-actions {
+            color: #64748B;
+            display: flex;
+            gap: 0.3rem;
+            justify-content: flex-end;
+        }
+        .ips-est-actions a {
+            align-items: center;
+            border: 1px solid #E5EAF2;
+            border-radius: 8px;
+            color: #475569;
+            display: inline-flex;
+            height: 28px;
+            justify-content: center;
+            text-decoration: none;
+            width: 28px;
+        }
+        .ips-est-actions a:hover {
+            background: #EFF6FF;
+            border-color: #BFDBFE;
+            color: #2563EB;
+        }
+        .ips-est-detail-panel {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .ips-est-detail-head {
+            display: grid;
+            grid-template-columns: 1.8fr 1.2fr 1fr;
+            gap: 1rem;
+            align-items: start;
+            border-bottom: 1px solid #E5EAF2;
+            padding-bottom: 0.85rem;
+            margin-bottom: 0.85rem;
+        }
+        .ips-est-detail-title {
+            color: #111827;
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin: 0;
+        }
+        .ips-est-detail-title-row {
+            align-items: center;
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .ips-est-detail-sub {
+            color: #64748B;
+            font-size: 0.9rem;
+            margin: 0.18rem 0;
+        }
+        .ips-est-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.3rem;
+        }
+        .ips-est-meta-grid span {
+            color: #64748B;
+            display: block;
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .ips-est-meta-grid strong {
+            color: #111827;
+            font-size: 0.86rem;
+        }
+        .ips-est-summary-card {
+            min-height: 230px;
+            padding: 0.9rem;
+        }
+        .ips-est-card-title {
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 750;
+            margin: 0 0 0.7rem;
+        }
+        .ips-est-kv {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 1px solid #F1F5F9;
+            padding: 0.42rem 0;
+        }
+        .ips-est-kv span {
+            color: #64748B;
+            font-size: 0.8rem;
+        }
+        .ips-est-kv strong {
+            color: #111827;
+            font-size: 0.82rem;
+            text-align: right;
+        }
+        .ips-est-donut-wrap {
+            align-items: center;
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 0.8rem;
+        }
+        .ips-est-donut {
+            height: 120px;
+            transform: rotate(-90deg);
+            width: 120px;
+        }
+        .ips-est-donut-seg {
+            transition: stroke-dasharray 0.2s ease;
+        }
+        .ips-est-donut-legend-row,
+        .ips-est-donut-total {
+            align-items: center;
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+        }
+        .ips-est-donut-legend-row span,
+        .ips-est-donut-total span {
+            align-items: center;
+            color: #64748B;
+            display: inline-flex;
+            font-size: 0.78rem;
+            gap: 0.35rem;
+        }
+        .ips-est-donut-legend-row i {
+            border-radius: 999px;
+            display: inline-block;
+            height: 8px;
+            width: 8px;
+        }
+        .ips-est-donut-legend-row strong,
+        .ips-est-donut-total strong {
+            color: #111827;
+            font-size: 0.78rem;
+        }
+        .ips-est-donut-total {
+            border-top: 1px solid #E5EAF2;
+            margin-top: 0.3rem;
+            padding-top: 0.45rem;
+        }
+        .ips-est-section-title-row {
+            align-items: center;
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin: 0.95rem 0 0.45rem;
+        }
+        .ips-est-section-title-row h4 {
+            color: #111827;
+            font-size: 0.98rem;
+            font-weight: 750;
+            margin: 0;
+        }
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+            border-color: #E5EAF2 !important;
+            border-radius: 10px !important;
+            min-height: 40px !important;
+        }
+        [data-testid="stTabs"] [role="tablist"] {
+            border-bottom: 1px solid #E5EAF2 !important;
+            gap: 1rem !important;
+        }
+        [data-testid="stTabs"] [role="tab"] {
+            border-radius: 0 !important;
+            color: #64748B !important;
+            padding: 0.45rem 0 !important;
+        }
+        [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+            border-bottom: 2px solid #2563EB !important;
+            color: #2563EB !important;
+        }
+        @media (max-width: 1100px) {
+            .ips-est-table-head,
+            .ips-est-table-row {
+                grid-template-columns: 1fr 1.7fr 1.1fr 0.9fr 0.8fr;
+            }
+            .ips-est-hide-tablet {
+                display: none;
+            }
+            .ips-est-detail-head {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+
+def _render_estimates_header(df_export: pd.DataFrame) -> None:
+    st.markdown(
+        """
+        <div class="ips-est-header-card">
+          <div class="ips-est-header-left">
+            <div class="ips-est-icon">📄</div>
+            <div>
+              <h1 class="ips-est-title">Estimates</h1>
+              <p class="ips-est-subtitle">Create, review, and manage all project estimates.</p>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _, h2, h3, h4 = st.columns([5, 1.05, 1.25, 1.35], gap="small")
+    with h2:
+        st.download_button(
+            "Export",
+            data=df_export.to_csv(index=False).encode("utf-8"),
+            file_name="estimates_export.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="est_ref_export",
+        )
+    with h3:
+        if st.button("Import Existing Quotes", type="secondary", use_container_width=True, key="est_ref_import"):
+            _reset_estimate_editor_transients(clear_import_hints=True)
+            st.session_state["estimates_view"] = "import"
+            st.rerun()
+    with h4:
+        if st.button("+ New Estimate", type="primary", use_container_width=True, key="est_ref_new"):
+            _new_estimate()
+
+
+def _estimate_filtered_df(
+    df: pd.DataFrame,
+    *,
+    customer_by_id: dict[str, str],
+    customer_name_to_id: dict[str, str],
+) -> pd.DataFrame:
+    st.markdown('<div class="ips-est-filter-card">', unsafe_allow_html=True)
+    c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.25, 1.45, 1.45, 1.35, 1.0], gap="small")
+    with c1:
+        search = st.text_input("Search", placeholder="Search estimates...", key="est_ref_search", label_visibility="collapsed")
+    statuses = ["All Statuses"]
+    if not df.empty and "status" in df.columns:
+        statuses += sorted({_status_label(v) for v in df["status"].dropna().tolist()})
+    with c2:
+        status_pick = st.selectbox("Status", statuses, key="est_ref_status", label_visibility="collapsed")
+    customers = ["All Customers"] + sorted(customer_name_to_id.keys())
+    with c3:
+        customer_pick = st.selectbox("Customer", customers, key="est_ref_customer", label_visibility="collapsed")
+    creators = ["All Created By"]
     if not df.empty:
-        keep = [
-            c
-            for c in [
-                "quote_number",
-                "status",
-                "proposal_total",
-                "job_received",
-                "po_number",
-                "scope_of_work",
-                "estimate_json",
-                "customer_location_id",
-            ]
-            if c in df.columns
-        ]
-        if "id" in df.columns:
-            keep = ["id"] + [c for c in keep if c != "id"]
-        if "job_id" in df.columns and "job_id" not in keep:
-            keep.insert(1, "job_id")
-        df = df[keep]
+        creators += sorted({_estimate_created_by(r) for _, r in df.iterrows() if _estimate_created_by(r) != "—"})
+    with c4:
+        creator_pick = st.selectbox("Created By", creators, key="est_ref_creator", label_visibility="collapsed")
+    with c5:
+        date_range = st.date_input("Date range", value=(), key="est_ref_date_range", label_visibility="collapsed")
+    with c6:
+        if st.button("Clear Filters", use_container_width=True, key="est_ref_clear_filters"):
+            for key in ("est_ref_search", "est_ref_status", "est_ref_customer", "est_ref_creator", "est_ref_date_range"):
+                st.session_state.pop(key, None)
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        if "status" in df.columns:
-            statuses = ["All"] + sorted(df["status"].dropna().astype(str).unique().tolist())
-            selected = st.selectbox("Filter Status", statuses, key="est_list_status")
-            if selected != "All":
-                df = df[df["status"] == selected]
+    out = df.copy()
+    if search.strip() and not out.empty:
+        s = search.strip().lower()
+        def _hay(row: pd.Series) -> str:
+            return " ".join([
+                _estimate_text(row.get("quote_number"), ""),
+                _estimate_project_title(row),
+                _estimate_description(row),
+                _estimate_customer_name(row, customer_by_id),
+                _estimate_created_by(row),
+                _estimate_text(row.get("po_number"), ""),
+            ]).lower()
+        out = out[out.apply(lambda r: s in _hay(r), axis=1)]
+    if status_pick != "All Statuses" and not out.empty:
+        out = out[out["status"].map(_status_label) == status_pick] if "status" in out.columns else out
+    if customer_pick != "All Customers" and not out.empty:
+        cid = customer_name_to_id.get(customer_pick, "")
+        out = out[out["customer_id"].astype(str) == cid] if cid and "customer_id" in out.columns else out
+    if creator_pick != "All Created By" and not out.empty:
+        out = out[out.apply(lambda r: _estimate_created_by(r) == creator_pick, axis=1)]
+    if isinstance(date_range, tuple) and len(date_range) == 2 and not out.empty:
+        start, end = date_range
+        def _in_range(row: pd.Series) -> bool:
+            raw = _estimate_date(row)
+            if raw == "—":
+                return False
+            try:
+                d = pd.to_datetime(raw).date()
+                return start <= d <= end
+            except Exception:
+                return True
+        out = out[out.apply(_in_range, axis=1)]
+    return out
 
-        search = st.text_input("Search Quote / PO Number", key="est_list_search")
-        if search.strip():
-            s = search.strip().lower()
-            mask = df.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            df = df[mask.any(axis=1)]
 
-        df = df.copy()
-        df["Linked job"] = df.apply(_linked_job_display_cell, axis=1)
-
+def _render_estimate_table(
+    df: pd.DataFrame,
+    *,
+    customer_by_id: dict[str, str],
+) -> str | None:
     if df.empty:
+        st.markdown(
+            '<div class="ips-est-table-card" style="padding:1.2rem;color:#64748B;">No estimates match the current filters.</div>',
+            unsafe_allow_html=True,
+        )
+        return None
+    selected_id = str(st.session_state.get("est_selected_id") or "").strip()
+    ids = [str(r.get("id") or "").strip() for _, r in df.iterrows() if str(r.get("id") or "").strip()]
+    if selected_id not in ids and ids:
+        selected_id = ids[0]
+        st.session_state["est_selected_id"] = selected_id
+
+    st.markdown('<span class="ips-est-table-anchor"></span><div class="ips-est-table-card">', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="ips-est-table-head">
+          <span>Estimate #</span><span>Project / Description</span><span>Customer</span>
+          <span class="ips-est-hide-tablet">Estimate Date</span><span class="ips-est-hide-tablet">Expiration Date</span>
+          <span>Total</span><span>Status</span><span class="ips-est-hide-tablet">Created By</span><span>Actions</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    for _, row in df.iterrows():
+        eid = str(row.get("id") or "").strip()
+        if not eid:
+            continue
+        is_selected = eid == selected_id
+        quote = _estimate_text(row.get("quote_number"), f"EST-{eid[:8]}")
+        project = _estimate_project_title(row)
+        desc = _estimate_description(row)
+        customer = _estimate_customer_name(row, customer_by_id)
+        total = _estimate_money_zero(row.get("proposal_total") or row.get("final_bid"))
+        row_cls = "ips-est-table-row is-selected" if is_selected else "ips-est-table-row"
+        view_href = html.escape(_estimate_select_href(eid), quote=True)
+        more_href = html.escape(_estimate_select_href(eid, action="more"), quote=True)
+        st.markdown(
+            f"""
+            <div class="{row_cls}">
+              <div><a class="ips-est-quote-link" href="{view_href}">{html.escape(quote)}</a></div>
+              <div><p class="ips-est-project-title">{html.escape(project)}</p><p class="ips-est-project-desc">{html.escape(desc)}</p></div>
+              <div class="ips-est-cell">{html.escape(customer)}</div>
+              <div class="ips-est-cell ips-est-hide-tablet">{html.escape(_estimate_date(row))}</div>
+              <div class="ips-est-cell ips-est-hide-tablet">{html.escape(_estimate_expiration_date(row))}</div>
+              <div class="ips-est-cell"><strong>{html.escape(total)}</strong></div>
+              <div>{_status_pill_html(row.get("status"))}</div>
+              <div class="ips-est-cell ips-est-hide-tablet">{html.escape(_estimate_created_by(row))}</div>
+              <div class="ips-est-actions"><a href="{view_href}" title="View">👁</a><a href="{more_href}" title="More">⋯</a></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+    return selected_id
+
+
+def _render_kv(label: str, value: Any) -> None:
+    st.markdown(
+        f'<div class="ips-est-kv"><span>{html.escape(label)}</span><strong>{html.escape(str(value))}</strong></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_overview_tab(row: pd.Series, *, customer_by_id: dict[str, str], linked_job: str) -> None:
+    c1, c2, c3 = st.columns(3, gap="medium")
+    total = _estimate_decimal(row.get("proposal_total") or row.get("final_bid"))
+    tax = _estimate_decimal(row.get("sales_tax_total") or row.get("tax"))
+    subtotal = _estimate_decimal(row.get("subtotal")) or max(Decimal("0"), total - tax)
+    markup = _estimate_decimal(row.get("markup_total") or row.get("profit_total"))
+    with c1:
+        st.markdown('<div class="ips-est-summary-card"><h3 class="ips-est-card-title">Estimate Summary</h3>', unsafe_allow_html=True)
+        _render_kv("Description", _estimate_description(row))
+        _render_kv("Project Type", _estimate_project_type(row))
+        _render_kv("Customer", _estimate_customer_name(row, customer_by_id))
+        st.markdown(f'<div class="ips-est-kv"><span>Status</span><strong>{_status_pill_html(row.get("status"))}</strong></div>', unsafe_allow_html=True)
+        _render_kv("Linked Job", linked_job or "—")
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="ips-est-summary-card"><h3 class="ips-est-card-title">Financial Summary</h3>', unsafe_allow_html=True)
+        _render_kv("Subtotal", _estimate_money_zero(subtotal))
+        _render_kv("Tax", _estimate_money_zero(tax))
+        _render_kv("Total", _estimate_money_zero(total))
+        _render_kv("Markup", _estimate_money_zero(markup))
+        _render_kv("Grand Total", _estimate_money_zero(total))
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="ips-est-summary-card"><h3 class="ips-est-card-title">Estimate Totals</h3>', unsafe_allow_html=True)
+        st.markdown(_donut_svg_html(_estimate_breakdown(row)), unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="ips-est-section-title-row"><h4>Top Line Items</h4></div>',
+        unsafe_allow_html=True,
+    )
+    lines = _line_item_rows(row, limit=5)
+    if lines:
+        st.dataframe(pd.DataFrame(lines), use_container_width=True, hide_index=True)
+    else:
+        st.info("No line items found on this estimate.")
+    if st.button("View All Line Items", key="est_ref_view_all_lines"):
+        st.session_state["est_ref_detail_tab_hint"] = "Line Items"
+
+
+def _render_detail_tab_table(title: str, rows: list[dict[str, Any]], empty: str) -> None:
+    st.markdown(f"#### {title}")
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    else:
+        st.info(empty)
+
+
+def _render_estimate_detail_panel(
+    row: pd.Series,
+    *,
+    customer_by_id: dict[str, str],
+    linked_job: str,
+) -> None:
+    eid = str(row.get("id") or "").strip()
+    quote = _estimate_text(row.get("quote_number"), f"EST-{eid[:8]}")
+    ej = _estimate_json(row)
+    st.markdown('<span class="ips-est-detail-anchor"></span><div class="ips-est-detail-panel">', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="ips-est-detail-head">
+          <div>
+            <div class="ips-est-detail-title-row">
+              <h2 class="ips-est-detail-title">{html.escape(quote)}</h2>{_status_pill_html(row.get("status"))}
+            </div>
+            <p class="ips-est-detail-sub"><strong>{html.escape(_estimate_project_title(row))}</strong></p>
+            <p class="ips-est-detail-sub">{html.escape(_estimate_customer_name(row, customer_by_id))}</p>
+          </div>
+          <div class="ips-est-meta-grid">
+            <div><span>Estimate Date</span><strong>{html.escape(_estimate_date(row))}</strong></div>
+            <div><span>Expiration Date</span><strong>{html.escape(_estimate_expiration_date(row))}</strong></div>
+            <div><span>Created By</span><strong>{html.escape(_estimate_created_by(row))}</strong></div>
+          </div>
+          <div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    a1, a2, a3, a4, _ = st.columns([1, 1.2, 0.8, 0.75, 4], gap="small")
+    with a1:
+        if st.button("Edit", type="primary", key=f"est_ref_detail_edit_{eid}", use_container_width=True):
+            _open_estimate_editor(eid)
+    with a2:
+        if st.button("Send Estimate", key=f"est_ref_detail_send_{eid}", use_container_width=True):
+            st.info("Use Edit to preview/export the proposal with the existing estimate workflow.")
+    with a3:
+        if st.button("More", key=f"est_ref_detail_more_{eid}", use_container_width=True):
+            st.session_state["est_ref_show_more"] = eid if st.session_state.get("est_ref_show_more") != eid else ""
+            st.rerun()
+    with a4:
+        if st.button("⌃", key=f"est_ref_detail_collapse_{eid}", help="Collapse detail panel", use_container_width=True):
+            st.session_state.pop("est_selected_id", None)
+            st.rerun()
+    if st.session_state.get("est_ref_show_more") == eid:
+        m1, m2, _ = st.columns([1.2, 1.4, 4], gap="small")
+        with m1:
+            if linked_job:
+                more_label = "Open Job"
+                more_disabled = False
+            else:
+                more_label = "Create Job"
+                more_disabled = not _estimates_page_can_edit()
+                try:
+                    from services.job_from_estimate import estimate_status_allows_job_creation
+                except ImportError:
+                    from app.services.job_from_estimate import estimate_status_allows_job_creation  # type: ignore
+                if not str(row.get("customer_id") or "").strip() or not estimate_status_allows_job_creation(str(row.get("status") or "")):
+                    more_disabled = True
+            if st.button(more_label, key=f"est_ref_more_job_{eid}", use_container_width=True, disabled=more_disabled):
+                job_rows = _fetch_jobs_for_estimate_links()
+                job = next((j for j in job_rows if str(j.get("estimate_id") or "") == eid), None)
+                if not job:
+                    try:
+                        from services.job_from_estimate import create_job_from_estimate
+                    except ImportError:
+                        from app.services.job_from_estimate import create_job_from_estimate  # type: ignore
+                    res = create_job_from_estimate(eid)
+                    if res.ok and res.job:
+                        _clear_estimates_page_cache()
+                        job = res.job
+                        st.success(res.message)
+                    elif res.message:
+                        st.error(res.message)
+                if job and job.get("id"):
+                    try:
+                        from ui import IPS_NAV_PENDING_KEY
+                    except ImportError:
+                        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
+                    st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
+                    st.session_state["job_mode"] = "edit"
+                    st.session_state["job_edit_id"] = str(job["id"])
+                    st.rerun()
+        with m2:
+            if st.button("Delete Estimate", key=f"est_ref_more_delete_{eid}", use_container_width=True, disabled=not _estimates_page_can_edit()):
+                st.session_state["est_ref_confirm_delete"] = eid
+                st.rerun()
+        if st.session_state.get("est_ref_confirm_delete") == eid:
+            st.warning("Delete this estimate? Linked jobs are kept and unlinked from this quote.")
+            d1, d2, _ = st.columns([1, 1, 4], gap="small")
+            with d1:
+                if st.button("Confirm Delete", key=f"est_ref_delete_confirm_{eid}", type="primary"):
+                    delete_estimate_unlink_first(eid, admin_read=_estimates_page_admin_read())
+                    _clear_estimates_page_cache()
+                    st.session_state.pop("est_selected_id", None)
+                    st.session_state.pop("est_ref_confirm_delete", None)
+                    st.success("Estimate deleted.")
+                    st.rerun()
+            with d2:
+                if st.button("Cancel", key=f"est_ref_delete_cancel_{eid}"):
+                    st.session_state.pop("est_ref_confirm_delete", None)
+                    st.rerun()
+
+    tabs = st.tabs(["Overview", "Line Items", "Labor", "Materials", "Equipment", "Attachments", "Notes", "Activity"])
+    with tabs[0]:
+        _render_overview_tab(row, customer_by_id=customer_by_id, linked_job=linked_job)
+    with tabs[1]:
+        _render_detail_tab_table("Line Items", _line_item_rows(row), "No line items found on this estimate.")
+    with tabs[2]:
+        _render_detail_tab_table("Labor", ej.get("labor", []) or [], "No labor entries found.")
+    with tabs[3]:
+        _render_detail_tab_table("Materials", ej.get("materials", []) or [], "No material entries found.")
+    with tabs[4]:
+        _render_detail_tab_table("Equipment", ej.get("equipment", []) or [], "No equipment entries found.")
+    with tabs[5]:
+        st.info("Attachments are managed in the existing estimate editor/export workflow.")
+    with tabs[6]:
+        notes = "\n\n".join(
+            str(ej.get(k) or row.get(k) or "").strip()
+            for k in ("scope_of_work", "exclusions", "additional_charges", "customer_responsibilities")
+            if str(ej.get(k) or row.get(k) or "").strip()
+        )
+        st.text_area("Notes", value=notes, height=180, disabled=True, key=f"est_ref_notes_{eid}")
+    with tabs[7]:
+        activity_rows = [
+            {"Action": "Created", "Date": _estimate_date_display(row.get("created_at")), "By": _estimate_created_by(row)},
+            {"Action": "Updated", "Date": _estimate_date_display(row.get("updated_at")), "By": _estimate_created_by(row)},
+            {"Action": f"Status: {_status_label(row.get('status'))}", "Date": _estimate_date(row), "By": _estimate_created_by(row)},
+        ]
+        st.dataframe(pd.DataFrame(activity_rows), use_container_width=True, hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_estimate_management_list() -> None:
+    _inject_estimates_page_styles()
+    _consume_estimate_query_selection()
+    rows = _fetch_estimates_list_rows()
+    customers = _fetch_customers_for_import()
+    customer_by_id, customer_name_to_id = _customer_name_maps(customers)
+    jobs = _fetch_jobs_for_estimate_links()
+    job_by_id = {str(r["id"]): r for r in jobs if r.get("id")}
+    job_by_estimate_id = {str(r["estimate_id"]): r for r in jobs if r.get("estimate_id")}
+    df = pd.DataFrame(rows)
+    if df.empty:
+        df_export = pd.DataFrame(columns=["Estimate #", "Project / Description", "Customer", "Estimate Date", "Expiration Date", "Total", "Status", "Created By"])
+        _render_estimates_header(df_export)
         st.info("No estimates found.")
         return
-
-    location_by_id: dict[str, dict[str, Any]] = {}
-
-    def _site_line_for_estimate(est_row: pd.Series) -> str:
-        if "customer_location_id" not in est_row.index:
-            return ""
-        raw = est_row.get("customer_location_id")
-        if raw is None:
-            return ""
-        try:
-            if pd.isna(raw):
-                return ""
-        except Exception:
-            pass
-        lid = str(raw).strip()
-        if not lid:
-            return ""
-        try:
-            from services.customer_locations import location_display_name_city_state
-        except ImportError:
-            from app.services.customer_locations import location_display_name_city_state  # type: ignore
-
-        row = location_by_id.get(lid)
-        return location_display_name_city_state(row) if row else ""
-
-    if "customer_location_id" in df.columns:
-        try:
-            from services.customer_locations import fetch_all_locations_indexed
-        except ImportError:
-            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
-
-        location_by_id = fetch_all_locations_indexed(admin_read=_estimates_page_admin_read())
-
-    # Visible columns: fixed order handled explicitly in the row layout below.
     if "id" not in df.columns:
+        _render_estimates_header(df)
         st.dataframe(df, use_container_width=True, hide_index=True)
         return
 
-    try:
-        from services.job_from_estimate import (
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
-    except ImportError:
-        from app.services.job_from_estimate import (  # type: ignore
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
+    export_rows = []
+    for _, row in df.iterrows():
+        export_rows.append({
+            "Estimate #": _estimate_text(row.get("quote_number"), str(row.get("id") or "")),
+            "Project / Description": _estimate_project_title(row),
+            "Customer": _estimate_customer_name(row, customer_by_id),
+            "Estimate Date": _estimate_date(row),
+            "Expiration Date": _estimate_expiration_date(row),
+            "Total": _estimate_money_csv(row.get("proposal_total") or row.get("final_bid")),
+            "Status": _status_label(row.get("status")),
+            "Created By": _estimate_created_by(row),
+        })
+    df_export = pd.DataFrame(export_rows)
+    _render_estimates_header(df_export)
 
-    try:
-        from ui import IPS_NAV_PENDING_KEY
-    except ImportError:
-        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-
-    def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
-        """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
-        if not can_edit:
-            return "Only admin or pm can run this action."
-        if _series_truthy_job_received(est_row):
-            return "This estimate is already marked as job received."
-        if not cust_id:
-            return "Choose a customer on the estimate before creating a job."
-        st_raw = str(est_row.get("status") or "")
-        if not estimate_status_allows_job_creation(st_raw):
-            return (
-                f"Estimate status {st_raw!r} does not allow creating a job from this page. "
-                "Job creation is only allowed after customer approval (approved/accepted/awarded/po_received). "
-                "Update status first, or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
-            )
-        return ""
-
-    st.caption(
-        "**Estimates = quotes / proposals** (pricing and approval live here). "
-        "**Jobs = costing / work records** in Job Database — create from an accepted estimate or standalone for field work."
-    )
-    st.caption(
-        "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "
-        "Use the **action bar** below for view, edit, delete, and export."
-    )
-    nav1, nav2 = st.columns([1.15, 3])
-    with nav1:
-        st.checkbox(
-            "Open new job in Job Database",
-            value=True,
-            key="est_job_recv_open_job_db",
-            help="After Job Received success, go to Job Database with that job open.",
-        )
-    with nav2:
-        st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
-
-    # Visible order (exact):
-    # Blank | Job | quote | Estimate Description | proposal | status | linked job | po | approve | delete
-    col_weights = [
-        0.4,  # checkbox
-        1.3,  # job
-        1.1,  # quote
-        2.4,  # description
-        1.0,  # proposal
-        0.9,  # status
-        1.8,  # linked job
-        1.0,  # po
-        0.8,  # approve
-        0.5,  # delete
-    ]
-    head = st.columns(col_weights)
-    with head[0]:
-        st.caption(" ")
-    with head[1]:
-        st.caption("Job")
-    with head[2]:
-        st.caption("Quote")
-    with head[3]:
-        st.caption("Estimate Description")
-    with head[4]:
-        st.caption("Proposal total")
-    with head[5]:
-        st.caption("Status")
-    with head[6]:
-        st.caption("Linked job")
-    with head[7]:
-        st.caption("PO #")
-    with head[8]:
-        st.caption("Approve")
-    with head[9]:
-        st.caption("Del")
-
-    picked: list[str] = []
-    for _, est_row in df.iterrows():
-        eid = _row_estimate_id(est_row)
-        if not eid:
-            continue
-        linked_id = _linked_job_id_for_row(est_row)
-        cust_id = eid_to_customer.get(eid, "")
-        row_status = str(est_row.get("status") or "").strip().lower()
-        rc = st.columns(col_weights)
-        with rc[0]:
-            ck = f"est_list_pick_{eid}"
-            if ck not in st.session_state:
-                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
-            checked = st.checkbox("", key=ck, label_visibility="collapsed")
-            if checked:
-                picked.append(eid)
-        with rc[1]:
-            if linked_id:
-                st.button(
-                    "Job Created",
-                    key=f"job_created_{eid}",
-                    disabled=True,
-                    use_container_width=True,
-                    help="A job is already linked to this estimate.",
-                )
-            else:
-                reason = _job_received_disabled_reason(est_row, cust_id=cust_id)
-                ready = not reason
-                clicked = st.button(
-                    "Job Received",
-                    key=f"job_received_{eid}",
-                    disabled=not ready,
-                    use_container_width=True,
-                    help=(
-                        "Create a job from this estimate, link it, and mark job received."
-                        if ready
-                        else reason
-                    ),
-                )
-                if clicked and ready:
-                    res = create_job_from_estimate(str(eid), mark_job_received=True)
-                    if res.ok and res.job:
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_job_recv_open_job_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.success(res.message)
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        elif res.error_code == "job_received":
-                            st.info(res.message)
-                        else:
-                            st.error(res.message)
-        with rc[2]:
-            st.text(_estimate_list_cell_text(est_row.get("quote_number"), col="quote_number"))
-        with rc[3]:
-            st.text(_estimate_description_display(est_row))
-            site_ln = _site_line_for_estimate(est_row)
-            if site_ln:
-                st.caption(f"Site: {site_ln}")
-        with rc[4]:
-            st.text(_estimate_list_cell_text(est_row.get("proposal_total"), col="proposal_total"))
-        with rc[5]:
-            st.text(_estimate_list_cell_text(est_row.get("status"), col="status"))
-        with rc[6]:
-            st.text(_estimate_list_cell_text(est_row.get("Linked job"), col="Linked job"))
-        with rc[7]:
-            st.text(_estimate_list_cell_text(est_row.get("po_number"), col="po_number"))
-        with rc[8]:
-            is_approved = row_status == "approved"
-            can_approve = can_edit and row_status in ["draft", "submitted"]
-            approve_label = "Approved ✓" if is_approved else "Approve"
-            anchor_cls = "ips-est-approve-anchor" + (" ips-est-approve-done" if is_approved else "")
-            st.markdown(f'<span class="{anchor_cls}"></span>', unsafe_allow_html=True)
-            approve_btn_type = "primary" if (can_approve or is_approved) else "secondary"
-
-            if st.button(
-                approve_label,
-                key=f"est_row_approve_{eid}",
-                type=approve_btn_type,
-                disabled=not can_approve,
-                use_container_width=True,
-                help=(
-                    "Approve this estimate"
-                    if can_approve
-                    else ("Estimate is already approved" if is_approved else "Only draft/submitted estimates can be approved")
-                ),
-            ):
-                try:
-                    update_rows_admin("estimates", {"status": "approved"}, {"id": eid})
-                    st.success("Estimate approved.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Could not approve: {exc}")
-        with rc[9]:
-            del_enabled = bool(can_edit)
-            if not can_edit:
-                del_help = "Only admin or pm can delete estimates."
-            else:
-                del_help = (
-                    "Delete this estimate (quote). Linked jobs are kept; the job is unlinked from this quote."
-                )
-            if st.button(
-                "🗑",
-                key=f"est_row_del_{eid}",
-                disabled=not del_enabled,
-                use_container_width=True,
-                help=del_help,
-            ):
-                # Trigger the same confirmation flow the bulk action bar uses.
-                st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
-                st.rerun()
-
-    set_selected_ids(TABLE_KEY_ESTIMATES, picked)
-    sel = picked
-
-    df_export = df.copy()
-    for _mc in _MONEY_LIST_COLUMNS:
-        if _mc in df_export.columns:
-            df_export[_mc] = df_export[_mc].map(_estimate_money_csv)
-
-    actions = render_selection_action_bar(
-        TABLE_KEY_ESTIMATES,
-        sel,
-        can_view=True,
-        can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df_export,
-        visible_df=df,
-        id_column="id",
-        export_filename="estimates_export.csv",
-        on_bulk_selection_change=_cleanup_est_list_row_pick_keys,
-    )
-
-    if can_edit and sel and len(sel) == 1:
-        row_one = df[df["id"].astype(str) == str(sel[0])]
-        open_jid: str | None = None
-        linked_jn = ""
-        linked_jnm = ""
-        qn = ""
-        if not row_one.empty:
-            r0 = row_one.iloc[0]
-            open_jid = _linked_job_id_for_row(r0)
-            qn = str(r0.get("quote_number") or "").strip()
-            if open_jid and str(open_jid) in job_by_id:
-                job_row = job_by_id[str(open_jid)]
-                linked_jn = job_number_display(job_row.get("job_number"))
-                linked_jnm = str(job_row.get("job_name") or "").strip()
-        with st.container(border=True):
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            if open_jid:
-                jdisp = job_display_label(linked_jn, linked_jnm)
-                if jdisp:
-                    st.markdown(f"**Linked job** · **{jdisp}**", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "**Linked job** · _This estimate is linked to a job, but the job details could not be loaded._",
-                        unsafe_allow_html=True,
-                    )
-                if qn:
-                    st.caption(f"Source estimate quote · {qn}")
-                if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                    st.session_state["job_mode"] = "edit"
-                    st.session_state["job_edit_id"] = str(open_jid)
-                    st.rerun()
-            else:
-                lc1, lc2, lc3 = st.columns([1, 1, 2], gap="small")
-                with lc1:
-                    run_cj = st.button(
-                        "Create Job from Estimate",
-                        key="est_list_create_job_btn",
-                        use_container_width=True,
-                    )
-                with lc2:
-                    st.checkbox(
-                        "Open Job Database after create",
-                        value=True,
-                        key="est_list_create_job_open_db",
-                    )
-                with lc3:
-                    st.caption("Creates a **J#####** job once the estimate is customer-approved (approved/accepted/awarded/po_received).")
-                if run_cj:
-                    res = create_job_from_estimate(str(sel[0]))
-                    if res.ok and res.job:
-                        st.success(res.message)
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_list_create_job_open_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        else:
-                            st.error(res.message)
-    if (actions.get("view") or actions.get("edit")) and sel and len(sel) == 1:
-        _load_estimate_into_session(str(sel[0]))
-        st.session_state["estimates_view"] = "edit"
-        st.rerun()
-    pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-    if actions.get("confirm_delete") and pend.get(TABLE_KEY_ESTIMATES):
-        _est_admin_read = _estimates_page_admin_read()
-        for eid in pend[TABLE_KEY_ESTIMATES]:
-            try:
-                delete_estimate_unlink_first(str(eid), admin_read=_est_admin_read)
-            except Exception as exc:
-                st.error(f"Could not delete {eid}: {exc}")
-        pend.pop(TABLE_KEY_ESTIMATES, None)
-        clear_selected_ids(TABLE_KEY_ESTIMATES)
-        _cleanup_est_list_row_pick_keys()
-        st.success("Delete completed where permitted.")
-        st.rerun()
+    filtered = _estimate_filtered_df(df, customer_by_id=customer_by_id, customer_name_to_id=customer_name_to_id)
+    selected_id = _render_estimate_table(filtered, customer_by_id=customer_by_id)
+    if not selected_id:
+        return
+    selected_rows = filtered[filtered["id"].astype(str) == str(selected_id)]
+    if selected_rows.empty:
+        return
+    row = selected_rows.iloc[0]
+    linked_job = ""
+    jid = row.get("job_id")
+    if jid is not None and pd.notna(jid) and str(jid).strip() in job_by_id:
+        job = job_by_id[str(jid).strip()]
+        linked_job = job_display_label(job.get("job_number"), job.get("job_name"))
+    elif str(row.get("id") or "") in job_by_estimate_id:
+        job = job_by_estimate_id[str(row.get("id"))]
+        linked_job = job_display_label(job.get("job_number"), job.get("job_name"))
+    _render_estimate_detail_panel(row, customer_by_id=customer_by_id, linked_job=linked_job)
 
 
 def _import_customer_status_short(cls: dict[str, Any] | None) -> str:
@@ -981,36 +1530,8 @@ def render() -> None:
 
     # Single branding header per request; each branch renders one body section only.
     render_header("Estimates")
-    inject_table_action_styles()
-
     if view == "list":
-        render_crud_list_subtitle("Search and open estimates, create new rows, or import JSON / PDF vendor quotes.")
-        with st.container(border=True):
-            st.markdown(
-                '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
-                unsafe_allow_html=True,
-            )
-            a1, a2 = st.columns(2, gap="small")
-            with a1:
-                if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):
-                    _reset_estimate_editor_transients(clear_import_hints=True)
-                    st.session_state["estimate_editor_state"] = blank_estimate()
-                    st.session_state["loaded_estimate_id"] = None
-                    st.session_state["estimate_editor_quote_ready"] = False
-                    ensure_state()
-                    st.session_state["estimates_view"] = "edit"
-                    st.rerun()
-            with a2:
-                if st.button(
-                    "Import Existing Quotes",
-                    type="secondary",
-                    use_container_width=True,
-                    key="est_list_imp",
-                ):
-                    _reset_estimate_editor_transients(clear_import_hints=True)
-                    st.session_state["estimates_view"] = "import"
-                    st.rerun()
-        _render_estimate_list()
+        _render_estimate_management_list()
 
     elif view == "import":
         render_crud_list_subtitle("Upload PDF vendor quotes or JSON estimate exports, then return to the editor.")
