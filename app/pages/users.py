@@ -854,12 +854,18 @@ def _render_overview_tab(
     perms: frozenset[str],
     departments: list[str],
 ) -> None:
+    status = str(
+        disp.get("status")
+        or row.get("status")
+        or row.get("Status")
+        or "Inactive"
+    )
     c1, c2, c3 = st.columns([1.2, 1.1, 0.9], gap="medium")
     notes = ""
     if emp:
         notes = _safe_str(emp.get("notes"))
     role_key = str(disp.get("role_key") or "")
-    status_lbl = str(disp.get("status") or "—")
+    status_lbl = status
     badge_html = {
         "Role": role_badge_html(role_lbl, color_key=role_key),
         "Status": status_badge_html(status_lbl),
