@@ -549,7 +549,7 @@ def render_estimates_list_page(
             title = _project_title(full_row if isinstance(full_row, dict) else {})
             subtitle = _project_subtitle(full_row if isinstance(full_row, dict) else {})
             cust = _safe_str(est_row.get("customer_name")) or customer_map.get(eid_to_customer.get(eid, ""), "-")
-            total = money_display(est_row.get("proposal_total"), col="proposal_total")
+            total = money_display(est_row.get("proposal_total"))
             status_html = estimate_status_badge_html(est_row.get("status"))
             created = _safe_str(est_row.get("prepared_by_name")) or _created_by_label(
                 full_row if isinstance(full_row, dict) else {}
@@ -737,7 +737,7 @@ def _render_estimate_detail_panel(
         )
         ej = _estimate_json_dict(row)
         breakdown = _compute_breakdown_for_row(row, money_fn=money_display)
-        pt = money_display(row.get("proposal_total"), col="proposal_total")
+        pt = money_display(row.get("proposal_total"))
         linked = linked_job_display_cell(pd.Series(row)) if callable(linked_job_display_cell) else ""
 
         with tabs[0]:

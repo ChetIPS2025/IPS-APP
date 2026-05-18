@@ -34,11 +34,16 @@ try:
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
     from app.ui import IPS_NAV_PENDING_KEY
     from app.ui.assets_components import (
+        completed_badge_html,
+        detail_header_html,
         detail_meta_grid_html,
+        detail_meta_strip_html,
         inject_assets_page_styles,
+        maintenance_table_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
+        tab_button_label,
         table_header_html,
     )
 except ImportError:
@@ -65,11 +70,16 @@ except ImportError:
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
     from ui.assets_components import (  # type: ignore
+        completed_badge_html,
+        detail_header_html,
         detail_meta_grid_html,
+        detail_meta_strip_html,
         inject_assets_page_styles,
+        maintenance_table_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
+        tab_button_label,
         table_header_html,
     )
 
@@ -280,10 +290,11 @@ def _render_header(*, can_add: bool, export_df: pd.DataFrame) -> None:
             st.markdown('<div style="height:0.15rem"></div>', unsafe_allow_html=True)
             b1, b2 = st.columns(2, gap="small")
             with b1:
+                st.markdown('<div class="ips-assets-export-btn">', unsafe_allow_html=True)
                 if not export_df.empty:
                     csv = export_df.to_csv(index=False).encode("utf-8")
                     st.download_button(
-                        "Export",
+                        "↓ Export",
                         data=csv,
                         file_name="assets_export.csv",
                         mime="text/csv",
@@ -291,12 +302,15 @@ def _render_header(*, can_add: bool, export_df: pd.DataFrame) -> None:
                         use_container_width=True,
                     )
                 else:
-                    st.button("Export", key="assets_hdr_export_disabled", disabled=True, use_container_width=True)
+                    st.button("↓ Export", key="assets_hdr_export_disabled", disabled=True, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             with b2:
+                st.markdown('<div class="ips-assets-new-btn">', unsafe_allow_html=True)
                 if can_add and st.button("+ New Asset", type="primary", key="assets_hdr_new", use_container_width=True):
                     st.session_state["asset_db_add_mode"] = True
                     st.session_state.pop("assets_selected_id", None)
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_filters(df: pd.DataFrame) -> None:
@@ -330,24 +344,36 @@ def _render_filters(df: pd.DataFrame) -> None:
         with c5:
             st.selectbox("Department", depts, key="assets_f_department", label_visibility="collapsed")
         with c6:
-            if st.button("Clear Filters", key="assets_clear_filters", use_container_width=True):
+            st.markdown('<div class="ips-assets-clear-filters">', unsafe_allow_html=True)
+            if st.button("⏷ Clear Filters", key="assets_clear_filters", use_container_width=True):
                 _clear_filters()
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_assets_table(filtered: pd.DataFrame, row_lookup: dict[str, dict[str, Any]]) -> None:
-    selected_id = _safe_str(st.session_state.get("assets_selected_id"))
+def _render_assets_table(
+    filtered: pd.DataFrame,
+    row_lookup: dict[str, dict[str, Any]],
+    *,
+    selected_id: str,
+    sel_row: dict[str, Any] | None,
+    can_edit: bool,
+    can_delete: bool,
+    job_label_by_id: dict[str, str],
+) -> None:
+    collapsed = bool(st.session_state.get("assets_detail_collapsed"))
     weights = [0.95, 1.35, 0.9, 0.85, 0.85, 0.75, 0.85, 0.75, 0.55]
 
     with st.container(border=True):
         st.markdown('<span class="ips-assets-table-anchor"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="ips-assets-th-row" aria-hidden="true"></span>', unsafe_allow_html=True)
         head = st.columns(weights)
         for col, lbl in zip(
             head,
-            ("Asset #", "Asset Name", "Category", "Location", "Department", "Status", "Acquired", "Value", "Actions"),
+            ("Asset #", "Asset Name", "Category", "Location", "Department", "Status", "Acquired Date", "Value", "Actions"),
         ):
             with col:
-                st.markdown(table_header_html(lbl), unsafe_allow_html=True)
+                st.markdown(table_header_html(lbl, sortable=lbl != "Actions"), unsafe_allow_html=True)
 
         for _, r in filtered.iterrows():
             aid = _safe_str(r.get("id"))
@@ -375,8 +401,7 @@ def _render_assets_table(filtered: pd.DataFrame, row_lookup: dict[str, dict[str,
                 st.markdown("</div>", unsafe_allow_html=True)
             with rc[1]:
                 st.markdown(
-                    f'<span class="ips-assets-muted-cell" style="color:#111827;font-weight:600;">'
-                    f"{html.escape(name)}</span>",
+                    f'<span class="ips-assets-name-cell">{html.escape(name)}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[2]:
@@ -426,21 +451,32 @@ def _render_assets_table(filtered: pd.DataFrame, row_lookup: dict[str, dict[str,
                             st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
+        if selected_id and sel_row and not collapsed:
+            _render_asset_detail_panel(
+                sel_row,
+                can_edit=can_edit,
+                can_delete=can_delete,
+                job_label_by_id=job_label_by_id,
+                embedded=True,
+            )
+
 
 def _render_tab_bar(aid: str, active: str) -> str:
     tab_key = f"assets_detail_tab_{aid}"
-    try:
-        idx = _ASSET_TABS.index(active)
-    except ValueError:
-        idx = 0
-    picked = st.radio(
-        "Asset sections",
-        _ASSET_TABS,
-        index=idx,
-        horizontal=True,
-        key=f"assets_tab_radio_{aid}",
-        label_visibility="collapsed",
-    )
+    st.markdown('<span class="ips-assets-tabs-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
+    tab_cols = st.columns(len(_ASSET_TABS), gap="small")
+    picked = active
+    for i, tab in enumerate(_ASSET_TABS):
+        with tab_cols[i]:
+            if st.button(
+                tab_button_label(tab),
+                key=f"assets_tab_btn_{aid}_{tab}",
+                use_container_width=True,
+                type="primary" if tab == active else "secondary",
+            ):
+                st.session_state[tab_key] = tab
+                picked = tab
+                st.rerun()
     st.session_state[tab_key] = picked
     return str(picked)
 
@@ -459,17 +495,11 @@ def _render_overview_tab(
             summary_card_html(
                 "Asset Details",
                 [
-                    ("Asset Number", _disp(row.get("asset_id"))),
-                    ("Asset Name", _disp(row.get("asset_name"))),
-                    ("Category", _disp(row.get("category"))),
-                    ("Status", _disp(row.get("status"))),
-                    ("Location", _disp(row.get("location"))),
-                    ("Department", _disp(row.get("department"))),
                     ("Manufacturer", _disp(row.get("manufacturer"))),
                     ("Model", _disp(row.get("model"))),
                     ("Serial Number", _disp(row.get("serial_number"))),
                     ("License Plate", _disp(row.get("license_plate"))),
-                    ("Description", _safe_str(row.get("notes"))[:200] or "—"),
+                    ("Description", (_safe_str(row.get("notes"))[:220] or "—")),
                 ],
             ),
             unsafe_allow_html=True,
@@ -531,34 +561,31 @@ def _render_overview_tab(
             )
         st.markdown("</div></div>", unsafe_allow_html=True)
 
-    st.markdown(
-        '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="ips-assets-maint-section">', unsafe_allow_html=True)
     hdr_r, btn_r = st.columns([3, 1], gap="small")
+    with hdr_r:
+        st.markdown('<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>', unsafe_allow_html=True)
     with btn_r:
         if st.button("View All Maintenance", key=f"assets_maint_all_{aid}", use_container_width=True):
             st.session_state[f"assets_detail_tab_{aid}"] = "Maintenance"
             st.rerun()
 
-    if not maintenance:
-        st.caption("No maintenance records yet.")
-        return
-
-    show_rows = []
+    maint_rows: list[dict[str, str]] = []
     for m in maintenance[:8]:
-        show_rows.append(
+        desc = _safe_str(m.get("notes")) or _safe_str(m.get("service_type")) or "—"
+        maint_rows.append(
             {
-                "Date": _fmt_date(m.get("service_date")),
-                "Type": _safe_str(m.get("service_type")) or "—",
-                "Description": _safe_str(m.get("notes")) or "—",
-                "Performed By": _safe_str(m.get("performed_by")) or "—",
-                "Cost": _money(m.get("cost")),
-                "Next Due": _fmt_date(m.get("next_service_date")),
-                "Status": "Scheduled" if m.get("next_service_date") else "Complete",
+                "date": _fmt_date(m.get("service_date")),
+                "type": _safe_str(m.get("service_type")) or "—",
+                "description": desc,
+                "performed_by": _safe_str(m.get("performed_by")) or "—",
+                "cost": _money(m.get("cost")),
+                "next_due": _fmt_date(m.get("next_service_date")),
+                "status_html": completed_badge_html(),
             }
         )
-    st.dataframe(pd.DataFrame(show_rows), use_container_width=True, hide_index=True)
+    st.markdown(maintenance_table_html(maint_rows), unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_maintenance_tab(row: dict[str, Any], maintenance: list[dict], *, can_edit: bool) -> None:
@@ -731,6 +758,7 @@ def _render_asset_detail_panel(
     can_edit: bool,
     can_delete: bool,
     job_label_by_id: dict[str, str],
+    embedded: bool = False,
 ) -> None:
     aid = _safe_str(row.get("id"))
     maintenance = _safe_fetch("asset_maintenance", {"asset_id": aid}, limit=500)
@@ -746,105 +774,122 @@ def _render_asset_detail_panel(
     if active_tab not in _ASSET_TABS:
         active_tab = "Overview"
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-assets-detail-anchor"></span>', unsafe_allow_html=True)
-        top_l, top_m, top_r = st.columns([2.2, 2.6, 1.35], gap="medium")
-        with top_l:
-            st.markdown(
-                f'<p class="ips-assets-detail-id">{html.escape(_disp(row.get("asset_id")))}</p>'
-                f"{status_badge_html(_safe_str(row.get('status')))}"
-                f'<p class="ips-assets-detail-name">{html.escape(_disp(row.get("asset_name")))}</p>',
-                unsafe_allow_html=True,
-            )
-        with top_m:
-            st.markdown(
-                detail_meta_grid_html(
-                    [
-                        ("Category", _disp(row.get("category"))),
-                        ("Location", _disp(row.get("location"))),
-                        ("Department", _disp(row.get("department"))),
-                        ("Serial Number", _disp(row.get("serial_number"))),
-                        ("Acquired Date", _fmt_date(row.get("purchase_date"))),
-                        ("Current Value", _money(row.get("current_value"))),
-                    ]
-                ),
-                unsafe_allow_html=True,
-            )
-        with top_r:
-            if can_edit and st.button("Edit", key=f"assets_det_edit_{aid}", use_container_width=True):
-                st.session_state["asset_view_mode"] = "edit"
-                st.session_state["selected_asset_id"] = aid
-                st.session_state["asset_return_to"] = "asset_database"
-                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
-                st.rerun()
-            if can_edit and st.button("Maintenance", type="primary", key=f"assets_det_maint_{aid}", use_container_width=True):
-                st.session_state[tab_key] = "Maintenance"
-                st.rerun()
-            more_c, collapse_c = st.columns(2, gap="small")
-            with more_c:
-                with st.popover("⋯", use_container_width=True):
-                    if st.button("Open full profile", key=f"assets_det_more_profile_{aid}", use_container_width=True):
-                        st.session_state["asset_detail_id"] = aid
-                        st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
-                        st.rerun()
-                    if st.button("Asset Scanner", key=f"assets_det_more_scan_{aid}", use_container_width=True):
-                        st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
-                        st.rerun()
-                    if can_delete and st.button("Delete asset", key=f"assets_det_del_{aid}", use_container_width=True):
-                        blocked, has_hist = _asset_delete_dependency_state(aid)
-                        if blocked:
-                            st.error("Cannot delete while checked out.")
-                        elif has_hist:
-                            payload: dict[str, Any] = {}
-                            if "is_active" in row:
-                                payload["is_active"] = False
-                            if "status" in row:
-                                payload["status"] = "Inactive"
-                            if not payload:
-                                payload = {"status": "Inactive"}
-                            try:
-                                update_rows_admin("assets", payload, {"id": aid})
-                                st.warning("Asset has history and was deactivated instead.")
-                                _invalidate_assets_cache()
-                                st.session_state.pop("assets_selected_id", None)
-                                st.rerun()
-                            except Exception as exc:
-                                st.error(str(exc))
-                        else:
-                            try:
-                                delete_rows_admin("assets", {"id": aid})
-                                st.success("Asset deleted.")
-                                _invalidate_assets_cache()
-                                st.session_state.pop("assets_selected_id", None)
-                                st.rerun()
-                            except Exception as exc:
-                                st.error(str(exc))
-            with collapse_c:
-                if st.button("▾", key=f"assets_det_collapse_{aid}", help="Collapse panel", use_container_width=True):
-                    st.session_state["assets_detail_collapsed"] = True
+    wrap_open = '<div class="ips-assets-detail-wrap">' if embedded else ""
+    wrap_close = "</div>" if embedded else ""
+    if embedded:
+        st.markdown(wrap_open, unsafe_allow_html=True)
+    else:
+        with st.container(border=True):
+            st.markdown('<span class="ips-assets-detail-anchor"></span>', unsafe_allow_html=True)
+
+    st.markdown('<div class="ips-assets-detail-top">', unsafe_allow_html=True)
+    top_l, top_m, top_r = st.columns([2.1, 3.2, 1.55], gap="medium")
+    with top_l:
+        st.markdown(
+            detail_header_html(
+                asset_id=_disp(row.get("asset_id")),
+                asset_name=_disp(row.get("asset_name")),
+                status=_safe_str(row.get("status")),
+            ),
+            unsafe_allow_html=True,
+        )
+    with top_m:
+        st.markdown(
+            detail_meta_strip_html(
+                [
+                    ("Category", _disp(row.get("category"))),
+                    ("Location", _disp(row.get("location"))),
+                    ("Department", _disp(row.get("department"))),
+                    ("Serial Number", _disp(row.get("serial_number"))),
+                    ("Acquired Date", _fmt_date(row.get("purchase_date"))),
+                    ("Current Value", _money(row.get("current_value"))),
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
+    with top_r:
+        st.markdown('<div class="ips-assets-detail-actions">', unsafe_allow_html=True)
+        if can_edit and st.button("Edit", key=f"assets_det_edit_{aid}", use_container_width=True):
+            st.session_state["asset_view_mode"] = "edit"
+            st.session_state["selected_asset_id"] = aid
+            st.session_state["asset_return_to"] = "asset_database"
+            st.session_state[IPS_NAV_PENDING_KEY] = "Asset Manager"
+            st.rerun()
+        st.markdown('<div class="ips-assets-maint-primary">', unsafe_allow_html=True)
+        if can_edit and st.button("🔧 Maintenance", type="primary", key=f"assets_det_maint_{aid}", use_container_width=True):
+            st.session_state[tab_key] = "Maintenance"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        more_c, collapse_c = st.columns(2, gap="small")
+        with more_c:
+            with st.popover("More", use_container_width=True):
+                if st.button("Open full profile", key=f"assets_det_more_profile_{aid}", use_container_width=True):
+                    st.session_state["asset_detail_id"] = aid
+                    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                     st.rerun()
+                if st.button("Asset Scanner", key=f"assets_det_more_scan_{aid}", use_container_width=True):
+                    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Scanner"
+                    st.rerun()
+                if can_delete and st.button("Delete asset", key=f"assets_det_del_{aid}", use_container_width=True):
+                    blocked, has_hist = _asset_delete_dependency_state(aid)
+                    if blocked:
+                        st.error("Cannot delete while checked out.")
+                    elif has_hist:
+                        payload: dict[str, Any] = {}
+                        if "is_active" in row:
+                            payload["is_active"] = False
+                        if "status" in row:
+                            payload["status"] = "Inactive"
+                        if not payload:
+                            payload = {"status": "Inactive"}
+                        try:
+                            update_rows_admin("assets", payload, {"id": aid})
+                            st.warning("Asset has history and was deactivated instead.")
+                            _invalidate_assets_cache()
+                            st.session_state.pop("assets_selected_id", None)
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+                    else:
+                        try:
+                            delete_rows_admin("assets", {"id": aid})
+                            st.success("Asset deleted.")
+                            _invalidate_assets_cache()
+                            st.session_state.pop("assets_selected_id", None)
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+        with collapse_c:
+            if st.button("▴", key=f"assets_det_collapse_{aid}", help="Collapse panel", use_container_width=True):
+                st.session_state["assets_detail_collapsed"] = True
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        active_tab = _render_tab_bar(aid, active_tab)
+    active_tab = _render_tab_bar(aid, active_tab)
 
-        if active_tab == "Overview":
-            _render_overview_tab(row, maintenance=maintenance)
-        elif active_tab == "Maintenance":
-            _render_maintenance_tab(row, maintenance, can_edit=can_edit)
-        elif active_tab == "Documents":
-            _render_documents_tab(row, can_edit=can_edit)
-        elif active_tab == "Assignments":
-            _render_assignments_tab(assignments, job_label_by_id)
-        elif active_tab == "Depreciation":
-            _render_depreciation_tab(row)
-        elif active_tab == "Notes":
-            _render_notes_tab(row, can_edit=can_edit)
-        else:
-            _render_activity_tab(
-                maintenance=maintenance,
-                assignments=assignments,
-                inspections=inspections,
-            )
-        _ = documents  # fetched for future inline doc counts
+    if active_tab == "Overview":
+        _render_overview_tab(row, maintenance=maintenance)
+    elif active_tab == "Maintenance":
+        _render_maintenance_tab(row, maintenance, can_edit=can_edit)
+    elif active_tab == "Documents":
+        _render_documents_tab(row, can_edit=can_edit)
+    elif active_tab == "Assignments":
+        _render_assignments_tab(assignments, job_label_by_id)
+    elif active_tab == "Depreciation":
+        _render_depreciation_tab(row)
+    elif active_tab == "Notes":
+        _render_notes_tab(row, can_edit=can_edit)
+    else:
+        _render_activity_tab(
+            maintenance=maintenance,
+            assignments=assignments,
+            inspections=inspections,
+        )
+    _ = documents  # fetched for future inline doc counts
+
+    if embedded:
+        st.markdown(wrap_close, unsafe_allow_html=True)
 
 
 def render_assets_page() -> None:
@@ -886,17 +931,19 @@ def render_assets_page() -> None:
             st.caption("Use **+ New Asset** to add equipment via intake.")
         return
 
-    _render_assets_table(filtered, row_lookup)
-
     selected_id = _safe_str(st.session_state.get("assets_selected_id"))
-    if selected_id and not st.session_state.get("assets_detail_collapsed"):
-        sel_row = row_lookup.get(selected_id)
-        if sel_row:
-            _render_asset_detail_panel(
-                sel_row,
-                can_edit=can_edit,
-                can_delete=can_delete,
-                job_label_by_id=job_label_by_id,
-            )
-        else:
-            st.session_state.pop("assets_selected_id", None)
+    sel_row = row_lookup.get(selected_id) if selected_id else None
+    if selected_id and not sel_row:
+        st.session_state.pop("assets_selected_id", None)
+        selected_id = ""
+        sel_row = None
+
+    _render_assets_table(
+        filtered,
+        row_lookup,
+        selected_id=selected_id,
+        sel_row=sel_row,
+        can_edit=can_edit,
+        can_delete=can_delete,
+        job_label_by_id=job_label_by_id,
+    )

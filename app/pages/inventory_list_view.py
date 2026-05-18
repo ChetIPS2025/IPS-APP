@@ -14,14 +14,17 @@ try:
     from app.confirm_delete import open_destructive_confirmation
     from app.db import fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin
     from app.ui.catalog_inventory_display import sanitize_catalog_inventory_export_df
+    from app.ui.assets_components import detail_meta_grid_html
     from app.ui.inventory_components import (
-        detail_meta_grid_html,
+        detail_stats_row_html,
         inject_inventory_page_styles,
         render_inventory_header_inner_html,
         stock_status_badge_html,
         summary_card_html,
+        tab_bar_html,
         table_header_html,
-        usage_sparkline_svg,
+        transactions_table_html,
+        usage_line_chart_html,
     )
     from app.ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun
 except ImportError:
@@ -29,14 +32,17 @@ except ImportError:
     from confirm_delete import open_destructive_confirmation  # type: ignore
     from db import fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
     from ui.catalog_inventory_display import sanitize_catalog_inventory_export_df  # type: ignore
+    from ui.assets_components import detail_meta_grid_html  # type: ignore
     from ui.inventory_components import (  # type: ignore
-        detail_meta_grid_html,
+        detail_stats_row_html,
         inject_inventory_page_styles,
         render_inventory_header_inner_html,
         stock_status_badge_html,
         summary_card_html,
+        tab_bar_html,
         table_header_html,
-        usage_sparkline_svg,
+        transactions_table_html,
+        usage_line_chart_html,
     )
     from ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun  # type: ignore
 
@@ -53,6 +59,30 @@ _INV_TABS = (
     "Notes",
     "Attachments",
 )
+
+
+def _unit(row: dict[str, Any]) -> str:
+    return _safe_str(row.get("unit")) or "EA"
+
+
+def _fmt_qty_unit(row: dict[str, Any], qty: float | object) -> str:
+    q = _qty_num(qty)
+    u = _unit(row)
+    if q == int(q):
+        return f"{int(q):,} {u}"
+    return f"{q:g} {u}"
+
+
+def _txn_type_label(txn_type: str) -> str:
+    t = str(txn_type or "").strip().upper()
+    return {
+        "TO_JOB": "Issue",
+        "SHOP": "Issue",
+        "ADJUST": "Adjustment",
+        "RECEIPT": "Receipt",
+        "COUNT": "Count",
+        "KIT_REPLACEMENT": "Issue",
+    }.get(t, str(txn_type or "—").replace("_", " ").title())
 
 _SEARCH_COLS = (
     "item_name",
@@ -181,10 +211,9 @@ def _row_lookup(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 @st.cache_data(ttl=60, show_spinner=False)
 def _cached_item_transactions(item_id: str, data_version: int) -> list[dict]:
     try:
-        return list(
-            fetch_by_match_admin(_TXN, {"inventory_item_id": item_id}, limit=500, order_by="created_at")
-            or []
-        )
+        rows = list(fetch_by_match_admin(_TXN, {"inventory_item_id": item_id}, limit=500) or [])
+        rows.sort(key=lambda t: str(t.get("created_at") or ""))
+        return rows
     except Exception:
         return []
 
@@ -364,7 +393,7 @@ def _render_header(*, can_edit: bool, export_df: pd.DataFrame) -> None:
         with left:
             st.markdown(render_inventory_header_inner_html(), unsafe_allow_html=True)
         with right:
-            st.markdown('<motion.div style="height:0.15rem"></motion.div>', unsafe_allow_html=True)
+            st.markdown('<span class="ips-inv-hdr-actions"></span>', unsafe_allow_html=True)
             b1, b2 = st.columns(2, gap="small")
             with b1:
                 if not export_df.empty:
@@ -424,6 +453,7 @@ def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> 
 
     with st.container(border=True):
         st.markdown('<span class="ips-inv-table-anchor"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="ips-inv-table-head-row" aria-hidden="true"></span>', unsafe_allow_html=True)
         head = st.columns(weights)
         for col, lbl in zip(
             head,
@@ -449,7 +479,7 @@ def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> 
             if not iid:
                 continue
             is_sel = iid == selected_id
-            marker = " ips-inv-row-selected" if is_sel else ""
+            row_cls = " ips-inv-row-selected ips-inv-table-row" if is_sel else " ips-inv-table-row"
             rc = st.columns(weights)
             item_num = _item_number(row)
             desc = _safe_str(row.get("item_name")) or "—"
@@ -457,55 +487,53 @@ def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> 
 
             with rc[0]:
                 st.markdown(
-                    f'<span class="ips-inv-row-marker{marker}" aria-hidden="true"></span>',
+                    f'<span class="ips-inv-row-marker{row_cls}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<div class="ips-inv-link-btn">', unsafe_allow_html=True)
+                st.markdown('<span class="ips-inv-link-anchor"></span>', unsafe_allow_html=True)
                 if st.button(item_num, key=f"inv_pick_{iid}", use_container_width=True):
                     st.session_state["inventory_selected_id"] = iid
                     st.session_state.pop("inventory_detail_collapsed", None)
                     ips_app_rerun()
-                st.markdown("</motion.div>", unsafe_allow_html=True)
             with rc[1]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell" style="color:#111827;font-weight:600;">'
-                    f"{html.escape(desc)}</span>",
+                    f'<span class="ips-inv-cell-desc">{html.escape(desc)}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[2]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{html.escape(_safe_str(row.get("category")) or "—")}</span>',
+                    f'<span class="ips-inv-cell-muted">{html.escape(_safe_str(row.get("category")) or "—")}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[3]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{html.escape(_safe_str(row.get("storage_location")) or "—")}</span>',
+                    f'<span class="ips-inv-cell-muted">{html.escape(_safe_str(row.get("storage_location")) or "—")}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[4]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{_qty_num(row.get("quantity_on_hand")):g}</span>',
+                    f'<span class="ips-inv-cell-muted">{html.escape(_fmt_qty_unit(row, row.get("quantity_on_hand")))}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[5]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{html.escape(_safe_str(row.get("unit")) or "EA")}</span>',
+                    f'<span class="ips-inv-cell-muted">{html.escape(_safe_str(row.get("unit")) or "EA")}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[6]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{html.escape(_money(row.get("unit_cost")))}</span>',
+                    f'<span class="ips-inv-cell-muted">{html.escape(_money(row.get("unit_cost")))}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[7]:
                 st.markdown(
-                    f'<span class="ips-inv-muted-cell">{html.escape(_money(_total_value(row)))}</span>',
+                    f'<span class="ips-inv-cell-total">{html.escape(_money(_total_value(row)))}</span>',
                     unsafe_allow_html=True,
                 )
             with rc[8]:
                 st.markdown(stock_status_badge_html(status), unsafe_allow_html=True)
             with rc[9]:
-                st.markdown('<div class="ips-inv-action-btn">', unsafe_allow_html=True)
+                st.markdown('<span class="ips-inv-act-anchor"></span>', unsafe_allow_html=True)
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
                     if st.button("👁", key=f"inv_view_{iid}", help="View item", use_container_width=True):
@@ -521,16 +549,10 @@ def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> 
                         if st.button("Adjust stock", key=f"inv_more_adj_{iid}", use_container_width=True):
                             st.session_state["inventory_adjust_item_id"] = iid
                             ips_app_rerun()
-                st.markdown("</motion.div>", unsafe_allow_html=True)
-
 
 def _render_tab_bar(iid: str, active: str) -> str:
-    parts: list[str] = ['<motion.div class="ips-inv-tab-bar">']
-    for tab in _INV_TABS:
-        cls = "ips-inv-tab-active" if tab == active else "ips-inv-tab-inactive"
-        parts.append(f'<span class="{cls}">{html.escape(tab)}</span>')
-    parts.append("</motion.div>")
-    st.markdown("".join(parts).replace("<motion.", "<").replace("</motion.", "</"), unsafe_allow_html=True)
+    st.markdown(tab_bar_html(_INV_TABS, active), unsafe_allow_html=True)
+    st.markdown('<span class="ips-inv-tab-picker" aria-hidden="true"></span>', unsafe_allow_html=True)
     pick_cols = st.columns(len(_INV_TABS), gap="small")
     for i, tab in enumerate(_INV_TABS):
         with pick_cols[i]:
@@ -559,7 +581,7 @@ def _render_overview_tab(
     warn_avail = rp > 0 and available < rp
 
     series, total_30, avg_daily = _usage_series(txns)
-    chart_html = usage_sparkline_svg(series)
+    chart_html = usage_line_chart_html(series)
 
     r1c1, r1c2, r1c3 = st.columns(3, gap="small")
     with r1c1:
@@ -570,13 +592,14 @@ def _render_overview_tab(
                     ("Item Number", _item_number(row)),
                     ("Description", _safe_str(row.get("item_name"))),
                     ("Category", _safe_str(row.get("category"))),
-                    ("Unit", _safe_str(row.get("unit")) or "EA"),
+                    ("Unit", _unit(row)),
                     ("Location", _safe_str(row.get("storage_location"))),
                     ("Barcode", _safe_str(row.get("qr_code_value") or row.get("sku"))),
                     ("Status", _stock_status(row)),
                     ("Created", _fmt_date(row.get("created_at"))),
                     ("Last Updated", _fmt_date(row.get("updated_at"))),
                 ],
+                badge_html={"Status": stock_status_badge_html(_stock_status(row))},
             ),
             unsafe_allow_html=True,
         )
@@ -585,12 +608,12 @@ def _render_overview_tab(
             summary_card_html(
                 "Stock Information",
                 [
-                    ("Qty On Hand", f"{qoh:g}"),
-                    ("Reorder Level", f"{rp:g}"),
+                    ("Qty On Hand", _fmt_qty_unit(row, qoh)),
+                    ("Reorder Level", _fmt_qty_unit(row, rp)),
                     ("Reorder Quantity", "—"),
                     ("On Order", "—"),
                     ("Allocated", "—"),
-                    ("Available", f"{available:g}"),
+                    ("Available", _fmt_qty_unit(row, available)),
                     ("Last Counted", "—"),
                 ],
                 value_class={"Available": "warn"} if warn_avail else None,
@@ -598,49 +621,48 @@ def _render_overview_tab(
             unsafe_allow_html=True,
         )
     with r1c3:
-        st.markdown('<motion.div class="ips-inv-summary-card"><h4>Usage Overview</h4>', unsafe_allow_html=True)
+        st.markdown('<div class="ips-inv-summary-card"><h4>Usage Overview</h4>', unsafe_allow_html=True)
         if chart_html:
             st.markdown(chart_html, unsafe_allow_html=True)
             st.markdown(
-                f"<p style='font-size:0.78rem;color:#374151;margin:0.35rem 0 0;'>"
-                f"<strong>Total Used (30 Days):</strong> {total_30:g} &nbsp;·&nbsp; "
-                f"<strong>Average Daily Use:</strong> {avg_daily:.2f}</p>",
+                f'<motion.div class="ips-inv-usage-metrics">'
+                f"<span><strong>Total Used (30 Days):</strong> {total_30:g} {_unit(row)}</span>"
+                f"<span><strong>Average Daily Use:</strong> {avg_daily:.1f} {_unit(row)}</span>"
+                f"</motion.div>".replace("<motion.", "<").replace("</motion.", "</"),
                 unsafe_allow_html=True,
             )
         else:
             st.markdown('<p class="ips-inv-usage-empty">No usage data for this item yet.</p>', unsafe_allow_html=True)
-        st.markdown("</motion.div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(
-        '<motion.div class="ips-inv-txn-head"><h4>Recent Transactions</h4></motion.div>'.replace("<motion.", "<"),
-        unsafe_allow_html=True,
-    )
-    _, btn_r = st.columns([3, 1])
+    st.markdown('<motion.div class="ips-inv-txn-section">'.replace("<motion.", "<"), unsafe_allow_html=True)
+    st.markdown('<motion.div class="ips-inv-txn-head"><h4>Recent Transactions</h4></motion.div>'.replace("<motion.", "<").replace("</motion.", "</"), unsafe_allow_html=True)
+    _, btn_r = st.columns([4, 1])
     with btn_r:
         if st.button("View All Transactions", key=f"inv_txn_all_{iid}", use_container_width=True):
             st.session_state[f"inventory_detail_tab_{iid}"] = "Transactions"
             ips_app_rerun()
 
-    recent = sorted(txns, key=lambda t: str(t.get("created_at") or ""), reverse=True)[:8]
-    if not recent:
-        st.caption("No transactions recorded.")
-        return
-    rows = []
-    for t in recent:
-        q = _qty_num(t.get("qty"))
-        uc = _qty_num(t.get("unit_cost")) if t.get("unit_cost") is not None else _qty_num(row.get("unit_cost"))
-        rows.append(
+    recent = sorted(txns, key=lambda tr: str(tr.get("created_at") or ""), reverse=True)[:8]
+    txn_rows: list[dict[str, str]] = []
+    for tr in recent:
+        q = _qty_num(tr.get("qty"))
+        uc = _qty_num(tr.get("unit_cost")) if tr.get("unit_cost") is not None else _qty_num(row.get("unit_cost"))
+        u = _unit(row)
+        qty_s = f"{q:+g} {u}" if q else f"0 {u}"
+        txn_rows.append(
             {
-                "Date": _fmt_date(t.get("created_at")),
-                "Type": _safe_str(t.get("txn_type")) or "—",
-                "Reference": _txn_reference(t),
-                "Qty": f"{q:+g}" if q else "0",
+                "Date": _fmt_date(tr.get("created_at")),
+                "Type": _txn_type_label(str(tr.get("txn_type") or "")),
+                "Reference": _txn_reference(tr),
+                "Qty": qty_s,
                 "Unit Cost": _money(uc),
                 "Total Cost": _money(abs(q) * uc) if uc else "—",
-                "Performed By": _txn_actor(t),
+                "Performed By": _txn_actor(tr),
             }
         )
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.markdown(transactions_table_html(txn_rows), unsafe_allow_html=True)
+    st.markdown("</motion.div>".replace("<motion.", "<").replace("</motion.", "</"), unsafe_allow_html=True)
 
 
 def _txn_dataframe(txns: list[dict], row: dict[str, Any]) -> pd.DataFrame:
@@ -651,7 +673,7 @@ def _txn_dataframe(txns: list[dict], row: dict[str, Any]) -> pd.DataFrame:
         rows.append(
             {
                 "Date": _fmt_date(t.get("created_at")),
-                "Type": _safe_str(t.get("txn_type")) or "—",
+                "Type": _txn_type_label(str(t.get("txn_type") or "")),
                 "Reference": _txn_reference(t),
                 "Qty": f"{q:+g}" if q else "0",
                 "Unit Cost": _money(uc),
@@ -771,19 +793,22 @@ def _render_detail_panel(
         top_l, top_m, top_r = st.columns([2.2, 2.6, 1.35], gap="medium")
         with top_l:
             st.markdown(
-                f'<p class="ips-inv-detail-id">{html.escape(_item_number(row))}</p>'
-                f"{stock_status_badge_html(status)}"
+                f'<motion.div class="ips-inv-detail-id-row">'
+                f'<span class="ips-inv-detail-id">{html.escape(_item_number(row))}</span>'
+                f"{stock_status_badge_html(status)}</motion.div>"
                 f'<p class="ips-inv-detail-name">{html.escape(_safe_str(row.get("item_name")))}</p>'
-                f'<p class="ips-inv-detail-cat">{html.escape(_safe_str(row.get("category")) or "—")}</p>',
+                f'<p class="ips-inv-detail-cat">{html.escape(_safe_str(row.get("category")) or "—")}</p>'.replace(
+                    "<motion.", "<"
+                ).replace("</motion.", "</"),
                 unsafe_allow_html=True,
             )
         with top_m:
             st.markdown(
-                detail_meta_grid_html(
+                detail_stats_row_html(
                     [
-                        ("Location", _safe_str(row.get("storage_location"))),
-                        ("Qty On Hand", f"{qoh:g}"),
-                        ("Reorder Level", f"{rp:g}"),
+                        ("Location", _safe_str(row.get("storage_location")) or "—"),
+                        ("Qty On Hand", _fmt_qty_unit(row, qoh)),
+                        ("Reorder Level", _fmt_qty_unit(row, rp)),
                         ("Unit Cost", _money(row.get("unit_cost"))),
                         ("Total Value", _money(tv)),
                     ]
@@ -791,6 +816,7 @@ def _render_detail_panel(
                 unsafe_allow_html=True,
             )
         with top_r:
+            st.markdown('<span class="ips-inv-det-actions"></span>', unsafe_allow_html=True)
             if can_edit and st.button("Edit", key=f"inv_det_edit_{iid}", use_container_width=True):
                 st.session_state["inventory_edit_popup_open"] = True
                 st.session_state["editing_inventory_id"] = iid
@@ -823,7 +849,7 @@ def _render_detail_panel(
                         st.session_state[IPS_NAV_PENDING_KEY] = "Scan Inventory"
                         ips_app_rerun()
             with collapse_c:
-                if st.button("▾", key=f"inv_det_collapse_{iid}", help="Collapse panel", use_container_width=True):
+                if st.button("▲", key=f"inv_det_collapse_{iid}", help="Collapse panel", use_container_width=True):
                     st.session_state["inventory_detail_collapsed"] = True
                     ips_app_rerun()
 
