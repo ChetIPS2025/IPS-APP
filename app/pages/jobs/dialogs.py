@@ -62,7 +62,7 @@ except ImportError:
     )
 
 from .constants import JOB_STATUSES
-from .queries import admin_read, fetch_contacts_for_job_database, fetch_contact_by_id, fetch_estimate_by_id
+from .queries import admin_read, bump_data_version, fetch_contacts_for_job_database, fetch_contact_by_id, fetch_estimate_by_id
 from .utils import card_text, clear_job_mode
 
 _LOG = logging.getLogger(__name__)
@@ -262,6 +262,7 @@ def _render_estimate_summary_overview(
                     st.caption("Removes the link from this job only. The estimate is **not** deleted.")
                     if st.button("Remove linked estimate", type="primary", key=f"job_ov_unlink_est_{jid}"):
                         update_rows_admin("jobs", {"estimate_id": None}, {"id": selected_job["id"]})
+                        bump_data_version()
                         st.success("Link removed. You can attach a different quote below.")
                         st.rerun()
 
@@ -756,6 +757,7 @@ def render_job_form_panel(
                     except ImportError:
                         from app.data_cache import clear_session_table_cache  # type: ignore
                     clear_session_table_cache()
+                    bump_data_version()
                     clear_job_mode()
                     st.success("Job created.")
                     st.rerun()
@@ -789,6 +791,7 @@ def render_job_form_panel(
                     except ImportError:
                         from app.data_cache import clear_session_table_cache  # type: ignore
                     clear_session_table_cache()
+                    bump_data_version()
                     clear_job_mode()
                     st.success("Job updated.")
                     st.rerun()

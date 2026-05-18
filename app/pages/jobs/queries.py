@@ -145,14 +145,14 @@ def jobs_has_customer_location_column() -> bool:
 # Contact labels (all contacts for the job list display)
 # ---------------------------------------------------------------------------
 
-def fetch_all_contact_labels(*, is_admin: bool) -> dict[str, str]:
-    """Return {contact_id: display_label} for the overview grid."""
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_contact_labels_cached(_is_admin: bool, _v: int) -> dict[str, str]:
     try:
         from app.services.customer_contacts import contact_option_label
     except ImportError:
         from services.customer_contacts import contact_option_label  # type: ignore
 
-    fn = fetch_table_admin if is_admin else fetch_table
+    fn = fetch_table_admin if _is_admin else fetch_table
     try:
         rows = fn("customer_contacts", limit=10000, order_by=None)
     except Exception:
@@ -162,6 +162,12 @@ def fetch_all_contact_labels(*, is_admin: bool) -> dict[str, str]:
         for cr in (rows or [])
         if str(cr.get("id") or "").strip()
     }
+
+
+def fetch_all_contact_labels(*, is_admin: bool) -> dict[str, str]:
+    """Return {contact_id: display_label} for the overview grid (cached 60 s)."""
+    v = int(st.session_state.get(KEY_DATA_VERSION, 0))
+    return _fetch_contact_labels_cached(is_admin, v)
 
 
 # ---------------------------------------------------------------------------
@@ -174,4 +180,5 @@ def bump_data_version() -> None:
     # Explicitly clear Streamlit's in-process cache for our cached functions.
     _fetch_customers_cached.clear()
     _fetch_estimates_cached.clear()
+    _fetch_contact_labels_cached.clear()
     _has_customer_location_column_cached.clear()

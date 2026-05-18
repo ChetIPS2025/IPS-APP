@@ -21,31 +21,21 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
 
 try:
-    from app.ui.field_light_theme import inject_field_light_theme
+    from app.table_actions import inject_table_action_styles
 except ImportError:
-    from ui.field_light_theme import inject_field_light_theme  # type: ignore
-
-try:
-    from app.table_actions import TABLE_KEY_JOBS, clear_selected_ids, inject_table_action_styles
-except ImportError:
-    from table_actions import TABLE_KEY_JOBS, clear_selected_ids, inject_table_action_styles  # type: ignore
+    from table_actions import inject_table_action_styles  # type: ignore
 
 try:
     from services.job_schema import fetch_jobs_for_job_database
-    from services.job_service import job_row_select_label, sort_jobs_by_name, sort_jobs_by_number_then_name
+    from services.job_service import sort_jobs_by_name, sort_jobs_by_number_then_name
 except ImportError:
     from app.services.job_schema import fetch_jobs_for_job_database  # type: ignore
-    from app.services.job_service import job_row_select_label, sort_jobs_by_name, sort_jobs_by_number_then_name  # type: ignore
+    from app.services.job_service import sort_jobs_by_name, sort_jobs_by_number_then_name  # type: ignore
 
 try:
-    from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin
+    from app.db import fetch_jobs_with_order_fallback
 except ImportError:
-    from db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin  # type: ignore
-
-try:
-    from app.services.customer_contacts import contact_option_label
-except ImportError:
-    from services.customer_contacts import contact_option_label  # type: ignore
+    from db import fetch_jobs_with_order_fallback  # type: ignore
 
 from .components import (
     render_delete_confirmation,
