@@ -66,6 +66,15 @@ def fetch_po_expenses(session_key: str, *, use_admin: bool, limit: int = 3000) -
     return _fetch("po_expenses", session_key=session_key, use_admin=use_admin, limit=limit, order_by="created_at")
 
 
+def fetch_job_expenses(session_key: str, *, use_admin: bool, limit: int = 10000) -> list[dict]:
+    """Primary expense/invoice lines (PO / Expenses page)."""
+    return _fetch("job_expenses", session_key=session_key, use_admin=use_admin, limit=limit, order_by="expense_date")
+
+
+def fetch_customers(session_key: str, *, use_admin: bool, limit: int = 5000) -> list[dict]:
+    return _fetch("customers", session_key=session_key, use_admin=use_admin, limit=limit, order_by="customer_name")
+
+
 def fetch_company_updates(session_key: str, *, use_admin: bool, limit: int = 500) -> list[dict]:
     return _fetch("company_updates", session_key=session_key, use_admin=use_admin, limit=limit, order_by="created_at")
 

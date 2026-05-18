@@ -35,6 +35,8 @@ class DashboardTables:
     job_tasks: list[dict] = field(default_factory=list)
     time_entries: list[dict] = field(default_factory=list)
     po_rows: list[dict] = field(default_factory=list)
+    expenses: list[dict] = field(default_factory=list)
+    customers: list[dict] = field(default_factory=list)
     company_updates: list[dict] = field(default_factory=list)
     company_update_reads: list[dict] = field(default_factory=list)
     kit_items: list[dict] = field(default_factory=list)
@@ -66,8 +68,12 @@ def load_core_tables(
     tables.time_entries = q.fetch_time_entries(session_key, use_admin=use_admin)
     if load_inventory:
         tables.inv_rows = q.fetch_inventory(session_key, use_admin=use_admin)
-    if load_pos:
-        tables.po_rows = q.fetch_po_expenses(session_key, use_admin=use_admin)
+    tables.expenses = q.fetch_job_expenses(session_key, use_admin=use_admin)
+    if not tables.expenses:
+        tables.po_rows = q.fetch_po_expenses(session_key, use_admin=use_admin) if load_pos else []
+    else:
+        tables.po_rows = tables.expenses
+    tables.customers = q.fetch_customers(session_key, use_admin=use_admin)
     if load_company_updates:
         tables.company_updates = q.fetch_company_updates(session_key, use_admin=use_admin)
         tables.company_update_reads = q.fetch_company_update_reads(session_key, use_admin=use_admin)
@@ -84,6 +90,8 @@ def load_core_tables(
         "job_tasks": tables.job_tasks,
         "time_entries": tables.time_entries,
         "po_rows": tables.po_rows,
+        "expenses": tables.expenses,
+        "customers": tables.customers,
         "company_updates": tables.company_updates,
         "company_update_reads": tables.company_update_reads,
         "kit_items": tables.kit_items,
