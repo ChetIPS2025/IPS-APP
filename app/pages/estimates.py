@@ -7,9 +7,9 @@ import pandas as pd
 import streamlit as st
 
 try:
-    from app.ui.page_shell import render_page_header
+    from app.ui.page_shell import render_card, render_page_header
 except ImportError:
-    from ui.page_shell import render_page_header  # type: ignore
+    from ui.page_shell import render_card, render_page_header  # type: ignore
 from auth import current_role
 from db import (
     fetch_by_match_admin,
@@ -691,10 +691,6 @@ def render() -> None:
 
     elif view == "import":
         render_page_header("Estimates", "PDF or JSON import — return to the list when done.")
-        try:
-            from app.ui.page_shell import render_card
-        except ImportError:
-            from ui.page_shell import render_card  # type: ignore
         with render_card():
             st.markdown(
                 '<span class="ips-list-top-anchor ips-estimate-topbar"></span>',
