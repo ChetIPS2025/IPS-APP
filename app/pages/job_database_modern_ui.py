@@ -8,6 +8,7 @@ then targets ONLY that per-row block, not the outer table card.
 
 Public API
 ──────────
+inject_job_database_root_canvas()
 inject_modern_jobs_css()
 render_jobs_table(df_display, job_num_col, can_edit, jobs, admin_read, customer_name_by_id)
 render_job_detail_panel(job_row, can_edit, admin_read, on_view, on_edit, on_collapse)
@@ -27,7 +28,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v11"
+_CSS_KEY = "jdb_modern_v12"
 
 # ── Status pill colours ─────────────────────────────────────────────────────
 _PILL: dict[str, tuple[str, str]] = {
@@ -124,22 +125,60 @@ def _pill(status: Any, sm: bool = False) -> str:
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
+def inject_job_database_root_canvas() -> None:
+    """Force the Job Database page root/background to clean white."""
+    st.markdown(
+        """
+        <style id="ips-job-db-root-canvas">
+        html:has(.ips-job-db-page),
+        body:has(.ips-job-db-page),
+        .stApp:has(.ips-job-db-page) {
+            --ips-bg-main: #ffffff !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+        }
+        html:has(.ips-job-db-page),
+        body:has(.ips-job-db-page),
+        .stApp:has(.ips-job-db-page),
+        .stApp:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
+        .stApp:has(.ips-job-db-page) [data-testid="stMain"],
+        .stApp:has(.ips-job-db-page) [data-testid="stMainBlockContainer"],
+        .stApp:has(.ips-job-db-page) section.main,
+        .stApp:has(.ips-job-db-page) main,
+        .stApp:has(.ips-job-db-page) .block-container {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+        }
+        .ips-job-db-page,
+        .jobs-page,
+        .jobs-shell,
+        .jobs-container,
+        .ips-page,
+        .ips-shell,
+        .job-table-card,
+        .job-detail-panel,
+        .job-overview-card,
+        .job-summary-card,
+        .jdb-tbl-host,
+        .jdb-panel-host,
+        .jdb-panel-outer,
+        .jdb-card {
+            background: #ffffff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def inject_modern_jobs_css() -> None:
     if st.session_state.get(_CSS_KEY):
         return
     st.session_state[_CSS_KEY] = True
     st.markdown("""
 <style>
-/* ═══════════════════════════════════════════════════
-   JOB DATABASE PAGE SHELL — bright white canvas
-═══════════════════════════════════════════════════ */
-section[data-testid="stMain"]:has(.ips-job-db-page),
-section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
-section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-}
-section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
+/* Page shell: see inject_job_database_root_canvas() for .stApp / body overrides */
+.stApp:has(.ips-job-db-page) section[data-testid="stMain"] .block-container {
     max-width: 1680px !important;
     padding-top: 0.35rem !important;
 }

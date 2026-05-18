@@ -55,13 +55,31 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
 
 try:
-    from app.pages.job_database_modern_ui import inject_job_database_root_canvas as _jmod_root_canvas
-    from app.pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css
-    from app.pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table
+    from app.pages import job_database_modern_ui as _jmod
 except ImportError:
-    from pages.job_database_modern_ui import inject_job_database_root_canvas as _jmod_root_canvas  # type: ignore
-    from pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css  # type: ignore
-    from pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table  # type: ignore
+    from pages import job_database_modern_ui as _jmod  # type: ignore
+
+_jmod_inject_css = _jmod.inject_modern_jobs_css
+_render_modern_jobs_table = _jmod.render_jobs_table
+_jmod_root_canvas = getattr(_jmod, "inject_job_database_root_canvas", None)
+if _jmod_root_canvas is None:
+    def _jmod_root_canvas() -> None:  # type: ignore[misc]
+        st.markdown(
+            """
+            <style id="ips-job-db-root-canvas-fallback">
+            html:has(.ips-job-db-page), body:has(.ips-job-db-page), .stApp:has(.ips-job-db-page),
+            .stApp:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
+            .stApp:has(.ips-job-db-page) [data-testid="stMain"],
+            .stApp:has(.ips-job-db-page) [data-testid="stMainBlockContainer"],
+            .stApp:has(.ips-job-db-page) section.main,
+            .stApp:has(.ips-job-db-page) main,
+            .stApp:has(.ips-job-db-page) .block-container {
+                background: #ffffff !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
 try:
     from app.ui.field_light_theme import inject_field_light_theme
