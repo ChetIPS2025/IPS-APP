@@ -97,6 +97,11 @@ KPI_SPECS: tuple[tuple[str, str, str, str], ...] = (
 
 
 def inject_company_updates_page_styles() -> None:
+    try:
+        from app.ui.clean_table import inject_clean_table_css
+    except ImportError:
+        from ui.clean_table import inject_clean_table_css  # type: ignore
+    inject_clean_table_css()
     if st.session_state.get(IPS_CU_PAGE_STYLES_KEY):
         return
     st.session_state[IPS_CU_PAGE_STYLES_KEY] = True

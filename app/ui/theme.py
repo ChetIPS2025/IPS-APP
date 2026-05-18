@@ -489,4 +489,10 @@ def apply_global_css() -> None:
         unsafe_allow_html=True,
         )
 
+    try:
+        from app.ui.clean_table import inject_clean_table_css
+    except ImportError:
+        from ui.clean_table import inject_clean_table_css  # type: ignore
+    inject_clean_table_css()
+
     inject_force_white_final_override()

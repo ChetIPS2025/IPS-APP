@@ -46,6 +46,7 @@ except ImportError:
     )
 
 try:
+    from app.ui.clean_table import render_clean_table_click_bridge
     from app.ui.users_components import (
         dept_pills_html,
         detail_header_row_html,
@@ -60,6 +61,7 @@ try:
     )
     from app.ui.modal import ensure_modal_styles
 except ImportError:
+    from ui.clean_table import render_clean_table_click_bridge  # type: ignore
     from ui.users_components import (  # type: ignore
         dept_pills_html,
         detail_header_row_html,
@@ -649,7 +651,7 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
     selected_id = _safe_str(st.session_state.get("users_selected_id"))
 
     with st.container(border=True):
-        st.markdown('<span class="ips-users-table-anchor"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="ips-users-table-anchor ips-clean-table"></span>', unsafe_allow_html=True)
         weights = [1.35, 1.5, 0.95, 0.9, 0.75, 0.95, 0.65]
         head = st.columns(weights)
         for col, lbl in zip(
@@ -678,12 +680,18 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
             dept = str(disp.get("department") or "—")
             last_login = str(disp.get("last_login") or "—")
 
-            row_cls = "usr-row selected" if is_sel else "usr-row"
+            row_cls = (
+                "usr-row ips-clean-row selected" if is_sel else "usr-row ips-clean-row"
+            )
+            uid_attr = html.escape(uid, quote=True)
 
             with st.container():
-                st.markdown('<span class="usr-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="{row_cls}">'
+                    '<span class="usr-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{row_cls}" data-row-id="{uid_attr}" role="button" tabindex="0">'
                     f'<span class="usr-name-cell" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
                     f'<span class="usr-cell email" title="{html.escape(email, quote=True)}">{html.escape(email)}</span>'
                     f'<span class="usr-cell">{role_html}</span>'
@@ -694,26 +702,18 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<span class="usr-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if st.button(
-                    "\u200b",
-                    key=f"users_pick_{uid}",
-                    use_container_width=True,
-                    help=f"Select {name}",
-                ):
-                    st.session_state["users_selected_id"] = uid
-                    st.session_state.pop("users_detail_collapsed", None)
-                    st.rerun()
-
-                st.markdown('<span class="usr-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="usr-actcol ips-clean-actions" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
-                    if st.button("👁", key=f"users_view_{uid}", help="View user", use_container_width=True):
+                    if st.button("👁", key=f"users_view_{uid}", help="View user"):
                         st.session_state["users_selected_id"] = uid
                         st.session_state.pop("users_detail_collapsed", None)
                         st.rerun()
                 with a2:
-                    with st.popover("⋯", use_container_width=True):
+                    with st.popover("⋯"):
                         if st.button("Edit user", key=f"users_more_edit_{uid}", use_container_width=True):
                             _edit_user_dialog(row)
                         if st.button("Resend invite", key=f"users_more_resend_{uid}", use_container_width=True):
@@ -736,6 +736,18 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
                                 st.rerun()
                             except Exception as exc:
                                 st.error(f"Could not update: {exc}")
+
+        picked = render_clean_table_click_bridge(
+            table_selector=".ips-users-table-anchor",
+            row_selector=".usr-row[data-row-id]",
+            component_key="ips_users_table_row_click_bridge",
+        )
+        if picked:
+            pid = str(picked).strip()
+            if pid:
+                st.session_state["users_selected_id"] = pid
+                st.session_state.pop("users_detail_collapsed", None)
+                st.rerun()
 
 
 def _render_user_detail_panel(row: dict[str, Any]) -> None:

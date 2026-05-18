@@ -14,6 +14,7 @@ from auth import current_role
 from db import fetch_table, fetch_table_admin, update_rows_admin
 
 try:
+    from app.ui.clean_table import render_clean_table_click_bridge
     from app.ui.estimates_components import (
         date_range_button_label,
         donut_chart_html,
@@ -24,6 +25,7 @@ try:
     )
     from app.ui.page_shell import render_card
 except ImportError:
+    from ui.clean_table import render_clean_table_click_bridge  # type: ignore
     from ui.estimates_components import (  # type: ignore
         date_range_button_label,
         donut_chart_html,
@@ -508,7 +510,10 @@ def render_estimates_list_page(
 
     # Table
     with st.container(border=True):
-        st.markdown('<span class="ips-est-table-anchor ips-est-list-table"></span>', unsafe_allow_html=True)
+        st.markdown(
+            '<span class="ips-est-table-anchor ips-est-list-table ips-clean-table"></span>',
+            unsafe_allow_html=True,
+        )
         weights = [1.0, 2.0, 1.3, 1.0, 1.0, 0.9, 0.85, 1.0, 0.75]
         head = st.columns(weights)
         sort_pairs = [
@@ -557,16 +562,24 @@ def render_estimates_list_page(
             est_date = _fmt_date(est_row.get("estimate_date"))
             exp_date = _fmt_date(est_row.get("expiration_date"))
 
-            row_cls = "ips-est-list-row is-selected" if is_sel else "ips-est-list-row"
+            row_cls = (
+                "ips-est-list-row ips-clean-row is-selected"
+                if is_sel
+                else "ips-est-list-row ips-clean-row"
+            )
+            eid_attr = html.escape(eid, quote=True)
             sub_html = (
                 f'<span class="ips-est-list-cell-sub">{html.escape(subtitle)}</span>'
                 if subtitle else ""
             )
 
             with st.container():
-                st.markdown('<span class="ips-est-list-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="{row_cls}">'
+                    '<span class="ips-est-list-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{row_cls}" data-row-id="{eid_attr}" role="button" tabindex="0">'
                     f'<span class="ips-est-list-qnum" title="{html.escape(qn, quote=True)}">{html.escape(qn)}</span>'
                     f'<div class="ips-est-list-cell-title-wrap">'
                     f'<div class="ips-est-list-cell-title">{html.escape(title)}</div>{sub_html}'
@@ -581,26 +594,18 @@ def render_estimates_list_page(
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<span class="ips-est-list-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if st.button(
-                    "\u200b",
-                    key=f"est_pick_{eid}",
-                    use_container_width=True,
-                    help=f"Select estimate {qn}",
-                ):
-                    st.session_state["est_list_selected_id"] = eid
-                    st.session_state.pop("est_list_detail_collapsed", None)
-                    st.rerun()
-
-                st.markdown('<span class="ips-est-list-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-est-list-actcol ips-clean-actions" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
-                    if st.button("👁", key=f"est_view_{eid}", help="View estimate", use_container_width=True):
+                    if st.button("👁", key=f"est_view_{eid}", help="View estimate"):
                         st.session_state["est_list_selected_id"] = eid
                         st.session_state.pop("est_list_detail_collapsed", None)
                         st.rerun()
                 with a2:
-                    with st.popover("⋯", use_container_width=True):
+                    with st.popover("⋯"):
                         if st.button("Open editor", key=f"est_more_edit_{eid}", use_container_width=True):
                             on_open_editor(eid)
                         if st.button("Import quotes", key=f"est_more_imp_{eid}", use_container_width=True):
@@ -612,6 +617,18 @@ def render_estimates_list_page(
                         ):
                             st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [eid]}
                             st.rerun()
+
+        picked = render_clean_table_click_bridge(
+            table_selector=".ips-est-table-anchor",
+            row_selector=".ips-est-list-row[data-row-id]",
+            component_key="ips_est_table_row_click_bridge",
+        )
+        if picked:
+            pid = str(picked).strip()
+            if pid:
+                st.session_state["est_list_selected_id"] = pid
+                st.session_state.pop("est_list_detail_collapsed", None)
+                st.rerun()
 
     # Delete confirmation
     pend = st.session_state.get(IPS_PENDING_DELETE) or {}

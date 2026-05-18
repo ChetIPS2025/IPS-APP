@@ -22,7 +22,11 @@ import html
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
+
+try:
+    from app.ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge
+except ImportError:
+    from ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge  # type: ignore
 
 try:
     from table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS
@@ -141,10 +145,14 @@ def _job_row_grid_html(
     is_selected: bool,
 ) -> str:
     """Single HTML grid row — matches ``.job-row`` / ``.job-row.selected`` CSS."""
-    row_cls = "job-row selected" if is_selected else "job-row"
+    row_cls = (
+        "job-row ips-clean-row selected"
+        if is_selected
+        else "job-row ips-clean-row"
+    )
     jid_attr = html.escape(jid, quote=True)
     return (
-        f'<div class="{row_cls}" data-jid="{jid_attr}" role="button" tabindex="0">'
+        f'<div class="{row_cls}" data-jid="{jid_attr}" data-row-id="{jid_attr}" role="button" tabindex="0">'
         f'<span class="job-number" title="{html.escape(jnum, quote=True)}">{html.escape(jnum)}</span>'
         f'<span class="job-project jdb-cell" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
         f'<span class="jdb-cell jdb-cell-muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
@@ -155,35 +163,6 @@ def _job_row_grid_html(
         f'<span class="jdb-cell jdb-cell-muted">{html.escape(ed)}</span>'
         f'<span class="job-row-act-slot"></span>'
         f"</div>"
-    )
-
-
-def _jdb_row_click_bridge_component() -> Any:
-    """Zero-height bridge: clicks on ``.job-row[data-jid]`` set component value to job id."""
-    st.markdown('<span class="jdb-click-bridge" aria-hidden="true"></span>', unsafe_allow_html=True)
-    return components.html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  if (doc.__jdbRowClickBridge) return;
-  doc.__jdbRowClickBridge = true;
-  doc.addEventListener("click", function (e) {
-    const t = e.target;
-    if (!t || !t.closest) return;
-    if (t.closest("[data-testid='stButton'], button, a, input, select, textarea, label")) return;
-    const row = t.closest(".jdb-tbl-host .job-row[data-jid]");
-    if (!row) return;
-    const jid = row.getAttribute("data-jid");
-    if (!jid) return;
-    window.postMessage({ type: "streamlit:setComponentValue", value: jid }, "*");
-  }, true);
-})();
-</script>
-        """,
-        height=0,
-        key="jdb_table_row_click_bridge",
     )
 
 
@@ -236,6 +215,7 @@ def inject_job_database_root_canvas() -> None:
 
 
 def inject_modern_jobs_css() -> None:
+    inject_clean_table_css()
     if st.session_state.get(_CSS_KEY):
         return
     st.session_state[_CSS_KEY] = True
@@ -987,7 +967,7 @@ def render_job_row(
     sd   = _date_table(full_row.get("start_date"))
     ed   = _date_table(full_row.get("target_completion_date") or full_row.get("due_date"))
 
-    st.markdown('<span class="job-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown('<span class="job-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
     st.markdown(
         _job_row_grid_html(
             jid=jid,
@@ -1004,7 +984,7 @@ def render_job_row(
         unsafe_allow_html=True,
     )
 
-    st.markdown('<span class="jdb-row-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown('<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
     a1, a2 = st.columns(2, gap="small")
     with a1:
         if st.button("👁", key=f"jrow_view_{jid}", help="View full job details"):
@@ -1040,7 +1020,7 @@ def render_jobs_table(
 
     with st.container(border=True):
         # Marker on the outer card — used by CSS to scope all inner selectors
-        st.markdown('<span class="jdb-tbl-host"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="jdb-tbl-host ips-clean-table"></span>', unsafe_allow_html=True)
 
         st.markdown(
             '<div class="jdb-thead">'
@@ -1094,7 +1074,11 @@ def render_jobs_table(
             if is_selected:
                 panel_row = full_row
 
-        picked = _jdb_row_click_bridge_component()
+        picked = render_clean_table_click_bridge(
+            table_selector=".jdb-tbl-host",
+            row_selector=".job-row[data-row-id]",
+            component_key="jdb_table_row_click_bridge",
+        )
         if picked:
             pid = str(picked).strip()
             if pid:

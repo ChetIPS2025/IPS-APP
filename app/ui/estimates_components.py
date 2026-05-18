@@ -24,6 +24,11 @@ _STATUS_STYLES: dict[str, tuple[str, str, str]] = {
 def inject_estimates_list_css() -> None:
     """Inject Estimates list page CSS on every render (navigation-safe)."""
     try:
+        from app.ui.clean_table import inject_clean_table_css
+    except ImportError:
+        from ui.clean_table import inject_clean_table_css  # type: ignore
+    inject_clean_table_css()
+    try:
         from app.ui.page_shell import inject_ips_dashboard_layout
     except ImportError:
         from ui.page_shell import inject_ips_dashboard_layout  # type: ignore

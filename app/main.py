@@ -44,6 +44,7 @@ try:
         apply_global_css,
         inject_force_white_final_override,
     )
+    from app.ui.clean_table import inject_clean_table_css
     from app.ui.components.topbar import render_top_bar
 except ImportError:
     from ui.theme import (  # type: ignore
@@ -51,6 +52,7 @@ except ImportError:
         apply_global_css,
         inject_force_white_final_override,
     )
+    from ui.clean_table import inject_clean_table_css  # type: ignore
     from ui.components.topbar import render_top_bar  # type: ignore
 try:
     from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
@@ -152,6 +154,7 @@ def main() -> None:
         apply_branding()
         apply_global_app_styles()
         apply_global_css()
+        inject_clean_table_css()
         inject_pwa_support()
 
     # Public customer signing flow (no login): `?tsign=<uuid>`
@@ -317,6 +320,7 @@ def main() -> None:
 
     with perf_span(f"main.page_render:{page}"):
         try:
+            inject_clean_table_css()
             render_fn()
             inject_force_white_final_override()
         except Exception as exc:
