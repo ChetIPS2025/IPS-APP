@@ -6,9 +6,11 @@ import streamlit as st
 
 try:
     from app.pages.modules import (
+        admin,
         assets,
         company_updates,
         dashboard,
+        documents,
         employee_certifications,
         employee_documents,
         employees,
@@ -16,6 +18,9 @@ try:
         estimates,
         inventory,
         jobs,
+        reports,
+        settings,
+        tasks,
         timekeeping,
     )
     from app.pages.modules._session import clear_all_module_selections, nav_slug
@@ -23,9 +28,11 @@ try:
     from app.utils.permissions import role_can_access_page
 except ImportError:
     from pages.modules import (  # type: ignore
+        admin,
         assets,
         company_updates,
         dashboard,
+        documents,
         employee_certifications,
         employee_documents,
         employees,
@@ -33,6 +40,9 @@ except ImportError:
         estimates,
         inventory,
         jobs,
+        reports,
+        settings,
+        tasks,
         timekeeping,
     )
     from pages.modules._session import clear_all_module_selections, nav_slug  # type: ignore
@@ -56,15 +66,14 @@ BUILT_MODULES: dict[str, object] = {
     "employee_certifications": employee_certifications.render,
     "employee_documents": employee_documents.render,
     "company_updates": company_updates.render,
+    "documents": documents.render,
+    "tasks": tasks.render,
+    "reports": reports.render,
+    "admin": admin.render,
+    "settings": settings.render,
 }
 
-COMING_SOON_LABELS: dict[str, str] = {
-    "tasks": "Tasks",
-    "documents": "Documents",
-    "reports": "Reports",
-    "admin": "Admin",
-    "settings": "Settings",
-}
+COMING_SOON_LABELS: dict[str, str] = {}
 
 
 def ensure_nav_defaults() -> None:

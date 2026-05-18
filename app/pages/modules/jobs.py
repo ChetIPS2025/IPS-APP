@@ -14,10 +14,9 @@ try:
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
-    from app.pages.modules._data import load_jobs
+    from app.pages.modules._data import load_jobs, lookup_options
     from app.pages.modules._session import select_key, tab_key
     from app.styles import inject_global_css
-    from app.utils.constants import JOB_STATUSES
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_header  # type: ignore
@@ -26,10 +25,9 @@ except ImportError:
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
-    from pages.modules._data import load_jobs  # type: ignore
+    from pages.modules._data import load_jobs, lookup_options  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
     from styles import inject_global_css  # type: ignore
-    from utils.constants import JOB_STATUSES  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("jobs")
@@ -129,7 +127,7 @@ def render() -> None:
         with c2:
             st.selectbox(
                 "Status",
-                ["All Statuses", *JOB_STATUSES],
+                ["All Statuses", *lookup_options("job_statuses")],
                 key="jobs_filter_status",
                 label_visibility="collapsed",
             )

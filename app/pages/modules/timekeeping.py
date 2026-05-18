@@ -79,7 +79,21 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
             st.button("Edit Week", key=f"tk_edit_{eid}", use_container_width=True)
         with c2:
             if st.button("Save Changes", key=f"tk_save_{eid}", type="primary", use_container_width=True):
-                st.success("Time entries saved (demo).")
+                try:
+                    from app.pages.modules._data import persist_timekeeping_week
+                except ImportError:
+                    from pages.modules._data import persist_timekeeping_week  # type: ignore
+                summary = {
+                    "st_total": sum(float(r.get("st") or 0) for r in grid),
+                    "ot_total": sum(float(r.get("ot") or 0) for r in grid),
+                    "dt_total": sum(float(r.get("dt") or 0) for r in grid),
+                    "status": str(emp.get("status") or "Pending"),
+                }
+                ok, msg = persist_timekeeping_week(eid, week_start_d, summary)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     gk = _grid_key(eid)

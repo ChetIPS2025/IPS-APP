@@ -706,6 +706,32 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   border-radius: 4px;
   margin-left: 0.35rem;
 }}
+.ips-report-section {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.65rem;
+}}
+.ips-report-section-title {{
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0 0 0.5rem;
+}}
+.ips-lookup-panel {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-top: 0.5rem;
+}}
+.ips-activity-item {{
+  font-size: 0.8125rem;
+  color: {TEXT_MUTED};
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}}
 </style>
 """,
         unsafe_allow_html=True,

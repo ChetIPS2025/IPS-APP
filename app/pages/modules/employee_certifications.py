@@ -134,9 +134,27 @@ def render() -> None:
             bc1, bc2 = st.columns(2)
             with bc1:
                 if st.button("Save", key="cert_save_new", type="primary"):
-                    st.success("Certification saved (demo).")
-                    st.session_state["ips_cert_form_open"] = False
-                    st.rerun()
+                    try:
+                        from app.pages.modules._data import persist_certification
+                    except ImportError:
+                        from pages.modules._data import persist_certification  # type: ignore
+                    ui = {
+                        "employee_id": str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or ""),
+                        "cert_type": st.session_state.get("cert_new_type"),
+                        "cert_number": st.session_state.get("cert_new_number"),
+                        "issuer": st.session_state.get("cert_new_issuer"),
+                        "issue_date": st.session_state.get("cert_new_issue"),
+                        "expiration_date": st.session_state.get("cert_new_exp"),
+                        "status": "Active",
+                        "notes": st.session_state.get("cert_new_notes"),
+                    }
+                    ok, msg = persist_certification(ui)
+                    if ok:
+                        st.success(msg)
+                        st.session_state["ips_cert_form_open"] = False
+                        st.rerun()
+                    else:
+                        st.error(msg)
             with bc2:
                 if st.button("Cancel", key="cert_cancel_new"):
                     st.session_state["ips_cert_form_open"] = False

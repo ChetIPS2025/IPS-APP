@@ -91,11 +91,12 @@ def _normalize_job(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_jobs() -> list[dict[str, Any]]:
-    rows = _fetch_table("jobs", order_by="job_number")
-    if rows:
-        out = [_normalize_job(r) for r in rows if r]
-        return [r for r in out if r.get("job_number")]
-    return list(_DEMO_JOBS)
+    try:
+        from app.services.phase2_modules_service import list_jobs
+    except ImportError:
+        from services.phase2_modules_service import list_jobs  # type: ignore
+    rows, _ = list_jobs(demo=list(_DEMO_JOBS))
+    return rows
 
 
 def load_dashboard_kpis() -> dict[str, Any]:
@@ -340,11 +341,12 @@ def _normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_estimates() -> list[dict[str, Any]]:
-    rows = _fetch_table("estimates", order_by="quote_number")
-    if rows:
-        out = [_normalize_estimate(r) for r in rows if r]
-        return [r for r in out if r.get("estimate_number")]
-    return list(_DEMO_ESTIMATES)
+    try:
+        from app.services.phase2_modules_service import list_estimates
+    except ImportError:
+        from services.phase2_modules_service import list_estimates  # type: ignore
+    rows, _ = list_estimates(demo=list(_DEMO_ESTIMATES))
+    return rows
 
 
 def get_estimate(estimate_id: str) -> dict[str, Any] | None:
@@ -357,26 +359,12 @@ def get_estimate(estimate_id: str) -> dict[str, Any] | None:
 
 def load_estimate_materials(estimate_id: str) -> list[dict[str, Any]]:
     eid = str(estimate_id or "").strip()
-    rows = _fetch_table("estimate_materials", limit=500)
-    if rows:
-        out = []
-        for r in rows:
-            if str(r.get("estimate_id") or "") == eid:
-                out.append({
-                    "id": str(r.get("id") or ""),
-                    "estimate_id": eid,
-                    "item_number": str(r.get("item_number") or r.get("sku") or ""),
-                    "description": str(r.get("description") or ""),
-                    "category": str(r.get("category") or ""),
-                    "qty": float(r.get("qty") or r.get("quantity") or 0),
-                    "unit": str(r.get("unit") or "EA"),
-                    "unit_cost": float(r.get("unit_cost") or 0),
-                    "total_cost": float(r.get("total_cost") or 0),
-                })
-        if out:
-            return out
-    demo = [m for m in _DEMO_MATERIALS if m.get("estimate_id") == eid]
-    return demo if demo else list(_DEMO_MATERIALS)
+    try:
+        from app.services.phase2_modules_service import list_estimate_materials
+    except ImportError:
+        from services.phase2_modules_service import list_estimate_materials  # type: ignore
+    rows, _ = list_estimate_materials(eid, demo=list(_DEMO_MATERIALS))
+    return rows
 
 
 def materials_summary(materials: list[dict[str, Any]]) -> dict[str, float]:
@@ -415,13 +403,12 @@ def _normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_inventory() -> list[dict[str, Any]]:
-    rows = _fetch_table("inventory_items", order_by="sku")
-    if not rows:
-        rows = _fetch_table("inventory", order_by="sku")
-    if rows:
-        out = [_normalize_inventory(r) for r in rows if r]
-        return [r for r in out if r.get("sku")]
-    return list(_DEMO_INVENTORY)
+    try:
+        from app.services.phase2_modules_service import list_inventory
+    except ImportError:
+        from services.phase2_modules_service import list_inventory  # type: ignore
+    rows, _ = list_inventory(demo=list(_DEMO_INVENTORY))
+    return rows
 
 
 def _normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
@@ -446,13 +433,12 @@ def _normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_assets() -> list[dict[str, Any]]:
-    rows = _fetch_table("assets", order_by="asset_number")
-    if not rows:
-        rows = _fetch_table("asset_database", limit=500)
-    if rows:
-        out = [_normalize_asset(r) for r in rows if r]
-        return [r for r in out if r.get("asset_number")]
-    return list(_DEMO_ASSETS)
+    try:
+        from app.services.phase2_modules_service import list_assets
+    except ImportError:
+        from services.phase2_modules_service import list_assets  # type: ignore
+    rows, _ = list_assets(demo=list(_DEMO_ASSETS))
+    return rows
 
 
 ACTIVE_EMPLOYEE_KEY = "ips_active_employee_id"
@@ -549,26 +535,12 @@ _DEMO_EVENTS: list[dict[str, Any]] = [
 
 
 def load_employees() -> list[dict[str, Any]]:
-    rows = _fetch_table("employees", order_by="name", limit=500)
-    if rows:
-        out = []
-        for r in rows:
-            eid = str(r.get("id") or "").strip()
-            out.append({
-                "id": eid,
-                "name": str(r.get("name") or r.get("full_name") or "—"),
-                "email": str(r.get("email") or "—"),
-                "role": str(r.get("role") or "Employee"),
-                "department": str(r.get("department") or "—"),
-                "status": str(r.get("status") or "Active"),
-                "last_login": str(r.get("last_login") or "—"),
-                "phone": str(r.get("phone") or "—"),
-                "username": str(r.get("username") or eid[:8]),
-                "member_since": str(r.get("created_at") or "")[:10],
-            })
-        if out:
-            return out
-    return list(_DEMO_EMPLOYEES)
+    try:
+        from app.services.phase2_modules_service import list_employees
+    except ImportError:
+        from services.phase2_modules_service import list_employees  # type: ignore
+    rows, _ = list_employees(demo=list(_DEMO_EMPLOYEES))
+    return rows
 
 
 def get_employee(employee_id: str) -> dict[str, Any] | None:
@@ -581,13 +553,15 @@ def get_employee(employee_id: str) -> dict[str, Any] | None:
 
 def load_certifications(employee_id: str) -> list[dict[str, Any]]:
     eid = str(employee_id or "").strip()
-    rows = _fetch_table("certifications", limit=500)
-    if rows:
-        out = [r for r in rows if str(r.get("employee_id") or "") == eid]
-        if out:
-            return out
+    try:
+        from app.services.phase2_modules_service import list_certifications
+    except ImportError:
+        from services.phase2_modules_service import list_certifications  # type: ignore
     demo = [c for c in _DEMO_CERTIFICATIONS if c.get("employee_id") == eid]
-    return demo if demo else [c for c in _DEMO_CERTIFICATIONS if eid == "emp-chance"][:2]
+    if not demo and eid:
+        demo = [c for c in _DEMO_CERTIFICATIONS if eid == "emp-chance"][:2]
+    rows, _ = list_certifications(eid, demo=demo or list(_DEMO_CERTIFICATIONS)[:2])
+    return rows
 
 
 def load_employee_documents(employee_id: str, *, role: str = "admin") -> list[dict[str, Any]]:
@@ -605,15 +579,22 @@ def load_employee_documents(employee_id: str, *, role: str = "admin") -> list[di
     return out
 
 
+def load_documents_hub(*, role: str = "admin") -> list[dict[str, Any]]:
+    try:
+        from app.services.phase2_modules_service import list_documents_hub
+    except ImportError:
+        from services.phase2_modules_service import list_documents_hub  # type: ignore
+    rows, _ = list_documents_hub(role=role, demo=list(_DEMO_DOCUMENTS_HUB))
+    return rows
+
+
 def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any]]:
-    rows = _fetch_table("company_updates", limit=100)
-    if rows:
-        out = rows
-    else:
-        out = list(_DEMO_COMPANY_UPDATES)
-    if category and category != "All Updates":
-        out = [u for u in out if str(u.get("category") or "") == category]
-    return out
+    try:
+        from app.services.phase2_modules_service import list_company_updates
+    except ImportError:
+        from services.phase2_modules_service import list_company_updates  # type: ignore
+    rows, _ = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
+    return rows
 
 
 def demo_update_metrics() -> dict[str, int]:
@@ -634,20 +615,17 @@ def load_upcoming_events() -> list[dict[str, Any]]:
 
 
 def load_all_certifications() -> list[dict[str, Any]]:
-    rows = _fetch_table("certifications", limit=500)
-    if rows:
-        out = []
-        for r in rows:
-            eid = str(r.get("employee_id") or "")
-            emp = get_employee(eid) or {}
-            out.append({**r, "employee_name": str(emp.get("name") or "—")})
-        if out:
-            return out
-    out = []
+    try:
+        from app.services.phase2_modules_service import list_all_certifications
+    except ImportError:
+        from services.phase2_modules_service import list_all_certifications  # type: ignore
+    employees = load_employees()
+    demo = []
     for c in _DEMO_CERTIFICATIONS:
         emp = get_employee(str(c.get("employee_id") or "")) or {}
-        out.append({**c, "employee_name": str(emp.get("name") or "—")})
-    return out
+        demo.append({**c, "employee_name": str(emp.get("name") or "—")})
+    rows, _ = list_all_certifications(demo=demo, employees=employees)
+    return rows
 
 
 def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
@@ -669,17 +647,36 @@ def job_options_for_timekeeping() -> list[str]:
     return opts
 
 
+def load_tasks() -> list[dict[str, Any]]:
+    try:
+        from app.services.phase2_modules_service import list_tasks
+    except ImportError:
+        from services.phase2_modules_service import list_tasks  # type: ignore
+    rows, _ = list_tasks(demo=list(_DEMO_TASKS))
+    return rows
+
+
+def get_task(task_id: str) -> dict[str, Any] | None:
+    tid = str(task_id or "").strip()
+    for t in load_tasks():
+        if str(t.get("id")) == tid:
+            return t
+    return None
+
+
 def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
-    _ = week_start
-    rows = _fetch_table("timekeeping", limit=500)
-    if rows:
-        return rows
-    return [
+    try:
+        from app.services.phase2_modules_service import list_timekeeping_summaries
+    except ImportError:
+        from services.phase2_modules_service import list_timekeeping_summaries  # type: ignore
+    demo = [
         {"id": "emp-chance", "name": "Chance Burgess", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 38.5, "ot_total": 4.0, "dt_total": 0.0, "status": "Pending"},
         {"id": "emp-mark", "name": "Mark Johnson", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 2.5, "dt_total": 0.0, "status": "Approved"},
         {"id": "emp-sarah", "name": "Sarah Chen", "department": "Project Management", "week_start": week_start.isoformat(), "st_total": 32.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
         {"id": "emp-leland", "name": "Leland Daigle", "department": "Administration", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
     ]
+    rows, _ = list_timekeeping_summaries(week_start, demo=demo)
+    return rows
 
 
 def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
@@ -700,3 +697,393 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
     if employee_id == "emp-mark":
         grid[4]["ot"] = 2.5
     return grid
+
+
+_DEMO_DOCUMENTS_HUB: list[dict[str, Any]] = [
+    {
+        "id": "dh1",
+        "file_name": "J26047_Contract_Signed.pdf",
+        "doc_type": "Contract",
+        "linked_module": "Jobs",
+        "linked_ref": "J26047 — Maintenance Shop Bathroom Remodel",
+        "upload_date": "2025-04-01",
+        "uploaded_by": "Sarah Chen",
+        "expiration_date": "",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh2",
+        "file_name": "EST-24018_Proposal.pdf",
+        "doc_type": "Specification",
+        "linked_module": "Estimates",
+        "linked_ref": "EST-24018 — Bayou Tank Farm",
+        "upload_date": "2025-03-12",
+        "uploaded_by": "Leland Daigle",
+        "expiration_date": "",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh3",
+        "file_name": "Forklift_Inspection_A042.pdf",
+        "doc_type": "Safety Document",
+        "linked_module": "Assets",
+        "linked_ref": "A-042 — Toyota Forklift",
+        "upload_date": "2025-05-01",
+        "uploaded_by": "Mark Johnson",
+        "expiration_date": "2026-05-01",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh4",
+        "file_name": "license_chance.pdf",
+        "doc_type": "Driver's License",
+        "linked_module": "Employees",
+        "linked_ref": "Chance Burgess",
+        "upload_date": "2024-08-01",
+        "uploaded_by": "HR Admin",
+        "expiration_date": "2027-08-01",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh5",
+        "file_name": "TWIC-88421.pdf",
+        "doc_type": "TWIC Card",
+        "linked_module": "Certifications",
+        "linked_ref": "Chance Burgess — TWIC",
+        "upload_date": "2023-01-15",
+        "uploaded_by": "HR Admin",
+        "expiration_date": "2028-01-14",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh6",
+        "file_name": "SKU-8842_MSDS.pdf",
+        "doc_type": "Safety Document",
+        "linked_module": "Inventory",
+        "linked_ref": "SKU-8842 — PVC Cement",
+        "upload_date": "2024-11-20",
+        "uploaded_by": "Warehouse",
+        "expiration_date": "",
+        "is_restricted": False,
+    },
+    {
+        "id": "dh7",
+        "file_name": "Heat_Stress_Policy.pdf",
+        "doc_type": "HR Document",
+        "linked_module": "Company Updates",
+        "linked_ref": "Heat Stress Prevention Reminder",
+        "upload_date": "2025-05-14",
+        "uploaded_by": "Safety",
+        "expiration_date": "",
+        "is_restricted": True,
+    },
+    {
+        "id": "dh8",
+        "file_name": "performance_review.pdf",
+        "doc_type": "HR Document",
+        "linked_module": "Employees",
+        "linked_ref": "Mark Johnson",
+        "upload_date": "2023-02-10",
+        "uploaded_by": "HR Admin",
+        "expiration_date": "",
+        "is_restricted": True,
+    },
+]
+
+_DEMO_TASKS: list[dict[str, Any]] = [
+    {
+        "id": "task1",
+        "title": "Approve weekly timekeeping — Field Ops",
+        "status": "Open",
+        "priority": "High",
+        "assigned_to": "Mark Johnson",
+        "linked_job": "J26047 — Maintenance Shop Bathroom Remodel",
+        "linked_estimate": "— None —",
+        "due_date": "2025-05-20",
+        "description": "Review and approve pending timecards for the week ending May 18.",
+        "activity": [
+            {"when": "2025-05-18 09:00", "who": "System", "note": "Task created from timekeeping workflow."},
+        ],
+    },
+    {
+        "id": "task2",
+        "title": "Order materials for EST-24018",
+        "status": "In Progress",
+        "priority": "Medium",
+        "assigned_to": "Sarah Chen",
+        "linked_job": "— None —",
+        "linked_estimate": "EST-24018 — Bayou Tank Farm",
+        "due_date": "2025-05-22",
+        "description": "Release PO for long-lead electrical items on estimate.",
+        "activity": [
+            {"when": "2025-05-17 14:30", "who": "Sarah Chen", "note": "Vendor quote received from Ferguson."},
+        ],
+    },
+    {
+        "id": "task3",
+        "title": "Forklift annual inspection",
+        "status": "Blocked",
+        "priority": "Urgent",
+        "assigned_to": "Chance Burgess",
+        "linked_job": "— None —",
+        "linked_estimate": "— None —",
+        "due_date": "2025-05-19",
+        "description": "Schedule inspection before asset returns to service.",
+        "activity": [
+            {"when": "2025-05-16 11:00", "who": "Mark Johnson", "note": "Waiting on vendor availability."},
+        ],
+    },
+    {
+        "id": "task4",
+        "title": "Update safety orientation deck",
+        "status": "Done",
+        "priority": "Low",
+        "assigned_to": "Leland Daigle",
+        "linked_job": "— None —",
+        "linked_estimate": "— None —",
+        "due_date": "2025-05-10",
+        "description": "Refresh site orientation slides for Q2.",
+        "activity": [
+            {"when": "2025-05-10 16:00", "who": "Leland Daigle", "note": "Published to document hub."},
+        ],
+    },
+]
+
+
+def task_job_options() -> list[str]:
+    opts = ["— None —"]
+    for j in load_jobs():
+        num = str(j.get("job_number") or "")
+        name = str(j.get("job_name") or "")
+        if num:
+            opts.append(f"{num} — {name}")
+    return opts
+
+
+def task_estimate_options() -> list[str]:
+    opts = ["— None —"]
+    for e in load_estimates():
+        num = str(e.get("estimate_number") or e.get("number") or "")
+        name = str(e.get("name") or e.get("title") or "")
+        if num:
+            opts.append(f"{num} — {name}")
+    return opts
+
+
+def task_assignee_options() -> list[str]:
+    return [str(e.get("name") or "") for e in load_employees() if e.get("name")]
+
+
+def demo_report_job_profitability() -> list[dict[str, Any]]:
+    return [
+        {"job_number": "J26047", "job_name": "Maintenance Shop Bathroom Remodel", "revenue": 185000, "cost": 142500, "margin_pct": 23.0},
+        {"job_number": "J26012", "job_name": "Tank Farm Piping", "revenue": 420000, "cost": 358200, "margin_pct": 14.7},
+        {"job_number": "J25988", "job_name": "Warehouse LED Retrofit", "revenue": 96000, "cost": 71200, "margin_pct": 25.8},
+    ]
+
+
+def demo_report_labor_by_job() -> list[dict[str, Any]]:
+    return [
+        {"job_number": "J26047", "st_hours": 312.5, "ot_hours": 28.0, "dt_hours": 0.0, "total_hours": 340.5},
+        {"job_number": "J26012", "st_hours": 890.0, "ot_hours": 112.5, "dt_hours": 16.0, "total_hours": 1018.5},
+        {"job_number": "J25988", "st_hours": 156.0, "ot_hours": 8.0, "dt_hours": 0.0, "total_hours": 164.0},
+    ]
+
+
+def demo_report_labor_by_employee() -> list[dict[str, Any]]:
+    return [
+        {"employee": "Chance Burgess", "st_hours": 38.5, "ot_hours": 4.0, "dt_hours": 0.0, "total_hours": 42.5},
+        {"employee": "Mark Johnson", "st_hours": 40.0, "ot_hours": 2.5, "dt_hours": 0.0, "total_hours": 42.5},
+        {"employee": "Sarah Chen", "st_hours": 32.0, "ot_hours": 0.0, "dt_hours": 0.0, "total_hours": 32.0},
+    ]
+
+
+def demo_report_inventory_value() -> list[dict[str, Any]]:
+    return [
+        {"category": "Electrical", "sku_count": 142, "on_hand_value": 48200.0},
+        {"category": "Plumbing", "sku_count": 98, "on_hand_value": 31500.0},
+        {"category": "Safety", "sku_count": 56, "on_hand_value": 12800.0},
+    ]
+
+
+def demo_report_low_stock() -> list[dict[str, Any]]:
+    inv = load_inventory()
+    low = [i for i in inv if str(i.get("status", "")).lower() == "low stock"]
+    if low:
+        return [
+            {"sku": i.get("sku"), "name": i.get("name"), "qty_on_hand": i.get("qty_on_hand"), "reorder_point": i.get("reorder_point", 10)}
+            for i in low
+        ]
+    return [
+        {"sku": "SKU-4421", "name": "3/4\" EMT Conduit", "qty_on_hand": 8, "reorder_point": 25},
+        {"sku": "SKU-8842", "name": "PVC Cement", "qty_on_hand": 3, "reorder_point": 12},
+    ]
+
+
+def demo_report_asset_maintenance() -> list[dict[str, Any]]:
+    return [
+        {"asset_number": "A-042", "name": "Toyota Forklift", "next_service": "2025-05-25", "status": "Scheduled"},
+        {"asset_number": "T-018", "name": "Tool Trailer A", "next_service": "2025-06-01", "status": "Due Soon"},
+    ]
+
+
+def demo_report_certs_expiring() -> list[dict[str, Any]]:
+    certs = load_all_certifications()
+    exp = [c for c in certs if str(c.get("status", "")).lower() in {"expired", "expiring soon"}]
+    if exp:
+        return [
+            {
+                "employee_name": c.get("employee_name"),
+                "cert_type": c.get("cert_type"),
+                "expiration_date": c.get("expiration_date"),
+                "status": c.get("status"),
+            }
+            for c in exp
+        ]
+    return [
+        {"employee_name": "Chance Burgess", "cert_type": "OSHA 30", "expiration_date": "2025-06-15", "status": "Expiring Soon"},
+        {"employee_name": "Mark Johnson", "cert_type": "Forklift", "expiration_date": "2024-03-09", "status": "Expired"},
+    ]
+
+
+def demo_report_open_estimates() -> list[dict[str, Any]]:
+    est = load_estimates()
+    open_est = [e for e in est if str(e.get("status", "")) in {"Draft", "Sent", "Pending"}]
+    if open_est:
+        return [
+            {
+                "estimate_number": e.get("estimate_number") or e.get("number"),
+                "customer": e.get("customer"),
+                "status": e.get("status"),
+                "total": e.get("total") or e.get("amount"),
+            }
+            for e in open_est[:8]
+        ]
+    return [
+        {"estimate_number": "EST-24018", "customer": "Bayou Petrochemical", "status": "Pending", "total": 285000},
+        {"estimate_number": "EST-24022", "customer": "Coastal Refining", "status": "Sent", "total": 142500},
+    ]
+
+
+def demo_report_completed_jobs() -> list[dict[str, Any]]:
+    jobs = load_jobs()
+    done = [j for j in jobs if str(j.get("status", "")).lower() == "completed"]
+    if done:
+        return [
+            {"job_number": j.get("job_number"), "job_name": j.get("job_name"), "end_date": j.get("end_date"), "customer": j.get("customer")}
+            for j in done
+        ]
+    return [
+        {"job_number": "J25801", "job_name": "Office HVAC Upgrade", "end_date": "2025-03-30", "customer": "IPS Internal"},
+    ]
+
+
+def demo_report_timekeeping_summary() -> list[dict[str, Any]]:
+    from datetime import date as _date
+
+    return load_timekeeping_summaries(_date.today())
+
+
+def lookup_options(slug: str) -> list[str]:
+    """Dropdown values from Supabase lookup tables with constants fallback."""
+    try:
+        from app.services.lookup_service import load_lookup_values
+    except ImportError:
+        from services.lookup_service import load_lookup_values  # type: ignore
+    values, _ = load_lookup_values(slug)
+    return values
+
+
+def _persist_result(result: Any, *, success: str) -> tuple[bool, str]:
+    """Return (ok, message) for UI feedback."""
+    try:
+        from app.services.repository import user_facing_error
+    except ImportError:
+        from services.repository import user_facing_error  # type: ignore
+    err = user_facing_error(result)
+    if err:
+        return False, err
+    return True, success
+
+
+def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_job
+    except ImportError:
+        from services.phase2_modules_service import save_job  # type: ignore
+    return _persist_result(save_job(ui, row_id=row_id), success="Job saved.")
+
+
+def persist_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_estimate
+    except ImportError:
+        from services.phase2_modules_service import save_estimate  # type: ignore
+    return _persist_result(save_estimate(ui, row_id=row_id), success="Estimate saved.")
+
+
+def persist_inventory(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_inventory_item
+    except ImportError:
+        from services.phase2_modules_service import save_inventory_item  # type: ignore
+    return _persist_result(save_inventory_item(ui, row_id=row_id), success="Inventory item saved.")
+
+
+def persist_asset(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_asset
+    except ImportError:
+        from services.phase2_modules_service import save_asset  # type: ignore
+    return _persist_result(save_asset(ui, row_id=row_id), success="Asset saved.")
+
+
+def persist_employee(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_employee
+    except ImportError:
+        from services.phase2_modules_service import save_employee  # type: ignore
+    return _persist_result(save_employee(ui, row_id=row_id), success="Employee saved.")
+
+
+def persist_certification(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_certification
+    except ImportError:
+        from services.phase2_modules_service import save_certification  # type: ignore
+    return _persist_result(save_certification(ui, row_id=row_id), success="Certification saved.")
+
+
+def persist_document(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_document_hub
+    except ImportError:
+        from services.phase2_modules_service import save_document_hub  # type: ignore
+    return _persist_result(save_document_hub(ui, row_id=row_id), success="Document saved.")
+
+
+def persist_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_company_update
+    except ImportError:
+        from services.phase2_modules_service import save_company_update  # type: ignore
+    return _persist_result(save_company_update(ui, row_id=row_id), success="Update published.")
+
+
+def persist_task(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_task
+    except ImportError:
+        from services.phase2_modules_service import save_task  # type: ignore
+    return _persist_result(save_task(ui, row_id=row_id), success="Task saved.")
+
+
+def persist_timekeeping_week(employee_id: str, week_start: date, summary: dict[str, Any]) -> tuple[bool, str]:
+    try:
+        from app.services.phase2_modules_service import save_timekeeping_week
+    except ImportError:
+        from services.phase2_modules_service import save_timekeeping_week  # type: ignore
+    return _persist_result(
+        save_timekeeping_week(employee_id, week_start, summary),
+        success="Timekeeping saved.",
+    )

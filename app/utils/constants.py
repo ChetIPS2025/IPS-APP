@@ -88,6 +88,90 @@ DEPARTMENTS = (
 
 UNITS = ("EA", "FT", "LF", "SF", "CY", "GAL", "LB", "TON", "HR", "DAY")
 
+CUSTOMERS = (
+    "Acme Industrial",
+    "Bayou Petrochemical",
+    "Coastal Refining",
+    "Gulf Coast Fabricators",
+    "IPS Internal",
+)
+
+VENDORS = (
+    "Grainger",
+    "Ferguson Supply",
+    "Louisiana Welding Supply",
+    "Sunbelt Rentals",
+    "Local Hardware Co.",
+)
+
+LOCATIONS = (
+    "Main Warehouse",
+    "Yard 1",
+    "Yard 2",
+    "Shop Office",
+    "Tool Trailer A",
+)
+
+CREWS = (
+    "Crew A — Field Ops",
+    "Crew B — Field Ops",
+    "Crew C — Maintenance",
+    "PM Support",
+)
+
+INVENTORY_CATEGORIES = (
+    "Electrical",
+    "Plumbing",
+    "Fasteners",
+    "Safety",
+    "Consumables",
+    "Tools",
+)
+
+ASSET_CATEGORIES = (
+    "Vehicle",
+    "Trailer",
+    "Heavy Equipment",
+    "Tool",
+    "Lift",
+    "Generator",
+)
+
+PERMISSION_GROUPS = (
+    "Full Access",
+    "Operations",
+    "Field Only",
+    "Read Only",
+    "HR Restricted",
+)
+
+DOCUMENT_LINK_MODULES = (
+    "All Modules",
+    "Jobs",
+    "Estimates",
+    "Assets",
+    "Employees",
+    "Certifications",
+    "Inventory",
+    "Company Updates",
+)
+
+LOOKUP_TABLES = (
+    "Customers",
+    "Vendors",
+    "Departments",
+    "Locations",
+    "Crews",
+    "Job Statuses",
+    "Estimate Statuses",
+    "Inventory Categories",
+    "Asset Categories",
+    "Certification Types",
+    "Document Types",
+    "User Roles",
+    "Permission Groups",
+)
+
 NAV_PAGES: list[tuple[str, str, str]] = [
     ("dashboard", "Dashboard", "layout-dashboard"),
     ("jobs", "Jobs", "briefcase"),
