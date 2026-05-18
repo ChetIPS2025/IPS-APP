@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 from datetime import date, datetime, timedelta, timezone
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pandas as pd
 import streamlit as st
@@ -83,7 +83,7 @@ except ImportError:
         week_dates,
     )
 
-TT_EDIT_ROLES = frozenset({"admin", "pm", "employee"})
+TT_EDIT_ROLES = frozenset({"admin", "manager", "pm", "employee"})
 
 _OT_THRESHOLD_DEFAULT = 40.0
 
@@ -1097,6 +1097,105 @@ def _inject_tt_styles() -> None:
             padding: 8px 10px 10px 10px !important;
             border-radius: 8px !important;
         }
+
+        /* ── Weekly Timecard Grid (new compact design) ── */
+        .ips-wc-col-hdr {
+            font-size: 9px !important;
+            font-weight: 700 !important;
+            color: #64748b !important;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin: 0 0 2px 0 !important;
+            padding: 0 !important;
+            line-height: 1.1 !important;
+        }
+        .ips-wc-day-lbl {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #cbd5e1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.3 !important;
+        }
+        .ips-wc-day-date {
+            font-size: 10px !important;
+            color: #64748b !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.2 !important;
+        }
+        .ips-wc-day-today {
+            color: #38bdf8 !important;
+        }
+        /* Compact card */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) {
+            padding: 8px 10px 10px 10px !important;
+            margin-bottom: 8px !important;
+            border-radius: 8px !important;
+        }
+        /* Compact inputs inside timecard cards */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stNumberInput"] input {
+            min-height: 1.45rem !important;
+            font-size: 0.8rem !important;
+            padding: 0.04rem 0.28rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stTextInput"] input {
+            min-height: 1.45rem !important;
+            font-size: 0.8rem !important;
+            padding: 0.04rem 0.28rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+            min-height: 1.45rem !important;
+            font-size: 0.8rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) label[data-testid="stWidgetLabel"] {
+            display: none !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) button {
+            min-height: 1.45rem !important;
+            padding: 0.08rem 0.3rem !important;
+            font-size: 0.74rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stElementContainer"] {
+            margin-bottom: 0.08rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stVerticalBlock"] > div {
+            gap: 0.15rem !important;
+        }
+        /* Day separator between days within a card */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-wc-day-sep) {
+            border-top: 1px solid rgba(71, 85, 105, 0.45) !important;
+            margin-top: 0.15rem !important;
+            padding-top: 0.25rem !important;
+        }
+        /* Add row subtle style */
+        div[data-testid="stHorizontalBlock"]:has(span.ips-wc-add-row) {
+            border-top: 1px dashed rgba(100, 116, 139, 0.3) !important;
+            margin-top: 0.08rem !important;
+            padding-top: 0.18rem !important;
+            opacity: 0.85;
+        }
+        div[data-testid="stHorizontalBlock"]:has(span.ips-wc-add-row):hover {
+            opacity: 1.0;
+        }
+        /* Entries expander compact */
+        div[data-testid="stExpander"]:has(span.ips-wc-entries-expander) {
+            margin-top: 0.4rem !important;
+        }
+        @media (max-width: 768px) {
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) {
+                padding: 6px 6px 8px 6px !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stNumberInput"] input,
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) [data-testid="stTextInput"] input {
+                min-height: 2rem !important;
+                font-size: 0.85rem !important;
+            }
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-wc-card) button {
+                min-height: 2rem !important;
+                font-size: 0.8rem !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1606,8 +1705,25 @@ def _tt_render_grid_section(
     filt: _TTFiltersResult,
     week_data: _TTWeekDataResult,
 ) -> tuple[list[float], list[float]] | None:
-    """Flat table, edit toolbars, weekly sheet (or read-only pivot). Returns footer inputs or None."""
+    """Weekly timecard cards + flat table expander (or read-only pivot). Returns footer data or None."""
     fj_id = filt.job_label_to_id.get(filt.default_job_label) if filt.default_job_label else None
+
+    if not can_edit:
+        st.info("View-only mode. Sign in as admin, manager, pm, or employee to log time.")
+        _render_readonly_pivot(week_data.visible_emps, days, week_data.idx, filt.job_id_to_label)
+        return None
+
+    # ── Primary UI: compact per-employee weekly timecard cards ──────────────
+    result = _render_weekly_timecard_grid(
+        today=today,
+        week_start=week_start,
+        days=days,
+        filt=filt,
+        week_data=week_data,
+        fj_id=fj_id,
+    )
+
+    # ── Secondary: flat entries table in expander (export / bulk delete) ────
     flat_rows = _tt_flat_entry_rows(
         week_data.grid_rows,
         filt.show_emp_ids,
@@ -1617,75 +1733,30 @@ def _tt_render_grid_section(
     )
     entries_df = pd.DataFrame(flat_rows)
 
+    # View detail popup (opened from table row select)
     tv_id = st.session_state.get("tt_entry_view_id")
     if tv_id:
         vr = fetch_one("time_entries", {"id": tv_id})
         if not vr:
             st.session_state.pop("tt_entry_view_id", None)
         else:
-            st.subheader("Time entry detail")
-            e_nm = week_data.emp_id_to_name.get(str(vr.get("employee_id") or ""), "—")
-            j_nm = filt.job_id_to_label.get(str(vr.get("job_id") or ""), "—")
-            tt_v = _tt_time_type_label(vr)
-            st.markdown(f"**Employee:** {e_nm}")
-            st.markdown(f"**Work date:** {vr.get('work_date') or '—'}")
-            st.markdown(f"**Job:** {j_nm}")
-            st.markdown(f"**Type:** {tt_v}")
-            st.markdown(f"**Hours:** {float(vr.get('hours') or 0):.2f}")
-            st.markdown(f"**Notes:** {vr.get('notes') or '—'}")
-            if st.button("← Week", use_container_width=True, key="tt_entry_view_back", help="Back to timesheet"):
-                st.session_state.pop("tt_entry_view_id", None)
-                st.rerun()
-            st.divider()
+            with st.container(border=True):
+                st.subheader("Time entry detail")
+                e_nm = week_data.emp_id_to_name.get(str(vr.get("employee_id") or ""), "—")
+                j_nm = filt.job_id_to_label.get(str(vr.get("job_id") or ""), "—")
+                st.markdown(
+                    f"**Employee:** {e_nm}  \n"
+                    f"**Work date:** {vr.get('work_date') or '—'}  \n"
+                    f"**Job:** {j_nm}  \n"
+                    f"**Type:** {_tt_time_type_label(vr)}  \n"
+                    f"**Hours:** {float(vr.get('hours') or 0):.2f}  \n"
+                    f"**Notes:** {vr.get('notes') or '—'}"
+                )
+                if st.button("← Close", key="tt_entry_view_back"):
+                    st.session_state.pop("tt_entry_view_id", None)
+                    st.rerun()
 
-    if not entries_df.empty and "id" in entries_df.columns:
-        st.subheader("Time entries (this week)")
-        st.caption("Select rows for export, edit, or delete.")
-        show_flat = [c for c in ["employee", "work_date", "job", "type", "hours", "notes"] if c in entries_df.columns]
-        bar_ph = st.empty()
-        _, sel = render_selectable_dataframe(
-            entries_df,
-            table_key=TABLE_KEY_TIME_ENTRIES,
-            id_column="id",
-            columns=show_flat,
-            editor_key="tt_flat_sel_editor",
-        )
-        with bar_ph.container():
-            actions = render_selection_action_bar(
-                TABLE_KEY_TIME_ENTRIES,
-                sel,
-                can_view=True,
-                can_edit=can_edit,
-                can_delete=can_edit,
-                export_df=entries_df,
-                visible_df=entries_df,
-                id_column="id",
-                export_filename="time_entries_week_export.csv",
-                view_label="View Entry",
-                edit_label="Edit Entry",
-                delete_label="Delete Entry",
-                delete_selected_label="Delete Selected",
-            )
-        if actions.get("view") and sel and len(sel) == 1:
-            st.session_state["tt_entry_view_id"] = str(sel[0])
-            st.session_state.pop(TT_EDIT_ID_KEY, None)
-            st.rerun()
-        if actions.get("edit") and sel and len(sel) == 1 and can_edit:
-            st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
-            st.session_state.pop("tt_entry_view_id", None)
-            st.rerun()
-        pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-        if actions.get("confirm_delete") and pend.get(TABLE_KEY_TIME_ENTRIES) and can_edit:
-            for tid in pend[TABLE_KEY_TIME_ENTRIES]:
-                try:
-                    delete_rows("time_entries", {"id": tid})
-                except Exception as exc:
-                    st.error(f"Could not delete {tid}: {exc}")
-            pend.pop(TABLE_KEY_TIME_ENTRIES, None)
-            clear_selected_ids(TABLE_KEY_TIME_ENTRIES)
-            st.success("Delete completed where permitted.")
-            st.rerun()
-
+    # Inline edit popup (opened from table Edit action)
     if can_edit:
         te_tbl = st.session_state.get(TT_EDIT_ID_KEY)
         if te_tbl:
@@ -1702,19 +1773,63 @@ def _tt_render_grid_section(
                     fast=fast,
                 )
 
-    if not can_edit:
-        st.info("View-only mode. Sign in as admin, pm, or employee to log time.")
-        _render_readonly_pivot(week_data.visible_emps, days, week_data.idx, filt.job_id_to_label)
-        return None
+    # Entries table expander (for export / bulk delete)
+    n_entries = len(flat_rows)
+    with st.expander(
+        f"Entries table ({n_entries} rows this week) — Export / Bulk delete",
+        expanded=False,
+    ):
+        st.markdown('<span class="ips-wc-entries-expander" aria-hidden="true"></span>', unsafe_allow_html=True)
+        if not entries_df.empty and "id" in entries_df.columns:
+            st.caption("Select rows to view, edit, export, or bulk-delete.")
+            show_flat = [c for c in ["employee", "work_date", "job", "type", "hours", "notes"] if c in entries_df.columns]
+            bar_ph = st.empty()
+            _, sel = render_selectable_dataframe(
+                entries_df,
+                table_key=TABLE_KEY_TIME_ENTRIES,
+                id_column="id",
+                columns=show_flat,
+                editor_key="tt_flat_sel_editor",
+            )
+            with bar_ph.container():
+                actions = render_selection_action_bar(
+                    TABLE_KEY_TIME_ENTRIES,
+                    sel,
+                    can_view=True,
+                    can_edit=can_edit,
+                    can_delete=can_edit,
+                    export_df=entries_df,
+                    visible_df=entries_df,
+                    id_column="id",
+                    export_filename="time_entries_week_export.csv",
+                    view_label="View Entry",
+                    edit_label="Edit Entry",
+                    delete_label="Delete Entry",
+                    delete_selected_label="Delete Selected",
+                )
+            if actions.get("view") and sel and len(sel) == 1:
+                st.session_state["tt_entry_view_id"] = str(sel[0])
+                st.session_state.pop(TT_EDIT_ID_KEY, None)
+                st.rerun()
+            if actions.get("edit") and sel and len(sel) == 1 and can_edit:
+                st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
+                st.session_state.pop("tt_entry_view_id", None)
+                st.rerun()
+            pend = st.session_state.get(IPS_PENDING_DELETE) or {}
+            if actions.get("confirm_delete") and pend.get(TABLE_KEY_TIME_ENTRIES) and can_edit:
+                for tid in pend[TABLE_KEY_TIME_ENTRIES]:
+                    try:
+                        delete_rows("time_entries", {"id": tid})
+                    except Exception as exc:
+                        st.error(f"Could not delete {tid}: {exc}")
+                pend.pop(TABLE_KEY_TIME_ENTRIES, None)
+                clear_selected_ids(TABLE_KEY_TIME_ENTRIES)
+                st.success("Delete completed where permitted.")
+                st.rerun()
+        else:
+            st.caption("No entries for this week matching current filters.")
 
-    return _tt_render_simple_timesheet(
-        today=today,
-        week_start=week_start,
-        days=days,
-        filt=filt,
-        week_data=week_data,
-        fj_id=fj_id,
-    )
+    return result
 
 
 def _tt_render_footer_section(day_col_totals: list[float], days: list[date], grid_ratios: list[float]) -> None:
@@ -2426,6 +2541,579 @@ def _render_day_column_body(
     )
 
     return day_sum
+
+
+# ─── Weekly Timecard Grid (new compact per-employee design) ──────────────────
+
+_WC_COL_RATIOS = [1.1, 3.2, 0.95, 0.95, 2.0, 1.5]  # day, job, st, ot, notes, action
+
+
+def _wc_job_key(job_id: str | None, nj: str | None) -> str:
+    """Stable, key-safe fragment derived from job_id or non_job_code."""
+    if job_id:
+        return "j" + job_id.replace("-", "")[:16]
+    if nj:
+        return "nj" + str(nj).upper().replace(" ", "")[:8]
+    return "nojob"
+
+
+def _group_day_entries(
+    entries: list[dict],
+    job_id_to_label: dict[str, str],
+) -> list[dict]:
+    """Combine ST and OT entries per (job/non-job code) into one dict per group."""
+    groups: dict[str, dict] = {}
+    for ent in entries:
+        jid = str(ent.get("job_id") or "").strip()
+        nj = str(ent.get("non_job_code") or "").strip()
+        gk = _wc_job_key(jid or None, nj or None)
+        if gk not in groups:
+            if jid:
+                label = str(job_id_to_label.get(jid) or jid[:24])
+            elif nj:
+                label = f"NON-JOB — {nj}"
+            else:
+                label = "—"
+            groups[gk] = {
+                "gk": gk,
+                "job_id": jid or None,
+                "nj": nj or None,
+                "label": label,
+                "st_id": None,
+                "ot_id": None,
+                "st_hrs": 0.0,
+                "ot_hrs": 0.0,
+                "notes": "",
+            }
+        g = groups[gk]
+        h = float(ent.get("hours") or 0)
+        n = str(ent.get("notes") or "").strip()
+        if _tt_entry_time_type(ent) == "OT":
+            g["ot_id"] = str(ent.get("id") or "") or None
+            g["ot_hrs"] = h
+            if n and not g["notes"]:
+                g["notes"] = n
+        else:
+            g["st_id"] = str(ent.get("id") or "") or None
+            g["st_hrs"] = h
+            if n:
+                g["notes"] = n
+    return list(groups.values())
+
+
+def _wc_key(eid: str, day_iso: str, gk: str, week_iso: str, field: str) -> str:
+    return f"wc_{eid[:8]}_{day_iso}_{gk}_{week_iso.replace('-', '')}_{field}"
+
+
+def _wc_add_key(eid: str, day_iso: str, week_iso: str, field: str) -> str:
+    return f"wca_{eid[:8]}_{day_iso}_{week_iso.replace('-', '')}_{field}"
+
+
+def _wc_clear_row_state(eid: str, day_iso: str, gk: str, week_iso: str) -> None:
+    """Remove cached widget state for one row so it re-reads from DB on rerun."""
+    for field in ["job", "st", "ot", "notes"]:
+        st.session_state.pop(_wc_key(eid, day_iso, gk, week_iso, field), None)
+
+
+def _wc_clear_add_row_state(eid: str, day_iso: str, week_iso: str) -> None:
+    """Remove cached widget state for an add-row after successful submit."""
+    for field in ["job", "st", "ot", "notes"]:
+        st.session_state.pop(_wc_add_key(eid, day_iso, week_iso, field), None)
+
+
+def _save_timecard_row(
+    *,
+    eid: str,
+    d: date,
+    orig_job_id: str | None,
+    orig_nj: str | None,
+    orig_st_id: str | None,
+    orig_ot_id: str | None,
+    new_job_id: str | None,
+    new_nj: str | None,
+    new_st_hrs: float,
+    new_ot_hrs: float,
+    new_notes: str,
+    uid: Any,
+    ts_now: str,
+) -> tuple[bool, str]:
+    """Upsert/delete ST and OT entries for one combined timecard row."""
+    job_changed = str(orig_job_id or "") != str(new_job_id or "") or str(orig_nj or "") != str(new_nj or "")
+
+    if job_changed:
+        for tid in [orig_st_id, orig_ot_id]:
+            if tid:
+                try:
+                    delete_rows("time_entries", {"id": tid})
+                except Exception as exc:
+                    return False, str(exc)
+        orig_st_id = None
+        orig_ot_id = None
+
+    if new_st_hrs > 0:
+        try:
+            upsert_time_entry(
+                employee_id=eid, job_id=new_job_id, work_date=d,
+                hours=new_st_hrs, notes=new_notes, created_by=uid,
+                updated_at_iso=ts_now, non_job_code=new_nj, time_type="ST",
+            )
+        except Exception as exc:
+            return False, str(exc)
+    elif orig_st_id:
+        try:
+            delete_rows("time_entries", {"id": orig_st_id})
+        except Exception as exc:
+            return False, str(exc)
+
+    if new_ot_hrs > 0:
+        try:
+            upsert_time_entry(
+                employee_id=eid, job_id=new_job_id, work_date=d,
+                hours=new_ot_hrs, notes=new_notes, created_by=uid,
+                updated_at_iso=ts_now, non_job_code=new_nj, time_type="OT",
+            )
+        except Exception as exc:
+            return False, str(exc)
+    elif orig_ot_id:
+        try:
+            delete_rows("time_entries", {"id": orig_ot_id})
+        except Exception as exc:
+            return False, str(exc)
+
+    return True, ""
+
+
+def _resolve_job_from_label(
+    label: str, job_label_to_id: dict[str, str]
+) -> tuple[str | None, str | None]:
+    """From a selectbox label return (job_id, non_job_code)."""
+    if label.startswith("NON-JOB — "):
+        code = label[len("NON-JOB — "):].strip()
+        return None, code or None
+    jid = str(job_label_to_id.get(label) or "").strip()
+    return jid or None, None
+
+
+def _build_full_job_options(all_job_labels: list[str]) -> list[str]:
+    """Combine job labels with NON-JOB category labels."""
+    nj_labels = [f"NON-JOB — {c}" for c in NON_JOB_CATEGORY_OPTIONS if c]
+    return all_job_labels + nj_labels
+
+
+def _label_for_group(g: dict, job_id_to_label: dict[str, str]) -> str:
+    if g["job_id"]:
+        return str(job_id_to_label.get(g["job_id"]) or g.get("label") or g["job_id"][:24])
+    if g["nj"]:
+        return f"NON-JOB — {g['nj']}"
+    return "—"
+
+
+def _render_wc_col_headers() -> None:
+    cols = st.columns(_WC_COL_RATIOS, gap="small")
+    for col, lbl in zip(cols, ["Day", "Job / Work Item", "S/T h", "O/T h", "Notes", ""]):
+        with col:
+            st.markdown(f'<p class="ips-wc-col-hdr">{html.escape(lbl)}</p>', unsafe_allow_html=True)
+
+
+def _render_wc_existing_row(
+    *,
+    eid: str,
+    d: date,
+    week_start: date,
+    today: date,
+    g: dict,
+    full_job_labels: list[str],
+    job_label_to_id: dict[str, str],
+    job_id_to_label: dict[str, str],
+    uid: Any,
+    ts_now: str,
+    show_day_label: bool,
+) -> None:
+    """One combined S/T + O/T edit row for an existing (job, day) group."""
+    day_iso = d.isoformat()
+    week_iso = week_start.isoformat()
+    gk = g["gk"]
+
+    # Stable widget keys
+    jk = _wc_key(eid, day_iso, gk, week_iso, "job")
+    stk = _wc_key(eid, day_iso, gk, week_iso, "st")
+    otk = _wc_key(eid, day_iso, gk, week_iso, "ot")
+    nk = _wc_key(eid, day_iso, gk, week_iso, "notes")
+
+    # Resolve current job label and its index in the dropdown
+    job_lbl = _label_for_group(g, job_id_to_label)
+    if full_job_labels:
+        try:
+            job_idx = full_job_labels.index(job_lbl)
+        except ValueError:
+            # Job not in list (inactive/closed); prepend it so it's still visible
+            full_job_labels = [job_lbl] + full_job_labels
+            job_idx = 0
+    else:
+        job_idx = 0
+
+    is_today = d == today
+    day_cls = "ips-wc-day-today" if is_today else ""
+    if show_day_label:
+        day_html = (
+            f'<p class="ips-wc-day-lbl {day_cls}">{d.strftime("%a")}</p>'
+            f'<p class="ips-wc-day-date">{d.strftime("%m/%d")}</p>'
+        )
+    else:
+        day_html = '<p class="ips-wc-day-lbl">&nbsp;</p>'
+
+    cols = st.columns(_WC_COL_RATIOS, gap="small")
+    with cols[0]:
+        st.markdown(day_html, unsafe_allow_html=True)
+    with cols[1]:
+        sel_job = st.selectbox(
+            "Job",
+            full_job_labels,
+            index=min(job_idx, max(0, len(full_job_labels) - 1)),
+            key=jk,
+            label_visibility="collapsed",
+        )
+    with cols[2]:
+        new_st = st.number_input(
+            "S/T h",
+            min_value=0.0,
+            max_value=24.0,
+            value=g["st_hrs"],
+            step=0.25,
+            format="%.2f",
+            key=stk,
+            label_visibility="collapsed",
+        )
+    with cols[3]:
+        new_ot = st.number_input(
+            "O/T h",
+            min_value=0.0,
+            max_value=24.0,
+            value=g["ot_hrs"],
+            step=0.25,
+            format="%.2f",
+            key=otk,
+            label_visibility="collapsed",
+        )
+    with cols[4]:
+        new_notes = st.text_input(
+            "Notes",
+            value=g["notes"],
+            key=nk,
+            label_visibility="collapsed",
+            placeholder="Notes…",
+        )
+    with cols[5]:
+        sv_col, dl_col = st.columns([1, 1], gap="small")
+        with sv_col:
+            save_key = f"wcsv_{eid[:8]}_{day_iso}_{gk}_{week_iso.replace('-', '')}"
+            if st.button("Save", key=save_key, use_container_width=True, type="primary"):
+                cur_st = float(st.session_state.get(stk, g["st_hrs"]))
+                cur_ot = float(st.session_state.get(otk, g["ot_hrs"]))
+                cur_notes = str(st.session_state.get(nk, g["notes"]) or "").strip()
+                cur_job_lbl = st.session_state.get(jk, sel_job)
+                new_jid, new_nj = _resolve_job_from_label(str(cur_job_lbl), job_label_to_id)
+                if not new_jid and not new_nj:
+                    st.warning("Pick a valid job or work item.")
+                else:
+                    ok, err = _save_timecard_row(
+                        eid=eid, d=d,
+                        orig_job_id=g["job_id"], orig_nj=g["nj"],
+                        orig_st_id=g["st_id"], orig_ot_id=g["ot_id"],
+                        new_job_id=new_jid, new_nj=new_nj,
+                        new_st_hrs=cur_st, new_ot_hrs=cur_ot,
+                        new_notes=cur_notes, uid=uid, ts_now=ts_now,
+                    )
+                    if ok:
+                        _wc_clear_row_state(eid, day_iso, gk, week_iso)
+                        try:
+                            st.cache_data.clear()
+                        except Exception:
+                            pass
+                        st.rerun()
+                    else:
+                        st.error(err or "Save failed.")
+        with dl_col:
+            del_key = f"wcdel_{eid[:8]}_{day_iso}_{gk}_{week_iso.replace('-', '')}"
+            if st.button("✕", key=del_key, use_container_width=True, help="Remove this row"):
+                for tid in [g["st_id"], g["ot_id"]]:
+                    if tid:
+                        try:
+                            delete_rows("time_entries", {"id": tid})
+                        except Exception as exc:
+                            st.error(str(exc))
+                            return
+                _wc_clear_row_state(eid, day_iso, gk, week_iso)
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+                st.rerun()
+
+
+def _render_wc_add_row(
+    *,
+    eid: str,
+    d: date,
+    week_start: date,
+    today: date,
+    has_existing_rows: bool,
+    full_job_labels: list[str],
+    job_label_to_id: dict[str, str],
+    fj_default_label: str | None,
+    uid: Any,
+    ts_now: str,
+) -> None:
+    """Compact add-new-entry row at the bottom of each day section."""
+    if not full_job_labels:
+        return
+    day_iso = d.isoformat()
+    week_iso = week_start.isoformat()
+    is_today = d == today
+
+    default_lbl = fj_default_label if (fj_default_label and fj_default_label in full_job_labels) else full_job_labels[0]
+    try:
+        default_idx = full_job_labels.index(default_lbl)
+    except ValueError:
+        default_idx = 0
+
+    jk = _wc_add_key(eid, day_iso, week_iso, "job")
+    stk = _wc_add_key(eid, day_iso, week_iso, "st")
+    otk = _wc_add_key(eid, day_iso, week_iso, "ot")
+    nk = _wc_add_key(eid, day_iso, week_iso, "notes")
+
+    day_cls = "ips-wc-day-today" if is_today else ""
+    if not has_existing_rows:
+        day_html = (
+            f'<p class="ips-wc-day-lbl {day_cls}">{d.strftime("%a")}</p>'
+            f'<p class="ips-wc-day-date">{d.strftime("%m/%d")}</p>'
+        )
+    else:
+        day_html = '<p class="ips-wc-day-lbl" style="opacity:0">&nbsp;</p>'
+
+    # Marker span for CSS day separator on add row
+    st.markdown('<span class="ips-wc-add-row" aria-hidden="true"></span>', unsafe_allow_html=True)
+    cols = st.columns(_WC_COL_RATIOS, gap="small")
+    with cols[0]:
+        st.markdown(day_html, unsafe_allow_html=True)
+    with cols[1]:
+        sel_job = st.selectbox(
+            "Job",
+            full_job_labels,
+            index=default_idx,
+            key=jk,
+            label_visibility="collapsed",
+        )
+    with cols[2]:
+        new_st = st.number_input(
+            "S/T h", min_value=0.0, max_value=24.0, value=0.0, step=0.25,
+            format="%.2f", key=stk, label_visibility="collapsed",
+        )
+    with cols[3]:
+        new_ot = st.number_input(
+            "O/T h", min_value=0.0, max_value=24.0, value=0.0, step=0.25,
+            format="%.2f", key=otk, label_visibility="collapsed",
+        )
+    with cols[4]:
+        new_notes = st.text_input(
+            "Notes", value="", key=nk, label_visibility="collapsed", placeholder="Notes…",
+        )
+    with cols[5]:
+        add_key = f"wcadd_{eid[:8]}_{day_iso}_{week_iso.replace('-', '')}"
+        if st.button("＋ Add", key=add_key, use_container_width=True, type="secondary"):
+            cur_st = float(st.session_state.get(stk, 0.0))
+            cur_ot = float(st.session_state.get(otk, 0.0))
+            cur_notes = str(st.session_state.get(nk, "") or "").strip()
+            cur_job_lbl = st.session_state.get(jk, sel_job)
+            if cur_st <= 0 and cur_ot <= 0:
+                st.warning("Enter S/T or O/T hours.")
+            else:
+                new_jid, new_nj = _resolve_job_from_label(str(cur_job_lbl), job_label_to_id)
+                if not new_jid and not new_nj:
+                    st.warning("Pick a valid job or work item.")
+                else:
+                    ok = True
+                    err = ""
+                    if cur_st > 0:
+                        try:
+                            upsert_time_entry(
+                                employee_id=eid, job_id=new_jid, work_date=d,
+                                hours=cur_st, notes=cur_notes, created_by=uid,
+                                updated_at_iso=ts_now, non_job_code=new_nj, time_type="ST",
+                            )
+                        except Exception as exc:
+                            ok, err = False, str(exc)
+                    if ok and cur_ot > 0:
+                        try:
+                            upsert_time_entry(
+                                employee_id=eid, job_id=new_jid, work_date=d,
+                                hours=cur_ot, notes=cur_notes, created_by=uid,
+                                updated_at_iso=ts_now, non_job_code=new_nj, time_type="OT",
+                            )
+                        except Exception as exc:
+                            ok, err = False, str(exc)
+                    if ok:
+                        _wc_clear_add_row_state(eid, day_iso, week_iso)
+                        try:
+                            st.cache_data.clear()
+                        except Exception:
+                            pass
+                        st.rerun()
+                    else:
+                        st.error(err or "Add failed.")
+
+
+def _render_employee_timecard_card(
+    *,
+    emp: dict,
+    days: list[date],
+    week_start: date,
+    today: date,
+    idx: dict,
+    filt: _TTFiltersResult,
+    fj_id: str | None,
+    full_job_labels: list[str],
+    job_label_to_id: dict[str, str],
+    uid: Any,
+    ts_now: str,
+) -> None:
+    """Full weekly timecard card for one employee."""
+    eid = str(emp.get("id"))
+    nm = str(emp.get("name", "") or "—").strip() or "—"
+    week_iso = week_start.isoformat()
+
+    # Compute weekly ST/OT totals
+    wk_st = wk_ot = 0.0
+    for d in days:
+        for ent in idx.get((eid, d.isoformat()), []):
+            if fj_id and str(ent.get("job_id") or "") != fj_id:
+                continue
+            h = float(ent.get("hours") or 0)
+            if _tt_entry_time_type(ent) == "OT":
+                wk_ot += h
+            else:
+                wk_st += h
+    wk_total = wk_st + wk_ot
+
+    with st.container(border=True):
+        st.markdown('<span class="ips-wc-card" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+        # Card header: employee name + weekly totals + Quick Actions toggle
+        h1, h2, h3 = st.columns([3, 2.5, 0.55], gap="small")
+        with h1:
+            st.markdown(f"**{html.escape(nm)}**")
+        with h2:
+            over = wk_total > filt.ot_threshold
+            ot_note = f"  ⚠ >{filt.ot_threshold:g}h" if over else ""
+            st.caption(
+                f"Week {week_start.strftime('%b %d')}–{days[-1].strftime('%b %d')}  ·  "
+                f"S/T **{wk_st:.1f}** · O/T **{wk_ot:.1f}** · Total **{wk_total:.1f}** h{ot_note}"
+            )
+        with h3:
+            _render_qa_toggle_button(eid)
+
+        # Column header row
+        _render_wc_col_headers()
+
+        # One section per day
+        for di, d in enumerate(days):
+            day_iso = d.isoformat()
+            entries_for_day = list(idx.get((eid, day_iso), []))
+            if fj_id:
+                entries_for_day = [e for e in entries_for_day if str(e.get("job_id") or "") == fj_id]
+
+            groups = _group_day_entries(entries_for_day, filt.job_id_to_label)
+
+            # Thin separator between days (except first)
+            if di > 0:
+                sep_cols = st.columns(_WC_COL_RATIOS, gap="small")
+                with sep_cols[0]:
+                    st.markdown('<span class="ips-wc-day-sep" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+            is_first_row = True
+            for g in groups:
+                _render_wc_existing_row(
+                    eid=eid, d=d, week_start=week_start, today=today,
+                    g=g,
+                    full_job_labels=list(full_job_labels),
+                    job_label_to_id=job_label_to_id,
+                    job_id_to_label=filt.job_id_to_label,
+                    uid=uid, ts_now=ts_now,
+                    show_day_label=is_first_row,
+                )
+                is_first_row = False
+
+            _render_wc_add_row(
+                eid=eid, d=d, week_start=week_start, today=today,
+                has_existing_rows=bool(groups),
+                full_job_labels=full_job_labels,
+                job_label_to_id=job_label_to_id,
+                fj_default_label=filt.default_job_label,
+                uid=uid, ts_now=ts_now,
+            )
+
+
+def _render_weekly_timecard_grid(
+    *,
+    today: date,
+    week_start: date,
+    days: list[date],
+    filt: _TTFiltersResult,
+    week_data: _TTWeekDataResult,
+    fj_id: str | None,
+) -> tuple[list[float], list[float]]:
+    """Per-employee weekly timecard cards — replaces the old single-day form."""
+    uid = current_profile().get("id")
+    ts_now = datetime.now(timezone.utc).isoformat()
+
+    # Build job options (all jobs for existing rows; active + non-job for add rows)
+    jobs_raw = _tt_load_jobs_rows(limit=5000)
+    _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
+    if not jobs_raw:
+        st.caption("**No jobs loaded** — check Supabase `jobs` table and RLS policies.")
+
+    full_job_labels = _build_full_job_options(list(all_job_labels))
+
+    # Quick-actions popup (rendered outside the card so it floats above)
+    open_emp = str(st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) or "")
+    if open_emp:
+        matching = [e for e in week_data.visible_emps if str(e.get("id")) == open_emp]
+        if matching:
+            nm_qa = str(matching[0].get("name", "") or "—").strip()
+            _render_quick_actions_popup(
+                eid=open_emp, emp_name=nm_qa, days=days,
+                week_start=week_start, week_end=days[-1], today=today,
+                idx=week_data.idx, fj_id=fj_id,
+                job_labels_sorted=filt.job_labels_sorted,
+                job_label_to_id=filt.job_label_to_id,
+                default_job_label=filt.default_job_label,
+                fast=False, user_id=uid, ts_iso=ts_now,
+            )
+
+    # Render one card per employee
+    for emp in week_data.visible_emps:
+        _render_employee_timecard_card(
+            emp=emp, days=days, week_start=week_start, today=today,
+            idx=week_data.idx, filt=filt, fj_id=fj_id,
+            full_job_labels=full_job_labels,
+            job_label_to_id=job_label_to_id,
+            uid=uid, ts_now=ts_now,
+        )
+
+    # Week grand total summary
+    wk_st = wk_ot = 0.0
+    for eid_k in filt.show_emp_ids:
+        _, s, o = _tt_emp_hours_breakdown_for_week(str(eid_k), days, week_data.idx, fj_id)
+        wk_st += s
+        wk_ot += o
+    st.caption(
+        f"Week total (all visible employees): S/T **{wk_st:.2f}** h · "
+        f"O/T **{wk_ot:.2f}** h · Σ **{wk_st + wk_ot:.2f}** h"
+    )
+
+    day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
+    grid_ratios = _week_grid_column_ratios(fast=False)
+    return day_col_totals, grid_ratios
 
 
 def _render_readonly_pivot(
