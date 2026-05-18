@@ -478,7 +478,7 @@ def inject_coastal_theme() -> None:
 
         /* ============================================================
            SCOPED TEXT OVERRIDES
-           Wins over global "section .stMarkdown p { color !important }"
+           Wins over global "section .stMarkdown p {{ color !important }}"
            by using the :has(.{c}) ancestor selector (higher specificity).
         ============================================================ */
 
