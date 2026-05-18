@@ -55,9 +55,11 @@ except ImportError:
     from ips_crud_list_styles import inject_ips_crud_list_styles  # type: ignore
 
 try:
+    from app.pages.job_database_modern_ui import inject_job_database_root_canvas as _jmod_root_canvas
     from app.pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css
     from app.pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table
 except ImportError:
+    from pages.job_database_modern_ui import inject_job_database_root_canvas as _jmod_root_canvas  # type: ignore
     from pages.job_database_modern_ui import inject_modern_jobs_css as _jmod_inject_css  # type: ignore
     from pages.job_database_modern_ui import render_jobs_table as _render_modern_jobs_table  # type: ignore
 
@@ -247,7 +249,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v15"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v16"
 JOB_DB_DETAIL_VIEW_CSS_KEY = "job_db_detail_view_css_v1"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
@@ -268,14 +270,18 @@ def _inject_job_database_responsive_styles() -> None:
     st.markdown(
         """
         <style>
-        /* Bright white Jobs page — override global #F8FAFC canvas and nested gray boxes */
-        section[data-testid="stMain"]:has(.ips-job-db-page),
-        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
-        section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
+        /* Reinforce white root canvas (primary fix: inject_job_database_root_canvas) */
+        html:has(.ips-job-db-page),
+        body:has(.ips-job-db-page),
+        .stApp:has(.ips-job-db-page),
+        .stApp:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
+        .stApp:has(.ips-job-db-page) section[data-testid="stMain"],
+        .stApp:has(.ips-job-db-page) [data-testid="stMainBlockContainer"],
+        .stApp:has(.ips-job-db-page) .block-container {
             background: #ffffff !important;
             background-color: #ffffff !important;
         }
-        section[data-testid="stMain"]:has(.ips-job-db-page)
+        .stApp:has(.ips-job-db-page)
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.jdb-tbl-host)) {
             background: transparent !important;
             border: none !important;
@@ -2256,7 +2262,11 @@ def _render_job_db_top_bar(
 
 
 def render() -> None:
-    st.markdown('<span class="ips-job-db-page" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="ips-job-db-page jobs-page jobs-shell jobs-container" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    _jmod_root_canvas()
     render_page_header(
         "Job Database",
         "Manage jobs, customers, contacts, and linked estimates.",
@@ -2266,6 +2276,7 @@ def render() -> None:
     inject_table_action_styles()
     _jmod_inject_css()
     _inject_job_database_responsive_styles()
+    _jmod_root_canvas()
 
     can_edit = current_role() in {"admin", "manager"}
     st.session_state.setdefault("job_db_bypass_filters", True)
