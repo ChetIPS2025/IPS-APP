@@ -127,7 +127,7 @@ def _render_list_view() -> None:
 
     location_by_id = fetch_locations_index()
 
-    # Restrict df columns to what the table actually uses
+    # --- Restrict df columns to what the table uses (preserves all needed for search) ---
     if not df.empty:
         keep = [
             c for c in [
@@ -137,11 +137,14 @@ def _render_list_view() -> None:
             ]
             if c in df.columns
         ]
+        # Guarantee id is first; job_id second when present
         if "id" in df.columns:
             keep = ["id"] + [c for c in keep if c != "id"]
+        if "job_id" in df.columns and "job_id" not in keep:
+            keep.insert(1, "job_id")
         df = df[keep]
 
-    # --- Empty state ---
+    # --- No estimates in DB at all ---
     if df.empty:
         if render_estimate_empty_state():
             start_new_estimate()
@@ -149,13 +152,20 @@ def _render_list_view() -> None:
             st.rerun()
         return
 
-    # --- Filters ---
-    df = render_estimates_filters(df)
+    # --- Filters (status + text search applied here) ---
+    df_filtered = render_estimates_filters(df)
+
+    # --- Empty after filtering ---
+    if df_filtered.empty:
+        st.info("No estimates match the current filter. Adjust or clear the filter above.")
+        return
 
     # --- Table ---
     can_edit = current_role() in {"admin", "pm"}
-    result = render_estimates_table(
-        df,
+    sel: list[str]
+    actions: dict
+    sel, actions = render_estimates_table(
+        df_filtered,
         job_by_id=job_by_id,
         job_by_estimate_id=job_by_estimate_id,
         location_by_id=location_by_id,
@@ -163,21 +173,16 @@ def _render_list_view() -> None:
         can_edit=can_edit,
     )
 
-    # render_estimates_table returns (picked_ids, actions_dict) tuple
-    sel: list[str]
-    actions: dict
-    sel, actions = result  # type: ignore[misc]
-
-    # --- Detail panel (linked job / create job) ---
+    # --- Detail panel (linked job / create-job) ---
     render_estimate_detail_panel(
         sel,
-        df=df,
+        df=df_filtered,
         job_by_id=job_by_id,
         job_by_estimate_id=job_by_estimate_id,
         can_edit=can_edit,
     )
 
-    # --- View / Edit action from action bar ---
+    # --- View / Edit action triggered from action bar ---
     if (actions.get("view") or actions.get("edit")) and sel and len(sel) == 1:
         if load_estimate_into_session(str(sel[0])):
             go_to_edit()
@@ -230,8 +235,6 @@ def _render_edit_view() -> None:
     except Exception:
         render_activity_panel = None  # type: ignore
 
-    from app.estimates.queries import fetch_estimate_by_id
-
     if render_page_header:
         render_page_header("Estimates", "Line items and save — Back to list when done.")
     else:
@@ -251,9 +254,11 @@ def _render_edit_view() -> None:
                 go_to_import()
                 st.rerun()
 
-    # Activity panel for saved estimates
+    # Activity panel for saved estimates — uses the 30-second cached single-row fetch
+    # so it does not hit the DB on every widget interaction rerun.
     eid_edit = str(st.session_state.get("loaded_estimate_id") or "").strip()
     if eid_edit and render_activity_panel:
+        from app.estimates.queries import fetch_estimate_by_id
         erow = fetch_estimate_by_id(eid_edit)
         if erow:
             render_activity_panel(

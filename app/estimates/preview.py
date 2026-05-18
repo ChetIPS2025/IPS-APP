@@ -1,63 +1,75 @@
 """Single-source proposal preview renderer for the Estimating module.
 
-Design principle: ONE preview system.
---------------------------------------
-Both the Proposal tab and the Review/Save tab use render_estimate_preview(),
-which delegates to the canonical HTML builder in app.estimate.proposal_preview_tab.
-This eliminates duplicate preview logic and ensures on-screen preview matches
-the Word/PDF export exactly.
+Design principle: ONE preview system
+-------------------------------------
+All on-screen proposal preview rendering delegates to the canonical helpers in
+``app.estimate.proposal_preview_tab``:
 
-The HTML builder (build_proposal_html) uses build_proposal_view_model() internally,
-so the preview and the Word document always pull from the same field mapping.
+  * ``build_proposal_tab_estimate_data()``  — builds the data dict
+  * ``build_proposal_html()``               — HTML card (used by Proposal tab and
+                                              Review/Save tab in editor.py)
+  * ``render_proposal_document_preview()``  — renders the HTML card via st.html
+  * ``render_proposal_tab()``               — show/hide toggle + preview panel
 
-Notes
------
-- Customer location is intentionally excluded from the rendered proposal (matches
-  the Word template design).
-- The "Estimate Description" field maps to "Project" in the proposal title when set.
-  If empty, falls back to Job name, then to the literal string "Project".
+The editor's Review/Save tab calls ``render_proposal_export_actions()`` directly
+(download buttons only, no second preview).  Both tabs use the same
+``build_proposal_tab_estimate_data()`` → ``build_proposal_html()`` pipeline so
+the on-screen preview always matches the exported Word document.
+
+Proposal title ("Project" label)
+---------------------------------
+``build_proposal_view_model()`` in ``proposal_document_layout.py`` resolves the
+title token:
+  1. ``est["estimate_description"]`` (the "Estimate Description" / "Project" field)
+  2. Job name from the linked job row
+  3. Literal string ``"Project"``
+
+The resolved token is stored under ``estimate_data["estimate_description"]`` in
+the data dict returned by ``build_proposal_tab_estimate_data()``.  ``build_proposal_html()``
+uses it as the banner title, matching the Word ``{{JOB_NAME}}`` placeholder.
+
+Customer location
+-----------------
+Customer location is intentionally **excluded** from all proposal/preview output
+(not printed in Word template, not in ``build_proposal_html``).  The only use
+of ``customer_location_id`` in the proposal pipeline is to scope contact lookup
+(``proposal_exports._proposal_contact_name_for_export``) — not to print an
+address line.
 """
 from __future__ import annotations
 
 from typing import Any
 
-import streamlit as st
-
 
 # ---------------------------------------------------------------------------
-# Build helpers (thin wrappers; keep imports lazy to avoid circular deps)
+# Data-building helpers
 # ---------------------------------------------------------------------------
 
 def build_estimate_data_for_preview(
     est: dict[str, Any],
     totals: dict[str, Any],
+    pe: dict[str, Any],
     *,
-    customer_name: str,
-    job_name: str,
-    contact_name: str,
-    prepared_by_phone: str,
     docx_bytes: bytes | None = None,
     pdf_bytes: bytes | None = None,
     word_error: str = "",
     loaded_estimate_id: str | None = None,
     is_locked: bool = False,
 ) -> dict[str, Any]:
-    """Flatten estimate + export context into a single preview data dict.
+    """Build the canonical proposal data dict for preview and export.
 
-    This is the single source of truth for what the proposal preview shows.
-    Both the Proposal tab and the Review/Save tab call this function.
+    ``pe`` must contain: customer_name, job_name, contact_name, prepared_by_phone.
+    These are typically produced by ``export.get_proposal_export_kwargs()``.
+
+    Both the Proposal tab and the Review/Save tab should call this function to
+    guarantee they show identical content.
     """
     from app.estimate.proposal_preview_tab import build_proposal_tab_estimate_data
 
     return build_proposal_tab_estimate_data(
         est,
         totals,
-        {
-            "customer_name": customer_name,
-            "job_name": job_name,
-            "contact_name": contact_name,
-            "prepared_by_phone": prepared_by_phone,
-        },
+        pe,
         docx_bytes=docx_bytes,
         pdf_bytes=pdf_bytes,
         word_error=word_error,
@@ -66,11 +78,16 @@ def build_estimate_data_for_preview(
     )
 
 
-def render_estimate_preview(estimate_data: dict[str, Any]) -> None:
-    """Render the on-screen proposal preview (HTML card matching Word export).
+# ---------------------------------------------------------------------------
+# Rendering helpers (all delegate to proposal_preview_tab — no duplication)
+# ---------------------------------------------------------------------------
 
-    Uses the same field values as the Word document so layout and content are
-    consistent.  Customer location is not shown (matches Word template).
+def render_estimate_preview(estimate_data: dict[str, Any]) -> None:
+    """Render the on-screen HTML card preview (Proposal tab and Review/Save tab).
+
+    The HTML is generated by ``build_proposal_html()`` in proposal_preview_tab,
+    which uses the same field mapping as the Word template, so the preview
+    matches the exported document.  Customer location is not shown.
     """
     from app.estimate.proposal_preview_tab import render_proposal_document_preview
 
@@ -78,47 +95,22 @@ def render_estimate_preview(estimate_data: dict[str, Any]) -> None:
 
 
 def render_proposal_tab(estimate_data: dict[str, Any]) -> None:
-    """Proposal tab: Show/hide preview button + preview panel.
+    """Proposal tab: show/hide toggle + HTML preview panel.
 
-    Delegates to the canonical implementation in proposal_preview_tab.py.
+    Delegates directly to the canonical ``render_proposal_tab`` in
+    ``proposal_preview_tab.py``.
     """
     from app.estimate.proposal_preview_tab import render_proposal_tab as _render
 
     _render(estimate_data)
 
 
-def render_proposal_page_html(
-    est: dict[str, Any],
-    totals: dict[str, Any],
-    *,
-    customer_name: str,
-    job_name: str,
-    contact_name: str,
-    prepared_by_phone: str,
-) -> str:
-    """Return the Word-aligned HTML preview string.
+def build_proposal_html_string(estimate_data: dict[str, Any]) -> str:
+    """Return the proposal HTML string for the on-screen card preview.
 
-    Delegates to the CSS-rich renderer in proposal_exports.py / proposal_document_layout.py.
+    Delegates to ``build_proposal_html()`` in proposal_preview_tab.
+    The returned HTML uses the same field values as the Word export.
     """
-    try:
-        from app.estimate.proposal_exports import build_proposal_view_bundle, _proposal_export_kwargs
-        from app.estimate.proposal_preview_tab import build_proposal_html, build_proposal_tab_estimate_data
+    from app.estimate.proposal_preview_tab import build_proposal_html
 
-        pe = {
-            "customer_name": customer_name,
-            "job_name": job_name,
-            "contact_name": contact_name,
-            "prepared_by_phone": prepared_by_phone,
-        }
-        _, docx, err, _live, pdf_b = build_proposal_view_bundle(est, totals, pe)
-        pdata = build_proposal_tab_estimate_data(
-            est, totals, pe,
-            docx_bytes=docx,
-            pdf_bytes=pdf_b,
-            word_error=str(err or ""),
-            loaded_estimate_id=None,
-            is_locked=True,
-        )
-        return build_proposal_html(pdata)
-    except Exception:
-        return ""
+    return build_proposal_html(estimate_data)

@@ -270,10 +270,16 @@ def render_estimates_table(
     eid_to_customer: dict[str, str],
     can_edit: bool,
 ) -> tuple[list[str], dict]:
-    """Render the estimates list table. Returns list of selected estimate IDs.
+    """Render the estimates list table.
+
+    Returns ``(selected_ids, actions_dict)`` — always a 2-tuple.
+    ``selected_ids`` is the list of checked estimate IDs.
+    ``actions_dict`` is the action-bar result dict from render_selection_action_bar.
 
     Handles Job Received / Approve / Delete per-row actions inline.
     """
+    _empty: tuple[list[str], dict] = ([], {})
+
     try:
         try:
             from services.job_from_estimate import (
@@ -310,7 +316,7 @@ def render_estimates_table(
             )
     except Exception as e:
         st.error(f"Could not load table actions: {e}")
-        return []
+        return _empty
 
     try:
         try:
@@ -517,34 +523,39 @@ def render_estimates_table(
 
     set_selected_ids(TABLE_KEY_ESTIMATES, picked)
 
-    # Export CSV with formatted money columns
+    # Export CSV — format money columns, preserve id column for action bar
     df_export = df.copy()
     for mc in MONEY_LIST_COLUMNS:
         if mc in df_export.columns:
             df_export[mc] = df_export[mc].map(money_csv)
 
-    # Action bar (view / edit / delete / export)
+    # Action bar (view / edit / delete / CSV export)
     def _cleanup_picks() -> None:
         for k in list(st.session_state.keys()):
             if str(k).startswith("est_list_pick_"):
                 st.session_state.pop(k, None)
 
-    actions = render_selection_action_bar(
-        TABLE_KEY_ESTIMATES,
-        picked,
-        can_view=True,
-        can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df_export,
-        visible_df=df,
-        id_column="id",
-        export_filename="estimates_export.csv",
-        on_bulk_selection_change=_cleanup_picks,
-    )
+    try:
+        actions: dict = render_selection_action_bar(
+            TABLE_KEY_ESTIMATES,
+            picked,
+            can_view=True,
+            can_edit=can_edit,
+            can_delete=can_edit,
+            export_df=df_export,
+            visible_df=df,
+            id_column="id",
+            export_filename="estimates_export.csv",
+            on_bulk_selection_change=_cleanup_picks,
+        )
+    except Exception as _act_err:
+        st.warning(f"Action bar unavailable: {_act_err}")
+        actions = {}
 
-    # Delete confirmation
+    # Delete confirmation flow
     pend = st.session_state.get(IPS_PENDING_DELETE) or {}
     if actions.get("confirm_delete") and pend.get(TABLE_KEY_ESTIMATES) and delete_estimate_unlink_first:
+        from app.estimates.services import bump_estimates_cache
         for del_eid in pend[TABLE_KEY_ESTIMATES]:
             try:
                 delete_estimate_unlink_first(str(del_eid), admin_read=is_admin_reader())
@@ -553,7 +564,6 @@ def render_estimates_table(
         pend.pop(TABLE_KEY_ESTIMATES, None)
         clear_selected_ids(TABLE_KEY_ESTIMATES)
         _cleanup_picks()
-        from app.estimates.services import bump_estimates_cache
         bump_estimates_cache()
         st.success("Delete completed where permitted.")
         st.rerun()

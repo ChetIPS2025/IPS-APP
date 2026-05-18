@@ -208,10 +208,10 @@ def render_json_import() -> None:
         for e in errors:
             st.error(e)
         if ok:
-            from app.estimates.services import bump_estimates_cache
+            from app.estimates.services import EST_VIEW_KEY, bump_estimates_cache
             bump_estimates_cache()
             st.success(f"Imported {ok} JSON estimate(s). Returning to list.")
-            st.session_state["estimates_view"] = "list"
+            st.session_state[EST_VIEW_KEY] = "list"
             st.rerun()
 
 

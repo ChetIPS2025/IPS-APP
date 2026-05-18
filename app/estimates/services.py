@@ -1,24 +1,24 @@
 """Session-state management and estimate lifecycle helpers.
 
-Key constants
--------------
-EST_VIEW_KEY        : "estimates_view"        (list | import | edit)
-EST_SELECTED_ID     : "selected_estimate_id"  (canonical selected estimate ID)
-EST_DATA_VERSION    : "est_data_version"      (cache-busting counter)
-EST_FILTER_STATUS   : "estimates_filter_status"
-EST_SEARCH_QUERY    : "estimates_search_query"
-EST_EDIT_MODE       : "estimates_edit_mode"
-EST_PREVIEW_MODE    : "estimates_preview_mode"
+Standardised session state key constants
+-----------------------------------------
+EST_VIEW_KEY        "estimates_view"          list | import | edit
+EST_SELECTED_ID     "selected_estimate_id"    last loaded estimate PK (mirror of loaded_estimate_id)
+EST_DATA_VERSION    "est_data_version"        int counter; increment to bust @st.cache_data list cache
+EST_FILTER_STATUS   "estimates_filter_status" list status dropdown key
+EST_SEARCH_QUERY    "estimates_search_query"  list search text key
 
-The editor still uses its legacy internal keys (estimate_editor_state,
-loaded_estimate_id, …) — we keep those intact and mirror into the new keys.
+Note: The estimate editor (app/estimate/editor.py) retains its own legacy internal
+keys (``estimate_editor_state``, ``loaded_estimate_id``, …).  This module writes
+those keys so the editor stays compatible, while also writing EST_SELECTED_ID for
+convenience of any new code that prefers the canonical name.
 """
 from __future__ import annotations
 
 import streamlit as st
 
 # ---------------------------------------------------------------------------
-# Standardised state key constants
+# Public session-state key constants
 # ---------------------------------------------------------------------------
 
 EST_VIEW_KEY = "estimates_view"
@@ -26,10 +26,14 @@ EST_SELECTED_ID = "selected_estimate_id"
 EST_DATA_VERSION = "est_data_version"
 EST_FILTER_STATUS = "estimates_filter_status"
 EST_SEARCH_QUERY = "estimates_search_query"
-EST_EDIT_MODE = "estimates_edit_mode"
-EST_PREVIEW_MODE = "estimates_preview_mode"
 
-# Transient widget-key prefixes that should be flushed when switching estimates.
+
+# ---------------------------------------------------------------------------
+# Internal transient-key management
+# ---------------------------------------------------------------------------
+
+# Widget-key prefixes that must be flushed when switching between estimates
+# to prevent stale values appearing in the next estimate's inputs.
 _EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
     "est_material_",
     "est_labor_",
@@ -39,6 +43,7 @@ _EDITOR_TRANSIENT_PREFIXES: tuple[str, ...] = (
     "est_eq_",
 )
 
+# Individual singleton keys (not prefix-matched) that must also be cleared.
 _EDITOR_SINGLETON_KEYS: tuple[str, ...] = (
     "est_material_edit_idx",
     "est_labor_edit_idx",
@@ -55,7 +60,11 @@ _EDITOR_SINGLETON_KEYS: tuple[str, ...] = (
 # ---------------------------------------------------------------------------
 
 def bump_estimates_cache() -> None:
-    """Increment the version counter to invalidate cached estimate lists."""
+    """Increment the version counter to invalidate the cached estimates list.
+
+    Must be called after any write operation (create, edit, delete, approve)
+    so the next list render fetches fresh data from the database.
+    """
     st.session_state[EST_DATA_VERSION] = int(st.session_state.get(EST_DATA_VERSION, 0)) + 1
 
 
@@ -67,7 +76,7 @@ def reset_estimate_transients(*, clear_import_hints: bool = True) -> None:
     """Clear editor-only transient session keys.
 
     Prevents stale widget state from carrying over when switching between
-    estimates or starting a new one (double-entry / ghost values).
+    estimates or starting a new one (avoids double-entry / ghost values).
     """
     for k in _EDITOR_SINGLETON_KEYS:
         st.session_state.pop(k, None)
@@ -87,7 +96,11 @@ def reset_estimate_transients(*, clear_import_hints: bool = True) -> None:
 def load_estimate_into_session(estimate_id: str) -> bool:
     """Load a saved estimate row into the editor's session state.
 
-    Returns True on success, False if the row was not found.
+    Fetches the row from the DB (short-TTL cache), merges all scalar fields
+    into the editor dict, initialises editor defaults, and binds Job Scope
+    widgets.
+
+    Returns True on success, False when the row is not found or imports fail.
     """
     from app.estimates.queries import fetch_estimate_by_id
 
@@ -111,6 +124,7 @@ def load_estimate_into_session(estimate_id: str) -> bool:
     if not isinstance(loaded, dict):
         loaded = {}
 
+    # Always pull scalar columns from the DB row so they override stale JSON values.
     loaded.update({
         "quote_number": row.get("quote_number", "") or "",
         "customer_id": row.get("customer_id"),
@@ -130,6 +144,7 @@ def load_estimate_into_session(estimate_id: str) -> bool:
     merge_estimate_row_scalar_fields_into_editor(row, loaded)
     ensure_numeric_defaults(loaded)
 
+    # Write to both legacy keys (for editor.py) and canonical key.
     st.session_state["estimate_editor_state"] = loaded
     st.session_state["loaded_estimate_id"] = estimate_id
     st.session_state[EST_SELECTED_ID] = estimate_id
@@ -156,6 +171,10 @@ def start_new_estimate() -> None:
     ensure_state()
 
 
+# ---------------------------------------------------------------------------
+# Navigation helpers
+# ---------------------------------------------------------------------------
+
 def go_to_list() -> None:
     """Switch to the estimates list view and clear transient editor state."""
     reset_estimate_transients(clear_import_hints=True)
@@ -168,6 +187,6 @@ def go_to_edit() -> None:
 
 
 def go_to_import() -> None:
-    """Switch to the import view."""
+    """Switch to the import view and clear transient editor state."""
     reset_estimate_transients(clear_import_hints=True)
     st.session_state[EST_VIEW_KEY] = "import"
