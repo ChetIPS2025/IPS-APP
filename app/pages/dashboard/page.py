@@ -29,11 +29,13 @@ def render() -> None:
 
     kpi_specs = build_kpi_specs(tables, ctx)
     ui.render_kpi_cards(kpi_specs)
+    ui.render_quick_actions(ctx)
+    ui.render_charts_section(tables, ctx)
 
-    ui.render_task_progress(ctx)
+    ui.render_task_progress(ctx, tables)
     ui.render_who_has_what(tables, ctx)
     ui.render_alerts_panel(tables, ctx)
-    ui.render_todo_section(ctx)
+    ui.render_todo_section(ctx, tables)
 
     ui.render_jobs_estimates_grid(tables)
 

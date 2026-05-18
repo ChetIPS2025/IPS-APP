@@ -203,6 +203,10 @@ def inject_dashboard_layout_css() -> None:
           section[data-testid="stMain"]:has(.ips-dashboard-page) [data-testid="stMetric"] label {
             font-size: 0.68rem !important;
           }
+          section[data-testid="stMain"]:has(.ips-dashboard-page) .ips-dash-grid [data-testid="column"] {
+            flex: 1 1 45% !important;
+            min-width: 8rem !important;
+          }
         }
         </style>
         """,

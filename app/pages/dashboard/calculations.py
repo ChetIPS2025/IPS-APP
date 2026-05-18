@@ -69,16 +69,20 @@ def count_draft_estimates(estimates: list[dict]) -> int:
 
 
 def count_awarded_jobs_this_month(jobs: list[dict], *, today: date | None = None) -> int:
+    """Count awarded jobs updated or created in the current calendar month."""
     today = today or date.today()
     ym = today.strftime("%Y-%m")
-    n = 0
-    for j in jobs or []:
-        if job_status_bucket((j or {}).get("status")) != "awarded":
-            continue
-        raw = str((j or {}).get("updated_at") or (j or {}).get("created_at") or "")[:7]
-        if raw == ym:
-            n += 1
-    return n if n else count_awarded_jobs(list(jobs or []))
+    try:
+        n = 0
+        for j in jobs or []:
+            if job_status_bucket((j or {}).get("status")) != "awarded":
+                continue
+            raw = str((j or {}).get("updated_at") or (j or {}).get("created_at") or "")[:7]
+            if raw == ym:
+                n += 1
+        return n
+    except Exception:
+        return count_awarded_jobs(list(jobs or []))
 
 
 def count_low_stock(inv_rows: list[dict]) -> int:

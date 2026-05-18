@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
-from typing import Any
-
 import pandas as pd
 import streamlit as st
 
@@ -93,13 +90,15 @@ def render_quick_actions(ctx: DashboardContext) -> None:
         actions.append(("Time", "Time Tracking"))
     if role_can_open_page(role, "Inventory"):
         actions.append(("Inventory", "Inventory"))
+    if role_can_open_page(role, "PO / Expenses"):
+        actions.append(("POs", "PO / Expenses"))
     if not actions:
         return
     render_section_header("Quick actions")
     cols = st.columns(min(len(actions), 4), gap="small")
     for i, (label, page) in enumerate(actions):
         with cols[i % len(cols)]:
-            if st.button(label, key=f"dash_quick_{page.replace(' ', '_')}", use_container_width=True):
+            if st.button(label, key=f"dash_quick_{i}", use_container_width=True):
                 st.session_state[IPS_NAV_PENDING_KEY] = page
                 st.rerun()
 
@@ -164,8 +163,10 @@ def render_pending_estimates(estimates: list[dict]) -> None:
     )
 
 
-def render_task_progress(ctx: DashboardContext) -> None:
-    dwp = load_task_progress_tables(ctx.session_key, ctx.use_admin)
+def render_task_progress(ctx: DashboardContext, tables: DashboardTables) -> None:
+    dwp = load_task_progress_tables(
+        ctx.session_key, ctx.use_admin, job_tasks=tables.job_tasks
+    )
     ts, repeat = calc.task_progress_snapshot(
         today=ctx.today,
         packages=dwp["packages"],
@@ -176,13 +177,14 @@ def render_task_progress(ctx: DashboardContext) -> None:
     )
     with st.container(border=True):
         render_section_header("Daily work packages", "Tasks on today's work packages.")
-        c1, c2, c3, c4, c5, c6 = st.columns(6, gap="small")
-        c1.metric("Work packages today", f"{ts.get('work_packages_today', 0):,}")
-        c2.metric("Tasks assigned today", f"{ts.get('tasks_assigned_today', 0):,}")
-        c3.metric("Tasks completed today", f"{ts.get('tasks_completed_today', 0):,}")
-        c4.metric("Blocked tasks", f"{ts.get('blocked', 0):,}")
-        c5.metric("High priority open", f"{ts.get('high_priority_open', 0):,}")
-        c6.metric("Missing after photos", f"{ts.get('missing_after_photo', 0):,}")
+        r1c1, r1c2, r1c3 = st.columns(3, gap="small")
+        r1c1.metric("Work packages today", f"{ts.get('work_packages_today', 0):,}")
+        r1c2.metric("Tasks assigned today", f"{ts.get('tasks_assigned_today', 0):,}")
+        r1c3.metric("Tasks completed today", f"{ts.get('tasks_completed_today', 0):,}")
+        r2c1, r2c2, r2c3 = st.columns(3, gap="small")
+        r2c1.metric("Blocked tasks", f"{ts.get('blocked', 0):,}")
+        r2c2.metric("High priority open", f"{ts.get('high_priority_open', 0):,}")
+        r2c3.metric("Missing after photos", f"{ts.get('missing_after_photo', 0):,}")
         if repeat:
             st.caption(
                 "Repeat shift delay reasons (14d): "
@@ -216,7 +218,9 @@ def render_who_has_what(tables: DashboardTables, ctx: DashboardContext) -> None:
         for e in (tables.employees or [])
         if isinstance(e, dict) and e.get("id")
     }
-    n_out, n_overdue, n_on_job = calc.who_has_what_counts(tables.assets)
+    n_out, n_overdue, n_on_job = calc.who_has_what_counts(
+        tables.assets, overdue_days=_DASH_OUT_OVERDUE_DAYS
+    )
 
     with st.container(border=True):
         st.markdown("##### Who Has What")
@@ -313,11 +317,21 @@ def render_alerts_panel(tables: DashboardTables, ctx: DashboardContext) -> None:
     """Inventory, asset, and kit alerts."""
     low_n = calc.count_low_stock(tables.inv_rows)
     has_inv_alert = bool(tables.inv_rows and low_n > 0)
-    has_kit = role_can_open_page(ctx.role, "Asset Database") and any(
-        str(a.get("asset_type") or "").strip().lower() == "tool trailer" for a in (tables.assets or [])
+    kit_metrics = (
+        calc.kit_theft_metrics(tables.assets, tables.kit_items, tables.kit_replacements)
+        if role_can_open_page(ctx.role, "Asset Database")
+        else None
+    )
+    has_kit_alert = bool(
+        kit_metrics
+        and (
+            int(kit_metrics.get("short_lines", 0))
+            or int(kit_metrics.get("hot_items", 0))
+            or int(kit_metrics.get("replacements_90d", 0))
+        )
     )
 
-    if not has_inv_alert and not has_kit:
+    if not has_inv_alert and not has_kit_alert:
         return
 
     if has_inv_alert:
@@ -332,7 +346,40 @@ def render_alerts_panel(tables: DashboardTables, ctx: DashboardContext) -> None:
                 height=min(360, 44 + 30 * len(disp)),
             )
 
-    _render_kit_theft_alerts(tables, ctx)
+    if has_kit_alert:
+        _render_kit_theft_alerts(tables, ctx)
+
+
+def render_charts_section(tables: DashboardTables, ctx: DashboardContext) -> None:
+    """Summary charts (collapsed by default)."""
+    has_jobs = bool(tables.jobs)
+    has_est = bool(tables.estimates)
+    has_labor = bool(tables.time_entries)
+    if not has_jobs and not has_est and not has_labor:
+        return
+    with st.expander("Charts", expanded=False):
+        from . import charts
+
+        if not has_jobs and not has_est:
+            st.caption("No chart data available.")
+        if has_jobs or has_est:
+            c1, c2 = st.columns(2, gap="small")
+            with c1:
+                if has_jobs:
+                    charts.render_jobs_chart(tables.jobs)
+                else:
+                    st.caption("No chart data available for jobs.")
+            with c2:
+                if has_est:
+                    charts.render_estimates_chart(tables.estimates)
+                else:
+                    st.caption("No chart data available for estimates.")
+        if has_labor:
+            charts.render_labor_summary_chart(
+                tables.time_entries, work_date=ctx.today.isoformat()
+            )
+        if has_jobs:
+            charts.render_profitability_chart(tables.jobs)
 
 
 def render_jobs_estimates_grid(tables: DashboardTables) -> None:
@@ -344,5 +391,9 @@ def render_jobs_estimates_grid(tables: DashboardTables) -> None:
         render_recent_estimates(tables.estimates)
 
 
-def render_todo_section(ctx: DashboardContext) -> None:
-    render_todo_list(session_key=ctx.session_key, use_admin=ctx.use_admin)
+def render_todo_section(ctx: DashboardContext, tables: DashboardTables) -> None:
+    render_todo_list(
+        session_key=ctx.session_key,
+        use_admin=ctx.use_admin,
+        todos=tables.todos,
+    )

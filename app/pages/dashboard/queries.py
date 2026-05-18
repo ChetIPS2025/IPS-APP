@@ -54,7 +54,7 @@ def fetch_todos(session_key: str, *, use_admin: bool, limit: int = 2000) -> list
     return _fetch("todos", session_key=session_key, use_admin=use_admin, limit=limit, order_by="created_at")
 
 
-def fetch_job_tasks(session_key: str, *, use_admin: bool, limit: int = 8000) -> list[dict]:
+def fetch_job_tasks(session_key: str, *, use_admin: bool, limit: int = 12000) -> list[dict]:
     return _fetch("job_tasks", session_key=session_key, use_admin=use_admin, limit=limit, order_by="planned_date")
 
 

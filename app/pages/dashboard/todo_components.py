@@ -424,7 +424,12 @@ def profiles_for_todo_assign(session_key: str, *, use_admin: bool) -> tuple[dict
     return id_to_label, ordered
 
 
-def render_todo_list(*, session_key: str, use_admin: bool) -> None:
+def render_todo_list(
+    *,
+    session_key: str,
+    use_admin: bool,
+    todos: list[dict] | None = None,
+) -> None:
     prof = current_profile()
     me = str(prof.get("id") or "").strip()
 
@@ -436,7 +441,8 @@ def render_todo_list(*, session_key: str, use_admin: bool) -> None:
         inject_todo_list_css()
         id_to_label, ordered_ids = profiles_for_todo_assign(session_key, use_admin=use_admin)
 
-        todos = q.fetch_todos(session_key, use_admin=use_admin)
+        if todos is None:
+            todos = q.fetch_todos(session_key, use_admin=use_admin)
 
         raw_list = [t for t in (todos or []) if isinstance(t, dict) and str(t.get("id") or "").strip()]
         valid_todos = sort_todos(dedupe_todos(raw_list))

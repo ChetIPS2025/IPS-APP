@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-import streamlit as st
-
 from . import calculations as calc
 from . import queries as q
 
@@ -47,7 +45,6 @@ class DashboardTables:
     dwp_photo_rows: list[dict] | None = None
 
 
-@st.cache_data(ttl=60, show_spinner=False)
 def load_core_tables(
     session_key: str,
     use_admin: bool,
@@ -108,10 +105,17 @@ def load_dashboard_tables(ctx: DashboardContext) -> DashboardTables:
     return DashboardTables(**data)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def load_task_progress_tables(session_key: str, use_admin: bool) -> dict[str, list[dict]]:
+def load_task_progress_tables(
+    session_key: str,
+    use_admin: bool,
+    *,
+    job_tasks: list[dict] | None = None,
+) -> dict[str, list[dict]]:
+    """DWP snapshot tables; reuses ``job_tasks`` from core load when provided."""
     return {
-        "tasks": q.fetch_job_tasks(session_key, use_admin=use_admin, limit=12000),
+        "tasks": job_tasks
+        if job_tasks is not None
+        else q.fetch_job_tasks(session_key, use_admin=use_admin, limit=12000),
         "packages": q.fetch_daily_work_packages(session_key, use_admin=use_admin),
         "package_tasks": q.fetch_daily_work_package_tasks(session_key, use_admin=use_admin),
         "executions": q.fetch_supervisor_daily_execution(session_key, use_admin=use_admin),
