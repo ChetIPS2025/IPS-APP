@@ -28,7 +28,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v17"
+_CSS_KEY = "jdb_modern_v18"
 
 # Shared grid template for header + data rows
 _JDB_GRID_COLS = "100px 2fr 1.4fr 1fr 1.2fr 1fr 1fr 1fr 120px"
@@ -143,7 +143,7 @@ def _job_row_grid_html(
     return (
         f'<div class="{row_cls}">'
         f'<span class="job-number" title="{html.escape(jnum, quote=True)}">{html.escape(jnum)}</span>'
-        f'<span class="jdb-cell jdb-cell-name" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
+        f'<span class="job-project jdb-cell" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
         f'<span class="jdb-cell jdb-cell-muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
         f'<span class="jdb-cell jdb-cell-muted">{html.escape(est)}</span>'
         f'<span class="jdb-cell jdb-cell-muted" title="{html.escape(sup, quote=True)}">{html.escape(sup)}</span>'
@@ -318,7 +318,7 @@ div[data-testid="stVerticalBlock"]:has(.job-row-wrap):hover .job-row:not(.select
 }
 .job-row.selected {
     background: #eef5ff;
-    border-left-color: #2563eb;
+    border-left: 4px solid #2563eb;
 }
 .job-number {
     color: #2563eb;
@@ -331,19 +331,8 @@ div[data-testid="stVerticalBlock"]:has(.job-row-wrap):hover .job-row:not(.select
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.job-row.selected .job-number { color: #1d4ed8; font-weight: 800; }
-.jdb-cell {
-    font-size: 0.84rem;
-    font-weight: 500;
-    color: #111827;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.4;
-    min-width: 0;
-}
-.jdb-cell-name {
-    font-weight: 600;
+.job-project {
+    font-weight: 700;
     white-space: normal;
     line-height: 1.35;
     display: -webkit-box;
@@ -351,12 +340,22 @@ div[data-testid="stVerticalBlock"]:has(.job-row-wrap):hover .job-row:not(.select
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
-.jdb-cell-muted { color: #6b7280; font-size: 0.8rem; font-weight: 400; }
+.jdb-cell {
+    font-size: 0.84rem;
+    color: #111827;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+    min-width: 0;
+}
+.jdb-cell-muted { color: #6b7280; font-size: 0.8rem; }
 .job-row-act-slot { min-height: 1px; }
 
-/* ── Streamlit row host ─ */
+/* ── Streamlit row host (relative; invisible select + action overlays) ─ */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host)) {
+    position: relative !important;
     margin: 0 !important;
     padding: 0 !important;
     gap: 0 !important;
@@ -367,131 +366,92 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"] {
+    [data-testid="stElementContainer"] {
     margin: 0 !important;
     padding: 0 !important;
     min-height: 0 !important;
 }
 
-/* ── Sel+Act bar: slides up over the HTML grid row ─ */
-/* The stElementContainer wrapping the 3-col layout sits right after jdb-sel-act-bar */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"] {
-    margin-top: -60px !important;
-    height: 60px !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-    background: transparent !important;
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 120px !important;
+    bottom: 0 !important;
+    z-index: 1 !important;
+    height: 100% !important;
+    margin: 0 !important;
     padding: 0 !important;
-    pointer-events: none !important;
-    z-index: 2 !important;
-    position: relative !important;
-}
-/* Horizontal block inside the bar */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"] {
-    height: 60px !important;
-    align-items: center !important;
-    gap: 0 !important;
-    background: transparent !important;
-    min-height: 0 !important;
-}
-/* Columns inside the bar */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="column"] {
-    padding: 0 !important;
-    min-height: 0 !important;
-}
-
-/* Select column (first): transparent full-height overlay */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:first-child {
-    height: 60px !important;
     pointer-events: auto !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:first-child .stButton > button {
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) .stButton,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
     width: 100% !important;
-    height: 60px !important;
+    height: 100% !important;
     min-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
     opacity: 0 !important;
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
     cursor: pointer !important;
-    pointer-events: auto !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
-
-/* Action columns (2nd, 3rd): compact icon buttons */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:not(:first-child) {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0 !important;
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-actcol)
+    + [data-testid="stElementContainer"] {
+    position: absolute !important;
+    top: 50% !important;
+    right: 14px !important;
+    transform: translateY(-50%) !important;
+    z-index: 3 !important;
+    width: 5rem !important;
     pointer-events: auto !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:not(:first-child) .stButton > button {
-    min-width: 2.2rem !important;
-    max-width: 2.2rem !important;
-    min-height: 2.2rem !important;
-    height: 2.2rem !important;
-    width: 2.2rem !important;
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-actcol)
+    + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+    gap: 0.35rem !important;
+    min-height: unset !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-actcol)
+    + [data-testid="stElementContainer"] .stButton > button {
+    min-width: 2rem !important;
+    max-width: 2rem !important;
+    min-height: 2rem !important;
+    height: 2rem !important;
     padding: 0 !important;
-    font-size: 0.88rem !important;
+    font-size: 0.9rem !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     background: #ffffff !important;
     color: #374151 !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-    pointer-events: auto !important;
-    cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:not(:first-child) .stButton > button:hover {
-    background: #f1f5f9 !important;
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-actcol)
+    + [data-testid="stElementContainer"] .stButton > button:hover {
+    background: #f8fafc !important;
     border-color: #cbd5e1 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-sel-act-bar)
-    + [data-testid="stElementContainer"]
-    [data-testid="stHorizontalBlock"]
-    > [data-testid="column"]:not(:first-child) .stButton > button:disabled {
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap)
+    [data-testid="stElementContainer"]:has(.jdb-actcol)
+    + [data-testid="stElementContainer"] .stButton > button:disabled {
     opacity: 0.38 !important;
 }
 
@@ -639,7 +599,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
-.job-row-wrap, .jdb-sel-act-bar, .jdb-ph-btns { display:none !important; }
+.job-row-wrap, .jdb-row-select-btn, .jdb-actcol, .jdb-ph-btns { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -994,16 +954,16 @@ def render_job_row(
         ),
         unsafe_allow_html=True,
     )
-    # Marker for the sel+act bar — CSS slides this up over the grid row via margin-top: -60px
-    st.markdown('<span class="jdb-sel-act-bar" aria-hidden="true"></span>', unsafe_allow_html=True)
-    sel_col, view_col, del_col = st.columns([9.5, 0.75, 0.75], gap="small")
-    with sel_col:
-        if st.button("\u200b", key=f"jrow_sel_{jid}", use_container_width=True, help=f"Select {jnum}"):
-            on_select()
-    with view_col:
+    st.markdown('<span class="jdb-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
+    if st.button("\u200b", key=f"jrow_sel_{jid}", use_container_width=True, help=f"Select {jnum}"):
+        on_select()
+
+    st.markdown('<span class="jdb-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
+    a1, a2 = st.columns(2, gap="small")
+    with a1:
         if st.button("👁", key=f"jrow_view_{jid}", use_container_width=True, help="View full job details"):
             on_view()
-    with del_col:
+    with a2:
         if st.button(
             "🗑",
             key=f"jrow_del_{jid}",
@@ -1063,10 +1023,11 @@ def render_jobs_table(
 
             # ── Per-row container — REQUIRED for CSS :has() to work per row ──
             with st.container():
-                def _toggle(j=jid):
-                    st.session_state["selected_job_id"] = (
-                        None if st.session_state.get("selected_job_id") == j else j
-                    )
+                def _select(j=jid):
+                    st.session_state["selected_job_id"] = j
+                    st.session_state["job_view_mode"] = "list"
+                    st.session_state.pop("job_mode", None)
+                    st.session_state.pop("job_edit_id", None)
                     st.rerun()
 
                 def _open_view(j=jid):
@@ -1089,11 +1050,13 @@ def render_jobs_table(
                 render_job_row(
                     row=row, full_row=full_row, job_num_col=job_num_col,
                     can_edit=can_edit, is_selected=is_selected,
-                    on_select=_toggle, on_view=_open_view, on_delete=_del,
+                    on_select=_select, on_view=_open_view, on_delete=_del,
                 )
 
             if is_selected:
                 panel_row = full_row
+    if sel and not panel_row:
+        panel_row = by_id.get(sel)
     if sel and panel_row:
         def _pv():
             st.session_state.update({"job_view_mode": "view", "selected_job_id": sel})
