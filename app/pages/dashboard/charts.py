@@ -6,7 +6,7 @@ from collections import Counter
 
 import streamlit as st
 
-from .utils import job_status_bucket, norm_status
+from .utils import job_status_bucket
 
 
 def _status_counts(rows: list[dict], *, field: str = "status") -> dict[str, int]:

@@ -10,7 +10,7 @@ except ImportError:
     from auth import current_profile, current_role  # type: ignore
 
 from . import components as ui
-from .services import DashboardContext, build_kpi_specs, dashboard_has_any_data, load_dashboard_tables
+from .services import DashboardContext, build_kpi_specs, load_dashboard_tables
 
 
 def render() -> None:
@@ -26,10 +26,6 @@ def render() -> None:
     )
 
     tables = load_dashboard_tables(ctx)
-
-    if not dashboard_has_any_data(tables):
-        ui.render_empty_dashboard_state()
-        return
 
     kpi_specs = build_kpi_specs(tables, ctx)
     ui.render_kpi_cards(kpi_specs)
