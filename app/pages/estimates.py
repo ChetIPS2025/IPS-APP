@@ -7,8 +7,10 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.ui.estimates_components import inject_estimates_list_css
     from app.ui.page_shell import render_card, render_page_header
 except ImportError:
+    from ui.estimates_components import inject_estimates_list_css  # type: ignore
     from ui.page_shell import render_card, render_page_header  # type: ignore
 from auth import current_role
 from db import (
@@ -670,6 +672,8 @@ def _render_estimate_import() -> None:
 
 
 def render() -> None:
+    inject_estimates_list_css()
+
     if "estimates_view" not in st.session_state:
         st.session_state["estimates_view"] = "list"
 

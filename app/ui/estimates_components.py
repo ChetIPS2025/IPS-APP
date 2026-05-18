@@ -8,8 +8,6 @@ from typing import Any
 
 import streamlit as st
 
-IPS_ESTIMATES_PAGE_STYLES_KEY = "ips_estimates_page_styles_v4"
-
 _STATUS_STYLES: dict[str, tuple[str, str, str]] = {
     "approved": ("#dcfce7", "#166534", "#bbf7d0"),
     "accepted": ("#dcfce7", "#166534", "#bbf7d0"),
@@ -23,10 +21,8 @@ _STATUS_STYLES: dict[str, tuple[str, str, str]] = {
 }
 
 
-def inject_estimates_page_styles() -> None:
-    if st.session_state.get(IPS_ESTIMATES_PAGE_STYLES_KEY):
-        return
-    st.session_state[IPS_ESTIMATES_PAGE_STYLES_KEY] = True
+def inject_estimates_list_css() -> None:
+    """Inject Estimates list page CSS on every render (navigation-safe)."""
     try:
         from app.ui.page_shell import inject_ips_dashboard_layout
     except ImportError:
@@ -209,8 +205,8 @@ def inject_estimates_page_styles() -> None:
             padding: 0 !important;
         }
 
-        /* ── Clean estimate row (CSS grid) ── */
-        .est-row {
+        /* ── Estimates list table rows (unique class prefix) ── */
+        .ips-est-list-row {
             display: grid;
             grid-template-columns: 1fr 2fr 1.3fr 1fr 1fr 0.9fr 0.85fr 1fr 0.75fr;
             align-items: center;
@@ -225,14 +221,14 @@ def inject_estimates_page_styles() -> None:
             transition: background 0.12s ease, border-color 0.12s ease;
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):hover .est-row:not(.selected) {
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap):hover .ips-est-list-row:not(.is-selected) {
             background: #f8fbff;
         }
-        .est-row.selected {
+        .ips-est-list-row.is-selected {
             background: #eef5ff;
             border-left-color: #2563eb;
         }
-        .est-qnum {
+        .ips-est-list-qnum {
             color: #2563eb;
             font-weight: 700;
             font-size: 0.83rem;
@@ -241,8 +237,8 @@ def inject_estimates_page_styles() -> None:
             white-space: nowrap;
             min-width: 0;
         }
-        .est-row.selected .est-qnum { color: #1d4ed8; font-weight: 800; }
-        .est-cell {
+        .ips-est-list-row.is-selected .ips-est-list-qnum { color: #1d4ed8; font-weight: 800; }
+        .ips-est-list-cell {
             font-size: 0.83rem;
             color: #111827;
             overflow: hidden;
@@ -251,10 +247,10 @@ def inject_estimates_page_styles() -> None:
             min-width: 0;
             line-height: 1.4;
         }
-        .est-cell.muted { color: #6b7280; font-size: 0.79rem; }
-        .est-cell.bold  { font-weight: 600; }
-        .est-cell-title-wrap { min-width: 0; }
-        .est-cell-title {
+        .ips-est-list-cell.ips-est-list-muted { color: #6b7280; font-size: 0.79rem; }
+        .ips-est-list-cell.ips-est-list-bold  { font-weight: 600; }
+        .ips-est-list-cell-title-wrap { min-width: 0; }
+        .ips-est-list-cell-title {
             color: #111827;
             font-weight: 600;
             font-size: 0.83rem;
@@ -265,7 +261,7 @@ def inject_estimates_page_styles() -> None:
             overflow: hidden;
             line-height: 1.35;
         }
-        .est-cell-sub {
+        .ips-est-list-cell-sub {
             color: #9ca3af;
             font-size: 0.75rem;
             display: block;
@@ -273,13 +269,13 @@ def inject_estimates_page_styles() -> None:
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .est-cell-stat { min-width: 0; overflow: visible; }
-        .est-act-slot  { min-height: 1px; }
+        .ips-est-list-cell-stat { min-width: 0; overflow: visible; }
+        .ips-est-list-act-slot  { min-height: 1px; }
 
         /* Row host: relative container for overlays */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):not(:has(.ips-est-table-anchor)) {
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap):not(:has(.ips-est-table-anchor)) {
             position: relative !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -291,7 +287,7 @@ def inject_estimates_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):not(:has(.ips-est-table-anchor))
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap):not(:has(.ips-est-table-anchor))
         [data-testid="stElementContainer"] {
             margin: 0 !important;
             padding: 0 !important;
@@ -301,8 +297,8 @@ def inject_estimates_page_styles() -> None:
         /* Invisible full-row select button overlay */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-row-select-btn)
         + [data-testid="stElementContainer"]:has(.stButton) {
             position: absolute !important;
             top: 0 !important; left: 0 !important;
@@ -314,13 +310,13 @@ def inject_estimates_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-row-select-btn)
         + [data-testid="stElementContainer"]:has(.stButton) .stButton,
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-row-select-btn)
         + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
             width: 100% !important; height: 100% !important;
             min-height: 60px !important;
@@ -333,8 +329,8 @@ def inject_estimates_page_styles() -> None:
         /* Action buttons: absolutely positioned right */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] {
             position: absolute !important;
             top: 50% !important; right: 14px !important;
@@ -344,20 +340,20 @@ def inject_estimates_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
             gap: 0.35rem !important; min-height: unset !important;
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] .stButton > button,
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] [data-testid="stPopover"] > button {
             min-width: 2rem !important; max-width: 2rem !important;
             min-height: 2rem !important; height: 2rem !important;
@@ -368,19 +364,19 @@ def inject_estimates_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] .stButton > button:hover,
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
-        [data-testid="stElementContainer"]:has(.est-actcol)
+        div[data-testid="stVerticalBlock"]:has(.ips-est-list-row-wrap)
+        [data-testid="stElementContainer"]:has(.ips-est-list-actcol)
         + [data-testid="stElementContainer"] [data-testid="stPopover"] > button:hover {
             background: #f8fafc !important; border-color: #cbd5e1 !important;
         }
 
         /* Hide helper markers */
-        .est-row-wrap, .est-row-select-btn, .est-actcol { display: none !important; }
+        .ips-est-list-row-wrap, .ips-est-list-row-select-btn, .ips-est-list-actcol { display: none !important; }
 
         /* Zero stMarkdown margins inside table card */
         section[data-testid="stMain"]:has(.ips-estimates-page)
@@ -623,6 +619,10 @@ def inject_estimates_page_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+# Backward-compatible alias
+inject_estimates_page_styles = inject_estimates_list_css
 
 
 _DOC_ICON_SVG = (

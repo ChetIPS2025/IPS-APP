@@ -18,7 +18,6 @@ try:
         date_range_button_label,
         donut_chart_html,
         estimate_status_badge_html,
-        inject_estimates_page_styles,
         meta_block_html,
         render_estimates_header_left_html,
         summary_card_html,
@@ -29,7 +28,6 @@ except ImportError:
         date_range_button_label,
         donut_chart_html,
         estimate_status_badge_html,
-        inject_estimates_page_styles,
         meta_block_html,
         render_estimates_header_left_html,
         summary_card_html,
@@ -337,7 +335,6 @@ def render_estimates_list_page(
     on_open_editor: Any,
     site_line_for_estimate: Any,
 ) -> None:
-    inject_estimates_page_styles()
     st.markdown('<span class="ips-estimates-page" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     customer_map = _fetch_customers_name_map_cached(admin_read)
@@ -511,7 +508,7 @@ def render_estimates_list_page(
 
     # Table
     with st.container(border=True):
-        st.markdown('<span class="ips-est-table-anchor"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="ips-est-table-anchor ips-est-list-table"></span>', unsafe_allow_html=True)
         weights = [1.0, 2.0, 1.3, 1.0, 1.0, 0.9, 0.85, 1.0, 0.75]
         head = st.columns(weights)
         sort_pairs = [
@@ -560,31 +557,31 @@ def render_estimates_list_page(
             est_date = _fmt_date(est_row.get("estimate_date"))
             exp_date = _fmt_date(est_row.get("expiration_date"))
 
-            row_cls = "est-row selected" if is_sel else "est-row"
+            row_cls = "ips-est-list-row is-selected" if is_sel else "ips-est-list-row"
             sub_html = (
-                f'<span class="est-cell-sub">{html.escape(subtitle)}</span>'
+                f'<span class="ips-est-list-cell-sub">{html.escape(subtitle)}</span>'
                 if subtitle else ""
             )
 
             with st.container():
-                st.markdown('<span class="est-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown('<span class="ips-est-list-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="{row_cls}">'
-                    f'<span class="est-qnum" title="{html.escape(qn, quote=True)}">{html.escape(qn)}</span>'
-                    f'<div class="est-cell-title-wrap">'
-                    f'<div class="est-cell-title">{html.escape(title)}</div>{sub_html}'
+                    f'<span class="ips-est-list-qnum" title="{html.escape(qn, quote=True)}">{html.escape(qn)}</span>'
+                    f'<div class="ips-est-list-cell-title-wrap">'
+                    f'<div class="ips-est-list-cell-title">{html.escape(title)}</div>{sub_html}'
                     f'</div>'
-                    f'<span class="est-cell muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
-                    f'<span class="est-cell muted">{html.escape(est_date)}</span>'
-                    f'<span class="est-cell muted">{html.escape(exp_date)}</span>'
-                    f'<span class="est-cell bold">{html.escape(total)}</span>'
-                    f'<span class="est-cell-stat">{status_html}</span>'
-                    f'<span class="est-cell muted">{html.escape(created)}</span>'
-                    f'<span class="est-act-slot"></span>'
+                    f'<span class="ips-est-list-cell ips-est-list-muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
+                    f'<span class="ips-est-list-cell ips-est-list-muted">{html.escape(est_date)}</span>'
+                    f'<span class="ips-est-list-cell ips-est-list-muted">{html.escape(exp_date)}</span>'
+                    f'<span class="ips-est-list-cell ips-est-list-bold">{html.escape(total)}</span>'
+                    f'<span class="ips-est-list-cell-stat">{status_html}</span>'
+                    f'<span class="ips-est-list-cell ips-est-list-muted">{html.escape(created)}</span>'
+                    f'<span class="ips-est-list-act-slot"></span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<span class="est-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown('<span class="ips-est-list-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if st.button(
                     "\u200b",
                     key=f"est_pick_{eid}",
@@ -595,7 +592,7 @@ def render_estimates_list_page(
                     st.session_state.pop("est_list_detail_collapsed", None)
                     st.rerun()
 
-                st.markdown('<span class="est-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown('<span class="ips-est-list-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
                     if st.button("👁", key=f"est_view_{eid}", help="View estimate", use_container_width=True):
