@@ -213,6 +213,15 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     sync_auth_flags()
 
 
+def _try_get_client():
+    """Return Supabase client or None when URL/key are missing or invalid at startup."""
+    try:
+        return get_client()
+    except Exception as exc:
+        _log.debug("Supabase client unavailable during auth bootstrap: %s", exc)
+        return None
+
+
 def _try_hydrate_auth_from_supabase_client() -> bool:
     """
     If the Supabase Python client already has a session (e.g. right after sign-in),
@@ -220,7 +229,9 @@ def _try_hydrate_auth_from_supabase_client() -> bool:
     """
     if is_authenticated():
         return True
-    client = get_client()
+    client = _try_get_client()
+    if client is None:
+        return False
     user: Any = None
     try:
         gu = client.auth.get_user()
@@ -268,7 +279,9 @@ def try_restore_supabase_session_from_cookies() -> None:
     rt = urllib.parse.unquote(str(cookies.get(_COOKIE_REFRESH) or "").strip())
     if not at or not rt:
         return
-    client = get_client()
+    client = _try_get_client()
+    if client is None:
+        return
     try:
         sr = client.auth.set_session(at, rt)
     except Exception:

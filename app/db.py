@@ -13,7 +13,10 @@ except ImportError:
     class StorageApiError(Exception):
         """Fallback when storage3 is not installed."""
 
-from app.config import ROOT_DIR, settings
+try:
+    from app.config import ROOT_DIR, settings
+except ImportError:
+    from config import ROOT_DIR, settings  # type: ignore
 
 _LOG = logging.getLogger(__name__)
 
@@ -24,11 +27,13 @@ except ImportError:  # scripts / tests without Streamlit
 
 
 def _create_public_supabase_client(url: str, key: str) -> Client:
-    return create_client(url.strip(), key)
+    _patch_supabase_publishable_keys()
+    return create_client(url.strip(), key.strip())
 
 
 def _create_admin_supabase_client(url: str, key: str) -> Client:
-    return create_client(url.strip(), key)
+    _patch_supabase_publishable_keys()
+    return create_client(url.strip(), key.strip())
 
 
 if _st_for_cache is not None:
@@ -40,6 +45,71 @@ else:
 
 _client_fallback: Client | None = None
 _admin_client_fallback: Client | None = None
+_supabase_publishable_patch_applied = False
+
+
+def _patch_supabase_publishable_keys() -> None:
+    """
+    supabase-py < 2.16 rejects ``sb_publishable_*`` / ``sb_secret_*`` keys in ``SyncClient.__init__``.
+
+    The API accepts them; only the client-side JWT regex is wrong. Patch once per process.
+    """
+    global _supabase_publishable_patch_applied
+    if _supabase_publishable_patch_applied:
+        return
+    try:
+        from gotrue import SyncMemoryStorage
+        from supabase._sync.client import SupabaseException, SyncClient
+        from supabase.lib.client_options import SyncClientOptions
+    except ImportError:
+        return
+
+    import re
+
+    _original_init = SyncClient.__init__
+
+    def _init(self, supabase_url: str, supabase_key: str, options=None):
+        key_s = str(supabase_key or "").strip()
+        if not key_s.startswith(("sb_publishable_", "sb_secret_")):
+            return _original_init(self, supabase_url, supabase_key, options)
+
+        if not supabase_url:
+            raise SupabaseException("supabase_url is required")
+        if not supabase_key:
+            raise SupabaseException("supabase_key is required")
+        if not re.match(r"^(https?)://.+", supabase_url):
+            raise SupabaseException("Invalid URL")
+        if options is None:
+            options = SyncClientOptions(storage=SyncMemoryStorage())
+
+        self.supabase_url = supabase_url
+        self.supabase_key = supabase_key
+        self.options = options
+        options.headers.update(self._get_auth_headers())
+        self.rest_url = f"{supabase_url}/rest/v1"
+        self.realtime_url = f"{supabase_url}/realtime/v1".replace("http", "ws")
+        self.auth_url = f"{supabase_url}/auth/v1"
+        self.storage_url = f"{supabase_url}/storage/v1"
+        self.functions_url = f"{supabase_url}/functions/v1"
+        self.auth = self._init_supabase_auth_client(
+            auth_url=self.auth_url,
+            client_options=options,
+        )
+        self.realtime = self._init_realtime_client(
+            realtime_url=self.realtime_url,
+            supabase_key=self.supabase_key,
+            options=options.realtime if options else None,
+        )
+        self._postgrest = None
+        self._storage = None
+        self._functions = None
+        self.auth.on_auth_state_change(self._listen_to_auth_events)
+
+    SyncClient.__init__ = _init  # type: ignore[method-assign]
+    _supabase_publishable_patch_applied = True
+
+
+_patch_supabase_publishable_keys()
 
 _JOBS_STALE_COLUMN_DESCRIPTION = "description"
 _JOBS_ORDER_BY_FOR_STALE_DESCRIPTION = "job_name"

@@ -1,0 +1,616 @@
+"""
+Centralized IPS operations platform CSS.
+
+Call inject_global_css() on every Streamlit render (no session guard).
+"""
+
+from __future__ import annotations
+
+import streamlit as st
+
+# Design tokens
+APP_BG = "#f4f6f9"
+SIDEBAR_BG = "#ffffff"
+CARD_BG = "#ffffff"
+BORDER = "#e5eaf2"
+PRIMARY = "#2563eb"
+PRIMARY_HOVER = "#1d4ed8"
+TEXT = "#0f172a"
+TEXT_MUTED = "#64748b"
+SELECTED_BG = "#eff6ff"
+SELECTED_BORDER = "#2563eb"
+
+
+def inject_global_css() -> None:
+    """Inject global IPS SaaS styles on every render."""
+    st.markdown(
+        f"""
+<style id="ips-global-styles-v3">
+:root {{
+  --ips-bg: {APP_BG};
+  --ips-sidebar: {SIDEBAR_BG};
+  --ips-card: {CARD_BG};
+  --ips-border: {BORDER};
+  --ips-primary: {PRIMARY};
+  --ips-text: {TEXT};
+  --ips-muted: {TEXT_MUTED};
+  --ips-selected-bg: {SELECTED_BG};
+  --ips-selected-border: {SELECTED_BORDER};
+}}
+
+html, body, .stApp {{
+  background: {APP_BG} !important;
+}}
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+section[data-testid="stMain"] > div,
+.block-container {{
+  background: {APP_BG} !important;
+}}
+section[data-testid="stMain"] .block-container {{
+  max-width: 1680px !important;
+  padding-top: 0.5rem !important;
+  padding-bottom: 1rem !important;
+}}
+
+/* Sidebar */
+section[data-testid="stSidebar"],
+[data-testid="stSidebar"] {{
+  background: {SIDEBAR_BG} !important;
+  border-right: 1px solid {BORDER} !important;
+}}
+section[data-testid="stSidebar"] .block-container {{
+  padding-top: 0.75rem !important;
+}}
+.ips-sidebar-logo {{
+  padding: 0.5rem 0.75rem 1rem;
+  border-bottom: 1px solid {BORDER};
+  margin-bottom: 0.5rem;
+}}
+.ips-sidebar-logo img {{
+  max-height: 48px;
+  width: auto;
+}}
+.ips-nav-item {{
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.75rem;
+  margin: 0.1rem 0.5rem;
+  border-radius: 8px;
+  color: {TEXT};
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}}
+.ips-nav-item:hover {{
+  background: #f1f5f9;
+}}
+.ips-nav-item.active {{
+  background: {SELECTED_BG};
+  color: {PRIMARY};
+  font-weight: 600;
+  border-left: 3px solid {PRIMARY};
+  margin-left: 0.35rem;
+  padding-left: 0.55rem;
+}}
+.ips-sidebar-user {{
+  margin-top: auto;
+  padding: 0.75rem;
+  border-top: 1px solid {BORDER};
+  font-size: 0.8rem;
+  color: {TEXT_MUTED};
+}}
+
+/* Cards */
+.ips-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}}
+.ips-metric-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  min-height: 4.5rem;
+}}
+.ips-metric-label {{
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: {TEXT_MUTED};
+  margin: 0;
+}}
+.ips-metric-value {{
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0.15rem 0 0;
+  line-height: 1.2;
+}}
+
+/* Page header */
+.ips-page-header {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}}
+.ips-page-title {{
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0;
+  letter-spacing: -0.02em;
+}}
+.ips-page-subtitle {{
+  font-size: 0.8125rem;
+  color: {TEXT_MUTED};
+  margin: 0.2rem 0 0;
+}}
+
+/* Filter bar */
+.ips-filter-bar {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.65rem;
+}}
+
+/* Status pills */
+.ips-status-pill {{
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}}
+.ips-status-active {{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }}
+.ips-status-pending {{ background:#ffedd5; color:#c2410c; border-color:#fed7aa; }}
+.ips-status-draft {{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }}
+.ips-status-sent {{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }}
+.ips-status-danger {{ background:#fee2e2; color:#dc2626; border-color:#fecaca; }}
+
+/* Data table — stable grid (survives Streamlit reruns) */
+.ips-data-table-wrap {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 0.65rem;
+  width: 100%;
+}}
+.ips-data-table-scroll {{
+  overflow-x: auto;
+  width: 100%;
+}}
+.ips-data-table-stable .ips-data-table-header,
+.ips-data-table-stable .ips-data-row {{
+  display: grid !important;
+  align-items: center;
+  column-gap: 12px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+  width: 100%;
+  min-width: 48rem;
+  box-sizing: border-box;
+}}
+.ips-data-table-header,
+.ips-data-row {{
+  display: grid;
+  align-items: center;
+  column-gap: 12px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+}}
+.ips-data-table-header {{
+  background: #fafbfc;
+  border-bottom: 1px solid {BORDER};
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: {TEXT_MUTED};
+}}
+.ips-data-row {{
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background 0.12s;
+}}
+.ips-data-row:hover {{
+  background: #f8fafc;
+}}
+.ips-data-row.selected {{
+  background: {SELECTED_BG};
+  border-left: 3px solid {SELECTED_BORDER};
+  padding-left: calc(0.75rem - 3px);
+}}
+
+/* Detail panel */
+.ips-detail-panel {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-left: 3px solid {PRIMARY};
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin: 0.5rem 0 0.75rem;
+}}
+.ips-detail-header {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}}
+.ips-detail-title {{
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: {TEXT};
+}}
+
+/* Links */
+a.ips-link, .ips-data-row a {{
+  color: {PRIMARY} !important;
+  text-decoration: underline !important;
+}}
+
+/* Compact Streamlit controls */
+section[data-testid="stMain"] .stButton > button {{
+  border-radius: 8px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  min-height: 2.1rem !important;
+  padding: 0.25rem 0.75rem !important;
+  border: 1px solid {BORDER} !important;
+  background: #fff !important;
+  color: {TEXT} !important;
+}}
+section[data-testid="stMain"] .stButton > button[kind="primary"],
+section[data-testid="stMain"] .stButton > button[data-testid="baseButton-primary"] {{
+  background: {PRIMARY} !important;
+  border-color: {PRIMARY} !important;
+  color: #fff !important;
+}}
+section[data-testid="stMain"] .stButton > button:hover {{
+  border-color: #cbd5e1 !important;
+}}
+section[data-testid="stMain"] input,
+section[data-testid="stMain"] textarea,
+section[data-testid="stMain"] [data-baseweb="select"] > div {{
+  border-radius: 8px !important;
+  border-color: {BORDER} !important;
+  min-height: 2.1rem !important;
+  font-size: 0.8125rem !important;
+}}
+
+/* Hide row-select helper buttons */
+.ips-row-select-btn,
+.ips-click-bridge {{
+  display: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}}
+
+/* Login */
+.ips-login-wrap {{
+  max-width: 420px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: #fff;
+  border: 1px solid {BORDER};
+  border-radius: 14px;
+}}
+
+/* Empty state */
+.ips-empty-state {{
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: {TEXT_MUTED};
+}}
+.ips-empty-state h3 {{
+  color: {TEXT};
+  font-size: 1rem;
+  margin: 0.5rem 0 0.25rem;
+}}
+
+/* Tabs */
+.ips-tab-bar {{
+  border-bottom: 1px solid {BORDER};
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}}
+
+/* Field mode */
+.ips-field-mode .block-container {{
+  max-width: 100% !important;
+}}
+
+/* Module layout */
+.ips-kpi-grid {{
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}}
+@media (max-width: 1200px) {{
+  .ips-kpi-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+}}
+@media (max-width: 768px) {{
+  .ips-kpi-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
+.ips-kpi-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  min-height: 5.5rem;
+}}
+.ips-kpi-top {{
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+}}
+.ips-kpi-icon {{
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}}
+.ips-kpi-label {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  margin: 0;
+  font-weight: 600;
+}}
+.ips-kpi-value {{
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0.1rem 0 0;
+  line-height: 1.2;
+}}
+.ips-kpi-trend {{
+  font-size: 0.72rem;
+  margin: 0.35rem 0 0;
+}}
+.ips-kpi-trend.up {{ color: #16a34a; }}
+.ips-kpi-trend.down {{ color: #dc2626; }}
+.ips-kpi-trend.flat {{ color: {TEXT_MUTED}; }}
+
+.ips-panel-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.65rem;
+  min-height: 12rem;
+}}
+.ips-panel-title {{
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0 0 0.55rem;
+}}
+.ips-chart-legend {{
+  display: flex;
+  gap: 1rem;
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  margin-bottom: 0.35rem;
+}}
+.ips-legend-dot {{
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}}
+.ips-activity-item {{
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+}}
+.ips-activity-item:last-child {{ border-bottom: none; }}
+.ips-activity-icon {{
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}}
+.ips-activity-meta {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  margin-top: 0.1rem;
+}}
+.ips-deadline-row {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+}}
+.ips-deadline-badge {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+}}
+.ips-deadline-badge.danger {{ background: #fee2e2; color: #dc2626; }}
+.ips-deadline-badge.warn {{ background: #ffedd5; color: #c2410c; }}
+.ips-deadline-badge.ok {{ background: #dcfce7; color: #166534; }}
+
+.ips-quick-actions {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}}
+.ips-quick-action {{
+  background: #fff;
+  border: 1px solid {BORDER};
+  border-radius: 10px;
+  padding: 0.55rem 0.4rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: {TEXT};
+}}
+.ips-progress-bar {{
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}}
+.ips-progress-fill {{
+  height: 100%;
+  background: {PRIMARY};
+  border-radius: 999px;
+}}
+.ips-donut-legend {{
+  font-size: 0.75rem;
+  color: {TEXT};
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-donut-legend span {{
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}}
+.ips-detail-meta-row {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.8125rem;
+  margin: 0.35rem 0 0.65rem;
+}}
+.ips-detail-meta-row span {{
+  color: {TEXT_MUTED};
+}}
+.ips-detail-meta-row strong {{
+  color: {TEXT};
+  display: block;
+  font-size: 0.875rem;
+}}
+.ips-info-grid {{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  font-size: 0.8125rem;
+}}
+.ips-info-grid dt {{
+  color: {TEXT_MUTED};
+  margin: 0;
+  font-weight: 500;
+}}
+.ips-info-grid dd {{
+  margin: 0.1rem 0 0.5rem;
+  color: {TEXT};
+  font-weight: 600;
+}}
+.ips-module-placeholder {{
+  text-align: center;
+  padding: 3rem 1rem;
+  color: {TEXT_MUTED};
+}}
+.ips-summary-card {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+}}
+.ips-summary-grid {{
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  font-size: 0.8125rem;
+}}
+@media (max-width: 1100px) {{
+  .ips-summary-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+}}
+.ips-summary-grid .lbl {{
+  color: {TEXT_MUTED};
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0;
+}}
+.ips-summary-grid .val {{
+  color: {TEXT};
+  font-weight: 600;
+  margin: 0.15rem 0 0;
+}}
+.ips-summary-grid .val-lg {{
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: {TEXT};
+}}
+.ips-side-panel {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+}}
+.ips-side-panel h4 {{
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}}
+.ips-side-line {{
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-side-line:last-child {{ border-bottom: none; font-weight: 700; }}
+.ips-photo-card {{
+  background: #f8fafc;
+  border: 1px dashed {BORDER};
+  border-radius: 12px;
+  min-height: 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: {TEXT_MUTED};
+  font-size: 0.8125rem;
+  text-align: center;
+  padding: 1rem;
+}}
+.ips-nested-table-wrap {{
+  margin-top: 0.75rem;
+}}
+.ips-status-in-service {{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }}
+.ips-status-out-of-service {{ background:#fee2e2; color:#dc2626; border-color:#fecaca; }}
+.ips-status-scheduled {{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }}
+</style>
+""",
+        unsafe_allow_html=True,
+    )

@@ -32,10 +32,8 @@ from ui import (
     IPS_NAV_PAGE_KEY,
     IPS_ROUTE_SLUG_KEY,
     apply_pending_navigation,
-    render_sidebar,
     sync_session_route_slug_to_nav_page,
 )
-from ui import role_can_open_page
 from branding import apply_branding, render_header
 
 try:
@@ -45,7 +43,6 @@ try:
         inject_force_white_final_override,
     )
     from app.ui.clean_table import inject_clean_table_css
-    from app.ui.components.topbar import render_top_bar
 except ImportError:
     from ui.theme import (  # type: ignore
         apply_global_app_styles,
@@ -53,83 +50,29 @@ except ImportError:
         inject_force_white_final_override,
     )
     from ui.clean_table import inject_clean_table_css  # type: ignore
-    from ui.components.topbar import render_top_bar  # type: ignore
 try:
     from app.pwa import inject_pwa_support, trigger_pwa_install_prompt
 except ImportError:
     from pwa import inject_pwa_support, trigger_pwa_install_prompt  # type: ignore
 
-from pages import dashboard
-from pages import estimates
-from pages import estimate_materials
-from pages import customers_jobs
-from pages import job_database
-from pages import supervisor_planning
-from pages import job_costing
-from pages import asset_database
-from pages import tool_dashboard
-from pages import asset_detail
-from pages import assets as assets_page
-from pages import asset_scanner
-from pages import tool_trailer_audits
-from pages import sign_timesheet
-from pages import labor
-from pages import inventory
-from pages import inventory_dashboard
-from pages import inventory_scan
-from pages import time_tracking
-from pages import pm_matrix_entry
-from pages import weekly_timesheet
-from pages import employees
-from pages import employee_toolbox
-from pages import people
-from pages import po_expenses
-from pages import admin
-from pages import users
-from pages import company_updates
-from pages import field_dashboard
-from pages import field_daily_reports
-from pages import field_crew_time
+try:
+    from app.styles import inject_global_css as inject_ips_foundation_css
+except ImportError:
+    from styles import inject_global_css as inject_ips_foundation_css  # type: ignore
 
+try:
+    from app.phase2 import ensure_nav_defaults, on_nav_change, render_module
+    from app.components.sidebar import render_sidebar as render_foundation_sidebar
+    from app.utils.constants import SESSION_NAV_KEY
+except ImportError:
+    from phase2 import ensure_nav_defaults, on_nav_change, render_module  # type: ignore
+    from components.sidebar import render_sidebar as render_foundation_sidebar  # type: ignore
+    from utils.constants import SESSION_NAV_KEY  # type: ignore
 
-PAGES = {
-    "Dashboard": dashboard.render,
-    "Field Dashboard": field_dashboard.render,
-    "Daily Reports": field_daily_reports.render,
-    "Crew Time": field_crew_time.render,
-    "Company Updates": company_updates.render,
-    # Estimates UI: app/pages/estimates.py → estimates.render
-    "Estimates": estimates.render,
-    "Estimate Materials": estimate_materials.render,
-    "Job Database": job_database.render,
-    "Assign Tasks (PM)": supervisor_planning.render_pm,
-    "Work & Plan (Supervisor)": supervisor_planning.render_supervisor,
-    "Customers": customers_jobs.render_customers,
-    "Job Costing": job_costing.render,
-    "Labor": labor.render,
-    "Inventory": inventory.render,
-    "Scan Inventory": inventory_scan.render,
-    "Inventory Usage": inventory_dashboard.render,
-    "Time Tracking": time_tracking.render,
-    "PM Matrix Time Entry": pm_matrix_entry.render,
-    "Weekly Timesheet": weekly_timesheet.render,
-    "People": people.render,
-    "Employees": employees.render,
-    "Employee Toolbox": employee_toolbox.render,
-    "PO / Expenses": po_expenses.render,
-    "Asset Database": asset_database.render,
-    "Who Has What": tool_dashboard.render,
-    "Asset Scanner": asset_scanner.render,
-    "Tool Trailer Audits": tool_trailer_audits.render,
-    "Admin": admin.render,
-    "Users": users.render,
-    "Asset Detail": asset_detail.render,
-    "Asset Manager": assets_page.render,
-}
-
-# Catalog pages (Labor, Inventory) gate writes inside each page;
-# non-admins may browse lists read-only.
-_ADMIN_ONLY_PAGES = frozenset({"People", "Employees", "Admin", "Users"})
+try:
+    from pages import inventory_scan
+except ImportError:
+    inventory_scan = None  # type: ignore
 
 
 def main() -> None:
@@ -146,14 +89,16 @@ def main() -> None:
         bootstrap_auth_at_startup()
     # Camera / deep link: ``?code=INV-…`` must survive the login screen (see inventory_scan).
     with perf_span("main.deeplink_query"):
-        try:
-            inventory_scan.merge_inventory_scan_deeplink_from_query()
-        except Exception:
-            pass
+        if inventory_scan is not None:
+            try:
+                inventory_scan.merge_inventory_scan_deeplink_from_query()
+            except Exception:
+                pass
     with perf_span("main.shell_branding"):
         apply_branding()
         apply_global_app_styles()
         apply_global_css()
+        inject_ips_foundation_css()
         inject_clean_table_css()
         inject_pwa_support()
 
@@ -169,6 +114,10 @@ def main() -> None:
         token = str(tok)
     if token and str(token).strip():
         try:
+            try:
+                from pages import sign_timesheet
+            except ImportError:
+                from pages import sign_timesheet  # type: ignore
             sign_timesheet.render_public(str(token).strip())
         except Exception as exc:
             show_page_error(exc, context="page:sign_timesheet_public")
@@ -270,61 +219,27 @@ def main() -> None:
 
     with perf_span("main.page_routing"):
         apply_pending_navigation()
-        # Align ``st.session_state["page"]`` slug (Office & reports) with ``ips_nav_page`` before sidebar.
         sync_session_route_slug_to_nav_page()
-        # After auth: ``?page=Scan%20Inventory`` and/or ``?code=INV-…`` from QR / camera links.
         _want_scan = bool(st.session_state.get("_ips_query_wants_scan_inventory"))
         _inv_deeplink = str(st.session_state.get("_ips_inv_scan_deeplink_code") or "").strip()
-        if (
-            (_want_scan or _inv_deeplink)
-            and not st.session_state.get(IPS_ACTIVE_PAGE_KEY)
-            and role_can_open_page(current_role(), "Scan Inventory")
-        ):
-            st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-            st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
+        if _want_scan or _inv_deeplink:
+            st.session_state[SESSION_NAV_KEY] = "inventory"
+        ensure_nav_defaults()
+        prev_slug = st.session_state.get("_ips_last_slug")
+        slug = str(st.session_state.get(SESSION_NAV_KEY) or "dashboard")
+        if prev_slug and prev_slug != slug:
+            on_nav_change(str(prev_slug), slug)
+        st.session_state["_ips_last_slug"] = slug
     with perf_span("main.sidebar"):
-        sidebar_page = render_sidebar()
-    if sidebar_page != "Dashboard":
-        try:
-            from pages.dashboard.coastal_sidebar import reset_coastal_sidebar_session
-        except ImportError:
-            try:
-                from app.pages.dashboard.coastal_sidebar import reset_coastal_sidebar_session  # type: ignore
-            except ImportError:
-                reset_coastal_sidebar_session = None  # type: ignore
-        if reset_coastal_sidebar_session:
-            reset_coastal_sidebar_session()
-    with perf_span("main.topbar"):
-        render_top_bar(page_label=str(sidebar_page))
+        render_foundation_sidebar(slug)
     trigger_pwa_install_prompt()
-    if not st.session_state.pop("_ips_skip_nav_overlay_clear", False):
-        prev = st.session_state.get("_ips_last_nav_page")
-        if prev is not None and sidebar_page != prev:
-            st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
-    st.session_state["_ips_last_nav_page"] = sidebar_page
-    page = st.session_state.get(IPS_ACTIVE_PAGE_KEY) or sidebar_page
-
-    if page in _ADMIN_ONLY_PAGES and current_role() != "admin":
-        st.error("Admin access required.")
-        return
-
-    # Hard enforcement: do not rely only on sidebar hiding.
-    if not role_can_open_page(current_role(), str(page or "")):
-        st.error("You do not have access to this page.")
-        return
-
-    render_fn = PAGES.get(page)
-    if render_fn is None:
-        st.error(f"Unknown page: {page}")
-        return
-
-    with perf_span(f"main.page_render:{page}"):
+    with perf_span(f"main.page_render:{slug}"):
         try:
             inject_clean_table_css()
-            render_fn()
+            render_module(slug)
             inject_force_white_final_override()
         except Exception as exc:
-            show_page_error(exc, context=f"page:{page}")
+            show_page_error(exc, context=f"module:{slug}")
 
 
 if __name__ == "__main__":
