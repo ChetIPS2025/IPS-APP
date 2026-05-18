@@ -8,24 +8,25 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_THEME_CSS_KEY = "ips_theme_global_v1"
-IPS_GLOBAL_APP_STYLES_KEY = "ips_global_app_styles_v1"
+IPS_THEME_CSS_KEY = "ips_theme_global_v2"
+IPS_GLOBAL_APP_STYLES_KEY = "ips_global_app_styles_v2"
 IPS_DENSITY_KEY = "ips_display_density"
 
 DENSITY_CHOICES = ("compact", "comfortable", "spacious")
 DEFAULT_DENSITY = "compact"
 
 # Global canvas tokens (single source of truth for app background)
-APP_BG = "#F8FAFC"
+APP_BG = "#FFFFFF"
 SIDEBAR_BG = "#FFFFFF"
 CARD_BG = "#FFFFFF"
 BORDER_COLOR = "#E5EAF2"
+HOVER_BG = "#F8FAFC"
 
 # Design tokens (industrial SaaS)
 COLORS = {
     "bg_app": APP_BG,
     "bg_surface": CARD_BG,
-    "bg_muted": "#F9FBFD",
+    "bg_muted": "#FFFFFF",
     "border": BORDER_COLOR,
     "border_strong": "#CBD5E1",
     "text": "#0F172A",

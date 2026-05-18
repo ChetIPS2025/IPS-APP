@@ -28,7 +28,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v12"
+_CSS_KEY = "jdb_modern_v13"
 
 # ── Status pill colours ─────────────────────────────────────────────────────
 _PILL: dict[str, tuple[str, str]] = {
@@ -272,13 +272,19 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 /* hover */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)):hover {
-    background: #f8fafc !important;
+    background: #f0f9ff !important;
+    cursor: pointer !important;
 }
 /* selected */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row-sel):not(:has(.jdb-tbl-host)) {
     background: #eff6ff !important;
     box-shadow: inset 4px 0 0 #2563eb !important;
+    cursor: pointer !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-sel):not(:has(.jdb-tbl-host)):hover {
+    background: #eff6ff !important;
 }
 
 /* ── Row column alignment ──────────────────────────── */
@@ -289,11 +295,22 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     align-items: center !important;
     gap: 0.5rem !important;
     min-height: 3rem !important;
+    position: relative !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host))
     [data-testid="stElementContainer"] {
     margin: 0 !important; padding: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row) .jdb-actcol,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row) .jdb-actcol [data-testid="stElementContainer"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row) .jdb-actcol .stButton {
+    pointer-events: auto !important;
 }
 
 /* ── Force dark text inside table ──────────────────── */
@@ -313,25 +330,66 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 .jdb-cell-name { white-space: normal !important; line-height: 1.35 !important; }
 .jdb-cell-muted { color: #6b7280 !important; font-size: 0.79rem !important; }
 
-/* ── Job-number as blue text button ────────────────── */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    .jdb-numcol .stButton > button {
-    background: transparent !important;
-    border: none !important; box-shadow: none !important;
+/* ── Job # as blue text (not a button) ─────────────── */
+.jdb-cell-num {
     color: #2563eb !important;
-    font-size: 0.83rem !important; font-weight: 700 !important;
-    padding: 0 !important; min-height: unset !important;
-    height: auto !important; line-height: 1.4 !important;
-    text-align: left !important; justify-content: flex-start !important;
+    font-weight: 700 !important;
+    font-size: 0.83rem !important;
+}
+div[data-testid="stVerticalBlock"]:has(.jdb-row-sel) .jdb-cell-num {
+    color: #1d4ed8 !important;
+    font-weight: 800 !important;
+}
+
+/* ── Invisible full-row select hit target ──────────── */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)) {
+    position: relative !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    .jdb-numcol .stButton > button:hover {
-    text-decoration: underline !important; background: transparent !important;
-    color: #1d4ed8 !important;
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    > div[data-testid="stElementContainer"]:has(.stButton) {
+    position: absolute !important;
+    top: 0 !important; left: 0 !important; right: 5.75rem !important; bottom: 0 !important;
+    z-index: 1 !important;
+    height: auto !important;
+    min-height: 3rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
 }
-div[data-testid="stVerticalBlock"]:has(.jdb-row-sel)
-    .jdb-numcol .stButton > button {
-    font-weight: 800 !important; color: #1d4ed8 !important;
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    > div[data-testid="stElementContainer"]:has(.stButton) .stButton {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 3rem !important;
+    margin: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 3rem !important;
+    opacity: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button:hover,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.jdb-row-select-hit)
+    > div[data-testid="stElementContainer"]:has(.stButton) .stButton > button:focus {
+    opacity: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* ── Action icon buttons  (two square bordered icons) ─ */
@@ -492,7 +550,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-panel-host, .jdb-panel-outer, .jdb-row, .jdb-row-sel,
-.jdb-numcol,   .jdb-actcol,    .jdb-ph-btns { display:none !important; }
+.jdb-row-select-hit, .jdb-actcol, .jdb-ph-btns { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -823,16 +881,6 @@ def render_job_row(
 ) -> None:
     jid = str(row.get("id") or full_row.get("id") or "").strip()
 
-    # This marker targets the containing stVerticalBlock via CSS :has()
-    st.markdown(
-        f'<span class="{"jdb-row-sel" if is_selected else "jdb-row"}"></span>',
-        unsafe_allow_html=True,
-    )
-
-    # Columns: job# | name | customer | est# | supervisor | status | start | end | actions
-    weights = [0.65, 2.0, 1.35, 0.75, 1.0, 0.85, 0.9, 0.9, 0.9]
-    cols = st.columns(weights, gap="small")
-
     jnum = _v(row.get(job_num_col) or full_row.get(job_num_col) or full_row.get("job_number"))
     name = _v(row.get("job_name") or full_row.get("job_name"), "Untitled")
     cust = _v(row.get("customer_name") or full_row.get("customer_name"))
@@ -842,11 +890,26 @@ def render_job_row(
     sd   = _date_table(full_row.get("start_date"))
     ed   = _date_table(full_row.get("target_completion_date") or full_row.get("due_date"))
 
-    # Job # — blue text button, click = toggle expand
+    # Row marker + invisible select layer (whole row clickable except actions)
+    st.markdown(
+        f'<span class="{"jdb-row-sel" if is_selected else "jdb-row"}"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<span class="jdb-row-select-hit" aria-hidden="true"></span>', unsafe_allow_html=True)
+    if st.button("\u200b", key=f"jrow_sel_{jid}", use_container_width=True, help=f"Select {jnum}"):
+        on_select()
+
+    # Columns: job# | name | customer | est# | supervisor | status | start | end | actions
+    weights = [0.65, 2.0, 1.35, 0.75, 1.0, 0.85, 0.9, 0.9, 0.9]
+    cols = st.columns(weights, gap="small")
+
+    # Job # — blue text only (row click selects)
     with cols[0]:
-        st.markdown('<span class="jdb-numcol"></span>', unsafe_allow_html=True)
-        if st.button(jnum, key=f"jrow_num_{jid}", use_container_width=True):
-            on_select()
+        st.markdown(
+            f'<span class="jdb-cell jdb-cell-num" title="{html.escape(jnum, quote=True)}">'
+            f'{html.escape(jnum)}</span>',
+            unsafe_allow_html=True,
+        )
 
     # Project / Description
     with cols[1]:
