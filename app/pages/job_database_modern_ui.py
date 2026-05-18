@@ -27,7 +27,7 @@ try:
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
 
-_CSS_KEY = "jdb_modern_v10"
+_CSS_KEY = "jdb_modern_v11"
 
 # ── Status pill colours ─────────────────────────────────────────────────────
 _PILL: dict[str, tuple[str, str]] = {
@@ -130,8 +130,48 @@ def inject_modern_jobs_css() -> None:
     st.session_state[_CSS_KEY] = True
     st.markdown("""
 <style>
+/* ═══════════════════════════════════════════════════
+   JOB DATABASE PAGE SHELL — bright white canvas
+═══════════════════════════════════════════════════ */
+section[data-testid="stMain"]:has(.ips-job-db-page),
+section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
+section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+}
 section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
     max-width: 1680px !important;
+    padding-top: 0.35rem !important;
+}
+/* Flatten gray nested Streamlit borders on list/filter chrome (keep jdb table + panel) */
+section[data-testid="stMain"]:has(.ips-job-db-page)
+    div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.jdb-tbl-host)):not(:has(.jdb-panel-host)):not(:has(.jdb-panel-outer)) {
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-job-db-page)
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-joblist-section-anchor),
+section[data-testid="stMain"]:has(.ips-job-db-page)
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-job-filter-anchor) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-job-db-page) .ips-surface-soft {
+    border-bottom: 1px solid #e5eaf2 !important;
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0.35rem !important;
+}
+section[data-testid="stMain"]:has(.ips-job-db-page) p.ips-section-title,
+section[data-testid="stMain"]:has(.ips-job-db-page) .ips-jdb-section-title {
+    color: #111827 !important;
+}
+section[data-testid="stMain"]:has(.ips-job-db-page) p.ips-section-desc,
+section[data-testid="stMain"]:has(.ips-job-db-page) .ips-jdb-section-desc {
+    color: #4b5563 !important;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -140,8 +180,8 @@ section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
     background: #ffffff !important;
     border: 1px solid #e5eaf2 !important;
-    border-radius: 14px !important;
-    box-shadow: 0 1px 6px rgba(15,23,42,0.06) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
     padding: 0 !important;
     overflow: hidden !important;
 }
@@ -153,7 +193,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
     height: 2.5rem;
     padding: 0 1rem;
     gap: 0.5rem;          /* matches st.columns gap="small" */
-    background: #f8fafc;
+    background: #ffffff;
     border-bottom: 1px solid #e5eaf2;
     font-size: 0.67rem;
     font-weight: 700;
@@ -180,7 +220,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host) {
 ═══════════════════════════════════════════════════ */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row):not(:has(.jdb-tbl-host)) {
-    border-bottom: 1px solid #f1f5f9 !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5eaf2 !important;
     padding: 0 1rem !important;
     transition: background 0.12s ease !important;
     position: relative !important;
@@ -198,7 +239,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.jdb-row-sel):not(:has(.jdb-tbl-host)) {
     background: #eff6ff !important;
-    box-shadow: inset 3px 0 0 #2563eb !important;
+    box-shadow: inset 4px 0 0 #2563eb !important;
 }
 
 /* ── Row column alignment ──────────────────────────── */
@@ -226,7 +267,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 
 /* ── Cell text ─────────────────────────────────────── */
 .jdb-cell {
-    font-size: 0.83rem; color: #374151;
+    font-size: 0.83rem; color: #111827;
     overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; display: block; line-height: 1.4;
 }
@@ -279,11 +320,11 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host),
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-outer) {
     background: #ffffff !important;
-    border: 1.5px solid #2563eb !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 20px rgba(37,99,235,0.09) !important;
-    padding: 1.35rem 1.5rem 1.1rem !important;
-    margin: 0.65rem 0 0.85rem !important;
+    border: 1px solid #2563eb !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06) !important;
+    padding: 1.25rem 1.4rem 1rem !important;
+    margin: 0.75rem 0 1rem !important;
 }
 
 /* panel header typography */
@@ -371,7 +412,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 /* info card shells */
 .jdb-card {
     background: #ffffff; border: 1px solid #e5eaf2;
-    border-radius: 10px; padding: 1rem 1.1rem; height: 100%;
+    border-radius: 10px; padding: 1rem 1.15rem; height: 100%;
+    box-shadow: none;
 }
 .jdb-card-title {
     font-size: 0.88rem; font-weight: 700; color: #111827; margin: 0 0 0.8rem;

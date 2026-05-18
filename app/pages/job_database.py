@@ -247,7 +247,7 @@ HIDDEN_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
-JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v14"
+JOB_DB_RESPONSIVE_STYLES_KEY = "job_db_responsive_styles_injected_v15"
 JOB_DB_DETAIL_VIEW_CSS_KEY = "job_db_detail_view_css_v1"
 
 # Shown in the Job Database grid; kept on the DataFrame for filters / search / logic.
@@ -268,6 +268,30 @@ def _inject_job_database_responsive_styles() -> None:
     st.markdown(
         """
         <style>
+        /* Bright white Jobs page — override global #F8FAFC canvas and nested gray boxes */
+        section[data-testid="stMain"]:has(.ips-job-db-page),
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stAppViewContainer"],
+        section[data-testid="stMain"]:has(.ips-job-db-page) .block-container {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page)
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor):not(:has(.jdb-tbl-host)) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stSelectbox"] [data-baseweb="select"],
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stTextInput"] input,
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stTextInput"] [data-baseweb="input"] {
+            background: #ffffff !important;
+            border-color: #d1d5db !important;
+            color: #111827 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stWidgetLabel"] p {
+            color: #374151 !important;
+            font-weight: 600 !important;
+        }
         section[data-testid="stMain"]:has(.ips-job-db-page) [data-testid="stImage"] {
             margin: 0 0 0.08rem 0 !important;
         }
@@ -2240,6 +2264,7 @@ def render() -> None:
     )
     inject_ips_crud_list_styles()
     inject_table_action_styles()
+    _jmod_inject_css()
     _inject_job_database_responsive_styles()
 
     can_edit = current_role() in {"admin", "manager"}
@@ -2613,7 +2638,6 @@ def render() -> None:
                 if "id" not in df_display.columns:
                     st.dataframe(df_display[visible_cols], use_container_width=True, hide_index=True)
                 elif use_table:
-                    _jmod_inject_css()
                     _render_modern_jobs_table(
                         df_display=df_display,
                         job_num_col=job_num_col,
