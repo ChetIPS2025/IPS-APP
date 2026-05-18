@@ -77,10 +77,16 @@ from pages import po_expenses
 from pages import admin
 from pages import users
 from pages import company_updates
+from pages import field_dashboard
+from pages import field_daily_reports
+from pages import field_crew_time
 
 
 PAGES = {
     "Dashboard": dashboard.render,
+    "Field Dashboard": field_dashboard.render,
+    "Daily Reports": field_daily_reports.render,
+    "Crew Time": field_crew_time.render,
     "Company Updates": company_updates.render,
     # Estimates UI: app/pages/estimates.py → estimates.render
     "Estimates": estimates.render,

@@ -425,6 +425,10 @@ def _render_asset_create_update_form(
                 st.session_state["asset_detail_id"] = str(selected_asset["id"])
                 st.session_state[IPS_NAV_PENDING_KEY] = "Asset Detail"
                 st.session_state["asset_detail_flash"] = "Asset updated."
+            elif ret == "asset_database":
+                st.session_state["assets_selected_id"] = str(selected_asset["id"])
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+                st.session_state["asset_detail_flash"] = "Asset updated."
             else:
                 st.success("Asset updated.")
             st.rerun()
@@ -472,12 +476,16 @@ def render() -> None:
             st.rerun()
 
         return_to_detail = st.session_state.get("asset_return_to") == "asset_detail"
+        return_to_database = st.session_state.get("asset_return_to") == "asset_database"
 
-        if st.button("← Back to Asset Overview", key="asset_mgr_back_overview", use_container_width=True):
+        back_label = "← Back to Assets" if return_to_database else "← Back to Asset Overview"
+        if st.button(back_label, key="asset_mgr_back_overview", use_container_width=True):
             _clear_asset_manager_edit_session()
             clear_selected_ids(TABLE_KEY_ASSET_MANAGER)
             st.session_state.pop("asset_mgr_sel_editor", None)
-            st.session_state.pop("asset_return_to", None)
+            ret_back = st.session_state.pop("asset_return_to", None)
+            if ret_back == "asset_database":
+                st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
             st.rerun()
 
         _render_asset_create_update_form(

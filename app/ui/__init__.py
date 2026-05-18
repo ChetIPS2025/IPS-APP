@@ -55,7 +55,7 @@ _PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.item
 
 # ---- Sidebar structure (simple, field + office friendly) ----
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
-_NAV_PRIMARY: tuple[str, ...] = ("Dashboard", "Company Updates")
+_NAV_PRIMARY: tuple[str, ...] = ("Dashboard", "Field Dashboard", "Company Updates")
 
 # Jobs (routable; sidebar layout is built in ``_render_sidebar_office``).
 _NAV_ASSETS_EXPANDER_PAGES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
@@ -80,6 +80,8 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Job Database",
+    "Daily Reports",
+    "Crew Time",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -99,6 +101,8 @@ _NAV_INVENTORY_SUBPAGES: tuple[str, ...] = ("Scan Inventory", "Inventory Usage")
 # Sidebar expander membership (session page keys are unchanged).
 _NAV_JOBS_SIDEBAR_PAGES: tuple[str, ...] = (
     "Job Database",
+    "Daily Reports",
+    "Crew Time",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Job Costing",
@@ -132,13 +136,19 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Customers",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
+            "Field Dashboard",
+            "Daily Reports",
+            "Crew Time",
         }
     ),
     "manager": frozenset(
         {
             "Dashboard",
+            "Field Dashboard",
             "Company Updates",
             "Job Database",
+            "Daily Reports",
+            "Crew Time",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
             "Estimates",
@@ -155,7 +165,10 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "employee": frozenset(
         {
             "Dashboard",
+            "Field Dashboard",
             "Company Updates",
+            "Daily Reports",
+            "Crew Time",
             "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
@@ -242,7 +255,7 @@ def apply_pending_navigation() -> None:
     if pending == "Daily Tasks":
         pending = "Work & Plan (Supervisor)"
     if pending in ("Supervisor Daily Reports", "Daily crew report"):
-        pending = "Work & Plan (Supervisor)"
+        pending = "Daily Reports"
     if not pending:
         return
     st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
@@ -540,7 +553,7 @@ def _ensure_valid_nav_page() -> None:
     elif cur0 == "Daily Tasks":
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
     elif cur0 in ("Supervisor Daily Reports", "Daily crew report"):
-        st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
+        st.session_state[IPS_NAV_PAGE_KEY] = "Daily Reports"
 
     if st.session_state.get(IPS_NAV_PAGE_KEY) != cur0:
         st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
@@ -705,9 +718,10 @@ def _render_sidebar_office(*, role: str) -> None:
                     '<p class="ips-nav-expander-hint">Quote catalog — proposals and pricing</p>',
                     unsafe_allow_html=True,
                 )
+                est_nav_active = nav_page in ("Estimates", "Estimate Materials")
                 if role_can_open_page(role, "Estimates"):
                     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
-                    active = cur == "Estimates"
+                    active = est_nav_active
                     if st.button(
                         "Estimates",
                         key=_nav_btn_key("Estimates__est_exp"),
@@ -715,11 +729,33 @@ def _render_sidebar_office(*, role: str) -> None:
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Estimates")
+                    _, est_sub = st.columns([0.08, 0.92])
+                    with est_sub:
+                        sub_list_active = nav_page == "Estimates" and str(
+                            st.session_state.get("estimates_view") or "list"
+                        ) == "list"
+                        if st.button(
+                            "All Estimates",
+                            key=_nav_btn_key("Estimates__all_est"),
+                            type="primary" if sub_list_active else "secondary",
+                            use_container_width=True,
+                        ):
+                            _set_sidebar_nav_page("Estimates")
+                            st.session_state["estimates_view"] = "list"
+                        if st.button(
+                            "Templates",
+                            key=_nav_btn_key("Estimates__templates"),
+                            type="secondary",
+                            use_container_width=True,
+                        ):
+                            _set_sidebar_nav_page("Estimates")
+                            st.session_state["estimates_view"] = "list"
+                            st.session_state["est_list_filter_templates"] = True
                 if role_can_open_page(role, "Estimate Materials"):
                     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
                     active = cur == "Estimate Materials"
                     if st.button(
-                        "Estimate Materials",
+                        "Materials",
                         key=_nav_btn_key("Estimate_Materials__est_exp"),
                         type="primary" if active else "secondary",
                         use_container_width=True,

@@ -280,8 +280,31 @@ def _load_estimate_into_session(selected_id: str) -> None:
     ensure_scope_widgets_bound(loaded, selected_id)
 
 
+def _start_new_estimate() -> None:
+    _reset_estimate_editor_transients(clear_import_hints=True)
+    st.session_state["estimate_editor_state"] = blank_estimate()
+    st.session_state["loaded_estimate_id"] = None
+    st.session_state["estimate_editor_quote_ready"] = False
+    ensure_state()
+    st.session_state["estimates_view"] = "edit"
+    st.rerun()
+
+
+def _open_estimate_editor(estimate_id: str) -> None:
+    _load_estimate_into_session(str(estimate_id))
+    st.session_state["estimates_view"] = "edit"
+    st.rerun()
+
+
+def _go_import_view() -> None:
+    _reset_estimate_editor_transients(clear_import_hints=True)
+    st.session_state["estimates_view"] = "import"
+    st.rerun()
+
+
 def _render_estimate_list() -> None:
     can_edit = current_role() in {"admin", "pm"}
+    admin_read = _estimates_page_admin_read()
     rows = _fetch_estimates_list_rows()
     df = pd.DataFrame(rows)
 
@@ -392,64 +415,14 @@ def _render_estimate_list() -> None:
         s = s.splitlines()[0].strip()
         return s[:60] + ("…" if len(s) > 60 else "")
 
-    if not df.empty:
-        keep = [
-            c
-            for c in [
-                "quote_number",
-                "status",
-                "proposal_total",
-                "job_received",
-                "po_number",
-                "scope_of_work",
-                "estimate_json",
-                "customer_location_id",
-            ]
-            if c in df.columns
-        ]
-        if "id" in df.columns:
-            keep = ["id"] + [c for c in keep if c != "id"]
-        if "job_id" in df.columns and "job_id" not in keep:
-            keep.insert(1, "job_id")
-        df = df[keep]
-
-        if "status" in df.columns:
-            statuses = ["All"] + sorted(df["status"].dropna().astype(str).unique().tolist())
-            selected = st.selectbox("Filter Status", statuses, key="est_list_status")
-            if selected != "All":
-                df = df[df["status"] == selected]
-
-        search = st.text_input("Search Quote / PO Number", key="est_list_search")
-        if search.strip():
-            s = search.strip().lower()
-            mask = df.astype(str).apply(lambda col: col.str.lower().str.contains(s, na=False))
-            df = df[mask.any(axis=1)]
-
-        df = df.copy()
-        df["Linked job"] = df.apply(_linked_job_display_cell, axis=1)
-
-    if df.empty:
-        try:
-            from app.ui.components.empty_states import render_empty_state
-        except ImportError:
-            from ui.components.empty_states import render_empty_state  # type: ignore
-        if render_empty_state(
-            "No estimates found",
-            "Create a new estimate or import existing quotes to get started.",
-            icon="📄",
-            action_label="New estimate",
-            action_key="est_list_empty_new",
-        ):
-            _reset_estimate_editor_transients(clear_import_hints=True)
-            st.session_state["estimate_editor_state"] = blank_estimate()
-            st.session_state["loaded_estimate_id"] = None
-            st.session_state["estimate_editor_quote_ready"] = False
-            ensure_state()
-            st.session_state["estimates_view"] = "edit"
-            st.rerun()
-        return
-
     location_by_id: dict[str, dict[str, Any]] = {}
+    if not df.empty and "customer_location_id" in df.columns:
+        try:
+            from services.customer_locations import fetch_all_locations_indexed
+        except ImportError:
+            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
+
+        location_by_id = fetch_all_locations_indexed(admin_read=admin_read)
 
     def _site_line_for_estimate(est_row: pd.Series) -> str:
         if "customer_location_id" not in est_row.index:
@@ -473,334 +446,31 @@ def _render_estimate_list() -> None:
         row = location_by_id.get(lid)
         return location_display_name_city_state(row) if row else ""
 
-    if "customer_location_id" in df.columns:
-        try:
-            from services.customer_locations import fetch_all_locations_indexed
-        except ImportError:
-            from app.services.customer_locations import fetch_all_locations_indexed  # type: ignore
-
-        location_by_id = fetch_all_locations_indexed(admin_read=_estimates_page_admin_read())
-
-    # Visible columns: fixed order handled explicitly in the row layout below.
-    if "id" not in df.columns:
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        return
-
     try:
-        from services.job_from_estimate import (
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
+        from app.pages.estimates_list_view import render_estimates_list_page
     except ImportError:
-        from app.services.job_from_estimate import (  # type: ignore
-            create_job_from_estimate,
-            estimate_status_allows_job_creation,
-        )
+        from pages.estimates_list_view import render_estimates_list_page  # type: ignore
 
-    try:
-        from ui import IPS_NAV_PENDING_KEY
-    except ImportError:
-        from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-
-    def _job_received_disabled_reason(est_row: pd.Series, *, cust_id: str) -> str:
-        """Non-empty means Job Received should stay disabled (linked estimates use **Job Created** instead)."""
-        if not can_edit:
-            return "Only admin or pm can run this action."
-        if _series_truthy_job_received(est_row):
-            return "This estimate is already marked as job received."
-        if not cust_id:
-            return "Choose a customer on the estimate before creating a job."
-        st_raw = str(est_row.get("status") or "")
-        if not estimate_status_allows_job_creation(st_raw):
-            return (
-                f"Estimate status {st_raw!r} does not allow creating a job from this page. "
-                "Job creation is only allowed after customer approval (approved/accepted/awarded/po_received). "
-                "Update status first, or adjust ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION in job_from_estimate.py."
-            )
-        return ""
-
-    st.caption(
-        "**Estimates = quotes / proposals** (pricing and approval live here). "
-        "**Jobs = costing / work records** in Job Database — create from an accepted estimate or standalone for field work."
-    )
-    st.caption(
-        "**Job Received** is the first column on each row; the **selection checkbox** is next, then fields. "
-        "Use the **action bar** below for view, edit, delete, and export."
-    )
-    nav1, nav2 = st.columns([1.15, 3])
-    with nav1:
-        st.checkbox(
-            "Open new job in Job Database",
-            value=True,
-            key="est_job_recv_open_job_db",
-            help="After Job Received success, go to Job Database with that job open.",
-        )
-    with nav2:
-        st.caption("Uncheck to stay on this list after creating a job (filters and search unchanged).")
-
-    # Visible order (exact):
-    # Blank | Job | quote | Estimate Description | proposal | status | linked job | po | approve | delete
-    col_weights = [
-        0.4,  # checkbox
-        1.3,  # job
-        1.1,  # quote
-        2.4,  # description
-        1.0,  # proposal
-        0.9,  # status
-        1.8,  # linked job
-        1.0,  # po
-        0.8,  # approve
-        0.5,  # delete
-    ]
-    head = st.columns(col_weights)
-    with head[0]:
-        st.caption(" ")
-    with head[1]:
-        st.caption("Job")
-    with head[2]:
-        st.caption("Quote")
-    with head[3]:
-        st.caption("Estimate Description")
-    with head[4]:
-        st.caption("Proposal total")
-    with head[5]:
-        st.caption("Status")
-    with head[6]:
-        st.caption("Linked job")
-    with head[7]:
-        st.caption("PO #")
-    with head[8]:
-        st.caption("Approve")
-    with head[9]:
-        st.caption("Del")
-
-    picked: list[str] = []
-    for _, est_row in df.iterrows():
-        eid = _row_estimate_id(est_row)
-        if not eid:
-            continue
-        linked_id = _linked_job_id_for_row(est_row)
-        cust_id = eid_to_customer.get(eid, "")
-        row_status = str(est_row.get("status") or "").strip().lower()
-        rc = st.columns(col_weights)
-        with rc[0]:
-            ck = f"est_list_pick_{eid}"
-            if ck not in st.session_state:
-                st.session_state[ck] = eid in get_selected_ids(TABLE_KEY_ESTIMATES)
-            checked = st.checkbox("", key=ck, label_visibility="collapsed")
-            if checked:
-                picked.append(eid)
-        with rc[1]:
-            if linked_id:
-                st.button(
-                    "Job Created",
-                    key=f"job_created_{eid}",
-                    disabled=True,
-                    use_container_width=True,
-                    help="A job is already linked to this estimate.",
-                )
-            else:
-                reason = _job_received_disabled_reason(est_row, cust_id=cust_id)
-                ready = not reason
-                clicked = st.button(
-                    "Job Received",
-                    key=f"job_received_{eid}",
-                    disabled=not ready,
-                    use_container_width=True,
-                    help=(
-                        "Create a job from this estimate, link it, and mark job received."
-                        if ready
-                        else reason
-                    ),
-                )
-                if clicked and ready:
-                    res = create_job_from_estimate(str(eid), mark_job_received=True)
-                    if res.ok and res.job:
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_job_recv_open_job_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_view_mode"] = "edit"
-                            st.session_state["selected_job_id"] = jid
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.success(res.message)
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        elif res.error_code == "job_received":
-                            st.info(res.message)
-                        else:
-                            st.error(res.message)
-        with rc[2]:
-            st.text(_estimate_list_cell_text(est_row.get("quote_number"), col="quote_number"))
-        with rc[3]:
-            st.text(_estimate_description_display(est_row))
-            site_ln = _site_line_for_estimate(est_row)
-            if site_ln:
-                st.caption(f"Site: {site_ln}")
-        with rc[4]:
-            st.text(_estimate_list_cell_text(est_row.get("proposal_total"), col="proposal_total"))
-        with rc[5]:
-            st.text(_estimate_list_cell_text(est_row.get("status"), col="status"))
-        with rc[6]:
-            st.text(_estimate_list_cell_text(est_row.get("Linked job"), col="Linked job"))
-        with rc[7]:
-            st.text(_estimate_list_cell_text(est_row.get("po_number"), col="po_number"))
-        with rc[8]:
-            is_approved = row_status == "approved"
-            can_approve = can_edit and row_status in ["draft", "submitted"]
-            approve_label = "Approved ✓" if is_approved else "Approve"
-            anchor_cls = "ips-est-approve-anchor" + (" ips-est-approve-done" if is_approved else "")
-            st.markdown(f'<span class="{anchor_cls}"></span>', unsafe_allow_html=True)
-            approve_btn_type = "primary" if (can_approve or is_approved) else "secondary"
-
-            if st.button(
-                approve_label,
-                key=f"est_row_approve_{eid}",
-                type=approve_btn_type,
-                disabled=not can_approve,
-                use_container_width=True,
-                help=(
-                    "Approve this estimate"
-                    if can_approve
-                    else ("Estimate is already approved" if is_approved else "Only draft/submitted estimates can be approved")
-                ),
-            ):
-                try:
-                    update_rows_admin("estimates", {"status": "approved"}, {"id": eid})
-                    st.success("Estimate approved.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Could not approve: {exc}")
-        with rc[9]:
-            del_enabled = bool(can_edit)
-            if not can_edit:
-                del_help = "Only admin or pm can delete estimates."
-            else:
-                del_help = (
-                    "Delete this estimate (quote). Linked jobs are kept; the job is unlinked from this quote."
-                )
-            if st.button(
-                "🗑",
-                key=f"est_row_del_{eid}",
-                disabled=not del_enabled,
-                use_container_width=True,
-                help=del_help,
-            ):
-                # Trigger the same confirmation flow the bulk action bar uses.
-                st.session_state[IPS_PENDING_DELETE] = {TABLE_KEY_ESTIMATES: [str(eid)]}
-                st.rerun()
-
-    set_selected_ids(TABLE_KEY_ESTIMATES, picked)
-    sel = picked
-
-    df_export = df.copy()
-    for _mc in _MONEY_LIST_COLUMNS:
-        if _mc in df_export.columns:
-            df_export[_mc] = df_export[_mc].map(_estimate_money_csv)
-
-    actions = render_selection_action_bar(
-        TABLE_KEY_ESTIMATES,
-        sel,
-        can_view=True,
+    render_estimates_list_page(
+        rows=rows,
+        df=df,
         can_edit=can_edit,
-        can_delete=can_edit,
-        export_df=df_export,
-        visible_df=df,
-        id_column="id",
-        export_filename="estimates_export.csv",
-        on_bulk_selection_change=_cleanup_est_list_row_pick_keys,
+        admin_read=admin_read,
+        money_display=_estimate_money_display,
+        money_csv=_estimate_money_csv,
+        estimate_description_display=_estimate_description_display,
+        row_estimate_id=_row_estimate_id,
+        linked_job_display_cell=_linked_job_display_cell,
+        linked_job_id_for_row=_linked_job_id_for_row,
+        series_truthy_job_received=_series_truthy_job_received,
+        job_by_id=job_by_id,
+        job_by_estimate_id=job_by_estimate_id,
+        eid_to_customer=eid_to_customer,
+        on_new_estimate=_start_new_estimate,
+        on_import=_go_import_view,
+        on_open_editor=_open_estimate_editor,
+        site_line_for_estimate=_site_line_for_estimate,
     )
-
-    if can_edit and sel and len(sel) == 1:
-        row_one = df[df["id"].astype(str) == str(sel[0])]
-        open_jid: str | None = None
-        linked_jn = ""
-        linked_jnm = ""
-        qn = ""
-        if not row_one.empty:
-            r0 = row_one.iloc[0]
-            open_jid = _linked_job_id_for_row(r0)
-            qn = str(r0.get("quote_number") or "").strip()
-            if open_jid and str(open_jid) in job_by_id:
-                job_row = job_by_id[str(open_jid)]
-                linked_jn = job_number_display(job_row.get("job_number"))
-                linked_jnm = str(job_row.get("job_name") or "").strip()
-        try:
-            from app.ui.page_shell import render_card
-        except ImportError:
-            from ui.page_shell import render_card  # type: ignore
-        with render_card():
-            st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
-            if open_jid:
-                jdisp = job_display_label(linked_jn, linked_jnm)
-                if jdisp:
-                    st.markdown(f"**Linked job** · **{jdisp}**", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "**Linked job** · _This estimate is linked to a job, but the job details could not be loaded._",
-                        unsafe_allow_html=True,
-                    )
-                if qn:
-                    st.caption(f"Source estimate quote · {qn}")
-                if st.button("Open Job", type="primary", use_container_width=True, key="est_list_open_job_btn"):
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                    st.session_state["job_view_mode"] = "edit"
-                    st.session_state["selected_job_id"] = str(open_jid)
-                    st.session_state["job_mode"] = "edit"
-                    st.session_state["job_edit_id"] = str(open_jid)
-                    st.rerun()
-            else:
-                lc1, lc2, lc3 = st.columns([1, 1, 2], gap="small")
-                with lc1:
-                    run_cj = st.button(
-                        "Create Job from Estimate",
-                        key="est_list_create_job_btn",
-                        use_container_width=True,
-                    )
-                with lc2:
-                    st.checkbox(
-                        "Open Job Database after create",
-                        value=True,
-                        key="est_list_create_job_open_db",
-                    )
-                with lc3:
-                    st.caption("Creates a **J#####** job once the estimate is customer-approved (approved/accepted/awarded/po_received).")
-                if run_cj:
-                    res = create_job_from_estimate(str(sel[0]))
-                    if res.ok and res.job:
-                        st.success(res.message)
-                        jid = str(res.job.get("id") or "")
-                        if jid and st.session_state.get("est_list_create_job_open_db", True):
-                            st.session_state[IPS_NAV_PENDING_KEY] = "Job Database"
-                            st.session_state["job_view_mode"] = "edit"
-                            st.session_state["selected_job_id"] = jid
-                            st.session_state["job_mode"] = "edit"
-                            st.session_state["job_edit_id"] = jid
-                        st.rerun()
-                    elif res.message:
-                        if res.error_code == "duplicate":
-                            st.warning(res.message)
-                        else:
-                            st.error(res.message)
-    if (actions.get("view") or actions.get("edit")) and sel and len(sel) == 1:
-        _load_estimate_into_session(str(sel[0]))
-        st.session_state["estimates_view"] = "edit"
-        st.rerun()
-    pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-    if actions.get("confirm_delete") and pend.get(TABLE_KEY_ESTIMATES):
-        _est_admin_read = _estimates_page_admin_read()
-        for eid in pend[TABLE_KEY_ESTIMATES]:
-            try:
-                delete_estimate_unlink_first(str(eid), admin_read=_est_admin_read)
-            except Exception as exc:
-                st.error(f"Could not delete {eid}: {exc}")
-        pend.pop(TABLE_KEY_ESTIMATES, None)
-        clear_selected_ids(TABLE_KEY_ESTIMATES)
-        _cleanup_est_list_row_pick_keys()
-        st.success("Delete completed where permitted.")
-        st.rerun()
 
 
 def _import_customer_status_short(cls: dict[str, Any] | None) -> str:
@@ -1015,34 +685,8 @@ def render() -> None:
     # Single branding header per request; each branch renders one body section only.
     inject_table_action_styles()
 
-    try:
-        from app.ui.page_shell import action_bar_card
-    except ImportError:
-        from ui.page_shell import action_bar_card  # type: ignore
-
     if view == "list":
-        render_page_header("Estimates", "Quotes, imports, and customer-ready estimates.")
-        with action_bar_card(title="Quick Actions"):
-            a1, a2 = st.columns(2, gap="small")
-            with a1:
-                if st.button("New estimate", type="primary", use_container_width=True, key="est_list_new"):
-                    _reset_estimate_editor_transients(clear_import_hints=True)
-                    st.session_state["estimate_editor_state"] = blank_estimate()
-                    st.session_state["loaded_estimate_id"] = None
-                    st.session_state["estimate_editor_quote_ready"] = False
-                    ensure_state()
-                    st.session_state["estimates_view"] = "edit"
-                    st.rerun()
-            with a2:
-                if st.button(
-                    "Import Existing Quotes",
-                    type="secondary",
-                    use_container_width=True,
-                    key="est_list_imp",
-                ):
-                    _reset_estimate_editor_transients(clear_import_hints=True)
-                    st.session_state["estimates_view"] = "import"
-                    st.rerun()
+        st.markdown('<span class="ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
         _render_estimate_list()
 
     elif view == "import":
