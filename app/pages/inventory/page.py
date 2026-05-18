@@ -15,7 +15,6 @@ try:
     from app.confirm_delete import (
         close_destructive_confirmation,
         destructive_confirm_open_key,
-        open_destructive_confirmation,
         render_destructive_confirmation,
     )
     from app.ui.page_shell import render_page_header
@@ -26,7 +25,6 @@ except ImportError:
     from confirm_delete import (  # type: ignore
         close_destructive_confirmation,
         destructive_confirm_open_key,
-        open_destructive_confirmation,
         render_destructive_confirmation,
     )
     from ui.page_shell import render_page_header  # type: ignore
@@ -173,21 +171,33 @@ def render() -> None:
             )
 
             def _on_confirm_delete() -> None:
+                failed: list[str] = []
                 for iid in pending:
                     try:
                         delete_inventory_item(iid)
                     except Exception as exc:
                         st.error(f"Could not delete {iid}: {exc}")
+                        failed.append(iid)
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.session_state[_SELECTED_KEY] = []
                 _clear_inv_checkbox_keys()
-                # Clear panel if deleted item was selected
+                # Clear panel if the deleted item was selected
                 panel_id = st.session_state.get(SK_SELECTED_ITEM_ID)
                 if panel_id and str(panel_id) in {str(x) for x in pending}:
                     st.session_state.pop(SK_SELECTED_ITEM_ID, None)
                     st.session_state.pop("inventory_panel_id", None)
                 bump_data_version()
-                st.session_state["inventory_success"] = "Inventory item(s) deleted."
+                deleted = len(pending) - len(failed)
+                if deleted > 0 and not failed:
+                    st.session_state["inventory_success"] = (
+                        "Inventory item deleted."
+                        if deleted == 1
+                        else f"{deleted} inventory items deleted."
+                    )
+                elif deleted > 0 and failed:
+                    st.session_state["inventory_success"] = (
+                        f"{deleted} item(s) deleted; {len(failed)} could not be deleted (see errors above)."
+                    )
 
             def _on_cancel_delete() -> None:
                 st.session_state.pop("inventory_pending_delete_ids", None)
@@ -245,7 +255,7 @@ def render() -> None:
     # --- Inventory list (fragment-isolated) ---
     render_inventory_list_fragment(df=df, can_edit=can_edit, selected_key=_SELECTED_KEY)
 
-    # --- Add dialog ---
+    # --- Add dialog (mutually exclusive with edit dialog) ---
     _should_add = (
         view_mode == "add"
         or st.session_state.get("inventory_panel_mode") == "add"
@@ -253,12 +263,12 @@ def render() -> None:
     if _should_add and can_edit:
         inventory_add_dialog()
 
-    # --- Edit dialog ---
+    # --- Edit dialog (only if add mode is NOT active) ---
     _edit_mode = bool(
         st.session_state.get(SK_EDIT_MODE)
         or st.session_state.get("inventory_edit_popup_open")
     )
-    if _edit_mode:
+    if not _should_add and _edit_mode:
         if not can_edit:
             st.session_state[SK_EDIT_MODE] = False
             st.session_state["inventory_edit_popup_open"] = False

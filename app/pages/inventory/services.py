@@ -84,6 +84,8 @@ def backfill_missing_qr_codes() -> int:
         update_inventory_item(rid, {"qr_code_value": qv})
         sync_qr_to_storage(rid, qv)
         n += 1
+    if n > 0:
+        bump_data_version()
     return n
 
 
@@ -107,6 +109,8 @@ def regenerate_qr_pngs() -> int:
             continue
         sync_qr_to_storage(rid, qv)
         n += 1
+    if n > 0:
+        bump_data_version()
     return n
 
 

@@ -50,7 +50,6 @@ from app.pages.inventory.utils import (
 from app.pages.inventory.queries import fetch_inventory_image_signed_url_cached
 
 # State key constants (standardized per spec)
-SK_SELECTED_IDS = "selected_inventory_ids"
 SK_SELECTED_ITEM_ID = "selected_inventory_item_id"
 SK_FILTER_CATEGORY = "inventory_filter_category"
 SK_FILTER_STATUS = "inventory_filter_status"
@@ -544,8 +543,13 @@ def render_inventory_action_bar(
                 disabled=not can_edit,
                 key="inv_btn_add",
             ):
+                # Ensure edit mode is cleared before opening add dialog
                 st.session_state[SK_VIEW_MODE] = "add"
                 st.session_state[SK_SELECTED_ITEM_ID] = None
+                st.session_state[SK_EDIT_MODE] = False
+                st.session_state["inventory_edit_popup_open"] = False
+                st.session_state["editing_inventory_id"] = None
+                st.session_state["inventory_panel_mode"] = "add"
                 ips_app_rerun()
         with b1:
             if st.button(
@@ -555,9 +559,12 @@ def render_inventory_action_bar(
                 disabled=not can_edit or not one,
                 key="inv_btn_edit",
             ):
+                # Ensure add mode is cleared before opening edit dialog
                 st.session_state[SK_EDIT_MODE] = True
                 st.session_state[SK_SELECTED_ITEM_ID] = str(sel[0])
-                # Also keep legacy keys in sync for safety
+                st.session_state[SK_VIEW_MODE] = None
+                st.session_state["inventory_panel_mode"] = None
+                # Keep legacy keys in sync
                 st.session_state["inventory_edit_popup_open"] = True
                 st.session_state["editing_inventory_id"] = str(sel[0])
                 ips_app_rerun()

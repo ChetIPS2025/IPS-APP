@@ -114,7 +114,7 @@ def thumb_display_url(image_url: str | None) -> str:
     from app.pages.inventory.queries import fetch_inventory_image_signed_url_cached
 
     raw = str(image_url or "").strip()
-    return fetch_inventory_image_signed_url_cached(raw) if raw else _PLACEHOLDER_THUMB or _PLACEHOLDER_THUMB
+    return fetch_inventory_image_signed_url_cached(raw) or _PLACEHOLDER_THUMB
 
 
 def format_stock_status(quantity_on_hand: float, reorder_point: float) -> str:

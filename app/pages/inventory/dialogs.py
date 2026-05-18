@@ -32,7 +32,7 @@ from app.pages.inventory.services import (
     get_signed_image_url,
     sync_qr_to_storage,
 )
-from app.pages.inventory.queries import update_inventory_item
+from app.pages.inventory.queries import bump_data_version, update_inventory_item
 
 
 # ---------------------------------------------------------------------------
@@ -61,11 +61,11 @@ def inventory_add_dialog() -> None:
     modal_wide_marker()
     st.markdown("### Add inventory item")
 
-    # Pre-fill category if the category filter is set to something useful
-    if str(st.session_state.get(SK_EDIT_MODE) or "").strip().lower() == "materials":
-        st.session_state.setdefault("inv_add_cat", "Materials")
-    # Legacy pre-fill key
-    if str(st.session_state.get("inv_f_cat") or "").strip().lower() == "materials":
+    # Pre-fill category when the category filter is already set to "Materials"
+    from app.pages.inventory.components import SK_FILTER_CATEGORY  # local import to avoid top-level cycle
+    _cat_filter = str(st.session_state.get(SK_FILTER_CATEGORY) or "").strip().lower()
+    _cat_legacy = str(st.session_state.get("inv_f_cat") or "").strip().lower()
+    if _cat_filter == "materials" or _cat_legacy == "materials":
         st.session_state.setdefault("inv_add_cat", "Materials")
 
     with st.form("inv_add_item_form_v2", clear_on_submit=True):
@@ -270,6 +270,7 @@ def inventory_edit_dialog(row: dict) -> None:
                 )
                 update_inventory_item(str(row.get("id") or ""), {"qr_code_value": nv})
                 sync_qr_to_storage(str(row.get("id") or ""), nv)
+                bump_data_version()
             except Exception as exc:
                 st.error(f"Could not update QR: {exc}")
                 return
