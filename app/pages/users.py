@@ -47,32 +47,30 @@ except ImportError:
 
 try:
     from app.ui.users_components import (
-        audit_footer_html,
         dept_pills_html,
-        detail_meta_row_html,
+        detail_header_row_html,
         inject_users_page_styles,
-        permissions_granted_html,
-        profile_identity_html,
         render_users_header_inner_html,
         role_badge_html,
+        role_permissions_card_html,
         status_badge_html,
         summary_card_html,
         table_header_html,
+        user_info_card_html,
     )
     from app.ui.modal import ensure_modal_styles
 except ImportError:
     from ui.users_components import (  # type: ignore
-        audit_footer_html,
         dept_pills_html,
-        detail_meta_row_html,
+        detail_header_row_html,
         inject_users_page_styles,
-        permissions_granted_html,
-        profile_identity_html,
         render_users_header_inner_html,
         role_badge_html,
+        role_permissions_card_html,
         status_badge_html,
         summary_card_html,
         table_header_html,
+        user_info_card_html,
     )
     from ui.modal import ensure_modal_styles  # type: ignore
 
@@ -659,6 +657,8 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
             ("User", "Email", "Role", "Department", "Status", "Last Login", "Actions"),
         ):
             with col:
+                if lbl == "User":
+                    st.markdown('<span class="ips-users-th-row" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if lbl == "Actions":
                     st.markdown('<p class="ips-users-th">Actions</p>', unsafe_allow_html=True)
                 else:
@@ -764,22 +764,20 @@ def _render_user_detail_panel(row: dict[str, Any]) -> None:
     with st.container(border=True):
         st.markdown('<span class="ips-users-detail-anchor"></span>', unsafe_allow_html=True)
 
-        top_id, top_meta, top_act = st.columns([2.4, 2.8, 1.35], gap="medium")
-        with top_id:
+        hdr_main, top_act = st.columns([4.2, 1.35], gap="medium")
+        with hdr_main:
             st.markdown(
-                profile_identity_html(
+                detail_header_row_html(
                     initials=str(disp.get("initials") or "?"),
                     name=name,
                     status_html=status_badge_html(status),
                     role=role_lbl,
                     department=dept,
                     active=active,
+                    email=email,
+                    phone=phone,
+                    last_login=last_login,
                 ),
-                unsafe_allow_html=True,
-            )
-        with top_meta:
-            st.markdown(
-                detail_meta_row_html(email=email, phone=phone, last_login=last_login),
                 unsafe_allow_html=True,
             )
         with top_act:
@@ -860,6 +858,7 @@ def _render_overview_tab(
         or row.get("Status")
         or "Inactive"
     )
+    st.markdown('<div class="ips-users-overview-grid">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1.2, 1.1, 0.9], gap="medium")
     notes = ""
     if emp:
@@ -872,8 +871,7 @@ def _render_overview_tab(
     }
     with c1:
         st.markdown(
-            summary_card_html(
-                title="User Information",
+            user_info_card_html(
                 rows=[
                     ("Full Name", str(disp.get("name") or "—")),
                     ("Email", _safe_str(row.get("email"))),
@@ -886,13 +884,8 @@ def _render_overview_tab(
                     ("Notes", notes or "—"),
                 ],
                 html_values=badge_html,
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            audit_footer_html(
                 created=_fmt_date(row.get("created_at")),
-                created_by="System",
+                created_by="System Administrator",
                 updated=_fmt_date(row.get("updated_at")) if row.get("updated_at") else "—",
                 updated_by="Admin",
             ),
@@ -901,18 +894,18 @@ def _render_overview_tab(
     with c2:
         granted_list = [p for p in _ALL_PERMISSIONS if p in perms]
         st.markdown(
-            f'<div class="ips-users-summary-card"><h4>Role &amp; Permissions</h4>'
-            f'<table class="ips-users-kv"><tr><td class="k">Role</td><td class="v">'
-            f'{role_badge_html(role_lbl, color_key=role_key)}</td></tr>'
-            f'<tr><td class="k">Permission Summary</td><td class="v">'
-            f'{html.escape(_permission_summary(role_norm))}</td></tr></table>'
-            f"{permissions_granted_html(granted_list)}"
-            f'<a class="ips-users-perm-link" href="#">View all permissions ›</a></div>',
+            role_permissions_card_html(
+                role_lbl=role_lbl,
+                role_key=role_key,
+                perm_summary=_permission_summary(role_norm),
+                granted=granted_list,
+            ),
             unsafe_allow_html=True,
         )
         if st.button("View all permissions", key=f"users_view_perms_{row.get('id')}"):
             st.session_state["users_detail_tab_hint"] = "permissions"
     with c3:
+        st.markdown('<div class="ips-users-card-stack">', unsafe_allow_html=True)
         tfa_label = "Enabled" if status == "Active" else "Not configured"
         st.markdown(
             summary_card_html(
@@ -932,6 +925,8 @@ def _render_overview_tab(
             f'<div class="ips-users-summary-card"><h4>Assigned Departments</h4>{dept_pills_html(departments)}</div>',
             unsafe_allow_html=True,
         )
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_permissions_tab(role_norm: str, perms: frozenset[str]) -> None:
@@ -1135,6 +1130,7 @@ def render() -> None:
                         mime="text/csv",
                         key="users_hdr_export",
                         use_container_width=True,
+                        type="secondary",
                     )
             with hb2:
                 if st.button("+ New User", type="primary", use_container_width=True, key="users_hdr_new"):

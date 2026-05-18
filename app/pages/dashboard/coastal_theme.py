@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 COASTAL_MARKER = "ips-coastal-dashboard"
-THEME_KEY = "ips_coastal_theme_v3"
+THEME_KEY = "ips_coastal_theme_v4"
 
 
 def inject_coastal_theme() -> None:
@@ -19,10 +19,10 @@ def inject_coastal_theme() -> None:
         /* ---- App canvas ---- */
         .stApp:has(.{c}),
         .stApp:has(.{c}) [data-testid="stAppViewContainer"] {{
-          background: #f4f6f9 !important;
+          background: #f8fafc !important;
         }}
         section[data-testid="stMain"]:has(.{c}) {{
-          background: #f4f6f9 !important;
+          background: #f8fafc !important;
         }}
         section[data-testid="stMain"]:has(.{c}) .block-container {{
           padding: 1.25rem 1.75rem 2rem !important;
@@ -91,18 +91,50 @@ def inject_coastal_theme() -> None:
         .stApp:has(.{c}) section[data-testid="stSidebar"] button[kind="primary"] p {{
           color: #1d4ed8 !important;
         }}
-        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-sidebar-brand {{
-          font-size: 0.72rem;
+        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-sidebar-head {{
+          margin: 0.15rem 0 0.85rem 0.2rem;
+          padding-bottom: 0.65rem;
+          border-bottom: 1px solid #e8edf4;
+        }}
+        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-sidebar-title {{
+          font-size: 0.95rem;
           font-weight: 800;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.04em;
           color: #0f172a;
-          margin: 0.25rem 0 0.75rem 0.35rem;
+          margin: 0;
+        }}
+        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-sidebar-sub {{
+          font-size: 0.62rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          color: #64748b;
+          margin: 0.12rem 0 0;
         }}
         .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-profile {{
           border-top: 1px solid #e8edf4;
-          margin-top: 0.75rem;
-          padding: 0.65rem 0.35rem;
-          font-size: 0.82rem;
+          margin-top: 1rem;
+          padding: 0.75rem 0.35rem 0.35rem;
+          display: flex;
+          align-items: center;
+          gap: 0.55rem;
+        }}
+        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-profile-avatar {{
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #dbeafe;
+          color: #1d4ed8;
+          font-size: 0.72rem;
+          font-weight: 800;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }}
+        .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-collapse-hint {{
+          font-size: 0.72rem;
+          color: #94a3b8;
+          margin: 0.35rem 0 0.5rem 0.35rem;
         }}
         .stApp:has(.{c}) section[data-testid="stSidebar"] .ips-coastal-profile-name {{
           font-weight: 700;
@@ -133,12 +165,28 @@ def inject_coastal_theme() -> None:
         .ips-coastal-kpi {{
           background: #fff;
           border: 1px solid #e5eaf2;
-          border-radius: 14px;
-          padding: 1rem 1.1rem 0.9rem;
-          box-shadow: 0 1px 2px rgba(16,24,40,.04);
-          min-height: 112px;
+          border-radius: 16px;
+          padding: 1rem 1.05rem 0.85rem;
+          box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.05);
+          min-height: 118px;
           height: 100%;
         }}
+        .ips-coastal-kpi-top {{
+          display: flex;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }}
+        .ips-coastal-kpi-icon {{
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.15rem;
+          flex-shrink: 0;
+        }}
+        .ips-coastal-kpi-body {{ flex: 1; min-width: 0; }}
         .ips-coastal-kpi-label {{
           font-size: 0.78rem;
           color: #64748b;
@@ -146,11 +194,12 @@ def inject_coastal_theme() -> None:
           margin: 0;
         }}
         .ips-coastal-kpi-value {{
-          font-size: 1.35rem;
+          font-size: 1.38rem;
           font-weight: 700;
           color: #0f172a;
-          margin: 0.45rem 0 0.2rem;
+          margin: 0.2rem 0 0;
           letter-spacing: -0.02em;
+          line-height: 1.15;
         }}
         .ips-coastal-kpi-trend {{
           font-size: 0.72rem;
@@ -278,6 +327,32 @@ def inject_coastal_theme() -> None:
           font-size: 0.72rem !important;
         }}
 
+        .ips-coastal-date-pill {{
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #334155;
+          background: #fff;
+          border: 1px solid #e5eaf2;
+          border-radius: 10px;
+          padding: 0.45rem 0.75rem;
+          margin: 0 0 0.35rem;
+          text-align: right;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-view-all-wrap div.stButton > button {{
+          background: transparent !important;
+          border: none !important;
+          color: #2563eb !important;
+          font-size: 0.78rem !important;
+          font-weight: 600 !important;
+          box-shadow: none !important;
+          min-height: 1.75rem !important;
+          padding: 0 !important;
+        }}
+        section[data-testid="stMain"]:has(.{c}) .ips-coastal-view-all-wrap div.stButton > button:hover {{
+          text-decoration: underline !important;
+          background: transparent !important;
+        }}
+
         /* Date / customize controls */
         section[data-testid="stMain"]:has(.{c}) .ips-coastal-controls [data-testid="stDateInput"] > div {{
           border-radius: 10px !important;
@@ -360,6 +435,34 @@ def inject_coastal_theme() -> None:
         .ips-coastal-legend-dot {{
           display: inline-block; width: 10px; height: 10px;
           border-radius: 2px; margin-right: 0.35rem; vertical-align: middle;
+        }}
+
+        .ips-coastal-alerts {{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin: 0.15rem 0 0.35rem;
+        }}
+        .ips-coastal-alert-chip {{
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 0.35rem 0.65rem;
+          border-radius: 8px;
+          border: 1px solid #e5eaf2;
+          background: #fff;
+        }}
+        .ips-coastal-alert-chip.warn {{
+          border-color: #fed7aa;
+          background: #fff7ed;
+          color: #c2410c;
+        }}
+        .ips-coastal-alert-chip.info {{
+          border-color: #bfdbfe;
+          background: #eff6ff;
+          color: #1d4ed8;
         }}
 
         @media (max-width: 1100px) {{

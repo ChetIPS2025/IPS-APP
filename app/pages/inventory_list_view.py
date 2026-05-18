@@ -14,14 +14,12 @@ try:
     from app.confirm_delete import open_destructive_confirmation
     from app.db import fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin
     from app.ui.catalog_inventory_display import sanitize_catalog_inventory_export_df
-    from app.ui.assets_components import detail_meta_grid_html
     from app.ui.inventory_components import (
         detail_stats_row_html,
         inject_inventory_page_styles,
         render_inventory_header_inner_html,
         stock_status_badge_html,
         summary_card_html,
-        tab_bar_html,
         table_header_html,
         transactions_table_html,
         usage_line_chart_html,
@@ -32,14 +30,12 @@ except ImportError:
     from confirm_delete import open_destructive_confirmation  # type: ignore
     from db import fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
     from ui.catalog_inventory_display import sanitize_catalog_inventory_export_df  # type: ignore
-    from ui.assets_components import detail_meta_grid_html  # type: ignore
     from ui.inventory_components import (  # type: ignore
         detail_stats_row_html,
         inject_inventory_page_styles,
         render_inventory_header_inner_html,
         stock_status_badge_html,
         summary_card_html,
-        tab_bar_html,
         table_header_html,
         transactions_table_html,
         usage_line_chart_html,
@@ -256,7 +252,7 @@ def _parse_ts(v: object) -> datetime | None:
         return None
 
 
-def _usage_series(txns: list[dict], *, days: int = 14) -> tuple[list[float], float, float]:
+def _usage_series(txns: list[dict], *, days: int = 28) -> tuple[list[float], float, float]:
     today = date.today()
     labels = [today - timedelta(days=(days - 1 - i)) for i in range(days)]
     by_day: dict[date, float] = {d: 0.0 for d in labels}
@@ -399,7 +395,7 @@ def _render_header(*, can_edit: bool, export_df: pd.DataFrame) -> None:
                 if not export_df.empty:
                     csv = sanitize_catalog_inventory_export_df(export_df).to_csv(index=False).encode("utf-8")
                     st.download_button(
-                        "Export",
+                        "↓ Export",
                         data=csv,
                         file_name="inventory_export.csv",
                         mime="text/csv",
@@ -407,7 +403,7 @@ def _render_header(*, can_edit: bool, export_df: pd.DataFrame) -> None:
                         use_container_width=True,
                     )
                 else:
-                    st.button("Export", key="inv_hdr_export_disabled", disabled=True, use_container_width=True)
+                    st.button("↓ Export", key="inv_hdr_export_disabled", disabled=True, use_container_width=True)
             with b2:
                 if can_edit and st.button("+ New Item", type="primary", key="inv_hdr_new", use_container_width=True):
                     st.session_state["inventory_panel_mode"] = "add"
@@ -429,6 +425,7 @@ def _render_filters(df: pd.DataFrame) -> None:
         st.markdown('<span class="ips-inv-filter-anchor"></span>', unsafe_allow_html=True)
         c1, c2, c3, c4, c5 = st.columns([2.2, 1, 1, 1, 0.75], gap="small")
         with c1:
+            st.markdown('<span class="ips-inv-search-cell"></span>', unsafe_allow_html=True)
             st.text_input(
                 "Search inventory",
                 placeholder="Search inventory...",
@@ -442,12 +439,19 @@ def _render_filters(df: pd.DataFrame) -> None:
         with c4:
             st.selectbox("Status", stats, key="inv_f_stock_status", label_visibility="collapsed")
         with c5:
-            if st.button("Clear Filters", key="inv_clear_filters", use_container_width=True):
+            if st.button("Clear Filters", key="inv_clear_filters", use_container_width=True, help="Reset all filters"):
                 _clear_filters()
                 ips_app_rerun()
 
 
-def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> None:
+def _render_table(
+    filtered: pd.DataFrame,
+    lookup: dict[str, dict[str, Any]],
+    *,
+    can_edit: bool,
+    data_version: int,
+    bump_data_version: Callable[[], None],
+) -> None:
     selected_id = _safe_str(st.session_state.get("inventory_selected_id"))
     weights = [0.85, 1.5, 0.85, 0.85, 0.7, 0.5, 0.75, 0.8, 0.85, 0.55]
 
@@ -550,18 +554,38 @@ def _render_table(filtered: pd.DataFrame, lookup: dict[str, dict[str, Any]]) -> 
                             st.session_state["inventory_adjust_item_id"] = iid
                             ips_app_rerun()
 
+        if selected_id and not st.session_state.get("inventory_detail_collapsed"):
+            sel_row = lookup.get(selected_id)
+            if sel_row:
+                _render_detail_inline(
+                    sel_row,
+                    can_edit=can_edit,
+                    data_version=data_version,
+                    bump_data_version=bump_data_version,
+                )
+            else:
+                st.session_state.pop("inventory_selected_id", None)
+
+
 def _render_tab_bar(iid: str, active: str) -> str:
-    st.markdown(tab_bar_html(_INV_TABS, active), unsafe_allow_html=True)
-    st.markdown('<span class="ips-inv-tab-picker" aria-hidden="true"></span>', unsafe_allow_html=True)
-    pick_cols = st.columns(len(_INV_TABS), gap="small")
-    for i, tab in enumerate(_INV_TABS):
-        with pick_cols[i]:
-            if st.button(
-                tab,
-                key=f"inv_tab_{iid}_{tab}",
-                use_container_width=True,
-                type="primary" if tab == active else "secondary",
-            ):
+    st.markdown('<span class="ips-inv-tab-picker"></span>', unsafe_allow_html=True)
+    tab_cols = st.columns(len(_INV_TABS), gap="small")
+    _tab_icons = {
+        "Overview": "▦",
+        "Stock History": "↕",
+        "Transactions": "⇄",
+        "Purchase Orders": "🛒",
+        "Vendors": "🏢",
+        "Notes": "📝",
+        "Attachments": "📎",
+    }
+    for col, tab in zip(tab_cols, _INV_TABS):
+        ico = _tab_icons.get(tab, "")
+        label = f"{ico} {tab}".strip()
+        cell_cls = "ips-inv-tab-cell-active" if tab == active else "ips-inv-tab-cell"
+        with col:
+            st.markdown(f'<span class="{cell_cls}"></span>', unsafe_allow_html=True)
+            if st.button(label, key=f"inv_tab_{iid}_{tab}", use_container_width=True):
                 st.session_state[f"inventory_detail_tab_{iid}"] = tab
                 ips_app_rerun()
     return active
@@ -768,7 +792,7 @@ def _render_attachments_tab(row: dict[str, Any], iid: str) -> None:
         )
 
 
-def _render_detail_panel(
+def _render_detail_inline(
     row: dict[str, Any],
     *,
     can_edit: bool,
@@ -788,87 +812,89 @@ def _render_detail_panel(
     rp = _qty_num(row.get("reorder_point"))
     tv = _total_value(row)
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-inv-detail-anchor"></span>', unsafe_allow_html=True)
-        top_l, top_m, top_r = st.columns([2.2, 2.6, 1.35], gap="medium")
-        with top_l:
-            st.markdown(
-                f'<motion.div class="ips-inv-detail-id-row">'
-                f'<span class="ips-inv-detail-id">{html.escape(_item_number(row))}</span>'
-                f"{stock_status_badge_html(status)}</motion.div>"
-                f'<p class="ips-inv-detail-name">{html.escape(_safe_str(row.get("item_name")))}</p>'
-                f'<p class="ips-inv-detail-cat">{html.escape(_safe_str(row.get("category")) or "—")}</p>'.replace(
-                    "<motion.", "<"
-                ).replace("</motion.", "</"),
-                unsafe_allow_html=True,
-            )
-        with top_m:
-            st.markdown(
-                detail_stats_row_html(
-                    [
-                        ("Location", _safe_str(row.get("storage_location")) or "—"),
-                        ("Qty On Hand", _fmt_qty_unit(row, qoh)),
-                        ("Reorder Level", _fmt_qty_unit(row, rp)),
-                        ("Unit Cost", _money(row.get("unit_cost"))),
-                        ("Total Value", _money(tv)),
-                    ]
-                ),
-                unsafe_allow_html=True,
-            )
-        with top_r:
-            st.markdown('<span class="ips-inv-det-actions"></span>', unsafe_allow_html=True)
+    st.markdown('<div class="ips-inv-detail-inline ips-inv-detail-anchor">', unsafe_allow_html=True)
+    hl, hm, hr = st.columns([1.35, 2.2, 1.45], gap="medium")
+    with hl:
+        st.markdown(
+            f'<div class="ips-inv-detail-id-row">'
+            f'<span class="ips-inv-detail-id">{html.escape(_item_number(row))}</span>'
+            f"{stock_status_badge_html(status)}"
+            f"</motion.div>"
+            f'<p class="ips-inv-detail-name">{html.escape(_safe_str(row.get("item_name")))}</p>'
+            f'<p class="ips-inv-detail-cat">{html.escape(_safe_str(row.get("category")) or "—")}</p>'.replace(
+                "<motion.", "<"
+            ).replace("</motion.", "</"),
+            unsafe_allow_html=True,
+        )
+    with hm:
+        st.markdown(
+            detail_stats_row_html(
+                [
+                    ("Location", _safe_str(row.get("storage_location")) or "—"),
+                    ("Qty On Hand", _fmt_qty_unit(row, qoh)),
+                    ("Reorder Level", _fmt_qty_unit(row, rp)),
+                    ("Unit Cost", _money(row.get("unit_cost"))),
+                    ("Total Value", _money(tv)),
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
+    with hr:
+        st.markdown('<span class="ips-inv-det-actions"></span>', unsafe_allow_html=True)
+        b1, b2, b3, b4 = st.columns([1, 1.25, 0.55, 0.35], gap="small")
+        with b1:
             if can_edit and st.button("Edit", key=f"inv_det_edit_{iid}", use_container_width=True):
                 st.session_state["inventory_edit_popup_open"] = True
                 st.session_state["editing_inventory_id"] = iid
                 ips_app_rerun()
-            if can_edit and st.button(
-                "Adjust Stock", type="primary", key=f"inv_det_adj_{iid}", use_container_width=True
-            ):
+        with b2:
+            if can_edit and st.button("Adjust Stock", type="primary", key=f"inv_det_adj_{iid}", use_container_width=True):
                 st.session_state["inventory_adjust_item_id"] = iid
                 ips_app_rerun()
-            more_c, collapse_c = st.columns(2, gap="small")
-            with more_c:
-                with st.popover("⋯", use_container_width=True):
-                    if can_edit and st.button("Deactivate", key=f"inv_det_deact_{iid}", use_container_width=True):
-                        try:
-                            update_rows_admin(_TABLE, {"is_active": False}, {"id": iid})
-                            bump_data_version()
-                            st.session_state["inventory_success"] = "Item deactivated."
-                            ips_app_rerun()
-                        except Exception as exc:
-                            st.error(str(exc))
-                    if can_edit and st.button("Delete item", key=f"inv_det_del_{iid}", use_container_width=True):
-                        open_destructive_confirmation(_DELETE_CONFIRM_PREFIX)
-                        st.session_state["inventory_pending_delete_ids"] = [iid]
-                        ips_app_rerun()
+        with b3:
+            with st.popover("More", use_container_width=True):
+                if can_edit and st.button("Deactivate", key=f"inv_det_deact_{iid}", use_container_width=True):
                     try:
-                        from app.ui import IPS_NAV_PENDING_KEY
-                    except ImportError:
-                        from ui import IPS_NAV_PENDING_KEY  # type: ignore
-                    if st.button("Scan Inventory", key=f"inv_det_scan_{iid}", use_container_width=True):
-                        st.session_state[IPS_NAV_PENDING_KEY] = "Scan Inventory"
+                        update_rows_admin(_TABLE, {"is_active": False}, {"id": iid})
+                        bump_data_version()
+                        st.session_state["inventory_success"] = "Item deactivated."
                         ips_app_rerun()
-            with collapse_c:
-                if st.button("▲", key=f"inv_det_collapse_{iid}", help="Collapse panel", use_container_width=True):
-                    st.session_state["inventory_detail_collapsed"] = True
+                    except Exception as exc:
+                        st.error(str(exc))
+                if can_edit and st.button("Delete item", key=f"inv_det_del_{iid}", use_container_width=True):
+                    open_destructive_confirmation(_DELETE_CONFIRM_PREFIX)
+                    st.session_state["inventory_pending_delete_ids"] = [iid]
                     ips_app_rerun()
+                try:
+                    from app.ui import IPS_NAV_PENDING_KEY
+                except ImportError:
+                    from ui import IPS_NAV_PENDING_KEY  # type: ignore
+                if st.button("Scan Inventory", key=f"inv_det_scan_{iid}", use_container_width=True):
+                    st.session_state[IPS_NAV_PENDING_KEY] = "Scan Inventory"
+                    ips_app_rerun()
+        with b4:
+            if st.button("▲", key=f"inv_det_collapse_{iid}", help="Collapse", use_container_width=True):
+                st.session_state["inventory_detail_collapsed"] = True
+                ips_app_rerun()
 
-        active_tab = _render_tab_bar(iid, active_tab)
+    active_tab = _render_tab_bar(iid, active_tab)
 
-        if active_tab == "Overview":
-            _render_overview_tab(row, txns, data_version=data_version, can_edit=can_edit)
-        elif active_tab == "Stock History":
-            _render_stock_history_tab(txns, row)
-        elif active_tab == "Transactions":
-            _render_transactions_tab(txns, row)
-        elif active_tab == "Purchase Orders":
-            _render_purchase_orders_tab()
-        elif active_tab == "Vendors":
-            _render_vendors_tab(row)
-        elif active_tab == "Notes":
-            _render_notes_tab(row, can_edit=can_edit, bump_data_version=bump_data_version)
-        else:
-            _render_attachments_tab(row, iid)
+    if active_tab == "Overview":
+        _render_overview_tab(row, txns, data_version=data_version, can_edit=can_edit)
+    elif active_tab == "Stock History":
+        _render_stock_history_tab(txns, row)
+    elif active_tab == "Transactions":
+        _render_transactions_tab(txns, row)
+    elif active_tab == "Purchase Orders":
+        _render_purchase_orders_tab()
+    elif active_tab == "Vendors":
+        _render_vendors_tab(row)
+    elif active_tab == "Notes":
+        _render_notes_tab(row, can_edit=can_edit, bump_data_version=bump_data_version)
+    else:
+        _render_attachments_tab(row, iid)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 @fragment
@@ -917,20 +943,13 @@ def _render_list_fragment(
         st.info("No items match your filters.")
         return
 
-    _render_table(filtered, lookup)
-
-    selected_id = _safe_str(st.session_state.get("inventory_selected_id"))
-    if selected_id and not st.session_state.get("inventory_detail_collapsed"):
-        sel_row = lookup.get(selected_id)
-        if sel_row:
-            _render_detail_panel(
-                sel_row,
-                can_edit=can_edit,
-                data_version=data_version,
-                bump_data_version=bump_data_version,
-            )
-        else:
-            st.session_state.pop("inventory_selected_id", None)
+    _render_table(
+        filtered,
+        lookup,
+        can_edit=can_edit,
+        data_version=data_version,
+        bump_data_version=bump_data_version,
+    )
 
 
 def render_inventory_list_page(

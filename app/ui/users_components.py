@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_USERS_PAGE_STYLES_KEY = "ips_users_page_styles_v2"
+IPS_USERS_PAGE_STYLES_KEY = "ips_users_page_styles_v3"
 
 _ROLE_BADGE_COLORS: dict[str, str] = {
     "administrator": "#2563eb",
@@ -69,7 +69,16 @@ def inject_users_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor) > div {
-            padding: 0.2rem 0.55rem 0.35rem !important;
+            padding: 0.15rem 0.55rem 0.3rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stHorizontalBlock"]:has(.ips-users-th-row) {
+            background: #f9fafb !important;
+            border-bottom: 1px solid #e5eaf2 !important;
+            margin: 0 -0.35rem 0.15rem !important;
+            padding: 0 0.35rem !important;
+            border-radius: 6px 6px 0 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-detail-anchor) {
@@ -300,14 +309,59 @@ def inject_users_page_styles() -> None:
             color: #6b7280;
             font-weight: 500;
         }
+        .ips-users-detail-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+            padding-bottom: 0.7rem;
+            border-bottom: 1px solid #e5eaf2;
+            margin-bottom: 0.6rem;
+        }
+        .ips-users-detail-header-main {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex: 1;
+            min-width: 0;
+            flex-wrap: wrap;
+        }
         .ips-users-detail-meta-row {
             display: flex;
             align-items: flex-start;
-            gap: 1.5rem;
+            gap: 1.75rem;
             flex-wrap: wrap;
-            flex: 1;
-            justify-content: center;
-            padding-top: 0.35rem;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-filter-anchor)
+        [data-testid="stTextInput"] input {
+            border-radius: 8px !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-header-anchor)
+        button[kind="secondary"] {
+            background: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            color: #374151 !important;
+            font-weight: 600 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        .ips-users-overview-grid {
+            margin-top: 0.15rem;
+        }
+        .ips-users-card-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+        .ips-users-perm-summary-lbl {
+            margin: 0.35rem 0 0.15rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
         .ips-users-meta-block .ico {
             color: #9ca3af;
@@ -509,6 +563,61 @@ def audit_footer_html(*, created: str, created_by: str, updated: str, updated_by
         f"<p><strong>Last Updated</strong> {html.escape(updated)} · "
         f'<span class="by">{html.escape(updated_by)}</span></p>'
         "</div>"
+    )
+
+
+def detail_header_row_html(
+    *,
+    initials: str,
+    name: str,
+    status_html: str,
+    role: str,
+    department: str,
+    active: bool,
+    email: str,
+    phone: str,
+    last_login: str,
+) -> str:
+    return (
+        '<div class="ips-users-detail-header-row">'
+        '<div class="ips-users-detail-header-main">'
+        f"{profile_identity_html(initials=initials, name=name, status_html=status_html, role=role, department=department, active=active)}"
+        f"{detail_meta_row_html(email=email, phone=phone, last_login=last_login)}"
+        "</div></div>"
+    )
+
+
+def user_info_card_html(
+    *,
+    rows: list[tuple[str, str]],
+    html_values: dict[str, str] | None,
+    created: str,
+    created_by: str,
+    updated: str,
+    updated_by: str,
+) -> str:
+    card = summary_card_html(title="User Information", rows=rows, html_values=html_values)
+    audit = audit_footer_html(
+        created=created, created_by=created_by, updated=updated, updated_by=updated_by
+    )
+    return card.replace("</div>", f"{audit}</div>", 1)
+
+
+def role_permissions_card_html(
+    *,
+    role_lbl: str,
+    role_key: str,
+    perm_summary: str,
+    granted: list[str],
+) -> str:
+    return (
+        f'<div class="ips-users-summary-card">'
+        f"<h4>Role &amp; Permissions</h4>"
+        f'<table class="ips-users-kv"><tr><td class="k">Role</td><td class="v">'
+        f"{role_badge_html(role_lbl, color_key=role_key)}</td></tr></table>"
+        f'<p class="ips-users-perm-summary-lbl">Permission Summary</p>'
+        f"{permissions_granted_html(granted)}"
+        f'<span class="ips-users-perm-link">View all permissions ›</span></div>'
     )
 
 

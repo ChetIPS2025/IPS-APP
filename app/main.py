@@ -272,6 +272,16 @@ def main() -> None:
             st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
     with perf_span("main.sidebar"):
         sidebar_page = render_sidebar()
+    if sidebar_page != "Dashboard":
+        try:
+            from pages.dashboard.coastal_sidebar import reset_coastal_sidebar_session
+        except ImportError:
+            try:
+                from app.pages.dashboard.coastal_sidebar import reset_coastal_sidebar_session  # type: ignore
+            except ImportError:
+                reset_coastal_sidebar_session = None  # type: ignore
+        if reset_coastal_sidebar_session:
+            reset_coastal_sidebar_session()
     with perf_span("main.topbar"):
         render_top_bar(page_label=str(sidebar_page))
     trigger_pwa_install_prompt()

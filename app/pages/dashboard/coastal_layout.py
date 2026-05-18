@@ -9,7 +9,15 @@ from typing import Any
 import streamlit as st
 
 from .coastal_charts import render_category_donut, render_job_status_donut, render_sales_line_chart
-from .coastal_metrics import CoastalMetrics, TrendDelta, build_coastal_metrics, customers_map
+from .coastal_metrics import (
+    CoastalMetrics,
+    TrendDelta,
+    _assets_checked_out,
+    _low_stock_count,
+    build_coastal_metrics,
+    customers_map,
+    format_period_range,
+)
 from .coastal_theme import COASTAL_MARKER, inject_coastal_theme
 from .services import DashboardContext, DashboardTables
 from .utils import STATE_DATE_END, STATE_DATE_START, is_open_job, recent_rows
@@ -57,15 +65,18 @@ def _trend_html(
     money: bool = False,
     prior_label: str = "",
     invert: bool = False,
+    use_percent: bool = False,
 ) -> str:
     arrow = {"up": "↑", "down": "↓", "flat": "—"}[t.direction]
-    if money:
+    if t.direction == "flat":
+        txt = "No change"
+    elif use_percent and t.pct is not None:
+        txt = f"{arrow} {abs(t.pct):.1f}%"
+    elif money:
         txt = f"{arrow} {_money(abs(t.value))}"
     else:
         txt = f"{arrow} {abs(int(t.value)):,}"
-    if t.pct is not None and t.direction != "flat":
-        txt += f" ({abs(t.pct):.1f}%)"
-    vs = f" vs {prior_label}" if prior_label else " vs prior period"
+    vs = " vs previous period" if not prior_label else f" vs {prior_label}"
     cls = t.direction
     if invert and t.direction == "up":
         cls = "bad-up"
@@ -84,18 +95,33 @@ def _kpi_html(
     money: bool,
     prior_label: str,
     invert: bool = False,
+    use_percent: bool = False,
 ) -> str:
     return (
-        f'<div class="ips-coastal-kpi"><div style="display:flex;justify-content:space-between">'
+        f'<div class="ips-coastal-kpi">'
+        f'<div class="ips-coastal-kpi-top">'
+        f'<div class="ips-coastal-kpi-icon" style="background:{bg}">{icon}</div>'
+        f'<div class="ips-coastal-kpi-body">'
         f'<p class="ips-coastal-kpi-label">{html.escape(label)}</p>'
-        f'<div style="width:40px;height:40px;border-radius:50%;background:{bg};display:flex;'
-        f'align-items:center;justify-content:center;font-size:1.1rem">{icon}</div></div>'
         f'<p class="ips-coastal-kpi-value">{html.escape(value)}</p>'
-        f"{_trend_html(trend, money=money, prior_label=prior_label, invert=invert)}</div>"
+        f"</div></div>"
+        f"{_trend_html(trend, money=money, prior_label=prior_label, invert=invert, use_percent=use_percent)}"
+        f"</div>"
     )
 
 
+def _ensure_date_range_state() -> None:
+    if STATE_DATE_END not in st.session_state:
+        st.session_state[STATE_DATE_END] = date.today()
+    if STATE_DATE_START not in st.session_state:
+        end = st.session_state[STATE_DATE_END]
+        if hasattr(end, "date"):
+            end = end.date()  # type: ignore[union-attr]
+        st.session_state[STATE_DATE_START] = end - timedelta(days=30)
+
+
 def _date_range() -> tuple[date, date]:
+    _ensure_date_range_state()
     end = st.session_state.get(STATE_DATE_END) or date.today()
     start = st.session_state.get(STATE_DATE_START) or (end - timedelta(days=30))
     if hasattr(end, "date"):
@@ -113,8 +139,10 @@ def _card_header(title: str, *, view_key: str | None = None, page: str | None = 
         st.markdown(f'<p class="ips-coastal-card-title">{html.escape(title)}</p>', unsafe_allow_html=True)
     with right:
         if view_key and page and ctx and role_can_open_page(ctx.role, page):
+            st.markdown('<div class="ips-coastal-view-all-wrap">', unsafe_allow_html=True)
             if st.button("View All", key=view_key, type="secondary", use_container_width=True):
                 _nav(page)
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_coastal_header() -> tuple[date, date]:
@@ -132,6 +160,10 @@ def render_coastal_header() -> tuple[date, date]:
         )
     with right:
         st.markdown('<div class="ips-coastal-controls">', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="ips-coastal-date-pill">📅 {html.escape(format_period_range(start, end))}</p>',
+            unsafe_allow_html=True,
+        )
         c1, c2 = st.columns([1.25, 0.55], gap="small")
         with c1:
             dr = st.date_input("Range", value=(start, end), key="coastal_dash_dr", label_visibility="collapsed")
@@ -148,19 +180,50 @@ def render_coastal_header() -> tuple[date, date]:
 def render_coastal_kpis(m: CoastalMetrics) -> None:
     prior = m.prior_period_label
     specs = [
-        ("Total Sales", _money(m.total_sales), "💰", "#dbeafe", m.sales_trend, True, False),
-        ("Open Invoices", _money(m.open_invoices_amount), "🧾", "#dcfce7", m.invoices_trend, True, True),
+        ("Total Sales", _money(m.total_sales), "💰", "#dbeafe", m.sales_trend, True, False, True),
+        ("Open Invoices", _money(m.open_invoices_amount), "🧾", "#dcfce7", m.invoices_trend, True, True, True),
         ("Active Jobs", f"{m.active_jobs:,}", "🔧", "#ede9fe", m.jobs_trend, False, False),
         ("Open Estimates", f"{m.open_estimates:,}", "📄", "#ffedd5", m.estimates_trend, False, True),
-        ("Total Inventory Value", _money(m.inventory_value), "📦", "#e0f2fe", m.inventory_trend, True, False),
+        ("Total Inventory Value", _money(m.inventory_value), "📦", "#e0f2fe", m.inventory_trend, True, False, False),
     ]
     cols = st.columns(5, gap="small")
     for col, s in zip(cols, specs):
         with col:
             st.markdown(
-                _kpi_html(s[0], s[1], s[2], s[3], s[4], money=s[5], prior_label=prior, invert=s[6]),
+                _kpi_html(
+                    s[0], s[1], s[2], s[3], s[4],
+                    money=s[5], prior_label=prior, invert=s[6],
+                    use_percent=s[7] if len(s) > 7 else False,
+                ),
                 unsafe_allow_html=True,
             )
+
+
+def _render_alerts_panel(
+    *,
+    low_stock: int,
+    assets_out: int,
+    ctx: DashboardContext,
+) -> None:
+    if low_stock <= 0 and assets_out <= 0:
+        return
+    parts: list[str] = []
+    if low_stock > 0 and role_can_open_page(ctx.role, "Inventory"):
+        parts.append(
+            f'<span class="ips-coastal-alert-chip warn">📦 {low_stock:,} low-stock item'
+            f'{"s" if low_stock != 1 else ""}</span>'
+        )
+    if assets_out > 0 and role_can_open_page(ctx.role, "Who Has What"):
+        parts.append(
+            f'<span class="ips-coastal-alert-chip info">🏗 {assets_out:,} asset'
+            f'{"s" if assets_out != 1 else ""} checked out</span>'
+        )
+    if not parts:
+        return
+    st.markdown(
+        f'<div class="ips-coastal-alerts">{"".join(parts)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_coastal_dashboard(ctx: DashboardContext, tables: DashboardTables) -> None:
@@ -176,56 +239,117 @@ def render_coastal_dashboard(ctx: DashboardContext, tables: DashboardTables) -> 
         date_end=end,
     )
 
+    show_sales = True
+    show_side = True
     if st.session_state.get("coastal_customize_open"):
         with st.container(border=True):
             st.caption("Toggle sections")
-            st.checkbox("Sales charts", True, key="coastal_sec_sales")
-            st.checkbox("Activity & deadlines", True, key="coastal_sec_side")
+            show_sales = st.checkbox(
+                "Sales charts",
+                value=st.session_state.get("coastal_sec_sales", True),
+                key="coastal_sec_sales",
+            )
+            show_side = st.checkbox(
+                "Activity & deadlines",
+                value=st.session_state.get("coastal_sec_side", True),
+                key="coastal_sec_side",
+            )
+    else:
+        show_sales = st.session_state.get("coastal_sec_sales", True)
+        show_side = st.session_state.get("coastal_sec_side", True)
 
     render_coastal_kpis(metrics)
+    _render_alerts_panel(
+        low_stock=_low_stock_count(tables.inv_rows),
+        assets_out=_assets_checked_out(tables.assets),
+        ctx=ctx,
+    )
+
+    if not show_sales and not show_side:
+        render_empty_state(
+            "Dashboard sections hidden",
+            "Use Customize to show sales charts or the activity column.",
+            icon="⚙️",
+        )
+        return
 
     # Row 2: Sales overview | Sales by category | Recent activity
-    r2a, r2b, r2c = st.columns([2.05, 1, 1], gap="medium")
-    with r2a:
-        with st.container(border=True):
-            st.markdown('<p class="ips-coastal-card-title">Sales Overview</p>', unsafe_allow_html=True)
-            render_sales_line_chart(metrics.sales_by_month, metrics.sales_by_month_prev)
-    with r2b:
-        with st.container(border=True):
-            st.markdown('<p class="ips-coastal-card-title">Sales by Category</p>', unsafe_allow_html=True)
-            render_category_donut(metrics.category_breakdown)
-    with r2c:
-        with st.container(border=True):
-            _card_header("Recent Activity", view_key="coastal_all_act", page="PO / Expenses", ctx=ctx)
-            _activity(metrics.activity)
+    if show_sales and show_side:
+        r2a, r2b, r2c = st.columns([2.35, 1.05, 1.05], gap="medium")
+        sales_cols = (r2a, r2b)
+        activity_col = r2c
+    elif show_sales:
+        r2a, r2b = st.columns([1.35, 1], gap="medium")
+        sales_cols = (r2a, r2b)
+        activity_col = None
+    elif show_side:
+        activity_col = st.columns([1])[0]
+        sales_cols = None
+    else:
+        sales_cols = None
+        activity_col = None
+
+    if sales_cols:
+        with sales_cols[0]:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Sales Overview</p>', unsafe_allow_html=True)
+                render_sales_line_chart(metrics.sales_by_month, metrics.sales_by_month_prev)
+        with sales_cols[1]:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Sales by Category</p>', unsafe_allow_html=True)
+                render_category_donut(metrics.category_breakdown)
+    if show_side and activity_col is not None:
+        with activity_col:
+            with st.container(border=True):
+                _card_header("Recent Activity", view_key="coastal_all_act", page="PO / Expenses", ctx=ctx)
+                _activity(metrics.activity)
 
     # Row 3: Job status | Aging | Deadlines
-    r3a, r3b, r3c = st.columns(3, gap="medium")
-    with r3a:
-        with st.container(border=True):
-            st.markdown('<p class="ips-coastal-card-title">Job Status Overview</p>', unsafe_allow_html=True)
-            render_job_status_donut(metrics.job_status_breakdown)
-    with r3b:
-        with st.container(border=True):
-            st.markdown('<p class="ips-coastal-card-title">Aging Invoices</p>', unsafe_allow_html=True)
-            _aging(metrics.aging_buckets)
-    with r3c:
+    if show_sales and show_side:
+        r3a, r3b, r3c = st.columns(3, gap="medium")
+        with r3a:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Job Status Overview</p>', unsafe_allow_html=True)
+                render_job_status_donut(metrics.job_status_breakdown)
+        with r3b:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Aging Invoices</p>', unsafe_allow_html=True)
+                _aging(metrics.aging_buckets)
+        with r3c:
+            with st.container(border=True):
+                _card_header("Upcoming Deadlines", view_key="coastal_all_dl", page="Job Database", ctx=ctx)
+                _deadlines(metrics.deadlines)
+    elif show_sales:
+        r3a, r3b = st.columns(2, gap="medium")
+        with r3a:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Job Status Overview</p>', unsafe_allow_html=True)
+                render_job_status_donut(metrics.job_status_breakdown)
+        with r3b:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Aging Invoices</p>', unsafe_allow_html=True)
+                _aging(metrics.aging_buckets)
+    elif show_side:
         with st.container(border=True):
             _card_header("Upcoming Deadlines", view_key="coastal_all_dl", page="Job Database", ctx=ctx)
             _deadlines(metrics.deadlines)
 
     # Row 4: Recent jobs | Quick actions
-    r4a, r4b = st.columns([2.15, 1], gap="medium")
+    if show_side:
+        r4a, r4b = st.columns([2.45, 1], gap="medium")
+    else:
+        r4a, r4b = st.columns([1]), None
     with r4a:
         with st.container(border=True):
             _card_header("Recent Jobs", view_key="coastal_all_jobs", page="Job Database", ctx=ctx)
             _recent_jobs_table(tables.jobs, customers_map(tables.customers))
-    with r4b:
-        with st.container(border=True):
-            st.markdown('<p class="ips-coastal-card-title">Quick Actions</p>', unsafe_allow_html=True)
-            st.markdown('<div class="ips-qa-grid">', unsafe_allow_html=True)
-            _quick_actions(ctx)
-            st.markdown("</div>", unsafe_allow_html=True)
+    if show_side and r4b is not None:
+        with r4b:
+            with st.container(border=True):
+                st.markdown('<p class="ips-coastal-card-title">Quick Actions</p>', unsafe_allow_html=True)
+                st.markdown('<div class="ips-qa-grid">', unsafe_allow_html=True)
+                _quick_actions(ctx)
+                st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _activity(items: list[dict[str, Any]]) -> None:
@@ -283,11 +407,19 @@ def _aging(buckets: dict[str, float]) -> None:
         render_empty_state("No open balances", "Unpaid expense lines drive aging buckets.", icon="🧾")
         return
     mx = max(buckets.values()) or 1.0
+    colors = {
+        "Current (0-30)": "#22c55e",
+        "31-60 Days": "#f59e0b",
+        "61-90 Days": "#f97316",
+        "90+ Days": "#ef4444",
+    }
     for label, amt in buckets.items():
         w = amt / mx * 100
+        fill = colors.get(label, "#3b82f6")
         st.markdown(
             f'<div class="ips-coastal-aging-row"><span>{html.escape(label)}</span>'
-            f'<div class="ips-coastal-aging-bar"><div class="ips-coastal-aging-fill" style="width:{w:.0f}%"></div></div>'
+            f'<div class="ips-coastal-aging-bar"><div class="ips-coastal-aging-fill" '
+            f'style="width:{w:.0f}%;background:{fill}"></div></div>'
             f'<span class="ips-coastal-aging-amt">${amt:,.0f}</span></div>',
             unsafe_allow_html=True,
         )

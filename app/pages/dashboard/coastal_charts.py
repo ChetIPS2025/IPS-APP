@@ -61,6 +61,7 @@ def render_sales_line_chart(current: dict[str, float], previous: dict[str, float
         ax.spines["bottom"].set_color("#e2e8f0")
         fig.tight_layout(pad=0.6)
         st.pyplot(fig, use_container_width=True, clear_figure=True)
+        plt.close(fig)
     except Exception:
         import pandas as pd
 
@@ -99,6 +100,7 @@ def _render_donut(
             ax.text(0, -0.14, center_label, ha="center", va="center", fontsize=7.5, color="#64748b")
             ax.axis("equal")
             st.pyplot(fig, use_container_width=True, clear_figure=True)
+            plt.close(fig)
         except Exception:
             for lbl, val in zip(labels, values):
                 pct = (val / total * 100) if total else 0
@@ -121,7 +123,7 @@ def render_category_donut(breakdown: dict[str, float]) -> None:
         center_label="Total",
         center_value=f"${total:,.0f}",
         money_legend=True,
-        colors=["#2563eb", "#0ea5e9", "#6366f1", "#94a3b8"],
+        colors=["#2563eb", "#22c55e", "#f59e0b", "#8b5cf6"],
     )
 
 

@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-IPS_ESTIMATES_PAGE_STYLES_KEY = "ips_estimates_page_styles_v2"
+IPS_ESTIMATES_PAGE_STYLES_KEY = "ips_estimates_page_styles_v3"
 
 _STATUS_STYLES: dict[str, tuple[str, str, str]] = {
     "approved": ("#dcfce7", "#166534", "#bbf7d0"),
@@ -56,6 +56,13 @@ def inject_estimates_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-header-anchor) > div {
             padding: 0.9rem 1rem 0.95rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-header-anchor)
+        div[data-testid="column"]:has(.ips-est-hdr-actions) {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
         .ips-est-header-inner {
             display: flex;
@@ -120,19 +127,27 @@ def inject_estimates_page_styles() -> None:
             min-height: 2.35rem !important;
             font-size: 0.8125rem !important;
         }
-        .ips-est-date-range-label {
-            font-size: 0.8125rem;
-            color: #374151;
-            padding: 0.5rem 0.65rem;
-            border: 1px solid #e5eaf2;
-            border-radius: 10px;
-            background: #fff;
-            min-height: 2.35rem;
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-filter-anchor)
+        div[data-testid="column"]:has(.ips-est-date-pop) [data-testid="stPopover"] button {
+            width: 100% !important;
+            border-radius: 10px !important;
+            border: 1px solid #e5eaf2 !important;
+            background: #fff !important;
+            color: #374151 !important;
+            font-size: 0.8125rem !important;
+            font-weight: 500 !important;
+            min-height: 2.35rem !important;
+            justify-content: flex-start !important;
         }
-
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        .ips-est-thead-bar {
+            background: #f9fafb;
+            border-bottom: 1px solid #e5eaf2;
+            padding: 0.5rem 0.75rem 0.4rem;
+            margin: 0;
+        }
         /* ----- Table card ----- */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor) {
@@ -577,6 +592,46 @@ def meta_block_html(label: str, value: str) -> str:
         f'<div class="lbl">{html.escape(label)}</div>'
         f'<div class="val">{html.escape(value or "-")}</div></div>'
     )
+
+
+def date_range_button_label(d_from: Any, d_to: Any) -> str:
+    """Plain text for date popover trigger (mockup single field)."""
+
+    def _fmt(d: Any) -> str:
+        if d is None:
+            return ""
+        try:
+            return d.strftime("%b %d, %Y")
+        except Exception:
+            return str(d)[:10]
+
+    a, b = _fmt(d_from), _fmt(d_to)
+    if a and b:
+        return f"{a} – {b}"
+    if a:
+        return f"From {a}"
+    if b:
+        return f"Until {b}"
+    return "Date range"
+
+
+def table_column_header_html() -> str:
+    cols = [
+        "Estimate #",
+        "Project / Description",
+        "Customer",
+        "Estimate Date",
+        "Expiration Date",
+        "Total",
+        "Status",
+        "Created By",
+        "Actions",
+    ]
+    cells = "".join(
+        f'<span class="ips-est-th">{html.escape(c)}<span class="sort"> ↕</span></span>'
+        for c in cols
+    )
+    return f'<div class="ips-est-thead-bar ips-est-table-head">{cells}</div>'
 
 
 def date_range_label_html(d_from, d_to) -> str:

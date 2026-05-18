@@ -67,3 +67,11 @@ def load_dashboard_tables(ctx: DashboardContext) -> DashboardTables:
         role_can_open_page(ctx.role, "Inventory"),
     )
     return DashboardTables(**data)
+
+
+def clear_dashboard_data_cache() -> None:
+    """Invalidate dashboard bundle cache after writes elsewhere."""
+    try:
+        _load_tables_cached.clear()
+    except Exception:
+        pass

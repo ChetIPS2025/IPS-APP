@@ -15,7 +15,7 @@ from db import fetch_table, fetch_table_admin, update_rows_admin
 
 try:
     from app.ui.estimates_components import (
-        date_range_label_html,
+        date_range_button_label,
         donut_chart_html,
         estimate_status_badge_html,
         inject_estimates_page_styles,
@@ -26,7 +26,7 @@ try:
     from app.ui.page_shell import render_card
 except ImportError:
     from ui.estimates_components import (  # type: ignore
-        date_range_label_html,
+        date_range_button_label,
         donut_chart_html,
         estimate_status_badge_html,
         inject_estimates_page_styles,
@@ -349,7 +349,7 @@ def render_estimates_list_page(
             render_estimates_header_left_html()
         with hc2:
             st.markdown('<span class="ips-est-hdr-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-            st.markdown('<div style="height:0.4rem"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="height:0.15rem"></div>', unsafe_allow_html=True)
             hb_exp, hb_new = st.columns(2, gap="small")
             with hb_exp:
                 export_slot = st.empty()
@@ -386,18 +386,18 @@ def render_estimates_list_page(
         with f4:
             st.selectbox("Created By", creators, key="est_list_created_f", label_visibility="collapsed")
         with f5:
-            st.markdown(
-                date_range_label_html(
-                    st.session_state.get("est_list_date_from"),
-                    st.session_state.get("est_list_date_to"),
-                ),
-                unsafe_allow_html=True,
+            st.markdown('<span class="ips-est-date-pop" aria-hidden="true"></span>', unsafe_allow_html=True)
+            dr_lbl = date_range_button_label(
+                st.session_state.get("est_list_date_from"),
+                st.session_state.get("est_list_date_to"),
             )
-            dr1, dr2 = st.columns(2, gap="small")
-            with dr1:
-                st.date_input("From", key="est_list_date_from", value=None, label_visibility="collapsed")
-            with dr2:
-                st.date_input("To", key="est_list_date_to", value=None, label_visibility="collapsed")
+            with st.popover(f"📅 {dr_lbl}", use_container_width=True):
+                st.date_input("From", key="est_list_date_from", value=None)
+                st.date_input("To", key="est_list_date_to", value=None)
+                if st.button("Clear dates", key="est_list_clear_dates", use_container_width=True):
+                    st.session_state.pop("est_list_date_from", None)
+                    st.session_state.pop("est_list_date_to", None)
+                    st.rerun()
         with f6:
             st.markdown('<div style="height:1.55rem"></div>', unsafe_allow_html=True)
             if st.button("Clear Filters", key="est_list_clear_filters", use_container_width=True):
@@ -468,6 +468,11 @@ def render_estimates_list_page(
     if sort_col in filtered.columns:
         filtered = _sort_dataframe(filtered, sort_col, sort_asc)
 
+    if not filtered.empty and "id" in filtered.columns and "est_list_selected_id" not in st.session_state:
+        first_eid = row_estimate_id(filtered.iloc[0])
+        if first_eid:
+            st.session_state["est_list_selected_id"] = first_eid
+
     selected_id = _safe_str(st.session_state.get("est_list_selected_id"))
     if selected_id and not filtered.empty and selected_id not in set(filtered["id"].astype(str)):
         st.session_state.pop("est_list_selected_id", None)
@@ -481,7 +486,7 @@ def render_estimates_list_page(
         csv_bytes = df_export.to_csv(index=False).encode("utf-8")
         with export_slot:
             st.download_button(
-                "Export",
+                "⬇ Export",
                 data=csv_bytes,
                 file_name="estimates_export.csv",
                 mime="text/csv",
@@ -510,19 +515,19 @@ def render_estimates_list_page(
         weights = [1.0, 2.0, 1.3, 1.0, 1.0, 0.9, 0.85, 1.0, 0.75]
         head = st.columns(weights)
         sort_pairs = [
-            ("Estimate #", "quote_number"),
-            ("Project / Description", "estimate_description"),
-            ("Customer", "customer_name"),
-            ("Estimate Date", "estimate_date"),
-            ("Expiration Date", "expiration_date"),
-            ("Total", "proposal_total"),
-            ("Status", "status"),
-            ("Created By", "prepared_by_name"),
+            ("ESTIMATE #", "quote_number"),
+            ("PROJECT / DESCRIPTION", "estimate_description"),
+            ("CUSTOMER", "customer_name"),
+            ("ESTIMATE DATE", "estimate_date"),
+            ("EXPIRATION DATE", "expiration_date"),
+            ("TOTAL", "proposal_total"),
+            ("STATUS", "status"),
+            ("CREATED BY", "prepared_by_name"),
         ]
         for col, (lbl, scol) in zip(head, sort_pairs):
             with col:
                 st.markdown('<span class="ips-est-sort-anchor"></span>', unsafe_allow_html=True)
-                if st.button(lbl + " ↕", key=f"est_sort_{scol}", use_container_width=True):
+                if st.button(f"{lbl} ↕", key=f"est_sort_{scol}", use_container_width=True):
                     if st.session_state.get("est_list_sort_col") == scol:
                         st.session_state["est_list_sort_asc"] = not bool(
                             st.session_state.get("est_list_sort_asc", True)
@@ -532,7 +537,7 @@ def render_estimates_list_page(
                         st.session_state["est_list_sort_asc"] = True
                     st.rerun()
         with head[-1]:
-            st.markdown('<p class="ips-est-th">Actions</p>', unsafe_allow_html=True)
+            st.markdown('<p class="ips-est-th" style="margin:0;padding:0.35rem 0;">ACTIONS</p>', unsafe_allow_html=True)
 
         row_lookup = {str(r.get("id")): r for r in rows if r.get("id")}
 
@@ -677,18 +682,17 @@ def _render_estimate_detail_panel(
 
     with st.container(border=True):
         st.markdown('<span class="ips-est-detail-anchor"></span>', unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="ips-est-detail-head"><div>'
-            f'<div class="ips-est-detail-id-row">'
-            f'<span class="ips-est-detail-title">{html.escape(qn)}</span> '
-            f"{estimate_status_badge_html(status)}</div>"
-            f'<p class="ips-est-detail-project">{html.escape(title)}</p>'
-            f'<p class="ips-est-detail-customer">{html.escape(cust)}</p></div></div>',
-            unsafe_allow_html=True,
-        )
-        top_m, top_r = st.columns([2.4, 2], gap="medium")
-        with top_m:
-            st.markdown('<div class="ips-est-detail-meta-row">', unsafe_allow_html=True)
+        dl, dm, dr = st.columns([2.5, 2.8, 2.2], gap="medium")
+        with dl:
+            st.markdown(
+                f'<div class="ips-est-detail-id-row">'
+                f'<span class="ips-est-detail-title">{html.escape(qn)}</span> '
+                f"{estimate_status_badge_html(status)}</div>"
+                f'<p class="ips-est-detail-project">{html.escape(title)}</p>'
+                f'<p class="ips-est-detail-customer">{html.escape(cust)}</p>',
+                unsafe_allow_html=True,
+            )
+        with dm:
             m1, m2, m3 = st.columns(3)
             with m1:
                 st.markdown(meta_block_html("Estimate Date", _fmt_date(_estimate_date_value(row))), unsafe_allow_html=True)
@@ -696,14 +700,13 @@ def _render_estimate_detail_panel(
                 st.markdown(meta_block_html("Expiration Date", _fmt_date(_expiration_date_value(row))), unsafe_allow_html=True)
             with m3:
                 st.markdown(meta_block_html("Created By", _created_by_label(row)), unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        with top_r:
-            b1, b2, b3, b4 = st.columns(4, gap="small")
+        with dr:
+            b1, b2, b3, b4 = st.columns([1.1, 1.5, 0.7, 0.5], gap="small")
             with b1:
-                if st.button("✎ Edit", key=f"est_det_edit_{eid}", use_container_width=True):
+                if st.button("Edit", key=f"est_det_edit_{eid}", type="secondary", use_container_width=True):
                     on_open_editor(eid)
             with b2:
-                if st.button("Send Estimate", key=f"est_det_send_{eid}", type="primary", use_container_width=True, help="Open editor to send/export"):
+                if st.button("Send Estimate", key=f"est_det_send_{eid}", type="primary", use_container_width=True):
                     on_open_editor(eid)
             with b3:
                 with st.popover("⋯", use_container_width=True):
@@ -719,10 +722,11 @@ def _render_estimate_detail_panel(
                         on_import=on_import,
                     )
             with b4:
-                if st.button("▲", key=f"est_det_collapse_{eid}", help="Collapse panel", use_container_width=True):
+                if st.button("▲", key=f"est_det_collapse_{eid}", help="Collapse", use_container_width=True):
                     st.session_state["est_list_detail_collapsed"] = True
                     st.rerun()
 
+        st.markdown('<div style="border-bottom:1px solid #f1f5f9;margin:0.5rem 0 0.65rem"></div>', unsafe_allow_html=True)
         tabs = st.tabs(
             [
                 "Overview",
@@ -831,7 +835,11 @@ def _render_overview_tab(
     cust: str,
 ) -> None:
     controls = ej.get("controls") if isinstance(ej.get("controls"), dict) else {}
-    tax_pct = controls.get("sales_tax_pct", 0)
+    try:
+        tax_pct = float(controls.get("sales_tax_pct", 0) or 0)
+    except (TypeError, ValueError):
+        tax_pct = 0.0
+    tax_label = f"Tax ({tax_pct:g}%)" if tax_pct else "Tax"
     c1, c2, c3 = st.columns(3, gap="small")
     with c1:
         st.markdown(
@@ -850,12 +858,13 @@ def _render_overview_tab(
     with c2:
         sub = breakdown["labor"] + breakdown["materials"] + breakdown["equipment"] + breakdown["other"]
         sub_s = f"${sub:,.2f}" if sub else pt
+        tax_amt_s = f"${sub * tax_pct / 100:,.2f}" if sub and tax_pct else "-"
         st.markdown(
             summary_card_html(
                 title="Financial Summary",
                 rows=[
                     ("Subtotal", sub_s),
-                    ("Tax", f"{tax_pct}%"),
+                    (tax_label, tax_amt_s),
                     ("Total", pt),
                     ("Markup", f"{_safe_str(controls.get('material_markup_pct')) or '0'}%"),
                 ],
@@ -868,7 +877,7 @@ def _render_overview_tab(
             ("Labor", breakdown["labor"], "#2563eb"),
             ("Materials", breakdown["materials"], "#16a34a"),
             ("Equipment", breakdown["equipment"], "#d97706"),
-            ("Other", breakdown["other"], "#94a3b8"),
+            ("Other", breakdown["other"], "#ef4444"),
         ]
         st.markdown(
             f'<div class="ips-est-summary-card"><h4>Estimate Totals</h4>'
@@ -888,9 +897,6 @@ def _render_overview_tab(
         st.dataframe(pd.DataFrame(preview), use_container_width=True, hide_index=True)
     else:
         st.caption("No line items in saved estimate data.")
-    if st.button("View All Line Items", key=f"est_view_all_li_{row.get('id')}", type="secondary"):
-        st.session_state["est_list_detail_tab_hint"] = "Line Items"
-        st.rerun()
 
 
 def _render_line_items_tab(ej: dict[str, Any], *, full: bool) -> None:

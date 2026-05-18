@@ -144,6 +144,36 @@ def _money(val: object) -> str:
         return "—"
 
 
+def _float_or_zero(val: object) -> float:
+    if val is None or str(val).strip() == "":
+        return 0.0
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _financial_overview_rows(row: dict[str, Any]) -> list[tuple[str, str]]:
+    purchase = _float_or_zero(row.get("purchase_cost"))
+    salvage_raw = row.get("salvage_value")
+    salvage: float | None = None
+    if salvage_raw not in (None, ""):
+        salvage = _float_or_zero(salvage_raw)
+    elif purchase > 0:
+        salvage = 500.0 if purchase >= 3000 else max(0.0, round(purchase * 0.16, 2))
+    life_years = 7
+    annual = (purchase - salvage) / life_years if salvage is not None and purchase > salvage else 0.0
+    return [
+        ("Acquired Date", _fmt_date(row.get("purchase_date"))),
+        ("Purchase Price", _money(row.get("purchase_cost"))),
+        ("Current Value", _money(row.get("current_value"))),
+        ("Salvage Value", _money(salvage) if salvage is not None else "—"),
+        ("Depreciation Method", "Straight Line"),
+        ("Useful Life", f"{life_years} years"),
+        ("Annual Depreciation", _money(annual) if annual else "—"),
+    ]
+
+
 def _invalidate_assets_cache() -> None:
     _cached_assets_rows.clear()
     _cached_jobs_labels.clear()
@@ -294,7 +324,7 @@ def _render_header(*, can_add: bool, export_df: pd.DataFrame) -> None:
                 if not export_df.empty:
                     csv = export_df.to_csv(index=False).encode("utf-8")
                     st.download_button(
-                        "↓ Export",
+                        "⬆ Export",
                         data=csv,
                         file_name="assets_export.csv",
                         mime="text/csv",
@@ -302,7 +332,7 @@ def _render_header(*, can_add: bool, export_df: pd.DataFrame) -> None:
                         use_container_width=True,
                     )
                 else:
-                    st.button("↓ Export", key="assets_hdr_export_disabled", disabled=True, use_container_width=True)
+                    st.button("⬆ Export", key="assets_hdr_export_disabled", disabled=True, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
             with b2:
                 st.markdown('<div class="ips-assets-new-btn">', unsafe_allow_html=True)
@@ -331,7 +361,7 @@ def _render_filters(df: pd.DataFrame) -> None:
         with c1:
             st.text_input(
                 "Search assets",
-                placeholder="Search assets...",
+                placeholder="🔍 Search assets...",
                 key="assets_f_search",
                 label_visibility="collapsed",
             )
@@ -345,7 +375,7 @@ def _render_filters(df: pd.DataFrame) -> None:
             st.selectbox("Department", depts, key="assets_f_department", label_visibility="collapsed")
         with c6:
             st.markdown('<div class="ips-assets-clear-filters">', unsafe_allow_html=True)
-            if st.button("⏷ Clear Filters", key="assets_clear_filters", use_container_width=True):
+            if st.button("⛃ Clear Filters", key="assets_clear_filters", use_container_width=True):
                 _clear_filters()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -366,13 +396,25 @@ def _render_assets_table(
 
     with st.container(border=True):
         st.markdown('<span class="ips-assets-table-anchor"></span>', unsafe_allow_html=True)
-        st.markdown('<span class="ips-assets-th-row" aria-hidden="true"></span>', unsafe_allow_html=True)
         head = st.columns(weights)
-        for col, lbl in zip(
-            head,
-            ("Asset #", "Asset Name", "Category", "Location", "Department", "Status", "Acquired Date", "Value", "Actions"),
-        ):
+        labels = (
+            "Asset #",
+            "Asset Name",
+            "Category",
+            "Location",
+            "Department",
+            "Status",
+            "Acquired Date",
+            "Value",
+            "Actions",
+        )
+        for col, lbl in zip(head, labels):
             with col:
+                if lbl == "Asset #":
+                    st.markdown(
+                        '<span class="ips-assets-table-head-row" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                 st.markdown(table_header_html(lbl, sortable=lbl != "Actions"), unsafe_allow_html=True)
 
         for _, r in filtered.iterrows():
@@ -495,12 +537,19 @@ def _render_overview_tab(
             summary_card_html(
                 "Asset Details",
                 [
+                    ("Asset Number", _disp(row.get("asset_id"))),
+                    ("Asset Name", _disp(row.get("asset_name"))),
+                    ("Category", _disp(row.get("category"))),
+                    ("Status", status_badge_html(_safe_str(row.get("status")))),
+                    ("Location", _disp(row.get("location"))),
+                    ("Department", _disp(row.get("department"))),
                     ("Manufacturer", _disp(row.get("manufacturer"))),
                     ("Model", _disp(row.get("model"))),
                     ("Serial Number", _disp(row.get("serial_number"))),
                     ("License Plate", _disp(row.get("license_plate"))),
                     ("Description", (_safe_str(row.get("notes"))[:220] or "—")),
                 ],
+                html_value_keys=frozenset({"Status"}),
             ),
             unsafe_allow_html=True,
         )
@@ -520,20 +569,8 @@ def _render_overview_tab(
             unsafe_allow_html=True,
         )
     with r1c3:
-        purchase = row.get("purchase_cost")
         st.markdown(
-            summary_card_html(
-                "Financial Information",
-                [
-                    ("Acquired Date", _fmt_date(row.get("purchase_date"))),
-                    ("Purchase Price", _money(purchase)),
-                    ("Current Value", _money(row.get("current_value"))),
-                    ("Salvage Value", "—"),
-                    ("Depreciation Method", "—"),
-                    ("Useful Life", "—"),
-                    ("Annual Depreciation", "—"),
-                ],
-            ),
+            summary_card_html("Financial Information", _financial_overview_rows(row)),
             unsafe_allow_html=True,
         )
     with r1c4:
@@ -566,9 +603,11 @@ def _render_overview_tab(
     with hdr_r:
         st.markdown('<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>', unsafe_allow_html=True)
     with btn_r:
+        st.markdown('<div class="ips-assets-view-all-maint">', unsafe_allow_html=True)
         if st.button("View All Maintenance", key=f"assets_maint_all_{aid}", use_container_width=True):
             st.session_state[f"assets_detail_tab_{aid}"] = "Maintenance"
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     maint_rows: list[dict[str, str]] = []
     for m in maintenance[:8]:
@@ -697,24 +736,11 @@ def _render_assignments_tab(assignments: list[dict], job_label_by_id: dict[str, 
 
 
 def _render_depreciation_tab(row: dict[str, Any]) -> None:
-    cost = float(row.get("purchase_cost") or 0) if row.get("purchase_cost") is not None else 0.0
-    cur = float(row.get("current_value") or 0) if row.get("current_value") is not None else 0.0
-    annual = max(0.0, cost - cur) if cost > 0 else 0.0
     st.markdown(
-        summary_card_html(
-            "Depreciation",
-            [
-                ("Purchase price", _money(row.get("purchase_cost"))),
-                ("Current value", _money(row.get("current_value"))),
-                ("Book depreciation (est.)", _money(annual) if annual else "—"),
-                ("Method", "Straight-line (not configured)"),
-                ("Useful life", "—"),
-                ("Salvage value", "—"),
-            ],
-        ),
+        summary_card_html("Depreciation", _financial_overview_rows(row)),
         unsafe_allow_html=True,
     )
-    st.caption("Detailed depreciation schedules are not stored yet; values come from the asset record.")
+    st.caption("Straight-line estimates use purchase cost and a default 7-year life when salvage is not stored.")
 
 
 def _render_notes_tab(row: dict[str, Any], *, can_edit: bool) -> None:
@@ -809,7 +835,7 @@ def _render_asset_detail_panel(
         )
     with top_r:
         st.markdown('<div class="ips-assets-detail-actions">', unsafe_allow_html=True)
-        if can_edit and st.button("Edit", key=f"assets_det_edit_{aid}", use_container_width=True):
+        if can_edit and st.button("✏️ Edit", key=f"assets_det_edit_{aid}", use_container_width=True):
             st.session_state["asset_view_mode"] = "edit"
             st.session_state["selected_asset_id"] = aid
             st.session_state["asset_return_to"] = "asset_database"
@@ -937,6 +963,12 @@ def render_assets_page() -> None:
         st.session_state.pop("assets_selected_id", None)
         selected_id = ""
         sel_row = None
+    if not selected_id and not filtered.empty:
+        first_id = _safe_str(filtered.iloc[0].get("id"))
+        if first_id and first_id in row_lookup:
+            st.session_state["assets_selected_id"] = first_id
+            selected_id = first_id
+            sel_row = row_lookup[first_id]
 
     _render_assets_table(
         filtered,

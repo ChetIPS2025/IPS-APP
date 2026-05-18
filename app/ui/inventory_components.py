@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-IPS_INVENTORY_PAGE_STYLES_KEY = "ips_inventory_page_styles_v2"
+IPS_INVENTORY_PAGE_STYLES_KEY = "ips_inventory_page_styles_v3"
 
 _STOCK_PILL: dict[str, tuple[str, str]] = {
     "in stock": ("#15803d", "#dcfce7"),
@@ -229,20 +229,26 @@ def inject_inventory_page_styles() -> None:
             font-size: 0.8125rem;
         }
 
-        /* Detail panel */
-        section[data-testid="stMain"]:has(.ips-inventory-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-detail-anchor) {
-            background: #ffffff !important;
-            border: 1px solid #e5eaf2 !important;
-            border-top: 3px solid #2563eb !important;
-            border-radius: 12px !important;
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
-            margin-bottom: 0.65rem !important;
+        /* Inline detail (inside table card — mirrors mockup) */
+        .ips-inv-detail-inline {
+            border-top: 1px solid #e5eaf2;
+            padding: 0.85rem 0.75rem 1rem;
+            margin-top: 0.15rem;
+            background: #ffffff;
         }
-        section[data-testid="stMain"]:has(.ips-inventory-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-detail-anchor) > div {
-            padding: 0.85rem 1rem 1rem !important;
+        .ips-inv-detail-head-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem 1rem;
+            padding-bottom: 0.65rem;
+            border-bottom: 1px solid #f1f5f9;
+            margin-bottom: 0.5rem;
         }
+        .ips-inv-detail-head-left { flex: 1 1 12rem; min-width: 0; }
+        .ips-inv-detail-head-mid { flex: 1 1 20rem; min-width: 0; }
+        .ips-inv-detail-head-right { flex: 0 0 auto; min-width: 11rem; }
         .ips-inv-detail-id-row {
             display: flex;
             align-items: center;
@@ -295,8 +301,7 @@ def inject_inventory_page_styles() -> None:
             color: #111827;
         }
         section[data-testid="stMain"]:has(.ips-inventory-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-detail-anchor)
-        div[data-testid="column"]:has(.ips-inv-det-actions) .stButton > button[kind="secondary"] {
+        div:has(.ips-inv-det-actions) .stButton > button[kind="secondary"] {
             background: #ffffff !important;
             border: 1px solid #2563eb !important;
             color: #2563eb !important;
@@ -306,50 +311,58 @@ def inject_inventory_page_styles() -> None:
             min-height: 2.2rem !important;
         }
         section[data-testid="stMain"]:has(.ips-inventory-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-detail-anchor)
-        div[data-testid="column"]:has(.ips-inv-det-actions) .stButton > button[kind="primary"] {
+        div:has(.ips-inv-det-actions) .stButton > button[kind="primary"] {
             border-radius: 10px !important;
             font-weight: 600 !important;
             font-size: 0.8125rem !important;
             min-height: 2.2rem !important;
         }
 
-        /* Tabs */
-        .ips-inv-tab-bar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.25rem 0.5rem;
-            border-bottom: 1px solid #e5eaf2;
-            margin: 0.75rem 0 0;
-            padding-bottom: 0;
-        }
-        .ips-inv-tab-active, .ips-inv-tab-inactive {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.5rem 0.65rem 0.55rem;
-            font-size: 0.8125rem;
-            font-weight: 600;
-            margin-bottom: -1px;
-            cursor: default;
-        }
-        .ips-inv-tab-active {
-            color: #2563eb;
-            border-bottom: 2px solid #2563eb;
-            font-weight: 700;
-        }
-        .ips-inv-tab-inactive { color: #6b7280; }
-        .ips-inv-tab-ico { font-size: 0.9rem; opacity: 0.85; }
+        /* Tabs — Streamlit buttons styled as mockup tabs */
         section[data-testid="stMain"]:has(.ips-inventory-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-detail-anchor)
+        div:has(.ips-inv-tab-picker) {
+            border-bottom: 1px solid #e5eaf2;
+            margin: 0.5rem 0 0.75rem;
+            padding-bottom: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-inventory-page)
         div[data-testid="stHorizontalBlock"]:has(.ips-inv-tab-picker) {
-            height: 0 !important;
-            min-height: 0 !important;
-            overflow: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
+            gap: 0.15rem !important;
+            flex-wrap: wrap !important;
+        }
+        section[data-testid="stMain"]:has(.ips-inventory-page)
+        div[data-testid="column"]:has(.ips-inv-tab-cell) .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #6b7280 !important;
+            font-weight: 600 !important;
+            font-size: 0.8125rem !important;
+            padding: 0.45rem 0.55rem 0.5rem !important;
+            min-height: auto !important;
+            border-radius: 0 !important;
+            border-bottom: 2px solid transparent !important;
+            width: 100% !important;
+        }
+        section[data-testid="stMain"]:has(.ips-inventory-page)
+        div[data-testid="column"]:has(.ips-inv-tab-cell-active) .stButton > button {
+            color: #2563eb !important;
+            font-weight: 700 !important;
+            border-bottom: 2px solid #2563eb !important;
+        }
+        section[data-testid="stMain"]:has(.ips-inventory-page)
+        div[data-testid="column"]:has(.ips-inv-tab-cell) .stButton > button:hover {
+            color: #2563eb !important;
+            background: transparent !important;
+        }
+        /* Search icon hint */
+        section[data-testid="stMain"]:has(.ips-inventory-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-inv-filter-anchor)
+        div[data-testid="column"]:has(.ips-inv-search-cell) input {
+            padding-left: 2rem !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='M11 11l3 3'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: 0.65rem center !important;
         }
 
         .ips-inv-summary-card {
@@ -574,7 +587,7 @@ def transactions_table_html(rows: list[dict[str, str]]) -> str:
     return f'<table class="ips-inv-txn-table">{hdr}<tbody>{"".join(body_parts)}</tbody></table>'
 
 
-def usage_line_chart_html(daily_values: list[float], *, days: int = 14) -> str:
+def usage_line_chart_html(daily_values: list[float], *, days: int = 28) -> str:
     if not daily_values:
         return ""
     w, h = 400, 120

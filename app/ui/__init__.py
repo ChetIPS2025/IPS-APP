@@ -890,6 +890,17 @@ def _render_sidebar_viewer(*, role: str) -> None:
 
 def render_sidebar() -> str:
     _sidebar_brand()
+    nav_early = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "Dashboard")
+    if nav_early == "Dashboard":
+        try:
+            from app.pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header
+        except ImportError:
+            try:
+                from pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header  # type: ignore
+            except ImportError:
+                inject_coastal_sidebar_header = None  # type: ignore
+        if inject_coastal_sidebar_header:
+            inject_coastal_sidebar_header()
 
     render_install_app_sidebar_block()
 

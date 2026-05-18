@@ -101,6 +101,37 @@ def _estimate_amount(row: dict) -> float:
     return 0.0
 
 
+def _row_date(row: dict) -> date | None:
+    ts = row_ts(row)
+    if ts:
+        return safe_date(ts[:10])
+    return safe_date(row.get("created_at") or row.get("expense_date") or row.get("work_date"))
+
+
+def _low_stock_count(inv_rows: list[dict]) -> int:
+    n = 0
+    for r in inv_rows or []:
+        if not isinstance(r, dict) or r.get("is_active", True) is False:
+            continue
+        qoh = dash_kf(r.get("quantity_on_hand"))
+        rp = dash_kf(r.get("reorder_point"))
+        if rp > 0 and qoh <= rp:
+            n += 1
+    return n
+
+
+def _assets_checked_out(assets: list[dict]) -> int:
+    return sum(
+        1
+        for a in assets or []
+        if isinstance(a, dict)
+        and (
+            str(a.get("status") or "").strip() == "Checked Out"
+            or str(a.get("current_holder_employee_id") or "").strip()
+        )
+    )
+
+
 def _job_status_group(status: Any) -> str:
     s = norm_status(status)
     if s in ("complete", "completed", "closed"):
@@ -137,29 +168,29 @@ def build_coastal_metrics(
         amt = _estimate_amount(e)
         if amt <= 0:
             continue
-        ts = safe_date(row_ts(e)[:10] if row_ts(e) else e.get("created_at"))
+        ts = _row_date(e)
         if ts and in_range(ts, date_start, date_end):
             sales_cur += amt
             sales_month[ts.strftime("%Y-%m")] = sales_month.get(ts.strftime("%Y-%m"), 0.0) + amt
+            tl = norm_status(e.get("estimate_type") or e.get("category") or "")
+            if "labor" in tl:
+                cat["Labor"] += amt
+            elif "equip" in tl:
+                cat["Equipment"] += amt
+            elif "material" in tl:
+                cat["Materials"] += amt
+            else:
+                cat["Other"] += amt
         elif ts and in_range(ts, prev_start, prev_end):
             sales_prev += amt
             sales_month_prev[ts.strftime("%Y-%m")] = sales_month_prev.get(ts.strftime("%Y-%m"), 0.0) + amt
-        tl = norm_status(e.get("estimate_type") or e.get("category") or "")
-        if "labor" in tl:
-            cat["Labor"] += amt
-        elif "equip" in tl:
-            cat["Equipment"] += amt
-        elif "material" in tl:
-            cat["Materials"] += amt
-        else:
-            cat["Other"] += amt
 
     for ex in expenses or []:
         if not isinstance(ex, dict):
             continue
         amt = dash_kf(ex.get("amount"))
         stt = norm_status(ex.get("status"))
-        ts = safe_date(ex.get("expense_date") or ex.get("created_at"))
+        ts = _row_date(ex)
         if stt in _PAID and ts and in_range(ts, date_start, date_end):
             sales_cur += amt
             sales_month[ts.strftime("%Y-%m")] = sales_month.get(ts.strftime("%Y-%m"), 0.0) + amt
@@ -181,8 +212,9 @@ def build_coastal_metrics(
     m.sales_by_month_prev = sales_month_prev
     m.category_breakdown = cat
 
-    open_n = open_prev = 0
-    open_amt = open_amt_prev = 0.0
+    open_n = 0
+    open_amt = 0.0
+    new_unpaid_cur = new_unpaid_prev = 0.0
     for ex in expenses or []:
         if not isinstance(ex, dict):
             continue
@@ -191,33 +223,62 @@ def build_coastal_metrics(
         if stt not in _PAID:
             open_n += 1
             open_amt += amt
-        ts = safe_date(ex.get("expense_date") or ex.get("created_at"))
-        if ts and in_range(ts, prev_start, prev_end) and stt not in _PAID:
-            open_prev += 1
-            open_amt_prev += amt
+        ts = _row_date(ex)
+        if stt not in _PAID and ts:
+            if in_range(ts, date_start, date_end):
+                new_unpaid_cur += amt
+            elif in_range(ts, prev_start, prev_end):
+                new_unpaid_prev += amt
     m.open_invoices = open_n
     m.open_invoices_amount = open_amt
-    m.invoices_trend = _trend(open_amt, open_amt_prev)
+    m.invoices_trend = _trend(new_unpaid_cur, new_unpaid_prev)
 
     active = sum(1 for j in jobs or [] if isinstance(j, dict) and is_open_job(j))
     m.active_jobs = active
-    m.jobs_trend = _trend(float(active), float(max(0, active - 1)))
+    new_open_jobs_cur = sum(
+        1
+        for j in jobs or []
+        if isinstance(j, dict)
+        and is_open_job(j)
+        and (d := _row_date(j))
+        and in_range(d, date_start, date_end)
+    )
+    new_open_jobs_prev = sum(
+        1
+        for j in jobs or []
+        if isinstance(j, dict)
+        and is_open_job(j)
+        and (d := _row_date(j))
+        and in_range(d, prev_start, prev_end)
+    )
+    m.jobs_trend = _trend(float(new_open_jobs_cur), float(new_open_jobs_prev))
 
-    open_est = sum(
+    open_est = sum(1 for e in estimates or [] if isinstance(e, dict) and is_pending_estimate(e))
+    m.open_estimates = open_est
+    new_pending_cur = sum(
         1
         for e in estimates or []
         if isinstance(e, dict)
-        and (is_pending_estimate(e) or norm_status(e.get("status")) in ("draft", "open", "pending", ""))
+        and is_pending_estimate(e)
+        and (d := _row_date(e))
+        and in_range(d, date_start, date_end)
     )
-    m.open_estimates = open_est
-    m.estimates_trend = _trend(float(open_est), float(max(0, open_est - 1)))
+    new_pending_prev = sum(
+        1
+        for e in estimates or []
+        if isinstance(e, dict)
+        and is_pending_estimate(e)
+        and (d := _row_date(e))
+        and in_range(d, prev_start, prev_end)
+    )
+    m.estimates_trend = _trend(float(new_pending_cur), float(new_pending_prev))
 
     inv_val = 0.0
     for r in inv_rows or []:
         if isinstance(r, dict) and r.get("is_active", True) is not False:
             inv_val += dash_kf(r.get("quantity_on_hand")) * dash_kf(r.get("unit_cost"))
     m.inventory_value = inv_val
-    m.inventory_trend = _trend(inv_val, inv_val * 0.98)
+    m.inventory_trend = TrendDelta(0.0, None, "flat")
 
     status_counts = {"Not Started": 0, "In Progress": 0, "On Hold": 0, "Completed": 0}
     for j in jobs or []:
@@ -231,7 +292,7 @@ def build_coastal_metrics(
         if not isinstance(ex, dict) or norm_status(ex.get("status")) in _PAID:
             continue
         amt = dash_kf(ex.get("amount"))
-        ts = safe_date(ex.get("expense_date") or ex.get("created_at")) or today
+        ts = _row_date(ex) or today
         days = (today - ts).days
         if days <= 30:
             aging["Current (0-30)"] += amt

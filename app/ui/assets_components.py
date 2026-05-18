@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v3"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v4"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -381,18 +381,57 @@ def inject_assets_page_styles() -> None:
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.35rem 0.85rem;
         }
-        .asset-meta-cell .asset-meta-label {
+        .asset-meta-cell .asset-meta-label,
+        .ips-assets-meta-block .lbl {
             font-size: 0.65rem;
             color: #9ca3af;
             text-transform: uppercase;
             letter-spacing: 0.04em;
             font-weight: 600;
         }
-        .asset-meta-cell .asset-meta-value {
+        .asset-meta-cell .asset-meta-value,
+        .ips-assets-meta-block .val {
             font-size: 0.8125rem;
             color: #111827;
             font-weight: 600;
             margin-top: 0.06rem;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-filter-anchor) input {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            min-height: 2.1rem !important;
+            font-size: 0.84rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-filter-anchor)
+        [data-baseweb="select"] > div {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            min-height: 2.1rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-view-all-maint button {
+            background: transparent !important;
+            border: none !important;
+            color: #2563eb !important;
+            font-weight: 600 !important;
+            font-size: 0.8rem !important;
+            box-shadow: none !important;
+            text-decoration: none !important;
+            justify-content: flex-end !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-view-all-maint button:hover {
+            text-decoration: underline !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stHorizontalBlock"]:has(.ips-assets-table-head-row) {
+            background: #f8fafc !important;
+            border-bottom: 1px solid #e5eaf2 !important;
+            margin: 0 -0.35rem 0.12rem -0.35rem !important;
+            padding: 0.22rem 0.35rem !important;
+            border-radius: 6px 6px 0 0 !important;
         }
         </style>
         """,
@@ -442,11 +481,21 @@ def completed_badge_html() -> str:
         f'white-space:nowrap;">Completed</span>'
     )
 
-def summary_card_html(title: str, rows: list[tuple[str, str]]) -> str:
-    body = "".join(
-        f'<tr><td class="k">{html.escape(k)}</td><td class="v">{html.escape(v or "—")}</td></tr>'
-        for k, v in rows
-    )
+def summary_card_html(
+    title: str,
+    rows: list[tuple[str, str]],
+    *,
+    html_value_keys: frozenset[str] | None = None,
+) -> str:
+    raw_keys = html_value_keys or frozenset()
+    body_parts: list[str] = []
+    for k, v in rows:
+        if k in raw_keys:
+            val_cell = f'<td class="v">{v}</td>'
+        else:
+            val_cell = f'<td class="v">{html.escape(str(v or "—"))}</td>'
+        body_parts.append(f'<tr><td class="k">{html.escape(k)}</td>{val_cell}</tr>')
+    body = "".join(body_parts)
     return (
         f'<div class="ips-assets-summary-card">'
         f"<h4>{html.escape(title)}</h4>"
@@ -480,7 +529,15 @@ def detail_meta_grid_html(items: list[tuple[str, str]]) -> str:
 
 
 def detail_meta_strip_html(items: list[tuple[str, str]]) -> str:
-    return detail_meta_grid_html(items)
+    """Horizontal metadata row (reference mockup center strip)."""
+    blocks = "".join(
+        f'<div class="ips-assets-meta-block">'
+        f'<span class="lbl">{html.escape(str(k))}</span>'
+        f'<span class="val">{html.escape(str(v or "—"))}</span>'
+        "</div>"
+        for k, v in (items or [])
+    )
+    return f'<div class="ips-assets-meta-strip">{blocks}</div>'
 
 
 def maintenance_table_html(rows: list[dict[str, str]]) -> str:
