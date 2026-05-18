@@ -237,6 +237,13 @@ def _bump_inventory_data_version() -> None:
         _signed_url_for_inventory_image_cached.clear()
     except Exception:
         pass
+    # Clear db.py's inner _fetch_table_admin_cached so post-write renders
+    # see fresh rows, not stale data from the underlying Supabase cache.
+    try:
+        from app.db import clear_streamlit_db_read_cache
+        clear_streamlit_db_read_cache()
+    except Exception:
+        pass
     try:
         from app.data_cache import clear_session_table_cache
     except ImportError:
@@ -345,6 +352,10 @@ def _inv_add_dialog_on_dismiss() -> None:
 def _inv_edit_dialog_on_dismiss() -> None:
     st.session_state["inventory_edit_popup_open"] = False
     st.session_state["editing_inventory_id"] = None
+    # Clear selection so the item does not remain highlighted after dialog X-dismiss.
+    st.session_state["selected_inventory_ids"] = []
+    _clear_inv_checkbox_keys()
+    clear_selected_ids(TABLE_KEY_INVENTORY)
 
 
 @st.dialog("Add inventory item", width="large", on_dismiss=_inv_add_dialog_on_dismiss)
@@ -676,8 +687,6 @@ def _inventory_edit_dialog(row: dict) -> None:
                     )
                 else:
                     st.warning(f"Image upload skipped: {exc}")
-        st.session_state["inventory_edit_mode"] = False
-        st.session_state["editing_inventory_id"] = None
         st.session_state["selected_inventory_ids"] = []
         _clear_inv_checkbox_keys()
         clear_selected_ids(TABLE_KEY_INVENTORY)
@@ -721,7 +730,8 @@ def _render_inventory_action_bar(
 
     with render_card():
         st.markdown('<span class="ips-crud-toolbar-root"></span>', unsafe_allow_html=True)
-        left, b0, b1, b2, b3, b4, b5, b6 = st.columns([1.1, 1, 1, 1, 1, 1, 1, 1], gap="small")
+        # Row 1: primary actions (4 columns + count — fits comfortably on tablet/mobile)
+        left, b0, b1, b2, b3 = st.columns([1.1, 1.2, 1, 1, 1], gap="small")
         with left:
             st.markdown(
                 f'<span class="ips-ta-summary"><span class="ips-ta-num">{n}</span> selected</span>',
@@ -770,7 +780,9 @@ def _render_inventory_action_bar(
                 open_destructive_confirmation(_DELETE_CONFIRM_PREFIX)
                 st.session_state["inventory_pending_delete_ids"] = [str(x) for x in sel]
                 ips_app_rerun()
-        with b4:
+        # Row 2: selection helpers + export
+        r2a, r2b, r2c, r2d = st.columns([1.2, 1, 1, 1.2], gap="small")
+        with r2a:
             st.download_button(
                 "Export Selected",
                 data=csv_bytes,
@@ -780,7 +792,7 @@ def _render_inventory_action_bar(
                 disabled=not exp_ok,
                 key="inv_btn_export",
             )
-        with b5:
+        with r2b:
             if st.button(
                 "Select All Visible",
                 use_container_width=True,
@@ -791,7 +803,7 @@ def _render_inventory_action_bar(
                 set_selected_ids(TABLE_KEY_INVENTORY, list(vis_ids))
                 _clear_inv_checkbox_keys()
                 st.rerun()
-        with b6:
+        with r2c:
             if st.button(
                 "Clear selection",
                 use_container_width=True,
@@ -803,6 +815,11 @@ def _render_inventory_action_bar(
                 clear_selected_ids(TABLE_KEY_INVENTORY)
                 st.session_state.pop("inventory_pending_delete_ids", None)
                 st.rerun()
+        with r2d:
+            st.markdown(
+                f'<span style="font-size:0.78rem;color:#6b7280;">{len(vis_ids):,} visible</span>',
+                unsafe_allow_html=True,
+            )
         if can_edit:
             q1, q2 = st.columns(2, gap="small")
             with q1:
@@ -813,8 +830,8 @@ def _render_inventory_action_bar(
                     help="Assigns a unique INV-* QR to every item missing qr_code_value, then uploads a PNG when storage is available.",
                 ):
                     try:
-                        n = _backfill_missing_qr_codes()
-                        st.success(f"Generated QR codes for {n} item(s).")
+                        n_backfilled = _backfill_missing_qr_codes()
+                        st.success(f"Generated QR codes for {n_backfilled} item(s).")
                     except Exception as exc:
                         st.error(f"Backfill failed: {exc}")
                     _bump_inventory_data_version()
@@ -827,8 +844,8 @@ def _render_inventory_action_bar(
                     help="Re-uploads QR PNGs using APP_BASE_URL so scans open the live app. Reprint labels after running.",
                 ):
                     try:
-                        n = _regenerate_qr_pngs_current_app_url()
-                        st.success(f"Regenerated {n} QR image(s). Reprint any physical labels.")
+                        n_regen = _regenerate_qr_pngs_current_app_url()
+                        st.success(f"Regenerated {n_regen} QR image(s). Reprint any physical labels.")
                     except Exception as exc:
                         st.error(f"Regenerate failed: {exc}")
                     _bump_inventory_data_version()
@@ -1076,12 +1093,6 @@ section[data-testid="stMain"]:has(.ips-inventory-list-anchor) [data-testid="stHo
         _render_inventory_action_bar(
             df_all=df, visible_df=filtered, can_edit=can_edit, selected_key=selected_key
         )
-
-    sel_ids = selected_ids
-    if len(sel_ids) != 1:
-        if st.session_state.get("inventory_edit_popup_open"):
-            st.session_state["inventory_edit_popup_open"] = False
-            st.session_state["editing_inventory_id"] = None
 
 
 @fragment
