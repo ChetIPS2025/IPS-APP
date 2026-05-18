@@ -318,8 +318,6 @@ def render_alerts_panel(tables: DashboardTables, ctx: DashboardContext) -> None:
     )
 
     if not has_inv_alert and not has_kit:
-        render_section_header("Alerts")
-        render_empty_state("No alerts", "Inventory and asset signals will appear here when action is needed.", icon="✓")
         return
 
     if has_inv_alert:
