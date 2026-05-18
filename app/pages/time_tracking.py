@@ -1,6 +1,6 @@
 """
-Timekeeping page -- professional weekly time entry management.
-Header card + week nav + employee table + expandable detail panel.
+Timekeeping -- professional weekly time entry, light-theme design.
+Matches reference screenshot: white cards, table + detail panel.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------------------------
-# Service imports with fallbacks
+# Service imports (fallbacks for both run modes)
 # ---------------------------------------------------------------------------
 try:
     from mobile_ui import ensure_narrow_viewport_detected
@@ -63,245 +63,352 @@ TT_EDIT_ROLES = frozenset({"admin", "manager", "pm", "employee"})
 NON_JOB_CATEGORY_OPTIONS = ["SHOP", "ADMIN", "TRAINING", "SAFETY", "PTO", "HOLIDAY", "TRAVEL"]
 _OT_THRESHOLD = 40.0
 _CLOSED_STATUSES = frozenset({"closed", "complete", "completed", "cancelled", "archived", "close", "done"})
-_NO_ENTRY_LABEL = "(No entry -- skip)"
+_NO_ENTRY_LABEL = "Select a job (optional)"
 
-# Stable session-state keys
-_TK_EMP = "selected_timekeeping_employee_id"
+# Session state keys
+_TK_EMP  = "selected_timekeeping_employee_id"
 _TK_WEEK = "selected_timekeeping_week_start"
 _TK_VIEW = "timekeeping_view_mode"
 _TK_EDIT = "timekeeping_edit_mode"
 
 # ---------------------------------------------------------------------------
-# CSS  (dark-professional / IPS brand palette)
+# Light-theme CSS  (forces white/light palette over Streamlit dark theme)
 # ---------------------------------------------------------------------------
 _CSS = """
 <style>
-/* ======================================================
-   Timekeeping page  -- scoped via span marker classes
-   ====================================================== */
+/* ============================================================
+   Timekeeping page  --  light-theme professional UI
+   ============================================================ */
 
-/* ---- Header card ---------------------------------------- */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-header) {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-    border: 1px solid rgba(148,163,184,.22) !important;
-    border-radius: 14px !important;
-    padding: 18px 22px 16px 22px !important;
-    margin-bottom: 14px !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,.35) !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-header) label[data-testid="stWidgetLabel"] {
-    display: none !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-header) [data-testid="stElementContainer"] {
-    margin-bottom: 0 !important;
-}
-/* Week nav buttons */
-div[data-testid="stHorizontalBlock"]:has(span.tk-week-nav) button {
-    min-height: 1.7rem !important;
-    padding: 0.12rem 0.8rem !important;
-    font-size: 0.8rem !important;
-    border-radius: 7px !important;
-    font-weight: 600 !important;
-}
-/* Filter bar */
-div[data-testid="stHorizontalBlock"]:has(span.tk-filter-bar) {
-    background: #1e293b !important;
-    border: 1px solid rgba(148,163,184,.18) !important;
-    border-radius: 10px !important;
-    padding: 8px 14px !important;
-    margin-bottom: 10px !important;
-    align-items: center !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-filter-bar) label[data-testid="stWidgetLabel"] {
-    display: none !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-filter-bar) button {
-    min-height: 1.7rem !important;
-    padding: 0.1rem 0.8rem !important;
-    font-size: 0.8rem !important;
-    border-radius: 7px !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-filter-bar) [data-testid="stTextInput"] input,
-div[data-testid="stHorizontalBlock"]:has(span.tk-filter-bar) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-    min-height: 1.7rem !important;
-    font-size: 0.82rem !important;
-}
-/* ---- Employee table container ----------------------- */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-table-wrap) {
-    background: #1e293b !important;
-    border: 1px solid rgba(148,163,184,.2) !important;
+/* Page background */
+[data-testid="stMain"] > div { background: #f1f4f9 !important; }
+.block-container { padding-top: 1rem !important; }
+
+/* ---- Global overrides for all TK containers ---- */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) {
+    background: #ffffff !important;
+    border: 1px solid #e5eaf2 !important;
     border-radius: 12px !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    margin-bottom: 2px !important;
+    box-shadow: 0 1px 6px rgba(15,23,42,.07) !important;
+    padding: 18px 22px !important;
+    margin-bottom: 12px !important;
 }
-/* Table header row */
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-hdr) {
-    background: rgba(15,23,42,.9) !important;
-    padding: 5px 14px !important;
-    border-bottom: 1px solid rgba(148,163,184,.2) !important;
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) p,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) span,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) label {
+    color: #1e293b !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-hdr) > div[data-testid="column"] {
-    padding: 3px 5px !important;
-}
-/* Table data rows */
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) {
-    padding: 2px 14px !important;
-    border-bottom: 1px solid rgba(71,85,105,.28) !important;
-    align-items: center !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row.tk-even) {
-    background: rgba(30,41,59,.65) !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row.tk-odd) {
-    background: rgba(22,32,48,.65) !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row):hover {
-    background: rgba(59,130,246,.10) !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row.tk-sel) {
-    background: rgba(59,130,246,.15) !important;
-    border-left: 3px solid #3b82f6 !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) > div[data-testid="column"] {
-    padding: 5px 5px !important;
-    align-self: center !important;
-}
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) button {
-    min-height: 1.5rem !important;
-    max-height: 1.75rem !important;
-    padding: 0.05rem 0.45rem !important;
-    font-size: 0.74rem !important;
+
+/* ---- Inputs: light theme ---- */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) input,
+div[data-testid="stHorizontalBlock"]:has(span.tki) input {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
     border-radius: 6px !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) label[data-testid="stWidgetLabel"] {
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) [data-baseweb="select"] > div,
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-baseweb="select"] > div {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) [data-baseweb="select"] svg,
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-baseweb="select"] svg {
+    fill: #64748b !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) [data-testid="stWidgetLabel"],
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-testid="stWidgetLabel"] {
     display: none !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) p {
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tks) [data-testid="stElementContainer"],
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-testid="stElementContainer"] {
+    margin-bottom: 0 !important;
+}
+
+/* ---- Header card ---- */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) {
+    padding: 14px 22px 12px !important;
+    margin-bottom: 10px !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) button {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #374151 !important;
+    border-radius: 7px !important;
+    min-height: 1.85rem !important;
+    padding: 0.18rem 0.9rem !important;
     font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06) !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) button:hover {
+    background: #f8fafc !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) [data-testid="stWidgetLabel"] {
+    display: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) [data-testid="stElementContainer"] {
+    margin-bottom: 0 !important;
+}
+
+/* ---- Filter bar ---- */
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) {
+    background: #ffffff !important;
+    border: 1px solid #e5eaf2 !important;
+    border-radius: 10px !important;
+    padding: 8px 16px !important;
+    margin-bottom: 12px !important;
+    align-items: center !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05) !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) input {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    min-height: 1.85rem !important;
+    font-size: 0.84rem !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-baseweb="select"] > div {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    min-height: 1.85rem !important;
+    font-size: 0.84rem !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-testid="stWidgetLabel"] { display: none !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-filter) button {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #374151 !important;
+    border-radius: 7px !important;
+    min-height: 1.85rem !important;
+    padding: 0.15rem 0.9rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+}
+
+/* ---- Table container ---- */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-tbl) {
+    padding: 0 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    margin-bottom: 0 !important;
+}
+/* Table header row */
+div[data-testid="stHorizontalBlock"]:has(span.tk-th) {
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e5eaf2 !important;
+    padding: 7px 16px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-th) > div[data-testid="column"] {
+    padding: 0 5px !important;
+}
+/* Table data rows */
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) {
+    padding: 0 16px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    align-items: center !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr.rven) { background: #ffffff !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr.rodd) { background: #f8fafc !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr):hover { background: #f0f7ff !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr.rsel) {
+    background: #eff6ff !important;
+    border-left: 3px solid #3b82f6 !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) > div[data-testid="column"] {
+    padding: 6px 5px !important;
+    align-self: center !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) button {
+    background: transparent !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+    border-radius: 6px !important;
+    min-height: 1.6rem !important;
+    max-height: 1.8rem !important;
+    padding: 0.05rem 0.4rem !important;
+    font-size: 0.74rem !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) button:hover {
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+    background: #eff6ff !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) [data-testid="stWidgetLabel"] { display: none !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-tr) p {
+    font-size: 0.84rem !important;
+    color: #1e293b !important;
     margin: 0 !important;
     line-height: 1.3 !important;
 }
 /* Table footer */
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-footer) {
-    background: rgba(15,23,42,.6) !important;
-    padding: 5px 14px !important;
-    border-top: 1px solid rgba(71,85,105,.35) !important;
+div[data-testid="stHorizontalBlock"]:has(span.tk-tf) {
+    background: #f8fafc !important;
+    border-top: 1px solid #e5eaf2 !important;
+    padding: 6px 16px !important;
     border-radius: 0 0 12px 12px !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-footer) p {
-    font-size: 0.77rem !important;
+div[data-testid="stHorizontalBlock"]:has(span.tk-tf) p {
+    font-size: 0.78rem !important;
+    color: #64748b !important;
     margin: 0 !important;
 }
-/* ---- Detail panel ----------------------------------- */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) {
-    background: #1e293b !important;
-    border: 1px solid #3b82f6 !important;
-    border-left: 4px solid #3b82f6 !important;
+
+/* ---- Detail panel ---- */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-dp) {
+    padding: 18px 22px 18px !important;
     border-radius: 0 12px 12px 12px !important;
-    padding: 18px 20px 20px 20px !important;
+    border-left: 4px solid #3b82f6 !important;
+    border-top: 1px solid #e5eaf2 !important;
+    border-right: 1px solid #e5eaf2 !important;
+    border-bottom: 1px solid #e5eaf2 !important;
+    box-shadow: 0 2px 12px rgba(59,130,246,.08) !important;
     margin-top: 0 !important;
-    box-shadow: 0 4px 20px rgba(59,130,246,.10) !important;
-}
-/* Detail panel compact inputs */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) [data-testid="stNumberInput"] input {
-    min-height: 1.5rem !important;
-    font-size: 0.82rem !important;
-    padding: 0.04rem 0.28rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) [data-testid="stTextInput"] input {
-    min-height: 1.5rem !important;
-    font-size: 0.82rem !important;
-    padding: 0.04rem 0.28rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-    min-height: 1.5rem !important;
-    font-size: 0.82rem !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) label[data-testid="stWidgetLabel"] {
-    display: none !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-detail) [data-testid="stElementContainer"] {
-    margin-bottom: 0.07rem !important;
 }
 /* Detail action buttons */
-div[data-testid="stHorizontalBlock"]:has(span.tk-detail-actions) button {
+div[data-testid="stHorizontalBlock"]:has(span.tk-dact) button {
     border-radius: 7px !important;
-    font-size: 0.8rem !important;
-    min-height: 1.75rem !important;
+    min-height: 2rem !important;
+    padding: 0.18rem 0.9rem !important;
+    font-size: 0.82rem !important;
     font-weight: 600 !important;
 }
-/* Daily rows header */
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-hdr) {
-    background: rgba(15,23,42,.55) !important;
-    border-radius: 6px 6px 0 0 !important;
-    padding: 4px 4px !important;
-    border-bottom: 1px solid rgba(71,85,105,.5) !important;
+/* Detail: Edit Week button */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dact) button[kind="secondary"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #374151 !important;
 }
-/* Daily rows */
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row) {
-    border-bottom: 1px solid rgba(71,85,105,.22) !important;
+/* Detail: Save Changes button (primary) */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dact) button[kind="primaryFormSubmit"],
+div[data-testid="stHorizontalBlock"]:has(span.tk-dact) button[data-testid="stBaseButton-primary"] {
+    background: #3b82f6 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* ---- Daily rows header ---- */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dh) {
+    background: #f8fafc !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 5px 4px !important;
+    border-bottom: 1px solid #e5eaf2 !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-dh) p {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .06em !important;
+    color: #64748b !important;
+    margin: 0 !important;
+}
+/* Daily data rows */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) {
+    border-bottom: 1px solid #f1f5f9 !important;
     padding: 2px 4px !important;
     align-items: center !important;
+    background: #ffffff !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row.tk-today-row) {
-    background: rgba(59,130,246,.07) !important;
-    border-left: 2px solid rgba(56,189,248,.5) !important;
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr.dr-today) {
+    background: #f0f7ff !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row) p {
+div[data-testid="stHorizontalBlock"]:has(span.tki) {
+    align-items: center !important;
+}
+/* Compact inputs inside daily rows */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) input,
+div[data-testid="stHorizontalBlock"]:has(span.tki) input {
+    min-height: 1.6rem !important;
     font-size: 0.82rem !important;
+    padding: 0.05rem 0.3rem !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 5px !important;
+    text-align: center !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) [data-baseweb="select"] > div,
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-baseweb="select"] > div {
+    min-height: 1.6rem !important;
+    font-size: 0.82rem !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 5px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) [data-testid="stWidgetLabel"],
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-testid="stWidgetLabel"] { display: none !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) [data-testid="stElementContainer"],
+div[data-testid="stHorizontalBlock"]:has(span.tki) [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) p {
+    font-size: 0.82rem !important;
+    color: #1e293b !important;
     margin: 0 !important;
-    line-height: 1.3 !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row) [data-testid="stNumberInput"] input {
-    min-height: 1.45rem !important;
-    font-size: 0.8rem !important;
-    padding: 0.03rem 0.25rem !important;
+/* Checkbox-style comment button */
+div[data-testid="stHorizontalBlock"]:has(span.tk-dr) button {
+    background: transparent !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #94a3b8 !important;
+    border-radius: 4px !important;
+    min-height: 1.4rem !important;
+    max-height: 1.6rem !important;
+    padding: 0.02rem 0.25rem !important;
+    font-size: 0.72rem !important;
+    min-width: 1.4rem !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row) [data-testid="stTextInput"] input {
-    min-height: 1.45rem !important;
-    font-size: 0.8rem !important;
-    padding: 0.03rem 0.25rem !important;
+
+/* ---- Typography ---- */
+.tk-page-title    { font-size:1.4rem;font-weight:800;color:#111827;margin:0;letter-spacing:-.01em; }
+.tk-page-sub      { font-size:.78rem;color:#6b7280;margin:.1rem 0 0; }
+.tk-wk-range      { font-size:1rem;font-weight:700;color:#111827;margin:0;text-align:right; }
+.tk-wk-num        { font-size:.73rem;color:#6b7280;margin:0;text-align:right; }
+.tk-th-lbl        { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:0; }
+.tk-th-lbl-sort   { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:0; }
+.tk-td-name       { font-size:.86rem;font-weight:600;color:#111827;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.tk-td-name-sel   { color:#3b82f6 !important; }
+.tk-td            { font-size:.84rem;color:#374151;margin:0; }
+.tk-td-num        { font-size:.84rem;color:#374151;font-variant-numeric:tabular-nums;margin:0; }
+.tk-td-num-ot     { font-size:.84rem;color:#d97706;font-weight:600;font-variant-numeric:tabular-nums;margin:0; }
+.tk-ft-lbl        { font-size:.76rem;font-weight:600;color:#64748b;margin:0; }
+.tk-det-name      { font-size:1.1rem;font-weight:800;color:#111827;margin:0; }
+.tk-det-dept      { font-size:.77rem;color:#6b7280;margin:.1rem 0 0; }
+.tk-met-lbl       { font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:0; }
+.tk-met-val       { font-size:1.05rem;font-weight:700;color:#111827;margin:0;font-variant-numeric:tabular-nums; }
+.tk-met-val-ot    { font-size:1.05rem;font-weight:700;color:#d97706;margin:0;font-variant-numeric:tabular-nums; }
+.tk-day-lbl       { font-size:.83rem;font-weight:600;color:#374151;margin:0; }
+.tk-day-today     { color:#3b82f6 !important; }
+.tk-day-date      { font-size:.81rem;color:#6b7280;margin:0; }
+.tk-row-total     { font-size:.82rem;font-weight:600;color:#374151;font-variant-numeric:tabular-nums;margin:0;text-align:center; }
+.tk-dash          { font-size:.82rem;color:#94a3b8;margin:0; }
+.tk-footer-note   { font-size:.72rem;color:#94a3b8;font-style:italic;margin:.6rem 0 0; }
+.tk-hint          { font-size:.84rem;color:#9ca3af;font-style:italic;text-align:center;padding:1.4rem 0; }
+.tk-no-emp        { font-size:.84rem;color:#9ca3af;text-align:center;padding:.8rem 0; }
+/* Status badges */
+.tkb { display:inline-block;font-size:.7rem;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;letter-spacing:.02em; }
+.tkb-approved { background:#d1fae5;color:#065f46; }
+.tkb-pending  { background:#fef3c7;color:#92400e; }
+.tkb-draft    { background:#f1f5f9;color:#64748b; }
+.tkb-rejected { background:#fee2e2;color:#991b1b; }
+/* Wk-nav "current week" outline-primary */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) button[kind="primary"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(span.tk-hdr-card) button[data-testid="stBaseButton-primary"] {
+    background: #eff6ff !important;
+    border: 1px solid #3b82f6 !important;
+    color: #3b82f6 !important;
 }
-div[data-testid="stHorizontalBlock"]:has(span.tk-day-row) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-    min-height: 1.45rem !important;
-    font-size: 0.8rem !important;
-}
-/* ---- Typography helpers ----------------------------- */
-.tk-title { font-size:1.45rem;font-weight:800;color:#f1f5f9;margin:0;letter-spacing:-0.01em; }
-.tk-subtitle { font-size:0.78rem;color:#94a3b8;margin:0.1rem 0 0 0; }
-.tk-week-range { font-size:1rem;font-weight:700;color:#e2e8f0;margin:0; }
-.tk-week-num { font-size:0.72rem;color:#64748b;margin:0; }
-.tk-hdr { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin:0;padding:0; }
-.tk-cell { font-size:0.82rem;color:#cbd5e1;margin:0; }
-.tk-cell-name { font-size:0.86rem;font-weight:600;color:#f1f5f9;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-.tk-cell-name-sel { color:#93c5fd !important; }
-.tk-num { font-size:0.82rem;color:#e2e8f0;font-variant-numeric:tabular-nums;margin:0; }
-.tk-num-warn { color:#fbbf24 !important;font-weight:700 !important; }
-.tk-ft-total { font-size:0.78rem;font-weight:700;color:#94a3b8;margin:0; }
-.tk-emp-name { font-size:1.1rem;font-weight:800;color:#f1f5f9;margin:0; }
-.tk-emp-dept { font-size:0.76rem;color:#94a3b8;margin:0; }
-.tk-metric-lbl { font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin:0; }
-.tk-metric-val { font-size:1.1rem;font-weight:700;color:#f1f5f9;font-variant-numeric:tabular-nums;margin:0; }
-.tk-day-lbl { font-size:0.82rem;font-weight:700;color:#cbd5e1;margin:0; }
-.tk-day-date { font-size:0.73rem;color:#64748b;margin:0; }
-.tk-day-today { color:#38bdf8 !important; }
-.tk-total-val { font-size:0.82rem;font-weight:600;color:#e2e8f0;font-variant-numeric:tabular-nums;margin:0; }
-.tk-footer-note { font-size:0.71rem;color:#475569;font-style:italic;margin:0.5rem 0 0 0; }
-.tk-hint { font-size:0.82rem;color:#475569;font-style:italic;text-align:center;padding:1.2rem 0; }
-/* Status pill badges */
-.tk-badge {
-    display:inline-block;font-size:10px;font-weight:700;
-    padding:2px 9px;border-radius:20px;letter-spacing:.04em;white-space:nowrap;
-}
-.tk-draft    { background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3); }
-.tk-pending  { background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3); }
-.tk-approved { background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.25); }
-.tk-rejected { background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.25); }
 /* Responsive */
 @media(max-width:768px) {
-    .tk-title { font-size:1.1rem !important; }
-    div[data-testid="stHorizontalBlock"]:has(span.tk-tbl-row) button { min-height:2rem !important; }
+    .tk-page-title { font-size:1.05rem !important; }
+    div[data-testid="stHorizontalBlock"]:has(span.tk-tr) button { min-height:2.1rem !important; }
 }
 </style>
 """
@@ -324,8 +431,7 @@ def _load_employees() -> list[dict]:
 
 def _load_jobs() -> list[dict]:
     role = current_role()
-    prefer_admin = role in ("admin", "manager")
-    fn = fetch_table_admin if prefer_admin else fetch_table
+    fn = fetch_table_admin if role in ("admin", "manager") else fetch_table
     for ob in ("job_number", "job_name", None):
         try:
             rows = list(fn("jobs", columns="*", limit=5000, order_by=ob) or [])
@@ -341,22 +447,14 @@ def _load_jobs() -> list[dict]:
         return []
 
 
-def _is_active_job(j: dict) -> bool:
-    s = str(j.get("status") or j.get("job_status") or "").strip().lower()
-    return not s or s not in _CLOSED_STATUSES
-
-
 def _build_job_options(jobs: list[dict]) -> tuple[list[str], dict[str, str]]:
-    """Return (sorted_labels, label_to_id)."""
     _, lbl_to_id, sorted_labels = build_job_dropdown_label_maps(jobs)
-    # Add non-job categories
     nj_labels = [f"NON-JOB -- {c}" for c in NON_JOB_CATEGORY_OPTIONS]
     all_labels = [_NO_ENTRY_LABEL] + sorted_labels + nj_labels
     return all_labels, lbl_to_id
 
 
-def _resolve_job_label(label: str, lbl_to_id: dict[str, str]) -> tuple[str | None, str | None]:
-    """Label -> (job_id, non_job_code)."""
+def _resolve_job(label: str, lbl_to_id: dict[str, str]) -> tuple[str | None, str | None]:
     if not label or label == _NO_ENTRY_LABEL:
         return None, None
     if label.startswith("NON-JOB -- "):
@@ -366,149 +464,139 @@ def _resolve_job_label(label: str, lbl_to_id: dict[str, str]) -> tuple[str | Non
     return jid or None, None
 
 
-def _time_type(ent: dict) -> str:
+def _tt(ent: dict) -> str:
     s = str(ent.get("time_type") or "").strip().upper()
     return "OT" if s in ("OT", "O/T") else "ST"
 
 
-def _emp_week_summary(eid: str, days: list[date], idx: dict) -> tuple[float, float]:
-    """Return (st_hours, ot_hours) for the week."""
+def _week_summary(eid: str, days: list[date], idx: dict) -> tuple[float, float]:
     st_h = ot_h = 0.0
     for d in days:
-        for ent in idx.get((eid, d.isoformat()), []):
-            h = float(ent.get("hours") or 0)
-            if _time_type(ent) == "OT":
+        for e in idx.get((eid, d.isoformat()), []):
+            h = float(e.get("hours") or 0)
+            (ot_h := ot_h + h) if _tt(e) == "OT" else (st_h := st_h + h)  # noqa: walrus
+    return st_h, ot_h
+
+
+def _week_summary2(eid: str, days: list[date], idx: dict) -> tuple[float, float]:
+    """Non-walrus fallback for Python < 3.8."""
+    st_h = ot_h = 0.0
+    for d in days:
+        for e in idx.get((eid, d.isoformat()), []):
+            h = float(e.get("hours") or 0)
+            if _tt(e) == "OT":
                 ot_h += h
             else:
                 st_h += h
     return st_h, ot_h
 
 
-def _compute_status(st_h: float, ot_h: float) -> str:
-    total = st_h + ot_h
-    if total == 0:
-        return "draft"
-    if total < 32:
-        return "pending"
-    return "pending"
+def _status(st_h: float, ot_h: float) -> str:
+    return "draft" if st_h + ot_h == 0 else "pending"
 
 
-def _status_badge_html(status: str) -> str:
-    label = status.title()
-    css = {"draft": "tk-draft", "pending": "tk-pending", "approved": "tk-approved", "rejected": "tk-rejected"}.get(status, "tk-draft")
-    return f'<span class="tk-badge {css}">{html.escape(label)}</span>'
+def _badge(status: str) -> str:
+    css = {"approved": "tkb-approved", "pending": "tkb-pending", "rejected": "tkb-rejected"}.get(status, "tkb-draft")
+    return f'<span class="tkb {css}">{html.escape(status.title())}</span>'
 
 
-def _week_label(week_start: date) -> str:
-    end = week_start + timedelta(days=6)
-    if week_start.month == end.month:
-        return f"{week_start.strftime('%b %d')} \u2013 {end.strftime('%d, %Y')}"
-    return f"{week_start.strftime('%b %d')} \u2013 {end.strftime('%b %d, %Y')}"
+def _fmt_week(ws: date) -> str:
+    we = ws + timedelta(days=6)
+    return f"{ws.strftime('%b %-d')} \u2013 {we.strftime('%b %-d, %Y')}"
 
 
-def _week_number(week_start: date) -> int:
-    return week_start.isocalendar()[1]
+def _fmt_week_win(ws: date) -> str:
+    """strftime without %-d for Windows."""
+    we = ws + timedelta(days=6)
+    return f"{ws.strftime('%b')} {ws.day} \u2013 {we.strftime('%b')} {we.day}, {we.year}"
 
 
-# ---------------------------------------------------------------------------
-# Row-level session state key helpers
-# ---------------------------------------------------------------------------
+def _wlabel(ws: date) -> str:
+    try:
+        return _fmt_week(ws)
+    except ValueError:
+        return _fmt_week_win(ws)
+
+
+def _wnum(ws: date) -> int:
+    return ws.isocalendar()[1]
+
+
 def _rk(eid: str, day_iso: str, week_iso: str, field: str) -> str:
-    """Stable widget key: tk_{eid8}_{day}_{week}_{field}"""
     return f"tk_{eid[:8]}_{day_iso}_{week_iso.replace('-','')}_{field}"
 
 
-def _clear_row_state(eid: str, days: list[date], week_start: date) -> None:
-    week_iso = week_start.isoformat()
+def _clear_state(eid: str, days: list[date], week_start: date) -> None:
+    w = week_start.isoformat()
     for d in days:
         for f in ("job", "st", "ot", "notes"):
-            st.session_state.pop(_rk(eid, d.isoformat(), week_iso, f), None)
+            st.session_state.pop(_rk(eid, d.isoformat(), w, f), None)
 
 
 # ---------------------------------------------------------------------------
-# Save logic
+# Save
 # ---------------------------------------------------------------------------
-def _save_all_rows(
-    eid: str,
-    days: list[date],
-    week_start: date,
-    lbl_to_id: dict[str, str],
-    uid: Any,
-) -> list[str]:
-    """Upsert all non-empty rows for this employee/week. Returns list of error strings."""
-    ts_now = datetime.now(timezone.utc).isoformat()
-    week_iso = week_start.isoformat()
-    errors: list[str] = []
+def _save_week(eid: str, days: list[date], week_start: date, lbl_to_id: dict[str, str], uid: Any) -> list[str]:
+    ts = datetime.now(timezone.utc).isoformat()
+    w = week_start.isoformat()
+    errs: list[str] = []
     for d in days:
-        day_iso = d.isoformat()
-        job_lbl = str(st.session_state.get(_rk(eid, day_iso, week_iso, "job"), "") or "").strip()
-        st_hrs = float(st.session_state.get(_rk(eid, day_iso, week_iso, "st"), 0.0) or 0.0)
-        ot_hrs = float(st.session_state.get(_rk(eid, day_iso, week_iso, "ot"), 0.0) or 0.0)
-        notes = str(st.session_state.get(_rk(eid, day_iso, week_iso, "notes"), "") or "").strip()
-
-        if not job_lbl or job_lbl == _NO_ENTRY_LABEL:
+        di = d.isoformat()
+        jlbl = str(st.session_state.get(_rk(eid, di, w, "job"), "") or "").strip()
+        sth  = float(st.session_state.get(_rk(eid, di, w, "st"),  0.0) or 0.0)
+        oth  = float(st.session_state.get(_rk(eid, di, w, "ot"),  0.0) or 0.0)
+        notes = str(st.session_state.get(_rk(eid, di, w, "notes"), "") or "").strip()
+        if not jlbl or jlbl == _NO_ENTRY_LABEL:
             continue
-
-        job_id, nj_code = _resolve_job_label(job_lbl, lbl_to_id)
-        if not job_id and not nj_code:
+        jid, nj = _resolve_job(jlbl, lbl_to_id)
+        if not jid and not nj:
             continue
-
-        for hrs, ttype in [(st_hrs, "ST"), (ot_hrs, "OT")]:
+        for hrs, ttype in ((sth, "ST"), (oth, "OT")):
             if hrs > 0:
                 try:
                     upsert_time_entry(
-                        employee_id=eid,
-                        job_id=job_id,
-                        work_date=d,
-                        hours=hrs,
-                        notes=notes,
-                        created_by=uid,
-                        updated_at_iso=ts_now,
-                        non_job_code=nj_code,
-                        time_type=ttype,
+                        employee_id=eid, job_id=jid, work_date=d,
+                        hours=hrs, notes=notes, created_by=uid,
+                        updated_at_iso=ts, non_job_code=nj, time_type=ttype,
                     )
                 except Exception as exc:
-                    errors.append(f"{d.strftime('%a')}/{ttype}: {exc}")
-
-    return errors
+                    errs.append(f"{d.strftime('%a')}/{ttype}: {exc}")
+    return errs
 
 
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-def _render_header(week_start: date, days: list[date]) -> None:
+def _render_header(week_start: date) -> None:
     with st.container(border=True):
-        st.markdown('<span class="tk-header" aria-hidden="true"></span>', unsafe_allow_html=True)
-        left, center, right = st.columns([2.2, 2.8, 2.0], gap="small")
-
-        with left:
+        st.markdown('<span class="tks tk-hdr-card" aria-hidden="true"></span>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([2.2, 3.0, 2.0], gap="small")
+        with c1:
             st.markdown(
-                '<p class="tk-title">&#x23F0; Timekeeping</p>'
-                '<p class="tk-subtitle">View and edit employee weekly time entries.</p>',
+                '<p class="tk-page-title">\u23f0&nbsp; Timekeeping</p>'
+                '<p class="tk-page-sub">View and edit employee weekly time entries.</p>',
                 unsafe_allow_html=True,
             )
-
-        with center:
-            st.markdown('<span class="tk-week-nav" aria-hidden="true"></span>', unsafe_allow_html=True)
+        with c2:
             n1, n2, n3 = st.columns(3, gap="small")
             with n1:
-                if st.button("\u25c0 Prev", key="tk_prev_week", use_container_width=True):
+                if st.button("\u2039 Previous Week", key="tk_prev", use_container_width=True):
                     st.session_state[_TK_WEEK] = (week_start - timedelta(days=7)).isoformat()
                     st.rerun()
             with n2:
-                if st.button("This Week", key="tk_this_week", use_container_width=True, type="primary"):
+                if st.button("\U0001f4c5 Current Week", key="tk_cur", type="primary", use_container_width=True):
                     st.session_state[_TK_WEEK] = monday_of_week(date.today()).isoformat()
                     st.rerun()
             with n3:
-                if st.button("Next \u25ba", key="tk_next_week", use_container_width=True):
+                if st.button("Next Week \u203a", key="tk_next", use_container_width=True):
                     st.session_state[_TK_WEEK] = (week_start + timedelta(days=7)).isoformat()
                     st.rerun()
-
-        with right:
-            wnum = _week_number(week_start)
+        with c3:
+            wl = _wlabel(week_start)
+            wn = _wnum(week_start)
             st.markdown(
-                f'<p class="tk-week-range">{html.escape(_week_label(week_start))}</p>'
-                f'<p class="tk-week-num">Week {wnum}</p>',
+                f'<p class="tk-wk-range">\U0001f4c5&nbsp; {html.escape(wl)}</p>'
+                f'<p class="tk-wk-num">Week {wn}</p>',
                 unsafe_allow_html=True,
             )
 
@@ -516,134 +604,111 @@ def _render_header(week_start: date, days: list[date]) -> None:
 # ---------------------------------------------------------------------------
 # Filter bar
 # ---------------------------------------------------------------------------
-def _render_filter_bar(all_emps: list[dict]) -> tuple[str, list[str]]:
-    """Returns (search_query, selected_dept_list)."""
-    # Collect distinct departments
-    depts = sorted({str(e.get("department") or "").strip() for e in all_emps if e.get("department")})
-    dept_opts = ["All Departments"] + depts
+def _render_filter_bar(all_emps: list[dict]) -> tuple[str, str, bool]:
+    depts = sorted({str(e.get("department") or "").strip() for e in all_emps if str(e.get("department") or "").strip()})
+    opts  = ["All Departments"] + depts
 
-    f1, f2, f3 = st.columns([3.0, 1.8, 0.85], gap="small")
-    with f1:
-        st.markdown('<span class="tk-filter-bar" aria-hidden="true"></span>', unsafe_allow_html=True)
-        q = st.text_input(
-            "Search",
-            placeholder="Search employee...",
-            key="tk_search",
-            label_visibility="collapsed",
-        )
-    with f2:
-        dept = st.selectbox(
-            "Department",
-            dept_opts,
-            key="tk_dept_filter",
-            label_visibility="collapsed",
-        )
-    with f3:
-        export_clicked = st.button("Export", key="tk_export_btn", use_container_width=True)
-
-    return str(q or "").strip().lower(), str(dept or "All Departments"), export_clicked
+    c1, c2, _sp, c3 = st.columns([2.6, 2.0, 3.0, 0.8], gap="small")
+    with c1:
+        st.markdown('<span class="tk-filter" aria-hidden="true"></span>', unsafe_allow_html=True)
+        q = st.text_input("Search", placeholder="Search employee...", key="tk_q", label_visibility="collapsed")
+    with c2:
+        dept = st.selectbox("Dept", opts, key="tk_dept", label_visibility="collapsed")
+    with c3:
+        clicked = st.button("\u2913 Export", key="tk_export", use_container_width=True)
+    return str(q or "").strip().lower(), str(dept or "All Departments"), clicked
 
 
 # ---------------------------------------------------------------------------
-# Employee summary table
+# Employee table
 # ---------------------------------------------------------------------------
-# Column weights: emp, dept, week-start, st, ot, total, status, action
-_TBL_COLS = [2.3, 1.0, 0.9, 0.75, 0.75, 0.75, 0.85, 0.55]
+# col weights: name, dept, week-start, st, ot, total, status, actions
+_TC = [2.3, 1.15, 1.05, 0.82, 0.82, 0.82, 0.9, 0.52]
+_TH = ["Employee \u21d5", "Department \u21d5", "Week Start \u21d5", "S/T Total (Hrs) \u21d5",
+       "O/T Total (Hrs) \u21d5", "Total Hours \u21d5", "Status \u21d5", "Actions"]
 
 
-def _render_employee_table(
-    visible_emps: list[dict],
-    days: list[date],
-    week_start: date,
-    idx: dict,
-    can_edit: bool,
-) -> str | None:
-    """Render the employee summary table. Returns selected employee_id or None."""
-    selected_eid = str(st.session_state.get(_TK_EMP) or "")
+def _render_table(visible: list[dict], days: list[date], week_start: date, idx: dict) -> str | None:
+    sel = str(st.session_state.get(_TK_EMP) or "")
+    new_sel: str | None = sel or None
 
     with st.container(border=True):
-        st.markdown('<span class="tk-table-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="tks tk-tbl" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-        # -- Header row --
-        hcols = st.columns(_TBL_COLS, gap="small")
-        labels = ["Employee", "Department", "Week Start", "S/T (Hrs)", "O/T (Hrs)", "Total Hrs", "Status", ""]
+        # Header
+        hcols = st.columns(_TC, gap="small")
         with hcols[0]:
-            st.markdown('<span class="tk-tbl-hdr" aria-hidden="true"></span>', unsafe_allow_html=True)
-        for lbl, col in zip(labels, hcols):
+            st.markdown('<span class="tk-th" aria-hidden="true"></span>', unsafe_allow_html=True)
+        for lbl, col in zip(_TH, hcols):
             with col:
-                st.markdown(f'<p class="tk-hdr">{html.escape(lbl)}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="tk-th-lbl">{html.escape(lbl)}</p>', unsafe_allow_html=True)
 
-        # -- Data rows --
-        new_sel: str | None = selected_eid or None
-        for ri, emp in enumerate(visible_emps):
-            eid = str(emp.get("id"))
-            nm = str(emp.get("name") or "").strip() or "—"
+        # Rows
+        for ri, emp in enumerate(visible):
+            eid  = str(emp.get("id"))
+            nm   = str(emp.get("name") or "").strip() or "—"
             dept = str(emp.get("department") or "").strip() or "—"
-            is_sel = eid == selected_eid
-            is_over = False
-            zebra = "tk-even" if ri % 2 == 0 else "tk-odd"
-            sel_cls = " tk-sel" if is_sel else ""
+            is_sel = eid == sel
+            sth, oth = _week_summary2(eid, days, idx)
+            tot = sth + oth
+            over = tot > _OT_THRESHOLD
+            z = "rven" if ri % 2 == 0 else "rodd"
+            rc = " rsel" if is_sel else ""
 
-            st_h, ot_h = _emp_week_summary(eid, days, idx)
-            total_h = st_h + ot_h
-            is_over = total_h > _OT_THRESHOLD
-            status = _compute_status(st_h, ot_h)
-
-            rcols = st.columns(_TBL_COLS, gap="small")
+            rcols = st.columns(_TC, gap="small")
             with rcols[0]:
-                name_cls = "tk-cell-name" + (" tk-cell-name-sel" if is_sel else "")
+                ncls = "tk-td-name" + (" tk-td-name-sel" if is_sel else "")
                 st.markdown(
-                    f'<span class="tk-tbl-row {zebra}{sel_cls}" aria-hidden="true"></span>'
-                    f'<p class="{name_cls}" title="{html.escape(nm, quote=True)}">'
-                    f'{html.escape(nm)}</p>',
+                    f'<span class="tk-tr {z}{rc}" aria-hidden="true"></span>'
+                    f'<p class="{ncls}">{html.escape(nm)}</p>',
                     unsafe_allow_html=True,
                 )
             with rcols[1]:
-                st.markdown(f'<p class="tk-cell">{html.escape(dept)}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="tk-td">{html.escape(dept)}</p>', unsafe_allow_html=True)
             with rcols[2]:
-                st.markdown(f'<p class="tk-cell">{week_start.strftime("%m/%d/%Y")}</p>', unsafe_allow_html=True)
+                wlbl = week_start.strftime("%b %-d, %Y") if hasattr(date, "strftime") else week_start.strftime("%b %d, %Y")
+                try:
+                    wlbl = week_start.strftime("%b %-d, %Y")
+                except ValueError:
+                    wlbl = f"{week_start.strftime('%b')} {week_start.day}, {week_start.year}"
+                st.markdown(f'<p class="tk-td">{html.escape(wlbl)}</p>', unsafe_allow_html=True)
             with rcols[3]:
-                st.markdown(f'<p class="tk-num">{st_h:.1f}</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="tk-td-num">{sth:.2f}</p>', unsafe_allow_html=True)
             with rcols[4]:
-                ot_cls = "tk-num tk-num-warn" if is_over and ot_h > 0 else "tk-num"
-                st.markdown(f'<p class="{ot_cls}">{ot_h:.1f}</p>', unsafe_allow_html=True)
+                oc = "tk-td-num-ot" if oth > 0 else "tk-td-num"
+                st.markdown(f'<p class="{oc}">{oth:.2f}</p>', unsafe_allow_html=True)
             with rcols[5]:
-                tot_cls = "tk-num tk-num-warn" if is_over else "tk-num"
-                st.markdown(f'<p class="{tot_cls}">{total_h:.1f}</p>', unsafe_allow_html=True)
+                tc = "tk-td-num-ot" if over else "tk-td-num"
+                st.markdown(f'<p class="{tc}">{tot:.2f}</p>', unsafe_allow_html=True)
             with rcols[6]:
-                st.markdown(_status_badge_html(status), unsafe_allow_html=True)
+                st.markdown(_badge(_status(sth, oth)), unsafe_allow_html=True)
             with rcols[7]:
-                btn_lbl = "\u25bc Open" if is_sel else "\u25b6 View"
-                btn_tp = "primary" if is_sel else "secondary"
-                if st.button(
-                    btn_lbl,
-                    key=f"tk_view_{eid}_{week_start.isoformat()}",
-                    type=btn_tp,
-                    use_container_width=True,
-                ):
+                if st.button("\U0001f441", key=f"tkv_{eid}_{week_start.isoformat()}", use_container_width=True,
+                             help=f"{'Close' if is_sel else 'View'} {nm}"):
                     new_sel = None if is_sel else eid
 
-        # -- Footer totals row --
-        total_st = sum(_emp_week_summary(str(e.get("id")), days, idx)[0] for e in visible_emps)
-        total_ot = sum(_emp_week_summary(str(e.get("id")), days, idx)[1] for e in visible_emps)
-        fcols = st.columns(_TBL_COLS, gap="small")
-        with fcols[0]:
+        # Footer
+        ft_st  = sum(_week_summary2(str(e.get("id")), days, idx)[0] for e in visible)
+        ft_ot  = sum(_week_summary2(str(e.get("id")), days, idx)[1] for e in visible)
+        ft_tot = ft_st + ft_ot
+        fc = st.columns(_TC, gap="small")
+        with fc[0]:
             st.markdown(
-                '<span class="tk-tbl-footer" aria-hidden="true"></span>'
-                f'<p class="tk-ft-total">{len(visible_emps)} employee{"s" if len(visible_emps) != 1 else ""}</p>',
+                f'<span class="tk-tf" aria-hidden="true"></span>'
+                f'<p class="tk-ft-lbl">{len(visible)} employee{"s" if len(visible) != 1 else ""}</p>',
                 unsafe_allow_html=True,
             )
-        with fcols[3]:
-            st.markdown(f'<p class="tk-ft-total">{total_st:.1f}</p>', unsafe_allow_html=True)
-        with fcols[4]:
-            st.markdown(f'<p class="tk-ft-total">{total_ot:.1f}</p>', unsafe_allow_html=True)
-        with fcols[5]:
-            st.markdown(f'<p class="tk-ft-total">{total_st + total_ot:.1f}</p>', unsafe_allow_html=True)
+        with fc[3]:
+            st.markdown(f'<p class="tk-ft-lbl">{ft_st:.2f}</p>', unsafe_allow_html=True)
+        with fc[4]:
+            st.markdown(f'<p class="tk-ft-lbl">{ft_ot:.2f}</p>', unsafe_allow_html=True)
+        with fc[5]:
+            st.markdown(f'<p class="tk-ft-lbl">{ft_tot:.2f}</p>', unsafe_allow_html=True)
 
-    # Apply selection change after all buttons rendered
-    if new_sel != (selected_eid or None):
+    # Apply selection change
+    if new_sel != (sel or None):
         if new_sel:
-            st.session_state[_TK_EMP] = new_sel
+            st.session_state[_TK_EMP]  = new_sel
             st.session_state[_TK_VIEW] = "detail"
             st.session_state[_TK_EDIT] = True
         else:
@@ -652,231 +717,200 @@ def _render_employee_table(
             st.session_state[_TK_EDIT] = False
         st.rerun()
 
-    return selected_eid or None
+    return sel or None
 
 
 # ---------------------------------------------------------------------------
-# Daily time rows (inside detail panel)
+# Daily rows (inside detail panel)
 # ---------------------------------------------------------------------------
-# Column weights: day, date, job, st, ot, total, notes, comment
-_DAY_COLS = [0.75, 0.72, 3.3, 0.82, 0.82, 0.68, 2.0, 0.42]
+# col weights: day, date, job/desc, st, ot, total, notes, chk
+_DC = [0.65, 0.72, 3.2, 0.85, 0.85, 0.8, 2.2, 0.38]
+_DH = ["Day", "Date", "Job / Description", "S/T (Hrs)", "O/T (Hrs)", "Total (Hrs)", "Notes", ""]
 
 
-def _render_daily_rows(
-    eid: str,
-    days: list[date],
-    week_start: date,
-    idx: dict,
-    job_options: list[str],
-    lbl_to_id: dict[str, str],
-) -> None:
+def _render_daily(eid: str, days: list[date], week_start: date, idx: dict,
+                  jopts: list[str], lbl_to_id: dict[str, str]) -> None:
     today = date.today()
-    week_iso = week_start.isoformat()
+    w = week_start.isoformat()
 
-    # Day table header
-    hcols = st.columns(_DAY_COLS, gap="small")
-    with hcols[0]:
-        st.markdown('<span class="tk-day-hdr" aria-hidden="true"></span>', unsafe_allow_html=True)
-    for lbl, col in zip(["Day", "Date", "Job / Description", "S/T", "O/T", "Total", "Notes", ""], hcols):
+    # Header row
+    hc = st.columns(_DC, gap="small")
+    with hc[0]:
+        st.markdown('<span class="tk-dh" aria-hidden="true"></span>', unsafe_allow_html=True)
+    for lbl, col in zip(_DH, hc):
         with col:
-            st.markdown(f'<p class="tk-hdr">{html.escape(lbl)}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="font-size:10px;font-weight:700;text-transform:uppercase;'
+                        f'letter-spacing:.06em;color:#6b7280;margin:0">{html.escape(lbl)}</p>',
+                        unsafe_allow_html=True)
 
     for d in days:
-        day_iso = d.isoformat()
+        di    = d.isoformat()
         is_today = d == today
-        today_cls = " tk-today-row" if is_today else ""
+        tc    = " dr-today" if is_today else ""
 
-        # Existing entries for this day (pick first ST and first OT)
-        entries = idx.get((eid, day_iso), [])
-        st_ent = next((e for e in entries if _time_type(e) == "ST"), None)
-        ot_ent = next((e for e in entries if _time_type(e) == "OT"), None)
+        ents   = idx.get((eid, di), [])
+        st_ent = next((e for e in ents if _tt(e) == "ST"), None)
+        ot_ent = next((e for e in ents if _tt(e) == "OT"), None)
+        prim   = st_ent or ot_ent
 
-        # Determine primary job label from existing entry
-        def _label_for_entry(ent: dict | None) -> str:
+        # Resolve current job label
+        def _jlbl(ent: dict | None) -> str:
             if not ent:
                 return _NO_ENTRY_LABEL
             jid = str(ent.get("job_id") or "").strip()
-            nj = str(ent.get("non_job_code") or "").strip()
+            nj  = str(ent.get("non_job_code") or "").strip()
             if jid:
                 for lbl, lid in lbl_to_id.items():
                     if str(lid) == jid:
                         return lbl
-                return _NO_ENTRY_LABEL
             if nj:
                 return f"NON-JOB -- {nj}"
             return _NO_ENTRY_LABEL
 
-        primary_ent = st_ent or ot_ent
-        existing_job_lbl = _label_for_entry(primary_ent)
-        existing_st = float(st_ent.get("hours") or 0) if st_ent else 0.0
-        existing_ot = float(ot_ent.get("hours") or 0) if ot_ent else 0.0
-        existing_notes = str((primary_ent or {}).get("notes") or "").strip()
+        ex_jlbl  = _jlbl(prim)
+        ex_st    = float(st_ent.get("hours") or 0) if st_ent else 0.0
+        ex_ot    = float(ot_ent.get("hours") or 0) if ot_ent else 0.0
+        ex_notes = str((prim or {}).get("notes") or "").strip()
 
-        # Widget keys
-        jk = _rk(eid, day_iso, week_iso, "job")
-        stk = _rk(eid, day_iso, week_iso, "st")
-        otk = _rk(eid, day_iso, week_iso, "ot")
-        nk = _rk(eid, day_iso, week_iso, "notes")
+        jk  = _rk(eid, di, w, "job")
+        stk = _rk(eid, di, w, "st")
+        otk = _rk(eid, di, w, "ot")
+        nk  = _rk(eid, di, w, "notes")
 
-        # Safe default job index
-        if existing_job_lbl in job_options:
-            j_idx = job_options.index(existing_job_lbl)
-        else:
-            j_idx = 0
+        j_idx = jopts.index(ex_jlbl) if ex_jlbl in jopts else 0
 
-        dcols = st.columns(_DAY_COLS, gap="small")
-        with dcols[0]:
-            day_lbl_cls = "tk-day-lbl" + (" tk-day-today" if is_today else "")
+        # Day label style
+        dlc = "tk-day-lbl" + (" tk-day-today" if is_today else "")
+        dtc = "tk-day-date" + (" tk-day-today" if is_today else "")
+
+        dc = st.columns(_DC, gap="small")
+        with dc[0]:
             st.markdown(
-                f'<span class="tk-day-row{today_cls}" aria-hidden="true"></span>'
-                f'<p class="{day_lbl_cls}">{d.strftime("%a")}</p>',
+                f'<span class="tk-dr{tc}" aria-hidden="true"></span>'
+                f'<p class="{dlc}">{d.strftime("%a")}</p>',
                 unsafe_allow_html=True,
             )
-        with dcols[1]:
-            date_lbl_cls = "tk-day-date" + (" tk-day-today" if is_today else "")
-            st.markdown(f'<p class="{date_lbl_cls}">{d.strftime("%m/%d")}</p>', unsafe_allow_html=True)
-        with dcols[2]:
-            sel_job = st.selectbox(
-                "Job",
-                job_options,
-                index=j_idx,
-                key=jk,
-                label_visibility="collapsed",
-            )
-        with dcols[3]:
-            new_st = st.number_input(
-                "S/T", min_value=0.0, max_value=24.0,
-                value=existing_st, step=0.25, format="%.2f",
-                key=stk, label_visibility="collapsed",
-            )
-        with dcols[4]:
-            new_ot = st.number_input(
-                "O/T", min_value=0.0, max_value=24.0,
-                value=existing_ot, step=0.25, format="%.2f",
-                key=otk, label_visibility="collapsed",
-            )
-        with dcols[5]:
-            row_total = float(new_st) + float(new_ot)
-            st.markdown(
-                f'<p class="tk-total-val">{row_total:.1f}</p>',
-                unsafe_allow_html=True,
-            )
-        with dcols[6]:
-            st.text_input(
-                "Notes", value=existing_notes, key=nk,
-                label_visibility="collapsed", placeholder="Notes...",
-            )
-        with dcols[7]:
+        with dc[1]:
+            try:
+                dlbl = f"{d.strftime('%b')} {d.day}"
+            except Exception:
+                dlbl = d.isoformat()
+            st.markdown(f'<p class="{dtc}">{html.escape(dlbl)}</p>', unsafe_allow_html=True)
+        with dc[2]:
+            st.markdown('<span class="tki" aria-hidden="true"></span>', unsafe_allow_html=True)
+            sel_job = st.selectbox("Job", jopts, index=j_idx, key=jk, label_visibility="collapsed")
+        with dc[3]:
+            new_st = st.number_input("ST", min_value=0.0, max_value=24.0, value=ex_st,
+                                     step=0.25, format="%.2f", key=stk, label_visibility="collapsed")
+        with dc[4]:
+            new_ot = st.number_input("OT", min_value=0.0, max_value=24.0, value=ex_ot,
+                                     step=0.25, format="%.2f", key=otk, label_visibility="collapsed")
+        with dc[5]:
+            row_tot = float(new_st) + float(new_ot)
+            st.markdown(f'<p class="tk-row-total">{row_tot:.2f}</p>', unsafe_allow_html=True)
+        with dc[6]:
+            placeholder = "Add notes..." if ex_jlbl == _NO_ENTRY_LABEL else (ex_notes or "—")
+            ph_arg = "Add notes..." if ex_jlbl == _NO_ENTRY_LABEL else "Add notes..."
+            st.text_input("Notes", value=ex_notes, key=nk,
+                          label_visibility="collapsed", placeholder=ph_arg)
+        with dc[7]:
             has_entry = bool(st_ent or ot_ent)
-            if has_entry:
-                if st.button(
-                    "\U0001f4ac",
-                    key=f"tk_cmt_{eid[:8]}_{day_iso}",
-                    help=f"Notes: {existing_notes or 'none'}",
-                ):
-                    pass  # comment icon -- no-op display
+            chk_lbl = "\u2611" if has_entry else "\u2610"
+            if st.button(chk_lbl, key=f"tkchk_{eid[:8]}_{di}", help=ex_notes or "No notes"):
+                pass
 
 
 # ---------------------------------------------------------------------------
 # Detail panel
 # ---------------------------------------------------------------------------
-def _render_detail_panel(
-    eid: str,
-    all_emps: list[dict],
-    days: list[date],
-    week_start: date,
-    idx: dict,
-    job_options: list[str],
-    lbl_to_id: dict[str, str],
-    uid: Any,
-    can_edit: bool,
-) -> None:
+def _render_detail(eid: str, all_emps: list[dict], days: list[date], week_start: date,
+                   idx: dict, jopts: list[str], lbl_to_id: dict[str, str],
+                   uid: Any, can_edit: bool) -> None:
     emp = next((e for e in all_emps if str(e.get("id")) == eid), None)
     if not emp:
-        st.warning("Selected employee not found.")
         st.session_state.pop(_TK_EMP, None)
         return
 
-    nm = str(emp.get("name") or "").strip() or "—"
-    dept = str(emp.get("department") or "").strip() or "—"
-    st_h, ot_h = _emp_week_summary(eid, days, idx)
-    total_h = st_h + ot_h
-    status = _compute_status(st_h, ot_h)
-    over = total_h > _OT_THRESHOLD
+    nm    = str(emp.get("name") or "").strip() or "—"
+    dept  = str(emp.get("department") or "").strip() or "—"
+    sth, oth = _week_summary2(eid, days, idx)
+    tot = sth + oth
+    over = tot > _OT_THRESHOLD
+    stat = _status(sth, oth)
 
-    # Last updated metadata from most recent entry
-    entries_all: list[dict] = []
+    # Last-updated metadata
+    all_ents: list[dict] = []
     for d in days:
-        entries_all.extend(idx.get((eid, d.isoformat()), []))
-    last_updated_str = "—"
-    last_by = "—"
-    if entries_all:
-        latest = max(entries_all, key=lambda e: str(e.get("updated_at") or ""))
-        raw_ts = str(latest.get("updated_at") or "")
-        if raw_ts:
+        all_ents.extend(idx.get((eid, d.isoformat()), []))
+    lu_str = "—"
+    lu_by  = "—"
+    if all_ents:
+        latest = max(all_ents, key=lambda e: str(e.get("updated_at") or ""))
+        raw = str(latest.get("updated_at") or "")
+        if raw:
             try:
-                dt = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
-                last_updated_str = dt.strftime("%b %d, %Y %I:%M %p")
-            except Exception:
-                last_updated_str = raw_ts[:19]
-        last_by = str(latest.get("created_by") or "—")[:20]
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                lu_str = dt.strftime("%b %-d, %Y %-I:%M %p")
+            except ValueError:
+                try:
+                    dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    lu_str = f"{dt.strftime('%b')} {dt.day}, {dt.year} {dt.strftime('%I:%M %p').lstrip('0')}"
+                except Exception:
+                    lu_str = raw[:19]
+        lu_by = str(latest.get("created_by") or "—")
 
     with st.container(border=True):
-        st.markdown('<span class="tk-detail" aria-hidden="true"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="tks tk-dp" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-        # ---- Detail panel header -------------------------------------------
-        d1, d2, d3 = st.columns([2.5, 3.5, 2.0], gap="small")
+        # -- Panel header --
+        d1, d2, d3 = st.columns([2.4, 3.8, 2.0], gap="small")
 
         with d1:
             st.markdown(
-                f'<p class="tk-emp-name">{html.escape(nm)}'
-                f'&nbsp;&nbsp;{_status_badge_html(status)}</p>'
-                f'<p class="tk-emp-dept">{html.escape(dept)}</p>',
+                f'<p class="tk-det-name">{html.escape(nm)}&nbsp;&nbsp;{_badge(stat)}</p>'
+                f'<p class="tk-det-dept">{html.escape(dept)}</p>',
                 unsafe_allow_html=True,
             )
 
         with d2:
-            over_note = f"  \u26a0 >{_OT_THRESHOLD:g}h" if over else ""
+            wl = _wlabel(week_start)
             st.markdown(
-                f'<p class="tk-metric-lbl">\U0001f4c5 Week</p>'
-                f'<p class="tk-cell">{html.escape(_week_label(week_start))}</p>',
+                f'<p class="tk-met-lbl">\U0001f4c5 Week</p>'
+                f'<p style="font-size:.82rem;color:#374151;margin:0 0 .4rem">{html.escape(wl)}</p>',
                 unsafe_allow_html=True,
             )
-            mc1, mc2, mc3 = st.columns(3, gap="small")
-            with mc1:
-                st.markdown(f'<p class="tk-metric-lbl">S/T Total</p><p class="tk-metric-val">{st_h:.1f}h</p>', unsafe_allow_html=True)
-            with mc2:
-                ot_cls = "tk-metric-val tk-num-warn" if over else "tk-metric-val"
-                st.markdown(f'<p class="tk-metric-lbl">O/T Total</p><p class="{ot_cls}">{ot_h:.1f}h</p>', unsafe_allow_html=True)
-            with mc3:
-                st.markdown(f'<p class="tk-metric-lbl">Total{over_note}</p><p class="tk-metric-val">{total_h:.1f}h</p>', unsafe_allow_html=True)
+            m1, m2, m3 = st.columns(3, gap="small")
+            with m1:
+                st.markdown(f'<p class="tk-met-lbl">S/T Total</p>'
+                            f'<p class="tk-met-val">{sth:.2f} hrs</p>', unsafe_allow_html=True)
+            with m2:
+                vc = "tk-met-val-ot" if oth > 0 else "tk-met-val"
+                st.markdown(f'<p class="tk-met-lbl">O/T Total</p>'
+                            f'<p class="{vc}">{oth:.2f} hrs</p>', unsafe_allow_html=True)
+            with m3:
+                over_flag = " \u26a0" if over else ""
+                st.markdown(f'<p class="tk-met-lbl">Total Hours{over_flag}</p>'
+                            f'<p class="tk-met-val">{tot:.2f} hrs</p>', unsafe_allow_html=True)
 
         with d3:
-            st.markdown('<span class="tk-detail-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+            st.markdown('<span class="tk-dact" aria-hidden="true"></span>', unsafe_allow_html=True)
             if can_edit:
-                if st.button(
-                    "\U0001f4be Save Changes",
-                    key=f"tk_save_{eid[:8]}_{week_start.isoformat()}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    errs = _save_all_rows(eid, days, week_start, lbl_to_id, uid)
+                if st.button("\u270f\ufe0f Edit Week", key=f"tkedit_{eid[:8]}", use_container_width=True):
+                    pass  # Editing is inline in the rows below
+                if st.button("\U0001f4be Save Changes", key=f"tksave_{eid[:8]}_{week_start.isoformat()}",
+                             type="primary", use_container_width=True):
+                    errs = _save_week(eid, days, week_start, lbl_to_id, uid)
                     if errs:
                         st.error("Saved with errors:\n" + "\n".join(errs))
                     else:
-                        _clear_row_state(eid, days, week_start)
+                        _clear_state(eid, days, week_start)
                         try:
                             st.cache_data.clear()
                         except Exception:
                             pass
-                        st.success("Week saved!")
+                        st.success("Week saved successfully!")
                         st.rerun()
-            if st.button(
-                "\u2715 Close",
-                key="tk_close_panel",
-                type="secondary",
-                use_container_width=True,
-            ):
+            if st.button("\u2303 Collapse", key="tkclose", type="secondary", use_container_width=True):
                 st.session_state.pop(_TK_EMP, None)
                 st.session_state[_TK_VIEW] = "table"
                 st.session_state[_TK_EDIT] = False
@@ -884,49 +918,41 @@ def _render_detail_panel(
 
         st.divider()
 
-        # ---- Daily time rows -----------------------------------------------
-        _render_daily_rows(eid, days, week_start, idx, job_options, lbl_to_id)
+        # -- Daily rows --
+        _render_daily(eid, days, week_start, idx, jopts, lbl_to_id)
 
-        # ---- Footer metadata -----------------------------------------------
+        # -- Footer --
         st.markdown(
-            f'<p class="tk-footer-note">Last updated: {html.escape(last_updated_str)}'
-            f' &nbsp;\u00b7\u00a0 by {html.escape(last_by)}</p>',
+            f'<p class="tk-footer-note">Last updated: {html.escape(lu_str)}'
+            f'&nbsp; &middot; &nbsp;by {html.escape(lu_by)}</p>',
             unsafe_allow_html=True,
         )
 
 
 # ---------------------------------------------------------------------------
-# Export helper
+# Export
 # ---------------------------------------------------------------------------
-def _do_export(visible_emps: list[dict], days: list[date], idx: dict, job_id_to_lbl: dict[str, str]) -> None:
+def _do_export(visible: list[dict], days: list[date], idx: dict, id_to_lbl: dict[str, str]) -> None:
     rows: list[dict] = []
-    for emp in visible_emps:
+    for emp in visible:
         eid = str(emp.get("id"))
-        nm = str(emp.get("name") or "")
+        nm  = str(emp.get("name") or "")
         for d in days:
             for ent in idx.get((eid, d.isoformat()), []):
-                jid = str(ent.get("job_id") or "").strip()
-                nj = str(ent.get("non_job_code") or "").strip()
-                job_lbl = job_id_to_lbl.get(jid, jid) if jid else (f"NON-JOB -- {nj}" if nj else "")
+                jid  = str(ent.get("job_id") or "").strip()
+                nj   = str(ent.get("non_job_code") or "").strip()
+                jlbl = id_to_lbl.get(jid, jid) if jid else (f"NON-JOB -- {nj}" if nj else "")
                 rows.append({
-                    "Employee": nm,
-                    "Date": d.isoformat(),
-                    "Job": job_lbl,
-                    "Type": _time_type(ent),
+                    "Employee": nm, "Date": d.isoformat(),
+                    "Job": jlbl, "Type": _tt(ent),
                     "Hours": float(ent.get("hours") or 0),
                     "Notes": str(ent.get("notes") or ""),
                 })
-    if rows:
-        csv_data = pd.DataFrame(rows).to_csv(index=False)
-        st.download_button(
-            "Download CSV",
-            csv_data,
-            file_name=f"timekeeping_export.csv",
-            mime="text/csv",
-            key="tk_dl_csv",
-        )
-    else:
+    if not rows:
         st.info("No entries to export for this week.")
+        return
+    csv = pd.DataFrame(rows).to_csv(index=False)
+    st.download_button("Download CSV", csv, file_name="timekeeping_export.csv", mime="text/csv", key="tkdl")
 
 
 # ---------------------------------------------------------------------------
@@ -934,15 +960,12 @@ def _do_export(visible_emps: list[dict], days: list[date], idx: dict, job_id_to_
 # ---------------------------------------------------------------------------
 def render() -> None:
     today = date.today()
-
-    # Inject styles once
     _inject_styles()
 
-    # Auth check
-    role = current_role()
+    role     = current_role()
     can_edit = role in TT_EDIT_ROLES
 
-    # Initialise week state
+    # Week state
     if _TK_WEEK not in st.session_state:
         st.session_state[_TK_WEEK] = monday_of_week(today).isoformat()
     try:
@@ -950,82 +973,71 @@ def render() -> None:
     except (ValueError, TypeError):
         week_start = monday_of_week(today)
         st.session_state[_TK_WEEK] = week_start.isoformat()
-    # Snap to Monday
     if week_start.weekday() != 0:
         week_start = monday_of_week(week_start)
         st.session_state[_TK_WEEK] = week_start.isoformat()
 
-    days = week_dates(week_start)
+    days     = week_dates(week_start)
     week_end = days[-1]
 
-    # -- Page header
-    _render_header(week_start, days)
+    # Header
+    _render_header(week_start)
 
-    # -- Load data
+    # Data
     all_emps = _load_employees()
     jobs_raw = _load_jobs()
-    job_options, lbl_to_id = _build_job_options(jobs_raw)
-    job_id_to_lbl = {str(v): k for k, v in lbl_to_id.items()}
+    jopts, lbl_to_id = _build_job_options(jobs_raw)
+    id_to_lbl = {str(v): k for k, v in lbl_to_id.items()}
 
     try:
-        grid_rows = fetch_time_entries_between(week_start, week_end)
+        grid = fetch_time_entries_between(week_start, week_end)
     except Exception as exc:
-        grid_rows = []
+        grid = []
         st.error(f"Could not load time entries: {exc}")
-    idx = index_by_employee_date(grid_rows)
+    idx = index_by_employee_date(grid)
 
     if not all_emps:
         st.warning("No active employees found. Add employees under **Employees** in the sidebar.")
         return
 
-    # -- Filter bar
-    q, dept_filter, export_clicked = _render_filter_bar(all_emps)
+    # Filter bar
+    q, dept_f, export_clicked = _render_filter_bar(all_emps)
 
-    # Apply filters
-    visible_emps = all_emps
+    visible = all_emps
     if q:
-        visible_emps = [e for e in visible_emps if q in str(e.get("name") or "").lower()]
-    if dept_filter != "All Departments":
-        visible_emps = [e for e in visible_emps if str(e.get("department") or "").strip() == dept_filter]
+        visible = [e for e in visible if q in str(e.get("name") or "").lower()]
+    if dept_f != "All Departments":
+        visible = [e for e in visible if str(e.get("department") or "").strip() == dept_f]
 
-    if not visible_emps:
-        st.info("No employees match the current filter.")
+    if export_clicked:
+        _do_export(visible, days, idx, id_to_lbl)
+
+    if not visible:
+        st.markdown('<p class="tk-no-emp">No employees match the current filter.</p>',
+                    unsafe_allow_html=True)
         return
 
-    # Export handling
-    if export_clicked:
-        _do_export(visible_emps, days, idx, job_id_to_lbl)
-
-    # -- Employee table
     if not can_edit:
         st.info("View-only mode. Sign in as admin, manager, pm, or employee to log time.")
-    selected_eid = _render_employee_table(visible_emps, days, week_start, idx, can_edit)
 
-    # -- Detail panel
-    if selected_eid:
+    # Employee table
+    sel_eid = _render_table(visible, days, week_start, idx)
+
+    # Detail panel
+    if sel_eid:
         uid = current_profile().get("id")
-        _render_detail_panel(
-            eid=selected_eid,
-            all_emps=all_emps,
-            days=days,
-            week_start=week_start,
-            idx=idx,
-            job_options=job_options,
-            lbl_to_id=lbl_to_id,
-            uid=uid,
-            can_edit=can_edit,
-        )
+        _render_detail(sel_eid, all_emps, days, week_start, idx, jopts, lbl_to_id, uid, can_edit)
     else:
         st.markdown(
-            '<p class="tk-hint">\u25b6 Click an employee row to view and edit their weekly timecard.</p>',
+            '<p class="tk-hint">\u25b6\ufe0e&nbsp; Click an employee row to view and edit their weekly timecard.</p>',
             unsafe_allow_html=True,
         )
 
-    # -- Week totals caption
-    week_st = sum(_emp_week_summary(str(e.get("id")), days, idx)[0] for e in visible_emps)
-    week_ot = sum(_emp_week_summary(str(e.get("id")), days, idx)[1] for e in visible_emps)
+    # Week summary caption
+    wst = sum(_week_summary2(str(e.get("id")), days, idx)[0] for e in visible)
+    wot = sum(_week_summary2(str(e.get("id")), days, idx)[1] for e in visible)
     st.caption(
-        f"Week {week_start.strftime('%b %d')} \u2013 {week_end.strftime('%b %d')}  \u00b7  "
-        f"S/T: **{week_st:.1f} h**  \u00b7  O/T: **{week_ot:.1f} h**  \u00b7  "
-        f"Total: **{week_st + week_ot:.1f} h**"
+        f"Week {week_start.strftime('%b')} {week_start.day} \u2013 "
+        f"{week_end.strftime('%b')} {week_end.day}  \u00b7  "
+        f"S/T: **{wst:.1f} h**  \u00b7  O/T: **{wot:.1f} h**  \u00b7  Total: **{wst+wot:.1f} h**"
     )
