@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_USERS_PAGE_STYLES_KEY = "ips_users_page_styles_v3"
+IPS_USERS_PAGE_STYLES_KEY = "ips_users_page_styles_v4"
 
 _ROLE_BADGE_COLORS: dict[str, str] = {
     "administrator": "#2563eb",
@@ -61,19 +61,208 @@ def inject_users_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-filter-anchor) > div {
             padding: 0.55rem 0.7rem 0.6rem !important;
         }
+        /* ----- Table card ----- */
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor) > div {
-            padding: 0.15rem 0.55rem 0.3rem !important;
+            padding: 0 !important;
         }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+        }
+
+        /* Column header row: compact + bottom border */
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
         div[data-testid="stHorizontalBlock"]:has(.ips-users-th-row) {
             background: #ffffff !important;
             border-bottom: 1px solid #e5eaf2 !important;
-            margin: 0 -0.35rem 0.15rem !important;
-            padding: 0 0.35rem !important;
-            border-radius: 6px 6px 0 0 !important;
+            margin: 0 !important;
+            padding: 0.3rem 0.55rem !important;
+            border-radius: 0 !important;
+            min-height: 2.25rem !important;
+            align-items: center !important;
+            box-sizing: border-box !important;
         }
+
+        /* Flatten nested BorderWrappers (per-row containers) */
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.ips-users-table-anchor)) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.ips-users-table-anchor)) > div {
+            padding: 0 !important;
+        }
+
+        /* ── Clean user row (CSS grid) ── */
+        .usr-row {
+            display: grid;
+            grid-template-columns: 1.35fr 1.5fr 0.95fr 0.9fr 0.75fr 0.95fr 0.65fr;
+            align-items: center;
+            gap: 0 8px;
+            min-height: 60px;
+            padding: 10px 14px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5eaf2;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap):hover .usr-row:not(.selected) {
+            background: #f8fbff;
+        }
+        .usr-row.selected {
+            background: #eef5ff;
+            border-left-color: #2563eb;
+        }
+        .usr-name-cell {
+            color: #2563eb;
+            font-weight: 700;
+            font-size: 0.83rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .usr-row.selected .usr-name-cell { color: #1d4ed8; font-weight: 800; }
+        .usr-cell {
+            font-size: 0.83rem;
+            color: #111827;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            line-height: 1.4;
+        }
+        .usr-cell.email { font-weight: 500; }
+        .usr-cell.muted { color: #6b7280; font-size: 0.79rem; }
+        .usr-act-slot { min-height: 1px; }
+
+        /* Row host: relative container for overlays */
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap):not(:has(.ips-users-table-anchor)) {
+            position: relative !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap):not(:has(.ips-users-table-anchor))
+        [data-testid="stElementContainer"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+        }
+
+        /* Invisible full-row select button overlay */
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) {
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
+            right: 100px !important; bottom: 0 !important;
+            z-index: 1 !important;
+            height: 100% !important;
+            margin: 0 !important; padding: 0 !important;
+            pointer-events: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) .stButton,
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+            width: 100% !important; height: 100% !important;
+            min-height: 60px !important;
+            margin: 0 !important; padding: 0 !important;
+            opacity: 0 !important;
+            border: none !important; background: transparent !important;
+            box-shadow: none !important; cursor: pointer !important;
+        }
+
+        /* Action buttons: absolutely positioned right */
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] {
+            position: absolute !important;
+            top: 50% !important; right: 14px !important;
+            transform: translateY(-50%) !important;
+            z-index: 3 !important; width: 5rem !important;
+            pointer-events: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+            gap: 0.35rem !important; min-height: unset !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] .stButton > button,
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stPopover"] > button {
+            min-width: 2rem !important; max-width: 2rem !important;
+            min-height: 2rem !important; height: 2rem !important;
+            padding: 0 !important; font-size: 0.9rem !important;
+            border: 1px solid #e2e8f0 !important; border-radius: 6px !important;
+            background: #ffffff !important; color: #374151 !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+        }
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] .stButton > button:hover,
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.usr-row-wrap)
+        [data-testid="stElementContainer"]:has(.usr-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stPopover"] > button:hover {
+            background: #f8fafc !important; border-color: #cbd5e1 !important;
+        }
+
+        /* Hide helper markers */
+        .usr-row-wrap, .usr-row-select-btn, .usr-actcol { display: none !important; }
+
+        /* Zero stMarkdown margins inside table card */
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        .stMarkdown,
+        section[data-testid="stMain"]:has(.ips-users-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-table-anchor)
+        .stMarkdown p { margin: 0 !important; }
+
         section[data-testid="stMain"]:has(.ips-users-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-users-detail-anchor) {
             background: #ffffff !important;
@@ -132,41 +321,6 @@ def inject_users_page_styles() -> None:
             font-size: 0.62rem;
             margin-left: 0.2rem;
             font-weight: 600;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page)
-        div[data-testid="stHorizontalBlock"]:has(.ips-users-row-selected) {
-            background: #eff6ff !important;
-            border-left: 4px solid #2563eb !important;
-            border-radius: 0 4px 4px 0 !important;
-            margin: 0 -0.4rem !important;
-            padding: 0.12rem 0 0.12rem 0.4rem !important;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page)
-        div[data-testid="stHorizontalBlock"]:has(.ips-users-row-marker):not(:has(.ips-users-row-selected)) {
-            border-bottom: 1px solid #f3f4f6;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page) .ips-users-link-btn button {
-            color: #2563eb !important;
-            font-weight: 600 !important;
-            font-size: 0.8125rem !important;
-            padding: 0 !important;
-            min-height: 1.35rem !important;
-            height: auto !important;
-            border: none !important;
-            background: #ffffff !important;
-            box-shadow: none !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page) .ips-users-link-btn button:hover {
-            color: #1d4ed8 !important;
-            background: #ffffff !important;
-        }
-        section[data-testid="stMain"]:has(.ips-users-page) .ips-users-action-btn button {
-            min-height: 1.65rem !important;
-            padding: 0.1rem 0.35rem !important;
-            font-size: 0.9rem !important;
-            border-radius: 6px !important;
         }
         .ips-users-email-cell {
             font-size: 0.8125rem;

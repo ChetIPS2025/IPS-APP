@@ -670,8 +670,6 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
                 continue
             disp = row.get("_display") or {}
             is_sel = uid == selected_id
-            marker = " ips-users-row-selected" if is_sel else ""
-            rc = st.columns(weights)
 
             name = str(disp.get("name") or "—")
             email = _safe_str(row.get("email")) or "—"
@@ -680,38 +678,34 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
             dept = str(disp.get("department") or "—")
             last_login = str(disp.get("last_login") or "—")
 
-            with rc[0]:
+            row_cls = "usr-row selected" if is_sel else "usr-row"
+
+            with st.container():
+                st.markdown('<span class="usr-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
                 st.markdown(
-                    f'<span class="ips-users-row-marker{marker}" aria-hidden="true"></span>',
+                    f'<div class="{row_cls}">'
+                    f'<span class="usr-name-cell" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
+                    f'<span class="usr-cell email" title="{html.escape(email, quote=True)}">{html.escape(email)}</span>'
+                    f'<span class="usr-cell">{role_html}</span>'
+                    f'<span class="usr-cell muted">{html.escape(dept)}</span>'
+                    f'<span class="usr-cell">{status_html}</span>'
+                    f'<span class="usr-cell muted">{html.escape(last_login)}</span>'
+                    f'<span class="usr-act-slot"></span>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<div class="ips-users-link-btn">', unsafe_allow_html=True)
-                if st.button(name, key=f"users_pick_{uid}", use_container_width=True):
+                st.markdown('<span class="usr-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
+                if st.button(
+                    "\u200b",
+                    key=f"users_pick_{uid}",
+                    use_container_width=True,
+                    help=f"Select {name}",
+                ):
                     st.session_state["users_selected_id"] = uid
                     st.session_state.pop("users_detail_collapsed", None)
                     st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-            with rc[1]:
-                st.markdown(
-                    f'<span class="ips-users-email-cell">{html.escape(email)}</span>',
-                    unsafe_allow_html=True,
-                )
-            with rc[2]:
-                st.markdown(role_html, unsafe_allow_html=True)
-            with rc[3]:
-                st.markdown(
-                    f'<span class="ips-users-muted-cell">{html.escape(dept)}</span>',
-                    unsafe_allow_html=True,
-                )
-            with rc[4]:
-                st.markdown(status_html, unsafe_allow_html=True)
-            with rc[5]:
-                st.markdown(
-                    f'<span class="ips-users-muted-cell">{html.escape(last_login)}</span>',
-                    unsafe_allow_html=True,
-                )
-            with rc[6]:
-                st.markdown('<div class="ips-users-action-btn">', unsafe_allow_html=True)
+
+                st.markdown('<span class="usr-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
                     if st.button("👁", key=f"users_view_{uid}", help="View user", use_container_width=True):
@@ -742,7 +736,6 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
                                 st.rerun()
                             except Exception as exc:
                                 st.error(f"Could not update: {exc}")
-                st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_user_detail_panel(row: dict[str, Any]) -> None:

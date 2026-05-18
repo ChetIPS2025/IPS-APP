@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-IPS_ESTIMATES_PAGE_STYLES_KEY = "ips_estimates_page_styles_v3"
+IPS_ESTIMATES_PAGE_STYLES_KEY = "ips_estimates_page_styles_v4"
 
 _STATUS_STYLES: dict[str, tuple[str, str, str]] = {
     "approved": ("#dcfce7", "#166534", "#bbf7d0"),
@@ -144,6 +144,7 @@ def inject_estimates_page_styles() -> None:
             padding: 0.5rem 0.75rem 0.4rem;
             margin: 0;
         }
+
         /* ----- Table card ----- */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor) {
@@ -158,70 +159,28 @@ def inject_estimates_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor) > div {
             padding: 0 !important;
         }
-        .ips-est-table-head {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1.2fr 1fr 1fr 0.9fr 0.85fr 1fr 0.7fr;
-            gap: 0.35rem;
-            padding: 0.55rem 0.75rem 0.45rem;
-            background: #ffffff;
-            border-bottom: 1px solid #e5eaf2;
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
         }
-        .ips-est-th {
-            color: #6b7280;
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin: 0;
-            line-height: 1.3;
-        }
-        .ips-est-th .sort { opacity: 0.45; font-size: 0.62rem; margin-left: 0.12rem; }
 
+        /* Sort header row: compact + bottom border */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stHorizontalBlock"]:has(.ips-est-row-selected) {
-            background: #eff6ff !important;
-            box-shadow: inset 3px 0 0 #2563eb !important;
-        }
-        section[data-testid="stMain"]:has(.ips-estimates-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stHorizontalBlock"]:has(.ips-est-table-row) {
-            border-bottom: 1px solid #f1f5f9 !important;
-            padding: 0.15rem 0.35rem !important;
-            margin: 0 !important;
+        div[data-testid="stHorizontalBlock"]:has(.ips-est-sort-anchor) {
+            padding: 0.3rem 0.55rem !important;
+            border-bottom: 1px solid #e5eaf2 !important;
+            background: #ffffff !important;
+            min-height: 2.25rem !important;
             align-items: center !important;
-        }
-        section[data-testid="stMain"]:has(.ips-estimates-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="stHorizontalBlock"]:has(.ips-est-table-row) > div {
-            padding: 0.35rem 0.4rem !important;
-            font-size: 0.8125rem !important;
-        }
-        /* Quote # link style */
-        section[data-testid="stMain"]:has(.ips-estimates-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="column"]:has(.ips-est-quote-anchor) .stButton > button {
-            background: #ffffff !important;
-            border: none !important;
-            box-shadow: none !important;
-            color: #2563eb !important;
-            font-weight: 600 !important;
-            font-size: 0.8125rem !important;
-            padding: 0.2rem 0 !important;
-            min-height: auto !important;
-            justify-content: flex-start !important;
-        }
-        section[data-testid="stMain"]:has(.ips-estimates-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="column"]:has(.ips-est-quote-anchor) .stButton > button:hover {
-            text-decoration: underline !important;
-            background: #ffffff !important;
+            box-sizing: border-box !important;
         }
         /* Sort header buttons → look like labels */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
         div[data-testid="column"]:has(.ips-est-sort-anchor) .stButton > button {
-            background: #ffffff !important;
+            background: transparent !important;
             border: none !important;
             box-shadow: none !important;
             color: #6b7280 !important;
@@ -232,17 +191,204 @@ def inject_estimates_page_styles() -> None:
             padding: 0 !important;
             min-height: auto !important;
         }
-        /* Action icon buttons */
+
+        /* Flatten nested BorderWrappers for per-row containers */
         section[data-testid="stMain"]:has(.ips-estimates-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
-        div[data-testid="column"]:has(.ips-est-act-anchor) .stButton > button {
-            background: #ffffff !important;
-            border: 1px solid #e5eaf2 !important;
-            border-radius: 8px !important;
-            min-height: 1.85rem !important;
-            padding: 0.15rem 0.35rem !important;
-            font-size: 0.9rem !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.ips-est-table-anchor)) {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlockBorderWrapper"]:not(:has(.ips-est-table-anchor)) > div {
+            padding: 0 !important;
+        }
+
+        /* ── Clean estimate row (CSS grid) ── */
+        .est-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1.3fr 1fr 1fr 0.9fr 0.85fr 1fr 0.75fr;
+            align-items: center;
+            gap: 0 8px;
+            min-height: 60px;
+            padding: 10px 14px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5eaf2;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):hover .est-row:not(.selected) {
+            background: #f8fbff;
+        }
+        .est-row.selected {
+            background: #eef5ff;
+            border-left-color: #2563eb;
+        }
+        .est-qnum {
+            color: #2563eb;
+            font-weight: 700;
+            font-size: 0.83rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .est-row.selected .est-qnum { color: #1d4ed8; font-weight: 800; }
+        .est-cell {
+            font-size: 0.83rem;
+            color: #111827;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            line-height: 1.4;
+        }
+        .est-cell.muted { color: #6b7280; font-size: 0.79rem; }
+        .est-cell.bold  { font-weight: 600; }
+        .est-cell-title-wrap { min-width: 0; }
+        .est-cell-title {
+            color: #111827;
+            font-weight: 600;
+            font-size: 0.83rem;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.35;
+        }
+        .est-cell-sub {
+            color: #9ca3af;
+            font-size: 0.75rem;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .est-cell-stat { min-width: 0; overflow: visible; }
+        .est-act-slot  { min-height: 1px; }
+
+        /* Row host: relative container for overlays */
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):not(:has(.ips-est-table-anchor)) {
+            position: relative !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap):not(:has(.ips-est-table-anchor))
+        [data-testid="stElementContainer"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+        }
+
+        /* Invisible full-row select button overlay */
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) {
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
+            right: 100px !important; bottom: 0 !important;
+            z-index: 1 !important;
+            height: 100% !important;
+            margin: 0 !important; padding: 0 !important;
+            pointer-events: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) .stButton,
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-row-select-btn)
+        + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+            width: 100% !important; height: 100% !important;
+            min-height: 60px !important;
+            margin: 0 !important; padding: 0 !important;
+            opacity: 0 !important;
+            border: none !important; background: transparent !important;
+            box-shadow: none !important; cursor: pointer !important;
+        }
+
+        /* Action buttons: absolutely positioned right */
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] {
+            position: absolute !important;
+            top: 50% !important; right: 14px !important;
+            transform: translateY(-50%) !important;
+            z-index: 3 !important; width: 5rem !important;
+            pointer-events: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+            gap: 0.35rem !important; min-height: unset !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] .stButton > button,
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stPopover"] > button {
+            min-width: 2rem !important; max-width: 2rem !important;
+            min-height: 2rem !important; height: 2rem !important;
+            padding: 0 !important; font-size: 0.9rem !important;
+            border: 1px solid #e2e8f0 !important; border-radius: 6px !important;
+            background: #ffffff !important; color: #374151 !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+        }
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] .stButton > button:hover,
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        div[data-testid="stVerticalBlock"]:has(.est-row-wrap)
+        [data-testid="stElementContainer"]:has(.est-actcol)
+        + [data-testid="stElementContainer"] [data-testid="stPopover"] > button:hover {
+            background: #f8fafc !important; border-color: #cbd5e1 !important;
+        }
+
+        /* Hide helper markers */
+        .est-row-wrap, .est-row-select-btn, .est-actcol { display: none !important; }
+
+        /* Zero stMarkdown margins inside table card */
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        .stMarkdown,
+        section[data-testid="stMain"]:has(.ips-estimates-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-est-table-anchor)
+        .stMarkdown p { margin: 0 !important; }
 
         .ips-est-project-title {
             color: #111827;

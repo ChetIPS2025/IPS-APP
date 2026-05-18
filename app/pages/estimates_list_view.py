@@ -547,8 +547,6 @@ def render_estimates_list_page(
                 continue
             full_row = row_lookup.get(eid, est_row.to_dict())
             is_sel = eid == selected_id
-            marker = " ips-est-row-selected" if is_sel else ""
-            rc = st.columns(weights)
 
             qn = _safe_str(est_row.get("quote_number")) or "-"
             title = _project_title(full_row if isinstance(full_row, dict) else {})
@@ -559,42 +557,45 @@ def render_estimates_list_page(
             created = _safe_str(est_row.get("prepared_by_name")) or _created_by_label(
                 full_row if isinstance(full_row, dict) else {}
             )
+            est_date = _fmt_date(est_row.get("estimate_date"))
+            exp_date = _fmt_date(est_row.get("expiration_date"))
 
-            with rc[0]:
-                st.markdown('<span class="ips-est-quote-anchor"></span>', unsafe_allow_html=True)
-                st.markdown('<span class="ips-est-table-row" aria-hidden="true"></span>', unsafe_allow_html=True)
+            row_cls = "est-row selected" if is_sel else "est-row"
+            sub_html = (
+                f'<span class="est-cell-sub">{html.escape(subtitle)}</span>'
+                if subtitle else ""
+            )
+
+            with st.container():
+                st.markdown('<span class="est-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
                 st.markdown(
-                    f'<span class="ips-est-row-marker{marker}" aria-hidden="true"></span>',
+                    f'<div class="{row_cls}">'
+                    f'<span class="est-qnum" title="{html.escape(qn, quote=True)}">{html.escape(qn)}</span>'
+                    f'<div class="est-cell-title-wrap">'
+                    f'<div class="est-cell-title">{html.escape(title)}</div>{sub_html}'
+                    f'</div>'
+                    f'<span class="est-cell muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
+                    f'<span class="est-cell muted">{html.escape(est_date)}</span>'
+                    f'<span class="est-cell muted">{html.escape(exp_date)}</span>'
+                    f'<span class="est-cell bold">{html.escape(total)}</span>'
+                    f'<span class="est-cell-stat">{status_html}</span>'
+                    f'<span class="est-cell muted">{html.escape(created)}</span>'
+                    f'<span class="est-act-slot"></span>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(qn, key=f"est_pick_{eid}", use_container_width=True):
+                st.markdown('<span class="est-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
+                if st.button(
+                    "\u200b",
+                    key=f"est_pick_{eid}",
+                    use_container_width=True,
+                    help=f"Select estimate {qn}",
+                ):
                     st.session_state["est_list_selected_id"] = eid
                     st.session_state.pop("est_list_detail_collapsed", None)
                     st.rerun()
-            with rc[1]:
-                sub_html = (
-                    f'<div class="ips-est-project-desc">{html.escape(subtitle)}</div>'
-                    if subtitle
-                    else ""
-                )
-                st.markdown(
-                    f'<div class="ips-est-project-title">{html.escape(title)}</div>{sub_html}',
-                    unsafe_allow_html=True,
-                )
-            with rc[2]:
-                st.markdown(f"<span>{html.escape(cust)}</span>", unsafe_allow_html=True)
-            with rc[3]:
-                st.caption(_fmt_date(est_row.get("estimate_date")))
-            with rc[4]:
-                st.caption(_fmt_date(est_row.get("expiration_date")))
-            with rc[5]:
-                st.markdown(f"**{html.escape(total)}**", unsafe_allow_html=True)
-            with rc[6]:
-                st.markdown(status_html, unsafe_allow_html=True)
-            with rc[7]:
-                st.caption(created)
-            with rc[8]:
-                st.markdown('<span class="ips-est-act-anchor"></span>', unsafe_allow_html=True)
+
+                st.markdown('<span class="est-actcol" aria-hidden="true"></span>', unsafe_allow_html=True)
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
                     if st.button("👁", key=f"est_view_{eid}", help="View estimate", use_container_width=True):
