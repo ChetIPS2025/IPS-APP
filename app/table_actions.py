@@ -518,7 +518,12 @@ def render_table_action_bar(
                 exp_single_ok = exp_ok and n == 1
 
                 with b1:
-                    if st.button(view_label, disabled=view_dis, use_container_width=False, key=f"ips_ta_view_{table_key}"):
+                    if can_view and st.button(
+                        view_label,
+                        disabled=view_dis,
+                        use_container_width=False,
+                        key=f"ips_ta_view_{table_key}",
+                    ):
                         out["view"] = True
                 with b2:
                     if st.button(edit_label, disabled=edit_dis, use_container_width=False, key=f"ips_ta_edit_{table_key}"):
