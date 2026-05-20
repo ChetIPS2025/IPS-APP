@@ -1686,6 +1686,8 @@ def _tt_render_grid_section(
             if j.get("id") and _tt_job_is_active_open(j)
         }
         active_job_labels = [lb for lb in all_job_labels if job_label_to_id.get(lb) in active_job_ids]
+        if not active_job_labels:
+            active_job_labels = list(all_job_labels)
         full_job_labels = _build_full_job_options(active_job_labels)
 
         uid = current_profile().get("id")
