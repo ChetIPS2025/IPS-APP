@@ -1610,7 +1610,7 @@ def _tt_render_grid_section(
     if selected_eid:
         # Build job options for the detail panel
         jobs_raw = _tt_load_jobs_rows(limit=5000)
-        job_label_to_id, full_job_labels = _build_full_job_options(jobs_raw)
+        job_label_to_id, picker_job_labels, full_job_labels = _build_full_job_options(jobs_raw)
 
         uid = current_profile().get("id")
         ts_now = datetime.now(timezone.utc).isoformat()
@@ -1626,6 +1626,7 @@ def _tt_render_grid_section(
             fj_id=fj_id,
             full_job_labels=full_job_labels,
             job_label_to_id=job_label_to_id,
+            picker_job_labels=picker_job_labels,
             uid=uid,
             ts_now=ts_now,
         )
@@ -1771,13 +1772,14 @@ def _render_quick_actions_popup(
     today: date,
     idx: dict,
     fj_id: str | None,
+    job_label_to_id: dict[str, str],
+    entry_job_labels: list[str],
     default_job_label: str | None,
     fast: bool,
     user_id,
     ts_iso: str,
 ) -> None:
     """Compact Quick Actions popup: day, bulk copy/fill/clear, entries and add for selected day."""
-    job_label_to_id, entry_job_labels = _tt_picker_job_labels(_tt_load_jobs_rows(limit=5000))
     _tt_init_qa_day(eid, days, today)
     wd_key = _tt_qa_day_key(eid)
     try:
@@ -2605,11 +2607,13 @@ def _resolve_job_from_label(
     return jid or None, None
 
 
-def _build_full_job_options(jobs_raw: list[dict[str, Any]]) -> tuple[dict[str, str], list[str]]:
-    """Active/open job labels (closed-job fallback) plus NON-JOB categories for time-entry pickers."""
+def _build_full_job_options(
+    jobs_raw: list[dict[str, Any]],
+) -> tuple[dict[str, str], list[str], list[str]]:
+    """Return (label_to_id, active job labels, full picker options including NON-JOB)."""
     job_label_to_id, job_labels = _tt_picker_job_labels(jobs_raw)
     nj_labels = [f"NON-JOB — {c}" for c in NON_JOB_CATEGORY_OPTIONS if c]
-    return job_label_to_id, job_labels + nj_labels
+    return job_label_to_id, job_labels, job_labels + nj_labels
 
 
 def _label_for_group(g: dict, job_id_to_label: dict[str, str]) -> str:
@@ -3039,6 +3043,7 @@ def _render_timekeeping_detail_panel(
     fj_id: str | None,
     full_job_labels: list[str],
     job_label_to_id: dict[str, str],
+    picker_job_labels: list[str],
     uid: Any,
     ts_now: str,
 ) -> None:
@@ -3096,6 +3101,8 @@ def _render_timekeeping_detail_panel(
                 eid=selected_eid, emp_name=nm, days=days,
                 week_start=week_start, week_end=week_end, today=today,
                 idx=idx, fj_id=fj_id,
+                job_label_to_id=job_label_to_id,
+                entry_job_labels=picker_job_labels,
                 default_job_label=filt.default_job_label,
                 fast=False, user_id=uid, ts_iso=ts_now,
             )
