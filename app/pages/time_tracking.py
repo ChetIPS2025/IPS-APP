@@ -1680,7 +1680,13 @@ def _tt_render_grid_section(
         # Build job options for the detail panel
         jobs_raw = _tt_load_jobs_rows(limit=5000)
         _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
-        full_job_labels = _build_full_job_options(list(all_job_labels))
+        active_job_ids = {
+            str(j.get("id"))
+            for j in jobs_raw
+            if j.get("id") and _tt_job_is_active_open(j)
+        }
+        active_job_labels = [lb for lb in all_job_labels if job_label_to_id.get(lb) in active_job_ids]
+        full_job_labels = _build_full_job_options(active_job_labels)
 
         uid = current_profile().get("id")
         ts_now = datetime.now(timezone.utc).isoformat()
@@ -2589,14 +2595,10 @@ def _save_timecard_row(
 ) -> tuple[bool, str]:
     """Upsert/delete ST and OT entries for one combined timecard row."""
     job_changed = str(orig_job_id or "") != str(new_job_id or "") or str(orig_nj or "") != str(new_nj or "")
+    delete_after_save: list[str] = []
 
     if job_changed:
-        for tid in [orig_st_id, orig_ot_id]:
-            if tid:
-                try:
-                    delete_rows("time_entries", {"id": tid})
-                except Exception as exc:
-                    return False, str(exc)
+        delete_after_save = [tid for tid in [orig_st_id, orig_ot_id] if tid]
         orig_st_id = None
         orig_ot_id = None
 
@@ -2630,6 +2632,12 @@ def _save_timecard_row(
         except Exception as exc:
             return False, str(exc)
 
+    for tid in delete_after_save:
+        try:
+            delete_rows("time_entries", {"id": tid})
+        except Exception as exc:
+            return False, str(exc)
+
     return True, ""
 
 
@@ -2645,7 +2653,7 @@ def _resolve_job_from_label(
 
 
 def _build_full_job_options(all_job_labels: list[str]) -> list[str]:
-    """Combine job labels with NON-JOB category labels."""
+    """Combine active/open job labels with NON-JOB category labels."""
     nj_labels = [f"NON-JOB — {c}" for c in NON_JOB_CATEGORY_OPTIONS if c]
     return all_job_labels + nj_labels
 
