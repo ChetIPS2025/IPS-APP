@@ -1,4 +1,4 @@
-"""Estimate materials — line items and summary."""
+"""Estimate materials — line items and summary.
 
 When an estimate is loaded (``loaded_estimate_id`` / ``selected_estimate_id`` in
 session state) this page renders a full estimate detail UI with:
