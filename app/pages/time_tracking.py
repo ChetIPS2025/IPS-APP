@@ -3114,159 +3114,6 @@ def _render_wc_add_row(
                         st.error(err or "Add failed.")
 
 
-def _render_employee_timecard_card(
-    *,
-    emp: dict,
-    days: list[date],
-    week_start: date,
-    today: date,
-    idx: dict,
-    filt: _TTFiltersResult,
-    fj_id: str | None,
-    full_job_labels: list[str],
-    job_label_to_id: dict[str, str],
-    uid: Any,
-    ts_now: str,
-) -> None:
-    """Full weekly timecard card for one employee."""
-    eid = str(emp.get("id"))
-    nm = str(emp.get("name", "") or "—").strip() or "—"
-    week_iso = week_start.isoformat()
-
-    # Compute weekly ST/OT totals
-    wk_st = wk_ot = 0.0
-    for d in days:
-        for ent in idx.get((eid, d.isoformat()), []):
-            if fj_id and str(ent.get("job_id") or "") != fj_id:
-                continue
-            h = float(ent.get("hours") or 0)
-            if _tt_entry_time_type(ent) == "OT":
-                wk_ot += h
-            else:
-                wk_st += h
-    wk_total = wk_st + wk_ot
-
-    with st.container(border=True):
-        st.markdown('<span class="ips-wc-card" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-        # Card header: employee name + weekly totals + Quick Actions toggle
-        h1, h2, h3 = st.columns([3, 2.5, 0.55], gap="small")
-        with h1:
-            st.markdown(f"**{html.escape(nm)}**")
-        with h2:
-            over = wk_total > filt.ot_threshold
-            ot_note = f"  ⚠ >{filt.ot_threshold:g}h" if over else ""
-            st.caption(
-                f"Week {week_start.strftime('%b %d')}–{days[-1].strftime('%b %d')}  ·  "
-                f"S/T **{wk_st:.1f}** · O/T **{wk_ot:.1f}** · Total **{wk_total:.1f}** h{ot_note}"
-            )
-        with h3:
-            _render_qa_toggle_button(eid)
-
-        # Column header row
-        _render_wc_col_headers()
-
-        # One section per day
-        for di, d in enumerate(days):
-            day_iso = d.isoformat()
-            entries_for_day = list(idx.get((eid, day_iso), []))
-            if fj_id:
-                entries_for_day = [e for e in entries_for_day if str(e.get("job_id") or "") == fj_id]
-
-            groups = _group_day_entries(entries_for_day, filt.job_id_to_label)
-
-            # Thin separator between days (except first)
-            if di > 0:
-                sep_cols = st.columns(_WC_COL_RATIOS, gap="small")
-                with sep_cols[0]:
-                    st.markdown('<span class="ips-wc-day-sep" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-            is_first_row = True
-            for g in groups:
-                _render_wc_existing_row(
-                    eid=eid, d=d, week_start=week_start, today=today,
-                    g=g,
-                    full_job_labels=list(full_job_labels),
-                    job_label_to_id=job_label_to_id,
-                    job_id_to_label=filt.job_id_to_label,
-                    uid=uid, ts_now=ts_now,
-                    show_day_label=is_first_row,
-                )
-                is_first_row = False
-
-            _render_wc_add_row(
-                eid=eid, d=d, week_start=week_start, today=today,
-                has_existing_rows=bool(groups),
-                full_job_labels=full_job_labels,
-                job_label_to_id=job_label_to_id,
-                fj_default_label=filt.default_job_label,
-                uid=uid, ts_now=ts_now,
-            )
-
-
-def _render_weekly_timecard_grid(
-    *,
-    today: date,
-    week_start: date,
-    days: list[date],
-    filt: _TTFiltersResult,
-    week_data: _TTWeekDataResult,
-    fj_id: str | None,
-) -> tuple[list[float], list[float]]:
-    """Per-employee weekly timecard cards — replaces the old single-day form."""
-    uid = current_profile().get("id")
-    ts_now = datetime.now(timezone.utc).isoformat()
-
-    # Build job options (all jobs for existing rows; active + non-job for add rows)
-    jobs_raw = _tt_load_jobs_rows(limit=5000)
-    _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
-    if not jobs_raw:
-        st.caption("**No jobs loaded** — check Supabase `jobs` table and RLS policies.")
-
-    full_job_labels = _build_full_job_options(list(all_job_labels))
-
-    # Quick-actions popup (rendered outside the card so it floats above)
-    open_emp = str(st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) or "")
-    if open_emp:
-        matching = [e for e in week_data.visible_emps if str(e.get("id")) == open_emp]
-        if matching:
-            nm_qa = str(matching[0].get("name", "") or "—").strip()
-            _render_quick_actions_popup(
-                eid=open_emp, emp_name=nm_qa, days=days,
-                week_start=week_start, week_end=days[-1], today=today,
-                idx=week_data.idx, fj_id=fj_id,
-                job_labels_sorted=filt.job_labels_sorted,
-                job_label_to_id=filt.job_label_to_id,
-                default_job_label=filt.default_job_label,
-                fast=False, user_id=uid, ts_iso=ts_now,
-            )
-
-    # Render one card per employee
-    for emp in week_data.visible_emps:
-        _render_employee_timecard_card(
-            emp=emp, days=days, week_start=week_start, today=today,
-            idx=week_data.idx, filt=filt, fj_id=fj_id,
-            full_job_labels=full_job_labels,
-            job_label_to_id=job_label_to_id,
-            uid=uid, ts_now=ts_now,
-        )
-
-    # Week grand total summary
-    wk_st = wk_ot = 0.0
-    for eid_k in filt.show_emp_ids:
-        _, s, o = _tt_emp_hours_breakdown_for_week(str(eid_k), days, week_data.idx, fj_id)
-        wk_st += s
-        wk_ot += o
-    st.caption(
-        f"Week total (all visible employees): S/T **{wk_st:.2f}** h · "
-        f"O/T **{wk_ot:.2f}** h · Σ **{wk_st + wk_ot:.2f}** h"
-    )
-
-    day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
-    grid_ratios = _week_grid_column_ratios(fast=False)
-    return day_col_totals, grid_ratios
-
-
 # ─── Timekeeping: table + detail panel (new Jobs-style layout) ───────────────
 
 _TC_COL_RATIOS = [2.8, 0.9, 0.9, 0.95, 0.85]  # name, st, ot, total, action
@@ -3458,8 +3305,8 @@ def _render_timekeeping_detail_panel(
     with st.container(border=True):
         st.markdown('<span class="ips-tc-detail-panel" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-        # Detail panel header: name + stats + close button
-        dh1, dh2, dh3 = st.columns([3.2, 2.5, 0.7], gap="small")
+        # Detail panel header: name + stats + Quick Actions + close button
+        dh1, dh2, dh3, dh4 = st.columns([3.2, 2.5, 0.55, 0.7], gap="small")
         with dh1:
             st.markdown(
                 '<span class="ips-tc-detail-hdr-row" aria-hidden="true"></span>'
@@ -3474,6 +3321,8 @@ def _render_timekeeping_detail_panel(
                 f"S/T **{wk_st:.1f}** · O/T **{wk_ot:.1f}** · **{wk_st + wk_ot:.1f}** h{ot_note}"
             )
         with dh3:
+            _render_qa_toggle_button(selected_eid)
+        with dh4:
             if st.button("✕ Close", key="tc_close_detail_panel", type="secondary", help="Close detail panel"):
                 st.session_state.pop("selected_timekeeping_employee_id", None)
                 st.session_state["timekeeping_view_mode"] = "table"
@@ -3493,8 +3342,6 @@ def _render_timekeeping_detail_panel(
             )
 
         # Inline weekly timecard (no extra card wrapper since we're inside the detail panel)
-        # Reuse the per-day rendering from _render_employee_timecard_card but
-        # without the outer container (we already have one)
         week_iso = week_start.isoformat()
 
         # Card sub-header for the timecard section
