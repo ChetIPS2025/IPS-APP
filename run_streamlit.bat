@@ -1,8 +1,10 @@
 @echo off
-REM IPS APP — always run Streamlit from this folder so imports resolve to app\...
+REM LEGACY HELPER — starts the ONE unified IPS app (same as: streamlit run app/main.py)
+REM Not a separate application. See LAUNCHERS.md and README.md.
 cd /d "%~dp0"
 echo.
-echo IPS APP root (cwd): %CD%
-echo Starting: streamlit run app\main.py
+echo IPS Operations (unified app)
+echo Root: %CD%
+echo Command: python run_streamlit.py
 echo.
-streamlit run app/main.py
+python run_streamlit.py

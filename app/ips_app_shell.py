@@ -1,7 +1,7 @@
 """
 IPS application shell: one cohesive visual system for Streamlit main content.
 
-- Field-first greys (#d1d5db / #cbd5e1), high-contrast text (#111827 / #1f2937), 48px touch buttons
+- White canvas (#FFFFFF), white sidebar/cards, high-contrast text, 48px touch buttons
 - Intended to be injected once per session from ``main`` after :func:`branding.apply_branding`
 
 Does not replace page-specific markers (``ips-crud-toolbar-root``, ``ips-list-top-anchor``, etc.);
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v10"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v12"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -28,19 +28,18 @@ def inject_ips_app_shell_styles() -> None:
             --ips-space-sm: 0.45rem;
             --ips-space-md: 0.65rem;
             --ips-space-lg: 0.9rem;
-            /* Field-ready: darker grey chrome, high-contrast text (outdoor / iPad) */
-            --ips-bg-main: #d1d5db;
+            --ips-bg-main: #FFFFFF;
             --ips-bg-secondary: #ffffff;
             --ips-bg-card: #ffffff;
-            --ips-bg-sidebar: #cbd5e1;
-            --ips-bg-hover: #e5e7eb;
+            --ips-bg-sidebar: #ffffff;
+            --ips-bg-hover: #F8FAFC;
 
-            --ips-text: #111827;
-            --ips-text-secondary: #1f2937;
-            --ips-text-muted: #374151;
+            --ips-text: #0F172A;
+            --ips-text-secondary: #334155;
+            --ips-text-muted: #64748B;
 
-            --ips-border: rgba(15, 23, 42, 0.1);
-            --ips-border-strong: rgba(15, 23, 42, 0.16);
+            --ips-border: #E5EAF2;
+            --ips-border-strong: #CBD5E1;
             --ips-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
             --ips-radius: 8px;
             --ips-radius-lg: 10px;
@@ -69,14 +68,8 @@ def inject_ips_app_shell_styles() -> None:
             --ips-widget-gap: 0.12rem;
         }
 
-        .stApp,
-        [data-testid="stAppViewContainer"],
-        [data-testid="stHeader"] {
-            background-color: var(--ips-bg-main) !important;
-        }
-        /* ----- App background + default text ----- */
+        /* App canvas: theme.apply_global_app_styles() */
         section[data-testid="stMain"] {
-            background: transparent !important;
             color: var(--ips-text) !important;
             font-weight: 500 !important;
         }
@@ -265,12 +258,12 @@ def inject_ips_app_shell_styles() -> None:
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"] {
             color: #111827 !important;
             border: 1px solid #9ca3af !important;
-            background: #e5e7eb !important;
+            background: #ffffff !important;
             font-weight: 600 !important;
         }
         section[data-testid="stMain"] .stButton > button[kind="secondary"]:hover,
         section[data-testid="stMain"] [data-testid="stFormSubmitButton"] button[kind="secondary"]:hover {
-            background: #e5e7eb !important;
+            background: #F8FAFC !important;
             border-color: #9ca3af !important;
             color: #111827 !important;
         }
@@ -555,7 +548,7 @@ def inject_ips_app_shell_styles() -> None:
             font-size: 0.75rem !important;
         }
 
-        /* ----- Sidebar: slightly darker than main (#d1d5db) ----- */
+        /* ----- Sidebar: white panel ----- */
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] > div,
         [data-testid="stSidebar"] {

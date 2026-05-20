@@ -128,7 +128,7 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] button[kind="secondary"],
         div[data-testid="stDialog"] button[data-testid="baseButton-secondary"] {
-            background: #f3f4f6 !important;
+            background: #ffffff !important;
             border: 1px solid #d1d5db !important;
             color: #1f2937 !important;
             font-weight: 500 !important;
@@ -145,7 +145,7 @@ def inject_ips_modal_styles() -> None:
         }
         div[data-testid="stDialog"] button[kind="secondary"]:hover:not(:disabled),
         div[data-testid="stDialog"] button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
-            background: #e5e7eb !important;
+            background: #ffffff !important;
             border-color: #9ca3af !important;
             color: #111827 !important;
         }

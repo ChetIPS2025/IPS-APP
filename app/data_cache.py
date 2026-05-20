@@ -52,6 +52,18 @@ def clear_session_table_cache() -> None:
         fetch_table_cached.clear()
     except Exception:
         pass
+    try:
+        from app.pages.dashboard.services import clear_dashboard_data_cache
+    except ImportError:
+        try:
+            from pages.dashboard.services import clear_dashboard_data_cache  # type: ignore
+        except ImportError:
+            clear_dashboard_data_cache = None  # type: ignore
+    if clear_dashboard_data_cache:
+        try:
+            clear_dashboard_data_cache()
+        except Exception:
+            pass
 
 
 @st.cache_data(ttl=_ttl, show_spinner=False)

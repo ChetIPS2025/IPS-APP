@@ -1,7 +1,9 @@
-# IPS APP — run Streamlit from repo root so Python loads app\pages\estimates.py etc.
+# LEGACY HELPER — starts the ONE unified IPS app (same as: streamlit run app/main.py)
+# Not a separate application. See LAUNCHERS.md and README.md.
 Set-Location $PSScriptRoot
 Write-Host ""
-Write-Host "IPS APP root (cwd): $(Get-Location)"
-Write-Host "Starting: streamlit run app/main.py"
+Write-Host "IPS Operations (unified app)"
+Write-Host "Root: $(Get-Location)"
+Write-Host "Command: python run_streamlit.py"
 Write-Host ""
-& streamlit run app/main.py
+& python run_streamlit.py

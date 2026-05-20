@@ -1,5 +1,8 @@
 """
-Launcher for the IPS Streamlit app.
+Hosting launcher for the unified IPS Streamlit app.
+
+Runs the same entry point as local dev: ``streamlit run app/main.py``.
+Used by Render (see render.yaml). Not a separate application.
 """
 from __future__ import annotations
 
@@ -24,6 +27,13 @@ def main() -> None:
         sys.exit(1)
 
     os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
+
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from app.streamlit_pwa_static_patch import install
+
+    install()
 
     from streamlit.web import cli as stcli
 

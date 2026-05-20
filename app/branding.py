@@ -21,16 +21,7 @@ def apply_branding() -> None:
     st.markdown(
         """
         <style>
-        body {
-            background-color: #d1d5db;
-        }
-        .stApp {
-            background: #d1d5db;
-        }
-
-        section[data-testid="stSidebar"] {
-            background: #cbd5e1;
-        }
+        /* App/sidebar background: theme.apply_global_app_styles() */
 
         .ips-topbar {
             padding: 8px 0 14px 0;

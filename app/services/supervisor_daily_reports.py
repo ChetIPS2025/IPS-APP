@@ -297,6 +297,50 @@ def append_report_photos(
         )
 
 
+def submit_daily_report(report_id: str, *, admin: bool = False) -> None:
+    """Mark report Submitted and log timeline event."""
+    rid = str(report_id or "").strip()
+    if not rid:
+        raise ValueError("report_id required")
+    _, update_fn, _ = _write_fn(admin=admin)
+    now = datetime.now(timezone.utc).isoformat()
+    update_fn(
+        "supervisor_daily_reports",
+        {"status": "Submitted", "submitted_at": now, "updated_at": now},
+        {"id": rid},
+    )
+    fetch_row, _, _ = _fetch_fn(admin=admin)
+    rows = fetch_row("supervisor_daily_reports", {"id": rid}, limit=1)
+    if rows:
+        r = rows[0]
+        try:
+            from services.job_timeline import EVENT_DAILY_REPORT, log_job_event
+        except ImportError:
+            from app.services.job_timeline import EVENT_DAILY_REPORT, log_job_event  # type: ignore
+        log_job_event(
+            job_id=str(r.get("job_id") or ""),
+            event_type=EVENT_DAILY_REPORT,
+            title="Daily report submitted",
+            description=str(r.get("completed_today") or r.get("main_goal") or "")[:500],
+            user_name=str(r.get("supervisor_name") or ""),
+            related_table="supervisor_daily_reports",
+            related_id=rid,
+            admin=admin,
+        )
+
+
+def review_daily_report(report_id: str, *, reviewed_by: str | None = None, admin: bool = False) -> None:
+    rid = str(report_id or "").strip()
+    if not rid:
+        raise ValueError("report_id required")
+    _, update_fn, _ = _write_fn(admin=admin)
+    now = datetime.now(timezone.utc).isoformat()
+    patch: dict[str, Any] = {"status": "Reviewed", "reviewed_at": now, "updated_at": now}
+    if reviewed_by:
+        patch["reviewed_by"] = str(reviewed_by).strip()
+    update_fn("supervisor_daily_reports", patch, {"id": rid})
+
+
 def upsert_supervisor_daily_report(
     *,
     job_id: str,
