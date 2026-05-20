@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import json
+
 import streamlit as st
 import streamlit.components.v1 as components
+
+try:
+    from app.config import APP_VERSION
+except ImportError:
+    from config import APP_VERSION  # type: ignore
 
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"
 _IPS_TRIGGER_INSTALL_KEY = "ips_trigger_install"
 
-_MANIFEST_HREF = "/app/static/manifest.json"
-_SW_HREF = "/app/static/sw.js"
-
-_THEME_COLOR = "#0b2247"
-_APP_NAME = "IPS App"
+_THEME_COLOR = "#2563eb"
+_APP_NAME = "IPS Operations"
 
 _INSTALL_UNAVAILABLE_MSG = (
     "Install prompt is not available yet. On iPhone use Share → Add to Home Screen. "
@@ -21,16 +24,46 @@ _INSTALL_UNAVAILABLE_MSG = (
 )
 
 
+def _streamlit_base_path() -> str:
+    """Optional ``server.baseUrlPath`` prefix (empty for default local dev)."""
+    try:
+        from streamlit import config
+
+        base = (config.get_option("server.baseUrlPath") or "").strip().strip("/")
+        return f"/{base}" if base else ""
+    except Exception:
+        return ""
+
+
+def _static_url(filename: str) -> str:
+    base = _streamlit_base_path()
+    return f"{base}/app/static/{filename}"
+
+
+def _start_url() -> str:
+    base = _streamlit_base_path()
+    return f"{base}/" if base else "/"
+
+
 def inject_pwa_support() -> None:
-    if st.session_state.get(_PWA_INJECTED_KEY):
+    """Register manifest + service worker (same entry URL as browser)."""
+    inject_key = f"{_PWA_INJECTED_KEY}_{APP_VERSION}"
+    if st.session_state.get(inject_key):
         return
-    st.session_state[_PWA_INJECTED_KEY] = True
+    st.session_state[inject_key] = True
+
+    manifest_href = _static_url("manifest.json")
+    sw_href = _static_url("sw.js")
+    start_url = _start_url()
 
     payload = {
-        "manifest": _MANIFEST_HREF,
-        "sw": _SW_HREF,
+        "manifest": f"{manifest_href}?v={APP_VERSION}",
+        "sw": f"{sw_href}?v={APP_VERSION}",
+        "startUrl": start_url,
+        "scope": start_url,
         "themeColor": _THEME_COLOR,
         "appName": _APP_NAME,
+        "version": APP_VERSION,
     }
 
     components.html(
@@ -69,9 +102,11 @@ def inject_pwa_support() -> None:
   upsertMeta('mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-title', cfg.appName);
-  upsertMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
+  upsertMeta('apple-mobile-web-app-status-bar-style', 'default');
+  upsertMeta('application-name', cfg.appName);
 
   w.__ipsBipEvent = null;
+  w.__ipsAppVersion = cfg.version;
 
   w.__ipsTriggerInstall = async function() {{
     if (!w.__ipsBipEvent) return false;
@@ -92,10 +127,38 @@ def inject_pwa_support() -> None:
     w.dispatchEvent(new Event('ips-install-ready'));
   }});
 
-  if ('serviceWorker' in w.navigator) {{
-    w.navigator.serviceWorker.register(cfg.sw, {{ scope: '/app/static/' }})
-      .then(() => console.log('SW registered:', cfg.sw))
-      .catch(err => console.error('SW failed:', err));
+  async function registerServiceWorker() {{
+    if (!('serviceWorker' in w.navigator)) return;
+    try {{
+      const regs = await w.navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) {{
+        const script = reg.active && reg.active.scriptURL ? reg.active.scriptURL : '';
+        if (!script.includes('app/static/sw.js') || !script.includes(cfg.version)) {{
+          await reg.unregister();
+        }}
+      }}
+    }} catch (err) {{
+      console.warn('IPS SW cleanup:', err);
+    }}
+    try {{
+      const reg = await w.navigator.serviceWorker.register(cfg.sw, {{ scope: cfg.scope }});
+      console.log('IPS SW registered', reg.scope, cfg.version);
+      if (reg.waiting) reg.waiting.postMessage({{ type: 'SKIP_WAITING' }});
+      reg.update();
+    }} catch (err) {{
+      console.error('IPS SW registration failed:', err);
+    }}
+  }}
+
+  registerServiceWorker();
+
+  if (w.location.pathname !== cfg.startUrl && w.location.search.indexOf('tsign=') < 0) {{
+    try {{
+      const target = new URL(cfg.startUrl, w.location.origin);
+      if (w.location.pathname + '/' !== target.pathname && w.location.pathname !== target.pathname) {{
+        console.log('IPS PWA aligning route to', target.href);
+      }}
+    }} catch (e) {{}}
   }}
 }})();
 </script>
@@ -128,6 +191,7 @@ def trigger_pwa_install_prompt() -> None:
 
 
 def render_install_app_sidebar_block() -> None:
+    """Optional install block — prefer ``components.sidebar`` footer for unified chrome."""
     st.sidebar.markdown(
         '<p class="ips-install-section-title">Install App</p>',
         unsafe_allow_html=True,

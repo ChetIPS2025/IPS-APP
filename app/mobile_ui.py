@@ -63,8 +63,9 @@ section[data-testid="stSidebar"],
 .stSidebar {
   width: 234px !important;
   min-width: 234px !important;
-  background-color: #cbd5e1 !important;
-  background: #cbd5e1 !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-right: 1px solid #E5EAF2 !important;
   color: #111827 !important;
 }
 
@@ -236,8 +237,9 @@ section[data-testid="stSidebar"],
     min-width: 260px !important;
     max-width: min(260px, 92vw) !important;
     transition: transform 0.2s ease-out !important;
-    background: #cbd5e1 !important;
-    background-color: #cbd5e1 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-right: 1px solid #E5EAF2 !important;
     color: #111827 !important;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
   }

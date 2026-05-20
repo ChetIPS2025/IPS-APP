@@ -61,6 +61,10 @@ def _unread_updates_count() -> int:
 
 def render_top_bar(*, page_label: str | None = None) -> None:
     """Compact top bar: breadcrumb, search, notifications, quick add, density, user."""
+    page_name = str(page_label or st.session_state.get("ips_nav_page") or "Dashboard")
+    if page_name == "Dashboard":
+        return
+
     prof = current_profile()
     display_name = str(prof.get("full_name") or prof.get("email") or "User").strip()
     role = str(current_role() or "").strip()

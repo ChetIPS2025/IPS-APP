@@ -113,7 +113,7 @@ def _inject_ref_attachment_css() -> None:
         .ips-jra-doc-fallback {
             text-align: center;
             padding: 1.25rem 0.75rem;
-            background: #f9fafb;
+            background: #ffffff;
             border: 1px dashed #d1d5db;
             border-radius: 10px;
             box-sizing: border-box;

@@ -137,7 +137,7 @@ TASK_PHOTO_PREVIEW_CSS = """
   object-fit: contain;
   border-radius: 10px;
   border: 1px solid #d1d5db;
-  background: #f9fafb;
+  background: #ffffff;
   box-sizing: border-box;
 }
 @media (max-width: 900px) {
