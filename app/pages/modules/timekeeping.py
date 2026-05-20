@@ -106,15 +106,14 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
                         except ImportError:
                             from pages.modules._data import persist_timekeeping_days  # type: ignore
                         ok2, msg2 = persist_timekeeping_days(eid, week_start_d, grid)
-                        if not ok2:
+                        if ok2:
                             st.success(msg)
-                            st.warning(
-                                f"Daily entry details could not be saved. {msg2}"
-                                if msg2
-                                else "Daily entry details could not be saved."
-                            )
                         else:
-                            st.success(msg)
+                            detail = f" {msg2}" if msg2 else ""
+                            st.warning(
+                                "Week totals were saved, but daily entry details could not be saved."
+                                f"{detail}"
+                            )
                     else:
                         st.error(msg)
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
