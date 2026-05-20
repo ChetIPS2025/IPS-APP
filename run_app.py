@@ -28,6 +28,13 @@ def main() -> None:
 
     os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
 
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from app.streamlit_pwa_static_patch import install
+
+    install()
+
     from streamlit.web import cli as stcli
 
     port = os.environ.get("PORT", "10000")

@@ -9,12 +9,12 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role, sign_out
-    from app.config import ROOT_DIR
+    from app.config import APP_VERSION, ROOT_DIR
     from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES, SESSION_NAV_KEY
     from app.utils.permissions import filter_nav_for_role, normalize_role
 except ImportError:
     from auth import current_profile, current_role, sign_out  # type: ignore
-    from config import ROOT_DIR  # type: ignore
+    from config import APP_VERSION, ROOT_DIR  # type: ignore
     from utils.constants import FIELD_NAV_PAGES, NAV_PAGES, SESSION_NAV_KEY  # type: ignore
     from utils.permissions import filter_nav_for_role, normalize_role  # type: ignore
 
@@ -79,3 +79,8 @@ def render_sidebar(active_slug: str) -> None:
         )
         if st.button("Log out", use_container_width=True, key="ips_logout"):
             sign_out()
+
+        st.markdown(
+            f'<p class="ips-sidebar-version">App v{html.escape(APP_VERSION)}</p>',
+            unsafe_allow_html=True,
+        )

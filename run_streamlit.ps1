@@ -4,6 +4,6 @@ Set-Location $PSScriptRoot
 Write-Host ""
 Write-Host "IPS Operations (unified app)"
 Write-Host "Root: $(Get-Location)"
-Write-Host "Command: streamlit run app/main.py"
+Write-Host "Command: python run_streamlit.py"
 Write-Host ""
-& streamlit run app/main.py
+& python run_streamlit.py

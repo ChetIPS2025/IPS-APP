@@ -5,6 +5,6 @@ cd /d "%~dp0"
 echo.
 echo IPS Operations (unified app)
 echo Root: %CD%
-echo Command: streamlit run app\main.py
+echo Command: python run_streamlit.py
 echo.
-streamlit run app/main.py
+python run_streamlit.py

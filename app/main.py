@@ -94,6 +94,11 @@ def _inject_app_shell(*, login_only: bool = False) -> None:
     """Global CSS and branding — safe before auth gate."""
     apply_branding()
     inject_ips_foundation_css()
+    try:
+        from app.mobile_ui import inject_ips_global_mobile_css
+    except ImportError:
+        from mobile_ui import inject_ips_global_mobile_css  # type: ignore
+    inject_ips_global_mobile_css()
     inject_pwa_support()
     if login_only:
         inject_unauthenticated_shell_css()

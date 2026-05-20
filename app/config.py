@@ -312,4 +312,7 @@ def validate_supabase_public_config() -> str | None:
     return None
 
 
+# Visible in sidebar / PWA cache busting (override with IPS_APP_VERSION in env).
+APP_VERSION: str = _strip_env("IPS_APP_VERSION", "2.5.0")
+
 settings = Settings()

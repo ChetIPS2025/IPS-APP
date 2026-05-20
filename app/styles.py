@@ -877,6 +877,15 @@ section[data-testid="stSidebar"] > div {{
   flex: 1 1 auto;
   min-height: 1.5rem;
 }}
+.ips-sidebar-version {{
+  font-size: 0.68rem;
+  color: {TEXT_MUTED};
+  text-align: center;
+  padding: 0.5rem 0.75rem 0.75rem;
+  margin: 0;
+  border-top: 1px solid {BORDER};
+  letter-spacing: 0.02em;
+}}
 section[data-testid="stSidebar"] .stButton > button {{
   width: 100% !important;
   justify-content: flex-start !important;
