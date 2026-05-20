@@ -45,3 +45,25 @@ def render_detail_actions(
         st.session_state.pop(session_select_key, None)
         st.session_state.pop(f"{prefix}_action", None)
         st.rerun()
+
+
+def render_modal_header_actions(
+    session_select_key: str,
+    *,
+    key_prefix: str | None = None,
+    show_edit: bool = True,
+) -> None:
+    """Compact modal actions: View, Edit, More, Close."""
+    prefix = key_prefix or f"ips_modal_{session_select_key}"
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.button("View", key=f"{prefix}_view", use_container_width=True)
+    with c2:
+        if show_edit:
+            st.button("Edit", key=f"{prefix}_edit", use_container_width=True)
+    with c3:
+        st.button("More", key=f"{prefix}_more", use_container_width=True)
+    with c4:
+        if st.button("Close", key=f"{prefix}_close", use_container_width=True):
+            st.session_state.pop(session_select_key, None)
+            st.rerun()

@@ -10,9 +10,10 @@ try:
     from app.components.charts import render_donut_chart
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
+    from app.components.layout import render_tab_placeholder
+    from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
+    from app.components.tables import render_clickable_table, render_data_table
     from app.components.tabs import render_tabs
     from app.pages.modules._data import (
         ACTIVE_ESTIMATE_KEY,
@@ -31,9 +32,10 @@ except ImportError:
     from components.charts import render_donut_chart  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
+    from components.layout import render_tab_placeholder  # type: ignore
+    from components.modals import render_record_detail_dialog  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.tables import render_clickable_table, render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages.modules._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
@@ -210,8 +212,9 @@ def _render_detail(est: dict) -> None:
                     if apply_persist_feedback(ok, msg):
                         st.rerun()
 
-    render_selected_detail_panel(
-        title,
+    render_record_detail_dialog(
+        f"{title} — Estimate Details",
+        module_name="estimates",
         session_select_key=_SEL,
         tabs_fn=_tabs,
         body_fn=_body,
@@ -308,7 +311,14 @@ def render() -> None:
             return html.escape(fmt_date(row.get(field)))
         return html.escape(str(row.get(field) or "—"))
 
-    sel = render_data_table(
+    def _plain_cell(field: str, row: dict) -> str:
+        if field == "total":
+            return fmt_currency(row.get("total"))
+        if field in ("estimate_date", "expiration_date"):
+            return fmt_date(row.get(field))
+        return str(row.get(field) or "—")
+
+    sel = render_clickable_table(
         filtered,
         [
             ("estimate_number", "ESTIMATE #"),
@@ -320,11 +330,11 @@ def render() -> None:
             ("status", "STATUS"),
             ("created_by", "CREATED BY"),
         ],
+        "estimates_list",
         row_id_key="id",
-        selected_id=selected_id or None,
         session_select_key=_SEL,
-        col_fr=["0.85fr", "1.4fr", "1fr", "0.85fr", "0.85fr", "0.75fr", "0.75fr", "0.9fr"],
-        cell_renderer=_cell,
+        selected_id=selected_id or None,
+        plain_cell=_plain_cell,
     )
 
     if sel:

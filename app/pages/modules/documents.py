@@ -10,8 +10,8 @@ try:
     from app.auth import current_profile, current_role
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel
-    from app.components.tables import render_data_table
+    from app.components.modals import render_record_detail_dialog
+    from app.components.tables import render_clickable_table, render_data_table
     from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._data import (
         document_link_ref_options,
@@ -27,8 +27,8 @@ except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.modals import render_record_detail_dialog  # type: ignore
+    from components.tables import render_clickable_table, render_data_table  # type: ignore
     from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._data import (  # type: ignore
         document_link_ref_options,
@@ -148,7 +148,12 @@ def _render_detail(doc: dict, *, hr_ok: bool) -> None:
                     if apply_persist_feedback(ok, msg):
                         st.rerun()
 
-    render_selected_detail_panel(title, session_select_key=_SEL, body_fn=_body)
+    render_record_detail_dialog(
+        f"{title} — Document Details",
+        module_name="documents",
+        session_select_key=_SEL,
+        body_fn=_body,
+    )
 
 
 def render() -> None:
@@ -231,7 +236,14 @@ def render() -> None:
             return html.escape(fmt_date(row.get(field)) if row.get(field) else "—")
         return html.escape(str(row.get(field) or "—"))
 
-    sel = render_data_table(
+    def _plain_cell(field: str, row: dict) -> str:
+        if field == "access":
+            return "Restricted" if row.get("is_restricted") else "Standard"
+        if field in ("upload_date", "expiration_date"):
+            return fmt_date(row.get(field)) if row.get(field) else "—"
+        return str(row.get(field) or "—")
+
+    sel = render_clickable_table(
         filtered,
         [
             ("file_name", "FILE"),
@@ -243,11 +255,11 @@ def render() -> None:
             ("expiration_date", "EXPIRES"),
             ("access", "ACCESS"),
         ],
+        "documents_list",
         row_id_key="id",
-        selected_id=selected_id or None,
         session_select_key=_SEL,
-        col_fr=["1.2fr", "0.9fr", "0.75fr", "1.2fr", "0.9fr", "0.75fr", "0.7fr", "0.65fr"],
-        cell_renderer=_cell,
+        selected_id=selected_id or None,
+        plain_cell=_plain_cell,
     )
 
     if sel:

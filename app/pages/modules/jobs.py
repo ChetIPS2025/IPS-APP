@@ -10,9 +10,10 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
+    from app.components.layout import render_tab_placeholder
+    from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
+    from app.components.tables import render_clickable_table
     from app.components.tabs import render_tabs
     from app.pages.modules._data import customer_filter_options, load_jobs, lookup_options, persist_job
     from app.pages.modules._crud import apply_persist_feedback, is_demo_id
@@ -21,9 +22,10 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
+    from components.layout import render_tab_placeholder  # type: ignore
+    from components.modals import render_record_detail_dialog  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.tables import render_clickable_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages.modules._data import customer_filter_options, load_jobs, lookup_options, persist_job  # type: ignore
     from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
@@ -32,6 +34,17 @@ except ImportError:
 
 _SEL = select_key("jobs")
 _TAB = tab_key("jobs")
+_JOB_TABS = [
+    "Overview",
+    "Scope",
+    "Financials",
+    "Schedule",
+    "Documents",
+    "Photos",
+    "Daily Updates",
+    "Notes",
+    "Activity",
+]
 
 
 def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> list[dict]:
@@ -57,11 +70,7 @@ def _render_detail(job: dict) -> None:
     title = f"{jn} — {job.get('job_name') or ''}"
 
     def _tabs() -> None:
-        render_tabs(
-            ["Overview", "Scope", "Financials", "Schedule", "Documents", "Notes", "Activity"],
-            session_key=_TAB,
-            default="Overview",
-        )
+        render_tabs(_JOB_TABS, session_key=_TAB, default="Overview")
 
     def _body() -> None:
         ot = "d" + "iv"
@@ -147,9 +156,12 @@ def _render_detail(job: dict) -> None:
                     if ok:
                         st.rerun()
 
-    render_selected_detail_panel(
-        str(job.get("job_name") or title),
+    render_record_detail_dialog(
+        f"{title} — Job Details",
+        module_name="jobs",
         session_select_key=_SEL,
+        tab_labels=_JOB_TABS,
+        tab_session_key=_TAB,
         tabs_fn=_tabs,
         body_fn=_body,
     )
@@ -254,14 +266,12 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field == "job_number":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("job_number") or ""))}</span>'
-        return html.escape(str(row.get(field) or "—"))
+    def _plain_cell(field: str, row: dict) -> str:
+        if field in ("start_date", "end_date"):
+            return fmt_date(row.get(field))
+        return str(row.get(field) or "—")
 
-    sel = render_data_table(
+    sel = render_clickable_table(
         filtered,
         [
             ("job_number", "JOB #"),
@@ -273,11 +283,11 @@ def render() -> None:
             ("start_date", "START DATE"),
             ("end_date", "END DATE"),
         ],
+        "jobs_list",
         row_id_key="id",
-        selected_id=selected_id or None,
         session_select_key=_SEL,
-        col_fr=["0.85fr", "1.5fr", "1.1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
-        cell_renderer=_cell,
+        selected_id=selected_id or None,
+        plain_cell=_plain_cell,
     )
 
     if sel:

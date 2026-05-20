@@ -9,9 +9,10 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
+    from app.components.layout import render_tab_placeholder
+    from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
+    from app.components.tables import render_clickable_table, render_data_table
     from app.components.tabs import render_tabs
     from app.pages.modules._data import load_inventory, lookup_options, persist_inventory
     from app.pages.modules._crud import apply_persist_feedback, is_demo_id
@@ -141,7 +142,13 @@ def _render_detail(item: dict) -> None:
                     if apply_persist_feedback(ok, msg):
                         st.rerun()
 
-    render_selected_detail_panel(title, session_select_key=_SEL, tabs_fn=_tabs, body_fn=_body)
+    render_record_detail_dialog(
+        f"{title} — Inventory Details",
+        module_name="inventory",
+        session_select_key=_SEL,
+        tabs_fn=_tabs,
+        body_fn=_body,
+    )
 
 
 def render() -> None:
@@ -229,7 +236,12 @@ def render() -> None:
             return html.escape(fmt_currency(row.get("unit_cost")))
         return html.escape(str(row.get(field) or "—"))
 
-    sel = render_data_table(
+    def _plain_cell(field: str, row: dict) -> str:
+        if field == "unit_cost":
+            return fmt_currency(row.get("unit_cost"))
+        return str(row.get(field) or "—")
+
+    sel = render_clickable_table(
         filtered,
         [
             ("sku", "SKU"),
@@ -241,11 +253,11 @@ def render() -> None:
             ("qty_on_hand", "QTY"),
             ("unit_cost", "UNIT COST"),
         ],
+        "inventory_list",
         row_id_key="id",
-        selected_id=selected_id or None,
         session_select_key=_SEL,
-        col_fr=["0.75fr", "1.3fr", "0.85fr", "0.85fr", "0.9fr", "0.75fr", "0.5fr", "0.65fr"],
-        cell_renderer=_cell,
+        selected_id=selected_id or None,
+        plain_cell=_plain_cell,
     )
 
     if sel:

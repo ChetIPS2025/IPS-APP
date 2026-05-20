@@ -343,12 +343,46 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   font-size: 0.8125rem !important;
 }}
 
-/* Hide row-select helper buttons */
+/* Hide legacy Select buttons (removed from list tables) */
 .ips-row-select-btn,
 .ips-click-bridge {{
   display: none !important;
   height: 0 !important;
   overflow: hidden !important;
+}}
+
+/* Native dataframe list — pointer + selection hint */
+[data-testid="stDataFrame"] {{
+  border: 1px solid {BORDER} !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}}
+[data-testid="stDataFrame"] [role="grid"] {{
+  cursor: pointer;
+}}
+.ips-data-table-nested .ips-data-row {{
+  cursor: default;
+}}
+
+/* Modal dialog */
+.ips-modal-header {{
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid {BORDER};
+}}
+.ips-modal-fallback {{
+  background: {CARD_BG};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  margin-top: 0.75rem;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+}}
+div[data-testid="stDialog"] .ips-detail-title {{
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0;
 }}
 
 /* Login — hide app chrome until authenticated */
