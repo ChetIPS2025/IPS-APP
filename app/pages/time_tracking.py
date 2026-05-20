@@ -209,7 +209,7 @@ def _tt_picker_job_labels(jobs_raw: list[dict[str, Any]]) -> tuple[dict[str, str
     Labels for job pickers: prefer open/active jobs.
 
     When every job is closed/inactive, return the full list so users can still log
-    time against real jobs (legacy ``_tt_render_simple_timesheet`` behavior).
+    time against real jobs.
     """
     _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
     active_job_ids = {
@@ -365,21 +365,6 @@ def _week_grid_column_ratios(*, fast: bool) -> list[float]:
     if fast:
         return [2.6] + [1.1] * 7 + [0.32]
     return [2.6] + [1.05] * 7 + [0.34]
-
-
-def _employee_name_display_html(nm: str) -> str:
-    """First line / second line at first space; no mid-word breaks (CSS keep-all). HTML-escaped."""
-    raw = str(nm or "").strip()
-    if not raw:
-        return ""
-    parts = raw.split(" ", 1)
-    esc = html.escape
-    if len(parts) == 2:
-        a, b = parts[0].strip(), parts[1].strip()
-        body = f"{esc(a)}<br>{esc(b)}"
-    else:
-        body = esc(raw)
-    return f'<div class="ips-tt-emp-name-inner">{body}</div>'
 
 
 def _hours_step(*, fast: bool) -> float:
@@ -683,17 +668,6 @@ def _inject_tt_styles() -> None:
             div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-quick-popup) {
                 max-width: 420px !important;
             }
-        }
-        /* Simple labor entry cards */
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) [data-testid="stElementContainer"] {
-            margin-bottom: 0.1rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) {
-            padding: 0.45rem 0.55rem 0.5rem !important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-simple-entry) [data-testid="stFormSubmitButton"] {
-            align-self: flex-end !important;
-            margin-top: 0.15rem !important;
         }
         /* Table “Edit Entry” — compact strip above grid */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(span.ips-tt-edit-mini-popup) {
@@ -1409,68 +1383,6 @@ def _tt_flat_entry_rows(
             }
         )
     return out
-
-
-def _render_employee_name_cell(*, nm: str, tot_s: str, over: bool, ot_threshold: float) -> None:
-    """Employee name (first line / remainder at first space; no mid-word breaks) and muted weekly hours."""
-    title_attr = html.escape(nm, quote=True)
-    over_cls = " ips-tt-row-over" if over else ""
-    name_inner = _employee_name_display_html(nm)
-    if over:
-        tot_line = html.escape(f"{tot_s} · over {ot_threshold:g} h")
-    else:
-        tot_line = html.escape(tot_s)
-    st.markdown(
-        f'<div class="ips-tt-emp-cell">'
-        f'<div class="ips-tt-emp-name ips-time-name{over_cls}" title="{title_attr}">{name_inner}</div>'
-        f'<p class="ips-tt-emp-total">{tot_line}</p></div>',
-        unsafe_allow_html=True,
-    )
-
-
-def _render_employee_time_header(
-    *,
-    nm: str,
-    tot_s: str,
-    over: bool,
-    ot_threshold: float,
-    eid: str,
-) -> None:
-    """Name + weekly hours (left) and Quick Actions lightning (right); used for narrow cards and desktop sheet first column."""
-    c1, c2 = st.columns([1, 0.22], gap="small")
-    with c1:
-        st.markdown(
-            '<span class="ips-tt-emp-header-scope" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        _render_employee_name_cell(nm=nm, tot_s=tot_s, over=over, ot_threshold=ot_threshold)
-    with c2:
-        _render_qa_toggle_button(eid)
-
-
-def _render_week_header_row(*, grid_ratios: list[float], days: list[date]) -> None:
-    """One row aligned to the grid: Employee + Mon–Sun + Σ (spreadsheet header band)."""
-    h0, *hday, hlast = st.columns(grid_ratios)
-    with h0:
-        st.markdown(
-            '<span class="ips-tt-sheet-hdr-corner" aria-hidden="true"></span>'
-            '<div class="ips-tt-week-hdr-cell ips-tt-week-hdr-emp">'
-            '<span class="ips-tt-week-hdr-title">Employee</span></div>',
-            unsafe_allow_html=True,
-        )
-    for di, d in enumerate(days):
-        with hday[di]:
-            st.markdown(
-                f'<div class="ips-tt-week-hdr-day ips-tt-sheet-hdr-day">'
-                f'<span class="ips-tt-wh-dow">{d.strftime("%a")}</span>'
-                f'<span class="ips-tt-wh-date">{d.strftime("%b %d")}</span></div>',
-                unsafe_allow_html=True,
-            )
-    with hlast:
-        st.markdown(
-            '<div class="ips-tt-week-hdr-sum ips-tt-sheet-hdr-sum">Σ</div>',
-            unsafe_allow_html=True,
-        )
 
 
 def _tt_render_header_section() -> tuple[bool, bool]:
@@ -2460,61 +2372,6 @@ def _render_new_entry_form(
         ):
             _on_dup()
     st.markdown("</div>", unsafe_allow_html=True)
-
-
-def _render_day_column_body(
-    *,
-    d: date,
-    eid: str,
-    idx: dict,
-    fj_id: str | None,
-    job_id_to_label: dict[str, str],
-    show_day_heading: bool,
-) -> float:
-    """Day cell: hours subtotal, compact job summary; selected day (Quick Actions) shown via light outline."""
-    wd = d.isoformat()
-    ents_all = idx.get((eid, wd), [])
-    ents_show = [e for e in ents_all if not fj_id or str(e.get("job_id")) == fj_id]
-    day_sum = sum(float(e.get("hours", 0) or 0) for e in ents_show)
-
-    sel_k = _tt_qa_day_key(eid)
-    sel_wd = str(st.session_state.get(sel_k) or "")[:10]
-    is_sel = sel_wd == wd and str(st.session_state.get(TT_OPEN_EMPLOYEE_POPUP_KEY) or "") == eid
-
-    if show_day_heading:
-        st.markdown(
-            f'<div class="ips-tt-day-head">{d.strftime("%a %m/%d")}</div>',
-            unsafe_allow_html=True,
-        )
-    st.markdown(
-        f'<div class="ips-tt-day-sum">{day_sum:.1f} h</div>',
-        unsafe_allow_html=True,
-    )
-
-    parts: list[str] = []
-    for e in ents_show[:6]:
-        h = float(e.get("hours", 0) or 0)
-        jid = str(e.get("job_id") or "").strip()
-        nj = str(e.get("non_job_code") or "").strip()
-        if jid:
-            lab = str(job_id_to_label.get(jid) or "?")
-            short = lab[:18] + ("…" if len(lab) > 18 else "")
-            parts.append(f"{short} {h:.1f}h")
-        elif nj:
-            parts.append(f"NON-JOB — {nj} {h:.1f}h")
-    summary = " · ".join(parts) if parts else ""
-    if summary:
-        st.caption(summary[:260] + ("…" if len(summary) > 260 else ""))
-
-    block_cls = "ips-tt-day-block"
-    if is_sel:
-        block_cls += " ips-tt-day-block-selected"
-    st.markdown(
-        f'<div class="{block_cls}"><span class="ips-tt-day-cell ips-tt-day-summary" aria-hidden="true"></span></div>',
-        unsafe_allow_html=True,
-    )
-
-    return day_sum
 
 
 # ─── Weekly Timecard Grid (new compact per-employee design) ──────────────────
