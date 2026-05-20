@@ -1771,15 +1771,13 @@ def _render_quick_actions_popup(
     today: date,
     idx: dict,
     fj_id: str | None,
-    job_labels_sorted: list[str],
-    job_label_to_id: dict[str, str],
     default_job_label: str | None,
     fast: bool,
     user_id,
     ts_iso: str,
 ) -> None:
     """Compact Quick Actions popup: day, bulk copy/fill/clear, entries and add for selected day."""
-    _, entry_job_labels = _tt_picker_job_labels(_tt_load_jobs_rows(limit=5000))
+    job_label_to_id, entry_job_labels = _tt_picker_job_labels(_tt_load_jobs_rows(limit=5000))
     _tt_init_qa_day(eid, days, today)
     wd_key = _tt_qa_day_key(eid)
     try:
@@ -3098,8 +3096,6 @@ def _render_timekeeping_detail_panel(
                 eid=selected_eid, emp_name=nm, days=days,
                 week_start=week_start, week_end=week_end, today=today,
                 idx=idx, fj_id=fj_id,
-                job_labels_sorted=filt.job_labels_sorted,
-                job_label_to_id=filt.job_label_to_id,
                 default_job_label=filt.default_job_label,
                 fast=False, user_id=uid, ts_iso=ts_now,
             )
