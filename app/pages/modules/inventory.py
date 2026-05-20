@@ -9,11 +9,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel
+    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
-    from app.pages.modules._data import load_inventory
+    from app.pages.modules._data import load_inventory, lookup_options, persist_inventory
+    from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._session import select_key, tab_key
     from app.styles import inject_global_css
     from app.utils.constants import INVENTORY_STATUSES
@@ -21,11 +22,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel  # type: ignore
+    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
-    from pages.modules._data import load_inventory  # type: ignore
+    from pages.modules._data import load_inventory, lookup_options, persist_inventory  # type: ignore
+    from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.constants import INVENTORY_STATUSES  # type: ignore
@@ -83,7 +85,7 @@ def _render_detail(item: dict) -> None:
         )
         tab = str(st.session_state.get(_TAB) or "Overview")
         if tab != "Overview":
-            st.info(f"{tab} will connect to Supabase in a later phase.")
+            render_tab_placeholder(f"{tab} will connect to Supabase in a later phase.")
             return
         c1, c2 = st.columns(2)
         with c1:
@@ -110,12 +112,45 @@ def _render_detail(item: dict) -> None:
                 f"</dl>",
                 unsafe_allow_html=True,
             )
+        iid = str(item.get("id") or "")
+        if not is_demo_id(iid):
+            with st.expander("Edit item", expanded=False):
+                ic1, ic2 = st.columns(2)
+                with ic1:
+                    st.text_input("SKU", value=str(item.get("sku") or ""), key=f"inv_edit_sku_{iid}")
+                    st.text_input("Name", value=str(item.get("name") or ""), key=f"inv_edit_name_{iid}")
+                    st.selectbox("Category", lookup_options("inventory_categories"), key=f"inv_edit_cat_{iid}")
+                    st.selectbox("Status", lookup_options("inventory_statuses"), key=f"inv_edit_status_{iid}")
+                with ic2:
+                    st.text_input("Location", value=str(item.get("location") or ""), key=f"inv_edit_loc_{iid}")
+                    st.number_input("Qty on hand", value=int(item.get("qty_on_hand") or 0), key=f"inv_edit_qty_{iid}")
+                    st.number_input("Unit cost", value=float(item.get("unit_cost") or 0), key=f"inv_edit_cost_{iid}")
+                if st.button("Save item", key=f"inv_save_{iid}", type="primary"):
+                    ok, msg = persist_inventory(
+                        {
+                            "sku": st.session_state.get(f"inv_edit_sku_{iid}"),
+                            "name": st.session_state.get(f"inv_edit_name_{iid}"),
+                            "category": st.session_state.get(f"inv_edit_cat_{iid}"),
+                            "status": st.session_state.get(f"inv_edit_status_{iid}"),
+                            "location": st.session_state.get(f"inv_edit_loc_{iid}"),
+                            "qty_on_hand": st.session_state.get(f"inv_edit_qty_{iid}"),
+                            "unit_cost": st.session_state.get(f"inv_edit_cost_{iid}"),
+                        },
+                        row_id=iid,
+                    )
+                    if apply_persist_feedback(ok, msg):
+                        st.rerun()
 
-    render_selected_detail_panel(title, tabs_fn=_tabs, body_fn=_body)
+    render_selected_detail_panel(title, session_select_key=_SEL, tabs_fn=_tabs, body_fn=_body)
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("inventory"):
+        return
     rows = load_inventory()
     categories = sorted({str(r.get("category") or "") for r in rows if r.get("category")})
     locations = sorted({str(r.get("location") or "") for r in rows if r.get("location")})
@@ -125,7 +160,26 @@ def render() -> None:
         render_page_header("Inventory", "Track stocked materials, supplies, and warehouse levels.")
     with act_r:
         st.button("Export", key="inv_export", use_container_width=True)
-        st.button("+ New Item", key="inv_new", type="primary", use_container_width=True)
+        if st.button("+ New Item", key="inv_new", type="primary", use_container_width=True):
+            st.session_state["ips_inv_form"] = True
+
+    if st.session_state.get("ips_inv_form"):
+        with st.expander("New inventory item", expanded=True):
+            st.text_input("SKU", key="inv_new_sku")
+            st.text_input("Item name", key="inv_new_name")
+            st.selectbox("Category", lookup_options("inventory_categories"), key="inv_new_cat")
+            st.selectbox("Status", lookup_options("inventory_statuses"), key="inv_new_status")
+            if st.button("Save item", key="inv_save_new", type="primary"):
+                ok, msg = persist_inventory(
+                    {
+                        "sku": st.session_state.get("inv_new_sku"),
+                        "name": st.session_state.get("inv_new_name"),
+                        "category": st.session_state.get("inv_new_cat"),
+                        "status": st.session_state.get("inv_new_status"),
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_inv_form",)):
+                    st.rerun()
 
     def _filters() -> None:
         c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.7])
@@ -136,7 +190,12 @@ def render() -> None:
         with c3:
             st.selectbox("Location", ["All Locations", *locations], key="inv_loc", label_visibility="collapsed")
         with c4:
-            st.selectbox("Status", ["All Statuses", *INVENTORY_STATUSES], key="inv_status", label_visibility="collapsed")
+            st.selectbox(
+                "Status",
+                ["All Statuses", *lookup_options("inventory_statuses")],
+                key="inv_status",
+                label_visibility="collapsed",
+            )
         with c5:
             if st.button("Clear", key="inv_clear", use_container_width=True):
                 for k in ("inv_search",):

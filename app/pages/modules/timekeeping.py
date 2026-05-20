@@ -91,7 +91,15 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
                 }
                 ok, msg = persist_timekeeping_week(eid, week_start_d, summary)
                 if ok:
-                    st.success(msg)
+                    try:
+                        from app.pages.modules._data import persist_timekeeping_days
+                    except ImportError:
+                        from pages.modules._data import persist_timekeeping_days  # type: ignore
+                    ok2, msg2 = persist_timekeeping_days(eid, week_start_d, grid)
+                    if not ok2:
+                        st.warning(msg2)
+                    else:
+                        st.success(msg)
                 else:
                     st.error(msg)
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
@@ -139,7 +147,12 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("timekeeping"):
+        return
     ws = _current_week_start()
     we = week_end(ws)
 

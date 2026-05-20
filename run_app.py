@@ -1,5 +1,8 @@
 """
-Launcher for the IPS Streamlit app.
+Hosting launcher for the unified IPS Streamlit app.
+
+Runs the same entry point as local dev: ``streamlit run app/main.py``.
+Used by Render (see render.yaml). Not a separate application.
 """
 from __future__ import annotations
 

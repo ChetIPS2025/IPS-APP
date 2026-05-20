@@ -8,29 +8,39 @@ import streamlit as st
 
 try:
     from app.components.headers import render_page_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
+    from app.components.tabs import render_tabs
     from app.pages.modules._data import (
         ACTIVE_ESTIMATE_KEY,
         get_estimate,
         load_estimate_materials,
         load_estimates,
+        lookup_options,
         materials_summary,
+        persist_estimate_material,
     )
+    from app.pages.modules._crud import apply_persist_feedback
     from app.styles import inject_global_css
     from app.utils.constants import SESSION_NAV_KEY
     from app.utils.formatting import fmt_currency
 except ImportError:
     from components.headers import render_page_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
+    from components.tabs import render_tabs  # type: ignore
     from pages.modules._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
         get_estimate,
         load_estimate_materials,
         load_estimates,
+        lookup_options,
         materials_summary,
+        persist_estimate_material,
     )
+    from pages.modules._crud import apply_persist_feedback  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.constants import SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
@@ -65,7 +75,12 @@ def _render_summary_card(est: dict) -> None:
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("estimate_materials"):
+        return
     estimates = load_estimates()
     est_opts = {str(e.get("id")): f"{e.get('estimate_number')} — {e.get('project_name')}" for e in estimates}
     if not est_opts:
@@ -105,17 +120,55 @@ def render() -> None:
     materials = load_estimate_materials(pick)
     summ = materials_summary(materials)
 
-    tool_l, tool_r = st.columns([3, 1])
-    with tool_l:
-        c1, c2, c3 = st.columns([2, 1, 1])
+    mat_tab = render_tabs(
+        ["Materials", "Add Items", "Summary"],
+        session_key="ips_mat_section_tab",
+        default="Materials",
+    )
+
+    def _mat_filters() -> None:
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
         with c1:
             st.text_input("Search", placeholder="Search materials…", key="mat_search", label_visibility="collapsed")
         with c2:
             st.button("Add from Inventory", key="mat_add_inv", use_container_width=True)
         with c3:
             st.button("Add Custom Item", key="mat_add_custom", use_container_width=True)
-    with tool_r:
-        st.button("+ Add Material", key="mat_add", type="primary", use_container_width=True)
+        with c4:
+            if st.button("+ Add Material", key="mat_add", type="primary", use_container_width=True):
+                st.session_state["ips_mat_form"] = True
+
+    layout_filter_bar(_mat_filters)
+
+    if mat_tab == "Add Items":
+        st.caption("Add lines using **Add from Inventory**, **Add Custom Item**, or **+ Add Material** above.")
+
+    if st.session_state.get("ips_mat_form"):
+        with st.expander("Add material line", expanded=True):
+            st.text_input("Item #", key="mat_new_item")
+            st.text_input("Description", key="mat_new_desc")
+            st.selectbox("Category", lookup_options("inventory_categories"), key="mat_new_cat")
+            mc1, mc2, mc3 = st.columns(3)
+            with mc1:
+                st.number_input("Qty", value=1.0, key="mat_new_qty")
+            with mc2:
+                st.selectbox("Unit", lookup_options("units"), key="mat_new_unit")
+            with mc3:
+                st.number_input("Unit cost", value=0.0, key="mat_new_cost")
+            if st.button("Save line", key="mat_save_new", type="primary"):
+                ok, msg = persist_estimate_material(
+                    {
+                        "estimate_id": pick,
+                        "item_number": st.session_state.get("mat_new_item"),
+                        "description": st.session_state.get("mat_new_desc"),
+                        "category": st.session_state.get("mat_new_cat"),
+                        "qty": st.session_state.get("mat_new_qty"),
+                        "unit": st.session_state.get("mat_new_unit"),
+                        "unit_cost": st.session_state.get("mat_new_cost"),
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_mat_form",)):
+                    st.rerun()
 
     q = str(st.session_state.get("mat_search") or "").strip().lower()
     filtered = materials
@@ -137,23 +190,36 @@ def render() -> None:
         return html.escape(str(row.get(field) or "—"))
 
     with main_l:
-        render_data_table(
-            filtered,
-            [
-                ("item_number", "ITEM #"),
-                ("description", "DESCRIPTION"),
-                ("category", "CATEGORY"),
-                ("qty", "QTY"),
-                ("unit", "UNIT"),
-                ("unit_cost", "UNIT COST"),
-                ("total_cost", "TOTAL COST"),
-            ],
-            row_id_key="id",
-            selected_id=None,
-            session_select_key="ips_sel_mat_rows",
-            col_fr=["0.75fr", "1.4fr", "0.8fr", "0.5fr", "0.45fr", "0.7fr", "0.75fr"],
-            cell_renderer=_cell,
-        )
+        if mat_tab == "Summary":
+            ot = "d" + "iv"
+            st.markdown(f'<{ot} class="ips-panel-card">', unsafe_allow_html=True)
+            st.markdown("**Full materials breakdown**")
+            for lbl, key in [
+                ("Material Total", "material_total"),
+                ("Freight", "freight"),
+                ("Tax (8.25%)", "tax"),
+                ("Total", "total"),
+            ]:
+                st.markdown(f"**{lbl}:** {fmt_currency(summ[key])}")
+            st.markdown(f"</{ot}>", unsafe_allow_html=True)
+        else:
+            render_data_table(
+                filtered,
+                [
+                    ("item_number", "ITEM #"),
+                    ("description", "DESCRIPTION"),
+                    ("category", "CATEGORY"),
+                    ("qty", "QTY"),
+                    ("unit", "UNIT"),
+                    ("unit_cost", "UNIT COST"),
+                    ("total_cost", "TOTAL COST"),
+                ],
+                row_id_key="id",
+                selected_id=None,
+                session_select_key="ips_sel_mat_rows",
+                col_fr=["0.75fr", "1.4fr", "0.8fr", "0.5fr", "0.45fr", "0.7fr", "0.75fr"],
+                cell_renderer=_cell,
+            )
 
     with main_r:
         ot = "d" + "iv"

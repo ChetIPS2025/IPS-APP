@@ -10,7 +10,7 @@ try:
     from app.auth import current_role
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel
+    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
@@ -20,7 +20,10 @@ try:
         load_certifications,
         load_employee_documents,
         load_employees,
+        lookup_options,
+        persist_employee,
     )
+    from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._session import select_key, tab_key
     from app.styles import inject_global_css
     from app.utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY
@@ -40,7 +43,10 @@ except ImportError:
         load_certifications,
         load_employee_documents,
         load_employees,
+        lookup_options,
+        persist_employee,
     )
+    from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY  # type: ignore
@@ -58,8 +64,6 @@ _EMPLOYEE_TABS = [
     "Assigned Jobs",
     "Certifications",
     "Documents",
-    "Time History",
-    "Notes",
 ]
 
 
@@ -183,6 +187,29 @@ def _render_detail(emp: dict) -> None:
                     f"</dl>",
                     unsafe_allow_html=True,
                 )
+            if not is_demo_id(eid):
+                with st.expander("Edit employee", expanded=False):
+                    ec1, ec2 = st.columns(2)
+                    with ec1:
+                        st.text_input("Name", value=str(emp.get("name") or ""), key=f"emp_edit_name_{eid}")
+                        st.text_input("Email", value=str(emp.get("email") or ""), key=f"emp_edit_email_{eid}")
+                        st.selectbox("Department", lookup_options("departments"), key=f"emp_edit_dept_{eid}")
+                    with ec2:
+                        st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{eid}")
+                        st.selectbox("Status", ["Active", "Inactive"], key=f"emp_edit_status_{eid}")
+                    if st.button("Save employee", key=f"emp_save_{eid}", type="primary"):
+                        ok, msg = persist_employee(
+                            {
+                                "name": st.session_state.get(f"emp_edit_name_{eid}"),
+                                "email": st.session_state.get(f"emp_edit_email_{eid}"),
+                                "department": st.session_state.get(f"emp_edit_dept_{eid}"),
+                                "role": st.session_state.get(f"emp_edit_role_{eid}"),
+                                "status": st.session_state.get(f"emp_edit_status_{eid}"),
+                            },
+                            row_id=eid,
+                        )
+                        if apply_persist_feedback(ok, msg):
+                            st.rerun()
             return
 
         if tab == "Role & Permissions":
@@ -236,23 +263,22 @@ def _render_detail(emp: dict) -> None:
                 st.rerun()
             return
 
-        if tab in ("Activity Log", "Assigned Jobs", "Time History"):
-            st.info(f"{tab} will load from Supabase in a later phase.")
+        if tab in ("Activity Log", "Assigned Jobs"):
+            render_tab_placeholder(f"{tab} will load from Supabase in a later phase.")
             return
 
-        if tab == "Notes":
-            st.text_area("Employee notes", height=120, key=f"emp_notes_{eid}", placeholder="Internal notes…")
-            if st.button("Save Notes", key=f"emp_save_notes_{eid}", type="primary"):
-                st.success("Notes saved (demo).")
-            return
+        render_tab_placeholder(f"{tab} content will connect to Supabase in a later phase.")
 
-        st.info(f"{tab} content will connect to Supabase in a later phase.")
-
-    render_selected_detail_panel(title, tabs_fn=_tabs, body_fn=_body)
+    render_selected_detail_panel(title, session_select_key=_SEL, tabs_fn=_tabs, body_fn=_body)
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("employees"):
+        return
     all_emp = load_employees()
     departments = sorted({str(e.get("department") or "") for e in all_emp if e.get("department")})
     roles = sorted({str(e.get("role") or "") for e in all_emp if e.get("role")})
@@ -262,7 +288,26 @@ def render() -> None:
         render_page_header("Employees", "Manage users, roles, certifications, and HR documents.")
     with act_r:
         if st.button("+ Add User", key="emp_add", type="primary", use_container_width=True):
-            st.info("User creation will connect to Supabase.")
+            st.session_state["ips_emp_form"] = True
+
+    if st.session_state.get("ips_emp_form"):
+        with st.expander("New employee", expanded=True):
+            st.text_input("Name", key="emp_new_name")
+            st.text_input("Email", key="emp_new_email")
+            st.selectbox("Department", lookup_options("departments"), key="emp_new_dept")
+            st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
+            if st.button("Save employee", key="emp_save_new", type="primary"):
+                ok, msg = persist_employee(
+                    {
+                        "name": st.session_state.get("emp_new_name"),
+                        "email": st.session_state.get("emp_new_email"),
+                        "department": st.session_state.get("emp_new_dept"),
+                        "role": st.session_state.get("emp_new_role"),
+                        "status": "Active",
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_emp_form",)):
+                    st.rerun()
 
     def _filters() -> None:
         c1, c2, c3, c4 = st.columns([2, 1, 1, 1])

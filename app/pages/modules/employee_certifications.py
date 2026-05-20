@@ -59,7 +59,12 @@ def _filter_certs(rows: list[dict], *, q: str, status: str, cert_type: str) -> l
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("employee_certifications"):
+        return
     employees = load_employees()
     emp_opts = {str(e.get("name") or ""): str(e.get("id") or "") for e in employees}
     names = list(emp_opts.keys())

@@ -183,12 +183,21 @@ def get_client() -> Client:
     The underlying ``create_client`` is wrapped with ``streamlit.cache_resource`` so the
     heavy client is built once per process per (url, key) pair.
     """
+    try:
+        from app.config import validate_supabase_public_config
+    except ImportError:
+        from config import validate_supabase_public_config  # type: ignore
+
+    cfg_err = validate_supabase_public_config()
+    if cfg_err:
+        raise RuntimeError(cfg_err)
+
     public_key = _public_api_key()
     url = (settings.supabase_url or "").strip()
     if not url or not public_key:
         raise RuntimeError(
             "Supabase URL or public API key is missing. Set SUPABASE_URL and "
-            "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY."
+            "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY in `.streamlit/secrets.toml` or `.env`."
         )
     if _st_for_cache is not None:
         try:

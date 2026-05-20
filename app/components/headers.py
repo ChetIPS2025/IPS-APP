@@ -16,6 +16,14 @@ def render_page_header(
     ot, ct = "d" + "iv", "/" + "d" + "iv"
     st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
     left, right = st.columns([3, 1])
+    with right:
+        if actions_cols:
+            st.markdown(f'<{ot} class="ips-header-actions">', unsafe_allow_html=True)
+            ac1, ac2 = st.columns(2)
+            for i, widget in enumerate(actions_cols):
+                with (ac1 if i % 2 == 0 else ac2):
+                    widget()
+            st.markdown(f"</{ct}>", unsafe_allow_html=True)
     with left:
         sub = (
             f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
@@ -33,7 +41,3 @@ def render_page_header(
 """,
             unsafe_allow_html=True,
         )
-    with right:
-        if actions_cols:
-            for widget in actions_cols:
-                widget()

@@ -23,7 +23,6 @@ try:
         demo_sales_series,
         load_dashboard_kpis,
     )
-    from app.styles import inject_global_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile  # type: ignore
@@ -41,7 +40,6 @@ except ImportError:
         demo_sales_series,
         load_dashboard_kpis,
     )
-    from styles import inject_global_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 
@@ -64,7 +62,12 @@ def _date_range_state() -> tuple[date, date]:
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("dashboard"):
+        return
     start, end = _date_range_state()
 
     hdr_l, hdr_r = st.columns([3, 1])
@@ -84,6 +87,7 @@ def render() -> None:
 
     kpis = load_dashboard_kpis()
     ot = "d" + "iv"
+    st.markdown(f'<{ot} class="ips-kpi-grid">', unsafe_allow_html=True)
     k1, k2, k3, k4, k5 = st.columns(5)
     cards = [
         (k1, "Total Sales", fmt_currency(kpis["total_sales"]), "💵", "#dbeafe", "↑ 12.5% vs previous period", "up"),
@@ -95,6 +99,7 @@ def render() -> None:
     for col, *args in cards:
         with col:
             render_kpi_card(*args)
+    st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     row1_l, row1_m, row1_r = st.columns([2.2, 1.2, 1], gap="medium")
     labels, series = demo_sales_series()

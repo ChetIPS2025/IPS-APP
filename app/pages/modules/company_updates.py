@@ -11,14 +11,28 @@ try:
     from app.components.cards import render_metric_card
     from app.components.headers import render_page_header
     from app.components.tabs import render_tabs
-    from app.pages.modules._data import demo_update_metrics, load_company_updates, load_upcoming_events
+    from app.pages.modules._data import (
+        demo_update_metrics,
+        load_company_updates,
+        load_upcoming_events,
+        lookup_options,
+        persist_company_update,
+    )
+    from app.pages.modules._crud import apply_persist_feedback
     from app.styles import inject_global_css
     from app.utils.constants import UPDATE_CATEGORIES
 except ImportError:
     from components.cards import render_metric_card  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.tabs import render_tabs  # type: ignore
-    from pages.modules._data import demo_update_metrics, load_company_updates, load_upcoming_events  # type: ignore
+    from pages.modules._data import (  # type: ignore
+        demo_update_metrics,
+        load_company_updates,
+        load_upcoming_events,
+        lookup_options,
+        persist_company_update,
+    )
+    from pages.modules._crud import apply_persist_feedback  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.constants import UPDATE_CATEGORIES  # type: ignore
 
@@ -70,7 +84,12 @@ def _event_date_block(iso: str) -> str:
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("company_updates"):
+        return
     metrics = demo_update_metrics()
 
     hdr_l, hdr_r = st.columns([3, 1])
@@ -81,7 +100,25 @@ def render() -> None:
         )
     with hdr_r:
         if st.button("+ New Update", key="cu_new", type="primary", use_container_width=True):
-            st.info("Create update will connect to Supabase.")
+            st.session_state["ips_cu_form"] = True
+
+    if st.session_state.get("ips_cu_form"):
+        with st.expander("New company update", expanded=True):
+            st.text_input("Title", key="cu_new_title")
+            st.text_area("Message", key="cu_new_body", height=100)
+            st.selectbox("Category", lookup_options("update_categories"), key="cu_new_cat")
+            st.checkbox("Pin to top", key="cu_new_pinned")
+            if st.button("Publish", key="cu_save_new", type="primary"):
+                ok, msg = persist_company_update(
+                    {
+                        "title": st.session_state.get("cu_new_title"),
+                        "body": st.session_state.get("cu_new_body"),
+                        "category": st.session_state.get("cu_new_cat"),
+                        "pinned": st.session_state.get("cu_new_pinned"),
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_cu_form",)):
+                    st.rerun()
 
     m1, m2, m3, m4 = st.columns(4)
     with m1:
@@ -96,7 +133,8 @@ def render() -> None:
     main, side = st.columns([2.1, 1])
 
     with main:
-        cat = render_tabs(list(UPDATE_CATEGORIES), session_key=_TAB_KEY, default="All Updates")
+        cats = ["All Updates", *lookup_options("update_categories")]
+        cat = render_tabs(cats, session_key=_TAB_KEY, default="All Updates")
         ctrl_l, ctrl_r = st.columns([1, 1.2])
         with ctrl_l:
             sort = st.selectbox("Sort by", _SORT_OPTS, key="cu_sort", label_visibility="collapsed")

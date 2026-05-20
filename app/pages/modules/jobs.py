@@ -10,24 +10,24 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel
+    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
-    from app.pages.modules._data import load_jobs, lookup_options
+    from app.pages.modules._data import customer_filter_options, load_jobs, lookup_options, persist_job
+    from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._session import select_key, tab_key
-    from app.styles import inject_global_css
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel  # type: ignore
+    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
-    from pages.modules._data import load_jobs, lookup_options  # type: ignore
+    from pages.modules._data import customer_filter_options, load_jobs, lookup_options, persist_job  # type: ignore
+    from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
-    from styles import inject_global_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("jobs")
@@ -57,12 +57,11 @@ def _render_detail(job: dict) -> None:
     title = f"{jn} — {job.get('job_name') or ''}"
 
     def _tabs() -> None:
-        tab = render_tabs(
+        render_tabs(
             ["Overview", "Scope", "Financials", "Schedule", "Documents", "Notes", "Activity"],
             session_key=_TAB,
             default="Overview",
         )
-        st.caption(f"Viewing **{tab}**")
 
     def _body() -> None:
         ot = "d" + "iv"
@@ -76,7 +75,7 @@ def _render_detail(job: dict) -> None:
         )
         tab = str(st.session_state.get(_TAB) or "Overview")
         if tab != "Overview":
-            st.info(f"{tab} content will connect to Supabase in a later phase.")
+            render_tab_placeholder(f"{tab} content will connect to Supabase in a later phase.")
             return
         c1, c2 = st.columns(2)
         with c1:
@@ -104,21 +103,110 @@ def _render_detail(job: dict) -> None:
             )
         st.markdown("**Summary**")
         st.caption("Labor, material, and equipment totals will load from job costing when connected.")
+        jid = str(job.get("id") or "")
+        if not is_demo_id(jid):
+            with st.expander("Edit job", expanded=False):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    st.text_input("Job number", value=str(job.get("job_number") or ""), key=f"job_edit_num_{jid}")
+                    st.text_input("Job name", value=str(job.get("job_name") or ""), key=f"job_edit_name_{jid}")
+                    st.selectbox(
+                        "Customer",
+                        customer_filter_options(),
+                        index=0,
+                        key=f"job_edit_cust_{jid}",
+                    )
+                    st.selectbox(
+                        "Status",
+                        lookup_options("job_statuses"),
+                        index=max(0, lookup_options("job_statuses").index(str(job.get("status") or "Draft")))
+                        if str(job.get("status") or "") in lookup_options("job_statuses")
+                        else 0,
+                        key=f"job_edit_status_{jid}",
+                    )
+                with ec2:
+                    st.text_input("Supervisor", value=str(job.get("supervisor") or ""), key=f"job_edit_sup_{jid}")
+                    st.date_input("Start date", value=job.get("start_date") or None, key=f"job_edit_start_{jid}")
+                    st.date_input("End date", value=job.get("end_date") or None, key=f"job_edit_end_{jid}")
+                    st.slider("Progress %", 0, 100, int(job.get("progress") or 0), key=f"job_edit_prog_{jid}")
+                st.text_area("Description", value=str(job.get("description") or ""), key=f"job_edit_desc_{jid}")
+                if st.button("Save job", key=f"job_save_{jid}", type="primary"):
+                    ui = {
+                        "job_number": st.session_state.get(f"job_edit_num_{jid}"),
+                        "job_name": st.session_state.get(f"job_edit_name_{jid}"),
+                        "customer": st.session_state.get(f"job_edit_cust_{jid}"),
+                        "status": st.session_state.get(f"job_edit_status_{jid}"),
+                        "supervisor": st.session_state.get(f"job_edit_sup_{jid}"),
+                        "start_date": st.session_state.get(f"job_edit_start_{jid}"),
+                        "end_date": st.session_state.get(f"job_edit_end_{jid}"),
+                        "progress": st.session_state.get(f"job_edit_prog_{jid}"),
+                        "description": st.session_state.get(f"job_edit_desc_{jid}"),
+                    }
+                    ok, msg = persist_job(ui, row_id=jid)
+                    apply_persist_feedback(ok, msg)
+                    if ok:
+                        st.rerun()
 
-    render_selected_detail_panel(str(job.get("job_name") or title), tabs_fn=_tabs, body_fn=_body)
+    render_selected_detail_panel(
+        str(job.get("job_name") or title),
+        session_select_key=_SEL,
+        tabs_fn=_tabs,
+        body_fn=_body,
+    )
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("jobs"):
+        return
     all_jobs = load_jobs()
-    customers = sorted({str(j.get("customer") or "") for j in all_jobs if j.get("customer")})
+    customers = customer_filter_options()
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
         render_page_header("Jobs", "Manage active projects, schedules, and job details.")
     with act_r:
         st.button("Export", key="jobs_export", use_container_width=True)
-        st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True)
+        if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+            st.session_state["ips_job_form"] = True
+
+    if st.session_state.get("ips_job_form"):
+        with st.expander("New job", expanded=True):
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.text_input("Job number", key="job_new_num")
+                st.text_input("Job name", key="job_new_name")
+                st.selectbox("Customer", customer_filter_options(), key="job_new_cust")
+                st.selectbox("Status", lookup_options("job_statuses"), key="job_new_status")
+            with nc2:
+                st.text_input("Supervisor", key="job_new_sup")
+                st.date_input("Start date", key="job_new_start", value=None)
+                st.date_input("End date", key="job_new_end", value=None)
+            st.text_area("Description", key="job_new_desc")
+            sb1, sb2 = st.columns(2)
+            with sb1:
+                if st.button("Save job", key="job_save_new", type="primary"):
+                    ok, msg = persist_job(
+                        {
+                            "job_number": st.session_state.get("job_new_num"),
+                            "job_name": st.session_state.get("job_new_name"),
+                            "customer": st.session_state.get("job_new_cust"),
+                            "status": st.session_state.get("job_new_status"),
+                            "supervisor": st.session_state.get("job_new_sup"),
+                            "start_date": st.session_state.get("job_new_start"),
+                            "end_date": st.session_state.get("job_new_end"),
+                            "description": st.session_state.get("job_new_desc"),
+                        }
+                    )
+                    if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
+                        st.rerun()
+            with sb2:
+                if st.button("Cancel", key="job_cancel_new"):
+                    st.session_state.pop("ips_job_form", None)
+                    st.rerun()
 
     def _filters() -> None:
         c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.7])

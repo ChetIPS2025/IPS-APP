@@ -10,6 +10,7 @@ try:
         ServiceResult,
         delete_row,
         fetch_list,
+        fetch_rows,
         insert_row,
         update_row,
     )
@@ -18,11 +19,55 @@ except ImportError:
         ServiceResult,
         delete_row,
         fetch_list,
+        fetch_rows,
         insert_row,
         update_row,
     )
 
 # --- Normalizers (UI shape) ---
+
+
+def normalize_customer(row: dict[str, Any]) -> dict[str, Any]:
+    cid = str(row.get("id") or "").strip()
+    active = row.get("is_active", True)
+    if isinstance(active, str):
+        active = active.lower() in ("true", "1", "active", "yes")
+    return {
+        "id": cid or str(row.get("customer_name") or "—"),
+        "customer_name": str(row.get("customer_name") or row.get("name") or "—"),
+        "address": str(row.get("address") or ""),
+        "city": str(row.get("city") or ""),
+        "state": str(row.get("state") or ""),
+        "zip": str(row.get("zip") or row.get("zip_code") or ""),
+        "is_active": bool(active),
+        "status": "Active" if active else "Inactive",
+        "notes": str(row.get("notes") or ""),
+    }
+
+
+def normalize_customer_location(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "customer_id": str(row.get("customer_id") or ""),
+        "site_name": str(row.get("site_name") or row.get("name") or "—"),
+        "address": str(row.get("address_line1") or row.get("address") or ""),
+        "city": str(row.get("city") or ""),
+        "state": str(row.get("state") or ""),
+        "zip": str(row.get("zip") or ""),
+        "status": "Active" if row.get("is_active", True) else "Inactive",
+    }
+
+
+def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "contact_name": str(row.get("contact_name") or row.get("name") or "—"),
+        "title": str(row.get("title") or row.get("role") or ""),
+        "email": str(row.get("email") or ""),
+        "phone": str(row.get("phone") or ""),
+        "status": "Active" if row.get("is_active", True) else "Inactive",
+        "is_primary": bool(row.get("is_primary")),
+    }
 
 
 def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
@@ -219,11 +264,13 @@ def normalize_timekeeping_summary(row: dict[str, Any], week_start: date) -> dict
 
 
 def list_jobs(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
-    return fetch_list("jobs", order_by="job_number", normalize=normalize_job, demo=demo)
+    rows, used = fetch_list("jobs", order_by="job_number", normalize=normalize_job, demo=demo)
+    return rows if rows or not used else demo, used
 
 
 def list_estimates(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
-    return fetch_list("estimates", order_by="quote_number", normalize=normalize_estimate, demo=demo)
+    rows, used = fetch_list("estimates", order_by="quote_number", normalize=normalize_estimate, demo=demo)
+    return rows if rows or not used else demo, used
 
 
 def list_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
@@ -234,11 +281,9 @@ def list_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]]) -> 
         demo=[],
         alt_tables=("estimate_materials",),
     )
-    if rows and not used_demo:
+    if not used_demo:
         out = [normalize_material_line(r, eid) for r in rows if str(r.get("estimate_id") or "") == eid]
-        if out:
-            return out, False
-    # legacy: estimate_materials catalog won't have estimate_id — use demo
+        return out, False
     demo_match = [m for m in demo if m.get("estimate_id") == eid]
     return (demo_match if demo_match else demo), True
 
@@ -342,9 +387,15 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         "job_name": ui.get("job_name"),
         "customer_name": ui.get("customer"),
         "status": ui.get("status"),
+        "supervisor": ui.get("supervisor"),
+        "project_manager": ui.get("project_manager"),
+        "location": ui.get("location"),
         "start_date": ui.get("start_date") or None,
         "end_date": ui.get("end_date") or None,
-        "notes": ui.get("description"),
+        "target_completion_date": ui.get("end_date") or None,
+        "percent_complete": ui.get("progress"),
+        "notes": ui.get("description") or ui.get("notes"),
+        "scope_of_work": ui.get("scope_of_work") or "",
     }
     if row_id:
         return update_row("jobs", payload, {"id": row_id})
@@ -357,23 +408,53 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "project_name": ui.get("project_name"),
         "customer_name": ui.get("customer"),
         "status": ui.get("status"),
+        "estimate_date": ui.get("estimate_date") or None,
+        "expiration_date": ui.get("expiration_date") or None,
+        "prepared_by_name": ui.get("created_by") or ui.get("prepared_by_name"),
+        "subtotal": ui.get("subtotal"),
+        "tax": ui.get("tax"),
+        "markup": ui.get("markup"),
         "total": ui.get("total"),
-        "notes": ui.get("description"),
+        "notes": ui.get("description") or ui.get("notes"),
     }
     if row_id:
         return update_row("estimates", payload, {"id": row_id})
     return insert_row("estimates", payload)
 
 
+def save_estimate_line_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    qty = float(ui.get("qty") or 0)
+    unit_cost = float(ui.get("unit_cost") or 0)
+    payload = {
+        "estimate_id": ui.get("estimate_id"),
+        "item_number": ui.get("item_number"),
+        "description": ui.get("description"),
+        "category": ui.get("category"),
+        "qty": qty,
+        "unit": ui.get("unit") or "EA",
+        "unit_cost": unit_cost,
+        "total_cost": ui.get("total_cost") if ui.get("total_cost") is not None else qty * unit_cost,
+        "vendor": ui.get("vendor") or "",
+        "notes": ui.get("notes") or "",
+        "sort_order": int(ui.get("sort_order") or 0),
+    }
+    if row_id:
+        return update_row("estimate_line_items", payload, {"id": row_id})
+    return insert_row("estimate_line_items", payload)
+
+
 def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     payload = {
-        "item_name": ui.get("name"),
+        "item_name": ui.get("name") or ui.get("item_name"),
+        "sku": ui.get("sku") or ui.get("item_number"),
         "category": ui.get("category"),
         "storage_location": ui.get("location"),
+        "department": ui.get("department") or "",
         "quantity_on_hand": ui.get("qty_on_hand"),
         "reorder_point": ui.get("reorder_point"),
         "unit_cost": ui.get("unit_cost"),
         "vendor": ui.get("vendor"),
+        "status": ui.get("status") or "In Stock",
     }
     table = "inventory_items"
     if row_id:
@@ -383,15 +464,18 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
 
 def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     payload = {
-        "asset_id": ui.get("asset_number"),
+        "asset_id": ui.get("asset_number") or ui.get("asset_id"),
         "asset_name": ui.get("asset_name"),
         "category": ui.get("category"),
         "location": ui.get("location"),
+        "department": ui.get("department") or "",
         "status": ui.get("status"),
         "serial_number": ui.get("serial_number"),
         "manufacturer": ui.get("manufacturer"),
         "model": ui.get("model"),
-        "notes": ui.get("description"),
+        "notes": ui.get("description") or ui.get("notes"),
+        "current_value": ui.get("value") or ui.get("current_value"),
+        "acquired_date": ui.get("acquired_date") or None,
     }
     if row_id:
         return update_row("assets", payload, {"id": row_id})
@@ -399,17 +483,40 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
 
 
 def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
     payload = {
         "name": ui.get("name"),
         "email": ui.get("email"),
         "role": ui.get("role"),
         "department": ui.get("department"),
         "phone": ui.get("phone"),
-        "is_active": str(ui.get("status", "Active")).lower() == "active",
+        "username": ui.get("username"),
+        "crew": ui.get("crew") or "",
+        "position": ui.get("position") or "",
+        "status": ui.get("status") or ("Active" if active else "Inactive"),
+        "is_active": active,
+        "notes": ui.get("notes") or "",
     }
     if row_id:
         return update_row("employees", payload, {"id": row_id})
     return insert_row("employees", payload)
+
+
+def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    payload = {
+        "employee_id": ui.get("employee_id"),
+        "doc_type": ui.get("doc_type"),
+        "file_name": ui.get("file_name"),
+        "uploaded_by": ui.get("uploaded_by") or "",
+        "expiration_date": ui.get("expiration_date") or None,
+        "is_restricted": bool(ui.get("is_restricted")),
+        "storage_path": ui.get("storage_path") or "",
+        "notes": ui.get("notes") or "",
+    }
+    table = "employee_documents"
+    if row_id:
+        return update_row(table, payload, {"id": row_id})
+    return insert_row(table, payload)
 
 
 def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
@@ -449,8 +556,10 @@ def save_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
     payload = {
         "title": ui.get("title"),
         "message": ui.get("body") or ui.get("message"),
-        "category": ui.get("category"),
-        "is_active": True,
+        "category": ui.get("category") or "Announcements",
+        "priority": ui.get("priority") or "Normal",
+        "pinned": bool(ui.get("pinned")),
+        "is_active": ui.get("is_active", True) is not False,
     }
     if row_id:
         return update_row("company_updates", payload, {"id": row_id})
@@ -523,6 +632,88 @@ def save_timekeeping_week(employee_id: str, week_start: date, ui_summary: dict[s
         "st_total": ui_summary.get("st_total"),
         "ot_total": ui_summary.get("ot_total"),
         "dt_total": ui_summary.get("dt_total"),
-        "status": ui_summary.get("status"),
+        "status": ui_summary.get("status") or "Pending",
+        "notes": ui_summary.get("notes") or "",
     }
+    rows, err = fetch_rows("employee_timekeeping_weeks", limit=500)
+    existing: dict[str, Any] | None = None
+    if not err:
+        for r in rows:
+            if (
+                str(r.get("employee_id")) == str(employee_id)
+                and str(r.get("week_start") or "")[:10] == week_start.isoformat()
+            ):
+                existing = r
+                break
+    if existing and existing.get("id"):
+        return update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
     return insert_row("employee_timekeeping_weeks", payload)
+
+
+def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    payload = {
+        "employee_id": ui.get("employee_id"),
+        "week_start": ui.get("week_start"),
+        "work_date": ui.get("work_date"),
+        "job_id": ui.get("job_id") or None,
+        "job_label": ui.get("job_label") or "",
+        "st_hours": ui.get("st_hours") or 0,
+        "ot_hours": ui.get("ot_hours") or 0,
+        "dt_hours": ui.get("dt_hours") or 0,
+        "notes": ui.get("notes") or "",
+    }
+    if row_id:
+        return update_row("employee_timekeeping_days", payload, {"id": row_id})
+    return insert_row("employee_timekeeping_days", payload)
+
+
+def delete_estimate_line_item(row_id: str) -> ServiceResult:
+    return delete_row("estimate_line_items", {"id": row_id})
+
+
+def delete_employee_document(row_id: str) -> ServiceResult:
+    return delete_row("employee_documents", {"id": row_id})
+
+
+def list_customers(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
+    return fetch_list("customers", order_by="customer_name", normalize=normalize_customer, demo=demo)
+
+
+def list_customer_locations(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
+    cid = str(customer_id or "").strip()
+    rows, err = fetch_rows("customer_locations", limit=200, order_by="site_name")
+    if err:
+        demo_rows = [normalize_customer_location(r) for r in (demo or []) if str(r.get("customer_id")) == cid]
+        return demo_rows, True
+    out = [normalize_customer_location(r) for r in rows if str(r.get("customer_id")) == cid]
+    return out, False
+
+
+def list_customer_contacts(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
+    cid = str(customer_id or "").strip()
+    rows, err = fetch_rows("customer_contacts", limit=200, alt_tables=("contacts",))
+    if err:
+        demo_rows = [normalize_customer_contact(r) for r in (demo or []) if str(r.get("customer_id")) == cid]
+        return demo_rows, True
+    out = [normalize_customer_contact(r) for r in rows if str(r.get("customer_id")) == cid]
+    return out, False
+
+
+def save_customer(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    payload = {
+        "customer_name": ui.get("customer_name") or ui.get("name"),
+        "address": ui.get("address") or "",
+        "city": ui.get("city") or "",
+        "state": ui.get("state") or "",
+        "zip": ui.get("zip") or "",
+        "is_active": active,
+        "notes": ui.get("notes") or "",
+    }
+    if row_id:
+        return update_row("customers", payload, {"id": row_id})
+    return insert_row("customers", payload)
+
+
+def delete_customer(row_id: str) -> ServiceResult:
+    return delete_row("customers", {"id": row_id})

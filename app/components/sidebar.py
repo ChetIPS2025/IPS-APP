@@ -1,4 +1,4 @@
-"""Fixed left sidebar navigation (slug-based; for new module pages)."""
+"""Fixed left sidebar navigation (slug-based)."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ except ImportError:
     from utils.constants import FIELD_NAV_PAGES, NAV_PAGES, SESSION_NAV_KEY  # type: ignore
     from utils.permissions import filter_nav_for_role, normalize_role  # type: ignore
 
+_OT, _CT = "d" + "iv", "/" + "d" + "iv"
+
 
 def _logo_path() -> Path | None:
     for name in ("company_logo.png", "IPS Icon.png", "ips_logo_round.png"):
@@ -33,13 +35,18 @@ def render_sidebar(active_slug: str) -> None:
     nav_items = FIELD_NAV_PAGES if field_mode else filter_nav_for_role(NAV_PAGES, role)
 
     with st.sidebar:
+        st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
         logo = _logo_path()
         if logo:
             st.image(str(logo), use_container_width=True)
         else:
-            st.markdown("### IPS Operations")
-        st.caption("Industrial Plant Solutions")
+            st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="ips-sidebar-tagline">Industrial Plant Solutions</p></{_CT}>',
+            unsafe_allow_html=True,
+        )
 
+        st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
@@ -56,7 +63,8 @@ def render_sidebar(active_slug: str) -> None:
                     st.session_state[SESSION_NAV_KEY] = slug
                     st.rerun()
 
-        st.markdown("---")
+        st.markdown(f'<{_OT} class="ips-sidebar-spacer"></{_CT}>', unsafe_allow_html=True)
+
         fm = st.toggle("Field Supervisor Mode", value=field_mode, key="ips_field_mode_toggle")
         if fm != field_mode:
             st.session_state["ips_field_mode"] = fm
@@ -65,9 +73,8 @@ def render_sidebar(active_slug: str) -> None:
         prof = current_profile()
         name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
         role_lbl = html.escape(role.replace("_", " ").title())
-        ot = "d" + "iv"
         st.markdown(
-            f'<{ot} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}</{ot}>',
+            f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}</{_CT}>',
             unsafe_allow_html=True,
         )
         if st.button("Log out", use_container_width=True, key="ips_logout"):

@@ -21,11 +21,60 @@ SELECTED_BG = "#eff6ff"
 SELECTED_BORDER = "#2563eb"
 
 
+def inject_estimates_module_css() -> None:
+    """
+    Estimate list/detail table stability — always call at the top of the estimates page render.
+
+    Uses unique class names so other pages cannot affect estimate layout on navigation.
+    """
+    st.markdown(
+        f"""
+<style id="ips-estimates-module-v1">
+.ips-estimates-page .ips-data-table-wrap,
+.ips-estimates-page .ips-data-table-stable .ips-data-table-header,
+.ips-estimates-page .ips-data-table-stable .ips-data-row {{
+  display: grid !important;
+  box-sizing: border-box !important;
+}}
+.ips-estimates-page .ips-data-table-stable .ips-data-row {{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-estimates-page .ips-detail-panel {{
+  border-left: 3px solid {PRIMARY};
+}}
+.ips-estimates-page section[data-testid="stMain"] .stButton > button {{
+  min-height: 2.1rem !important;
+  max-height: 2.35rem !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_unauthenticated_shell_css() -> None:
+    """Login-only layout: centered card, no sidebar navigation."""
+    st.markdown(
+        '<script>document.body.classList.add("ips-auth-login");</script>',
+        unsafe_allow_html=True,
+    )
+
+
+def inject_authenticated_shell_css() -> None:
+    """Full app layout after login."""
+    st.markdown(
+        '<script>document.body.classList.remove("ips-auth-login");</script>',
+        unsafe_allow_html=True,
+    )
+
+
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v3">
+<style id="ips-global-styles-v4">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -302,14 +351,39 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   overflow: hidden !important;
 }}
 
-/* Login */
+/* Login — hide app chrome until authenticated */
+body.ips-auth-login section[data-testid="stSidebar"],
+body.ips-auth-login [data-testid="stSidebarCollapsedControl"] {{
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+}}
+body.ips-auth-login section[data-testid="stMain"] .block-container {{
+  max-width: 440px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-top: 1.5rem !important;
+}}
 .ips-login-wrap {{
   max-width: 420px;
-  margin: 2rem auto;
+  margin: 0 auto;
   padding: 1.5rem;
   background: #fff;
   border: 1px solid {BORDER};
   border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}}
+
+/* Module list pages (Customers, Jobs, …) */
+.ips-module-page {{
+  width: 100%;
+}}
+.ips-module-page .ips-page-header {{
+  margin-bottom: 0.85rem;
+}}
+.ips-form-card {{
+  margin-bottom: 0.75rem;
 }}
 
 /* Empty state */
@@ -731,6 +805,183 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   color: {TEXT_MUTED};
   padding: 0.35rem 0;
   border-bottom: 1px solid #f1f5f9;
+}}
+
+/* Page shell */
+.ips-page-content {{
+  width: 100%;
+  max-width: 1680px;
+}}
+
+/* Strip default Streamlit chrome in main area */
+section[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] {{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}}
+section[data-testid="stMain"] [data-testid="element-container"] {{
+  background: transparent !important;
+}}
+section[data-testid="stMain"] [data-testid="stExpander"] {{
+  background: {CARD_BG} !important;
+  border: 1px solid {BORDER} !important;
+  border-radius: 12px !important;
+}}
+section[data-testid="stMain"] [data-testid="stExpander"] summary {{
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+}}
+
+/* Sidebar — fixed nav SaaS layout */
+section[data-testid="stSidebar"] {{
+  min-width: 15.5rem !important;
+  max-width: 15.5rem !important;
+}}
+section[data-testid="stSidebar"] > div {{
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}}
+.ips-sidebar-logo-wrap {{
+  padding: 0.65rem 0.75rem 0.85rem;
+  border-bottom: 1px solid {BORDER};
+  margin-bottom: 0.35rem;
+}}
+.ips-sidebar-logo-wrap img {{
+  max-height: 44px;
+  width: auto;
+  display: block;
+}}
+.ips-sidebar-brand {{
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0;
+}}
+.ips-sidebar-tagline {{
+  font-size: 0.7rem;
+  color: {TEXT_MUTED};
+  margin: 0.15rem 0 0;
+}}
+.ips-sidebar-nav-label {{
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: {TEXT_MUTED};
+  padding: 0.5rem 0.85rem 0.25rem;
+  margin: 0;
+}}
+.ips-sidebar-spacer {{
+  flex: 1 1 auto;
+  min-height: 1.5rem;
+}}
+section[data-testid="stSidebar"] .stButton > button {{
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: {TEXT} !important;
+  font-weight: 500 !important;
+  font-size: 0.8125rem !important;
+  min-height: 2.15rem !important;
+  padding: 0.4rem 0.75rem !important;
+  margin: 0.05rem 0.4rem !important;
+  border-radius: 8px !important;
+}}
+section[data-testid="stSidebar"] .stButton > button:hover {{
+  background: #f1f5f9 !important;
+}}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"],
+section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-primary"] {{
+  background: {SELECTED_BG} !important;
+  color: {PRIMARY} !important;
+  font-weight: 600 !important;
+  border-left: 3px solid {PRIMARY} !important;
+  padding-left: calc(0.75rem - 3px) !important;
+}}
+section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
+  background: transparent !important;
+  color: {TEXT} !important;
+}}
+section[data-testid="stSidebar"] hr {{
+  margin: 0.5rem 0.65rem !important;
+  border-color: {BORDER} !important;
+}}
+
+/* Tabs — underline style */
+.ips-tabs-wrap {{
+  margin-bottom: 0.65rem;
+}}
+.ips-tabs-wrap [data-testid="stRadio"] > div {{
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  gap: 0.15rem !important;
+  border-bottom: 1px solid {BORDER};
+  padding-bottom: 0.15rem;
+}}
+.ips-tabs-wrap [data-testid="stRadio"] label {{
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0.45rem 0.75rem !important;
+  margin: 0 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: {TEXT_MUTED} !important;
+  box-shadow: none !important;
+}}
+.ips-tabs-wrap [data-testid="stRadio"] label[data-checked="true"],
+.ips-tabs-wrap [data-testid="stRadio"] label:has(input:checked) {{
+  color: {PRIMARY} !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid {PRIMARY} !important;
+  margin-bottom: -1px !important;
+}}
+
+/* Detail panel actions */
+.ips-detail-actions .stButton > button {{
+  min-height: 2rem !important;
+  max-height: 2.15rem !important;
+  font-size: 0.75rem !important;
+  padding: 0.2rem 0.55rem !important;
+}}
+.ips-detail-actions .stButton > button[kind="primary"] {{
+  background: {PRIMARY} !important;
+  border-color: {PRIMARY} !important;
+  color: #fff !important;
+}}
+
+/* Table cells — prevent broken stacked text */
+.ips-data-table-stable .ips-data-row > div,
+.ips-data-table-header > div {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}}
+.ips-data-table-stable .ips-data-row > div .ips-status-pill {{
+  white-space: nowrap;
+}}
+
+/* Header action column */
+.ips-header-actions .stButton > button {{
+  min-height: 2.1rem !important;
+  font-size: 0.8125rem !important;
+}}
+
+.ips-tab-placeholder {{
+  background: #f8fafc;
+  border: 1px dashed {BORDER};
+  border-radius: 10px;
+  padding: 1.25rem;
+  text-align: center;
+  color: {TEXT_MUTED};
+  font-size: 0.8125rem;
+  margin: 0.5rem 0;
 }}
 </style>
 """,

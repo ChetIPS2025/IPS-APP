@@ -11,6 +11,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
         for p in [
             ("dashboard",),
             ("jobs",),
+            ("customers",),
             ("estimates",),
             ("estimate_materials",),
             ("inventory",),
@@ -31,6 +32,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
         {
             "dashboard",
             "jobs",
+            "customers",
             "estimates",
             "estimate_materials",
             "inventory",
@@ -50,6 +52,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
         {
             "dashboard",
             "jobs",
+            "customers",
             "estimates",
             "estimate_materials",
             "inventory",

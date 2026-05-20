@@ -10,26 +10,42 @@ try:
     from app.components.charts import render_donut_chart
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_selected_detail_panel
+    from app.components.layout import render_selected_detail_panel, render_tab_placeholder
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
-    from app.pages.modules._data import ACTIVE_ESTIMATE_KEY, get_estimate, load_estimates
+    from app.pages.modules._data import (
+        ACTIVE_ESTIMATE_KEY,
+        customer_filter_options,
+        get_estimate,
+        load_estimates,
+        lookup_options,
+        persist_estimate,
+    )
+    from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._session import select_key, tab_key
-    from app.styles import inject_global_css
+    from app.styles import inject_estimates_module_css
     from app.utils.constants import ESTIMATE_STATUSES, SESSION_NAV_KEY
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from components.charts import render_donut_chart  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel  # type: ignore
+    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
-    from pages.modules._data import ACTIVE_ESTIMATE_KEY, get_estimate, load_estimates  # type: ignore
+    from pages.modules._data import (  # type: ignore
+        ACTIVE_ESTIMATE_KEY,
+        customer_filter_options,
+        get_estimate,
+        load_estimates,
+        lookup_options,
+        persist_estimate,
+    )
+    from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
-    from styles import inject_global_css  # type: ignore
+    from styles import inject_estimates_module_css, inject_global_css  # type: ignore
     from utils.constants import ESTIMATE_STATUSES, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
@@ -92,8 +108,9 @@ def _render_detail(est: dict) -> None:
         )
         tab = str(st.session_state.get(_TAB) or "Overview")
         if tab != "Overview":
-            if tab != "Materials":
-                st.info(f"{tab} will connect to Supabase in a later phase.")
+            if tab == "Materials":
+                return
+            render_tab_placeholder(f"{tab} will connect to Supabase in a later phase.")
             return
         c1, c2, c3 = st.columns([1.2, 1, 1])
         with c1:
@@ -162,28 +179,101 @@ def _render_detail(est: dict) -> None:
             col_fr=["0.8fr", "1.5fr", "0.5fr", "0.5fr", "0.7fr", "0.7fr"],
             cell_renderer=_li_cell,
         )
+        eid = str(est.get("id") or "")
+        if not is_demo_id(eid):
+            with st.expander("Edit estimate", expanded=False):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    st.text_input("Estimate #", value=str(est.get("estimate_number") or ""), key=f"est_edit_num_{eid}")
+                    st.text_input("Project", value=str(est.get("project_name") or ""), key=f"est_edit_proj_{eid}")
+                    st.selectbox("Customer", customer_filter_options(), key=f"est_edit_cust_{eid}")
+                    st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
+                with ec2:
+                    st.number_input("Subtotal", value=float(est.get("subtotal") or 0), key=f"est_edit_sub_{eid}")
+                    st.number_input("Tax", value=float(est.get("tax") or 0), key=f"est_edit_tax_{eid}")
+                    st.number_input("Total", value=float(est.get("total") or 0), key=f"est_edit_total_{eid}")
+                st.text_area("Notes", value=str(est.get("description") or ""), key=f"est_edit_notes_{eid}")
+                if st.button("Save estimate", key=f"est_save_{eid}", type="primary"):
+                    ok, msg = persist_estimate(
+                        {
+                            "estimate_number": st.session_state.get(f"est_edit_num_{eid}"),
+                            "project_name": st.session_state.get(f"est_edit_proj_{eid}"),
+                            "customer": st.session_state.get(f"est_edit_cust_{eid}"),
+                            "status": st.session_state.get(f"est_edit_status_{eid}"),
+                            "subtotal": st.session_state.get(f"est_edit_sub_{eid}"),
+                            "tax": st.session_state.get(f"est_edit_tax_{eid}"),
+                            "total": st.session_state.get(f"est_edit_total_{eid}"),
+                            "description": st.session_state.get(f"est_edit_notes_{eid}"),
+                        },
+                        row_id=eid,
+                    )
+                    if apply_persist_feedback(ok, msg):
+                        st.rerun()
 
-    render_selected_detail_panel(title, tabs_fn=_tabs, body_fn=_body)
+    render_selected_detail_panel(
+        title,
+        session_select_key=_SEL,
+        tabs_fn=_tabs,
+        body_fn=_body,
+    )
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("estimates"):
+        return
+    inject_estimates_module_css()
+    st.markdown('<div class="ips-estimates-page"></div>', unsafe_allow_html=True)
     rows = load_estimates()
-    customers = sorted({str(r.get("customer") or "") for r in rows if r.get("customer")})
+    customers = customer_filter_options()
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
         render_page_header("Estimates", "Create, review, and manage all project estimates.")
     with act_r:
         st.button("Export", key="est_export", use_container_width=True)
-        st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True)
+        if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
+            st.session_state["ips_est_form"] = True
+
+    if st.session_state.get("ips_est_form"):
+        with st.expander("New estimate", expanded=True):
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.text_input("Estimate #", key="est_new_num")
+                st.text_input("Project name", key="est_new_proj")
+                st.selectbox("Customer", customer_filter_options(), key="est_new_cust")
+                st.selectbox("Status", lookup_options("estimate_statuses"), key="est_new_status")
+            with nc2:
+                st.number_input("Total", value=0.0, key="est_new_total")
+            st.text_area("Notes", key="est_new_notes")
+            if st.button("Save estimate", key="est_save_new", type="primary"):
+                ok, msg = persist_estimate(
+                    {
+                        "estimate_number": st.session_state.get("est_new_num"),
+                        "project_name": st.session_state.get("est_new_proj"),
+                        "customer": st.session_state.get("est_new_cust"),
+                        "status": st.session_state.get("est_new_status"),
+                        "total": st.session_state.get("est_new_total"),
+                        "description": st.session_state.get("est_new_notes"),
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_est_form",)):
+                    st.rerun()
 
     def _filters() -> None:
         c1, c2, c3, c4 = st.columns([2, 1, 1, 0.7])
         with c1:
             st.text_input("Search", placeholder="Search estimates…", key="est_search", label_visibility="collapsed")
         with c2:
-            st.selectbox("Status", ["All Statuses", *ESTIMATE_STATUSES], key="est_filter_status", label_visibility="collapsed")
+            st.selectbox(
+                "Status",
+                ["All Statuses", *lookup_options("estimate_statuses")],
+                key="est_filter_status",
+                label_visibility="collapsed",
+            )
         with c3:
             st.selectbox("Customer", ["All Customers", *customers], key="est_filter_customer", label_visibility="collapsed")
         with c4:

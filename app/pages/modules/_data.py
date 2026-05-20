@@ -63,39 +63,36 @@ _DEMO_JOBS: list[dict[str, Any]] = [
 
 def _fetch_table(name: str, *, order_by: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
     try:
+        from app.services.repository import fetch_rows
+    except ImportError:
+        from services.repository import fetch_rows  # type: ignore
+    rows, err = fetch_rows(name, limit=limit, order_by=order_by)
+    if err:
         try:
-            from app.db import fetch_table
+            from app.pages.modules._access import mark_demo_data, show_db_error
         except ImportError:
-            from db import fetch_table  # type: ignore
-        return fetch_table(name, limit=limit, order_by=order_by) or []
-    except Exception:
-        return []
+            from pages.modules._access import mark_demo_data, show_db_error  # type: ignore
+        mark_demo_data()
+        show_db_error(name, err)
+    return rows
 
 
-def _normalize_job(row: dict[str, Any]) -> dict[str, Any]:
-    jid = str(row.get("id") or row.get("job_id") or "").strip()
-    num = str(row.get("job_number") or row.get("number") or jid[:8] or "—")
-    return {
-        "id": jid or num,
-        "job_number": num,
-        "job_name": str(row.get("job_name") or row.get("name") or row.get("description") or "—"),
-        "customer": str(row.get("customer_name") or row.get("customer") or "—"),
-        "estimate_number": str(row.get("estimate_number") or row.get("quote_number") or "—"),
-        "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
-        "status": str(row.get("status") or "Draft"),
-        "start_date": str(row.get("start_date") or "")[:10],
-        "end_date": str(row.get("end_date") or "")[:10],
-        "progress": int(row.get("progress") or row.get("percent_complete") or 0),
-        "description": str(row.get("notes") or row.get("description") or ""),
-    }
+def _mark_if_demo(used: bool) -> None:
+    if used:
+        try:
+            from app.pages.modules._access import mark_demo_data
+        except ImportError:
+            from pages.modules._access import mark_demo_data  # type: ignore
+        mark_demo_data()
 
 
 def load_jobs() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_jobs
+        from app.services.jobs_service import list_jobs
     except ImportError:
-        from services.phase2_modules_service import list_jobs  # type: ignore
-    rows, _ = list_jobs(demo=list(_DEMO_JOBS))
+        from services.jobs_service import list_jobs  # type: ignore
+    rows, used = list_jobs(demo=list(_DEMO_JOBS))
+    _mark_if_demo(used)
     return rows
 
 
@@ -319,33 +316,13 @@ _DEMO_ASSETS: list[dict[str, Any]] = [
 ]
 
 
-def _normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
-    eid = str(row.get("id") or "").strip()
-    num = str(row.get("quote_number") or row.get("estimate_number") or eid[:8] or "—")
-    return {
-        "id": eid or num,
-        "estimate_number": num,
-        "project_name": str(row.get("project_name") or row.get("job_name") or row.get("title") or "—"),
-        "customer": str(row.get("customer_name") or row.get("customer") or "—"),
-        "estimate_date": str(row.get("estimate_date") or row.get("created_at") or "")[:10],
-        "expiration_date": str(row.get("expiration_date") or row.get("valid_through") or "")[:10],
-        "total": float(row.get("total") or row.get("grand_total") or 0),
-        "status": str(row.get("status") or "Draft"),
-        "created_by": str(row.get("created_by") or row.get("prepared_by") or "—"),
-        "job_number": str(row.get("job_number") or "—"),
-        "description": str(row.get("description") or row.get("notes") or ""),
-        "subtotal": float(row.get("subtotal") or row.get("total") or 0),
-        "tax": float(row.get("tax") or 0),
-        "markup": float(row.get("markup") or 0),
-    }
-
-
 def load_estimates() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_estimates
+        from app.services.estimates_service import list_estimates
     except ImportError:
-        from services.phase2_modules_service import list_estimates  # type: ignore
-    rows, _ = list_estimates(demo=list(_DEMO_ESTIMATES))
+        from services.estimates_service import list_estimates  # type: ignore
+    rows, used = list_estimates(demo=list(_DEMO_ESTIMATES))
+    _mark_if_demo(used)
     return rows
 
 
@@ -360,10 +337,11 @@ def get_estimate(estimate_id: str) -> dict[str, Any] | None:
 def load_estimate_materials(estimate_id: str) -> list[dict[str, Any]]:
     eid = str(estimate_id or "").strip()
     try:
-        from app.services.phase2_modules_service import list_estimate_materials
+        from app.services.estimates_service import list_estimate_materials
     except ImportError:
-        from services.phase2_modules_service import list_estimate_materials  # type: ignore
-    rows, _ = list_estimate_materials(eid, demo=list(_DEMO_MATERIALS))
+        from services.estimates_service import list_estimate_materials  # type: ignore
+    rows, used = list_estimate_materials(eid, demo=list(_DEMO_MATERIALS))
+    _mark_if_demo(used)
     return rows
 
 
@@ -384,60 +362,23 @@ def materials_summary(materials: list[dict[str, Any]]) -> dict[str, float]:
     }
 
 
-def _normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
-    iid = str(row.get("id") or "").strip()
-    sku = str(row.get("sku") or row.get("item_number") or iid[:8])
-    return {
-        "id": iid or sku,
-        "sku": sku,
-        "name": str(row.get("name") or row.get("description") or "—"),
-        "category": str(row.get("category") or "—"),
-        "location": str(row.get("location") or "—"),
-        "department": str(row.get("department") or "—"),
-        "status": str(row.get("status") or "In Stock"),
-        "qty_on_hand": int(row.get("qty_on_hand") or row.get("quantity") or 0),
-        "reorder_point": int(row.get("reorder_point") or 0),
-        "unit_cost": float(row.get("unit_cost") or 0),
-        "vendor": str(row.get("vendor") or "—"),
-    }
-
-
 def load_inventory() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_inventory
+        from app.services.inventory_service import list_inventory
     except ImportError:
-        from services.phase2_modules_service import list_inventory  # type: ignore
-    rows, _ = list_inventory(demo=list(_DEMO_INVENTORY))
+        from services.inventory_service import list_inventory  # type: ignore
+    rows, used = list_inventory(demo=list(_DEMO_INVENTORY))
+    _mark_if_demo(used)
     return rows
-
-
-def _normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
-    aid = str(row.get("id") or "").strip()
-    num = str(row.get("asset_number") or row.get("tag") or aid[:8])
-    return {
-        "id": aid or num,
-        "asset_number": num,
-        "asset_name": str(row.get("asset_name") or row.get("name") or "—"),
-        "category": str(row.get("category") or "—"),
-        "location": str(row.get("location") or "—"),
-        "department": str(row.get("department") or "—"),
-        "status": str(row.get("status") or "In Service"),
-        "acquired_date": str(row.get("acquired_date") or "")[:10],
-        "value": float(row.get("value") or row.get("current_value") or 0),
-        "serial_number": str(row.get("serial_number") or "—"),
-        "manufacturer": str(row.get("manufacturer") or "—"),
-        "model": str(row.get("model") or "—"),
-        "operator": str(row.get("operator") or row.get("assigned_to") or "—"),
-        "description": str(row.get("description") or row.get("notes") or ""),
-    }
 
 
 def load_assets() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_assets
+        from app.services.assets_service import list_assets
     except ImportError:
-        from services.phase2_modules_service import list_assets  # type: ignore
-    rows, _ = list_assets(demo=list(_DEMO_ASSETS))
+        from services.assets_service import list_assets  # type: ignore
+    rows, used = list_assets(demo=list(_DEMO_ASSETS))
+    _mark_if_demo(used)
     return rows
 
 
@@ -536,10 +477,11 @@ _DEMO_EVENTS: list[dict[str, Any]] = [
 
 def load_employees() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_employees
+        from app.services.employees_service import list_employees
     except ImportError:
-        from services.phase2_modules_service import list_employees  # type: ignore
-    rows, _ = list_employees(demo=list(_DEMO_EMPLOYEES))
+        from services.employees_service import list_employees  # type: ignore
+    rows, used = list_employees(demo=list(_DEMO_EMPLOYEES))
+    _mark_if_demo(used)
     return rows
 
 
@@ -554,13 +496,14 @@ def get_employee(employee_id: str) -> dict[str, Any] | None:
 def load_certifications(employee_id: str) -> list[dict[str, Any]]:
     eid = str(employee_id or "").strip()
     try:
-        from app.services.phase2_modules_service import list_certifications
+        from app.services.employees_service import list_certifications
     except ImportError:
-        from services.phase2_modules_service import list_certifications  # type: ignore
+        from services.employees_service import list_certifications  # type: ignore
     demo = [c for c in _DEMO_CERTIFICATIONS if c.get("employee_id") == eid]
     if not demo and eid:
         demo = [c for c in _DEMO_CERTIFICATIONS if eid == "emp-chance"][:2]
-    rows, _ = list_certifications(eid, demo=demo or list(_DEMO_CERTIFICATIONS)[:2])
+    rows, used = list_certifications(eid, demo=demo or list(_DEMO_CERTIFICATIONS)[:2])
+    _mark_if_demo(used)
     return rows
 
 
@@ -581,19 +524,21 @@ def load_employee_documents(employee_id: str, *, role: str = "admin") -> list[di
 
 def load_documents_hub(*, role: str = "admin") -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_documents_hub
+        from app.services.documents_service import list_documents_hub
     except ImportError:
-        from services.phase2_modules_service import list_documents_hub  # type: ignore
-    rows, _ = list_documents_hub(role=role, demo=list(_DEMO_DOCUMENTS_HUB))
+        from services.documents_service import list_documents_hub  # type: ignore
+    rows, used = list_documents_hub(role=role, demo=list(_DEMO_DOCUMENTS_HUB))
+    _mark_if_demo(used)
     return rows
 
 
 def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_company_updates
+        from app.services.updates_service import list_company_updates
     except ImportError:
-        from services.phase2_modules_service import list_company_updates  # type: ignore
-    rows, _ = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
+        from services.updates_service import list_company_updates  # type: ignore
+    rows, used = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
+    _mark_if_demo(used)
     return rows
 
 
@@ -616,15 +561,16 @@ def load_upcoming_events() -> list[dict[str, Any]]:
 
 def load_all_certifications() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_all_certifications
+        from app.services.employees_service import list_all_certifications
     except ImportError:
-        from services.phase2_modules_service import list_all_certifications  # type: ignore
+        from services.employees_service import list_all_certifications  # type: ignore
     employees = load_employees()
     demo = []
     for c in _DEMO_CERTIFICATIONS:
         emp = get_employee(str(c.get("employee_id") or "")) or {}
         demo.append({**c, "employee_name": str(emp.get("name") or "—")})
-    rows, _ = list_all_certifications(demo=demo, employees=employees)
+    rows, used = list_all_certifications(demo=demo, employees=employees)
+    _mark_if_demo(used)
     return rows
 
 
@@ -649,10 +595,11 @@ def job_options_for_timekeeping() -> list[str]:
 
 def load_tasks() -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_tasks
+        from app.services.tasks_service import list_tasks
     except ImportError:
-        from services.phase2_modules_service import list_tasks  # type: ignore
-    rows, _ = list_tasks(demo=list(_DEMO_TASKS))
+        from services.tasks_service import list_tasks  # type: ignore
+    rows, used = list_tasks(demo=list(_DEMO_TASKS))
+    _mark_if_demo(used)
     return rows
 
 
@@ -666,16 +613,17 @@ def get_task(task_id: str) -> dict[str, Any] | None:
 
 def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
     try:
-        from app.services.phase2_modules_service import list_timekeeping_summaries
+        from app.services.timekeeping_service import list_timekeeping_summaries
     except ImportError:
-        from services.phase2_modules_service import list_timekeeping_summaries  # type: ignore
+        from services.timekeeping_service import list_timekeeping_summaries  # type: ignore
     demo = [
         {"id": "emp-chance", "name": "Chance Burgess", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 38.5, "ot_total": 4.0, "dt_total": 0.0, "status": "Pending"},
         {"id": "emp-mark", "name": "Mark Johnson", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 2.5, "dt_total": 0.0, "status": "Approved"},
         {"id": "emp-sarah", "name": "Sarah Chen", "department": "Project Management", "week_start": week_start.isoformat(), "st_total": 32.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
         {"id": "emp-leland", "name": "Leland Daigle", "department": "Administration", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
     ]
-    rows, _ = list_timekeeping_summaries(week_start, demo=demo)
+    rows, used = list_timekeeping_summaries(week_start, demo=demo)
+    _mark_if_demo(used)
     return rows
 
 
@@ -864,10 +812,43 @@ def task_estimate_options() -> list[str]:
     opts = ["— None —"]
     for e in load_estimates():
         num = str(e.get("estimate_number") or e.get("number") or "")
-        name = str(e.get("name") or e.get("title") or "")
+        name = str(e.get("project_name") or e.get("name") or e.get("title") or "")
         if num:
             opts.append(f"{num} — {name}")
     return opts
+
+
+def document_link_ref_options(module: str) -> list[str]:
+    """Linked-record dropdown options for the documents hub."""
+    mod = str(module or "").strip()
+    if mod == "Jobs":
+        return [f"{j.get('job_number')} — {j.get('job_name')}" for j in load_jobs() if j.get("job_number")]
+    if mod == "Estimates":
+        return [
+            f"{e.get('estimate_number')} — {e.get('project_name')}"
+            for e in load_estimates()
+            if e.get("estimate_number")
+        ]
+    if mod == "Assets":
+        return [
+            f"{a.get('asset_number')} — {a.get('asset_name')}"
+            for a in load_assets()
+            if a.get("asset_number")
+        ]
+    if mod == "Employees":
+        return [str(e.get("name") or "") for e in load_employees() if e.get("name")]
+    if mod == "Certifications":
+        out: list[str] = []
+        for c in load_all_certifications():
+            label = f"{c.get('employee_name')} — {c.get('cert_type')}"
+            if label.strip(" —"):
+                out.append(label)
+        return out
+    if mod == "Inventory":
+        return [f"{i.get('sku')} — {i.get('name')}" for i in load_inventory() if i.get("sku")]
+    if mod == "Company Updates":
+        return [str(u.get("title") or "") for u in load_company_updates(category="All Updates") if u.get("title")]
+    return []
 
 
 def task_assignee_options() -> list[str]:
@@ -875,6 +856,26 @@ def task_assignee_options() -> list[str]:
 
 
 def demo_report_job_profitability() -> list[dict[str, Any]]:
+    jobs = load_jobs()
+    if jobs:
+        rows = []
+        for j in jobs[:12]:
+            rev = float(j.get("awarded_amount") or j.get("revenue") or 0)
+            if not rev:
+                rev = float(j.get("progress") or 0) * 1000
+            cost = rev * 0.78 if rev else 0
+            margin = ((rev - cost) / rev * 100) if rev else 0
+            rows.append(
+                {
+                    "job_number": j.get("job_number"),
+                    "job_name": j.get("job_name"),
+                    "revenue": rev or 85000,
+                    "cost": cost or 66000,
+                    "margin_pct": round(margin, 1) if rev else 22.0,
+                }
+            )
+        if rows:
+            return rows
     return [
         {"job_number": "J26047", "job_name": "Maintenance Shop Bathroom Remodel", "revenue": 185000, "cost": 142500, "margin_pct": 23.0},
         {"job_number": "J26012", "job_name": "Tank Farm Piping", "revenue": 420000, "cost": 358200, "margin_pct": 14.7},
@@ -883,6 +884,19 @@ def demo_report_job_profitability() -> list[dict[str, Any]]:
 
 
 def demo_report_labor_by_job() -> list[dict[str, Any]]:
+    jobs = load_jobs()
+    if jobs:
+        return [
+            {
+                "job_number": j.get("job_number"),
+                "st_hours": 40.0 + (int(j.get("progress") or 0) % 20) * 5,
+                "ot_hours": 4.0,
+                "dt_hours": 0.0,
+                "total_hours": 44.0 + (int(j.get("progress") or 0) % 20) * 5,
+            }
+            for j in jobs[:10]
+            if j.get("job_number")
+        ]
     return [
         {"job_number": "J26047", "st_hours": 312.5, "ot_hours": 28.0, "dt_hours": 0.0, "total_hours": 340.5},
         {"job_number": "J26012", "st_hours": 890.0, "ot_hours": 112.5, "dt_hours": 16.0, "total_hours": 1018.5},
@@ -891,6 +905,22 @@ def demo_report_labor_by_job() -> list[dict[str, Any]]:
 
 
 def demo_report_labor_by_employee() -> list[dict[str, Any]]:
+    from datetime import date as _date
+
+    summaries = load_timekeeping_summaries(_date.today())
+    if summaries:
+        return [
+            {
+                "employee": s.get("name"),
+                "st_hours": float(s.get("st_total") or 0),
+                "ot_hours": float(s.get("ot_total") or 0),
+                "dt_hours": float(s.get("dt_total") or 0),
+                "total_hours": float(s.get("st_total") or 0)
+                + float(s.get("ot_total") or 0)
+                + float(s.get("dt_total") or 0),
+            }
+            for s in summaries
+        ]
     return [
         {"employee": "Chance Burgess", "st_hours": 38.5, "ot_hours": 4.0, "dt_hours": 0.0, "total_hours": 42.5},
         {"employee": "Mark Johnson", "st_hours": 40.0, "ot_hours": 2.5, "dt_hours": 0.0, "total_hours": 42.5},
@@ -899,6 +929,15 @@ def demo_report_labor_by_employee() -> list[dict[str, Any]]:
 
 
 def demo_report_inventory_value() -> list[dict[str, Any]]:
+    inv = load_inventory()
+    if inv:
+        by_cat: dict[str, dict[str, Any]] = {}
+        for item in inv:
+            cat = str(item.get("category") or "Uncategorized")
+            bucket = by_cat.setdefault(cat, {"category": cat, "sku_count": 0, "on_hand_value": 0.0})
+            bucket["sku_count"] += 1
+            bucket["on_hand_value"] += float(item.get("qty_on_hand") or 0) * float(item.get("unit_cost") or 0)
+        return list(by_cat.values())
     return [
         {"category": "Electrical", "sku_count": 142, "on_hand_value": 48200.0},
         {"category": "Plumbing", "sku_count": 98, "on_hand_value": 31500.0},
@@ -984,6 +1023,15 @@ def demo_report_timekeeping_summary() -> list[dict[str, Any]]:
     return load_timekeeping_summaries(_date.today())
 
 
+def persist_lookup_table(table_label: str, values: list[str]) -> tuple[bool, str]:
+    """Save admin lookup table values (Supabase with session fallback)."""
+    try:
+        from app.services.lookup_service import save_lookup_for_label
+    except ImportError:
+        from services.lookup_service import save_lookup_for_label  # type: ignore
+    return save_lookup_for_label(table_label, values)
+
+
 def lookup_options(slug: str) -> list[str]:
     """Dropdown values from Supabase lookup tables with constants fallback."""
     try:
@@ -1006,84 +1054,377 @@ def _persist_result(result: Any, *, success: str) -> tuple[bool, str]:
     return True, success
 
 
-def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+_DEMO_SAVE_MSG = "Cannot save demo data to Supabase. Create a new record instead."
+
+
+def _demo_blocked(row_id: str | None) -> bool:
     try:
-        from app.services.phase2_modules_service import save_job
+        from app.pages.modules._crud import is_demo_id
     except ImportError:
-        from services.phase2_modules_service import save_job  # type: ignore
+        from pages.modules._crud import is_demo_id  # type: ignore
+    return is_demo_id(row_id)
+
+
+def employee_options(*, include_blank: bool = True) -> list[str]:
+    names = sorted({str(e.get("name") or "") for e in load_employees() if e.get("name")})
+    if include_blank:
+        return ["— Select —", *names]
+    return names
+
+
+_DEMO_CUSTOMERS: list[dict[str, Any]] = [
+    {
+        "id": "demo-c-birla",
+        "customer_name": "Birla Carbons - USA",
+        "address": "123 Industrial Park Rd",
+        "city": "Alexandria",
+        "state": "LA",
+        "zip": "71301",
+        "is_active": True,
+        "notes": "Primary petrochemical account.",
+    },
+    {
+        "id": "demo-c-acme",
+        "customer_name": "Acme Construction",
+        "address": "4500 Commerce Blvd",
+        "city": "Lake Charles",
+        "state": "LA",
+        "zip": "70601",
+        "is_active": True,
+        "notes": "",
+    },
+    {
+        "id": "demo-c-gulf",
+        "customer_name": "Gulf Coast Industrial",
+        "address": "800 Harbor Way",
+        "city": "Houma",
+        "state": "LA",
+        "zip": "70360",
+        "is_active": True,
+        "notes": "",
+    },
+    {
+        "id": "demo-c-bayou",
+        "customer_name": "Bayou Petrochemical",
+        "address": "2100 Plant Rd",
+        "city": "Baton Rouge",
+        "state": "LA",
+        "zip": "70802",
+        "is_active": False,
+        "notes": "Inactive — reactivate when contract renews.",
+    },
+]
+
+_DEMO_CUSTOMER_LOCATIONS: list[dict[str, Any]] = [
+    {
+        "id": "demo-loc-1",
+        "customer_id": "demo-c-birla",
+        "site_name": "Main Plant",
+        "address_line1": "123 Industrial Park Rd",
+        "city": "Alexandria",
+        "state": "LA",
+        "zip": "71301",
+        "is_active": True,
+    },
+]
+
+_DEMO_CUSTOMER_CONTACTS: list[dict[str, Any]] = [
+    {
+        "id": "demo-cc-1",
+        "customer_id": "demo-c-birla",
+        "contact_name": "Sarah Chen",
+        "title": "Project Manager",
+        "email": "sarah.chen@example.com",
+        "phone": "(318) 555-0101",
+        "is_active": True,
+        "is_primary": True,
+    },
+]
+
+
+def load_customers() -> list[dict[str, Any]]:
+    try:
+        from app.services.customers_service import list_customers
+    except ImportError:
+        from services.customers_service import list_customers  # type: ignore
+    rows, used = list_customers(demo=list(_DEMO_CUSTOMERS))
+    _mark_if_demo(used)
+    return rows
+
+
+def get_customer(customer_id: str) -> dict[str, Any] | None:
+    cid = str(customer_id or "").strip()
+    return next((c for c in load_customers() if str(c.get("id")) == cid), None)
+
+
+def load_customer_locations(customer_id: str) -> list[dict[str, Any]]:
+    try:
+        from app.services.customers_service import list_customer_locations
+    except ImportError:
+        from services.customers_service import list_customer_locations  # type: ignore
+    rows, used = list_customer_locations(customer_id, demo=list(_DEMO_CUSTOMER_LOCATIONS))
+    if used:
+        _mark_if_demo(True)
+    return rows
+
+
+def load_customer_contacts(customer_id: str) -> list[dict[str, Any]]:
+    try:
+        from app.services.customers_service import list_customer_contacts
+    except ImportError:
+        from services.customers_service import list_customer_contacts  # type: ignore
+    rows, used = list_customer_contacts(customer_id, demo=list(_DEMO_CUSTOMER_CONTACTS))
+    if used:
+        _mark_if_demo(True)
+    return rows
+
+
+def jobs_for_customer(customer_name: str) -> list[dict[str, Any]]:
+    name = str(customer_name or "").strip().lower()
+    if not name:
+        return []
+    return [j for j in load_jobs() if str(j.get("customer") or "").strip().lower() == name]
+
+
+def estimates_for_customer(customer_name: str) -> list[dict[str, Any]]:
+    name = str(customer_name or "").strip().lower()
+    if not name:
+        return []
+    return [e for e in load_estimates() if str(e.get("customer") or "").strip().lower() == name]
+
+
+def customer_filter_options() -> list[str]:
+    """Customers for filters — directory plus lookup seeds."""
+    opts = {str(c.get("customer_name") or "").strip() for c in load_customers() if c.get("customer_name")}
+    opts.update(lookup_options("customers"))
+    return sorted(opts)
+
+
+def persist_customer(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import save_customer
+    except ImportError:
+        from services.customers_service import save_customer  # type: ignore
+    return _persist_result(save_customer(ui, row_id=row_id), success="Customer saved.")
+
+
+def delete_customer_row(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import delete_customer
+    except ImportError:
+        from services.customers_service import delete_customer  # type: ignore
+    return _persist_result(delete_customer(row_id), success="Customer removed.")
+
+
+def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.jobs_service import save_job
+    except ImportError:
+        from services.jobs_service import save_job  # type: ignore
     return _persist_result(save_job(ui, row_id=row_id), success="Job saved.")
 
 
 def persist_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_estimate
+        from app.services.estimates_service import save_estimate
     except ImportError:
-        from services.phase2_modules_service import save_estimate  # type: ignore
+        from services.estimates_service import save_estimate  # type: ignore
     return _persist_result(save_estimate(ui, row_id=row_id), success="Estimate saved.")
 
 
-def persist_inventory(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+def persist_estimate_material(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_inventory_item
+        from app.services.estimates_service import save_estimate_line_item
     except ImportError:
-        from services.phase2_modules_service import save_inventory_item  # type: ignore
+        from services.estimates_service import save_estimate_line_item  # type: ignore
+    return _persist_result(save_estimate_line_item(ui, row_id=row_id), success="Material line saved.")
+
+
+def delete_estimate_material(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.estimates_service import delete_estimate_line_item
+    except ImportError:
+        from services.estimates_service import delete_estimate_line_item  # type: ignore
+    return _persist_result(delete_estimate_line_item(row_id), success="Material line removed.")
+
+
+def persist_inventory(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.inventory_service import save_inventory_item
+    except ImportError:
+        from services.inventory_service import save_inventory_item  # type: ignore
     return _persist_result(save_inventory_item(ui, row_id=row_id), success="Inventory item saved.")
 
 
 def persist_asset(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_asset
+        from app.services.assets_service import save_asset
     except ImportError:
-        from services.phase2_modules_service import save_asset  # type: ignore
+        from services.assets_service import save_asset  # type: ignore
     return _persist_result(save_asset(ui, row_id=row_id), success="Asset saved.")
 
 
 def persist_employee(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_employee
+        from app.services.employees_service import save_employee
     except ImportError:
-        from services.phase2_modules_service import save_employee  # type: ignore
+        from services.employees_service import save_employee  # type: ignore
     return _persist_result(save_employee(ui, row_id=row_id), success="Employee saved.")
 
 
 def persist_certification(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_certification
+        from app.services.employees_service import save_certification
     except ImportError:
-        from services.phase2_modules_service import save_certification  # type: ignore
+        from services.employees_service import save_certification  # type: ignore
     return _persist_result(save_certification(ui, row_id=row_id), success="Certification saved.")
 
 
 def persist_document(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_document_hub
+        from app.services.documents_service import save_document_hub
     except ImportError:
-        from services.phase2_modules_service import save_document_hub  # type: ignore
+        from services.documents_service import save_document_hub  # type: ignore
     return _persist_result(save_document_hub(ui, row_id=row_id), success="Document saved.")
 
 
 def persist_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_company_update
+        from app.services.updates_service import save_company_update
     except ImportError:
-        from services.phase2_modules_service import save_company_update  # type: ignore
+        from services.updates_service import save_company_update  # type: ignore
     return _persist_result(save_company_update(ui, row_id=row_id), success="Update published.")
 
 
 def persist_task(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_task
+        from app.services.tasks_service import save_task
     except ImportError:
-        from services.phase2_modules_service import save_task  # type: ignore
+        from services.tasks_service import save_task  # type: ignore
     return _persist_result(save_task(ui, row_id=row_id), success="Task saved.")
 
 
-def persist_timekeeping_week(employee_id: str, week_start: date, summary: dict[str, Any]) -> tuple[bool, str]:
+def delete_job(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
     try:
-        from app.services.phase2_modules_service import save_timekeeping_week
+        from app.services.jobs_service import delete_job as _del
     except ImportError:
-        from services.phase2_modules_service import save_timekeeping_week  # type: ignore
+        from services.jobs_service import delete_job as _del  # type: ignore
+    return _persist_result(_del(row_id), success="Job deleted.")
+
+
+def delete_estimate(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.estimates_service import delete_estimate as _del
+    except ImportError:
+        from services.estimates_service import delete_estimate as _del  # type: ignore
+    return _persist_result(_del(row_id), success="Estimate deleted.")
+
+
+def delete_inventory(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.inventory_service import delete_inventory_item as _del
+    except ImportError:
+        from services.inventory_service import delete_inventory_item as _del  # type: ignore
+    return _persist_result(_del(row_id), success="Item deleted.")
+
+
+def delete_asset(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.assets_service import delete_asset as _del
+    except ImportError:
+        from services.assets_service import delete_asset as _del  # type: ignore
+    return _persist_result(_del(row_id), success="Asset deleted.")
+
+
+def delete_company_update(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.updates_service import delete_company_update as _del
+    except ImportError:
+        from services.updates_service import delete_company_update as _del  # type: ignore
+    return _persist_result(_del(row_id), success="Update removed.")
+
+
+def persist_timekeeping_week(employee_id: str, week_start: date, summary: dict[str, Any]) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import save_timekeeping_week
+    except ImportError:
+        from services.timekeeping_service import save_timekeeping_week  # type: ignore
     return _persist_result(
         save_timekeeping_week(employee_id, week_start, summary),
         success="Timekeeping saved.",
     )
+
+
+def persist_timekeeping_days(
+    employee_id: str,
+    week_start: date,
+    grid: list[dict[str, Any]],
+) -> tuple[bool, str]:
+    """Upsert daily rows after week summary save."""
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import save_timekeeping_day
+    except ImportError:
+        from services.timekeeping_service import save_timekeeping_day  # type: ignore
+    ws = week_start.isoformat()
+    errors: list[str] = []
+    for row in grid:
+        work_date = str(row.get("date") or "")[:10]
+        if not work_date:
+            continue
+        ui = {
+            "employee_id": employee_id,
+            "week_start": ws,
+            "work_date": work_date,
+            "job_label": row.get("job") or "",
+            "st_hours": row.get("st") or 0,
+            "ot_hours": row.get("ot") or 0,
+            "dt_hours": row.get("dt") or 0,
+            "notes": row.get("notes") or "",
+        }
+        res = save_timekeeping_day(ui, row_id=str(row.get("day_id") or "") or None)
+        err = _persist_result(res, success="")
+        if err[0] is False and err[1]:
+            errors.append(err[1])
+    if errors:
+        return False, errors[0]
+    return True, "Daily entries saved."

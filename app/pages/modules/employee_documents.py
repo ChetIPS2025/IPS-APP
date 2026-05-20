@@ -39,7 +39,12 @@ def _filter_docs(rows: list[dict], *, q: str, doc_type: str) -> list[dict]:
 
 
 def render() -> None:
-    inject_global_css()
+    try:
+        from app.pages.modules._access import begin_module
+    except ImportError:
+        from pages.modules._access import begin_module  # type: ignore
+    if not begin_module("employee_documents"):
+        return
     role_norm = normalize_role(current_role())
     hr_ok = can_view_hr_documents(role_norm)
     employees = load_employees()

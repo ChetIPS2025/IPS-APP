@@ -44,6 +44,98 @@ def _load_environment_files() -> None:
 _load_environment_files()
 
 
+def _is_placeholder(value: str) -> bool:
+    """True when a secrets value looks like an unfilled template."""
+    low = value.lower()
+    return any(
+        p in low
+        for p in (
+            "your-project",
+            "your_project",
+            "your-publishable",
+            "your-anon",
+            "your_anon",
+            "your-service",
+            "changeme",
+            "placeholder",
+            "example.com",
+        )
+    ) or len(value) < 10
+
+
+def _load_streamlit_secrets() -> None:
+    """
+    Copy ``.streamlit/secrets.toml`` into ``os.environ`` for keys not already set.
+
+    Priority (highest → lowest):
+      1. Real values already in ``os.environ`` (set by Render/Docker/CI or a previous load).
+      2. ``secrets.toml`` values that are not placeholders.
+      3. ``.env`` values (loaded above by ``_load_environment_files``).
+
+    Placeholder values (e.g. "YOUR_PROJECT", "your-publishable-or-anon-key") are silently
+    ignored so a half-filled template never blocks real credentials loaded from ``.env``.
+    """
+    try:
+        import streamlit as st
+    except ImportError:
+        return
+    try:
+        secrets = st.secrets
+    except Exception:
+        return
+
+    def _set_env(key: str, value: object) -> None:
+        # Never overwrite a value already present in the environment.
+        if os.getenv(key):
+            return
+        if value is None:
+            return
+        s = str(value).strip().strip('"').strip("'")
+        if s and not _is_placeholder(s):
+            os.environ[key] = s
+
+    for key in (
+        "SUPABASE_URL",
+        "SUPABASE_PUBLISHABLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_SECRET_KEY",
+        "APP_BASE_URL",
+        "APP_ENV",
+        "OPENAI_API_KEY",
+        "LOG_LEVEL",
+    ):
+        try:
+            if key in secrets:
+                _set_env(key, secrets[key])
+        except Exception:
+            pass
+
+    try:
+        if "supabase" in secrets:
+            block = secrets["supabase"]
+            _set_env("SUPABASE_URL", block.get("url") or block.get("SUPABASE_URL"))
+            _set_env(
+                "SUPABASE_PUBLISHABLE_KEY",
+                block.get("publishable_key")
+                or block.get("key")
+                or block.get("SUPABASE_PUBLISHABLE_KEY"),
+            )
+            _set_env(
+                "SUPABASE_ANON_KEY",
+                block.get("anon_key") or block.get("anon") or block.get("SUPABASE_ANON_KEY"),
+            )
+            _set_env(
+                "SUPABASE_SERVICE_ROLE_KEY",
+                block.get("service_role_key") or block.get("SUPABASE_SERVICE_ROLE_KEY"),
+            )
+    except Exception:
+        pass
+
+
+_load_streamlit_secrets()
+
+
 def _strip_env(name: str, default: str = "") -> str:
     raw = os.getenv(name)
     if raw is None:
@@ -172,6 +264,52 @@ class Settings:
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in ("production", "prod")
+
+
+def validate_supabase_public_config() -> str | None:
+    """
+    Return a user-facing error message when URL/key are missing or obviously wrong.
+    None means configuration looks usable.
+    """
+    url = (settings.supabase_url or "").strip()
+    key = (_publishable_key() or "").strip()
+    if not url or not key:
+        return (
+            "Supabase is not configured. Add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY "
+            "(or SUPABASE_ANON_KEY) to `.streamlit/secrets.toml` or a project-root `.env` file."
+        )
+    low_url, low_key = url.lower(), key.lower()
+    if "your-project" in low_url or "your_project" in low_url:
+        return "SUPABASE_URL is still a placeholder. Use your project URL from Supabase → Settings → API."
+    placeholders = (
+        "your-publishable",
+        "your-anon",
+        "your_publishable",
+        "your_anon",
+        "changeme",
+        "placeholder",
+        "example.com",
+    )
+    if any(p in low_key for p in placeholders) or len(key) < 20:
+        return (
+            "SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) is missing or still a placeholder. "
+            "In Supabase Dashboard → Project Settings → API, copy the **anon public** key "
+            "(JWT starting with eyJ…, or sb_publishable_…). Do not paste the service_role key here."
+        )
+    if key.startswith(("sb_secret_", "sbp_")) and not key.startswith("sb_publishable_"):
+        return (
+            "The configured key looks like a **secret/service** key. For sign-in, use the "
+            "**anon / publishable** key from Supabase → Settings → API."
+        )
+    if not (
+        key.startswith("eyJ")
+        or key.startswith("sb_publishable_")
+    ):
+        return (
+            "SUPABASE_PUBLISHABLE_KEY does not look like a valid Supabase anon/publishable key. "
+            "Copy it again from Supabase → Settings → API (anon public)."
+        )
+    return None
 
 
 settings = Settings()

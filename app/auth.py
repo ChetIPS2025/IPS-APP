@@ -428,11 +428,38 @@ def run_auth_browser_cookie_effects() -> None:
 
 
 def sign_in(email: str, password: str, *, remember_device: bool = False) -> None:
-    client = get_client()
+    try:
+        from app.config import validate_supabase_public_config
+    except ImportError:
+        from config import validate_supabase_public_config  # type: ignore
+
+    cfg_err = validate_supabase_public_config()
+    if cfg_err:
+        raise RuntimeError(cfg_err)
+
+    try:
+        client = get_client()
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        low = str(exc).lower()
+        if "invalid api key" in low:
+            raise RuntimeError(
+                "Supabase API key was rejected. Use the **anon public** key from "
+                "Supabase Dashboard → Project Settings → API in `.streamlit/secrets.toml` "
+                "or `.env` as SUPABASE_PUBLISHABLE_KEY (not the service_role key)."
+            ) from exc
+        raise RuntimeError(f"Sign in failed: {exc!r}") from exc
+
     try:
         resp = client.auth.sign_in_with_password({"email": email, "password": password})
     except Exception as exc:
         low = str(exc).lower()
+        if "invalid api key" in low:
+            raise RuntimeError(
+                "Supabase API key was rejected. Use the **anon public** key from "
+                "Supabase Dashboard → Project Settings → API."
+            ) from exc
         if any(
             x in low
             for x in (
@@ -446,8 +473,8 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
             raise RuntimeError("Invalid email or password.") from exc
         raise RuntimeError(
             f"Could not sign in ({exc.__class__.__name__}). "
-            "Confirm SUPABASE_URL and the publishable/anon key are set in the environment "
-            "(e.g. Render Dashboard → Environment), then try again."
+            "Confirm SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in `.streamlit/secrets.toml` "
+            "or environment variables, then restart the app."
         ) from exc
     user = getattr(resp, "user", None)
     if not user:

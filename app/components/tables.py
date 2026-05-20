@@ -34,16 +34,21 @@ def render_data_table(
         f'<{open_tag} class="ips-data-table-header" style="{grid}">{header}<{close_tag}>',
         unsafe_allow_html=True,
     )
+    active_id = str(st.session_state.get(session_select_key) or selected_id or "")
     for row in rows:
         rid = str(row.get(row_id_key) or "")
-        sel = " selected" if rid and rid == selected_id else ""
+        sel = " selected" if rid and rid == active_id else ""
         parts = []
         for field, _ in columns:
             if cell_renderer:
-                parts.append(f"<{open_tag}>{cell_renderer(field, row)}<{close_tag}>")
+                parts.append(
+                    f'<{open_tag} class="ips-data-cell">{cell_renderer(field, row)}<{close_tag}>'
+                )
             else:
                 parts.append(
-                    f"<{open_tag}>{html.escape(str(row.get(field) or chr(8212)))}<{close_tag}>"
+                    f'<{open_tag} class="ips-data-cell">'
+                    f"{html.escape(str(row.get(field) or chr(8212)))}"
+                    f"<{close_tag}>"
                 )
         st.markdown(
             f'<{open_tag} class="ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>',
@@ -53,6 +58,7 @@ def render_data_table(
             st.markdown(f'<{open_tag} class="ips-row-select-btn">', unsafe_allow_html=True)
             if st.button("Select", key=f"sel_{session_select_key}_{rid}", type="secondary"):
                 st.session_state[session_select_key] = rid
+                st.rerun()
             st.markdown(f"<{close_tag}>", unsafe_allow_html=True)
     st.markdown(f"<{close_tag}><{close_tag}>", unsafe_allow_html=True)
     sel = st.session_state.get(session_select_key) or selected_id

@@ -81,17 +81,22 @@ def fetch_list(
     demo: list[dict[str, Any]] | None = None,
     alt_tables: tuple[str, ...] = (),
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Return (rows, used_demo_fallback)."""
+    """
+    Return (rows, used_demo_fallback).
+
+    Demo data is used only when the query fails (missing table, RLS, network).
+    An empty successful response returns [] with used_demo=False — never overrides live data.
+    """
     rows, err = fetch_rows(table, limit=limit, order_by=order_by, alt_tables=alt_tables)
-    if rows:
-        if normalize:
-            out = [normalize(r) for r in rows if r]
-            return [r for r in out if r], False
-        return rows, False
     if err:
         _LOG.info("Using demo fallback for %s (%s)", table, err)
-    demo_rows = list(demo or [])
-    return demo_rows, True
+        if normalize and demo:
+            return [normalize(r) for r in demo if r], True
+        return list(demo or []), True
+    if normalize:
+        out = [normalize(r) for r in rows if r]
+        return out, False
+    return rows, False
 
 
 def fetch_by_id(
