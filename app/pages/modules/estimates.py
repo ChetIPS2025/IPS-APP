@@ -27,6 +27,7 @@ try:
     from app.pages.modules._session import select_key, tab_key
     from app.styles import inject_estimates_module_css
     from app.utils.constants import ESTIMATE_STATUSES, SESSION_NAV_KEY
+    from app.estimates.utils import resolve_estimate_subtotal
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from components.charts import render_donut_chart  # type: ignore
@@ -49,6 +50,7 @@ except ImportError:
     from pages.modules._session import select_key, tab_key  # type: ignore
     from styles import inject_estimates_module_css, inject_global_css  # type: ignore
     from utils.constants import ESTIMATE_STATUSES, SESSION_NAV_KEY  # type: ignore
+    from estimates.utils import resolve_estimate_subtotal  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _SEL = select_key("estimates")
@@ -129,9 +131,10 @@ def _render_detail(est: dict) -> None:
             )
         with c2:
             st.markdown("**Financial Summary**")
+            subtotal_display = float(resolve_estimate_subtotal(est))
             st.markdown(
                 f'<dl class="ips-info-grid">'
-                f"<dt>Subtotal</dt><dd>{html.escape(fmt_currency(est.get('subtotal')))}</dd>"
+                f"<dt>Subtotal</dt><dd>{html.escape(fmt_currency(subtotal_display))}</dd>"
                 f"<dt>Tax</dt><dd>{html.escape(fmt_currency(est.get('tax')))}</dd>"
                 f"<dt>Markup</dt><dd>{html.escape(fmt_currency(est.get('markup')))}</dd>"
                 f"<dt>Grand Total</dt><dd>{html.escape(fmt_currency(est.get('total')))}</dd>"
@@ -140,11 +143,12 @@ def _render_detail(est: dict) -> None:
             )
         with c3:
             st.markdown("**Estimate Totals**")
+            breakdown_base = subtotal_display
             breakdown = {
-                "Labor": float(est.get("subtotal") or 0) * 0.4,
-                "Materials": float(est.get("subtotal") or 0) * 0.3,
-                "Equipment": float(est.get("subtotal") or 0) * 0.2,
-                "Other": float(est.get("subtotal") or 0) * 0.1,
+                "Labor": breakdown_base * 0.4,
+                "Materials": breakdown_base * 0.3,
+                "Equipment": breakdown_base * 0.2,
+                "Other": breakdown_base * 0.1,
             }
             render_donut_chart(
                 breakdown,

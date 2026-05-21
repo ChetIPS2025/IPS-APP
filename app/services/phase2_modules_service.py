@@ -27,6 +27,25 @@ except ImportError:
 # --- Normalizers (UI shape) ---
 
 
+def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
+    """Use ``primary`` when the key is present (including 0); else first present fallback."""
+    if primary in row:
+        raw = row[primary]
+        if raw is not None and str(raw).strip() != "":
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+    for key in fallbacks:
+        raw = row.get(key)
+        if raw is not None and str(raw).strip() != "":
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                continue
+    return 0.0
+
+
 def normalize_customer(row: dict[str, Any]) -> dict[str, Any]:
     cid = str(row.get("id") or "").strip()
     active = row.get("is_active", True)
@@ -103,7 +122,7 @@ def normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
         "created_by": str(row.get("created_by") or row.get("prepared_by") or "—"),
         "job_number": str(row.get("job_number") or "—"),
         "description": str(row.get("description") or row.get("notes") or ""),
-        "subtotal": float(row.get("subtotal") or row.get("total") or 0),
+        "subtotal": _money_field(row, "subtotal", "total", "grand_total"),
         "tax": float(row.get("tax") or 0),
         "markup": float(row.get("markup") or 0),
     }

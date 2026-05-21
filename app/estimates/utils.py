@@ -11,6 +11,66 @@ MONEY_LIST_COLUMNS: frozenset[str] = frozenset({"proposal_total", "final_bid"})
 
 
 # ---------------------------------------------------------------------------
+# Decimal helpers (distinguish missing vs zero — do not use ``or`` for fallbacks)
+# ---------------------------------------------------------------------------
+
+def estimate_decimal_optional(val: Any) -> Decimal | None:
+    """Parse money; return ``None`` when the value is missing (not when it is zero)."""
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    s = str(val).replace(",", "").strip()
+    if not s:
+        return None
+    try:
+        return Decimal(s).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return None
+
+
+def estimate_decimal(val: Any) -> Decimal:
+    """Parse money for arithmetic; missing values become ``Decimal('0')``."""
+    return estimate_decimal_optional(val) or Decimal("0")
+
+
+def resolve_estimate_subtotal(
+    row: Any,
+    *,
+    total: Decimal | None = None,
+    tax: Decimal | None = None,
+) -> Decimal:
+    """
+    Subtotal for display: use stored ``subtotal`` when present (including 0),
+    otherwise ``max(0, total - tax)``.
+    """
+    if hasattr(row, "get"):
+        stored = estimate_decimal_optional(row.get("subtotal"))
+        if stored is not None:
+            return stored
+        if total is None:
+            total = estimate_decimal_optional(row.get("proposal_total"))
+            if total is None:
+                total = estimate_decimal_optional(row.get("final_bid"))
+            if total is None:
+                total = estimate_decimal_optional(row.get("total"))
+        if tax is None:
+            tax = estimate_decimal_optional(row.get("sales_tax_total"))
+            if tax is None:
+                tax = estimate_decimal_optional(row.get("tax"))
+    total = total if total is not None else Decimal("0")
+    tax = tax if tax is not None else Decimal("0")
+    return max(Decimal("0"), total - tax)
+
+
+# Back-compat alias for older estimates page code.
+_estimate_decimal = estimate_decimal
+
+
+# ---------------------------------------------------------------------------
 # Money formatters
 # ---------------------------------------------------------------------------
 

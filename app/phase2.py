@@ -24,6 +24,7 @@ try:
         estimate_materials,
         estimates,
         inventory,
+        job_costing,
         jobs,
         reports,
         settings,
@@ -48,6 +49,7 @@ except ImportError:
         estimate_materials,
         estimates,
         inventory,
+        job_costing,
         jobs,
         reports,
         settings,
@@ -61,6 +63,7 @@ except ImportError:
 BUILT_MODULES: dict[str, object] = {
     "dashboard": dashboard.render,
     "jobs": jobs.render,
+    "job_costing": job_costing.render,
     "customers": customers.render,
     "estimates": estimates.render,
     "estimate_materials": estimate_materials.render,
