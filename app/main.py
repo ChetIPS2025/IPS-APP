@@ -204,6 +204,7 @@ def _render_password_reset_gate() -> None:
             try:
                 update_password(str(p1 or ""))
                 st.success("Password updated.")
+                st.rerun()
             except Exception as exc:
                 show_auth_error(exc)
 
