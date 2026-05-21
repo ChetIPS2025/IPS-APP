@@ -25,9 +25,9 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge
+    from app.ui.clean_table import inject_clean_table_css
 except ImportError:
-    from ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge  # type: ignore
+    from ui.clean_table import inject_clean_table_css  # type: ignore
 
 try:
     from table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS
@@ -471,6 +471,47 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     padding: 0 !important;
     min-height: 0 !important;
 }
+/* Invisible full-row open button (Streamlit click target) */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+    > [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 96px !important;
+    bottom: 0 !important;
+    z-index: 1 !important;
+    height: 60px !important;
+    max-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: auto !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+    > [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) .stButton,
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+    div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+    > [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
+    + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+    width: 100% !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    max-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
     > [data-testid="stElementContainer"]:has(.jdb-row-actions)
@@ -715,7 +756,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
-.job-row-wrap, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns { display:none !important; }
+.job-row-wrap, .jdb-row-select-btn, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1040,6 +1081,7 @@ def render_job_row(
     job_num_col: str,
     can_edit:    bool,
     is_selected: bool,
+    on_row_click: Any,
     on_view:     Any,
     on_delete:   Any,
 ) -> None:
@@ -1070,6 +1112,17 @@ def render_job_row(
         ),
         unsafe_allow_html=True,
     )
+
+    st.markdown(
+        '<span class="jdb-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        " ",
+        key=f"job_row_click_{jid}",
+        help=f"Open job {jnum}",
+    ):
+        on_row_click()
 
     st.markdown('<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
     a1, a2 = st.columns(2, gap="small")
@@ -1150,19 +1203,9 @@ def render_jobs_table(
                 render_job_row(
                     row=row, full_row=full_row, job_num_col=job_num_col,
                     can_edit=can_edit, is_selected=is_selected,
+                    on_row_click=_open_dialog,
                     on_view=_open_dialog, on_delete=_del,
                 )
-
-        picked = render_clean_table_click_bridge(
-            table_selector=".jdb-tbl-host",
-            row_selector=".job-row[data-row-id]",
-            component_key="jdb_table_row_click_bridge",
-        )
-        if picked:
-            pid = str(picked).strip()
-            if pid:
-                open_job_detail_dialog(pid)
-                st.rerun()
 
     st.session_state[JOB_DB_TABLE_BY_ID_KEY] = by_id
     st.session_state["_job_db_dialog_can_edit"] = can_edit
