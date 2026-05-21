@@ -80,7 +80,7 @@ def _render_detail(est: dict) -> None:
     title = str(est.get("project_name") or en)
 
     def _tabs() -> None:
-        tab = render_tabs(
+        render_tabs(
             [
                 "Overview",
                 "Line Items",
@@ -94,11 +94,6 @@ def _render_detail(est: dict) -> None:
             session_key=_TAB,
             default="Overview",
         )
-        if tab == "Materials":
-            st.session_state[ACTIVE_ESTIMATE_KEY] = str(est.get("id") or "")
-            if st.button("Open Estimate Materials", key="est_open_materials", type="primary"):
-                st.session_state[SESSION_NAV_KEY] = "estimate_materials"
-                st.rerun()
 
     def _body() -> None:
         ot = "d" + "iv"
@@ -111,9 +106,13 @@ def _render_detail(est: dict) -> None:
             unsafe_allow_html=True,
         )
         tab = str(st.session_state.get(_TAB) or "Overview")
+        if tab == "Materials":
+            st.session_state[ACTIVE_ESTIMATE_KEY] = str(est.get("id") or "")
+            if st.button("Open Estimate Materials", key="est_open_materials", type="primary"):
+                st.session_state[SESSION_NAV_KEY] = "estimate_materials"
+                st.rerun()
+            return
         if tab != "Overview":
-            if tab == "Materials":
-                return
             render_tab_placeholder(f"{tab} will connect to Supabase in a later phase.")
             return
         c1, c2, c3 = st.columns([1.2, 1, 1])

@@ -90,20 +90,22 @@ def _render_detail(task: dict) -> None:
             unsafe_allow_html=True,
         )
         if tab == "Details":
+            status_opts = statuses or ["Open"]
+            priority_opts = priorities or ["Medium"]
             c1, c2 = st.columns(2)
             with c1:
-                st_val = str(task.get("status") or statuses[0] if statuses else "Open")
+                st_val = str(task.get("status") or status_opts[0])
                 st.selectbox(
                     "Status",
-                    statuses,
-                    index=statuses.index(st_val) if st_val in statuses else 0,
+                    status_opts,
+                    index=status_opts.index(st_val) if st_val in status_opts else 0,
                     key=f"task_status_{tid}",
                 )
-                pr_val = str(task.get("priority") or priorities[0] if priorities else "Medium")
+                pr_val = str(task.get("priority") or priority_opts[0])
                 st.selectbox(
                     "Priority",
-                    priorities,
-                    index=priorities.index(pr_val) if pr_val in priorities else 0,
+                    priority_opts,
+                    index=priority_opts.index(pr_val) if pr_val in priority_opts else 0,
                     key=f"task_pri_{tid}",
                 )
                 st.selectbox("Assigned to", ["— Unassigned —", *task_assignee_options()], key=f"task_assign_{tid}")

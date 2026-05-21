@@ -8,6 +8,7 @@ navigation/rerun when page-local injectors use session-state guards.
 from __future__ import annotations
 
 import html
+import inspect
 from typing import Any
 
 import streamlit as st
@@ -390,6 +391,18 @@ section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.jdb-click-
     )
 
 
+def _components_html(html_content: str, *, component_key: str, height: int = 0) -> Any:
+    """Call ``components.html``; pass ``key`` when the installed Streamlit supports it."""
+    kwargs: dict[str, Any] = {"height": height}
+    if "key" in inspect.signature(components.html).parameters:
+        kwargs["key"] = component_key
+    try:
+        return components.html(html_content, **kwargs)
+    except TypeError:
+        kwargs.pop("key", None)
+        return components.html(html_content, **kwargs)
+
+
 def render_clean_table_click_bridge(
     *,
     table_selector: str,
@@ -400,33 +413,45 @@ def render_clean_table_click_bridge(
     Zero-height bridge: clicks on ``row_selector`` inside ``table_selector`` post row id.
 
     Row elements must expose the id via ``data-row-id`` or ``data-jid`` attribute.
+    ``component_key`` must be unique per table on a page (used for Streamlit widget identity
+    and the in-page click-handler registry).
     """
-    st.markdown('<span class="ips-clean-click-bridge" aria-hidden="true"></span>', unsafe_allow_html=True)
+    key_attr = html.escape(component_key, quote=True)
+    st.markdown(
+        f'<span class="ips-clean-click-bridge" data-bridge-key="{key_attr}" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     tbl = html.escape(table_selector, quote=True)
     row = html.escape(row_selector, quote=True)
     key_esc = html.escape(component_key, quote=True)
-    # Do not pass ``key`` — older Streamlit builds reject it on components.html().
-    return components.html(
+    return _components_html(
         f"""
 <script>
 (function () {{
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = "ipsCleanTableClick::{key_esc}";
-  if (doc[hookKey]) return;
-  doc[hookKey] = true;
-  doc.addEventListener("click", function (e) {{
-    const t = e.target;
-    if (!t || !t.closest) return;
-    if (t.closest("[data-testid='stButton'], button, a, input, select, textarea, label, [data-testid='stPopover']")) return;
-    const row = t.closest("{tbl} {row}");
-    if (!row) return;
-    const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
-    if (!id) return;
-    window.postMessage({{ type: "streamlit:setComponentValue", value: id }}, "*");
-  }}, true);
+  if (!doc.ipsCleanTableBridgeRegistry) {{
+    doc.ipsCleanTableBridgeRegistry = {{}};
+    doc.addEventListener("click", function (e) {{
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest("[data-testid='stButton'], button, a, input, select, textarea, label, [data-testid='stPopover']")) return;
+      const reg = doc.ipsCleanTableBridgeRegistry || {{}};
+      for (const cfg of Object.values(reg)) {{
+        const row = t.closest(cfg.tbl + " " + cfg.row);
+        if (!row) continue;
+        const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
+        if (!id) continue;
+        window.postMessage({{ type: "streamlit:setComponentValue", value: id }}, "*");
+        return;
+      }}
+    }}, true);
+  }}
+  doc.ipsCleanTableBridgeRegistry[hookKey] = {{ tbl: "{tbl}", row: "{row}" }};
 }})();
 </script>
         """,
+        component_key=component_key,
         height=0,
     )

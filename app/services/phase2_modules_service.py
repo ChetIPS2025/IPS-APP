@@ -300,9 +300,10 @@ def list_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]]) -> 
         demo=[],
         alt_tables=("estimate_materials",),
     )
-    if not used_demo:
+    if rows and not used_demo:
         out = [normalize_material_line(r, eid) for r in rows if str(r.get("estimate_id") or "") == eid]
-        return out, False
+        if out:
+            return out, False
     demo_match = [m for m in demo if m.get("estimate_id") == eid]
     return (demo_match if demo_match else demo), True
 
