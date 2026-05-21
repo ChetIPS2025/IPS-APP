@@ -14,6 +14,7 @@ patches apply before the HTTP server is constructed.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
@@ -42,6 +43,24 @@ _MEDIA_TYPES: Final[dict[str, str]] = {
 _ROUTE_TEMPLATE: Final[str] = "static/{path:path}"
 
 _PWA_STATIC_URL_RE: Final[str] = r"static/(?P<pwa_name>sw\.js|manifest\.json|icon-192\.png|icon-512\.png)"
+
+
+def _service_worker_allowed() -> str:
+    try:
+        from app.pwa import _start_url
+
+        return _start_url()
+    except Exception:
+        return "/"
+
+
+def _pwa_manifest_bytes() -> bytes:
+    try:
+        from app.pwa import build_web_manifest
+
+        return json.dumps(build_web_manifest(), separators=(",", ":")).encode("utf-8")
+    except Exception:
+        return b"{}"
 
 
 def _pwa_tornado_route_tuple(main_script_path: str, base: str | None) -> tuple[Any, ...]:
@@ -78,10 +97,15 @@ def _pwa_tornado_route_tuple(main_script_path: str, base: str | None) -> tuple[A
 
             self.set_header("Content-Type", _MEDIA_TYPES[pwa_name])
             if pwa_name == "sw.js":
-                self.set_header("Service-Worker-Allowed", "/")
+                self.set_header("Service-Worker-Allowed", _service_worker_allowed())
                 self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
-            elif pwa_name == "manifest.json":
+                with open(full, "rb") as f:
+                    self.write(f.read())
+                return
+            if pwa_name == "manifest.json":
                 self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.write(_pwa_manifest_bytes())
+                return
             with open(full, "rb") as f:
                 self.write(f.read())
 
@@ -211,10 +235,15 @@ def _create_pwa_static_routes(main_script_path: str | None, base_url: str | None
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["X-Content-Type-Options"] = "nosniff"
         if name == "sw.js":
-            response.headers["Service-Worker-Allowed"] = "/"
+            response.headers["Service-Worker-Allowed"] = _service_worker_allowed()
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         elif name == "manifest.json":
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return Response(
+                content=_pwa_manifest_bytes(),
+                media_type=_MEDIA_TYPES["manifest.json"],
+                headers=dict(response.headers),
+            )
         return response
 
     async def _pwa_static_options(_request: Request) -> Response:

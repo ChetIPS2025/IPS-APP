@@ -98,6 +98,15 @@ git push -u origin main
 
 Never commit `.env`, `.streamlit/secrets.toml`, or service-role keys.
 
+Verify locally (should print *passed*):
+
+```powershell
+python scripts/verify_no_secrets_tracked.py
+git check-ignore -v .streamlit/secrets.toml
+```
+
+If real keys were ever committed or shared in chat, rotate them in the Supabase dashboard immediately.
+
 ## Database assumptions
 
 See [SUPABASE_SCHEMA_NOTES.md](SUPABASE_SCHEMA_NOTES.md) for table/column mappings. Core tables:

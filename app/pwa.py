@@ -45,6 +45,43 @@ def _start_url() -> str:
     return f"{base}/" if base else "/"
 
 
+def build_web_manifest() -> dict[str, str | list[dict[str, str]]]:
+    """
+    Web app manifest with ``start_url`` / ``scope`` aligned to ``server.baseUrlPath``.
+
+    Served inline at runtime (see :func:`inject_pwa_support`); icon ``src`` values
+    include ``server.baseUrlPath`` when set. The static JSON fallback uses root
+    absolute paths under ``/app/static/``.
+    """
+    start = _start_url()
+    return {
+        "id": "ips-operations-platform-v2.5.0",
+        "name": _APP_NAME,
+        "short_name": "IPS",
+        "description": "Industrial Plant Solutions operations platform",
+        "start_url": start,
+        "scope": start,
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#f4f6f9",
+        "theme_color": _THEME_COLOR,
+        "icons": [
+            {
+                "src": _static_url("icon-192.png"),
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": _static_url("icon-512.png"),
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
+    }
+
+
 def inject_pwa_support() -> None:
     """Register manifest + service worker (same entry URL as browser)."""
     inject_key = f"{_PWA_INJECTED_KEY}_{APP_VERSION}"
@@ -52,15 +89,16 @@ def inject_pwa_support() -> None:
         return
     st.session_state[inject_key] = True
 
-    manifest_href = _static_url("manifest.json")
     sw_href = _static_url("sw.js")
     start_url = _start_url()
+    manifest_data = build_web_manifest()
 
     payload = {
-        "manifest": f"{manifest_href}?v={APP_VERSION}",
         "sw": f"{sw_href}?v={APP_VERSION}",
+        "manifestData": manifest_data,
         "startUrl": start_url,
         "scope": start_url,
+        "swPathMarker": "app/static/sw.js",
         "themeColor": _THEME_COLOR,
         "appName": _APP_NAME,
         "version": APP_VERSION,
@@ -97,7 +135,11 @@ def inject_pwa_support() -> None:
     el.setAttribute('content', content);
   }}
 
-  upsertLink('manifest', cfg.manifest);
+  const manifestBlob = new Blob([JSON.stringify(cfg.manifestData)], {{
+    type: 'application/manifest+json'
+  }});
+  const manifestUrl = URL.createObjectURL(manifestBlob);
+  upsertLink('manifest', manifestUrl);
   upsertMeta('theme-color', cfg.themeColor);
   upsertMeta('mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-capable', 'yes');
@@ -131,9 +173,13 @@ def inject_pwa_support() -> None:
     if (!('serviceWorker' in w.navigator)) return;
     try {{
       const regs = await w.navigator.serviceWorker.getRegistrations();
+      const swMarker = cfg.swPathMarker || 'app/static/sw.js';
       for (const reg of regs) {{
-        const script = reg.active && reg.active.scriptURL ? reg.active.scriptURL : '';
-        if (!script.includes('app/static/sw.js') || !script.includes(cfg.version)) {{
+        const worker = reg.active || reg.waiting || reg.installing;
+        const script = worker && worker.scriptURL ? worker.scriptURL : '';
+        const isIpsSw = script.includes(swMarker);
+        const isCurrentVersion = script.includes(cfg.version);
+        if (isIpsSw && !isCurrentVersion) {{
           await reg.unregister();
         }}
       }}
