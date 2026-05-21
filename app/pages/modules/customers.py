@@ -28,9 +28,10 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
+    from components.layout import render_tab_placeholder  # type: ignore
+    from components.modals import render_record_detail_dialog  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.tables import render_clickable_table, render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._data import (  # type: ignore
@@ -254,7 +255,8 @@ def _render_detail(customer: dict) -> None:
                     },
                     row_id=cid,
                 )
-                apply_persist_feedback(ok, msg)
+                if apply_persist_feedback(ok, msg):
+                    st.rerun()
             elif is_demo_id(cid):
                 st.caption("Notes save requires a live customer record.")
             return
