@@ -7,36 +7,48 @@ import html
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.layout import render_tab_placeholder
-    from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_clickable_table, render_data_table
-    from app.components.tabs import render_tabs
     from app.pages.modules._data import load_assets, lookup_options, persist_asset
     from app.pages.modules._crud import apply_persist_feedback, is_demo_id
     from app.pages.modules._session import select_key, tab_key
-    from app.styles import inject_global_css
-    from app.utils.constants import ASSET_STATUSES
+    from app.ui.assets_components import (
+        detail_header_html,
+        detail_meta_strip_html,
+        inject_assets_page_styles,
+        maintenance_table_html,
+        render_assets_header_inner_html,
+        status_badge_html,
+        summary_card_html,
+        tab_button_label,
+        table_header_html,
+    )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_tab_placeholder  # type: ignore
-    from components.modals import render_record_detail_dialog  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_clickable_table, render_data_table  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
     from pages.modules._data import load_assets, lookup_options, persist_asset  # type: ignore
     from pages.modules._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages.modules._session import select_key, tab_key  # type: ignore
-    from styles import inject_global_css  # type: ignore
-    from utils.constants import ASSET_STATUSES  # type: ignore
+    from ui.assets_components import (  # type: ignore
+        detail_header_html,
+        detail_meta_strip_html,
+        inject_assets_page_styles,
+        maintenance_table_html,
+        render_assets_header_inner_html,
+        status_badge_html,
+        summary_card_html,
+        tab_button_label,
+        table_header_html,
+    )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _SEL = select_key("assets")
 _TAB = tab_key("assets")
+_ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
+_ASSET_GRID = "0.9fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr 0.75fr"
 
 
 def _filter_rows(
@@ -62,105 +74,211 @@ def _filter_rows(
     return out
 
 
+def _clear_asset_filters() -> None:
+    st.session_state["ast_search"] = ""
+    st.session_state["ast_cat"] = "All Categories"
+    st.session_state["ast_loc"] = "All Locations"
+    st.session_state["ast_status"] = "All Statuses"
+    st.session_state["ast_dept"] = "All Departments"
+
+
+def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
+    operator = str(asset.get("operator") or "Mark Johnson")
+    return [
+        {
+            "date": "Apr 20, 2025",
+            "type": "Inspection",
+            "description": "Quarterly inspection and safety check",
+            "performed_by": operator,
+            "cost": "$150.00",
+            "next_due": "Jul 20, 2025",
+            "status_html": status_badge_html("In Service").replace("In Service", "Completed"),
+        },
+        {
+            "date": "Jan 20, 2025",
+            "type": "Service",
+            "description": "Grease bearings, check lights and brakes",
+            "performed_by": operator,
+            "cost": "$175.00",
+            "next_due": "Apr 20, 2025",
+            "status_html": status_badge_html("In Service").replace("In Service", "Completed"),
+        },
+        {
+            "date": "Oct 20, 2024",
+            "type": "Repair",
+            "description": "Replaced left tail light and wiring",
+            "performed_by": "Coastal Trailer Repair",
+            "cost": "$85.00",
+            "next_due": "Jan 20, 2025",
+            "status_html": status_badge_html("In Service").replace("In Service", "Completed"),
+        },
+    ]
+
+
+def _asset_image_html(asset: dict) -> str:
+    url = str(
+        asset.get("image_url")
+        or asset.get("photo_url")
+        or asset.get("asset_image_url")
+        or ""
+    ).strip()
+    if url:
+        safe = html.escape(url, quote=True)
+        alt = html.escape(str(asset.get("asset_name") or "Asset image"), quote=True)
+        return f'<div class="ips-assets-img-wrap"><img src="{safe}" alt="{alt}" style="width:100%;display:block;"></div>'
+    return (
+        '<div class="ips-assets-img-wrap">'
+        '<div class="ips-assets-img-empty">Asset image<br><span style="font-weight:500;">Upload photo</span></div>'
+        "</div>"
+    )
+
+
 def _render_detail(asset: dict) -> None:
-    title = str(asset.get("asset_name") or asset.get("asset_number") or "")
+    aid = str(asset.get("id") or "")
+    asset_number = str(asset.get("asset_number") or "—")
+    asset_name = str(asset.get("asset_name") or "Untitled asset")
+    current_tab = str(st.session_state.get(_TAB) or "Overview")
+    if current_tab not in _ASSET_TABS:
+        current_tab = "Overview"
+        st.session_state[_TAB] = current_tab
 
-    def _tabs() -> None:
-        render_tabs(
-            [
-                "Overview",
-                "Maintenance",
-                "Documents",
-                "Assignments",
-                "Depreciation",
-                "Notes",
-                "Activity",
-            ],
-            session_key=_TAB,
-            default="Overview",
-        )
-
-    def _body() -> None:
-        ot = "d" + "iv"
-        st.markdown(
-            f'<{ot} class="ips-detail-meta-row">'
-            f"<span>Status<br>{status_pill_html(str(asset.get('status') or ''))}</span>"
-            f"<span>Category<br><strong>{html.escape(str(asset.get('category') or '—'))}</strong></span>"
-            f"<span>Value<br><strong>{html.escape(fmt_currency(asset.get('value')))}</strong></span>"
-            f"</{ot}>",
-            unsafe_allow_html=True,
-        )
-        tab = str(st.session_state.get(_TAB) or "Overview")
-        if tab == "Maintenance":
-            st.markdown('<p class="ips-panel-title">Maintenance History</p>', unsafe_allow_html=True)
-            maint = [
-                {"id": "mx1", "date": "2025-04-12", "type": "Preventive", "description": "Annual inspection", "by": "Shop", "cost": 150, "status": "Completed"},
-            ]
-
-            def _mx_cell(field: str, row: dict) -> str:
-                if field == "status":
-                    return status_pill_html(str(row.get("status") or ""))
-                if field == "cost":
-                    return html.escape(fmt_currency(row.get("cost")))
-                return html.escape(str(row.get(field) or "—"))
-
-            render_data_table(
-                maint,
-                [
-                    ("date", "DATE"),
-                    ("type", "TYPE"),
-                    ("description", "DESCRIPTION"),
-                    ("by", "PERFORMED BY"),
-                    ("cost", "COST"),
-                    ("status", "STATUS"),
-                ],
-                row_id_key="id",
-                selected_id=None,
-                session_select_key="ips_sel_asset_maint",
-                col_fr=["0.7fr", "0.7fr", "1.4fr", "0.9fr", "0.6fr", "0.7fr"],
-                cell_renderer=_mx_cell,
-            )
-            return
-        if tab != "Overview":
-            st.info(f"{tab} will connect to Supabase in a later phase.")
-            return
-        c1, c2, c3 = st.columns([1.1, 1.1, 0.9])
-        with c1:
-            st.markdown("**Asset Details**")
+    with st.container(border=True):
+        st.markdown('<span class="ips-assets-detail-anchor"></span>', unsafe_allow_html=True)
+        top_l, top_meta, top_actions = st.columns([2.2, 3.7, 2.2], gap="medium")
+        with top_l:
             st.markdown(
-                f'<dl class="ips-info-grid">'
-                f"<dt>Asset #</dt><dd>{html.escape(str(asset.get('asset_number') or '—'))}</dd>"
-                f"<dt>Name</dt><dd>{html.escape(str(asset.get('asset_name') or '—'))}</dd>"
-                f"<dt>Category</dt><dd>{html.escape(str(asset.get('category') or '—'))}</dd>"
-                f"<dt>Status</dt><dd>{status_pill_html(str(asset.get('status') or ''))}</dd>"
-                f"<dt>Serial</dt><dd>{html.escape(str(asset.get('serial_number') or '—'))}</dd>"
-                f"<dt>Description</dt><dd>{html.escape(str(asset.get('description') or '—'))}</dd>"
-                f"</dl>",
+                detail_header_html(
+                    asset_id=asset_number,
+                    asset_name=asset_name,
+                    status=str(asset.get("status") or ""),
+                ),
                 unsafe_allow_html=True,
             )
-        with c2:
-            st.markdown("**Usage & Financial**")
+        with top_meta:
             st.markdown(
-                f'<dl class="ips-info-grid">'
-                f"<dt>Location</dt><dd>{html.escape(str(asset.get('location') or '—'))}</dd>"
-                f"<dt>Department</dt><dd>{html.escape(str(asset.get('department') or '—'))}</dd>"
-                f"<dt>Operator</dt><dd>{html.escape(str(asset.get('operator') or '—'))}</dd>"
-                f"<dt>Acquired</dt><dd>{html.escape(fmt_date(asset.get('acquired_date')))}</dd>"
-                f"<dt>Current Value</dt><dd>{html.escape(fmt_currency(asset.get('value')))}</dd>"
-                f"<dt>Mfr / Model</dt><dd>{html.escape(str(asset.get('manufacturer') or '—'))} / {html.escape(str(asset.get('model') or '—'))}</dd>"
-                f"</dl>",
+                detail_meta_strip_html(
+                    [
+                        ("Category", str(asset.get("category") or "—")),
+                        ("Location", str(asset.get("location") or "—")),
+                        ("Department", str(asset.get("department") or "—")),
+                        ("Serial Number", str(asset.get("serial_number") or "—")),
+                        ("Acquired Date", fmt_date(asset.get("acquired_date"))),
+                        ("Current Value", fmt_currency(asset.get("value"))),
+                    ]
+                ),
                 unsafe_allow_html=True,
             )
-        with c3:
-            st.markdown("**Photo**")
+        with top_actions:
+            st.markdown('<span class="ips-assets-detail-actions"></span>', unsafe_allow_html=True)
+            a1, a2, a3 = st.columns([1, 1.35, 0.9], gap="small")
+            with a1:
+                if st.button("✎ Edit", key=f"ast_detail_edit_{aid}", use_container_width=True, disabled=is_demo_id(aid)):
+                    st.session_state[f"ast_edit_open_{aid}"] = not st.session_state.get(f"ast_edit_open_{aid}", False)
+            with a2:
+                st.markdown('<span class="ips-assets-maint-primary"></span>', unsafe_allow_html=True)
+                if st.button("⚒ Maintenance", key=f"ast_detail_maint_{aid}", type="primary", use_container_width=True):
+                    st.session_state[_TAB] = "Maintenance"
+                    st.rerun()
+            with a3:
+                if st.button("⌃", key=f"ast_detail_close_{aid}", use_container_width=True, help="Close details"):
+                    st.session_state.pop(_SEL, None)
+                    st.rerun()
+
+        tabs = st.columns(len(_ASSET_TABS), gap="small")
+        for col, tab in zip(tabs, _ASSET_TABS):
+            with col:
+                st.markdown('<span class="ips-assets-tabs-anchor"></span>', unsafe_allow_html=True)
+                if st.button(
+                    tab_button_label(tab),
+                    key=f"ast_tab_{aid}_{tab}",
+                    type="primary" if tab == current_tab else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state[_TAB] = tab
+                    st.rerun()
+
+        if current_tab != "Overview":
+            if current_tab == "Maintenance":
+                st.markdown(
+                    '<div class="ips-assets-maint-section">'
+                    '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
+                    f"{maintenance_table_html(_maintenance_rows(asset))}"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                render_tab_placeholder(f"{current_tab} will connect to Supabase in a later phase.")
+        else:
+            c1, c2, c3, c4 = st.columns([1.2, 1.1, 1.1, 1.15], gap="medium")
+            with c1:
+                st.markdown(
+                    summary_card_html(
+                        "Asset Details",
+                        [
+                            ("Asset Number", asset_number),
+                            ("Asset Name", asset_name),
+                            ("Category", str(asset.get("category") or "—")),
+                            ("Status", status_badge_html(str(asset.get("status") or ""))),
+                            ("Location", str(asset.get("location") or "—")),
+                            ("Department", str(asset.get("department") or "—")),
+                            ("Manufacturer", str(asset.get("manufacturer") or "—")),
+                            ("Model", str(asset.get("model") or "—")),
+                            ("Serial Number", str(asset.get("serial_number") or "—")),
+                            ("Description", str(asset.get("description") or "—")),
+                        ],
+                        html_value_keys=frozenset({"Status"}),
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(
+                    summary_card_html(
+                        "Usage Information",
+                        [
+                            ("Current Operator", str(asset.get("operator") or "—")),
+                            ("Primary Use", str(asset.get("primary_use") or asset.get("description") or "Equipment Transport")),
+                            ("Hours/Miles", str(asset.get("hours_miles") or "—")),
+                            ("Last Used", str(asset.get("last_used") or "—")),
+                            ("Condition", str(asset.get("condition") or "Good")),
+                            ("Next Service Due", str(asset.get("next_service_due") or "—")),
+                        ],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with c3:
+                value = fmt_currency(asset.get("value"))
+                st.markdown(
+                    summary_card_html(
+                        "Financial Information",
+                        [
+                            ("Acquired Date", fmt_date(asset.get("acquired_date"))),
+                            ("Purchase Price", fmt_currency(asset.get("purchase_price") or asset.get("value"))),
+                            ("Current Value", value),
+                            ("Salvage Value", fmt_currency(asset.get("salvage_value"))),
+                            ("Depreciation Method", str(asset.get("depreciation_method") or "Straight Line")),
+                            ("Useful Life", str(asset.get("useful_life") or "7 years")),
+                            ("Annual Depreciation", fmt_currency(asset.get("annual_depreciation"))),
+                        ],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with c4:
+                st.markdown(
+                    '<div class="ips-assets-summary-card"><h4>Image</h4>'
+                    f"{_asset_image_html(asset)}</div>",
+                    unsafe_allow_html=True,
+                )
+
             st.markdown(
-                f'<{ot} class="ips-photo-card">📷 Asset photo<br><span style="font-size:0.75rem">'
-                f"{html.escape(str(asset.get('asset_name') or 'Upload image'))}</span></{ot}>",
+                '<div class="ips-assets-maint-section">'
+                '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
+                f"{maintenance_table_html(_maintenance_rows(asset))}"
+                "</div>",
                 unsafe_allow_html=True,
             )
-        aid = str(asset.get("id") or "")
-        if not is_demo_id(aid):
-            with st.expander("Edit asset", expanded=False):
+
+        if st.session_state.get(f"ast_edit_open_{aid}") and not is_demo_id(aid):
+            with st.expander("Edit asset", expanded=True):
                 ac1, ac2 = st.columns(2)
                 with ac1:
                     st.text_input("Asset #", value=str(asset.get("asset_number") or ""), key=f"ast_edit_num_{aid}")
@@ -185,13 +303,87 @@ def _render_detail(asset: dict) -> None:
                     if apply_persist_feedback(ok, msg):
                         st.rerun()
 
-    render_record_detail_dialog(
-        f"{title} — Asset Details",
-        module_name="assets",
-        session_select_key=_SEL,
-        tabs_fn=_tabs,
-        body_fn=_body,
-    )
+
+def _render_assets_table(rows: list[dict], *, selected_id: str, can_edit: bool) -> None:
+    grid = f"grid-template-columns: {_ASSET_GRID};"
+    with st.container(border=True):
+        st.markdown('<span class="ips-assets-table-anchor ips-clean-table"></span>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="ips-clean-header ips-assets-table-head-row" style="{grid}">'
+            f"{table_header_html('Asset #')}"
+            f"{table_header_html('Asset Name')}"
+            f"{table_header_html('Category')}"
+            f"{table_header_html('Location')}"
+            f"{table_header_html('Department')}"
+            f"{table_header_html('Status')}"
+            f"{table_header_html('Acquired Date')}"
+            f"{table_header_html('Value')}"
+            f"{table_header_html('Actions', sortable=False)}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        for asset in rows:
+            aid = str(asset.get("id") or "").strip()
+            if not aid:
+                continue
+            selected = aid == selected_id
+            row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
+            aid_attr = html.escape(aid, quote=True)
+            number = html.escape(str(asset.get("asset_number") or "—"))
+            name = html.escape(str(asset.get("asset_name") or "—"))
+            category = html.escape(str(asset.get("category") or "—"))
+            location = html.escape(str(asset.get("location") or "—"))
+            department = html.escape(str(asset.get("department") or "—"))
+            acquired = html.escape(fmt_date(asset.get("acquired_date")))
+            value = html.escape(fmt_currency(asset.get("value")))
+            with st.container():
+                st.markdown(
+                    '<span class="ips-assets-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
+                    f'<span class="ips-clean-link">{number}</span>'
+                    f'<span class="ips-assets-name-cell">{name}</span>'
+                    f'<span class="ips-assets-muted-cell">{category}</span>'
+                    f'<span class="ips-assets-muted-cell">{location}</span>'
+                    f'<span class="ips-assets-muted-cell">{department}</span>'
+                    f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
+                    f'<span class="ips-assets-muted-cell">{acquired}</span>'
+                    f'<span class="ips-assets-muted-cell">{value}</span>'
+                    '<span class="ips-assets-act-slot"></span>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<span class="ips-assets-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(" ", key=f"ast_row_select_{aid}", help=f"Select asset {number}"):
+                    st.session_state[_SEL] = aid
+                    st.session_state[_TAB] = "Overview"
+                    st.rerun()
+                st.markdown(
+                    '<span class="ips-assets-actcol ips-clean-actions" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                a1, a2 = st.columns(2, gap="small")
+                with a1:
+                    if st.button("👁", key=f"ast_view_{aid}", help="View asset"):
+                        st.session_state[_SEL] = aid
+                        st.session_state[_TAB] = "Overview"
+                        st.rerun()
+                with a2:
+                    with st.popover("⋯"):
+                        if st.button("Maintenance", key=f"ast_more_maint_{aid}", use_container_width=True):
+                            st.session_state[_SEL] = aid
+                            st.session_state[_TAB] = "Maintenance"
+                            st.rerun()
+                        if can_edit and st.button("Edit", key=f"ast_more_edit_{aid}", use_container_width=True):
+                            st.session_state[_SEL] = aid
+                            st.session_state[f"ast_edit_open_{aid}"] = True
+                            st.rerun()
 
 
 def render() -> None:
@@ -201,18 +393,29 @@ def render() -> None:
         from pages.modules._access import begin_module  # type: ignore
     if not begin_module("assets"):
         return
+    inject_assets_page_styles()
+    st.markdown('<span class="ips-assets-page"></span>', unsafe_allow_html=True)
     rows = load_assets()
     categories = sorted({str(r.get("category") or "") for r in rows if r.get("category")})
     locations = sorted({str(r.get("location") or "") for r in rows if r.get("location")})
     departments = sorted({str(r.get("department") or "") for r in rows if r.get("department")})
+    can_edit = True
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Assets", "Track and manage all company assets and equipment.")
-    with act_r:
-        st.button("Export", key="ast_export", use_container_width=True)
-        if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
-            st.session_state["ips_ast_form"] = True
+    with st.container(border=True):
+        st.markdown('<span class="ips-assets-header-anchor"></span>', unsafe_allow_html=True)
+        act_l, act_r = st.columns([5.5, 1.8], gap="small")
+        with act_l:
+            st.markdown(render_assets_header_inner_html(), unsafe_allow_html=True)
+        with act_r:
+            st.markdown('<div style="height:1.35rem"></div>', unsafe_allow_html=True)
+            e1, e2 = st.columns(2, gap="small")
+            with e1:
+                st.markdown('<span class="ips-assets-export-btn"></span>', unsafe_allow_html=True)
+                st.button("⇩ Export", key="ast_export", use_container_width=True)
+            with e2:
+                st.markdown('<span class="ips-assets-new-btn"></span>', unsafe_allow_html=True)
+                if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
+                    st.session_state["ips_ast_form"] = True
 
     if st.session_state.get("ips_ast_form"):
         with st.expander("New asset", expanded=True):
@@ -232,33 +435,31 @@ def render() -> None:
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_ast_form",)):
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([1.8, 1, 1, 1, 1, 0.7])
-        with c1:
-            st.text_input("Search", placeholder="Search assets…", key="ast_search", label_visibility="collapsed")
-        with c2:
-            st.selectbox("Category", ["All Categories", *categories], key="ast_cat", label_visibility="collapsed")
-        with c3:
-            st.selectbox("Location", ["All Locations", *locations], key="ast_loc", label_visibility="collapsed")
-        with c4:
-            st.selectbox(
-                "Status",
-                ["All Statuses", *lookup_options("asset_statuses")],
-                key="ast_status",
-                label_visibility="collapsed",
-            )
-        with c5:
-            st.selectbox("Department", ["All Departments", *departments], key="ast_dept", label_visibility="collapsed")
-        with c6:
-            if st.button("Clear", key="ast_clear", use_container_width=True):
-                st.session_state["ast_search"] = ""
-                st.session_state["ast_cat"] = "All Categories"
-                st.session_state["ast_loc"] = "All Locations"
-                st.session_state["ast_status"] = "All Statuses"
-                st.session_state["ast_dept"] = "All Departments"
-                st.rerun()
+    with st.container(border=True):
+        st.markdown('<span class="ips-assets-filter-anchor"></span>', unsafe_allow_html=True)
 
-    layout_filter_bar(_filters)
+        def _filters() -> None:
+            c1, c2, c3, c4, c5, c6 = st.columns([1.8, 1, 1, 1, 1, 0.7])
+            with c1:
+                st.text_input("Search", placeholder="Search assets…", key="ast_search", label_visibility="collapsed")
+            with c2:
+                st.selectbox("Category", ["All Categories", *categories], key="ast_cat", label_visibility="collapsed")
+            with c3:
+                st.selectbox("Location", ["All Locations", *locations], key="ast_loc", label_visibility="collapsed")
+            with c4:
+                st.selectbox(
+                    "Status",
+                    ["All Statuses", *lookup_options("asset_statuses")],
+                    key="ast_status",
+                    label_visibility="collapsed",
+                )
+            with c5:
+                st.selectbox("Department", ["All Departments", *departments], key="ast_dept", label_visibility="collapsed")
+            with c6:
+                st.markdown('<span class="ips-assets-clear-filters"></span>', unsafe_allow_html=True)
+                st.button("Clear Filters", key="ast_clear", use_container_width=True, on_click=_clear_asset_filters)
+
+        layout_filter_bar(_filters)
 
     filtered = _filter_rows(
         rows,
@@ -274,45 +475,14 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field == "asset_number":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("asset_number") or ""))}</span>'
-        if field == "value":
-            return html.escape(fmt_currency(row.get("value")))
-        if field == "acquired_date":
-            return html.escape(fmt_date(row.get("acquired_date")))
-        return html.escape(str(row.get(field) or "—"))
+    if filtered and not selected_id:
+        selected_id = str(filtered[0].get("id") or "")
+        st.session_state[_SEL] = selected_id
 
-    def _plain_cell(field: str, row: dict) -> str:
-        if field == "value":
-            return fmt_currency(row.get("value"))
-        if field == "acquired_date":
-            return fmt_date(row.get("acquired_date"))
-        return str(row.get(field) or "—")
+    _render_assets_table(filtered, selected_id=selected_id, can_edit=can_edit)
 
-    sel = render_clickable_table(
-        filtered,
-        [
-            ("asset_number", "ASSET #"),
-            ("asset_name", "ASSET NAME"),
-            ("category", "CATEGORY"),
-            ("location", "LOCATION"),
-            ("department", "DEPARTMENT"),
-            ("status", "STATUS"),
-            ("acquired_date", "ACQUIRED"),
-            ("value", "VALUE"),
-        ],
-        "assets_list",
-        row_id_key="id",
-        session_select_key=_SEL,
-        selected_id=selected_id or None,
-        plain_cell=_plain_cell,
-        html_cell=_cell,
-    )
-
+    sel = str(st.session_state.get(_SEL) or "")
     if sel:
-        asset = next((r for r in filtered if str(r.get("id")) == sel), None)
+        asset = next((r for r in rows if str(r.get("id")) == sel), None)
         if asset:
             _render_detail(asset)
