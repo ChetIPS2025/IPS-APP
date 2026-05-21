@@ -14,16 +14,18 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v1"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v2"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
     ".ips-clean-table",
+    ".ips-data-table-anchor",
     ".jdb-tbl-host",
     ".ips-est-table-anchor",
     ".ips-users-table-anchor",
     ".ips-assets-table-anchor",
     ".ips-inv-table-anchor",
+    ".ips-time-table-anchor",
 )
 
 # Per-row Streamlit host markers
@@ -32,6 +34,8 @@ ROW_WRAP_SELECTORS = (
     ".job-row-wrap",
     ".ips-est-list-row-wrap",
     ".usr-row-wrap",
+    ".ips-assets-row-wrap",
+    ".ips-tk-row-wrap",
 )
 
 ROW_SELECT_BTN_MARKERS = (
@@ -39,6 +43,8 @@ ROW_SELECT_BTN_MARKERS = (
     ".jdb-row-select-btn",
     ".ips-est-list-row-select-btn",
     ".usr-row-select-btn",
+    ".ips-assets-row-select-btn",
+    ".ips-tk-row-select-btn",
 )
 
 ACTIONS_MARKERS = (
@@ -46,23 +52,31 @@ ACTIONS_MARKERS = (
     ".jdb-row-actions",
     ".ips-est-list-actcol",
     ".usr-actcol",
+    ".ips-assets-actcol",
+    ".ips-tk-actions",
 )
 
 # HTML row classes (legacy aliases included)
 ROW_HTML_SELECTORS = (
     ".ips-clean-row",
+    ".ips-data-row",
     ".job-row",
     ".ips-est-list-row",
     ".usr-row",
     ".est-row",
+    ".ips-assets-row",
+    ".ips-time-row",
 )
 
 ROW_SELECTED_SELECTORS = (
     ".ips-clean-row.selected",
     ".ips-clean-row-selected",
+    ".ips-data-row.selected",
     ".job-row.selected",
     ".ips-est-list-row.is-selected",
     ".usr-row.selected",
+    ".ips-assets-row.selected",
+    ".ips-time-row.selected",
     ".ips-inv-row-selected",
 )
 
@@ -80,6 +94,12 @@ HIDDEN_MARKERS = (
     ".usr-row-wrap",
     ".usr-row-select-btn",
     ".usr-actcol",
+    ".ips-assets-row-wrap",
+    ".ips-assets-row-select-btn",
+    ".ips-assets-actcol",
+    ".ips-tk-row-wrap",
+    ".ips-tk-row-select-btn",
+    ".ips-tk-actions",
 )
 
 
@@ -129,11 +149,11 @@ def inject_clean_table_css() -> None:
     border-bottom: 1px solid #e5eaf2;
     border-left: 4px solid transparent;
     cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }}
 .ips-clean-row:hover,
 {rows}:hover {{
-    background: #f8fbff;
+    background: #eef5ff;
 }}
 .ips-clean-row-selected,
 .ips-clean-row.selected,
