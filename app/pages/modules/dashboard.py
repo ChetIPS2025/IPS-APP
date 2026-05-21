@@ -23,6 +23,7 @@ try:
         demo_sales_series,
         load_dashboard_kpis,
     )
+    from app.styles import inject_global_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile  # type: ignore
@@ -40,6 +41,7 @@ except ImportError:
         demo_sales_series,
         load_dashboard_kpis,
     )
+    from styles import inject_global_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 
@@ -62,11 +64,12 @@ def _date_range_state() -> tuple[date, date]:
 
 
 def render() -> None:
+    inject_global_css()
     try:
         from app.pages.modules._access import begin_module
     except ImportError:
         from pages.modules._access import begin_module  # type: ignore
-    if not begin_module("dashboard"):
+    if not begin_module("dashboard", inject_css=False):
         return
     start, end = _date_range_state()
 

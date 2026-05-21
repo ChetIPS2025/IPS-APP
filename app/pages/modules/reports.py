@@ -26,6 +26,7 @@ try:
         demo_report_open_estimates,
         demo_report_timekeeping_summary,
     )
+    from app.styles import inject_global_css
     from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
 except ImportError:
     from components.headers import render_page_header  # type: ignore
@@ -44,6 +45,7 @@ except ImportError:
         demo_report_open_estimates,
         demo_report_timekeeping_summary,
     )
+    from styles import inject_global_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date, fmt_hours  # type: ignore
 
 _TAB_KEY = "ips_reports_tab"
@@ -271,11 +273,12 @@ def _render_compliance() -> None:
 
 
 def render() -> None:
+    inject_global_css()
     try:
         from app.pages.modules._access import begin_module
     except ImportError:
         from pages.modules._access import begin_module  # type: ignore
-    if not begin_module("reports"):
+    if not begin_module("reports", inject_css=False):
         return
     render_page_header("Reports", "Operational summaries with CSV export.")
 
