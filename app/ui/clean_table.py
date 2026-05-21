@@ -475,3 +475,22 @@ def render_clean_table_click_bridge(
         component_key=component_key,
         height=0,
     )
+
+
+def apply_clean_table_row_selection(
+    row_id: str,
+    *,
+    session_select_key: str,
+    records_by_id: dict[str, dict[str, Any]],
+    on_row_click: Any | None = None,
+) -> None:
+    """Store selected row id and rerun when selection changes."""
+    rid = str(row_id or "").strip()
+    if not rid or rid not in records_by_id:
+        return
+    prev = st.session_state.get(session_select_key)
+    st.session_state[session_select_key] = rid
+    if on_row_click:
+        on_row_click(rid, records_by_id[rid])
+    if prev != rid:
+        st.rerun()

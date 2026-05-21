@@ -276,12 +276,12 @@ section[data-testid="stSidebar"] .block-container {{
   transition: background 0.12s;
 }}
 .ips-data-row:hover {{
-  background: #f8fafc;
+  background: #eef5ff;
 }}
 .ips-data-row.selected {{
-  background: {SELECTED_BG};
-  border-left: 3px solid {SELECTED_BORDER};
-  padding-left: calc(0.75rem - 3px);
+  background: #eef5ff;
+  border-left: 4px solid #2563eb;
+  padding-left: calc(0.75rem - 4px);
 }}
 
 /* Detail panel */

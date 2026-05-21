@@ -142,15 +142,7 @@ def _inject_timekeeping_styles() -> None:
             text-transform: uppercase;
         }
         .ips-time-row {
-            min-height: 60px;
             padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            border-left: 4px solid transparent;
-            cursor: pointer;
-        }
-        .ips-time-row.selected {
-            background: #eef5ff;
-            border-left-color: #2563eb;
         }
         .ips-time-emp {
             color: #2563eb;
@@ -471,10 +463,17 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
             dt_total = float(row.get("dt_total") or 0)
             total = st_total + ot_total + dt_total
             selected = eid == selected_id
-            row_cls = "ips-time-row selected" if selected else "ips-time-row"
+            row_cls = (
+                "ips-clean-row ips-time-row selected"
+                if selected
+                else "ips-clean-row ips-time-row"
+            )
             eid_attr = html.escape(eid, quote=True)
             with st.container():
-                st.markdown('<span class="ips-tk-row-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-tk-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 st.markdown(
                     f'<div class="{row_cls}" data-row-id="{eid_attr}" role="button" tabindex="0">'
                     f'<span class="ips-time-emp">{html.escape(str(row.get("name") or "—"))}</span>'
@@ -488,12 +487,18 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
                     "</div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown('<span class="ips-tk-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-tk-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 if st.button(" ", key=f"tk_row_select_{eid}", help=f"Select {row.get('name') or 'employee'}"):
                     st.session_state[_SEL] = eid
                     st.session_state.pop(_COLLAPSED_KEY, None)
                     st.rerun()
-                st.markdown('<span class="ips-tk-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-tk-actions ips-clean-actions" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 if st.button("👁", key=f"tk_view_{eid}", help="View weekly time"):
                     st.session_state[_SEL] = eid
                     st.session_state.pop(_COLLAPSED_KEY, None)

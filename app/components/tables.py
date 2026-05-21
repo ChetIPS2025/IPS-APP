@@ -27,6 +27,14 @@ def _cell_content(
     return html.escape(str(val)) if val is not None and str(val).strip() else "—"
 
 
+def _row_label(row: dict[str, Any], columns: list[tuple[str, str]]) -> str:
+    if not columns:
+        return "row"
+    field = columns[0][0]
+    val = row.get(field)
+    return str(val).strip() if val is not None and str(val).strip() else "row"
+
+
 def render_clickable_table(
     records: list[dict[str, Any]],
     columns: list[tuple[str, str]],
@@ -41,14 +49,22 @@ def render_clickable_table(
     col_fr: list[str] | None = None,
 ) -> str | None:
     """
-    HTML grid table — click anywhere on a row to select (no checkboxes).
+    HTML grid table — click anywhere on a row to select (invisible overlay button per row).
 
     Stores selected record id in ``session_select_key`` and returns it.
     """
     try:
-        from app.ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge
+        from app.ui.clean_table import (
+            apply_clean_table_row_selection,
+            inject_clean_table_css,
+            render_clean_table_click_bridge,
+        )
     except ImportError:
-        from ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge  # type: ignore
+        from ui.clean_table import (  # type: ignore
+            apply_clean_table_row_selection,
+            inject_clean_table_css,
+            render_clean_table_click_bridge,
+        )
 
     inject_clean_table_css()
 
@@ -84,7 +100,7 @@ def render_clickable_table(
     st.markdown(
         f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
         f'<{ot} class="ips-data-table-scroll">'
-        f'<span class="ips-clean-table {table_class}" aria-hidden="true"></span>'
+        f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
         f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
         + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
         + f"</{ot}>",
@@ -101,28 +117,49 @@ def render_clickable_table(
             f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
             for field, _ in columns
         )
-        st.markdown(
-            f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
-            f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
-            unsafe_allow_html=True,
-        )
+        label = _row_label(rec, columns)
+        with st.container():
+            st.markdown(
+                '<span class="ips-clean-row-wrap" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
+                f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                " ",
+                key=f"{key}_row_sel_{rid}",
+                help=f"Select {label}",
+            ):
+                apply_clean_table_row_selection(
+                    rid,
+                    session_select_key=sel_key,
+                    records_by_id=records_by_id,
+                    on_row_click=on_row_click,
+                )
 
     st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
 
     picked = render_clean_table_click_bridge(
-        table_selector=f".{table_class}",
+        table_selector=f".ips-data-table-stable:has(.{table_class})",
         row_selector=".ips-data-row[data-row-id]",
         component_key=f"{key}_row_click_bridge",
     )
     if picked:
         pid = str(picked).strip()
         if pid and pid in records_by_id:
-            prev = st.session_state.get(sel_key)
-            st.session_state[sel_key] = pid
-            if on_row_click:
-                on_row_click(pid, records_by_id[pid])
-            if prev != pid:
-                st.rerun()
+            apply_clean_table_row_selection(
+                pid,
+                session_select_key=sel_key,
+                records_by_id=records_by_id,
+                on_row_click=on_row_click,
+            )
 
     return str(st.session_state.get(sel_key) or "").strip() or None
 
@@ -192,7 +229,7 @@ def render_data_table(
                     f"<{close_tag}>"
                 )
         st.markdown(
-            f'<{open_tag} class="ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>',
+            f'<{open_tag} class="ips-clean-row ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>',
             unsafe_allow_html=True,
         )
     st.markdown(f"<{close_tag}><{close_tag}>", unsafe_allow_html=True)
