@@ -25,9 +25,9 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.ui.clean_table import inject_clean_table_css
+    from app.ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge
 except ImportError:
-    from ui.clean_table import inject_clean_table_css  # type: ignore
+    from ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge  # type: ignore
 
 try:
     from table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS
@@ -120,7 +120,7 @@ def show_job_detail_dialog() -> None:
         on_collapse=_close,
     )
 
-_CSS_KEY = "jdb_modern_v19"
+_CSS_KEY = "jdb_modern_v20"
 
 # Shared grid template for header + data rows
 _JDB_GRID_COLS = "100px 2fr 1.4fr 1fr 1.2fr 1fr 1fr 1fr 120px"
@@ -469,11 +469,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 .jdb-cell-muted { color: #6b7280; font-size: 0.8rem; }
 .job-row-act-slot { min-height: 1px; }
 
-/* ── Streamlit row shell: full-width click overlay + action column on top ─ */
+/* ── Streamlit row host: full-width overlay + action column (descendant selectors) ─ */
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host)),
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host)) {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host)) {
     position: relative !important;
     min-height: 60px !important;
     width: 100% !important;
@@ -485,43 +484,38 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     box-shadow: none !important;
     border-radius: 0 !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"],
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"] {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"] {
     margin: 0 !important;
     padding: 0 !important;
     min-height: 0 !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-host),
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-host) {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.job-row-host) {
     width: 100% !important;
+    position: relative !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
 }
-/* Invisible button — covers entire row (all columns); actions stay above via z-index */
+/* Invisible row button — full row; eye/delete stay above (z-index 5) */
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton),
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton) {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) {
     position: absolute !important;
-    inset: 0 !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+    z-index: 2 !important;
     width: 100% !important;
     height: 100% !important;
     min-height: 60px !important;
-    z-index: 2 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
@@ -530,22 +524,16 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     box-shadow: none !important;
     pointer-events: auto !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton,
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) .stButton,
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton > button,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-host):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
     display: block !important;
     width: 100% !important;
     height: 100% !important;
@@ -558,20 +546,17 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     box-shadow: none !important;
     cursor: pointer !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"],
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] {
     position: absolute !important;
     top: 0 !important;
     right: 10px !important;
     width: 86px !important;
-    height: 60px !important;
-    max-height: 60px !important;
+    height: 100% !important;
+    min-height: 60px !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
@@ -581,61 +566,48 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     z-index: 5 !important;
     pointer-events: none !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-row-host) {
-    flex: 1 1 auto !important;
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+    height: 100% !important;
     min-height: 60px !important;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"],
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
-    height: 60px !important;
     align-items: center !important;
     justify-content: flex-end !important;
     gap: 0.4rem !important;
-    min-height: 0 !important;
     background: transparent !important;
     pointer-events: auto !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] [data-testid="column"],
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] [data-testid="column"] {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] [data-testid="column"] {
     flex: 0 0 auto !important;
     width: auto !important;
     min-width: 0 !important;
     padding: 0 !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] .stButton,
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] .stButton,
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] [data-testid="stButton"] {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] [data-testid="stButton"] {
     margin: 0 !important;
     padding: 0 !important;
     background: transparent !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] .stButton > button,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] .stButton > button {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] .stButton > button {
     width: 38px !important;
     height: 38px !important;
     min-width: 38px !important;
@@ -653,26 +625,21 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    pointer-events: auto !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] .stButton > button:hover,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] .stButton > button:hover {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] .stButton > button:hover {
     background: #f8fafc !important;
     border-color: #cbd5e1 !important;
 }
+section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.job-actions)
-    + [data-testid="stElementContainer"] .stButton > button:disabled,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-    div[data-testid="stVerticalBlock"]:has(.job-row-shell):not(:has(.jdb-tbl-host))
-    > [data-testid="stElementContainer"]:has(.jdb-row-actions)
-    + [data-testid="stElementContainer"] .stButton > button:disabled {
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+[data-testid="stElementContainer"]:has(.jdb-row-actions)
++ [data-testid="stElementContainer"] .stButton > button:disabled {
     opacity: 0.38 !important;
 }
 /* Table row-click bridge iframe — zero layout footprint */
@@ -832,8 +799,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
-.job-row-shell, .job-row-wrap, .job-row-click-wrapper, .jdb-row-select-btn,
-.job-actions, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
+.job-row-wrap, .jdb-row-select-btn, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
     display: none !important;
     height: 0 !important;
     overflow: hidden !important;
@@ -1180,7 +1146,7 @@ def render_job_row(
     ed   = _date_table(full_row.get("target_completion_date") or full_row.get("due_date"))
 
     st.markdown(
-        '<span class="job-row-shell job-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+        '<span class="job-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -1200,9 +1166,7 @@ def render_job_row(
     )
 
     st.markdown(
-        '<div class="job-row-click-wrapper">'
-        '<span class="jdb-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>'
-        "</div>",
+        '<span class="jdb-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     if st.button(
@@ -1213,9 +1177,7 @@ def render_job_row(
         on_row_click()
 
     st.markdown(
-        '<div class="job-actions">'
-        '<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>'
-        "</div>",
+        '<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     a1, a2 = st.columns(2, gap="small")
@@ -1299,6 +1261,17 @@ def render_jobs_table(
                     on_row_click=_open_dialog,
                     on_view=_open_dialog, on_delete=_del,
                 )
+
+        picked = render_clean_table_click_bridge(
+            table_selector=".jdb-tbl-host",
+            row_selector=".job-row-host[data-row-id]",
+            component_key="ips_job_table_row_click_bridge",
+        )
+        if picked:
+            pid = str(picked).strip()
+            if pid:
+                open_job_detail_dialog(pid)
+                st.rerun()
 
     st.session_state[JOB_DB_TABLE_BY_ID_KEY] = by_id
     st.session_state["_job_db_dialog_can_edit"] = can_edit
