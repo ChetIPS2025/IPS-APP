@@ -1712,120 +1712,6 @@ def _tt_render_grid_section(
     grid_ratios = _week_grid_column_ratios(fast=False)
     return day_col_totals, grid_ratios
 
-    # ── Detail panel (below table, only when an employee is selected) ────────
-    if selected_eid:
-        # Build job options for the detail panel
-        jobs_raw = _tt_load_jobs_rows(limit=5000)
-        _, job_label_to_id, all_job_labels = build_job_dropdown_label_maps(jobs_raw)
-        active_job_ids = {
-            str(j.get("id"))
-            for j in jobs_raw
-            if j.get("id") and _tt_job_is_active_open(j)
-        }
-        active_job_labels = [lb for lb in all_job_labels if job_label_to_id.get(lb) in active_job_ids]
-        if not active_job_labels:
-            active_job_labels = list(all_job_labels)
-        full_job_labels = _build_full_job_options(active_job_labels)
-
-        uid = current_profile().get("id")
-        ts_now = datetime.now(timezone.utc).isoformat()
-
-        _render_timekeeping_detail_panel(
-            selected_eid=selected_eid,
-            visible_emps=week_data.visible_emps,
-            days=days,
-            week_start=week_start,
-            today=today,
-            idx=week_data.idx,
-            filt=filt,
-            fj_id=fj_id,
-            full_job_labels=full_job_labels,
-            job_label_to_id=job_label_to_id,
-            uid=uid,
-            ts_now=ts_now,
-        )
-        st.session_state["timekeeping_view_mode"] = "detail"
-        st.session_state["timekeeping_edit_mode"] = True
-    else:
-        st.markdown(
-            '<p class="ips-tc-hint">▶ Click an employee row to view and edit their weekly timecard.</p>',
-            unsafe_allow_html=True,
-        )
-        st.session_state["timekeeping_view_mode"] = "table"
-        st.session_state["timekeeping_edit_mode"] = False
-
-    # ── Entries table expander (export / bulk delete — kept for admin use) ───
-    flat_rows = _tt_flat_entry_rows(
-        week_data.grid_rows, filt.show_emp_ids, fj_id,
-        week_data.emp_id_to_name, filt.job_id_to_label,
-    )
-    entries_df = pd.DataFrame(flat_rows)
-    n_entries = len(flat_rows)
-    with st.expander(
-        f"All entries this week ({n_entries} rows) — Export / Bulk delete",
-        expanded=False,
-    ):
-        st.markdown('<span class="ips-wc-entries-expander" aria-hidden="true"></span>', unsafe_allow_html=True)
-        if not entries_df.empty and "id" in entries_df.columns:
-            st.caption("Select rows to view, edit, export, or bulk-delete.")
-            show_flat = [c for c in ["employee", "work_date", "job", "type", "hours", "notes"] if c in entries_df.columns]
-            bar_ph = st.empty()
-            _, sel = render_selectable_dataframe(
-                entries_df,
-                table_key=TABLE_KEY_TIME_ENTRIES,
-                id_column="id",
-                columns=show_flat,
-                editor_key="tt_flat_sel_editor",
-            )
-            with bar_ph.container():
-                actions = render_selection_action_bar(
-                    TABLE_KEY_TIME_ENTRIES, sel,
-                    can_view=True, can_edit=can_edit, can_delete=can_edit,
-                    export_df=entries_df, visible_df=entries_df, id_column="id",
-                    export_filename="time_entries_week_export.csv",
-                    view_label="View Entry", edit_label="Edit Entry",
-                    delete_label="Delete Entry", delete_selected_label="Delete Selected",
-                )
-            # Edit popup from table
-            te_tbl = st.session_state.get(TT_EDIT_ID_KEY)
-            if te_tbl:
-                erw = fetch_one("time_entries", {"id": str(te_tbl)})
-                if not erw:
-                    st.session_state.pop(TT_EDIT_ID_KEY, None)
-                else:
-                    _render_minimal_table_edit_popup(
-                        erw,
-                        job_labels_sorted=filt.job_labels_sorted,
-                        job_label_to_id=filt.job_label_to_id,
-                        job_id_to_label=filt.job_id_to_label,
-                        emp_id_to_name=week_data.emp_id_to_name,
-                        fast=fast,
-                    )
-            if actions.get("edit") and sel and len(sel) == 1 and can_edit:
-                st.session_state[TT_EDIT_ID_KEY] = str(sel[0])
-                st.rerun()
-            pend = st.session_state.get(IPS_PENDING_DELETE) or {}
-            if actions.get("confirm_delete") and pend.get(TABLE_KEY_TIME_ENTRIES) and can_edit:
-                for tid in pend[TABLE_KEY_TIME_ENTRIES]:
-                    try:
-                        delete_rows("time_entries", {"id": tid})
-                    except Exception as exc:
-                        st.error(f"Could not delete {tid}: {exc}")
-                pend.pop(TABLE_KEY_TIME_ENTRIES, None)
-                clear_selected_ids(TABLE_KEY_TIME_ENTRIES)
-                try:
-                    st.cache_data.clear()
-                except Exception:
-                    pass
-                st.success("Delete completed.")
-                st.rerun()
-        else:
-            st.caption("No entries for this week matching current filters.")
-
-    day_col_totals = _tt_day_column_totals(week_data.idx, days, filt.show_emp_ids, fj_id)
-    grid_ratios = _week_grid_column_ratios(fast=False)
-    return day_col_totals, grid_ratios
-
 
 def _tt_render_footer_section(day_col_totals: list[float], days: list[date], grid_ratios: list[float]) -> None:
     """Week totals row aligned to the grid (compact on narrow viewport)."""
@@ -3361,11 +3247,26 @@ def _save_timecard_row(
     """Upsert/delete ST and OT entries for one combined timecard row."""
     job_changed = str(orig_job_id or "") != str(new_job_id or "") or str(orig_nj or "") != str(new_nj or "")
     delete_after_save: list[str] = []
+    st_written = False
+    ot_written = False
 
     if job_changed:
+        # Defer deleting original rows until new ST/OT upserts succeed (see delete_after_save below).
         delete_after_save = [tid for tid in [orig_st_id, orig_ot_id] if tid]
         orig_st_id = None
         orig_ot_id = None
+
+    def _fail(exc: Exception) -> tuple[bool, str]:
+        if job_changed and (st_written or ot_written):
+            _rollback_job_change_writes(
+                employee_id=eid,
+                work_date=d,
+                job_id=new_job_id,
+                non_job_code=new_nj,
+                st_written=st_written,
+                ot_written=ot_written,
+            )
+        return False, str(exc)
 
     if new_st_hrs > 0:
         try:
@@ -3374,13 +3275,14 @@ def _save_timecard_row(
                 hours=new_st_hrs, notes=new_notes, created_by=uid,
                 updated_at_iso=ts_now, non_job_code=new_nj, time_type="ST",
             )
+            st_written = True
         except Exception as exc:
-            return False, str(exc)
+            return _fail(exc)
     elif orig_st_id:
         try:
             delete_rows("time_entries", {"id": orig_st_id})
         except Exception as exc:
-            return False, str(exc)
+            return _fail(exc)
 
     if new_ot_hrs > 0:
         try:
@@ -3389,19 +3291,20 @@ def _save_timecard_row(
                 hours=new_ot_hrs, notes=new_notes, created_by=uid,
                 updated_at_iso=ts_now, non_job_code=new_nj, time_type="OT",
             )
+            ot_written = True
         except Exception as exc:
-            return False, str(exc)
+            return _fail(exc)
     elif orig_ot_id:
         try:
             delete_rows("time_entries", {"id": orig_ot_id})
         except Exception as exc:
-            return False, str(exc)
+            return _fail(exc)
 
     for tid in delete_after_save:
         try:
             delete_rows("time_entries", {"id": tid})
         except Exception as exc:
-            return False, str(exc)
+            return _fail(exc)
 
     return True, ""
 
@@ -3417,10 +3320,13 @@ def _resolve_job_from_label(
     return jid or None, None
 
 
-def _build_full_job_options(all_job_labels: list[str]) -> list[str]:
-    """Combine active/open job labels with NON-JOB category labels."""
+def _build_full_job_options(
+    jobs_raw: list[dict[str, Any]],
+) -> tuple[dict[str, str], list[str], list[str]]:
+    """Return (label_to_id, active job labels, full picker options including NON-JOB)."""
+    job_label_to_id, job_labels = _tt_picker_job_labels(jobs_raw)
     nj_labels = [f"NON-JOB — {c}" for c in NON_JOB_CATEGORY_OPTIONS if c]
-    return all_job_labels + nj_labels
+    return job_label_to_id, job_labels, job_labels + nj_labels
 
 
 def _label_for_group(g: dict, job_id_to_label: dict[str, str]) -> str:
@@ -3850,6 +3756,7 @@ def _render_timekeeping_detail_panel(
     fj_id: str | None,
     full_job_labels: list[str],
     job_label_to_id: dict[str, str],
+    picker_job_labels: list[str],
     uid: Any,
     ts_now: str,
 ) -> None:
@@ -3907,8 +3814,8 @@ def _render_timekeeping_detail_panel(
                 eid=selected_eid, emp_name=nm, days=days,
                 week_start=week_start, week_end=week_end, today=today,
                 idx=idx, fj_id=fj_id,
-                job_labels_sorted=filt.job_labels_sorted,
-                job_label_to_id=filt.job_label_to_id,
+                job_label_to_id=job_label_to_id,
+                entry_job_labels=picker_job_labels,
                 default_job_label=filt.default_job_label,
                 fast=False, user_id=uid, ts_iso=ts_now,
             )
