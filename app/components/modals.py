@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from collections.abc import Callable
 
 import streamlit as st
@@ -42,7 +43,10 @@ def _render_dialog_content(
     st.markdown(f'<{ot} class="ips-modal-header">', unsafe_allow_html=True)
     h1, h2 = st.columns([4, 1])
     with h1:
-        st.markdown(f'<p class="ips-detail-title">{title}</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
+            unsafe_allow_html=True,
+        )
     with h2:
         if show_actions:
             render_modal_header_actions(session_select_key)

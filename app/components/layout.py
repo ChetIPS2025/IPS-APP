@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from collections.abc import Callable
 
 import streamlit as st
@@ -40,7 +41,10 @@ def render_selected_detail_panel(
     st.markdown(f'<{_OT} class="ips-detail-panel">', unsafe_allow_html=True)
     c1, c2 = st.columns([3, 1])
     with c1:
-        st.markdown(f'<p class="ips-detail-title">{title}</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
+            unsafe_allow_html=True,
+        )
     with c2:
         st.markdown(f'<{_OT} class="ips-detail-actions">', unsafe_allow_html=True)
         if actions:
