@@ -15,6 +15,7 @@ patches apply before the HTTP server is constructed.
 from __future__ import annotations
 
 import os
+import sys
 import threading
 from typing import TYPE_CHECKING, Any, Final
 
@@ -151,7 +152,9 @@ def _install_tornado() -> None:
             handlers = _inject_pwa_into_tornado_handlers(list(handlers), srv.main_script_path)
         _orig_app_init(self, handlers, default_host=default_host, transforms=transforms, **settings)
 
-    _orig_server_create_app = server_mod.Server._create_app
+    _orig_server_create_app = getattr(server_mod.Server, "_create_app", None)
+    if _orig_server_create_app is None:
+        return
 
     def _patched_server_create_app(self: Any) -> Any:
         _tls.server = self
@@ -255,5 +258,13 @@ def _install_starlette() -> None:
 
 
 def install() -> None:
-    _install_tornado()
-    _install_starlette()
+    # Optional compatibility patch. Streamlit internals change across versions,
+    # so do not let PWA static routing prevent the app from starting.
+    try:
+        _install_tornado()
+    except Exception as exc:
+        print(f"Warning: skipped Streamlit Tornado PWA patch: {exc}", file=sys.stderr)
+    try:
+        _install_starlette()
+    except Exception as exc:
+        print(f"Warning: skipped Streamlit Starlette PWA patch: {exc}", file=sys.stderr)
