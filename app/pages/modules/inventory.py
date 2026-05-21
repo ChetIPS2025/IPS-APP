@@ -258,6 +258,7 @@ def render() -> None:
         session_select_key=_SEL,
         selected_id=selected_id or None,
         plain_cell=_plain_cell,
+        html_cell=_cell,
     )
 
     if sel:
