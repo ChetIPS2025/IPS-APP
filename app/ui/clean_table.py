@@ -405,6 +405,7 @@ def render_clean_table_click_bridge(
     tbl = html.escape(table_selector, quote=True)
     row = html.escape(row_selector, quote=True)
     key_esc = html.escape(component_key, quote=True)
+    # Do not pass ``key`` — older Streamlit builds reject it on components.html().
     return components.html(
         f"""
 <script>
@@ -428,5 +429,4 @@ def render_clean_table_click_bridge(
 </script>
         """,
         height=0,
-        key=component_key,
     )
