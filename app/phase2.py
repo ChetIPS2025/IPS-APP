@@ -24,13 +24,13 @@ try:
         estimate_materials,
         estimates,
         inventory,
-        job_costing,
         jobs,
         reports,
         settings,
         tasks,
         timekeeping,
     )
+    from app.pages.modules import job_costing
     from app.pages.modules._session import clear_all_module_selections, nav_slug
     from app.utils.constants import SESSION_NAV_KEY
     from app.utils.permissions import role_can_access_page
@@ -49,13 +49,13 @@ except ImportError:
         estimate_materials,
         estimates,
         inventory,
-        job_costing,
         jobs,
         reports,
         settings,
         tasks,
         timekeeping,
     )
+    from pages.modules import job_costing  # type: ignore
     from pages.modules._session import clear_all_module_selections, nav_slug  # type: ignore
     from utils.constants import SESSION_NAV_KEY  # type: ignore
     from utils.permissions import role_can_access_page  # type: ignore

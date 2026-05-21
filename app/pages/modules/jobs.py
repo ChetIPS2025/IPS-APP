@@ -274,6 +274,11 @@ def render() -> None:
     def _html_cell(field: str, row: dict) -> str:
         if field == "status":
             return status_pill_html(str(row.get("status") or ""))
+        if field == "job_number":
+            return (
+                f'<span style="color:#2563eb;font-weight:600">'
+                f'{html.escape(str(row.get("job_number") or ""))}</span>'
+            )
         return html.escape(_plain_cell(field, row))
 
     sel = render_clickable_table(
