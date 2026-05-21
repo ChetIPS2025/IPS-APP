@@ -56,8 +56,18 @@ def set_job_db_dialog_context(
     st.session_state["_job_db_dialog_admin_read"] = admin_read
 
 
+def select_job_row(job_id: str) -> None:
+    """Select a job for the inline detail panel below the table."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    st.session_state["selected_job_id"] = jid
+    st.session_state.pop(JOB_DB_DETAIL_DIALOG_KEY, None)
+    st.session_state.pop("job_db_detail_collapsed", None)
+
+
 def open_job_detail_dialog(job_id: str) -> None:
-    """Select a job row and open the detail dialog on the next rerun."""
+    """Select a job row and open the detail dialog on the next rerun (card view)."""
     jid = str(job_id or "").strip()
     if not jid:
         return
@@ -241,8 +251,7 @@ def _job_row_grid_html(
     jid_attr = html.escape(jid, quote=True)
     return (
         f'<div class="{host_cls}" data-jid="{jid_attr}" data-row-id="{jid_attr}">'
-        f'<div class="{row_cls}">'
-        f'<div class="job-row-click-wrapper" aria-hidden="true"></div>'
+        f'<div class="{row_cls}" role="button" tabindex="0">'
         f'<span class="job-number" title="{html.escape(jnum, quote=True)}">{html.escape(jnum)}</span>'
         f'<span class="job-project jdb-cell" title="{html.escape(name, quote=True)}">{html.escape(name)}</span>'
         f'<span class="jdb-cell jdb-cell-muted" title="{html.escape(cust, quote=True)}">{html.escape(cust)}</span>'
@@ -429,25 +438,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
     background: transparent;
     border: none;
     box-sizing: border-box;
-    pointer-events: none;
     cursor: pointer;
 }
-.job-row-click-wrapper {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-}
-.job-row > .job-row-click-wrapper {
-    z-index: 2;
-}
-.job-row > * {
-    position: relative;
-    z-index: 3;
-}
-.job-actions {
-    position: relative;
-    z-index: 5;
+.job-row-host {
+    cursor: pointer;
 }
 .job-row.selected {
     background: #eef5ff;
@@ -515,63 +509,6 @@ div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
     width: 100% !important;
     position: relative !important;
     z-index: 0 !important;
-    pointer-events: none !important;
-}
-/* Invisible row button — full row; eye/delete stay above (z-index 5) */
-section[data-testid="stMain"]:has(.ips-job-db-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-[data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-+ [data-testid="stElementContainer"]:has(.stButton) {
-    position: absolute !important;
-    inset: 0 !important;
-    z-index: 2 !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 60px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    pointer-events: auto !important;
-}
-.job-row-click-wrapper [data-testid="stButton"],
-.job-row-click-wrapper .stButton,
-.job-row-click-wrapper button,
-section[data-testid="stMain"]:has(.ips-job-db-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-[data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-+ [data-testid="stElementContainer"]:has(.stButton) [data-testid="stButton"],
-section[data-testid="stMain"]:has(.ips-job-db-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-[data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-+ [data-testid="stElementContainer"]:has(.stButton) .stButton,
-section[data-testid="stMain"]:has(.ips-job-db-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-[data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-+ [data-testid="stElementContainer"]:has(.stButton) .stButton > button,
-section[data-testid="stMain"]:has(.ips-job-db-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
-div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
-[data-testid="stElementContainer"]:has(.job-row-click-wrapper)
-+ [data-testid="stElementContainer"]:has(.stButton) button {
-    position: absolute !important;
-    inset: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 60px !important;
-    opacity: 0 !important;
-    border: 0 !important;
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    cursor: pointer !important;
 }
 section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
@@ -826,7 +763,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
-.job-row-wrap, .job-row-click-wrapper .jdb-row-select-btn, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
+.job-row-wrap, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
     display: none !important;
     height: 0 !important;
     overflow: hidden !important;
@@ -1157,7 +1094,6 @@ def render_job_row(
     job_num_col: str,
     can_edit:    bool,
     is_selected: bool,
-    on_row_click: Any,
     on_view:     Any,
     on_delete:   Any,
 ) -> None:
@@ -1193,22 +1129,7 @@ def render_job_row(
     )
 
     st.markdown(
-        '<div class="job-row-click-wrapper">'
-        '<span class="jdb-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        " ",
-        key=f"job_row_click_{jid}",
-        help=f"Open job {jnum}",
-    ):
-        on_row_click()
-
-    st.markdown(
-        '<div class="job-actions">'
-        '<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>'
-        "</div>",
+        '<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     a1, a2 = st.columns(2, gap="small")
@@ -1274,8 +1195,8 @@ def render_jobs_table(
 
             # ── Per-row container — REQUIRED for CSS :has() to work per row ──
             with st.container():
-                def _open_dialog(j=jid):
-                    open_job_detail_dialog(j)
+                def _select(j=jid):
+                    select_job_row(j)
                     st.rerun()
 
                 def _del(j=jid):
@@ -1289,8 +1210,7 @@ def render_jobs_table(
                 render_job_row(
                     row=row, full_row=full_row, job_num_col=job_num_col,
                     can_edit=can_edit, is_selected=is_selected,
-                    on_row_click=_open_dialog,
-                    on_view=_open_dialog, on_delete=_del,
+                    on_view=_select, on_delete=_del,
                 )
 
         picked = render_clean_table_click_bridge(
@@ -1301,10 +1221,45 @@ def render_jobs_table(
         if picked:
             pid = str(picked).strip()
             if pid:
-                open_job_detail_dialog(pid)
+                select_job_row(pid)
                 st.rerun()
 
     st.session_state[JOB_DB_TABLE_BY_ID_KEY] = by_id
     st.session_state["_job_db_dialog_can_edit"] = can_edit
     st.session_state["_job_db_dialog_admin_read"] = admin_read
+
+    sel = str(st.session_state.get("selected_job_id") or "").strip()
+    if sel and not st.session_state.get("job_db_detail_collapsed"):
+        job_row = by_id.get(sel)
+        if job_row:
+
+            def _goto_full_view(jid: str = sel) -> None:
+                st.session_state.update({"job_view_mode": "view", "selected_job_id": jid})
+                st.session_state.pop("job_mode", None)
+                st.session_state.pop("job_edit_id", None)
+                st.rerun()
+
+            def _goto_edit(jid: str = sel) -> None:
+                st.session_state.update({
+                    "job_view_mode": "edit",
+                    "selected_job_id": jid,
+                    "job_mode": "edit",
+                    "job_edit_id": jid,
+                })
+                st.session_state.pop("job_number_manual_input", None)
+                st.rerun()
+
+            def _collapse() -> None:
+                st.session_state.pop("selected_job_id", None)
+                st.rerun()
+
+            render_job_detail_panel(
+                job_row=job_row,
+                can_edit=can_edit,
+                admin_read=admin_read,
+                on_view=_goto_full_view,
+                on_edit=_goto_edit,
+                on_collapse=_collapse,
+            )
+
     show_job_detail_dialog_if_pending()
