@@ -840,9 +840,10 @@ def document_link_ref_options(module: str) -> list[str]:
     if mod == "Certifications":
         out: list[str] = []
         for c in load_all_certifications():
-            label = f"{c.get('employee_name')} — {c.get('cert_type')}"
-            if label.strip(" —"):
-                out.append(label)
+            name = str(c.get("employee_name") or "").strip()
+            cert_type = str(c.get("cert_type") or "").strip()
+            if name and cert_type:
+                out.append(f"{name} — {cert_type}")
         return out
     if mod == "Inventory":
         return [f"{i.get('sku')} — {i.get('name')}" for i in load_inventory() if i.get("sku")]
