@@ -110,12 +110,19 @@ def render_module(slug: str | None = None) -> None:
     fn = BUILT_MODULES.get(active)
     if fn:
         try:
-            fn()  # type: ignore[operator]
-        except Exception as exc:
-            st.error(f"This page encountered an error: {exc}")
-            import logging
+            try:
+                fn()  # type: ignore[operator]
+            except Exception as exc:
+                st.error(f"This page encountered an error: {exc}")
+                import logging
 
-            logging.getLogger(__name__).exception("module %s failed", active)
+                logging.getLogger(__name__).exception("module %s failed", active)
+        finally:
+            try:
+                from app.pages.modules._access import end_module
+            except ImportError:
+                from pages.modules._access import end_module  # type: ignore
+            end_module()
         try:
             from app.pages.modules._access import show_demo_banner_if_needed
         except ImportError:

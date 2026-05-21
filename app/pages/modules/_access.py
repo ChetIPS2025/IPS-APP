@@ -14,11 +14,16 @@ except ImportError:
     from utils.permissions import role_can_access_page  # type: ignore
 
 _DEMO_FLAG = "ips_showing_demo_data"
+_MODULE_SHELL_KEY = "_ips_module_page_shell_open"
 
 
 def begin_module(slug: str, *, inject_css: bool = True) -> bool:
     """
     Per-page gate: foundation CSS + role check.
+
+    Emits ``.ips-page-content`` / ``.ips-page-{slug}`` markers for main-area CSS
+    (``:has(.ips-page-content)`` in global styles). ``end_module`` clears session state
+    after the page body (``phase2.render_module`` does this automatically).
 
     Returns False when the user must not see page content.
     """
@@ -28,12 +33,22 @@ def begin_module(slug: str, *, inject_css: bool = True) -> bool:
     if not role_can_access_page(role, slug):
         st.error("You do not have access to this page.")
         return False
+    end_module()
+    # Marker span (Streamlit widgets are not DOM children of a following open <div>).
+    # Layout/CSS scope uses section[data-testid="stMain"]:has(.ips-page-content) in global CSS.
     st.markdown(
-        f'<div class="ips-page-content ips-page-{slug}"></div>',
+        f'<span class="ips-page-content ips-page-shell-marker ips-page-{slug}" '
+        f'aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    st.session_state[_MODULE_SHELL_KEY] = slug
     show_demo_banner_if_needed()
     return True
+
+
+def end_module() -> None:
+    """Clear module shell session state after :func:`begin_module` (called from ``render_module``)."""
+    st.session_state.pop(_MODULE_SHELL_KEY, None)
 
 
 def mark_demo_data(active: bool = True) -> None:

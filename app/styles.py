@@ -841,10 +841,22 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   border-bottom: 1px solid #f1f5f9;
 }}
 
-/* Page shell */
+/* Page shell — marker class; Streamlit main area scoped via :has() */
 .ips-page-content {{
-  width: 100%;
-  max-width: 1680px;
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-content) [data-testid="stMainBlockContainer"],
+section[data-testid="stMain"]:has(.ips-page-content) .block-container {{
+  max-width: 1680px !important;
+  width: 100% !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-content) [data-testid="stElementContainer"] {{
+  margin-bottom: 0.1rem !important;
 }}
 
 /* Strip default Streamlit chrome in main area */
