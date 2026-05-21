@@ -47,11 +47,17 @@ _JOB_TABS = [
 ]
 
 
+def _default_jobs_date_range() -> tuple[date, date]:
+    today = date.today()
+    return today.replace(day=1), today
+
+
 def _clear_jobs_filters() -> None:
     """Reset filter widgets (must run via button ``on_click``, not after widgets render)."""
     st.session_state["jobs_search"] = ""
     st.session_state["jobs_filter_status"] = "All Statuses"
     st.session_state["jobs_filter_customer"] = "All Customers"
+    st.session_state["jobs_filter_dates"] = _default_jobs_date_range()
 
 
 def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> list[dict]:
@@ -248,7 +254,7 @@ def render() -> None:
         with c4:
             st.date_input(
                 "Range",
-                value=(date.today().replace(day=1), date.today()),
+                value=_default_jobs_date_range(),
                 key="jobs_filter_dates",
                 label_visibility="collapsed",
             )

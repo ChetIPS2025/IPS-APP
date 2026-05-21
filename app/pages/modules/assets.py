@@ -483,6 +483,6 @@ def render() -> None:
 
     sel = str(st.session_state.get(_SEL) or "")
     if sel:
-        asset = next((r for r in rows if str(r.get("id")) == sel), None)
+        asset = next((r for r in filtered if str(r.get("id")) == sel), None)
         if asset:
             _render_detail(asset)

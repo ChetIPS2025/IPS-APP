@@ -16,7 +16,7 @@ try:
         load_timekeeping_summaries,
     )
     from app.pages.modules._session import select_key
-    from app.utils.dates import week_dates, week_end, week_start
+    from app.utils.dates import week_end, week_start
     from app.utils.formatting import fmt_date, fmt_hours
 except ImportError:
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -27,11 +27,12 @@ except ImportError:
         load_timekeeping_summaries,
     )
     from pages.modules._session import select_key  # type: ignore
-    from utils.dates import week_dates, week_end, week_start  # type: ignore
+    from utils.dates import week_end, week_start  # type: ignore
     from utils.formatting import fmt_date, fmt_hours  # type: ignore
 
 _SEL = select_key("timekeeping")
 _WEEK_KEY = "ips_timekeeping_week_start"
+_COLLAPSED_KEY = "ips_timekeeping_detail_collapsed"
 _TK_GRID = "1.2fr 1fr 1fr 0.85fr 0.85fr 0.85fr 0.8fr 0.55fr"
 
 
@@ -383,6 +384,7 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
             with b3:
                 if st.button("⌃", key=f"tk_close_{eid}", use_container_width=True, help="Close details"):
                     st.session_state.pop(_SEL, None)
+                    st.session_state[_COLLAPSED_KEY] = True
                     st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -489,10 +491,12 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
                 st.markdown('<span class="ips-tk-row-select-btn" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if st.button(" ", key=f"tk_row_select_{eid}", help=f"Select {row.get('name') or 'employee'}"):
                     st.session_state[_SEL] = eid
+                    st.session_state.pop(_COLLAPSED_KEY, None)
                     st.rerun()
                 st.markdown('<span class="ips-tk-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if st.button("👁", key=f"tk_view_{eid}", help="View weekly time"):
                     st.session_state[_SEL] = eid
+                    st.session_state.pop(_COLLAPSED_KEY, None)
                     st.rerun()
 
 
@@ -503,39 +507,60 @@ def render() -> None:
         from pages.modules._access import begin_module  # type: ignore
     if not begin_module("timekeeping"):
         return
+    _inject_timekeeping_styles()
+    st.markdown('<span class="ips-timekeeping-page"></span>', unsafe_allow_html=True)
     ws = _current_week_start()
     we = week_end(ws)
 
-    render_page_header("Timekeeping", "View and edit employee weekly time entries.")
-
-    nav_l, nav_c, nav_r = st.columns([1, 2, 1])
-    with nav_l:
-        if st.button("← Previous Week", key="tk_prev_week", use_container_width=True):
-            st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
-            st.rerun()
-    with nav_c:
-        st.markdown(
-            f'<p class="ips-week-label">{fmt_date(ws)} – {fmt_date(we)} · Week {ws.isocalendar()[1]}</p>',
-            unsafe_allow_html=True,
-        )
-    with nav_r:
-        if st.button("Next Week →", key="tk_next_week", use_container_width=True):
-            st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
-            st.rerun()
+    with st.container(border=True):
+        st.markdown('<span class="ips-time-header-anchor"></span>', unsafe_allow_html=True)
+        h1, h2, h3 = st.columns([2.5, 2.7, 1.7], gap="medium")
+        with h1:
+            st.markdown(
+                '<div class="ips-time-header-inner">'
+                '<div class="ips-time-header-icon">◷</div>'
+                '<div><p class="ips-time-title">Timekeeping</p>'
+                '<p class="ips-time-subtitle">View and edit employee weekly time entries.</p></div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with h2:
+            n1, n2, n3 = st.columns(3, gap="small")
+            with n1:
+                if st.button("‹  Previous Week", key="tk_prev_week", use_container_width=True):
+                    st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
+                    st.rerun()
+            with n2:
+                if st.button("▣  Current Week", key="tk_current_week", use_container_width=True):
+                    st.session_state[_WEEK_KEY] = week_start()
+                    st.rerun()
+            with n3:
+                if st.button("Next Week  ›", key="tk_next_week", use_container_width=True):
+                    st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
+                    st.rerun()
+        with h3:
+            st.markdown(
+                f'<p class="ips-time-week-label">▣ {html.escape(fmt_date(ws))} – {html.escape(fmt_date(we))}</p>'
+                f'<p class="ips-time-week-sub">Week {ws.isocalendar()[1]}</p>',
+                unsafe_allow_html=True,
+            )
 
     summaries = load_timekeeping_summaries(ws)
     departments = sorted({str(s.get("department") or "") for s in summaries if s.get("department")})
 
-    def _filters() -> None:
-        c1, c2, c3 = st.columns([2, 1, 0.6])
-        with c1:
-            st.text_input("Search", placeholder="Search employee…", key="tk_search", label_visibility="collapsed")
-        with c2:
-            st.selectbox("Department", ["All Departments", *departments], key="tk_dept", label_visibility="collapsed")
-        with c3:
-            st.button("Export", key="tk_export", use_container_width=True)
+    with st.container(border=True):
+        st.markdown('<span class="ips-time-filter-anchor"></span>', unsafe_allow_html=True)
 
-    layout_filter_bar(_filters)
+        def _filters() -> None:
+            c1, c2, c3 = st.columns([2, 1, 0.75])
+            with c1:
+                st.text_input("Search", placeholder="Search employee…", key="tk_search", label_visibility="collapsed")
+            with c2:
+                st.selectbox("Department", ["All Departments", *departments], key="tk_dept", label_visibility="collapsed")
+            with c3:
+                st.button("⇩ Export", key="tk_export", use_container_width=True)
+
+        layout_filter_bar(_filters)
 
     q = str(st.session_state.get("tk_search") or "").strip().lower()
     dept = str(st.session_state.get("tk_dept") or "All Departments")
@@ -550,45 +575,14 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field in ("st_total", "ot_total"):
-            return html.escape(fmt_hours(row.get(field)))
-        if field == "total_hours":
-            t = float(row.get("st_total") or 0) + float(row.get("ot_total") or 0) + float(row.get("dt_total") or 0)
-            return html.escape(fmt_hours(t))
-        return html.escape(str(row.get(field) or "—"))
+    if filtered and not selected_id and not st.session_state.get(_COLLAPSED_KEY):
+        selected_id = str(filtered[0].get("id") or "")
+        st.session_state[_SEL] = selected_id
 
-    def _plain_cell(field: str, row: dict) -> str:
-        if field in ("st_total", "ot_total"):
-            return fmt_hours(row.get(field))
-        if field == "total_hours":
-            t = float(row.get("st_total") or 0) + float(row.get("ot_total") or 0) + float(row.get("dt_total") or 0)
-            return fmt_hours(t)
-        if field == "week_start":
-            return fmt_date(row.get(field))
-        return str(row.get(field) or "—")
+    _render_timekeeping_table(filtered, selected_id=selected_id, week_start_d=ws)
 
-    sel = render_clickable_table(
-        filtered,
-        [
-            ("name", "EMPLOYEE"),
-            ("department", "DEPARTMENT"),
-            ("week_start", "WEEK START"),
-            ("st_total", "S/T TOTAL (HRS)"),
-            ("ot_total", "O/T TOTAL (HRS)"),
-            ("total_hours", "TOTAL HOURS"),
-            ("status", "STATUS"),
-        ],
-        "timekeeping_list",
-        row_id_key="id",
-        session_select_key=_SEL,
-        selected_id=selected_id or None,
-        plain_cell=_plain_cell,
-    )
-
-    if sel:
-        emp = next((s for s in filtered if str(s.get("id")) == sel), None)
+    sel = str(st.session_state.get(_SEL) or "")
+    if sel and not st.session_state.get(_COLLAPSED_KEY):
+        emp = next((s for s in summaries if str(s.get("id")) == sel), None)
         if emp:
             _render_weekly_detail(emp, ws)
