@@ -5,6 +5,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
+try:
+    from app.utils.dates import week_dates
+except ImportError:
+    from utils.dates import week_dates  # type: ignore
+
 _DEMO_JOBS: list[dict[str, Any]] = [
     {
         "id": "demo-j26047",
