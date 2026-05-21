@@ -221,21 +221,39 @@ def build_coastal_metrics(
     m.active_jobs = active
     m.jobs_trend = _trend(float(active), float(active_prev))
 
-    open_est = sum(
-        1
-        for e in estimates or []
-        if isinstance(e, dict) and (is_pending_estimate(e) or norm_status(e.get("status")) in ("draft", "open", "pending", ""))
-    )
+    open_est = 0
+    open_est_prev = 0
+    for e in estimates or []:
+        if not isinstance(e, dict):
+            continue
+        if not (
+            is_pending_estimate(e)
+            or norm_status(e.get("status")) in ("draft", "open", "pending", "")
+        ):
+            continue
+        open_est += 1
+        ts_raw = row_ts(e)
+        ts = safe_date(ts_raw[:10] if ts_raw else e.get("created_at"))
+        if ts and in_range(ts, prev_start, prev_end):
+            open_est_prev += 1
     m.open_estimates = open_est
-    m.estimates_trend = _trend(float(open_est), float(max(0, open_est - 1)))
+    m.estimates_trend = _trend(float(open_est), float(open_est_prev))
 
     # --- Inventory value ---
-    inv_val = sum(_inventory_line_value(r) for r in (inv_rows or []) if isinstance(r, dict))
-    if inv_rows:
-        active_rows = [r for r in inv_rows if isinstance(r, dict) and r.get("is_active", True) is not False]
-        inv_val = sum(_inventory_line_value(r) for r in active_rows)
+    active_rows = [
+        r
+        for r in (inv_rows or [])
+        if isinstance(r, dict) and r.get("is_active", True) is not False
+    ]
+    inv_val = sum(_inventory_line_value(r) for r in active_rows)
+    active_prev_rows = [
+        r for r in active_rows if in_range(safe_date(row_ts(r)[:10]), prev_start, prev_end)
+    ]
+    inv_prev = sum(_inventory_line_value(r) for r in active_prev_rows)
     m.inventory_value = inv_val
-    m.inventory_trend = _trend(inv_val, inv_val * 0.98)
+    m.inventory_trend = (
+        _trend(inv_val, inv_prev) if active_prev_rows else TrendDelta(0, None, "flat")
+    )
 
     # --- Job status donut ---
     status_counts: dict[str, int] = {

@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from . import calculations as calc
 from . import queries as q
 
 try:
@@ -131,70 +130,3 @@ def load_task_progress_tables(
     }
 
 
-def build_kpi_specs(tables: DashboardTables, ctx: DashboardContext) -> list[dict]:
-    open_todos, overdue_todos = calc.todo_open_overdue_counts(tables.todos, today=ctx.today)
-    low_n = calc.count_low_stock(tables.inv_rows)
-    specs: list[dict] = [
-        {
-            "label": "Active Jobs",
-            "value": f"{calc.count_active_jobs(tables.jobs):,}",
-            "key": "jobs",
-            "nav_page": "Job Database",
-        },
-        {
-            "label": "Draft Estimates",
-            "value": f"{calc.count_draft_estimates(tables.estimates):,}",
-            "key": "draft_est",
-            "nav_page": "Estimates",
-        },
-        {
-            "label": "Awarded (month)",
-            "value": f"{calc.count_awarded_jobs_this_month(tables.jobs, today=ctx.today):,}",
-            "key": "awarded",
-            "nav_page": "Job Database",
-        },
-        {
-            "label": "Open Tasks",
-            "value": f"{calc.count_open_job_tasks(tables.job_tasks):,}",
-            "key": "tasks",
-            "nav_page": "Assign Tasks (PM)",
-        },
-        {"label": "Overdue Tasks", "value": f"{overdue_todos:,}", "key": "od_todo"},
-        {"label": "Low Stock", "value": f"{low_n:,}", "key": "low", "nav_page": "Inventory"},
-        {
-            "label": "Labor Hrs Today",
-            "value": f"{calc.labor_hours_for_date(tables.time_entries, work_date=ctx.today.isoformat()):.1f}",
-            "key": "labor",
-            "nav_page": "Time Tracking",
-        },
-    ]
-    if role_can_open_page(ctx.role, "PO / Expenses"):
-        specs.append(
-            {
-                "label": "Pending POs",
-                "value": f"{calc.count_pending_pos(tables.po_rows):,}",
-                "key": "po",
-                "nav_page": "PO / Expenses",
-            }
-        )
-    if role_can_open_page(ctx.role, "Company Updates"):
-        specs.append(
-            {
-                "label": "Unread Updates",
-                "value": f"{calc.count_unread_company_updates(tables.company_updates, tables.company_update_reads, user_id=ctx.user_id):,}",
-                "key": "cu",
-                "nav_page": "Company Updates",
-            }
-        )
-    return specs
-
-
-def dashboard_has_any_data(tables: DashboardTables) -> bool:
-    return bool(
-        tables.jobs
-        or tables.estimates
-        or tables.employees
-        or tables.assets
-        or tables.inv_rows
-        or tables.todos
-    )
