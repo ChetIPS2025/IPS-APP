@@ -120,7 +120,7 @@ def render_clickable_table(
         label = _row_label(rec, columns)
         with st.container():
             st.markdown(
-                '<span class="ips-clean-row-wrap" aria-hidden="true"></span>',
+                '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             st.markdown(

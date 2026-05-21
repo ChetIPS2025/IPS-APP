@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v2"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v3"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -30,6 +30,7 @@ TABLE_SCOPE_SELECTORS = (
 
 # Per-row Streamlit host markers
 ROW_WRAP_SELECTORS = (
+    ".ips-clean-row-host",
     ".ips-clean-row-wrap",
     ".job-row-wrap",
     ".ips-est-list-row-wrap",
@@ -83,6 +84,7 @@ ROW_SELECTED_SELECTORS = (
 )
 
 HIDDEN_MARKERS = (
+    ".ips-clean-row-host",
     ".ips-clean-row-wrap",
     ".ips-clean-row-select-btn",
     ".ips-clean-actions",
@@ -109,8 +111,29 @@ def _css_join(selectors: tuple[str, ...]) -> str:
     return ",\n".join(selectors)
 
 
+# Page-level markers: row-host CSS must not match the main column root (which
+# contains every row wrap as a descendant — that made non-dashboard pages blank).
+_PAGE_ROOT_MARKERS = (
+    ".ips-page-content",
+    ".ips-page-shell-marker",
+    ".ips-page-header",
+    ".ips-kpi-grid",
+    ".ips-filter-bar",
+    ".ips-data-table-wrap",
+    ".ips-data-table-header",
+)
+
+
+def _vb_row_wrap_excludes() -> str:
+    return "".join(f":not(:has({m}))" for m in _PAGE_ROOT_MARKERS)
+
+
 def _vb_has_row_wrap() -> str:
-    parts = [f'div[data-testid="stVerticalBlock"]:has({s})' for s in ROW_WRAP_SELECTORS]
+    ex = _vb_row_wrap_excludes()
+    parts = [
+        f'div[data-testid="stVerticalBlock"]:has({s}){ex}'
+        for s in ROW_WRAP_SELECTORS
+    ]
     return _css_join(tuple(parts))
 
 
