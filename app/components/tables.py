@@ -27,6 +27,31 @@ def _cell_content(
     return html.escape(str(val)) if val is not None and str(val).strip() else "—"
 
 
+def _index_clickable_rows(
+    records: list[dict[str, Any]],
+    row_id_key: str,
+) -> tuple[dict[str, dict[str, Any]], list[str], list[tuple[int, str, dict[str, Any]]]]:
+    """
+    Build row index for clickable tables.
+
+    Returns ``(records_by_id, id_order, row_entries)`` where ``row_entries`` is
+    ``(row_index, canonical_id, record)``. Canonical ids are stripped; the first
+    record wins when ids collide after strip. ``row_index`` keeps Streamlit keys unique.
+    """
+    records_by_id: dict[str, dict[str, Any]] = {}
+    id_order: list[str] = []
+    row_entries: list[tuple[int, str, dict[str, Any]]] = []
+    for idx, rec in enumerate(records):
+        rid = str(rec.get(row_id_key) or "").strip()
+        if not rid:
+            continue
+        row_entries.append((idx, rid, rec))
+        if rid not in records_by_id:
+            records_by_id[rid] = rec
+            id_order.append(rid)
+    return records_by_id, id_order, row_entries
+
+
 def _row_label(row: dict[str, Any], columns: list[tuple[str, str]]) -> str:
     if not columns:
         return "row"
@@ -107,10 +132,7 @@ def render_clickable_table(
         unsafe_allow_html=True,
     )
 
-    for rec in records:
-        rid = str(rec.get(row_id_key) or "").strip()
-        if not rid:
-            continue
+    for row_idx, rid, rec in row_entries:
         sel = " selected" if rid and rid == active_id else ""
         rid_attr = html.escape(rid, quote=True)
         cells = "".join(
@@ -134,7 +156,7 @@ def render_clickable_table(
             )
             if st.button(
                 " ",
-                key=f"{key}_row_sel_{rid}",
+                key=f"{key}_row_sel_{row_idx}",
                 help=f"Select {label}",
             ):
                 apply_clean_table_row_selection(

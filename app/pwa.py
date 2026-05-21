@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -45,6 +46,12 @@ def _start_url() -> str:
     return f"{base}/" if base else "/"
 
 
+def _manifest_id() -> str:
+    """Stable PWA manifest id tied to :data:`APP_VERSION` (incl. ``IPS_APP_VERSION`` env)."""
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "-", str(APP_VERSION or "0").strip()) or "0"
+    return f"ips-operations-platform-{safe}"
+
+
 def build_web_manifest() -> dict[str, str | list[dict[str, str]]]:
     """
     Web app manifest with ``start_url`` / ``scope`` aligned to ``server.baseUrlPath``.
@@ -55,7 +62,7 @@ def build_web_manifest() -> dict[str, str | list[dict[str, str]]]:
     """
     start = _start_url()
     return {
-        "id": "ips-operations-platform-v2.5.0",
+        "id": _manifest_id(),
         "name": _APP_NAME,
         "short_name": "IPS",
         "description": "Industrial Plant Solutions operations platform",
