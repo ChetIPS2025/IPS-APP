@@ -11,6 +11,7 @@ Public API
 inject_job_database_root_canvas()
 inject_modern_jobs_css()
 render_jobs_table(df_display, job_num_col, can_edit, jobs, admin_read, customer_name_by_id)
+open_job_detail_dialog(job_id) / show_job_detail_dialog_if_pending()
 render_job_detail_panel(job_row, can_edit, admin_read, on_view, on_edit, on_collapse)
 render_job_overview_tab(job_row)
 render_job_summary_cards(job_row)
@@ -32,6 +33,92 @@ try:
     from table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS
 except ImportError:
     from app.table_actions import IPS_PENDING_DELETE, TABLE_KEY_JOBS  # type: ignore
+
+JOB_DB_DETAIL_DIALOG_KEY = "job_db_detail_dialog_job_id"
+JOB_DB_TABLE_BY_ID_KEY = "job_db_table_jobs_by_id"
+
+
+def _clear_job_db_detail_dialog() -> None:
+    st.session_state.pop(JOB_DB_DETAIL_DIALOG_KEY, None)
+
+
+def set_job_db_dialog_context(
+    *,
+    jobs: list[dict[str, Any]],
+    can_edit: bool,
+    admin_read: bool = False,
+) -> None:
+    """Cache job rows for the detail dialog (table + card layouts)."""
+    st.session_state[JOB_DB_TABLE_BY_ID_KEY] = {
+        str(j.get("id") or ""): j for j in jobs if j.get("id")
+    }
+    st.session_state["_job_db_dialog_can_edit"] = can_edit
+    st.session_state["_job_db_dialog_admin_read"] = admin_read
+
+
+def open_job_detail_dialog(job_id: str) -> None:
+    """Select a job row and open the detail dialog on the next rerun."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    st.session_state["selected_job_id"] = jid
+    st.session_state[JOB_DB_DETAIL_DIALOG_KEY] = jid
+
+
+def show_job_detail_dialog_if_pending() -> None:
+    """Open the job detail dialog when ``JOB_DB_DETAIL_DIALOG_KEY`` is set."""
+    if str(st.session_state.get(JOB_DB_DETAIL_DIALOG_KEY) or "").strip():
+        show_job_detail_dialog()
+
+
+@st.dialog("Job Details", width="large", on_dismiss=_clear_job_db_detail_dialog)
+def show_job_detail_dialog() -> None:
+    by_id = st.session_state.get(JOB_DB_TABLE_BY_ID_KEY)
+    if not isinstance(by_id, dict):
+        by_id = {}
+    jid = str(st.session_state.get(JOB_DB_DETAIL_DIALOG_KEY) or "").strip()
+    job_row = by_id.get(jid) if jid else None
+    if not job_row:
+        st.warning("That job could not be loaded.")
+        if st.button("Close", key="job_dlg_missing_close"):
+            _clear_job_db_detail_dialog()
+            st.rerun()
+        return
+
+    can_edit = bool(st.session_state.get("_job_db_dialog_can_edit"))
+    admin_read = bool(st.session_state.get("_job_db_dialog_admin_read"))
+
+    def _goto_full_view() -> None:
+        st.session_state.update({"job_view_mode": "view", "selected_job_id": jid})
+        st.session_state.pop("job_mode", None)
+        st.session_state.pop("job_edit_id", None)
+        _clear_job_db_detail_dialog()
+        st.rerun()
+
+    def _goto_edit() -> None:
+        st.session_state.update({
+            "job_view_mode": "edit",
+            "selected_job_id": jid,
+            "job_mode": "edit",
+            "job_edit_id": jid,
+        })
+        st.session_state.pop("job_number_manual_input", None)
+        _clear_job_db_detail_dialog()
+        st.rerun()
+
+    def _close() -> None:
+        st.session_state.pop("selected_job_id", None)
+        _clear_job_db_detail_dialog()
+        st.rerun()
+
+    render_job_detail_panel(
+        job_row=job_row,
+        can_edit=can_edit,
+        admin_read=admin_read,
+        on_view=_goto_full_view,
+        on_edit=_goto_edit,
+        on_collapse=_close,
+    )
 
 _CSS_KEY = "jdb_modern_v19"
 
@@ -843,8 +930,8 @@ def render_job_detail_panel(
                              type="primary", use_container_width=True):
                     on_view()
             with b3:
-                if st.button("∧", key=f"jpan_close_{jid}",
-                             use_container_width=True, help="Collapse"):
+                if st.button("✕", key=f"jpan_close_{jid}",
+                             use_container_width=True, help="Close"):
                     on_collapse()
 
         st.divider()
@@ -987,7 +1074,7 @@ def render_job_row(
     st.markdown('<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
     a1, a2 = st.columns(2, gap="small")
     with a1:
-        if st.button("👁", key=f"jrow_view_{jid}", help="View full job details"):
+        if st.button("👁", key=f"jrow_view_{jid}", help="View job details"):
             on_view()
     with a2:
         if st.button(
@@ -1013,10 +1100,9 @@ def render_jobs_table(
     inject_modern_jobs_css()
 
     by_id: dict[str, dict[str, Any]] = {
-        str(j.get("id") or ""): j for j in jobs if j.get("id")
+        str(j.get("id") or ""): dict(j) for j in jobs if j.get("id")
     }
     sel = str(st.session_state.get("selected_job_id") or "").strip()
-    panel_row: dict[str, Any] | None = None
 
     with st.container(border=True):
         # Marker on the outer card — used by CSS to scope all inner selectors
@@ -1044,17 +1130,13 @@ def render_jobs_table(
             if not jid:
                 continue
             full_row = _merge_job_row(by_id.get(jid, {}), row, customer_name_by_id)
+            by_id[jid] = full_row
             is_selected = jid == sel
 
             # ── Per-row container — REQUIRED for CSS :has() to work per row ──
             with st.container():
-                def _open_view(j=jid):
-                    st.session_state.update({
-                        "job_view_mode":   "view",
-                        "selected_job_id": j,
-                    })
-                    st.session_state.pop("job_mode", None)
-                    st.session_state.pop("job_edit_id", None)
+                def _open_dialog(j=jid):
+                    open_job_detail_dialog(j)
                     st.rerun()
 
                 def _del(j=jid):
@@ -1068,11 +1150,8 @@ def render_jobs_table(
                 render_job_row(
                     row=row, full_row=full_row, job_num_col=job_num_col,
                     can_edit=can_edit, is_selected=is_selected,
-                    on_view=_open_view, on_delete=_del,
+                    on_view=_open_dialog, on_delete=_del,
                 )
-
-            if is_selected:
-                panel_row = full_row
 
         picked = render_clean_table_click_bridge(
             table_selector=".jdb-tbl-host",
@@ -1082,39 +1161,10 @@ def render_jobs_table(
         if picked:
             pid = str(picked).strip()
             if pid:
-                st.session_state["selected_job_id"] = pid
-                st.session_state["job_view_mode"] = "list"
-                st.session_state.pop("job_mode", None)
-                st.session_state.pop("job_edit_id", None)
+                open_job_detail_dialog(pid)
                 st.rerun()
-    if sel and not panel_row:
-        panel_row = by_id.get(sel)
-    if sel and panel_row:
-        def _pv():
-            st.session_state.update({"job_view_mode": "view", "selected_job_id": sel})
-            st.session_state.pop("job_mode", None)
-            st.session_state.pop("job_edit_id", None)
-            st.rerun()
 
-        def _pe():
-            st.session_state.update({
-                "job_view_mode": "edit",
-                "selected_job_id": sel,
-                "job_mode": "edit",
-                "job_edit_id": sel,
-            })
-            st.session_state.pop("job_number_manual_input", None)
-            st.rerun()
-
-        def _pc():
-            st.session_state["selected_job_id"] = None
-            st.rerun()
-
-        render_job_detail_panel(
-            job_row=panel_row,
-            can_edit=can_edit,
-            admin_read=admin_read,
-            on_view=_pv,
-            on_edit=_pe,
-            on_collapse=_pc,
-        )
+    st.session_state[JOB_DB_TABLE_BY_ID_KEY] = by_id
+    st.session_state["_job_db_dialog_can_edit"] = can_edit
+    st.session_state["_job_db_dialog_admin_read"] = admin_read
+    show_job_detail_dialog_if_pending()

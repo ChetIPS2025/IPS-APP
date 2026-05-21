@@ -2131,10 +2131,7 @@ def _render_job_card_list(
                     use_container_width=True,
                 ):
                     clear_selected_ids(TABLE_KEY_JOBS)
-                    st.session_state["job_view_mode"] = "view"
-                    st.session_state["selected_job_id"] = jid
-                    st.session_state.pop("job_mode", None)
-                    st.session_state.pop("job_edit_id", None)
+                    _jmod.open_job_detail_dialog(jid)
                     st.rerun()
             with b2:
                 if st.button(
@@ -2679,11 +2676,15 @@ def render() -> None:
                     )
                 else:
                     clear_selected_ids(TABLE_KEY_JOBS)
+                    _jmod.set_job_db_dialog_context(
+                        jobs=jobs, can_edit=can_edit, admin_read=admin_read
+                    )
                     _render_job_card_list(
                         df_display=df_display,
                         job_num_col=job_num_col,
                         can_edit=can_edit,
                     )
+                    _jmod.show_job_detail_dialog_if_pending()
 
             pend = st.session_state.get(IPS_PENDING_DELETE) or {}
             if isinstance(pend, dict) and pend.get(TABLE_KEY_JOBS):
