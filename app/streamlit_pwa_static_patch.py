@@ -76,6 +76,11 @@ def _pwa_tornado_route_tuple(main_script_path: str, base: str | None) -> tuple[A
                 raise tornado.web.HTTPError(404)
 
             self.set_header("Content-Type", _MEDIA_TYPES[pwa_name])
+            if pwa_name == "sw.js":
+                self.set_header("Service-Worker-Allowed", "/")
+                self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            elif pwa_name == "manifest.json":
+                self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
             with open(full, "rb") as f:
                 self.write(f.read())
 
@@ -202,6 +207,11 @@ def _create_pwa_static_routes(main_script_path: str | None, base_url: str | None
         response = FileResponse(safe_path, media_type=media_type)
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if name == "sw.js":
+            response.headers["Service-Worker-Allowed"] = "/"
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        elif name == "manifest.json":
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return response
 
     async def _pwa_static_options(_request: Request) -> Response:

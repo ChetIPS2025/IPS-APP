@@ -196,12 +196,12 @@ def _inject_task_card_row_css() -> None:
             font-size: 1.02rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="secondary"] {
-            background-color: #f3f4f6 !important;
+            background-color: #ffffff !important;
             color: #111827 !important;
-            border: 1px solid #d1d5db !important;
+            border: 1px solid #E5EAF2 !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="secondary"]:hover {
-            background-color: #e5e7eb !important;
+            background-color: #F8FAFC !important;
             border-color: #9ca3af !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jdt-task-card) button[kind="primary"] {
@@ -359,7 +359,7 @@ def _inject_jdt_task_ref_pdf_css() -> None:
             object-fit: contain;
             border-radius: 10px;
             border: 1px solid #d1d5db;
-            background: #f9fafb;
+            background: #ffffff;
             box-sizing: border-box;
         }
         </style>

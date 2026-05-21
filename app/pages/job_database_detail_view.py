@@ -471,6 +471,26 @@ def render_job_database_detail_view_page(
                 else:
                     st.link_button(f"Download / open {ext or 'file'}", url, use_container_width=True)
 
+    try:
+        from app.ui.field_components import render_job_photos_panel, render_job_timeline_panel
+    except ImportError:
+        from ui.field_components import render_job_photos_panel, render_job_timeline_panel  # type: ignore
+
+    render_job_timeline_panel(job_id=jid, admin_read=admin_read)
+    render_job_photos_panel(job_id=jid, admin_read=admin_read, compact=True)
+
+    try:
+        from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+    except ImportError:
+        from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
+
+    render_daily_reports_for_job(
+        job_id=jid,
+        job_label=job_row_select_label(job_row),
+        admin_read=admin_read,
+        show_title=True,
+    )
+
     with st.expander("Activity snapshot (from tasks)", expanded=False):
         dated: list[tuple[str, str]] = []
         for t in tasks:

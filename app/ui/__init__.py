@@ -55,7 +55,7 @@ _PAGE_BY_ROUTE_SLUG: dict[str, str] = {v: k for k, v in _ROUTE_SLUG_BY_PAGE.item
 
 # ---- Sidebar structure (simple, field + office friendly) ----
 # Keep routes separate from sidebar visibility so deep links / pending-nav still work.
-_NAV_PRIMARY: tuple[str, ...] = ("Dashboard", "Company Updates")
+_NAV_PRIMARY: tuple[str, ...] = ("Dashboard", "Field Dashboard", "Company Updates")
 
 # Jobs (routable; sidebar layout is built in ``_render_sidebar_office``).
 _NAV_ASSETS_EXPANDER_PAGES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
@@ -80,6 +80,8 @@ _NAV_HIDDEN_ROUTES: tuple[str, ...] = (
 # All keys that may appear in the sidebar or session for routing validation.
 _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Job Database",
+    "Daily Reports",
+    "Crew Time",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
@@ -99,6 +101,8 @@ _NAV_INVENTORY_SUBPAGES: tuple[str, ...] = ("Scan Inventory", "Inventory Usage")
 # Sidebar expander membership (session page keys are unchanged).
 _NAV_JOBS_SIDEBAR_PAGES: tuple[str, ...] = (
     "Job Database",
+    "Daily Reports",
+    "Crew Time",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Job Costing",
@@ -132,13 +136,19 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Customers",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
+            "Field Dashboard",
+            "Daily Reports",
+            "Crew Time",
         }
     ),
     "manager": frozenset(
         {
             "Dashboard",
+            "Field Dashboard",
             "Company Updates",
             "Job Database",
+            "Daily Reports",
+            "Crew Time",
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
             "Estimates",
@@ -155,7 +165,10 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
     "employee": frozenset(
         {
             "Dashboard",
+            "Field Dashboard",
             "Company Updates",
+            "Daily Reports",
+            "Crew Time",
             "Work & Plan (Supervisor)",
             "Time Tracking",
             "Asset Database",
@@ -242,7 +255,7 @@ def apply_pending_navigation() -> None:
     if pending == "Daily Tasks":
         pending = "Work & Plan (Supervisor)"
     if pending in ("Supervisor Daily Reports", "Daily crew report"):
-        pending = "Work & Plan (Supervisor)"
+        pending = "Daily Reports"
     if not pending:
         return
     st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
@@ -284,18 +297,19 @@ def _inject_sidebar_nav_css() -> None:
     st.sidebar.markdown(
         """
 <style>
-/* --- Sidebar: slightly darker than main (#d1d5db), high-contrast ink --- */
+/* --- Sidebar: white panel (canvas from theme.apply_global_app_styles) --- */
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"] > div,
 [data-testid="stSidebar"] {
-  background-color: #b0bac7 !important;
-  background: #b0bac7 !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-right: 1px solid #E5EAF2 !important;
   color: #0f172a !important;
   max-width: 14rem !important;
   min-width: 13rem !important;
 }
 section[data-testid="stSidebar"] .block-container {
-  background: transparent !important;
+  background: #ffffff !important;
   padding-top: 0.25rem !important;
   padding-bottom: 0.3rem !important;
   padding-left: 0.4rem !important;
@@ -342,7 +356,7 @@ section[data-testid="stSidebar"] .ips-nav-section-title {
 section[data-testid="stSidebar"] .ips-nav-group-spaced {
   margin-top: 6px !important;
   padding-top: 6px !important;
-  border-top: 1px solid #94a3b8 !important;
+  border-top: 1px solid #E5EAF2 !important;
 }
 section[data-testid="stSidebar"] .ips-nav-expander-hint {
   color: #1e293b !important;
@@ -357,7 +371,7 @@ section[data-testid="stSidebar"] .ips-nav-primary-secondary-divider {
   margin: 16px 0 10px 0;
   padding: 0;
   border: none;
-  border-top: 1px solid #94a3b8 !important;
+  border-top: 1px solid #E5EAF2 !important;
   box-shadow: none !important;
   opacity: 1;
 }
@@ -372,16 +386,16 @@ section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-s
   border-radius: 8px !important;
   line-height: 1.2 !important;
   box-sizing: border-box !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
 }
 section[data-testid="stSidebar"] div.stButton > button:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover:not(:disabled),
 section[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-secondary"]:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div.stButton > button p {
@@ -399,13 +413,13 @@ section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButt
   padding: 0.28rem 0.5rem !important;
   border-radius: 8px !important;
   box-sizing: border-box !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] div.stButton > button:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 /* Active page: blue highlight */
@@ -430,9 +444,9 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
 }
 /* TOOLS expander */
 section[data-testid="stSidebar"] [data-testid="stExpander"] details {
-  border: 1px solid #94a3b8 !important;
+  border: 1px solid #E5EAF2 !important;
   border-radius: 6px !important;
-  background: #d8dee8 !important;
+  background: #FFFFFF !important;
   margin-top: 1px !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
@@ -451,7 +465,7 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpa
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
   padding: 2px 6px 8px 6px !important;
-  background: transparent !important;
+  background: #ffffff !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[data-testid="baseButton-secondary"] {
@@ -460,15 +474,15 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > butto
   min-height: 2.1rem !important;
   padding: 0.26rem 0.45rem !important;
   border-radius: 8px !important;
-  background: #e5e7eb !important;
-  border: 1px solid #9ca3af !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E5EAF2 !important;
   color: #111827 !important;
   box-shadow: none !important;
   opacity: 1 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="secondary"]:hover:not(:disabled) {
-  background: #d1d5db !important;
-  border-color: #6b7280 !important;
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
   color: #111827 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stExpander"] div.stButton > button[kind="primary"],
@@ -540,7 +554,7 @@ def _ensure_valid_nav_page() -> None:
     elif cur0 == "Daily Tasks":
         st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
     elif cur0 in ("Supervisor Daily Reports", "Daily crew report"):
-        st.session_state[IPS_NAV_PAGE_KEY] = "Work & Plan (Supervisor)"
+        st.session_state[IPS_NAV_PAGE_KEY] = "Daily Reports"
 
     if st.session_state.get(IPS_NAV_PAGE_KEY) != cur0:
         st.session_state.pop(IPS_ROUTE_SLUG_KEY, None)
@@ -706,8 +720,7 @@ def _render_sidebar_office(*, role: str) -> None:
                     unsafe_allow_html=True,
                 )
                 if role_can_open_page(role, "Estimates"):
-                    cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
-                    active = cur == "Estimates"
+                    active = nav_page == "Estimates"
                     if st.button(
                         "Estimates",
                         key=_nav_btn_key("Estimates__est_exp"),
@@ -719,7 +732,7 @@ def _render_sidebar_office(*, role: str) -> None:
                     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
                     active = cur == "Estimate Materials"
                     if st.button(
-                        "Estimate Materials",
+                        "Materials",
                         key=_nav_btn_key("Estimate_Materials__est_exp"),
                         type="primary" if active else "secondary",
                         use_container_width=True,
@@ -854,6 +867,17 @@ def _render_sidebar_viewer(*, role: str) -> None:
 
 def render_sidebar() -> str:
     _sidebar_brand()
+    nav_early = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "Dashboard")
+    if nav_early == "Dashboard":
+        try:
+            from app.pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header
+        except ImportError:
+            try:
+                from pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header  # type: ignore
+            except ImportError:
+                inject_coastal_sidebar_header = None  # type: ignore
+        if inject_coastal_sidebar_header:
+            inject_coastal_sidebar_header()
 
     render_install_app_sidebar_block()
 
