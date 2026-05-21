@@ -47,6 +47,13 @@ _JOB_TABS = [
 ]
 
 
+def _clear_jobs_filters() -> None:
+    """Reset filter widgets (must run via button ``on_click``, not after widgets render)."""
+    st.session_state["jobs_search"] = ""
+    st.session_state["jobs_filter_status"] = "All Statuses"
+    st.session_state["jobs_filter_customer"] = "All Customers"
+
+
 def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> list[dict]:
     out = rows
     if q:
@@ -246,11 +253,12 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c5:
-            if st.button("Clear", key="jobs_clear_filters", use_container_width=True):
-                st.session_state["jobs_search"] = ""
-                st.session_state["jobs_filter_status"] = "All Statuses"
-                st.session_state["jobs_filter_customer"] = "All Customers"
-                st.rerun()
+            st.button(
+                "Clear",
+                key="jobs_clear_filters",
+                use_container_width=True,
+                on_click=_clear_jobs_filters,
+            )
 
     layout_filter_bar(_filters)
 
