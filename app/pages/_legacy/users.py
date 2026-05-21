@@ -703,6 +703,18 @@ def _render_users_table(filtered: list[dict[str, Any]]) -> None:
                     unsafe_allow_html=True,
                 )
                 st.markdown(
+                    '<span class="usr-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    " ",
+                    key=f"users_row_click_{uid}",
+                    help=f"Select {name}",
+                ):
+                    st.session_state["users_selected_id"] = uid
+                    st.session_state.pop("users_detail_collapsed", None)
+                    st.rerun()
+                st.markdown(
                     '<span class="usr-actcol ips-clean-actions" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
@@ -1099,9 +1111,13 @@ def render() -> None:
             st.selectbox("Department", ["All Departments"] + depts, key="users_dept_f", label_visibility="collapsed")
         with f5:
             st.markdown('<div style="height:1.55rem"></div>', unsafe_allow_html=True)
-            if st.button("Clear Filters", key="users_clear_filters", use_container_width=True, type="secondary"):
-                _clear_users_filters()
-                st.rerun()
+            st.button(
+                "Clear Filters",
+                key="users_clear_filters",
+                use_container_width=True,
+                type="secondary",
+                on_click=_clear_users_filters,
+            )
 
     filtered = _filter_rows(rows)
 

@@ -510,6 +510,47 @@ div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
     position: relative !important;
     z-index: 0 !important;
 }
+/* Full-row invisible select button (Streamlit widget — reliable vs html bridge) */
+section[data-testid="stMain"]:has(.ips-job-db-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+> [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) {
+    position: absolute !important;
+    inset: 0 !important;
+    right: 96px !important;
+    z-index: 2 !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+section[data-testid="stMain"]:has(.ips-job-db-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+> [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) .stButton,
+section[data-testid="stMain"]:has(.ips-job-db-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
+div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
+> [data-testid="stElementContainer"]:has(.jdb-row-select-btn)
++ [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+}
 section[data-testid="stMain"]:has(.ips-job-db-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-tbl-host)
 div[data-testid="stVerticalBlock"]:has(.job-row-wrap):not(:has(.jdb-tbl-host))
@@ -763,7 +804,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.jdb-panel-host)
 
 /* hide helper markers */
 .jdb-tbl-host, .jdb-tbody-anchor, .jdb-panel-host, .jdb-panel-outer,
-.job-row-wrap, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
+.job-row-wrap, .jdb-row-select-btn, .jdb-row-actions, .jdb-click-bridge, .jdb-ph-btns {
     display: none !important;
     height: 0 !important;
     overflow: hidden !important;
@@ -1127,6 +1168,17 @@ def render_job_row(
         ),
         unsafe_allow_html=True,
     )
+
+    st.markdown(
+        '<span class="jdb-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        " ",
+        key=f"job_row_click_{jid}",
+        help=f"Select job {jnum}",
+    ):
+        on_view()
 
     st.markdown(
         '<span class="jdb-row-actions ips-clean-actions" aria-hidden="true"></span>',
