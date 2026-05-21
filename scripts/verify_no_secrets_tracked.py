@@ -20,6 +20,14 @@ FORBIDDEN_PATTERNS = (
     "service_account",
 )
 
+# Live credential markers (must not appear in staged/tracked secret files)
+_LIVE_SECRET_MARKERS = (
+    "sb_secret_",
+    "sb_publishable_",
+    "SUPABASE_SERVICE_ROLE_KEY = \"eyJ",
+    "SUPABASE_ANON_KEY = \"eyJ",
+)
+
 
 def _git_ls_files() -> list[str]:
     proc = subprocess.run(
@@ -33,6 +41,31 @@ def _git_ls_files() -> list[str]:
         print("verify_no_secrets_tracked: not a git repo or git unavailable", file=sys.stderr)
         return []
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _git_staged_files() -> list[str]:
+    proc = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _file_has_live_secrets(path: Path) -> list[str]:
+    hits: list[str] = []
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return hits
+    for marker in _LIVE_SECRET_MARKERS:
+        if marker in text:
+            hits.append(marker)
+    return hits
 
 
 def main() -> int:
@@ -58,6 +91,22 @@ def main() -> int:
     )
     if ignore_proc.returncode != 0:
         errors.append(".streamlit/secrets.toml is not listed in .gitignore")
+
+    for rel in _git_staged_files():
+        norm = rel.replace("\\", "/")
+        if norm.endswith("secrets.toml") and not norm.endswith(".example"):
+            errors.append(f"Staged secrets file must not be committed: {rel}")
+            path = ROOT / rel
+            if path.is_file():
+                for marker in _file_has_live_secrets(path):
+                    errors.append(f"  Staged {rel} contains live credential pattern: {marker}")
+
+    for path in FORBIDDEN_TRACKED:
+        full = ROOT / path
+        if full.is_file():
+            for marker in _file_has_live_secrets(full):
+                if path in tracked:
+                    errors.append(f"Tracked {path} contains live credential pattern: {marker}")
 
     if errors:
         print("Secrets safety check FAILED:", file=sys.stderr)
