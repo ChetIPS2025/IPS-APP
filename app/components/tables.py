@@ -3,41 +3,28 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any, Callable
 
-import pandas as pd
 import streamlit as st
 
 PlainCellFn = Callable[[str, dict[str, Any]], str]
+HtmlCellFn = Callable[[str, dict[str, Any]], str]
 
 
-def _selection_rows(state_key: str) -> list[int]:
-    raw = st.session_state.get(state_key)
-    if raw is None:
-        return []
-    if hasattr(raw, "selection") and raw.selection is not None:
-        return list(raw.selection.rows or [])
-    if isinstance(raw, dict):
-        sel = raw.get("selection") or {}
-        if isinstance(sel, dict):
-            return list(sel.get("rows") or [])
-    return []
-
-
-def _plain_value(
+def _cell_content(
     field: str,
     row: dict[str, Any],
     *,
     plain_cell: PlainCellFn | None,
-    html_cell: Callable[[str, dict[str, Any]], str] | None,
+    html_cell: HtmlCellFn | None,
 ) -> str:
-    if plain_cell:
-        return plain_cell(field, row)
     if html_cell:
-        raw = html_cell(field, row)
-        return html.unescape(str(raw).replace("<br>", " ").strip()) or "—"
+        return str(html_cell(field, row))
+    if plain_cell:
+        return html.escape(plain_cell(field, row))
     val = row.get(field)
-    return str(val) if val is not None and str(val).strip() else "—"
+    return html.escape(str(val)) if val is not None and str(val).strip() else "—"
 
 
 def render_clickable_table(
@@ -49,63 +36,93 @@ def render_clickable_table(
     session_select_key: str | None = None,
     selected_id: str | None = None,
     plain_cell: PlainCellFn | None = None,
-    html_cell: Callable[[str, dict[str, Any]], str] | None = None,
+    html_cell: HtmlCellFn | None = None,
     on_row_click: Callable[[str, dict[str, Any]], None] | None = None,
+    col_fr: list[str] | None = None,
 ) -> str | None:
     """
-    Native Streamlit table — click a row to select (no Select button, no checkboxes).
+    HTML grid table — click anywhere on a row to select (no checkboxes).
 
     Stores selected record id in ``session_select_key`` and returns it.
     """
+    try:
+        from app.ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge
+    except ImportError:
+        from ui.clean_table import inject_clean_table_css, render_clean_table_click_bridge  # type: ignore
+
+    inject_clean_table_css()
+
     sel_key = session_select_key or key
-    df_key = f"{key}_ips_df"
+    table_class = "ips-click-table-" + re.sub(r"[^a-zA-Z0-9_-]", "_", key)
 
     if not records:
         st.caption("No records to display.")
         st.session_state.pop(sel_key, None)
         return None
 
-    id_by_index: list[str] = []
-    rows_out: list[dict[str, str]] = []
+    records_by_id: dict[str, dict[str, Any]] = {}
+    id_order: list[str] = []
     for rec in records:
-        rid = str(rec.get(row_id_key) or "")
-        id_by_index.append(rid)
-        row_display: dict[str, str] = {}
-        for field, header in columns:
-            row_display[header] = _plain_value(
-                field, rec, plain_cell=plain_cell, html_cell=html_cell
-            )
-        rows_out.append(row_display)
+        rid = str(rec.get(row_id_key) or "").strip()
+        id_order.append(rid)
+        if rid:
+            records_by_id[rid] = rec
 
-    df = pd.DataFrame(rows_out)
+    active_id = str(st.session_state.get(sel_key) or selected_id or "").strip()
+    if active_id and active_id not in id_order:
+        st.session_state.pop(sel_key, None)
+        active_id = ""
+
+    n = len(columns)
+    grid = "grid-template-columns: " + " ".join(
+        col_fr or ["1.1fr"] + ["1fr"] * max(n - 1, 0)
+    ) + ";"
+    ot = "d" + "iv"
+    ct = "/" + ot
+
     st.caption("Click a row to open details.")
-    st.dataframe(
-        df,
-        width="stretch",
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key=df_key,
+    st.markdown(
+        f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
+        f'<{ot} class="ips-data-table-scroll">'
+        f'<span class="ips-clean-table {table_class}" aria-hidden="true"></span>'
+        f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
+        + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
+        + f"</{ot}>",
+        unsafe_allow_html=True,
     )
 
-    picked_idx: int | None = None
-    for idx in _selection_rows(df_key):
-        if 0 <= idx < len(id_by_index):
-            picked_idx = idx
-            break
+    for rec in records:
+        rid = str(rec.get(row_id_key) or "").strip()
+        sel = " selected" if rid and rid == active_id else ""
+        rid_attr = html.escape(rid, quote=True)
+        cells = "".join(
+            f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
+            for field, _ in columns
+        )
+        st.markdown(
+            f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
+            f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
+            unsafe_allow_html=True,
+        )
 
-    if picked_idx is not None:
-        rid = id_by_index[picked_idx]
-        if rid:
-            st.session_state[sel_key] = rid
+    st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
+
+    picked = render_clean_table_click_bridge(
+        table_selector=f".{table_class}",
+        row_selector=".ips-data-row[data-row-id]",
+        component_key=f"{key}_row_click_bridge",
+    )
+    if picked:
+        pid = str(picked).strip()
+        if pid and pid in records_by_id:
+            prev = st.session_state.get(sel_key)
+            st.session_state[sel_key] = pid
             if on_row_click:
-                on_row_click(rid, records[picked_idx])
+                on_row_click(pid, records_by_id[pid])
+            if prev != pid:
+                st.rerun()
 
-    active = str(st.session_state.get(sel_key) or selected_id or "").strip()
-    if active and active not in id_by_index:
-        st.session_state.pop(sel_key, None)
-        return None
-    return active or None
+    return str(st.session_state.get(sel_key) or "").strip() or None
 
 
 def render_data_table(
@@ -128,7 +145,7 @@ def render_data_table(
     - ``use_native=True`` (main lists): ``render_clickable_table`` — row click only.
     - ``use_native=False`` (nested lists in modals): compact HTML grid, no Select buttons.
     """
-    _ = col_fr, hide_select
+    _ = hide_select
     tkey = table_key or session_select_key
     if use_native:
         return render_clickable_table(
@@ -140,6 +157,7 @@ def render_data_table(
             selected_id=selected_id,
             plain_cell=plain_cell,
             html_cell=cell_renderer,
+            col_fr=col_fr,
         )
 
     n = len(columns)

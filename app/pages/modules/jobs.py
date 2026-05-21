@@ -271,6 +271,11 @@ def render() -> None:
             return fmt_date(row.get(field))
         return str(row.get(field) or "—")
 
+    def _html_cell(field: str, row: dict) -> str:
+        if field == "status":
+            return status_pill_html(str(row.get("status") or ""))
+        return html.escape(_plain_cell(field, row))
+
     sel = render_clickable_table(
         filtered,
         [
@@ -287,7 +292,8 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         selected_id=selected_id or None,
-        plain_cell=_plain_cell,
+        html_cell=_html_cell,
+        col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
     )
 
     if sel:
