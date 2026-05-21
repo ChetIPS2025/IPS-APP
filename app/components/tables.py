@@ -64,8 +64,8 @@ def render_clickable_table(
     id_order: list[str] = []
     for rec in records:
         rid = str(rec.get(row_id_key) or "").strip()
-        id_order.append(rid)
         if rid:
+            id_order.append(rid)
             records_by_id[rid] = rec
 
     active_id = str(st.session_state.get(sel_key) or selected_id or "").strip()
@@ -93,6 +93,8 @@ def render_clickable_table(
 
     for rec in records:
         rid = str(rec.get(row_id_key) or "").strip()
+        if not rid:
+            continue
         sel = " selected" if rid and rid == active_id else ""
         rid_attr = html.escape(rid, quote=True)
         cells = "".join(
