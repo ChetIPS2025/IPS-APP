@@ -258,12 +258,21 @@ def _install_starlette() -> None:
 
 
 def install() -> None:
-    # Optional compatibility patch. Streamlit internals change across versions,
-    # so do not let PWA static routing prevent the app from starting.
+    """Install optional PWA static routing patch.
+
+    Disabled by default because recent Streamlit releases changed private
+    server internals used by this patch. The app should start without it.
+
+    Set IPS_ENABLE_PWA_STATIC_PATCH=1 only when actively testing this patch.
+    """
+    if os.environ.get("IPS_ENABLE_PWA_STATIC_PATCH") != "1":
+        return
+
     try:
         _install_tornado()
     except Exception as exc:
         print(f"Warning: skipped Streamlit Tornado PWA patch: {exc}", file=sys.stderr)
+
     try:
         _install_starlette()
     except Exception as exc:
