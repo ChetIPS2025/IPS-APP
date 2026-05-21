@@ -65,6 +65,6 @@ def render_filter_bar(widgets_fn: Callable[[], None]) -> None:
 def render_tab_placeholder(message: str) -> None:
     """Neutral placeholder for tabs not yet wired to Supabase."""
     st.markdown(
-        f'<{_OT} class="ips-tab-placeholder">{message}</{_CT}>',
+        f'<{_OT} class="ips-tab-placeholder">{message}<{_CT}>',
         unsafe_allow_html=True,
     )

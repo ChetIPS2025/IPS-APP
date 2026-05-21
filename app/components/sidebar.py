@@ -42,7 +42,7 @@ def render_sidebar(active_slug: str) -> None:
         else:
             st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
         st.markdown(
-            f'<p class="ips-sidebar-tagline">Industrial Plant Solutions</p></{_CT}>',
+            f'<p class="ips-sidebar-tagline">Industrial Plant Solutions</p><{_CT}>',
             unsafe_allow_html=True,
         )
 
@@ -63,7 +63,7 @@ def render_sidebar(active_slug: str) -> None:
                     st.session_state[SESSION_NAV_KEY] = slug
                     st.rerun()
 
-        st.markdown(f'<{_OT} class="ips-sidebar-spacer"></{_CT}>', unsafe_allow_html=True)
+        st.markdown(f'<{_OT} class="ips-sidebar-spacer"><{_CT}>', unsafe_allow_html=True)
 
         fm = st.toggle("Field Supervisor Mode", value=field_mode, key="ips_field_mode_toggle")
         if fm != field_mode:
@@ -74,7 +74,7 @@ def render_sidebar(active_slug: str) -> None:
         name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
         role_lbl = html.escape(role.replace("_", " ").title())
         st.markdown(
-            f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}</{_CT}>',
+            f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
             unsafe_allow_html=True,
         )
         if st.button("Log out", use_container_width=True, key="ips_logout"):
