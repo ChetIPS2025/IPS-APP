@@ -56,9 +56,9 @@ def _service_worker_allowed() -> str:
 
 def _pwa_manifest_bytes() -> bytes:
     try:
-        from app.pwa import build_web_manifest
+        from app.pwa import manifest_json_bytes
 
-        return json.dumps(build_web_manifest(), separators=(",", ":")).encode("utf-8")
+        return manifest_json_bytes()
     except Exception:
         return b"{}"
 
@@ -87,6 +87,12 @@ def _pwa_tornado_route_tuple(main_script_path: str, base: str | None) -> tuple[A
             if is_unsafe_path_pattern(pwa_name):
                 raise tornado.web.HTTPError(400)
 
+            if pwa_name == "manifest.json":
+                self.set_header("Content-Type", _MEDIA_TYPES["manifest.json"])
+                self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.write(_pwa_manifest_bytes())
+                return
+
             full = os.path.abspath(os.path.join(self._root, pwa_name))
             if os.path.commonpath([full, self._root]) != self._root:
                 raise tornado.web.HTTPError(404)
@@ -101,10 +107,6 @@ def _pwa_tornado_route_tuple(main_script_path: str, base: str | None) -> tuple[A
                 self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
                 with open(full, "rb") as f:
                     self.write(f.read())
-                return
-            if pwa_name == "manifest.json":
-                self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
-                self.write(_pwa_manifest_bytes())
                 return
             with open(full, "rb") as f:
                 self.write(f.read())
@@ -218,6 +220,16 @@ def _create_pwa_static_routes(main_script_path: str | None, base_url: str | None
         if name not in _ALLOWED_FILES:
             raise HTTPException(status_code=404, detail="File not found")
 
+        if name == "manifest.json":
+            response = Response(
+                content=_pwa_manifest_bytes(),
+                media_type=_MEDIA_TYPES["manifest.json"],
+            )
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return response
+
         safe_path = build_safe_abspath(app_static_root, name)
         if safe_path is None:
             raise HTTPException(status_code=400, detail="Bad Request")
@@ -237,13 +249,6 @@ def _create_pwa_static_routes(main_script_path: str | None, base_url: str | None
         if name == "sw.js":
             response.headers["Service-Worker-Allowed"] = _service_worker_allowed()
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        elif name == "manifest.json":
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            return Response(
-                content=_pwa_manifest_bytes(),
-                media_type=_MEDIA_TYPES["manifest.json"],
-                headers=dict(response.headers),
-            )
         return response
 
     async def _pwa_static_options(_request: Request) -> Response:

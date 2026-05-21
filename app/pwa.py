@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -52,13 +53,24 @@ def _manifest_id() -> str:
     return f"ips-operations-platform-{safe}"
 
 
+def manifest_json_bytes(*, indent: int | None = None) -> bytes:
+    """Serialize :func:`build_web_manifest` for HTTP responses and optional file sync."""
+    kwargs: dict[str, Any] = {}
+    if indent is not None:
+        kwargs["indent"] = indent
+        kwargs["ensure_ascii"] = False
+        text = json.dumps(build_web_manifest(), **kwargs) + "\n"
+    else:
+        text = json.dumps(build_web_manifest(), separators=(",", ":"))
+    return text.encode("utf-8")
+
+
 def build_web_manifest() -> dict[str, str | list[dict[str, str]]]:
     """
     Web app manifest with ``start_url`` / ``scope`` aligned to ``server.baseUrlPath``.
 
-    Served inline at runtime (see :func:`inject_pwa_support`); icon ``src`` values
-    include ``server.baseUrlPath`` when set. The static JSON fallback uses root
-    absolute paths under ``/app/static/``.
+    Single source of truth — used by :func:`inject_pwa_support` (blob link),
+    :func:`manifest_json_bytes`, and ``scripts/sync_pwa_manifest.py``.
     """
     start = _start_url()
     return {
