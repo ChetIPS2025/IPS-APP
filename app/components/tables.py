@@ -101,13 +101,11 @@ def render_clickable_table(
         st.session_state.pop(sel_key, None)
         return None
 
-    records_by_id: dict[str, dict[str, Any]] = {}
-    id_order: list[str] = []
-    for rec in records:
-        rid = str(rec.get(row_id_key) or "").strip()
-        if rid:
-            id_order.append(rid)
-            records_by_id[rid] = rec
+    records_by_id, id_order, row_entries = _index_clickable_rows(records, row_id_key)
+    if len(row_entries) > len(id_order):
+        st.caption(
+            "Some rows share the same id after trimming whitespace; only the first is selectable."
+        )
 
     active_id = str(st.session_state.get(sel_key) or selected_id or "").strip()
     if active_id and active_id not in id_order:
