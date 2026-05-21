@@ -103,10 +103,22 @@ def load_lookup_values(slug: str) -> tuple[list[str], bool]:
     return _constants_fallback(slug), True
 
 
+def constants_fallback_for_label(label: str) -> list[str]:
+    """Hardcoded defaults from ``app.utils.constants`` for admin / offline dev."""
+    slug = _LOOKUP_LABEL_TO_SLUG.get(label, label.lower().replace(" ", "_"))
+    return _constants_fallback(slug)
+
+
 def load_lookup_for_label(label: str) -> list[str]:
     slug = _LOOKUP_LABEL_TO_SLUG.get(label, label.lower().replace(" ", "_"))
-    values, _ = load_lookup_values(slug)
-    return values
+    try:
+        values, _ = load_lookup_values(slug)
+    except Exception as exc:
+        _LOG.debug("load_lookup_for_label %s failed: %s", label, exc)
+        values = []
+    if values:
+        return values
+    return constants_fallback_for_label(label)
 
 
 def all_lookup_slugs() -> list[str]:

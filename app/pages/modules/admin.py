@@ -31,11 +31,22 @@ def _get_lookup_items(table_name: str) -> list[str]:
     key = _lookup_session_key(table_name)
     if key not in st.session_state:
         try:
-            from app.services.lookup_service import load_lookup_for_label
+            from app.services.lookup_service import (
+                constants_fallback_for_label,
+                load_lookup_for_label,
+            )
         except ImportError:
-            from services.lookup_service import load_lookup_for_label  # type: ignore
-        db_vals = load_lookup_for_label(table_name)
-        st.session_state[key] = list(db_vals) if db_vals else []
+            from services.lookup_service import (  # type: ignore
+                constants_fallback_for_label,
+                load_lookup_for_label,
+            )
+        try:
+            db_vals = load_lookup_for_label(table_name)
+        except Exception:
+            db_vals = []
+        if not db_vals:
+            db_vals = constants_fallback_for_label(table_name)
+        st.session_state[key] = list(db_vals)
     return list(st.session_state[key])
 
 
