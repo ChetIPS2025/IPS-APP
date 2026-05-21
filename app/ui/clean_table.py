@@ -61,6 +61,7 @@ ROW_HTML_SELECTORS = (
     ".ips-clean-row",
     ".ips-data-row",
     ".job-row",
+    ".job-row-host",
     ".ips-est-list-row",
     ".usr-row",
     ".est-row",
@@ -73,6 +74,7 @@ ROW_SELECTED_SELECTORS = (
     ".ips-clean-row-selected",
     ".ips-data-row.selected",
     ".job-row.selected",
+    ".job-row-host.selected",
     ".ips-est-list-row.is-selected",
     ".usr-row.selected",
     ".ips-assets-row.selected",
@@ -394,6 +396,17 @@ section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.jdb-click-
     overflow: hidden !important;
     border: none !important;
     background: transparent !important;
+}}
+
+/* Company updates / event list cards (non-grid lists) */
+.ips-update-card,
+.ips-event-block {{
+    cursor: pointer;
+    transition: background 0.15s ease;
+}}
+.ips-update-card:hover,
+.ips-event-block:hover {{
+    background: #eef5ff;
 }}
 
 /* Hide helper markers */
