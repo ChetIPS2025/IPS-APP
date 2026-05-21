@@ -21,7 +21,7 @@ try:
     from app.components.tabs import render_tabs
     from app.components.feeds import render_activity_feed, render_document_list, render_upload_area
 except ImportError:
-    from components.buttons import render_action_buttons  # type: ignore
+    from components.buttons import render_action_buttons, render_detail_actions  # type: ignore
     from components.cards import render_card, render_metric_card  # type: ignore
     from components.empty_states import render_empty_state  # type: ignore
     from components.forms import render_dropdown  # type: ignore
