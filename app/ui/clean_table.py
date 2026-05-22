@@ -14,12 +14,13 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v10"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v11"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
     ".ips-clean-table",
     ".ips-data-table-anchor",
+    ".ips-click-table-host",
     ".jdb-tbl-host",
     ".ips-est-table-anchor",
     ".ips-users-table-anchor",
@@ -119,11 +120,19 @@ def _css_join(selectors: tuple[str, ...]) -> str:
 def _vb_has_row_wrap() -> str:
     """Scope row-host overlay CSS to list tables only (not the whole page column)."""
     tbl = _table_scope_has()
-    parts = [
+    scoped = [
         f'{tbl} div[data-testid="stVerticalBlock"]:has({s})'
         for s in ROW_WRAP_SELECTORS
     ]
-    return _css_join(tuple(parts))
+    # Streamlit may insert wrappers between the table card and row hosts; also match row
+    # hosts directly when both wrap + select markers are present.
+    row_sel = _css_join(ROW_SELECT_BTN_MARKERS)
+    direct = [
+        "section[data-testid=\"stMain\"] "
+        f'div[data-testid="stVerticalBlock"]:has({s}):has({row_sel})'
+        for s in ROW_WRAP_SELECTORS
+    ]
+    return _css_join(tuple(scoped + direct))
 
 
 def _table_scope_has() -> str:
@@ -250,7 +259,7 @@ def inject_clean_table_css() -> None:
     box-shadow: none !important;
     border-radius: 0 !important;
 }}
-{vb_wrap} > [data-testid="stElementContainer"] {{
+{vb_wrap} [data-testid="stElementContainer"] {{
     margin: 0 !important;
     padding: 0 !important;
     min-height: 0 !important;
@@ -258,14 +267,9 @@ def inject_clean_table_css() -> None:
     border: none !important;
     box-shadow: none !important;
 }}
-{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers}) {{
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-}}
-{vb_wrap} > [data-testid="stElementContainer"]:has(.ips-clean-row-host),
-{vb_wrap} > [data-testid="stElementContainer"]:has(.ips-clean-row-wrap) {{
+{vb_wrap} [data-testid="stElementContainer"]:has({row_sel_markers}),
+{vb_wrap} [data-testid="stElementContainer"]:has(.ips-clean-row-host),
+{vb_wrap} [data-testid="stElementContainer"]:has(.ips-clean-row-wrap) {{
     height: 0 !important;
     min-height: 0 !important;
     max-height: 0 !important;
@@ -275,54 +279,6 @@ def inject_clean_table_css() -> None:
 }}
 
 /* Invisible row-select Streamlit button: full-row hit target under visual HTML row */
-{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    z-index: 1 !important;
-    height: 60px !important;
-    max-height: 60px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    pointer-events: auto !important;
-}}
-{vb_wrap}:has({act_markers})
-    > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
-    right: 120px !important;
-}}
-{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"],
-{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
-{vb_wrap}
-    > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton,
-{vb_wrap}
-    > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {{
-    width: 100% !important;
-    height: 60px !important;
-    min-height: 60px !important;
-    max-height: 60px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    opacity: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: transparent !important;
-    cursor: pointer !important;
-}}
-
-/* Fallback overlay when marker/button ECs are not direct siblings (Streamlit layout drift) */
 {vb_wrap}:not(:has({act_markers}))
     [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
     position: absolute !important;
@@ -370,7 +326,7 @@ def inject_clean_table_css() -> None:
 }}
 
 /* Visual HTML row sits above the invisible button and does not steal clicks */
-{vb_wrap} > [data-testid="stElementContainer"]:has({rows}) {{
+{vb_wrap} [data-testid="stElementContainer"]:has({rows}) {{
     position: absolute !important;
     inset: 0 !important;
     z-index: 2 !important;

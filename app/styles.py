@@ -25,7 +25,7 @@ def inject_users_module_css() -> None:
     """Users/Employees list table stability — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v2">
+<style id="ips-users-module-v3">
 .ips-users-page .ips-data-table-wrap,
 .ips-users-page .ips-data-table-stable .ips-data-table-header,
 .ips-users-page .ips-data-table-stable .ips-data-row {{
@@ -70,17 +70,17 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.select
 /* Users list: invisible full-row select button layered under HTML row */
 section[data-testid="stMain"]:has(.ips-users-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap),
+section[data-testid="stMain"]:has(.ips-users-page)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn) {{
   position: relative !important;
   min-height: 2.75rem !important;
   margin: 0 !important;
   padding: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 1 !important;
@@ -95,15 +95,11 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
   pointer-events: auto !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
 section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] .stButton > button {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
   width: 100% !important;
   height: 100% !important;
   min-height: 2.75rem !important;
@@ -117,9 +113,8 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
   cursor: pointer !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-data-row) {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has(.ips-data-row) {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 2 !important;
@@ -196,7 +191,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list table stability — call at the top of the jobs page render."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v5">
+<style id="ips-jobs-module-v6">
 .ips-jobs-page .ips-data-table-wrap,
 .ips-jobs-page .ips-data-table-stable .ips-data-table-header,
 .ips-jobs-page .ips-data-table-stable .ips-data-row {{
@@ -234,17 +229,17 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.select
 /* Jobs list: invisible full-row select button layered under HTML row */
 section[data-testid="stMain"]:has(.ips-jobs-page)
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap),
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn) {{
   position: relative !important;
   min-height: 2.75rem !important;
   margin: 0 !important;
   padding: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 1 !important;
@@ -259,15 +254,11 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
   pointer-events: auto !important;
 }}
 section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
 section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-+ [data-testid="stElementContainer"] .stButton > button {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
   width: 100% !important;
   height: 100% !important;
   min-height: 2.75rem !important;
@@ -281,9 +272,8 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
   cursor: pointer !important;
 }}
 section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
-> [data-testid="stElementContainer"]:has(.ips-data-row) {{
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
+[data-testid="stElementContainer"]:has(.ips-data-row) {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 2 !important;

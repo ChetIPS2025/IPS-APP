@@ -202,11 +202,7 @@ def render_clickable_table(
 
                 with st.container():
                     st.markdown(
-                        '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
+                        '<span class="ips-clean-row-host ips-clean-row-wrap ips-clean-row-select-btn" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
                     st.button(
