@@ -190,9 +190,11 @@ def _jobs_table_cell(field: str, row: dict) -> str:
     if field == "status":
         return status_pill_html(str(row.get("status") or ""))
     if field == "job_number":
+        jid = html.escape(str(row.get("id") or ""), quote=True)
+        jnum = html.escape(str(row.get("job_number") or ""))
         return (
-            f'<span style="color:#2563eb;font-weight:600">'
-            f"{html.escape(str(row.get('job_number') or ''))}</span>"
+            f'<span class="ips-clean-link ips-row-open-link" data-row-id="{jid}" '
+            f'role="link" tabindex="0" title="Open job details">{jnum}</span>'
         )
     if field in ("start_date", "end_date"):
         return html.escape(fmt_date(row.get(field)))
@@ -373,6 +375,7 @@ def render() -> None:
         col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
         on_row_click=lambda rid, _rec: _open_jobs_detail_modal(rid),
         html_rows=True,
+        click_caption="Click a job number to open details.",
     )
 
     _show_jobs_detail_modal_if_pending()

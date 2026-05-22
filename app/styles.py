@@ -191,7 +191,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list table stability — call at the top of the jobs page render."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v7">
+<style id="ips-jobs-module-v8">
 .ips-jobs-page .ips-data-table-wrap,
 .ips-jobs-page .ips-data-table-stable .ips-data-table-header,
 .ips-jobs-page .ips-data-table-stable .ips-data-row {{
@@ -209,6 +209,16 @@ def inject_jobs_module_css() -> None:
 .ips-jobs-page .ips-data-table-html .ips-data-cell {{
   overflow: hidden;
   text-overflow: ellipsis;
+}}
+.ips-jobs-page .ips-row-open-link {{
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}}
+.ips-jobs-page .ips-row-open-link:hover {{
+  color: #1d4ed8;
 }}
 .ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
 div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{

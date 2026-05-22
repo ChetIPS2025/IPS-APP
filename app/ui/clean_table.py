@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v12"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v13"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -557,10 +557,28 @@ def render_clean_table_click_bridge(
     return anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
   }}
 
+  function rowOpenLink(target) {{
+    return target && target.closest
+      ? target.closest(".ips-row-open-link[data-row-id]")
+      : null;
+  }}
+
   function isInteractive(target) {{
+    if (rowOpenLink(target)) return false;
     return !!(target && target.closest && target.closest(
       "a, button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover']"
     ));
+  }}
+
+  function activateOpenLink(link, e) {{
+    const id = link.getAttribute("data-row-id");
+    if (!id) return false;
+    if (e) {{
+      e.preventDefault();
+      e.stopPropagation();
+    }}
+    sendValue(id);
+    return true;
   }}
 
   function activateRow(row, e) {{
@@ -591,6 +609,19 @@ def render_clean_table_click_bridge(
   function bindRows() {{
     const scope = tableScope();
     if (!scope) return;
+    scope.querySelectorAll(".ips-row-open-link[data-row-id]").forEach(function (link) {{
+      if (link.dataset.ipsCleanLinkBound === "1") return;
+      link.dataset.ipsCleanLinkBound = "1";
+      link.style.cursor = "pointer";
+      link.addEventListener("click", function (e) {{
+        activateOpenLink(link, e);
+      }}, true);
+      link.addEventListener("keydown", function (e) {{
+        if (e.key === "Enter" || e.key === " ") {{
+          activateOpenLink(link, e);
+        }}
+      }}, true);
+    }});
     scope.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsCleanBound === "1") return;
       row.dataset.ipsCleanBound = "1";
@@ -610,7 +641,13 @@ def render_clean_table_click_bridge(
     doc.ipsCleanTableBridgeRegistry = {{}};
     doc.addEventListener("click", function (e) {{
       const t = e.target;
-      if (!t || !t.closest || isInteractive(t)) return;
+      if (!t || !t.closest) return;
+      const openLink = rowOpenLink(t);
+      if (openLink) {{
+        activateOpenLink(openLink, e);
+        return;
+      }}
+      if (isInteractive(t)) return;
       const reg = doc.ipsCleanTableBridgeRegistry || {{}};
       for (const cfg of Object.values(reg)) {{
         const row = t.closest(cfg.row);

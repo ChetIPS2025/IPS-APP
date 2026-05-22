@@ -73,6 +73,7 @@ def render_clickable_table(
     on_row_click: Callable[[str, dict[str, Any]], None] | None = None,
     col_fr: list[str] | None = None,
     html_rows: bool | None = None,
+    click_caption: str | None = None,
 ) -> str | None:
     """
     HTML grid table — click anywhere on a row to select (invisible overlay button per row).
@@ -123,7 +124,7 @@ def render_clickable_table(
 
     use_html_rows = False if html_rows is None else html_rows
 
-    st.caption("Click a row to open details.")
+    st.caption(click_caption or "Click a row to open details.")
 
     if use_html_rows:
         row_html_parts: list[str] = []
