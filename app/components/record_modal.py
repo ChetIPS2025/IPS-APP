@@ -206,8 +206,78 @@ def placeholder_html(message: str) -> None:
     )
 
 
-def render_modal_shell(*, wide: bool = True) -> None:
+def compact_meta_card_html(label: str, value: object) -> str:
+    return (
+        f'<div class="ips-compact-meta-card">'
+        f'<div class="ips-compact-meta-label">{html.escape(label)}</div>'
+        f'<div class="ips-compact-meta-value">{html.escape(safe_value(value))}</div>'
+        f"</div>"
+    )
+
+
+def render_compact_modal_meta_grid(cards: list[tuple[str, object]]) -> None:
+    body = "".join(compact_meta_card_html(label, value) for label, value in cards)
+    st.markdown(f'<div class="ips-compact-meta-grid">{body}</div>', unsafe_allow_html=True)
+
+
+def render_compact_modal_header(
+    *,
+    title: str,
+    subtitle: str = "",
+    status: object | None = None,
+    module: str,
+    record_key: str,
+    on_edit: Callable[[], None] | None = None,
+    key_prefix: str | None = None,
+) -> None:
+    """Compact view-mode header: title/subtitle left, status pill + Edit right."""
+    if is_edit_mode(module, record_key):
+        return
+
+    subtitle_html = (
+        f'<div class="ips-compact-detail-subtitle">{html.escape(subtitle)}</div>'
+        if subtitle
+        else ""
+    )
+    status_html = status_pill_html(status) if status not in (None, "") else ""
+
+    st.markdown('<div class="ips-compact-detail-header">', unsafe_allow_html=True)
+    title_col, actions_col = st.columns([5.4, 2.1], gap="small")
+    with title_col:
+        st.markdown(
+            f'<div class="ips-compact-detail-main">'
+            f'<div>'
+            f'<h2 class="ips-compact-detail-title">{html.escape(title)}</h2>'
+            f"{subtitle_html}"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with actions_col:
+        pill_col, edit_col = st.columns([1.15, 1], gap="small")
+        with pill_col:
+            if status_html:
+                st.markdown(
+                    f'<div class="ips-compact-detail-actions">{status_html}</div>',
+                    unsafe_allow_html=True,
+                )
+        with edit_col:
+            prefix = key_prefix or f"{module}_modal_{record_key}"
+
+            def _edit() -> None:
+                if on_edit:
+                    on_edit()
+                else:
+                    set_edit_mode(module, record_key)
+
+            st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_modal_shell(*, wide: bool = True, compact: bool = False) -> None:
     cls = "ips-dialog-shell ips-modal-wide" if wide else "ips-dialog-shell"
+    if compact:
+        cls += " ips-compact-detail-modal"
     st.markdown(f'<span class="{cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
 
 

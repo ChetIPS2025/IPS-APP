@@ -203,41 +203,114 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"
 
 
 def inject_tasks_module_css() -> None:
-    """Tasks list — inline data editor styling (white cells, compact columns)."""
+    """Tasks custom interactive table styling."""
     st.markdown(
         f"""
-<style id="ips-tasks-module-v1">
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor {{
+<style id="ips-tasks-module-v2">
+.ips-task-table {{
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
   margin-bottom: 0.65rem;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] {{
-  border: 1px solid #d8e0ea !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
+.ips-task-header {{
+  background: #f8fafc;
+  color: {TEXT_MUTED};
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid #e2e8f0;
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
+}}
+.ips-task-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.35rem 0.15rem;
+}}
+.ips-task-row:hover {{
+  background: #eef5ff;
+}}
+.ips-task-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-task-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  min-height: 2.35rem;
+  display: flex;
+  align-items: center;
+  padding: 0.15rem 0.35rem;
+  min-width: 0;
+}}
+.ips-task-checkbox-cell {{
+  justify-content: center;
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
+}}
+.ips-task-title {{
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-status-open button {{
   background: #ffffff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #93c5fd !important;
+  border-radius: 999px !important;
+  min-height: 1.85rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 0.15rem 0.75rem !important;
+  width: 100% !important;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="columnheader"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="columnheader"] {{
-  background: #f8fafc !important;
-  color: {TEXT_MUTED} !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  font-size: 0.68rem !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-status-closed button {{
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #86efac !important;
+  border-radius: 999px !important;
+  min-height: 1.85rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 0.15rem 0.75rem !important;
+  width: 100% !important;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="gridcell"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="gridcell"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [data-testid="stTable"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [data-testid="stTable"] {{
-  background: #ffffff !important;
-  color: {TEXT} !important;
-  border-color: #e2e8f0 !important;
+.ips-priority-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="row"]:hover [role="gridcell"],
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
-  background: #f1f5f9 !important;
+.ips-priority-high {{
+  background: #fee2e2;
+  color: #b91c1c;
+}}
+.ips-priority-medium {{
+  background: #ffedd5;
+  color: #c2410c;
+}}
+.ips-priority-low {{
+  background: #dcfce7;
+  color: #166534;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-job-cell [data-baseweb="select"] > div {{
+  min-height: 2rem !important;
+  font-size: 0.78rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-checkbox-cell [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-checkbox-cell label {{
+  min-height: 0 !important;
 }}
 </style>
 """,
@@ -319,6 +392,18 @@ div[data-testid="stDialog"] div[role="dialog"] {{
   border-radius: 18px !important;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22) !important;
   overflow: hidden !important;
+  padding-top: 14px !important;
+}}
+div[data-testid="stDialog"] [data-testid="stModalHeader"] {{
+  padding-bottom: 0.15rem !important;
+  margin-bottom: 0 !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stModalHeader"] h1 {{
+  font-size: 0.95rem !important;
+  line-height: 1.2 !important;
+}}
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"] {{
+  gap: 0.65rem !important;
 }}
 div[data-testid="stDialog"] h1,
 div[data-testid="stDialog"] [data-testid="stModalHeader"] h1 {{
@@ -380,7 +465,20 @@ div[data-testid="stDialog"] .ips-dialog-actions {{
   display: none !important;
 }}
 div[data-testid="stDialog"] div[data-testid="stTabs"] {{
-  margin-top: 0.35rem !important;
+  margin-top: 4px !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) div[data-testid="stTabs"] {{
+  margin-top: 2px !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stTabContent"] {{
+  padding-top: 0.55rem !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .stButton > button,
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stButton"] > button {{
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 16px !important;
+  border-radius: 10px !important;
 }}
 div[data-testid="stDialog"] div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
   gap: 0.15rem !important;
@@ -474,6 +572,82 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   line-height: 1.35;
   word-break: break-word;
 }}
+
+.ips-compact-detail-header {{
+  padding: 4px 0 12px 0;
+  border-bottom: 1px solid #e5eaf1;
+  margin-bottom: 12px;
+}}
+.ips-compact-detail-main {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}}
+.ips-compact-detail-title {{
+  font-size: 24px;
+  font-weight: 800;
+  color: {TEXT};
+  margin: 0;
+  line-height: 1.15;
+}}
+.ips-compact-detail-subtitle {{
+  font-size: 14px;
+  color: {TEXT_MUTED};
+  margin-top: 4px;
+}}
+.ips-compact-detail-actions {{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+  min-height: 36px;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="stHorizontalBlock"] {{
+  align-items: flex-start !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+}}
+.ips-compact-meta-grid {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 10px 0 8px 0;
+}}
+@media (max-width: 900px) {{
+  .ips-compact-meta-grid {{
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }}
+}}
+.ips-compact-meta-card {{
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-height: 58px;
+  max-height: 70px;
+  overflow: hidden;
+}}
+.ips-compact-meta-label {{
+  font-size: 11px;
+  color: {TEXT_MUTED};
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+}}
+.ips-compact-meta-value {{
+  font-size: 14px;
+  color: {TEXT};
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}}
+
 .ips-dialog-card {{
   background: #ffffff;
   border: 1px solid #e8edf3;

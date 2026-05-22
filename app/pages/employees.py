@@ -23,9 +23,8 @@ try:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
+        render_compact_modal_header,
+        render_compact_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
         safe_value,
@@ -66,9 +65,8 @@ except ImportError:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
+        render_compact_modal_header,
+        render_compact_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
         safe_value,
@@ -394,33 +392,36 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.error(msg or "Could not save employee.")
 
 
+def _employee_type_label(emp: dict) -> str:
+    return "Employee" if emp.get("is_employee") is not False else "System User"
+
+
 def render_employee_detail_dialog(emp: dict) -> None:
     rk = record_session_key(emp, "id", "email")
     name = safe_value(emp.get("name"))
     email = safe_value(emp.get("email"))
     role = safe_value(emp.get("role"))
-    dept = safe_value(emp.get("department"))
     status = safe_value(emp.get("status"))
+    subtitle = f"{role} · {email}" if role != "—" and email != "—" else (role if role != "—" else email)
 
-    render_modal_shell()
-    render_modal_header(
-        title=name,
-        subtitle=f"{role} · {dept}" if role != "—" or dept != "—" else email,
-        status=status,
-    )
-    render_modal_edit_button(
-        module=MODULE,
-        record_key=rk,
-        key_prefix=f"emp_modal_{rk}",
-    )
-    render_modal_meta_grid(
-        [
-            ("Role", role),
-            ("Department", dept),
-            ("Email", email),
-            ("Last Login", emp.get("last_login")),
-        ]
-    )
+    render_modal_shell(compact=True)
+    if not is_edit_mode(MODULE, rk):
+        render_compact_modal_header(
+            title=name,
+            subtitle=subtitle,
+            status=status,
+            module=MODULE,
+            record_key=rk,
+            key_prefix=f"emp_modal_{rk}",
+        )
+        render_compact_modal_meta_grid(
+            [
+                ("Role", role),
+                ("Email", email),
+                ("Employee", _employee_type_label(emp)),
+                ("Last Login", emp.get("last_login")),
+            ]
+        )
 
     if is_edit_mode(MODULE, rk):
         _render_employee_edit_form(emp)
