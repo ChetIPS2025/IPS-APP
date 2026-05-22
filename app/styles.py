@@ -191,20 +191,10 @@ def inject_jobs_module_css() -> None:
     """Jobs list table — native dataframe row selection styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v9">
-section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [role="grid"] {{
+<style id="ips-jobs-module-v10">
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-selectable-table ~ div [data-testid="stDataFrame"] [role="grid"],
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"]:has(.ips-native-click-table-jobs_list) [data-testid="stDataFrame"] [role="grid"] {{
   cursor: pointer;
-}}
-section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [role="row"]:hover {{
-  background-color: #eef5ff !important;
-}}
-section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [data-testid="stCheckbox"] {{
-  opacity: 0 !important;
-  width: 1px !important;
-  min-width: 1px !important;
-  max-width: 1px !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
 }}
 </style>
 """,
@@ -248,9 +238,6 @@ section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testi
 section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="row"]:hover [role="gridcell"],
 section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
   background: #f1f5f9 !important;
-}}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stCheckbox"] {{
-  display: none !important;
 }}
 </style>
 """,
@@ -916,25 +903,63 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   overflow: hidden !important;
 }}
 
-/* Native dataframe list — pointer + selection hint */
-[data-testid="stDataFrame"] {{
-  border: 1px solid {BORDER} !important;
+/* Native selectable list tables — visible checkbox + clean white grid */
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] {{
+  border: 1px solid #e2e8f0 !important;
   border-radius: 12px !important;
-  overflow: hidden;
+  overflow: hidden !important;
+  background: #ffffff !important;
 }}
-[data-testid="stDataFrame"] [role="grid"] {{
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [role="columnheader"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [role="columnheader"] {{
+  background: #f8fafc !important;
+  color: {TEXT_MUTED} !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}}
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [role="gridcell"] {{
+  background: #ffffff !important;
+  color: {TEXT} !important;
+  border-color: #e2e8f0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [role="grid"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [role="grid"] {{
   cursor: pointer;
 }}
-[data-testid="stDataFrame"] [role="row"]:hover {{
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
   background-color: #eef5ff !important;
 }}
-[data-testid="stDataFrame"] [data-testid="stCheckbox"] {{
-  opacity: 0 !important;
-  width: 1px !important;
-  min-width: 1px !important;
-  max-width: 1px !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [role="row"][aria-selected="true"] [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [role="row"][aria-selected="true"] [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [data-testid="stTable"] [aria-selected="true"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [data-testid="stTable"] [aria-selected="true"] {{
+  background-color: #eaf2ff !important;
+}}
+section[data-testid="stMain"]:has(.ips-selectable-table) [data-testid="stDataFrame"] [data-testid="stCheckbox"],
+section[data-testid="stMain"]:has(.ips-native-click-table) [data-testid="stDataFrame"] [data-testid="stCheckbox"] {{
+  opacity: 1 !important;
+  width: auto !important;
+  min-width: 1.25rem !important;
+  max-width: none !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}}
+
+/* Legacy non-selectable dataframe containers */
+.ips-data-table-nested [data-testid="stDataFrame"],
+.ips-data-table-html [data-testid="stDataFrame"] {{
+  border: 1px solid {BORDER} !important;
+  border-radius: 12px !important;
+}}
+.ips-data-table-nested [data-testid="stCheckbox"],
+.ips-data-table-html [data-testid="stCheckbox"] {{
+  display: none !important;
 }}
 .ips-data-table-nested .ips-data-row {{
   cursor: default;

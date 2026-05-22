@@ -730,8 +730,17 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         format_cell=_jobs_display_cell,
-        click_caption="Click a row to open details.",
         on_row_selected=_open_jobs_detail_modal,
+        column_widths={
+            "job_number": "small",
+            "job_name": "large",
+            "customer": "medium",
+            "estimate_number": "small",
+            "supervisor": "medium",
+            "status": "small",
+            "start_date": "small",
+            "end_date": "small",
+        },
     )
 
     _show_jobs_detail_modal_if_pending()

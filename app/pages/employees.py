@@ -112,7 +112,7 @@ _EMPLOYEE_TABS = [
 ]
 
 
-def _filter_employees(rows: list[dict], *, q: str, dept: str, status: str, role: str) -> list[dict]:
+def _filter_employees(rows: list[dict], *, q: str, status: str, role: str) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
@@ -124,8 +124,6 @@ def _filter_employees(rows: list[dict], *, q: str, dept: str, status: str, role:
             or ql in str(e.get("username", "")).lower()
             or ql in str(e.get("phone", "")).lower()
         ]
-    if dept and dept != "All Departments":
-        out = [e for e in out if str(e.get("department", "")) == dept]
     if status and status != "All Statuses":
         out = [e for e in out if str(e.get("status", "")) == status]
     if role and role != "All Roles":
@@ -158,6 +156,8 @@ def _open_employee_modal(employee_id: str, employee: dict | None = None) -> None
 def _employees_display_cell(field: str, row: dict) -> str:
     if field == "last_login":
         return safe_value(row.get(field))
+    if field == "is_employee":
+        return "Employee" if row.get("is_employee") is not False else "System User"
     val = row.get(field)
     return str(val).strip() if val is not None and str(val).strip() else "—"
 
@@ -451,7 +451,6 @@ def render() -> None:
     inject_users_module_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     all_emp = load_employees()
-    departments = sorted({str(e.get("department") or "") for e in all_emp if e.get("department")})
     roles = sorted({str(e.get("role") or "") for e in all_emp if e.get("role")})
 
     act_l, act_r = st.columns([3, 1])
@@ -492,14 +491,12 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             st.text_input("Search", placeholder="Search name, email, username…", key="emp_search", label_visibility="collapsed")
         with c2:
-            st.selectbox("Department", ["All Departments", *departments], key="emp_dept", label_visibility="collapsed")
-        with c3:
             st.selectbox("Status", ["All Statuses", "Active", "Inactive"], key="emp_status", label_visibility="collapsed")
-        with c4:
+        with c3:
             st.selectbox("Role", ["All Roles", *roles], key="emp_role_filter", label_visibility="collapsed")
 
     layout_filter_bar(_filters)
@@ -507,7 +504,6 @@ def render() -> None:
     filtered = _filter_employees(
         all_emp,
         q=str(st.session_state.get("emp_search") or ""),
-        dept=str(st.session_state.get("emp_dept") or "All Departments"),
         status=str(st.session_state.get("emp_status") or "All Statuses"),
         role=str(st.session_state.get("emp_role_filter") or "All Roles"),
     )
@@ -522,7 +518,7 @@ def render() -> None:
             ("name", "NAME"),
             ("email", "EMAIL"),
             ("role", "ROLE"),
-            ("department", "DEPARTMENT"),
+            ("is_employee", "EMPLOYEE"),
             ("status", "STATUS"),
             ("last_login", "LAST LOGIN"),
         ],
@@ -530,7 +526,14 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         format_cell=_employees_display_cell,
-        click_caption="Click a row to open details.",
+        column_widths={
+            "name": "medium",
+            "email": "large",
+            "role": "small",
+            "is_employee": "small",
+            "status": "small",
+            "last_login": "small",
+        },
         on_row_selected=_open_employee_modal,
     )
 

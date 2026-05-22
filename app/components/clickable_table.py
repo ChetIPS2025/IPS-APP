@@ -1,14 +1,26 @@
-"""Native Streamlit dataframe row selection for list tables (no HTML row hacks)."""
+"""Native Streamlit dataframe single-row selection for list tables."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 import streamlit as st
 
 CellFormatter = Callable[[str, dict[str, Any]], str]
+ColumnWidth = Literal["small", "medium", "large"]
+
+_DEFAULT_WIDTHS: dict[str, ColumnWidth] = {
+    "status": "small",
+    "priority": "small",
+    "last_login": "small",
+    "due_date": "small",
+    "start_date": "small",
+    "end_date": "small",
+    "job_number": "small",
+    "estimate_number": "small",
+}
 
 
 def _df_gen_key(table_key: str) -> str:
@@ -70,6 +82,24 @@ def clear_table_selection(*, table_key: str, session_select_key: str) -> None:
     )
 
 
+def get_modal_record(
+    *,
+    cache_key: str,
+    modal_key: str,
+    session_select_key: str,
+) -> dict[str, Any] | None:
+    """Resolve the selected record for a detail modal."""
+    try:
+        from app.components.record_modal import get_modal_record as _get_modal_record
+    except ImportError:
+        from components.record_modal import get_modal_record as _get_modal_record  # type: ignore
+    return _get_modal_record(
+        cache_key=cache_key,
+        modal_key=modal_key,
+        session_select_key=session_select_key,
+    )
+
+
 def _cell_value(
     field: str,
     row: dict[str, Any],
@@ -82,7 +112,13 @@ def _cell_value(
     return str(val).strip() if val is not None and str(val).strip() else "—"
 
 
-def render_clickable_table(
+def _column_width(field: str, column_widths: dict[str, ColumnWidth] | None) -> ColumnWidth:
+    if column_widths and field in column_widths:
+        return column_widths[field]
+    return _DEFAULT_WIDTHS.get(field, "medium")
+
+
+def render_selectable_table(
     records: list[dict[str, Any]],
     columns: list[tuple[str, str]],
     table_key: str,
@@ -92,12 +128,13 @@ def render_clickable_table(
     on_row_selected: Callable[[str, dict[str, Any]], None] | None = None,
     format_cell: CellFormatter | None = None,
     click_caption: str | None = None,
+    column_widths: dict[str, ColumnWidth] | None = None,
 ) -> str | None:
     """
     Render a selectable list table using native ``st.dataframe`` row selection.
 
     Uses ``selection_mode="single-row"`` and ``on_select="rerun"`` — no Select buttons
-    and no custom HTML click overlays.
+    and no custom HTML click overlays. The checkbox selector opens the detail modal.
     """
     valid_records: list[dict[str, Any]] = []
     row_ids: list[str] = []
@@ -115,7 +152,7 @@ def render_clickable_table(
         st.session_state.pop(session_select_key, None)
         return None
 
-    st.caption(click_caption or "Click a row to open details.")
+    st.caption(click_caption or "Select a row to open details.")
 
     cur_sel = str(st.session_state.get(session_select_key) or "").strip()
     if cur_sel and cur_sel not in records_by_id:
@@ -135,7 +172,7 @@ def render_clickable_table(
     column_config = {
         field: st.column_config.TextColumn(
             header,
-            width="medium",
+            width=_column_width(field, column_widths),
         )
         for field, header in columns
     }
@@ -143,14 +180,14 @@ def render_clickable_table(
     df_key = dataframe_widget_key(table_key)
     st.session_state[f"ips_click_table_map_{session_select_key}"] = table_key
     st.markdown(
-        f'<span class="ips-native-click-table ips-native-click-table-{table_key}" aria-hidden="true"></span>',
+        f'<span class="ips-selectable-table ips-native-click-table ips-native-click-table-{table_key}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     selection = st.dataframe(
         df,
         column_config=column_config,
         hide_index=True,
-        width="stretch",
+        use_container_width=True,
         on_select="rerun",
         selection_mode="single-row",
         key=df_key,
@@ -166,3 +203,7 @@ def render_clickable_table(
                 on_row_selected(selected_id, records_by_id[selected_id])
 
     return selected_id
+
+
+# Backward-compatible alias used across list pages.
+render_clickable_table = render_selectable_table

@@ -721,6 +721,7 @@ def render() -> None:
     _render_tasks_editor(filtered, assignee_lookup, jobs_by_id)
 
     if filtered:
+        st.caption("Open full task details")
         task_labels = {
             str(t.get("title") or "Untitled"): t for t in filtered if t.get("title")
         }
