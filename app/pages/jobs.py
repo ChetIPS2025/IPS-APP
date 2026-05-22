@@ -329,11 +329,11 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("jobs"):
         return
-    inject_jobs_module_css()
     st.markdown(
         '<span class="ips-jobs-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    inject_jobs_module_css()
     all_jobs = load_jobs()
     customers = customer_filter_options()
 

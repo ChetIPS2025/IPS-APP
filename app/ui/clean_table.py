@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v8"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v9"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -264,6 +264,15 @@ def inject_clean_table_css() -> None:
     max-height: 0 !important;
     overflow: hidden !important;
 }}
+{vb_wrap} > [data-testid="stElementContainer"]:has(.ips-clean-row-host),
+{vb_wrap} > [data-testid="stElementContainer"]:has(.ips-clean-row-wrap) {{
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
 
 /* Invisible row-select Streamlit button: full-row hit target under visual HTML row */
 {vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
@@ -303,6 +312,53 @@ def inject_clean_table_css() -> None:
     height: 60px !important;
     min-height: 60px !important;
     max-height: 60px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    cursor: pointer !important;
+}}
+
+/* Fallback overlay when marker/button ECs are not direct siblings (Streamlit layout drift) */
+{vb_wrap}:not(:has({act_markers}))
+    [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 1 !important;
+    height: auto !important;
+    min-height: 2.75rem !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: auto !important;
+}}
+{vb_wrap}:not(:has({act_markers}))
+    [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"],
+{vb_wrap}:not(:has({act_markers}))
+    [data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton {{
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 2.75rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}}
+{vb_wrap}:not(:has({act_markers}))
+    [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
+{vb_wrap}:not(:has({act_markers}))
+    [data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 2.75rem !important;
     margin: 0 !important;
     padding: 0 !important;
     opacity: 0 !important;
