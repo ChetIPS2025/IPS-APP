@@ -105,6 +105,42 @@ def inject_customers_module_css() -> None:
     )
 
 
+def inject_jobs_module_css() -> None:
+    """Jobs list table stability — call at the top of the jobs page render."""
+    st.markdown(
+        f"""
+<style id="ips-jobs-module-v1">
+.ips-jobs-page .ips-data-table-wrap,
+.ips-jobs-page .ips-data-table-stable .ips-data-table-header,
+.ips-jobs-page .ips-data-table-stable .ips-data-row {{
+  display: grid !important;
+  box-sizing: border-box !important;
+}}
+.ips-jobs-page .ips-data-table-html .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}}
+.ips-jobs-page .ips-data-table-html .ips-data-row:hover {{
+  background: #eef5ff;
+}}
+.ips-jobs-page .ips-data-table-html .ips-data-row.selected {{
+  background: #eef5ff;
+  border-left: 4px solid #2563eb;
+}}
+.ips-jobs-page .ips-data-table-html .ips-data-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_estimates_module_css() -> None:
     """
     Estimate list/detail table stability — always call at the top of the estimates page render.
