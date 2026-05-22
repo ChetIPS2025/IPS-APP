@@ -191,7 +191,11 @@ def _render_detail(est: dict) -> None:
                 with ec1:
                     st.text_input("Estimate #", value=str(est.get("estimate_number") or ""), key=f"est_edit_num_{eid}")
                     st.text_input("Project", value=str(est.get("project_name") or ""), key=f"est_edit_proj_{eid}")
-                    st.selectbox("Customer", customer_filter_options(), key=f"est_edit_cust_{eid}")
+                    st.selectbox(
+                        "Customer",
+                        customer_filter_options(include_names={str(est.get("customer") or "")}),
+                        key=f"est_edit_cust_{eid}",
+                    )
                     st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
                 with ec2:
                     st.number_input("Subtotal", value=float(est.get("subtotal") or 0), key=f"est_edit_sub_{eid}")

@@ -1199,10 +1199,16 @@ def estimates_for_customer(customer_name: str) -> list[dict[str, Any]]:
     return [e for e in load_estimates() if str(e.get("customer") or "").strip().lower() == name]
 
 
-def customer_filter_options() -> list[str]:
-    """Customers for filters — directory plus lookup seeds."""
-    opts = {str(c.get("customer_name") or "").strip() for c in load_customers() if c.get("customer_name")}
-    opts.update(lookup_options("customers"))
+def customer_filter_options(*, include_names: set[str] | None = None) -> list[str]:
+    """Active customer company names from the directory (for forms and filters)."""
+    opts = {
+        str(c.get("customer_name") or "").strip()
+        for c in load_customers()
+        if str(c.get("customer_name") or "").strip()
+        and str(c.get("status") or "Active") == "Active"
+    }
+    if include_names:
+        opts.update(str(n).strip() for n in include_names if str(n).strip())
     return sorted(opts)
 
 
