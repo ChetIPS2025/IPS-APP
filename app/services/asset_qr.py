@@ -4,7 +4,7 @@ import io
 import re
 import textwrap
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, unquote_plus, urlparse
 
 try:
     from db import fetch_table
@@ -14,13 +14,179 @@ except ImportError:
     from app.services.asset_service import build_qr_value  # type: ignore
 
 
+def _app_base_url() -> str:
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    return str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
+
+
+def asset_scan_link_url(*, qr_code_value: str, app_base_url: str | None = None) -> str:
+    """
+    Full URL encoded in asset QR labels for phone scans.
+
+    Format: ``{APP_BASE_URL}/?page=Assets&code=<token>``
+    """
+    b = str(app_base_url or _app_base_url() or "").strip().rstrip("/")
+    v = str(qr_code_value or "").strip()
+    if not b or not v:
+        return v
+    page_q = quote("Assets", safe="")
+    code_q = quote(v, safe="")
+    return f"{b}/?page={page_q}&code={code_q}"
+
+
 def qr_payload(asset: dict[str, Any]) -> str:
-    """Value encoded in asset QR labels (matches DB qr_code_value when set)."""
+    """Stable scan token for an asset (matches DB ``qr_code_value`` when set)."""
     v = str(asset.get("qr_code_value") or "").strip()
     if v:
         return v
-    aid = str(asset.get("asset_id") or "").strip()
+    aid = str(asset.get("asset_id") or asset.get("asset_number") or "").strip()
     return build_qr_value(aid) if aid else ""
+
+
+def qr_embed_subject(asset: dict[str, Any], *, app_base_url: str | None = None) -> str:
+    """Value encoded inside the QR image — full app URL when ``APP_BASE_URL`` is configured."""
+    token = qr_payload(asset)
+    if not token:
+        return ""
+    base = str(app_base_url or _app_base_url() or "").strip().rstrip("/")
+    if base:
+        return asset_scan_link_url(qr_code_value=token, app_base_url=base)
+    return token
+
+
+def _first_query_param(name: str) -> str:
+    import streamlit as st
+
+    try:
+        v = st.query_params.get(name)
+    except Exception:
+        return ""
+    if isinstance(v, list):
+        return str(v[0]).strip() if v else ""
+    return str(v or "").strip()
+
+
+def _normalize_scan_input(raw: str) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    low = s.lower()
+    if "code=" in low or "qr=" in low:
+        try:
+            u = urlparse(s if "://" in s else f"https://placeholder.local{s if s.startswith('/') else '/' + s}")
+            qs = parse_qs(u.query)
+            for key in ("code", "qr"):
+                vals = qs.get(key) or []
+                if vals:
+                    return str(vals[0]).strip()
+        except Exception:
+            return s
+    return s
+
+
+def resolve_asset_uuid_from_scan(raw: str) -> str | None:
+    """Resolve a scanned token or URL to the assets table UUID (includes demo fallback)."""
+    rid = find_asset_id_by_scan(raw)
+    if rid:
+        return rid
+    token = _normalize_scan_token(_normalize_scan_input(raw))
+    if not token:
+        return None
+    try:
+        from app.pages._core._data import load_assets
+    except ImportError:
+        from pages._core._data import load_assets  # type: ignore
+    su = token.upper()
+    for asset in load_assets():
+        uuid = str(asset.get("id") or "").strip()
+        if not uuid:
+            continue
+        if uuid.upper() == su:
+            return uuid
+        num = str(asset.get("asset_number") or asset.get("asset_id") or "").strip().upper()
+        if num and num == su:
+            return uuid
+        qv = str(asset.get("qr_code_value") or "").strip().upper()
+        if qv and qv == su:
+            return uuid
+        if su.startswith("IPS-") and num and su == f"IPS-{num}":
+            return uuid
+    return None
+
+
+def capture_asset_deeplink_from_query() -> None:
+    """Read ``?page=Assets&code=…`` (or ``?qr=``) from the URL and stash for post-nav apply."""
+    import streamlit as st
+
+    pg = _first_query_param("page")
+    raw_code = _first_query_param("code") or _first_query_param("qr")
+    wants_assets = False
+    if pg:
+        decoded = unquote_plus(pg).strip().lower()
+        if decoded in {"assets", "asset", "asset database"}:
+            wants_assets = True
+
+    scan_raw = _normalize_scan_input(raw_code) if raw_code else ""
+    if wants_assets:
+        st.session_state["_ips_asset_deeplink_nav"] = True
+    if scan_raw:
+        st.session_state["_ips_asset_deeplink_code"] = scan_raw
+
+    if wants_assets or scan_raw:
+        for key in ("page", "code", "qr"):
+            try:
+                if key in st.query_params:
+                    del st.query_params[key]
+            except Exception:
+                try:
+                    st.query_params.pop(key, None)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+
+
+def apply_asset_deeplink_navigation() -> None:
+    """Open Assets with the scanned asset selected (call after nav-change clears)."""
+    import streamlit as st
+
+    try:
+        from app.utils.constants import SESSION_NAV_KEY
+    except ImportError:
+        from utils.constants import SESSION_NAV_KEY  # type: ignore
+
+    wants_assets = bool(st.session_state.pop("_ips_asset_deeplink_nav", False))
+    scan_raw = str(st.session_state.pop("_ips_asset_deeplink_code", "") or "").strip()
+    if not wants_assets and not scan_raw:
+        return
+
+    st.session_state[SESSION_NAV_KEY] = "assets"
+    asset_uuid = resolve_asset_uuid_from_scan(scan_raw) if scan_raw else None
+    if asset_uuid:
+        st.session_state["ips_sel_assets"] = asset_uuid
+        st.session_state["ips_tab_assets"] = "Overview"
+    elif scan_raw:
+        st.session_state["_ips_asset_deeplink_pending"] = scan_raw
+
+
+def merge_asset_deeplink_from_query() -> None:
+    """Capture URL params and apply navigation (single-call helper for tests)."""
+    capture_asset_deeplink_from_query()
+    apply_asset_deeplink_navigation()
+
+
+def apply_pending_asset_deeplink() -> None:
+    """Resolve a deferred scan token once assets data is available."""
+    import streamlit as st
+
+    pending = str(st.session_state.pop("_ips_asset_deeplink_pending", "") or "").strip()
+    if not pending:
+        return
+    asset_uuid = resolve_asset_uuid_from_scan(pending)
+    if asset_uuid:
+        st.session_state["ips_sel_assets"] = asset_uuid
+        st.session_state["ips_tab_assets"] = "Overview"
 
 
 def qr_png_bytes(payload: str, box_size: int = 6, border: int = 2) -> bytes:
@@ -285,6 +451,8 @@ def find_asset_id_by_scan(raw: str) -> str | None:
             qs = parse_qs(p.query)
             if "qr" in qs and qs["qr"]:
                 s = unquote(qs["qr"][0].strip())
+            elif "code" in qs and qs["code"]:
+                s = unquote(qs["code"][0].strip())
             else:
                 parts = [x for x in p.path.split("/") if x]
                 if parts:
@@ -292,11 +460,20 @@ def find_asset_id_by_scan(raw: str) -> str | None:
         except Exception:
             pass
 
+    s = _normalize_scan_token(s)
+    if not s:
+        return None
+
     assets = fetch_table("assets", limit=5000, order_by="asset_name")
     if not assets:
         return None
 
     su = s.upper()
+
+    for a in assets:
+        rid = str(a.get("id") or "").strip()
+        if rid and rid.upper() == su:
+            return rid
 
     for a in assets:
         qv = str(a.get("qr_code_value") or "").strip()

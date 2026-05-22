@@ -173,6 +173,12 @@ def main() -> None:
     bootstrap_auth_at_startup()
     inject_global_css()
 
+    try:
+        from app.services.asset_qr import capture_asset_deeplink_from_query
+    except ImportError:
+        from services.asset_qr import capture_asset_deeplink_from_query  # type: ignore
+    capture_asset_deeplink_from_query()
+
     if not is_authenticated():
         _render_login()
         if not is_authenticated():
@@ -195,6 +201,14 @@ def main() -> None:
     if prev_slug and prev_slug != slug:
         on_nav_change(str(prev_slug), slug)
     st.session_state["_ips_last_slug"] = slug
+
+    try:
+        from app.services.asset_qr import apply_asset_deeplink_navigation
+    except ImportError:
+        from services.asset_qr import apply_asset_deeplink_navigation  # type: ignore
+    apply_asset_deeplink_navigation()
+    slug = current_nav_slug()
+    st.session_state[SESSION_NAV_KEY] = slug
 
     render_sidebar(slug)
 

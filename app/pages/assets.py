@@ -133,6 +133,90 @@ def _asset_image_html(asset: dict) -> str:
     )
 
 
+def _asset_for_qr(asset: dict) -> dict:
+    num = str(asset.get("asset_number") or asset.get("asset_id") or "").strip()
+    return {**asset, "asset_id": num}
+
+
+def _render_asset_qr_block(asset: dict, aid: str) -> None:
+    try:
+        from app.services.asset_qr import (
+            asset_scan_link_url,
+            qr_embed_subject,
+            qr_label_2x1_sticker_download_filename,
+            qr_label_2x1_sticker_pdf_bytes,
+            qr_label_for_download,
+            qr_payload,
+            qr_png_bytes,
+        )
+    except ImportError:
+        from services.asset_qr import (  # type: ignore
+            asset_scan_link_url,
+            qr_embed_subject,
+            qr_label_2x1_sticker_download_filename,
+            qr_label_2x1_sticker_pdf_bytes,
+            qr_label_for_download,
+            qr_payload,
+            qr_png_bytes,
+        )
+
+    qr_asset = _asset_for_qr(asset)
+    token = qr_payload(qr_asset)
+    if not token:
+        return
+    subject = qr_embed_subject(qr_asset)
+    scan_url = asset_scan_link_url(qr_code_value=token)
+
+    with st.container(border=True):
+        st.markdown(
+            '<span class="ips-assets-qr-tool"></span>'
+            '<p style="margin:0 0 0.35rem;font-weight:700;font-size:0.9rem;">Equipment QR</p>',
+            unsafe_allow_html=True,
+        )
+        try:
+            st.image(qr_png_bytes(subject), width=132)
+        except Exception:
+            st.caption(f"Scan code: {token}")
+        st.caption(f"Asset tag: **{html.escape(token)}**", unsafe_allow_html=True)
+        if scan_url.startswith("http"):
+            st.caption("Scan with a phone camera to open this asset card.")
+        else:
+            st.caption("Set APP_BASE_URL so printed labels open the asset card when scanned.")
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            try:
+                dl_bytes, dl_mime, dl_name = qr_label_for_download(qr_asset, subject)
+                st.download_button(
+                    "Print label",
+                    data=dl_bytes,
+                    file_name=dl_name,
+                    mime=dl_mime,
+                    key=f"ast_qr_label_{aid}",
+                    use_container_width=True,
+                )
+            except Exception:
+                st.download_button(
+                    "Download QR (PNG)",
+                    data=qr_png_bytes(subject),
+                    file_name=f"{token}_qr.png",
+                    mime="image/png",
+                    key=f"ast_qr_png_{aid}",
+                    use_container_width=True,
+                )
+        with dl2:
+            try:
+                st.download_button(
+                    "2×1 sticker",
+                    data=qr_label_2x1_sticker_pdf_bytes(qr_asset, subject),
+                    file_name=qr_label_2x1_sticker_download_filename(qr_asset),
+                    mime="application/pdf",
+                    key=f"ast_qr_sticker_{aid}",
+                    use_container_width=True,
+                )
+            except Exception:
+                pass
+
+
 def _render_detail(asset: dict) -> None:
     aid = str(asset.get("id") or "")
     asset_number = str(asset.get("asset_number") or "—")
@@ -268,6 +352,7 @@ def _render_detail(asset: dict) -> None:
                     f"{_asset_image_html(asset)}</div>",
                     unsafe_allow_html=True,
                 )
+                _render_asset_qr_block(asset, aid)
 
             st.markdown(
                 '<div class="ips-assets-maint-section">'
@@ -397,6 +482,11 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("assets"):
         return
+    try:
+        from app.services.asset_qr import apply_pending_asset_deeplink
+    except ImportError:
+        from services.asset_qr import apply_pending_asset_deeplink  # type: ignore
+    apply_pending_asset_deeplink()
     inject_assets_page_styles()
     st.markdown(
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',

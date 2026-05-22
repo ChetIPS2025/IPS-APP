@@ -81,6 +81,7 @@ def _filter_employees(rows: list[dict], *, q: str, dept: str, status: str, role:
             if ql in str(e.get("name", "")).lower()
             or ql in str(e.get("email", "")).lower()
             or ql in str(e.get("username", "")).lower()
+            or ql in str(e.get("phone", "")).lower()
         ]
     if dept and dept != "All Departments":
         out = [e for e in out if str(e.get("department", "")) == dept]
@@ -238,6 +239,12 @@ def _render_detail(emp: dict) -> None:
                     with ec1:
                         st.text_input("Name", value=str(emp.get("name") or ""), key=f"emp_edit_name_{eid}")
                         st.text_input("Email", value=str(emp.get("email") or ""), key=f"emp_edit_email_{eid}")
+                        st.text_input(
+                            "Phone",
+                            value=str(emp.get("phone") or "").replace("—", ""),
+                            key=f"emp_edit_phone_{eid}",
+                            placeholder="(337) 555-0100",
+                        )
                         st.selectbox("Department", lookup_options("departments"), key=f"emp_edit_dept_{eid}")
                     with ec2:
                         st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{eid}")
@@ -247,6 +254,7 @@ def _render_detail(emp: dict) -> None:
                             {
                                 "name": st.session_state.get(f"emp_edit_name_{eid}"),
                                 "email": st.session_state.get(f"emp_edit_email_{eid}"),
+                                "phone": st.session_state.get(f"emp_edit_phone_{eid}"),
                                 "department": st.session_state.get(f"emp_edit_dept_{eid}"),
                                 "role": st.session_state.get(f"emp_edit_role_{eid}"),
                                 "status": st.session_state.get(f"emp_edit_status_{eid}"),
@@ -348,15 +356,25 @@ def render() -> None:
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New employee", expanded=True):
-            st.text_input("Name", key="emp_new_name")
-            st.text_input("Email", key="emp_new_email")
-            st.selectbox("Department", lookup_options("departments"), key="emp_new_dept")
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.text_input("Name", key="emp_new_name")
+                st.text_input("Email", key="emp_new_email")
+            with nc2:
+                st.text_input(
+                    "Phone",
+                    key="emp_new_phone",
+                    placeholder="(337) 555-0100",
+                    help="Mobile or office number for this employee.",
+                )
+                st.selectbox("Department", lookup_options("departments"), key="emp_new_dept")
             st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
             if st.button("Save employee", key="emp_save_new", type="primary"):
                 ok, msg = persist_employee(
                     {
                         "name": st.session_state.get("emp_new_name"),
                         "email": st.session_state.get("emp_new_email"),
+                        "phone": st.session_state.get("emp_new_phone"),
                         "department": st.session_state.get("emp_new_dept"),
                         "role": st.session_state.get("emp_new_role"),
                         "status": "Active",

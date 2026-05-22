@@ -186,6 +186,7 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "model": str(row.get("model") or "—"),
         "operator": str(row.get("operator") or row.get("assigned_employee") or "—"),
         "description": str(row.get("description") or row.get("notes") or ""),
+        "qr_code_value": str(row.get("qr_code_value") or "").strip(),
     }
 
 

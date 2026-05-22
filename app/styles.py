@@ -116,26 +116,28 @@ def inject_jobs_module_css() -> None:
   display: grid !important;
   box-sizing: border-box !important;
 }}
-.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
+.ips-jobs-page .ips-jobs-summary-table .ips-jobs-row,
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row {{
   display: grid !important;
   min-height: 2.75rem;
-  white-space: nowrap;
+  width: 100%;
+  min-width: 48rem;
+  box-sizing: border-box;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
-  border-bottom: 1px solid #e5eaf2;
-  background: #ffffff;
 }}
-.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row:hover {{
   background: #eef5ff;
 }}
-.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row.selected {{
   background: #eef5ff;
   border-left: 4px solid #2563eb;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
-  overflow: hidden;
-  text-overflow: ellipsis;
 }}
 .ips-jobs-page .ips-data-table-html .ips-data-row {{
   display: grid !important;
