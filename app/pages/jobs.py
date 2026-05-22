@@ -372,6 +372,7 @@ def render() -> None:
         html_cell=_jobs_table_cell,
         col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
         on_row_click=lambda rid, _rec: _open_jobs_detail_modal(rid),
+        html_rows=True,
     )
 
     _show_jobs_detail_modal_if_pending()

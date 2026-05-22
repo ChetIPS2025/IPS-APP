@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v11"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v12"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -533,17 +533,22 @@ def render_clean_table_click_bridge(
 
   function sendValue(id) {{
     const payload = {{ type: "streamlit:setComponentValue", value: id }};
-    try {{
-      if (window.Streamlit && typeof window.Streamlit.setComponentValue === "function") {{
-        window.Streamlit.setComponentValue(id);
-      }}
-    }} catch (err) {{}}
-    try {{
-      w.postMessage(payload, "*");
-    }} catch (err) {{}}
-    try {{
-      window.postMessage(payload, "*");
-    }} catch (err) {{}}
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {{
+      return f && arr.indexOf(f) === i;
+    }});
+    for (var i = 0; i < frames.length; i++) {{
+      try {{
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {{
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }}
+      }} catch (err) {{}}
+    }}
+    for (var j = 0; j < frames.length; j++) {{
+      try {{
+        frames[j].postMessage(payload, "*");
+      }} catch (err) {{}}
+    }}
   }}
 
   function tableScope() {{

@@ -138,17 +138,18 @@ def render_clickable_table(
                 f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
                 f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>'
             )
-        st.markdown(
-            f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
-            f'<{ot} class="ips-data-table-scroll">'
-            f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
-            f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
-            + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
-            + f"</{ot}>"
-            + "".join(row_html_parts)
-            + f"</{ct}></{ct}>",
-            unsafe_allow_html=True,
-        )
+        with st.container(border=True):
+            st.markdown(
+                f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
+                f'<{ot} class="ips-data-table-scroll">'
+                f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
+                f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
+                + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
+                + f"</{ot}>"
+                + "".join(row_html_parts)
+                + f"</{ct}></{ct}>",
+                unsafe_allow_html=True,
+            )
         picked = render_clean_table_click_bridge(
             table_selector=f".{table_class}",
             row_selector=".ips-data-row[data-row-id]",
@@ -157,13 +158,13 @@ def render_clickable_table(
         if picked:
             pid = str(picked).strip()
             if pid and pid in records_by_id:
-                if apply_clean_table_row_selection(
+                apply_clean_table_row_selection(
                     pid,
                     session_select_key=sel_key,
                     records_by_id=records_by_id,
                     on_row_click=on_row_click,
-                ):
-                    st.rerun()
+                )
+                st.rerun()
     else:
         with st.container(border=True):
             st.markdown(
