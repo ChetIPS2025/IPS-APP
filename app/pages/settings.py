@@ -1,12 +1,12 @@
-"""Settings — company profile and preferences."""
+"""Settings page — delegates to admin module with settings context."""
 
 from __future__ import annotations
 
 try:
-    from app.pages._import_render import load_render
+    from app.pages.modules import admin
 except ImportError:
-    from pages._import_render import load_render  # type: ignore
+    from pages.modules import admin  # type: ignore
 
-render = load_render("settings")
 
-__all__ = ["render"]
+def render() -> None:
+    admin.render()

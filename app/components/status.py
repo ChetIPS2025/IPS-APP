@@ -19,7 +19,7 @@ _STATUS_CLASS = {
     "expired": "ips-status-danger",
     "rejected": "ips-status-danger",
     "cancelled": "ips-status-danger",
-    "out of stock": "ips-status-danger",
+    "inactive": "ips-status-danger",
     "in service": "ips-status-active",
     "out of service": "ips-status-danger",
     "scheduled": "ips-status-sent",

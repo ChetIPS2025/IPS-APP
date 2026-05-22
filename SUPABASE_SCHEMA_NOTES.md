@@ -46,7 +46,7 @@ See **`sql/MIGRATION_ORDER.md`** for full dependency tiers and run order.
 
 ## Phase 3 app wiring (services)
 
-- Pages call **`app/pages/modules/_data.py`** → **`app/services/*_service.py`** → **`phase2_modules_service.py`** → **`repository.py`**.
+- Pages call **`app/pages/_core/_data.py`** → **`app/services/*_service.py`** → **`phase2_modules_service.py`** → **`repository.py`**.
 - Mutations call **`clear_all_data_caches()`** after insert/update/delete.
 - Demo row IDs (`demo-*`) are blocked from writes with a clear message; demo lists still load when tables are missing.
 

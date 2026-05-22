@@ -610,23 +610,23 @@ def current_profile() -> dict:
 
 def current_role() -> str:
     """
-    Normalized app role.
+    Normalized app role for permissions checks.
 
-    Supported roles:
-    - admin
-    - manager
-    - employee
-    - viewer
-
-    Legacy compatibility:
-    - pm, estimator -> manager
+    Supported roles: admin, supervisor, project manager, employee, viewer.
     """
     raw = str(current_profile().get("role", "viewer") or "viewer").strip().lower()
-    if raw in {"estimator", "pm"}:
-        return "manager"
-    if raw in {"admin", "manager", "employee", "viewer"}:
-        return raw
-    return "viewer"
+    aliases = {
+        "admin": "admin",
+        "supervisor": "supervisor",
+        "manager": "project manager",
+        "pm": "project manager",
+        "project manager": "project manager",
+        "project_manager": "project manager",
+        "estimator": "project manager",
+        "employee": "employee",
+        "viewer": "viewer",
+    }
+    return aliases.get(raw, "viewer")
 
 
 def get_current_user_role() -> str:

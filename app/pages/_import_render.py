@@ -1,4 +1,4 @@
-"""Resolve module render() for page wrappers (app/ vs project-root import paths)."""
+"""Resolve page render() for Streamlit multipage scripts (legacy path)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,6 @@ from typing import Callable
 
 
 def _multipage_auth_gate() -> None:
-    """
-    Streamlit multipage scripts under ``app/pages/*.py`` run outside ``main.py``.
-
-    Redirect unauthenticated visitors to the home entry so login and modules never mix.
-    """
     import streamlit as st
 
     try:
@@ -32,7 +27,7 @@ def _multipage_auth_gate() -> None:
 
 
 def _load_render_impl(module_name: str) -> Callable[[], None]:
-    for path in (f"app.pages.modules.{module_name}", f"pages.modules.{module_name}"):
+    for path in (f"app.pages.{module_name}", f"pages.{module_name}"):
         try:
             mod = importlib.import_module(path)
             fn = getattr(mod, "render", None)
@@ -40,15 +35,13 @@ def _load_render_impl(module_name: str) -> Callable[[], None]:
                 return fn
         except ImportError:
             continue
-    raise ImportError(f"Cannot import render() for pages.modules.{module_name}")
+    raise ImportError(f"Cannot import render() for pages.{module_name}")
 
 
 def load_render(module_name: str) -> Callable[[], None]:
     inner = _load_render_impl(module_name)
 
     def guarded_render() -> None:
-        import streamlit as st
-
         _multipage_auth_gate()
         inner()
 

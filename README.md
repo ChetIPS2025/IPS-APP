@@ -41,8 +41,9 @@ app/
   styles.py            # Global CSS (all modules)
   phase2.py            # Module registry → render()
   components/          # Shared UI (sidebar, tables, cards, …)
-  pages/               # Thin wrappers: dashboard.py, jobs.py, …
-    modules/           # Module implementations
+  pages/               # Page modules: dashboard.py, jobs.py, …
+    _core/             # Shared page helpers (_data, _access, _session)
+    modules/           # Legacy copies (not routed — use pages/*.py)
     _legacy/           # Old screens (not routed)
   services/            # Supabase reads/writes per domain
   utils/               # constants, permissions, formatting, dates

@@ -81,17 +81,15 @@ def render_clickable_table(
     try:
         from app.ui.clean_table import (
             apply_clean_table_row_selection,
-            inject_clean_table_css,
             render_clean_table_click_bridge,
         )
     except ImportError:
         from ui.clean_table import (  # type: ignore
             apply_clean_table_row_selection,
-            inject_clean_table_css,
             render_clean_table_click_bridge,
         )
 
-    inject_clean_table_css()
+    # Table row CSS is injected globally via styles.inject_global_css()
 
     sel_key = session_select_key or key
     table_class = "ips-click-table-" + re.sub(r"[^a-zA-Z0-9_-]", "_", key)

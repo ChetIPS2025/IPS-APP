@@ -41,3 +41,85 @@ def render_page_header(
                 with (ac1 if i % 2 == 0 else ac2):
                     widget()
             st.markdown(f"</{ct}>", unsafe_allow_html=True)
+
+
+def _initials(name: str) -> str:
+    parts = [p for p in str(name or "").strip().split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def render_person_profile_header(
+    name: str,
+    *,
+    role: str = "",
+    department: str = "",
+    status: str = "Active",
+    email: str = "",
+    phone: str = "",
+    last_login: str = "",
+    status_html: str = "",
+) -> None:
+    """Profile summary row matching Coastal/IPS Users detail header."""
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    pill = status_html or ""
+    if not pill and status:
+        try:
+            from app.components.status import status_pill_html
+        except ImportError:
+            from components.status import status_pill_html  # type: ignore
+        pill = status_pill_html(status)
+    sub_parts = [html.escape(x) for x in (role, department) if str(x or "").strip()]
+    sub = " · ".join(sub_parts)
+    contact_lines = []
+    if email:
+        contact_lines.append(html.escape(email))
+    if phone:
+        contact_lines.append(html.escape(phone))
+    if last_login:
+        contact_lines.append(f"Last login: {html.escape(last_login)}")
+    contact = "<br>".join(contact_lines)
+    st.markdown(
+        f"""
+<{ot} class="ips-profile-header">
+  <{ot} class="ips-profile-avatar">{html.escape(_initials(name))}</{ct}>
+  <{ot} class="ips-profile-main">
+    <p class="ips-profile-name">{html.escape(name)} {pill}</p>
+    <p class="ips-profile-sub">{sub}</p>
+    <{ot} class="ips-profile-contact">{contact}</{ct}>
+  </{ct}>
+</{ct}>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_quick_actions_grid(
+    actions: list[tuple[str, str, str]],
+    *,
+    key_prefix: str = "ips_qa",
+) -> None:
+    """
+    Quick-action button grid (Dashboard style).
+
+    Each item: (icon, label, nav_slug_or_empty).
+    """
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    st.markdown(f'<{ot} class="ips-quick-actions">', unsafe_allow_html=True)
+    row_size = 4
+    for row_start in range(0, len(actions), row_size):
+        cols = st.columns(row_size)
+        for j, col in enumerate(cols):
+            idx = row_start + j
+            if idx >= len(actions):
+                break
+            icon, label, slug = actions[idx]
+            with col:
+                if st.button(f"{icon}  {label}", key=f"{key_prefix}_{idx}", use_container_width=True):
+                    if slug:
+                        st.session_state["ips_nav_page"] = slug
+                        st.rerun()
+    st.markdown(f"</{ct}>", unsafe_allow_html=True)

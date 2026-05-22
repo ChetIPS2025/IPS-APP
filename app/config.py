@@ -227,7 +227,7 @@ class Settings:
     supabase_service_role_key: str = field(default_factory=_service_role_key)
 
     app_env: str = field(default_factory=lambda: _strip_env("APP_ENV", "development"))
-    app_name: str = field(default_factory=lambda: _strip_env("APP_NAME", "IPS Estimating"))
+    app_name: str = field(default_factory=lambda: _strip_env("APP_NAME", "IPS Operations"))
     # Public base URL for deep links (no trailing slash). Defaults to live Render; override with APP_BASE_URL.
     app_base_url: str = field(default_factory=_resolve_app_base_url)
     storage_bucket: str = field(default_factory=lambda: _strip_env("STORAGE_BUCKET", "ips-storage"))

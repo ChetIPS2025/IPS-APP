@@ -111,7 +111,6 @@ def set_nav_slug(slug: str) -> None:
     st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(slug)
 
 
-# Re-export router (implementation lives in phase2 until fully merged).
 try:
     from app.phase2 import BUILT_MODULES, ensure_nav_defaults, on_nav_change, render_module
 except ImportError:

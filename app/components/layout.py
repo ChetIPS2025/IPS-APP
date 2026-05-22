@@ -34,24 +34,28 @@ def render_selected_detail_panel(
     session_select_key: str | None = None,
     actions: Callable[[], None] | None = None,
     show_default_actions: bool = True,
+    header_fn: Callable[[], None] | None = None,
     tabs_fn: Callable[[], None] | None = None,
     body_fn: Callable[[], None] | None = None,
 ) -> None:
     """Detail panel below selected table row — tabs + action bar."""
     st.markdown(f'<{_OT} class="ips-detail-panel">', unsafe_allow_html=True)
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.markdown(
-            f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(f'<{_OT} class="ips-detail-actions">', unsafe_allow_html=True)
-        if actions:
-            actions()
-        elif show_default_actions and session_select_key:
-            render_detail_actions(session_select_key)
-        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
+    if header_fn:
+        header_fn()
+    else:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(
+                f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(f'<{_OT} class="ips-detail-actions">', unsafe_allow_html=True)
+            if actions:
+                actions()
+            elif show_default_actions and session_select_key:
+                render_detail_actions(session_select_key)
+            st.markdown(f"<{_CT}>", unsafe_allow_html=True)
     if tabs_fn:
         tabs_fn()
     if body_fn:

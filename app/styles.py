@@ -712,6 +712,59 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   text-align: center;
   padding: 1rem;
 }}
+
+/* Person / user profile header (Users, Employees detail) */
+.ips-profile-header {{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid {BORDER};
+}}
+.ips-profile-avatar {{
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: {PRIMARY};
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}}
+.ips-profile-main {{
+  flex: 1;
+  min-width: 12rem;
+}}
+.ips-profile-name {{
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: {TEXT};
+}}
+.ips-profile-sub {{
+  font-size: 0.8125rem;
+  color: {TEXT_MUTED};
+  margin: 0.2rem 0 0;
+}}
+.ips-profile-contact {{
+  font-size: 0.8125rem;
+  color: {TEXT_MUTED};
+  margin-top: 0.35rem;
+  line-height: 1.5;
+}}
+.ips-profile-actions {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-left: auto;
+}}
+
 .ips-nested-table-wrap {{
   margin-top: 0.75rem;
 }}
@@ -1042,3 +1095,8 @@ section[data-testid="stSidebar"] hr {{
 """,
         unsafe_allow_html=True,
     )
+    try:
+        from app.ui.clean_table import inject_clean_table_css
+    except ImportError:
+        from ui.clean_table import inject_clean_table_css  # type: ignore
+    inject_clean_table_css()
