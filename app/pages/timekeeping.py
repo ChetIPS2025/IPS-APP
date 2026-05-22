@@ -175,6 +175,36 @@ def _inject_timekeeping_styles() -> None:
             padding-bottom: 0.65rem;
             margin-bottom: 0.6rem;
         }
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-detail-anchor)
+        > div > [data-testid="stHorizontalBlock"]:first-of-type {
+            border-bottom: 1px solid #e5eaf2;
+            padding-bottom: 0.65rem;
+            margin-bottom: 0.55rem;
+        }
+        .ips-time-weekly-grid-section {
+            display: block;
+            width: 100%;
+        }
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-detail-anchor)
+        [data-testid="stNumberInput"] input,
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-detail-anchor)
+        [data-testid="stSelectbox"] > div,
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-detail-anchor)
+        [data-testid="stTextInput"] input {
+            background: #f3f4f6 !important;
+            border: 1px solid #e5eaf2 !important;
+            border-radius: 8px !important;
+            min-height: 2.1rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-detail-anchor)
+        [data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+        }
         .ips-time-detail-name {
             margin: 0;
             color: #111827;
@@ -334,7 +364,6 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
 
     with st.container(border=True):
         st.markdown('<span class="ips-time-detail-anchor"></span>', unsafe_allow_html=True)
-        st.markdown('<div class="ips-time-detail-top">', unsafe_allow_html=True)
         h1, h2, h3 = st.columns([2.2, 4.2, 2.3], gap="medium")
         with h1:
             st.markdown(
@@ -391,7 +420,8 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
                     st.session_state.pop(_SEL, None)
                     st.session_state[_COLLAPSED_KEY] = True
                     st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<span class="ips-time-weekly-grid-section"></span>', unsafe_allow_html=True)
 
         header = st.columns([0.55, 0.7, 2.2, 0.85, 0.85, 0.85, 1.45, 0.35])
         labels = ["Day", "Date", "Job / Description", "S/T (Hrs)", "O/T (Hrs)", "Total (Hrs)", "Notes", ""]
@@ -537,7 +567,10 @@ def render() -> None:
     if not begin_module("timekeeping"):
         return
     _inject_timekeeping_styles()
-    st.markdown('<span class="ips-timekeeping-page"></span>', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="ips-timekeeping-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     ws = _current_week_start()
     we = week_end(ws)
 
@@ -605,10 +638,6 @@ def render() -> None:
     if selected_id and not any(str(s.get("id")) == selected_id for s in filtered):
         st.session_state.pop(_SEL, None)
         selected_id = ""
-
-    if filtered and not selected_id and not st.session_state.get(_COLLAPSED_KEY):
-        selected_id = str(filtered[0].get("id") or "")
-        st.session_state[_SEL] = selected_id
 
     _render_timekeeping_table(filtered, selected_id=selected_id, week_start_d=ws)
 

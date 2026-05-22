@@ -616,20 +616,75 @@ def get_task(task_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _active_employees() -> list[dict[str, Any]]:
+    """Employees eligible for timekeeping (Active status in Users)."""
+    return [
+        e
+        for e in load_employees()
+        if str(e.get("status") or "Active") == "Active" and str(e.get("id") or "").strip()
+    ]
+
+
+_DEMO_TIMEKEEPING_BY_EMP: dict[str, dict[str, Any]] = {
+    "emp-chance": {"st_total": 38.5, "ot_total": 4.0, "dt_total": 0.0, "status": "Pending"},
+    "emp-mark": {"st_total": 40.0, "ot_total": 2.5, "dt_total": 0.0, "status": "Approved"},
+    "emp-sarah": {"st_total": 32.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
+    "emp-leland": {"st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
+}
+
+
+def _timekeeping_summary_for_employee(
+    emp: dict[str, Any],
+    week_start: date,
+    tk_row: dict[str, Any] | None,
+) -> dict[str, Any]:
+    eid = str(emp.get("id") or "").strip()
+    if tk_row:
+        return {
+            **tk_row,
+            "id": eid,
+            "name": str(emp.get("name") or tk_row.get("name") or ""),
+            "department": str(emp.get("department") or tk_row.get("department") or ""),
+            "week_start": str(tk_row.get("week_start") or week_start.isoformat())[:10],
+        }
+    demo = _DEMO_TIMEKEEPING_BY_EMP.get(eid, {})
+    return {
+        "id": eid,
+        "name": str(emp.get("name") or ""),
+        "department": str(emp.get("department") or ""),
+        "week_start": week_start.isoformat(),
+        "st_total": float(demo.get("st_total") or 0),
+        "ot_total": float(demo.get("ot_total") or 0),
+        "dt_total": float(demo.get("dt_total") or 0),
+        "status": str(demo.get("status") or "Pending"),
+    }
+
+
+def _demo_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
+    return [_timekeeping_summary_for_employee(e, week_start, None) for e in _active_employees()]
+
+
 def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
     try:
         from app.services.timekeeping_service import list_timekeeping_summaries
     except ImportError:
         from services.timekeeping_service import list_timekeeping_summaries  # type: ignore
-    demo = [
-        {"id": "emp-chance", "name": "Chance Burgess", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 38.5, "ot_total": 4.0, "dt_total": 0.0, "status": "Pending"},
-        {"id": "emp-mark", "name": "Mark Johnson", "department": "Field Operations", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 2.5, "dt_total": 0.0, "status": "Approved"},
-        {"id": "emp-sarah", "name": "Sarah Chen", "department": "Project Management", "week_start": week_start.isoformat(), "st_total": 32.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
-        {"id": "emp-leland", "name": "Leland Daigle", "department": "Administration", "week_start": week_start.isoformat(), "st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
-    ]
-    rows, used = list_timekeeping_summaries(week_start, demo=demo)
+
+    employees = _active_employees()
+    employee_ids = {str(e.get("id") or "").strip() for e in employees}
+    rows, used = list_timekeeping_summaries(week_start, demo=_demo_timekeeping_summaries(week_start))
     _mark_if_demo(used)
-    return rows
+
+    by_id: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        rid = str(row.get("id") or "").strip()
+        if rid and rid in employee_ids:
+            by_id[rid] = row
+
+    return [
+        _timekeeping_summary_for_employee(emp, week_start, by_id.get(str(emp.get("id") or "").strip()))
+        for emp in employees
+    ]
 
 
 def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
