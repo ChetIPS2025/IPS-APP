@@ -186,31 +186,35 @@ def render_clickable_table(
                     for field, _ in columns
                 )
                 label = _row_label(rec, columns)
+                row_html = (
+                    f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
+                    f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>'
+                )
+
+                def _select_row(_rid: str = rid) -> None:
+                    apply_clean_table_row_selection(
+                        _rid,
+                        session_select_key=sel_key,
+                        records_by_id=records_by_id,
+                        on_row_click=on_row_click,
+                    )
+
                 with st.container():
                     st.markdown(
                         '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
                     st.markdown(
-                        f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
-                        f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
                         '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    if st.button(
+                    st.button(
                         " ",
                         key=f"{key}_row_sel_{row_idx}",
                         help=f"Select {label}",
-                    ):
-                        apply_clean_table_row_selection(
-                            rid,
-                            session_select_key=sel_key,
-                            records_by_id=records_by_id,
-                            on_row_click=on_row_click,
-                        )
+                        on_click=_select_row,
+                    )
+                    st.markdown(row_html, unsafe_allow_html=True)
 
     return str(st.session_state.get(sel_key) or "").strip() or None
 

@@ -182,6 +182,10 @@ def _render_detail_body(job: dict) -> None:
                     st.rerun()
 
 
+def _select_job_row(job_id: str) -> None:
+    _open_jobs_detail_modal(job_id)
+
+
 def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
     if not rows:
         st.caption("No records to display.")
@@ -225,37 +229,53 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
             jid_attr = html.escape(jid, quote=True)
             jnum = html.escape(str(job.get("job_number") or ""))
             jlabel = html.escape(str(job.get("job_number") or "job"), quote=True)
+            row_html = (
+                f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
+                f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
+                f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
+                f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
+                f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
+                f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
+                f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
+                f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
+                f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
+                "</div>"
+            )
             with st.container():
                 st.markdown(
                     '<span class="ips-clean-row-wrap ips-jobs-row-wrap" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
-                    f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
-                    f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
-                    f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
-                    f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
-                    f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
-                    f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
-                    f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
-                    f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
                     '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                if st.button(
+                st.button(
                     " ",
                     key=f"jobs_row_sel_{row_idx}_{jid}",
                     help=f"Select job {jlabel}",
-                ):
-                    _open_jobs_detail_modal(jid)
-                    st.rerun()
+                    on_click=_select_job_row,
+                    args=(jid,),
+                )
+                st.markdown(row_html, unsafe_allow_html=True)
 
     st.session_state["_ips_jobs_modal_by_id"] = records_by_id
+
+    try:
+        from app.ui.clean_table import render_clean_table_click_bridge
+    except ImportError:
+        from ui.clean_table import render_clean_table_click_bridge  # type: ignore
+
+    picked = render_clean_table_click_bridge(
+        table_selector=".ips-jobs-click-table",
+        row_selector=".ips-jobs-row[data-row-id]",
+        component_key="ips_jobs_row_click_bridge",
+    )
+    if picked:
+        pid = str(picked).strip()
+        if pid in records_by_id:
+            _open_jobs_detail_modal(pid)
+            st.rerun()
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)

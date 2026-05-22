@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v4"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v5"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -163,6 +163,27 @@ def inject_assets_page_styles() -> None:
             box-shadow: none !important;
             text-align: left !important;
             justify-content: flex-start !important;
+        }
+        .ips-assets-num-qr-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+        .ips-assets-row-qr {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            border: 1px solid #e5eaf2;
+            border-radius: 4px;
+            background: #ffffff;
+            image-rendering: pixelated;
+        }
+        .ips-assets-num-label {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-name-cell {
             font-size: 0.8125rem;
@@ -475,6 +496,32 @@ def render_assets_header_inner_html() -> str:
 def table_header_html(label: str, *, sortable: bool = True) -> str:
     sort = '<span class="ips-assets-th-sort">⇅</span>' if sortable else ""
     return f'<p class="ips-assets-th">{html.escape(label)}{sort}</p>'
+
+
+def asset_number_cell_html(asset: dict) -> str:
+    """Asset # column: compact QR thumbnail beside the asset number."""
+    try:
+        from app.services.asset_qr import qr_embed_subject, qr_thumb_data_uri
+    except ImportError:
+        from services.asset_qr import qr_embed_subject, qr_thumb_data_uri  # type: ignore
+
+    num = str(asset.get("asset_number") or "—")
+    num_esc = html.escape(num)
+    qr_asset = {
+        **asset,
+        "asset_id": str(asset.get("asset_number") or asset.get("asset_id") or "").strip(),
+    }
+    subject = qr_embed_subject(qr_asset)
+    uri = qr_thumb_data_uri(subject) if subject else ""
+    if not uri:
+        return f'<span class="ips-clean-link">{num_esc}</span>'
+    alt = html.escape(f"QR code for {num}", quote=True)
+    return (
+        f'<span class="ips-assets-num-qr-cell">'
+        f'<img class="ips-assets-row-qr" src="{uri}" alt="{alt}" width="32" height="32" loading="lazy" />'
+        f'<span class="ips-clean-link ips-assets-num-label">{num_esc}</span>'
+        f"</span>"
+    )
 
 def status_pill_category(status: str) -> str:
     s = str(status or "").strip().lower()

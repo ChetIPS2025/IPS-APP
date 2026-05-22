@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import base64
 import io
 import re
 import textwrap
+from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, unquote_plus, urlparse
 
@@ -200,6 +202,16 @@ def qr_png_bytes(payload: str, box_size: int = 6, border: int = 2) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+@lru_cache(maxsize=512)
+def qr_thumb_data_uri(subject: str) -> str:
+    """Small QR thumbnail as a data URI for inline HTML table cells."""
+    s = str(subject or "").strip()
+    if not s:
+        return ""
+    png = qr_png_bytes(s, box_size=3, border=1)
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
 
 def qr_label_download_basename(asset: dict[str, Any]) -> str:

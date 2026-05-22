@@ -14,6 +14,7 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key, tab_key
     from app.ui.assets_components import (
+        asset_number_cell_html,
         detail_header_html,
         detail_meta_strip_html,
         inject_assets_page_styles,
@@ -37,6 +38,7 @@ except ImportError:
         detail_meta_strip_html,
         inject_assets_page_styles,
         maintenance_table_html,
+        asset_number_cell_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
@@ -48,7 +50,7 @@ except ImportError:
 _SEL = select_key("assets")
 _TAB = tab_key("assets")
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
-_ASSET_GRID = "0.9fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr 0.75fr"
+_ASSET_GRID = "1.25fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr 0.75fr"
 
 
 def _filter_rows(
@@ -389,6 +391,11 @@ def _render_detail(asset: dict) -> None:
                         st.rerun()
 
 
+def _select_asset_row(asset_id: str) -> None:
+    st.session_state[_SEL] = asset_id
+    st.session_state[_TAB] = "Overview"
+
+
 def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
     if not rows:
         st.caption("No assets match the current filters.")
@@ -424,51 +431,54 @@ def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
             row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
             aid_attr = html.escape(aid, quote=True)
             number = html.escape(str(asset.get("asset_number") or "—"))
+            number_cell = asset_number_cell_html(asset)
             name = html.escape(str(asset.get("asset_name") or "—"))
             category = html.escape(str(asset.get("category") or "—"))
             location = html.escape(str(asset.get("location") or "—"))
             department = html.escape(str(asset.get("department") or "—"))
             acquired = html.escape(fmt_date(asset.get("acquired_date")))
             value = html.escape(fmt_currency(asset.get("value")))
+            row_html = (
+                f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
+                f"{number_cell}"
+                f'<span class="ips-assets-name-cell">{name}</span>'
+                f'<span class="ips-assets-muted-cell">{category}</span>'
+                f'<span class="ips-assets-muted-cell">{location}</span>'
+                f'<span class="ips-assets-muted-cell">{department}</span>'
+                f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
+                f'<span class="ips-assets-muted-cell">{acquired}</span>'
+                f'<span class="ips-assets-muted-cell">{value}</span>'
+                f'<span class="ips-assets-act-slot" title="View">👁</span>'
+                "</div>"
+            )
             with st.container():
                 st.markdown(
                     '<span class="ips-assets-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
-                    f'<span class="ips-clean-link">{number}</span>'
-                    f'<span class="ips-assets-name-cell">{name}</span>'
-                    f'<span class="ips-assets-muted-cell">{category}</span>'
-                    f'<span class="ips-assets-muted-cell">{location}</span>'
-                    f'<span class="ips-assets-muted-cell">{department}</span>'
-                    f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
-                    f'<span class="ips-assets-muted-cell">{acquired}</span>'
-                    f'<span class="ips-assets-muted-cell">{value}</span>'
-                    f'<span class="ips-assets-act-slot" title="View">👁</span>'
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
                     '<span class="ips-assets-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                if st.button(
+                st.button(
                     " ",
                     key=f"ast_row_sel_{row_idx}_{aid}",
                     help=f"Select asset {number}",
-                ):
-                    st.session_state[_SEL] = aid
-                    st.session_state[_TAB] = "Overview"
-                    st.rerun()
+                    on_click=_select_asset_row,
+                    args=(aid,),
+                )
+                st.markdown(row_html, unsafe_allow_html=True)
                 st.markdown(
                     '<span class="ips-assets-actcol ips-clean-actions" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                if st.button("👁", key=f"ast_view_{row_idx}_{aid}", help="View asset"):
-                    st.session_state[_SEL] = aid
-                    st.session_state[_TAB] = "Overview"
-                    st.rerun()
+                st.button(
+                    "👁",
+                    key=f"ast_view_{row_idx}_{aid}",
+                    help="View asset",
+                    on_click=_select_asset_row,
+                    args=(aid,),
+                )
 
 
 def render() -> None:

@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v4"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v5"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -256,10 +256,9 @@ def inject_clean_table_css() -> None:
     box-shadow: none !important;
 }}
 
-/* Invisible row-select Streamlit button: out of document flow */
-{vb_wrap}
-    > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has(.stButton) {{
+/* Invisible row-select Streamlit button: full-row hit target under visual HTML row */
+{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -278,9 +277,13 @@ def inject_clean_table_css() -> None:
 }}
 {vb_wrap}:has({act_markers})
     > [data-testid="stElementContainer"]:has({row_sel_markers})
-    + [data-testid="stElementContainer"]:has(.stButton) {{
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
     right: 120px !important;
 }}
+{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"],
+{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
 {vb_wrap}
     > [data-testid="stElementContainer"]:has({row_sel_markers})
     + [data-testid="stElementContainer"]:has(.stButton) .stButton,
@@ -298,6 +301,21 @@ def inject_clean_table_css() -> None:
     background: transparent !important;
     box-shadow: none !important;
     cursor: pointer !important;
+}}
+
+/* Visual HTML row sits above the invisible button and does not steal clicks */
+{vb_wrap} > [data-testid="stElementContainer"]:has({rows}) {{
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }}
 
 /* Action column overlay (compact 38px buttons) */
@@ -509,12 +527,10 @@ def render_clean_table_click_bridge(
         const row = t.closest(cfg.row);
         if (!row) continue;
         if (cfg.tbl) {{
-          const wrap = row.closest(".ips-data-table-wrap");
-          if (!wrap) continue;
-          const anchor = wrap.querySelector(cfg.tbl);
+          const anchor = doc.querySelector(cfg.tbl);
           if (!anchor) continue;
-          const scroll = anchor.closest(".ips-data-table-scroll");
-          if (scroll && !scroll.contains(row)) continue;
+          const scope = anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]');
+          if (scope && !scope.contains(row)) continue;
         }}
         const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
         if (!id) continue;
