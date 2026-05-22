@@ -458,6 +458,8 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         "target_completion_date": ui.get("end_date") or None,
         "notes": ui.get("description") or ui.get("notes") or "",
     }
+    if ui.get("progress") is not None:
+        payload["percent_complete"] = int(ui.get("progress") or 0)
     if customer_id:
         payload["customer_id"] = customer_id
     if row_id:

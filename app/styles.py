@@ -265,7 +265,7 @@ def inject_ips_dialog_styles() -> None:
     """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
     st.markdown(
         f"""
-<style id="ips-dialog-styles-v1">
+<style id="ips-dialog-styles-v2">
 div[data-testid="stBackdrop"] {{
   background: rgba(15, 23, 42, 0.42) !important;
   backdrop-filter: blur(3px) !important;
@@ -510,6 +510,49 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   color: {TEXT_MUTED};
   font-size: 0.8125rem;
   line-height: 1.45;
+}}
+.ips-edit-form-card {{
+  background: #ffffff;
+  border: 1px solid #e8edf3;
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem 0.25rem;
+  margin: 0 0 0.75rem 0;
+}}
+.ips-form-section-title {{
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0 0 0.65rem 0;
+  letter-spacing: -0.01em;
+}}
+div[data-testid="stDialog"] .ips-edit-form-card ~ div [data-baseweb="input"],
+div[data-testid="stDialog"] .ips-edit-form-card ~ div input:not([type="checkbox"]):not([type="radio"]),
+div[data-testid="stDialog"] .ips-edit-form-card ~ div textarea,
+div[data-testid="stDialog"] .ips-edit-form-card ~ div [data-baseweb="select"] > div,
+div[data-testid="stDialog"] [data-testid="stTextInput"] input,
+div[data-testid="stDialog"] [data-testid="stTextArea"] textarea,
+div[data-testid="stDialog"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+div[data-testid="stDialog"] [data-testid="stDateInput"] input {{
+  background: #ffffff !important;
+  border: 1px solid #d8e0ea !important;
+  border-radius: 10px !important;
+  min-height: 40px !important;
+  height: auto !important;
+  font-size: 0.8125rem !important;
+  color: {TEXT} !important;
+  box-shadow: none !important;
+}}
+div[data-testid="stDialog"] [data-testid="stTextArea"] textarea {{
+  min-height: 96px !important;
+}}
+div[data-testid="stDialog"] [data-testid="stWidgetLabel"] p,
+div[data-testid="stDialog"] [data-testid="stWidgetLabel"] label {{
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: {TEXT_MUTED} !important;
+}}
+div[data-testid="stDialog"] [data-testid="stSlider"] {{
+  padding-top: 0.15rem !important;
 }}
 </style>
 """,

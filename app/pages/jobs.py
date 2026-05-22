@@ -11,8 +11,14 @@ try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.clickable_table import close_modal_and_clear_selection, render_clickable_table
-    from app.pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
+    from app.pages._core._data import (
+        customer_filter_options,
+        employee_options,
+        load_jobs,
+        lookup_options,
+        persist_job,
+    )
+    from app.pages._core._crud import apply_persist_feedback
     from app.pages._core._session import select_key
     from app.styles import inject_jobs_module_css
     from app.utils.formatting import fmt_date
@@ -20,8 +26,14 @@ except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.clickable_table import close_modal_and_clear_selection, render_clickable_table  # type: ignore
-    from pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
+    from pages._core._data import (  # type: ignore
+        customer_filter_options,
+        employee_options,
+        load_jobs,
+        lookup_options,
+        persist_job,
+    )
+    from pages._core._crud import apply_persist_feedback  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_jobs_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -73,11 +85,75 @@ def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> lis
 
 
 def _clear_jobs_detail_modal() -> None:
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("job_edit_mode_"):
+            st.session_state.pop(key, None)
     close_modal_and_clear_selection(
         table_key="jobs_list",
         session_select_key=_SEL,
         modal_key=_JOBS_MODAL_KEY,
     )
+
+
+def _job_session_key(job: dict) -> str:
+    raw = str(job.get("id") or job.get("job_number") or "job").strip()
+    safe = "".join(ch if ch.isalnum() else "_" for ch in raw)
+    return safe or "job"
+
+
+def _job_edit_mode_key(job: dict) -> str:
+    return f"job_edit_mode_{_job_session_key(job)}"
+
+
+def _set_job_view_mode(job: dict) -> None:
+    st.session_state[_job_edit_mode_key(job)] = False
+
+
+def _set_job_edit_mode(job: dict) -> None:
+    st.session_state[_job_edit_mode_key(job)] = True
+    _seed_job_edit_form(job)
+
+
+def _as_date(value: object) -> date | None:
+    if isinstance(value, date):
+        return value
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _supervisor_options(job: dict) -> list[str]:
+    opts = employee_options(include_blank=True)
+    cur = str(job.get("supervisor") or "").strip()
+    if cur and cur not in opts:
+        opts = [cur, *opts]
+    return opts
+
+
+def _location_options(job: dict) -> list[str]:
+    opts = lookup_options("locations")
+    cur = str(job.get("location") or "").strip()
+    if cur and cur not in opts:
+        opts = [cur, *opts]
+    return opts or ([cur] if cur else ["—"])
+
+
+def _seed_job_edit_form(job: dict) -> None:
+    job_key = _job_session_key(job)
+    st.session_state[f"job_edit_num_{job_key}"] = str(job.get("job_number") or "")
+    st.session_state[f"job_edit_name_{job_key}"] = str(job.get("job_name") or "")
+    st.session_state[f"job_edit_cust_{job_key}"] = str(job.get("customer") or "")
+    st.session_state[f"job_edit_status_{job_key}"] = str(job.get("status") or "Draft")
+    st.session_state[f"job_edit_sup_{job_key}"] = str(job.get("supervisor") or "")
+    st.session_state[f"job_edit_loc_{job_key}"] = str(job.get("location") or "")
+    st.session_state[f"job_edit_start_{job_key}"] = _as_date(job.get("start_date"))
+    st.session_state[f"job_edit_end_{job_key}"] = _as_date(job.get("end_date"))
+    st.session_state[f"job_edit_prog_{job_key}"] = int(job.get("progress") or 0)
+    st.session_state[f"job_edit_scope_{job_key}"] = str(job.get("scope") or job.get("description") or "")
+    st.session_state[f"job_edit_notes_{job_key}"] = str(job.get("notes") or "")
 
 
 def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
@@ -86,6 +162,10 @@ def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
         return
     st.session_state[_SEL] = jid
     st.session_state[_JOBS_MODAL_KEY] = jid
+    if isinstance(_job, dict):
+        st.session_state[_job_edit_mode_key(_job)] = False
+    else:
+        st.session_state[f"job_edit_mode_{''.join(ch if ch.isalnum() else '_' for ch in jid) or 'job'}"] = False
 
 
 def _show_jobs_detail_modal_if_pending() -> None:
@@ -185,55 +265,13 @@ def _render_dialog_placeholder(message: str) -> None:
     )
 
 
-def render_job_detail_dialog(job: dict) -> None:
-    """Professional Job Details modal body (opened via row selection)."""
+def _render_job_detail_tabs(job: dict) -> None:
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
     status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
     estimate_no = _safe_value(job.get("estimate_number"))
-    schedule = _schedule_summary(job)
-
-    st.markdown(
-        '<span class="ips-dialog-shell ips-modal-wide" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div class="ips-dialog-header">'
-        f'<div class="ips-dialog-title-row">'
-        f"<div>"
-        f'<h2 class="ips-dialog-title">{html.escape(jn)}</h2>'
-        f'<p class="ips-dialog-subtitle">{html.escape(jname)}</p>'
-        f"</div>"
-        f"<div>{_status_pill(status)}</div>"
-        f"</div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
-    with act1:
-        st.button("View", key="jobs_modal_view")
-    with act2:
-        st.button("Edit", key="jobs_modal_edit")
-    with act3:
-        st.button("More", key="jobs_modal_more")
-    with act4:
-        if st.button("Close", key="jobs_modal_close"):
-            _clear_jobs_detail_modal()
-            st.rerun()
-
-    st.markdown(
-        f'<div class="ips-dialog-meta-grid">'
-        f"{_dialog_meta_card('Customer', customer)}"
-        f"{_dialog_meta_card('Supervisor', supervisor)}"
-        f"{_dialog_meta_card('Estimate #', estimate_no)}"
-        f"{_dialog_meta_card('Schedule', schedule)}"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
 
     (
         tab_overview,
@@ -261,53 +299,6 @@ def render_job_detail_dialog(job: dict) -> None:
             f"</div>"
         )
         st.markdown(_dialog_card("Overview", overview_html), unsafe_allow_html=True)
-
-        jid = str(job.get("id") or "")
-        if jid and not is_demo_id(jid):
-            with st.expander("Edit job", expanded=False):
-                ec1, ec2 = st.columns(2)
-                with ec1:
-                    st.text_input("Job number", value=str(job.get("job_number") or ""), key=f"job_edit_num_{jid}")
-                    st.text_input("Job name", value=str(job.get("job_name") or ""), key=f"job_edit_name_{jid}")
-                    cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
-                    cur_cust = str(job.get("customer") or "")
-                    cust_idx = cust_opts.index(cur_cust) if cur_cust in cust_opts else 0
-                    st.selectbox(
-                        "Customer",
-                        cust_opts,
-                        index=cust_idx,
-                        key=f"job_edit_cust_{jid}",
-                    )
-                    st.selectbox(
-                        "Status",
-                        lookup_options("job_statuses"),
-                        index=max(0, lookup_options("job_statuses").index(str(job.get("status") or "Draft")))
-                        if str(job.get("status") or "") in lookup_options("job_statuses")
-                        else 0,
-                        key=f"job_edit_status_{jid}",
-                    )
-                with ec2:
-                    st.text_input("Supervisor", value=str(job.get("supervisor") or ""), key=f"job_edit_sup_{jid}")
-                    st.date_input("Start date", value=job.get("start_date") or None, key=f"job_edit_start_{jid}")
-                    st.date_input("End date", value=job.get("end_date") or None, key=f"job_edit_end_{jid}")
-                    st.slider("Progress %", 0, 100, int(job.get("progress") or 0), key=f"job_edit_prog_{jid}")
-                st.text_area("Description", value=str(job.get("description") or ""), key=f"job_edit_desc_{jid}")
-                if st.button("Save job", key=f"job_save_{jid}", type="primary"):
-                    ui = {
-                        "job_number": st.session_state.get(f"job_edit_num_{jid}"),
-                        "job_name": st.session_state.get(f"job_edit_name_{jid}"),
-                        "customer": st.session_state.get(f"job_edit_cust_{jid}"),
-                        "status": st.session_state.get(f"job_edit_status_{jid}"),
-                        "supervisor": st.session_state.get(f"job_edit_sup_{jid}"),
-                        "start_date": st.session_state.get(f"job_edit_start_{jid}"),
-                        "end_date": st.session_state.get(f"job_edit_end_{jid}"),
-                        "progress": st.session_state.get(f"job_edit_prog_{jid}"),
-                        "description": st.session_state.get(f"job_edit_desc_{jid}"),
-                    }
-                    ok, msg = persist_job(ui, row_id=jid)
-                    apply_persist_feedback(ok, msg)
-                    if ok:
-                        st.rerun()
 
     with tab_scope:
         scope_text = _safe_value(job.get("scope") or job.get("description"), "No scope defined.")
@@ -359,6 +350,143 @@ def render_job_detail_dialog(job: dict) -> None:
 
     with tab_activity:
         _render_dialog_placeholder("Job activity history will appear here when connected to Supabase.")
+
+
+def _render_job_edit_form(job: dict) -> None:
+    job_key = _job_session_key(job)
+    jid = str(job.get("id") or "")
+    edit_mode_key = _job_edit_mode_key(job)
+    pk = f"job_edit_{job_key}"
+
+    if f"job_edit_num_{job_key}" not in st.session_state:
+        _seed_job_edit_form(job)
+
+    st.markdown(
+        '<div class="ips-edit-form-card"><div class="ips-form-section-title">Edit Job</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
+    status_opts = lookup_options("job_statuses")
+    sup_opts = _supervisor_options(job)
+    loc_opts = _location_options(job)
+
+    ec1, ec2 = st.columns(2, gap="medium")
+    with ec1:
+        st.text_input("Job number", key=f"job_edit_num_{job_key}")
+        st.text_input("Job name / project description", key=f"job_edit_name_{job_key}")
+        st.selectbox("Customer", cust_opts, key=f"job_edit_cust_{job_key}")
+        st.selectbox("Status", status_opts, key=f"job_edit_status_{job_key}")
+        st.selectbox("Supervisor", sup_opts, key=f"job_edit_sup_{job_key}")
+    with ec2:
+        st.selectbox("Location", loc_opts, key=f"job_edit_loc_{job_key}")
+        st.date_input("Start date", key=f"job_edit_start_{job_key}")
+        st.date_input("End date", key=f"job_edit_end_{job_key}")
+        st.slider("Progress %", 0, 100, key=f"job_edit_prog_{job_key}")
+
+    st.text_area("Scope of work", key=f"job_edit_scope_{job_key}", height=120)
+    st.text_area("Notes", key=f"job_edit_notes_{job_key}", height=100)
+
+    btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
+    with btn_cancel:
+        if st.button("Cancel", key=f"{pk}_cancel"):
+            _set_job_view_mode(job)
+            st.rerun()
+    with btn_save:
+        if st.button("Save Changes", key=f"{pk}_save", type="primary"):
+            scope_text = str(st.session_state.get(f"job_edit_scope_{job_key}") or "").strip()
+            notes_text = str(st.session_state.get(f"job_edit_notes_{job_key}") or "").strip()
+            ui = {
+                "job_number": st.session_state.get(f"job_edit_num_{job_key}"),
+                "job_name": st.session_state.get(f"job_edit_name_{job_key}"),
+                "customer": st.session_state.get(f"job_edit_cust_{job_key}"),
+                "status": st.session_state.get(f"job_edit_status_{job_key}"),
+                "supervisor": st.session_state.get(f"job_edit_sup_{job_key}"),
+                "location": st.session_state.get(f"job_edit_loc_{job_key}"),
+                "start_date": st.session_state.get(f"job_edit_start_{job_key}"),
+                "end_date": st.session_state.get(f"job_edit_end_{job_key}"),
+                "progress": st.session_state.get(f"job_edit_prog_{job_key}"),
+                "description": scope_text,
+                "notes": notes_text or scope_text,
+            }
+            ok, msg = persist_job(ui, row_id=jid or None)
+            if ok:
+                st.session_state[edit_mode_key] = False
+                st.success(msg or "Job saved.")
+                st.rerun()
+            else:
+                st.error(msg or "Could not save job.")
+
+
+def render_job_detail_dialog(job: dict) -> None:
+    """Professional Job Details modal body (opened via row selection)."""
+    job_key = _job_session_key(job)
+    edit_mode_key = _job_edit_mode_key(job)
+    st.session_state.setdefault(edit_mode_key, False)
+    edit_mode = bool(st.session_state.get(edit_mode_key))
+
+    jn = _safe_value(job.get("job_number"))
+    jname = _safe_value(job.get("job_name"))
+    status = _safe_value(job.get("status"))
+    customer = _safe_value(job.get("customer"))
+    supervisor = _safe_value(job.get("supervisor"))
+    estimate_no = _safe_value(job.get("estimate_number"))
+    schedule = _schedule_summary(job)
+
+    st.markdown(
+        '<span class="ips-dialog-shell ips-modal-wide" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="ips-dialog-header">'
+        f'<div class="ips-dialog-title-row">'
+        f"<div>"
+        f'<h2 class="ips-dialog-title">{html.escape(jn)}</h2>'
+        f'<p class="ips-dialog-subtitle">{html.escape(jname)}</p>'
+        f"</div>"
+        f"<div>{_status_pill(status)}</div>"
+        f"</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
+    with act1:
+        st.button(
+            "View",
+            key=f"jobs_modal_view_{job_key}",
+            on_click=_set_job_view_mode,
+            args=(job,),
+        )
+    with act2:
+        st.button(
+            "Edit",
+            key=f"jobs_modal_edit_{job_key}",
+            on_click=_set_job_edit_mode,
+            args=(job,),
+        )
+    with act3:
+        st.button("More", key=f"jobs_modal_more_{job_key}")
+    with act4:
+        if st.button("Close", key=f"jobs_modal_close_{job_key}"):
+            _clear_jobs_detail_modal()
+            st.rerun()
+
+    st.markdown(
+        f'<div class="ips-dialog-meta-grid">'
+        f"{_dialog_meta_card('Customer', customer)}"
+        f"{_dialog_meta_card('Supervisor', supervisor)}"
+        f"{_dialog_meta_card('Estimate #', estimate_no)}"
+        f"{_dialog_meta_card('Schedule', schedule)}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    if edit_mode:
+        _render_job_edit_form(job)
+    else:
+        _render_job_detail_tabs(job)
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
