@@ -72,11 +72,15 @@ def render_clickable_table(
     html_cell: HtmlCellFn | None = None,
     on_row_click: Callable[[str, dict[str, Any]], None] | None = None,
     col_fr: list[str] | None = None,
+    html_rows: bool | None = None,
 ) -> str | None:
     """
     HTML grid table — click anywhere on a row to select (invisible overlay button per row).
 
     Stores selected record id in ``session_select_key`` and returns it.
+
+    When ``html_rows`` is True (or auto for 7+ columns), all data rows render in one HTML
+    block so wide tables stay visible (Streamlit widget rows can collapse on Documents, etc.).
     """
     try:
         from app.ui.clean_table import (
@@ -117,52 +121,80 @@ def render_clickable_table(
     ot = "d" + "iv"
     ct = "/" + ot
 
+    use_html_rows = html_rows if html_rows is not None else n >= 7
+
     st.caption("Click a row to open details.")
-    st.markdown(
-        f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
-        f'<{ot} class="ips-data-table-scroll">'
-        f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
-        f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
-        + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
-        + f"</{ot}>",
-        unsafe_allow_html=True,
-    )
 
-    for row_idx, rid, rec in row_entries:
-        sel = " selected" if rid and rid == active_id else ""
-        rid_attr = html.escape(rid, quote=True)
-        cells = "".join(
-            f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
-            for field, _ in columns
-        )
-        label = _row_label(rec, columns)
-        with st.container():
-            st.markdown(
-                '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
+    if use_html_rows:
+        row_html_parts: list[str] = []
+        for _row_idx, rid, rec in row_entries:
+            sel = " selected" if rid and rid == active_id else ""
+            rid_attr = html.escape(rid, quote=True)
+            cells = "".join(
+                f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
+                for field, _ in columns
             )
-            st.markdown(
+            row_html_parts.append(
                 f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
-                f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
-                unsafe_allow_html=True,
+                f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>'
             )
-            st.markdown(
-                '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                " ",
-                key=f"{key}_row_sel_{row_idx}",
-                help=f"Select {label}",
-            ):
-                apply_clean_table_row_selection(
-                    rid,
-                    session_select_key=sel_key,
-                    records_by_id=records_by_id,
-                    on_row_click=on_row_click,
-                )
+        st.markdown(
+            f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
+            f'<{ot} class="ips-data-table-scroll">'
+            f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
+            f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
+            + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
+            + f"</{ot}>"
+            + "".join(row_html_parts)
+            + f"</{ct}></{ct}>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
+            f'<{ot} class="ips-data-table-scroll">'
+            f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
+            f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
+            + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
+            + f"</{ot}>",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
+        for row_idx, rid, rec in row_entries:
+            sel = " selected" if rid and rid == active_id else ""
+            rid_attr = html.escape(rid, quote=True)
+            cells = "".join(
+                f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
+                for field, _ in columns
+            )
+            label = _row_label(rec, columns)
+            with st.container():
+                st.markdown(
+                    '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
+                    f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    " ",
+                    key=f"{key}_row_sel_{row_idx}",
+                    help=f"Select {label}",
+                ):
+                    apply_clean_table_row_selection(
+                        rid,
+                        session_select_key=sel_key,
+                        records_by_id=records_by_id,
+                        on_row_click=on_row_click,
+                    )
+
+        st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
 
     picked = render_clean_table_click_bridge(
         table_selector=f".ips-data-table-stable:has(.{table_class})",

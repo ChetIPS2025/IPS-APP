@@ -20,6 +20,7 @@ try:
         persist_document,
     )
     from app.pages._core._session import select_key
+    from app.styles import inject_documents_module_css
     from app.utils.constants import DOCUMENT_LINK_MODULES
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
@@ -38,6 +39,7 @@ except ImportError:
     )
     from pages._core._session import select_key  # type: ignore
     from utils.constants import DOCUMENT_LINK_MODULES  # type: ignore
+    from styles import inject_documents_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
 
@@ -163,6 +165,8 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("documents"):
         return
+    inject_documents_module_css()
+    st.markdown('<span class="ips-documents-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     role_norm = normalize_role(current_role())
     hr_ok = can_view_hr_documents(role_norm)
     all_docs = load_documents_hub(role=role_norm)
@@ -236,13 +240,6 @@ def render() -> None:
             return html.escape(fmt_date(row.get(field)) if row.get(field) else "—")
         return html.escape(str(row.get(field) or "—"))
 
-    def _plain_cell(field: str, row: dict) -> str:
-        if field == "access":
-            return "Restricted" if row.get("is_restricted") else "Standard"
-        if field in ("upload_date", "expiration_date"):
-            return fmt_date(row.get(field)) if row.get(field) else "—"
-        return str(row.get(field) or "—")
-
     sel = render_clickable_table(
         filtered,
         [
@@ -259,8 +256,9 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         selected_id=selected_id or None,
-        plain_cell=_plain_cell,
         html_cell=_cell,
+        html_rows=True,
+        col_fr=["1.4fr", "0.9fr", "0.75fr", "1.2fr", "0.9fr", "0.7fr", "0.7fr", "0.65fr"],
     )
 
     if sel:
