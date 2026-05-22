@@ -212,6 +212,52 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [d
     )
 
 
+def inject_tasks_module_css() -> None:
+    """Tasks list — inline data editor styling (white cells, compact columns)."""
+    st.markdown(
+        f"""
+<style id="ips-tasks-module-v1">
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor {{
+  margin-bottom: 0.65rem;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] {{
+  border: 1px solid #d8e0ea !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="columnheader"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="columnheader"] {{
+  background: #f8fafc !important;
+  color: {TEXT_MUTED} !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [data-testid="stTable"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [data-testid="stTable"] {{
+  background: #ffffff !important;
+  color: {TEXT} !important;
+  border-color: #e2e8f0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataEditor"] [role="row"]:hover [role="gridcell"],
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
+  background: #f1f5f9 !important;
+}}
+section[data-testid="stMain"]:has(.ips-tasks-page) .ips-tasks-editor [data-testid="stCheckbox"] {{
+  display: none !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_estimates_module_css() -> None:
     """
     Estimate list/detail table stability — always call at the top of the estimates page render.
