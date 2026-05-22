@@ -50,7 +50,7 @@ except ImportError:
 _SEL = select_key("assets")
 _TAB = tab_key("assets")
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
-_ASSET_GRID = "1.25fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr 0.75fr"
+_ASSET_GRID = "1.25fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr"
 
 
 def _filter_rows(
@@ -418,15 +418,17 @@ def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
             f"{table_header_html('Status')}"
             f"{table_header_html('Acquired Date')}"
             f"{table_header_html('Value')}"
-            f"{table_header_html('Actions', sortable=False)}"
             "</div>",
             unsafe_allow_html=True,
         )
+
+        records_by_id: dict[str, dict] = {}
 
         for row_idx, asset in enumerate(rows):
             aid = str(asset.get("id") or "").strip()
             if not aid:
                 continue
+            records_by_id[aid] = asset
             selected = aid == selected_id
             row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
             aid_attr = html.escape(aid, quote=True)
@@ -448,7 +450,6 @@ def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
                 f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
                 f'<span class="ips-assets-muted-cell">{acquired}</span>'
                 f'<span class="ips-assets-muted-cell">{value}</span>'
-                f'<span class="ips-assets-act-slot" title="View">👁</span>'
                 "</div>"
             )
             with st.container():
@@ -463,22 +464,27 @@ def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
                 st.button(
                     " ",
                     key=f"ast_row_sel_{row_idx}_{aid}",
-                    help=f"Select asset {number}",
+                    help=f"Open asset {number}",
                     on_click=_select_asset_row,
                     args=(aid,),
                 )
                 st.markdown(row_html, unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="ips-assets-actcol ips-clean-actions" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    "👁",
-                    key=f"ast_view_{row_idx}_{aid}",
-                    help="View asset",
-                    on_click=_select_asset_row,
-                    args=(aid,),
-                )
+
+    try:
+        from app.ui.clean_table import render_clean_table_click_bridge
+    except ImportError:
+        from ui.clean_table import render_clean_table_click_bridge  # type: ignore
+
+    picked = render_clean_table_click_bridge(
+        table_selector=".ips-assets-click-table",
+        row_selector=".ips-assets-row[data-row-id]",
+        component_key="ips_assets_row_click_bridge",
+    )
+    if picked:
+        pid = str(picked).strip()
+        if pid in records_by_id:
+            _select_asset_row(pid)
+            st.rerun()
 
 
 def render() -> None:
