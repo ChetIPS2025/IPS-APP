@@ -12,6 +12,7 @@ try:
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.layout import render_tab_placeholder
     from app.components.status import status_pill_html
+    from app.components.tables import render_clickable_table
     from app.components.tabs import render_tabs
     from app.pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
@@ -23,6 +24,7 @@ except ImportError:
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
+    from components.tables import render_clickable_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
@@ -33,7 +35,6 @@ except ImportError:
 _SEL = select_key("jobs")
 _TAB = tab_key("jobs")
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
-_JOB_GRID = "0.75fr 1.4fr 1fr 0.85fr 1fr 0.85fr 0.85fr 0.85fr"
 _JOB_TABS = [
     "Overview",
     "Scope",
@@ -185,83 +186,17 @@ def _render_detail_body(job: dict) -> None:
                     st.rerun()
 
 
-def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
-    if not rows:
-        st.caption("No records to display.")
-        return
-
-    grid = f"grid-template-columns: {_JOB_GRID};"
-    records_by_id: dict[str, dict] = {}
-    row_parts: list[str] = []
-
-    st.caption("Click a row to open details.")
-
-    for job in rows:
-        jid = str(job.get("id") or "").strip()
-        if not jid:
-            continue
-        records_by_id[jid] = job
-        selected = jid == selected_id
-        row_cls = (
-            "ips-clean-row ips-jobs-row ips-data-row selected"
-            if selected
-            else "ips-clean-row ips-jobs-row ips-data-row"
+def _jobs_table_cell(field: str, row: dict) -> str:
+    if field == "status":
+        return status_pill_html(str(row.get("status") or ""))
+    if field == "job_number":
+        return (
+            f'<span style="color:#2563eb;font-weight:600">'
+            f"{html.escape(str(row.get('job_number') or ''))}</span>"
         )
-        jid_attr = html.escape(jid, quote=True)
-        jnum = html.escape(str(job.get("job_number") or ""))
-        row_parts.append(
-            f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
-            f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
-            f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
-            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
-            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
-            "</div>"
-        )
-
-    with st.container(border=True):
-        st.markdown(
-            '<span class="ips-jobs-table-anchor ips-jobs-click-table ips-clean-table"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
-            f'<div class="ips-data-table-scroll">'
-            f'<div class="ips-data-table-header ips-clean-header" style="{grid}">'
-            "<span>JOB #</span>"
-            "<span>PROJECT / DESCRIPTION</span>"
-            "<span>CUSTOMER</span>"
-            "<span>ESTIMATE #</span>"
-            "<span>SUPERVISOR</span>"
-            "<span>STATUS</span>"
-            "<span>START DATE</span>"
-            "<span>END DATE</span>"
-            "</div>"
-            + "".join(row_parts)
-            + "</div></div>",
-            unsafe_allow_html=True,
-        )
-
-    st.session_state["_ips_jobs_modal_by_id"] = records_by_id
-
-    try:
-        from app.ui.clean_table import render_clean_table_click_bridge
-    except ImportError:
-        from ui.clean_table import render_clean_table_click_bridge  # type: ignore
-
-    picked = render_clean_table_click_bridge(
-        table_selector=".ips-jobs-click-table",
-        row_selector=".ips-jobs-row[data-row-id]",
-        component_key="ips_jobs_row_click_bridge",
-    )
-    if picked:
-        pid = str(picked).strip()
-        if pid in records_by_id:
-            _open_jobs_detail_modal(pid)
-            st.rerun()
+    if field in ("start_date", "end_date"):
+        return html.escape(fmt_date(row.get(field)))
+    return html.escape(str(row.get(field) or "—"))
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
@@ -412,6 +347,31 @@ def render() -> None:
 
     st.caption(f"{len(filtered)} job(s)")
 
-    _render_jobs_table(filtered, selected_id=selected_id)
+    st.session_state["_ips_jobs_modal_by_id"] = {
+        str(job.get("id") or "").strip(): job
+        for job in filtered
+        if str(job.get("id") or "").strip()
+    }
+
+    render_clickable_table(
+        filtered,
+        [
+            ("job_number", "JOB #"),
+            ("job_name", "PROJECT / DESCRIPTION"),
+            ("customer", "CUSTOMER"),
+            ("estimate_number", "ESTIMATE #"),
+            ("supervisor", "SUPERVISOR"),
+            ("status", "STATUS"),
+            ("start_date", "START DATE"),
+            ("end_date", "END DATE"),
+        ],
+        "jobs_list",
+        row_id_key="id",
+        session_select_key=_SEL,
+        selected_id=selected_id or None,
+        html_cell=_jobs_table_cell,
+        col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
+        on_row_click=lambda rid, _rec: _open_jobs_detail_modal(rid),
+    )
 
     _show_jobs_detail_modal_if_pending()

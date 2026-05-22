@@ -196,35 +196,12 @@ def inject_jobs_module_css() -> None:
     """Jobs list table stability — call at the top of the jobs page render."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v3">
+<style id="ips-jobs-module-v5">
 .ips-jobs-page .ips-data-table-wrap,
 .ips-jobs-page .ips-data-table-stable .ips-data-table-header,
 .ips-jobs-page .ips-data-table-stable .ips-data-row {{
   display: grid !important;
   box-sizing: border-box !important;
-}}
-.ips-jobs-page .ips-jobs-summary-table .ips-jobs-row,
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  width: 100%;
-  min-width: 48rem;
-  box-sizing: border-box;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
-  overflow: hidden;
-  text-overflow: ellipsis;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row:hover {{
-  background: #eef5ff;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row.selected {{
-  background: #eef5ff;
-  border-left: 4px solid #2563eb;
 }}
 .ips-jobs-page .ips-data-table-html .ips-data-row {{
   display: grid !important;
@@ -232,58 +209,42 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-jobs-row.select
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
-}}
-.ips-jobs-page .ips-jobs-summary-table .ips-jobs-row {{
-  display: grid !important;
-}}
-.ips-jobs-page .ips-data-table-html .ips-data-row:hover {{
-  background: #eef5ff;
-}}
-.ips-jobs-page .ips-data-table-html .ips-data-row.selected {{
-  background: #eef5ff;
-  border-left: 4px solid #2563eb;
 }}
 .ips-jobs-page .ips-data-table-html .ips-data-cell {{
   overflow: hidden;
   text-overflow: ellipsis;
 }}
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  width: 100%;
+  min-width: 48rem;
+  box-sizing: border-box;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
+  background: #eef5ff;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
+  background: #eef5ff;
+  border-left: 4px solid #2563eb;
+}}
 /* Jobs list: invisible full-row select button layered under HTML row */
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap) {{
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) {{
   position: relative !important;
   min-height: 2.75rem !important;
   margin: 0 !important;
   padding: 0 !important;
 }}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-> [data-testid="stElementContainer"] {{
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has(.ips-jobs-row-wrap),
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has(.ips-clean-row-select-btn) {{
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  overflow: hidden !important;
-}}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
++ [data-testid="stElementContainer"] {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 1 !important;
@@ -297,31 +258,16 @@ div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
   box-shadow: none !important;
   pointer-events: auto !important;
 }}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"],
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton {{
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
++ [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+> [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
++ [data-testid="stElementContainer"] .stButton > button {{
   width: 100% !important;
   height: 100% !important;
   min-height: 2.75rem !important;
@@ -334,10 +280,10 @@ div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
   color: transparent !important;
   cursor: pointer !important;
 }}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-[data-testid="stElementContainer"]:has(.ips-jobs-row) {{
+section[data-testid="stMain"]:has(.ips-jobs-page)
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+> [data-testid="stElementContainer"]:has(.ips-data-row) {{
   position: absolute !important;
   inset: 0 !important;
   z-index: 2 !important;
@@ -347,12 +293,6 @@ div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-}}
-section[data-testid="stMain"]
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-jobs-click-table)
-div[data-testid="stVerticalBlock"]:has(.ips-jobs-row-wrap)
-.ips-jobs-row {{
-  cursor: pointer;
 }}
 </style>
 """,

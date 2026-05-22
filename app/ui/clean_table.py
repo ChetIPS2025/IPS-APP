@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v9"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v10"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -546,13 +546,14 @@ def render_clean_table_click_bridge(
     table_selector: str,
     row_selector: str,
     component_key: str = "ips_clean_table_click_bridge",
+    trigger_sibling_button: bool = False,
 ) -> Any:
     """
-    Zero-height bridge: clicks on ``row_selector`` inside ``table_selector`` post row id.
+    Zero-height bridge: clicks on ``row_selector`` inside ``table_selector`` activate the row.
 
-    Row elements must expose the id via ``data-row-id`` or ``data-jid`` attribute.
-    ``component_key`` must be unique per table on a page (used for Streamlit widget identity
-    and the in-page click-handler registry).
+    By default posts the row id via ``setComponentValue``. When ``trigger_sibling_button`` is
+    True, row clicks programmatically activate the Streamlit ``st.button`` in the same row host
+    (row HTML must be rendered before the button in that container).
     """
     key_attr = html.escape(component_key, quote=True)
     st.markdown(
@@ -562,6 +563,7 @@ def render_clean_table_click_bridge(
     tbl = html.escape(table_selector, quote=True)
     row = html.escape(row_selector, quote=True)
     key_esc = html.escape(component_key, quote=True)
+    trigger_btn = "true" if trigger_sibling_button else "false"
     return _components_html(
         f"""
 <script>
@@ -569,6 +571,9 @@ def render_clean_table_click_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = "ipsCleanTableClick::{key_esc}";
+  const tblSel = "{tbl}";
+  const rowSel = "{row}";
+  const triggerSiblingButton = {trigger_btn};
 
   function sendValue(id) {{
     const payload = {{ type: "streamlit:setComponentValue", value: id }};
@@ -585,6 +590,57 @@ def render_clean_table_click_bridge(
     }} catch (err) {{}}
   }}
 
+  function tableScope() {{
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }}
+
+  function isInteractive(target) {{
+    return !!(target && target.closest && target.closest(
+      "a, button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover']"
+    ));
+  }}
+
+  function activateRow(row, e) {{
+    if (triggerSiblingButton) {{
+      const host = row.closest('div[data-testid="stVerticalBlock"]');
+      const btn = host && host.querySelector('[data-testid="stButton"] > button');
+      if (btn) {{
+        if (e) {{
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        btn.click();
+        return true;
+      }}
+    }}
+    const id = row.getAttribute("data-row-id")
+      || row.getAttribute("data-jid")
+      || row.getAttribute("data-est-id");
+    if (!id) return false;
+    if (e) {{
+      e.preventDefault();
+      e.stopPropagation();
+    }}
+    sendValue(id);
+    return true;
+  }}
+
+  function bindRows() {{
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(rowSel).forEach(function (row) {{
+      if (row.dataset.ipsCleanBound === "1") return;
+      row.dataset.ipsCleanBound = "1";
+      row.style.cursor = "pointer";
+      row.addEventListener("click", function (e) {{
+        if (isInteractive(e.target)) return;
+        activateRow(row, e);
+      }}, true);
+    }});
+  }}
+
   function sendReady() {{
     w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
   }}
@@ -593,8 +649,7 @@ def render_clean_table_click_bridge(
     doc.ipsCleanTableBridgeRegistry = {{}};
     doc.addEventListener("click", function (e) {{
       const t = e.target;
-      if (!t || !t.closest) return;
-      if (t.closest("[data-testid='stButton'], button, a, input, select, textarea, label, [data-testid='stPopover']")) return;
+      if (!t || !t.closest || isInteractive(t)) return;
       const reg = doc.ipsCleanTableBridgeRegistry || {{}};
       for (const cfg of Object.values(reg)) {{
         const row = t.closest(cfg.row);
@@ -605,20 +660,41 @@ def render_clean_table_click_bridge(
           const scope = anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]');
           if (scope && !scope.contains(row)) continue;
         }}
-        const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
+        const id = row.getAttribute("data-row-id")
+          || row.getAttribute("data-jid")
+          || row.getAttribute("data-est-id");
         if (!id) continue;
-        sendValue(id);
+        if (cfg.triggerSiblingButton) {{
+          activateRow(row, e);
+        }} else {{
+          sendValue(id);
+        }}
         return;
       }}
     }}, true);
   }}
-  doc.ipsCleanTableBridgeRegistry[hookKey] = {{ tbl: "{tbl}", row: "{row}" }};
+
+  doc.ipsCleanTableBridgeRegistry[hookKey] = {{
+    tbl: tblSel,
+    row: rowSel,
+    bind: bindRows,
+    triggerSiblingButton: triggerSiblingButton,
+  }};
+  bindRows();
+  if (!doc.ipsCleanTableBindObserver) {{
+    doc.ipsCleanTableBindObserver = new MutationObserver(function () {{
+      Object.values(doc.ipsCleanTableBridgeRegistry || {{}}).forEach(function (cfg) {{
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      }});
+    }});
+    doc.ipsCleanTableBindObserver.observe(doc.body, {{ childList: true, subtree: true }});
+  }}
   sendReady();
 }})();
 </script>
         """,
         component_key=component_key,
-        height=0,
+        height=1,
     )
 
 
