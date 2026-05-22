@@ -116,6 +116,27 @@ def inject_jobs_module_css() -> None:
   display: grid !important;
   box-sizing: border-box !important;
 }}
+.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-bottom: 1px solid #e5eaf2;
+  background: #ffffff;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
+  background: #eef5ff;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
+  background: #eef5ff;
+  border-left: 4px solid #2563eb;
+}}
+.ips-jobs-page div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
 .ips-jobs-page .ips-data-table-html .ips-data-row {{
   display: grid !important;
   min-height: 2.75rem;
@@ -405,6 +426,25 @@ section[data-testid="stSidebar"] .block-container {{
   background: #eef5ff;
   border-left: 4px solid #2563eb;
   padding-left: calc(0.75rem - 4px);
+}}
+
+/* Overlay-button rows: HTML row + invisible Streamlit button per row host */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-clean-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
+  display: grid !important;
+  align-items: center;
+  min-height: 2.75rem;
+  width: 100%;
+  min-width: 48rem;
+  box-sizing: border-box;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+  cursor: pointer;
+}}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-clean-table)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 
 /* Detail panel */

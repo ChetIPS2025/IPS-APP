@@ -164,51 +164,53 @@ def render_clickable_table(
                     on_row_click=on_row_click,
                 )
     else:
-        st.markdown(
-            f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
-            f'<{ot} class="ips-data-table-scroll">'
-            f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
-            f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
-            + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
-            + f"</{ot}>",
-            unsafe_allow_html=True,
-        )
-
-        for row_idx, rid, rec in row_entries:
-            sel = " selected" if rid and rid == active_id else ""
-            rid_attr = html.escape(rid, quote=True)
-            cells = "".join(
-                f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
-                for field, _ in columns
+        with st.container(border=True):
+            st.markdown(
+                f'<span class="ips-clean-table ips-data-table-anchor {table_class}" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
             )
-            label = _row_label(rec, columns)
-            with st.container():
-                st.markdown(
-                    '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
-                    f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    " ",
-                    key=f"{key}_row_sel_{row_idx}",
-                    help=f"Select {label}",
-                ):
-                    apply_clean_table_row_selection(
-                        rid,
-                        session_select_key=sel_key,
-                        records_by_id=records_by_id,
-                        on_row_click=on_row_click,
-                    )
+            st.markdown(
+                f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
+                f'<{ot} class="ips-data-table-scroll">'
+                f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
+                + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)
+                + f"</{ot}></{ct}></{ct}>",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
+            for row_idx, rid, rec in row_entries:
+                sel = " selected" if rid and rid == active_id else ""
+                rid_attr = html.escape(rid, quote=True)
+                cells = "".join(
+                    f'<span class="ips-data-cell">{_cell_content(field, rec, plain_cell=plain_cell, html_cell=html_cell)}</span>'
+                    for field, _ in columns
+                )
+                label = _row_label(rec, columns)
+                with st.container():
+                    st.markdown(
+                        '<span class="ips-clean-row-host ips-clean-row-wrap" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<{ot} class="ips-clean-row ips-data-row{sel}" style="{grid}" '
+                        f'data-row-id="{rid_attr}" role="button" tabindex="0">{cells}</{ot}>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(
+                        " ",
+                        key=f"{key}_row_sel_{row_idx}",
+                        help=f"Select {label}",
+                    ):
+                        apply_clean_table_row_selection(
+                            rid,
+                            session_select_key=sel_key,
+                            records_by_id=records_by_id,
+                            on_row_click=on_row_click,
+                        )
 
     return str(st.session_state.get(sel_key) or "").strip() or None
 
