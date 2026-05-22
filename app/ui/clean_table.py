@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v3"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v4"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -24,6 +24,8 @@ TABLE_SCOPE_SELECTORS = (
     ".ips-est-table-anchor",
     ".ips-users-table-anchor",
     ".ips-assets-table-anchor",
+    ".ips-assets-click-table",
+    ".ips-jobs-click-table",
     ".ips-inv-table-anchor",
     ".ips-time-table-anchor",
 )
@@ -111,27 +113,11 @@ def _css_join(selectors: tuple[str, ...]) -> str:
     return ",\n".join(selectors)
 
 
-# Page-level markers: row-host CSS must not match the main column root (which
-# contains every row wrap as a descendant — that made non-dashboard pages blank).
-_PAGE_ROOT_MARKERS = (
-    ".ips-page-content",
-    ".ips-page-shell-marker",
-    ".ips-page-header",
-    ".ips-kpi-grid",
-    ".ips-filter-bar",
-    ".ips-data-table-wrap",
-    ".ips-data-table-header",
-)
-
-
-def _vb_row_wrap_excludes() -> str:
-    return "".join(f":not(:has({m}))" for m in _PAGE_ROOT_MARKERS)
-
-
 def _vb_has_row_wrap() -> str:
-    ex = _vb_row_wrap_excludes()
+    """Scope row-host overlay CSS to list tables only (not the whole page column)."""
+    tbl = _table_scope_has()
     parts = [
-        f'div[data-testid="stVerticalBlock"]:has({s}){ex}'
+        f'{tbl} div[data-testid="stVerticalBlock"]:has({s})'
         for s in ROW_WRAP_SELECTORS
     ]
     return _css_join(tuple(parts))
@@ -277,7 +263,7 @@ def inject_clean_table_css() -> None:
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    right: 120px !important;
+    right: 0 !important;
     bottom: 0 !important;
     z-index: 1 !important;
     height: 60px !important;
@@ -289,6 +275,11 @@ def inject_clean_table_css() -> None:
     border: none !important;
     box-shadow: none !important;
     pointer-events: auto !important;
+}}
+{vb_wrap}:has({act_markers})
+    > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has(.stButton) {{
+    right: 120px !important;
 }}
 {vb_wrap}
     > [data-testid="stElementContainer"]:has({row_sel_markers})
@@ -490,11 +481,17 @@ def render_clean_table_click_bridge(
 
   function sendValue(id) {{
     const payload = {{ type: "streamlit:setComponentValue", value: id }};
-    if (window.Streamlit && typeof window.Streamlit.setComponentValue === "function") {{
-      window.Streamlit.setComponentValue(id);
-      return;
-    }}
-    w.postMessage(payload, "*");
+    try {{
+      if (window.Streamlit && typeof window.Streamlit.setComponentValue === "function") {{
+        window.Streamlit.setComponentValue(id);
+      }}
+    }} catch (err) {{}}
+    try {{
+      w.postMessage(payload, "*");
+    }} catch (err) {{}}
+    try {{
+      window.postMessage(payload, "*");
+    }} catch (err) {{}}
   }}
 
   function sendReady() {{

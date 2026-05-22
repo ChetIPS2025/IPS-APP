@@ -43,6 +43,30 @@ def inject_users_module_css() -> None:
   overflow: hidden;
   text-overflow: ellipsis;
 }}
+.ips-users-page .ips-employees-summary-table .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  width: 100%;
+  min-width: 48rem;
+  box-sizing: border-box;
+}}
+.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
+  background: #eef5ff;
+}}
+.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
+div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
+  background: #eef5ff;
+  border-left: 4px solid #2563eb;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -431,6 +455,7 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 
 /* Overlay-button rows: HTML row + invisible Streamlit button per row host */
+section[data-testid="stMain"]
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-clean-table)
 div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
   display: grid !important;
@@ -443,6 +468,7 @@ div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
   background: #ffffff;
   cursor: pointer;
 }}
+section[data-testid="stMain"]
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-clean-table)
 div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-cell {{
   overflow: hidden;

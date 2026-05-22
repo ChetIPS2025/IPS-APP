@@ -183,57 +183,21 @@ def _render_detail_body(job: dict) -> None:
 
 
 def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
-    try:
-        from app.ui.clean_table import render_clean_table_click_bridge
-    except ImportError:
-        from ui.clean_table import render_clean_table_click_bridge  # type: ignore
-
     if not rows:
         st.caption("No records to display.")
         return
 
-    table_class = "ips-jobs-click-table"
     grid = f"grid-template-columns: {_JOB_GRID};"
-    row_parts: list[str] = []
     records_by_id: dict[str, dict] = {}
-
-    for job in rows:
-        jid = str(job.get("id") or "").strip()
-        if not jid:
-            continue
-        records_by_id[jid] = job
-        selected = jid == selected_id
-        row_cls = (
-            "ips-clean-row ips-jobs-row ips-data-row selected"
-            if selected
-            else "ips-clean-row ips-jobs-row ips-data-row"
-        )
-        jid_attr = html.escape(jid, quote=True)
-        jnum = html.escape(str(job.get("job_number") or ""))
-        row_parts.append(
-            f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
-            f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
-            f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
-            f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
-            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
-            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
-            "</div>"
-        )
 
     st.caption("Click a row to open details.")
 
     with st.container(border=True):
         st.markdown(
-            '<span class="ips-jobs-table-anchor ips-clean-table"></span>',
+            '<span class="ips-jobs-table-anchor ips-jobs-click-table ips-clean-table"></span>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            f'<div class="ips-data-table-wrap ips-data-table-stable ips-data-table-html ips-jobs-summary-table">'
-            f'<div class="ips-data-table-scroll">'
-            f'<span class="ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
             f'<div class="ips-data-table-header ips-clean-header" style="{grid}">'
             "<span>JOB #</span>"
             "<span>PROJECT / DESCRIPTION</span>"
@@ -243,24 +207,55 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
             "<span>STATUS</span>"
             "<span>START DATE</span>"
             "<span>END DATE</span>"
-            "</div>"
-            + "".join(row_parts)
-            + "</div></div>",
+            "</div>",
             unsafe_allow_html=True,
         )
 
-    st.session_state["_ips_jobs_modal_by_id"] = records_by_id
+        for row_idx, job in rows:
+            jid = str(job.get("id") or "").strip()
+            if not jid:
+                continue
+            records_by_id[jid] = job
+            selected = jid == selected_id
+            row_cls = (
+                "ips-clean-row ips-jobs-row ips-data-row selected"
+                if selected
+                else "ips-clean-row ips-jobs-row ips-data-row"
+            )
+            jid_attr = html.escape(jid, quote=True)
+            jnum = html.escape(str(job.get("job_number") or ""))
+            jlabel = html.escape(str(job.get("job_number") or "job"), quote=True)
+            with st.container():
+                st.markdown(
+                    '<span class="ips-clean-row-wrap ips-jobs-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
+                    f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
+                    f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
+                    f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
+                    f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
+                    f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
+                    f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
+                    f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
+                    f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    " ",
+                    key=f"jobs_row_sel_{row_idx}_{jid}",
+                    help=f"Select job {jlabel}",
+                ):
+                    _open_jobs_detail_modal(jid)
+                    st.rerun()
 
-    picked = render_clean_table_click_bridge(
-        table_selector=f".{table_class}",
-        row_selector=".ips-jobs-row[data-row-id]",
-        component_key="ips_jobs_row_click_bridge",
-    )
-    if picked:
-        pid = str(picked).strip()
-        if pid in records_by_id:
-            _open_jobs_detail_modal(pid)
-            st.rerun()
+    st.session_state["_ips_jobs_modal_by_id"] = records_by_id
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)

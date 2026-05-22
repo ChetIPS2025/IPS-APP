@@ -79,8 +79,8 @@ def render_clickable_table(
 
     Stores selected record id in ``session_select_key`` and returns it.
 
-    When ``html_rows`` is True (default), all data rows render in one HTML block for reliable
-    visibility. Set ``html_rows=False`` to use invisible Streamlit button overlays per row.
+    When ``html_rows`` is False (default), each row gets an invisible Streamlit button overlay
+    so clicks reliably open details. Set ``html_rows=True`` for read-only nested tables.
     """
     try:
         from app.ui.clean_table import (
@@ -121,7 +121,7 @@ def render_clickable_table(
     ot = "d" + "iv"
     ct = "/" + ot
 
-    use_html_rows = True if html_rows is None else html_rows
+    use_html_rows = False if html_rows is None else html_rows
 
     st.caption("Click a row to open details.")
 
@@ -170,7 +170,7 @@ def render_clickable_table(
                 unsafe_allow_html=True,
             )
             st.markdown(
-                f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
+                f'<{ot} class="ips-data-table-wrap ips-data-table-stable ips-data-table-html ips-click-table-host">'
                 f'<{ot} class="ips-data-table-scroll">'
                 f'<{ot} class="ips-data-table-header ips-clean-header" style="{grid}">'
                 + "".join(f"<span>{html.escape(h)}</span>" for _, h in columns)

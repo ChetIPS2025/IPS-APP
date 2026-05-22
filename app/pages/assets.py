@@ -389,60 +389,19 @@ def _render_detail(asset: dict) -> None:
                         st.rerun()
 
 
-def _select_asset_row(_rid: str, _rec: dict) -> None:
-    st.session_state[_TAB] = "Overview"
-
-
 def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
-    try:
-        from app.ui.clean_table import apply_clean_table_row_selection, render_clean_table_click_bridge
-    except ImportError:
-        from ui.clean_table import apply_clean_table_row_selection, render_clean_table_click_bridge  # type: ignore
-
     if not rows:
         st.caption("No assets match the current filters.")
         return
 
-    table_class = "ips-assets-click-table"
     grid = f"grid-template-columns: {_ASSET_GRID};"
-    row_parts: list[str] = []
-    records_by_id: dict[str, dict] = {}
-
-    for asset in rows:
-        aid = str(asset.get("id") or "").strip()
-        if not aid:
-            continue
-        records_by_id[aid] = asset
-        selected = aid == selected_id
-        row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
-        aid_attr = html.escape(aid, quote=True)
-        number = html.escape(str(asset.get("asset_number") or "—"))
-        name = html.escape(str(asset.get("asset_name") or "—"))
-        category = html.escape(str(asset.get("category") or "—"))
-        location = html.escape(str(asset.get("location") or "—"))
-        department = html.escape(str(asset.get("department") or "—"))
-        acquired = html.escape(fmt_date(asset.get("acquired_date")))
-        value = html.escape(fmt_currency(asset.get("value")))
-        row_parts.append(
-            f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
-            f'<span class="ips-clean-link">{number}</span>'
-            f'<span class="ips-assets-name-cell">{name}</span>'
-            f'<span class="ips-assets-muted-cell">{category}</span>'
-            f'<span class="ips-assets-muted-cell">{location}</span>'
-            f'<span class="ips-assets-muted-cell">{department}</span>'
-            f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
-            f'<span class="ips-assets-muted-cell">{acquired}</span>'
-            f'<span class="ips-assets-muted-cell">{value}</span>'
-            f'<span class="ips-assets-act-slot" title="View">👁</span>'
-            "</div>"
-        )
 
     with st.container(border=True):
-        st.markdown('<span class="ips-assets-table-anchor ips-clean-table"></span>', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="ips-data-table-wrap ips-data-table-stable ips-data-table-html ips-assets-summary-table">'
-            f'<div class="ips-data-table-scroll">'
-            f'<span class="ips-data-table-anchor {table_class}" aria-hidden="true"></span>'
+            '<span class="ips-assets-table-anchor ips-assets-click-table ips-clean-table"></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
             f'<div class="ips-clean-header ips-assets-table-head-row" style="{grid}">'
             f"{table_header_html('Asset #')}"
             f"{table_header_html('Asset Name')}"
@@ -453,26 +412,63 @@ def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
             f"{table_header_html('Acquired Date')}"
             f"{table_header_html('Value')}"
             f"{table_header_html('Actions', sortable=False)}"
-            "</div>"
-            + "".join(row_parts)
-            + "</div></div>",
+            "</div>",
             unsafe_allow_html=True,
         )
 
-    picked = render_clean_table_click_bridge(
-        table_selector=f".{table_class}",
-        row_selector=".ips-assets-row[data-row-id]",
-        component_key="ips_assets_row_bridge",
-    )
-    if picked:
-        pid = str(picked).strip()
-        if pid and pid in records_by_id:
-            apply_clean_table_row_selection(
-                pid,
-                session_select_key=_SEL,
-                records_by_id=records_by_id,
-                on_row_click=_select_asset_row,
-            )
+        for row_idx, asset in enumerate(rows):
+            aid = str(asset.get("id") or "").strip()
+            if not aid:
+                continue
+            selected = aid == selected_id
+            row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
+            aid_attr = html.escape(aid, quote=True)
+            number = html.escape(str(asset.get("asset_number") or "—"))
+            name = html.escape(str(asset.get("asset_name") or "—"))
+            category = html.escape(str(asset.get("category") or "—"))
+            location = html.escape(str(asset.get("location") or "—"))
+            department = html.escape(str(asset.get("department") or "—"))
+            acquired = html.escape(fmt_date(asset.get("acquired_date")))
+            value = html.escape(fmt_currency(asset.get("value")))
+            with st.container():
+                st.markdown(
+                    '<span class="ips-assets-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
+                    f'<span class="ips-clean-link">{number}</span>'
+                    f'<span class="ips-assets-name-cell">{name}</span>'
+                    f'<span class="ips-assets-muted-cell">{category}</span>'
+                    f'<span class="ips-assets-muted-cell">{location}</span>'
+                    f'<span class="ips-assets-muted-cell">{department}</span>'
+                    f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
+                    f'<span class="ips-assets-muted-cell">{acquired}</span>'
+                    f'<span class="ips-assets-muted-cell">{value}</span>'
+                    f'<span class="ips-assets-act-slot" title="View">👁</span>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<span class="ips-assets-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    " ",
+                    key=f"ast_row_sel_{row_idx}_{aid}",
+                    help=f"Select asset {number}",
+                ):
+                    st.session_state[_SEL] = aid
+                    st.session_state[_TAB] = "Overview"
+                    st.rerun()
+                st.markdown(
+                    '<span class="ips-assets-actcol ips-clean-actions" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button("👁", key=f"ast_view_{row_idx}_{aid}", help="View asset"):
+                    st.session_state[_SEL] = aid
+                    st.session_state[_TAB] = "Overview"
+                    st.rerun()
 
 
 def render() -> None:
