@@ -144,10 +144,13 @@ def _render_detail_body(job: dict) -> None:
             with ec1:
                 st.text_input("Job number", value=str(job.get("job_number") or ""), key=f"job_edit_num_{jid}")
                 st.text_input("Job name", value=str(job.get("job_name") or ""), key=f"job_edit_name_{jid}")
+                cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
+                cur_cust = str(job.get("customer") or "")
+                cust_idx = cust_opts.index(cur_cust) if cur_cust in cust_opts else 0
                 st.selectbox(
                     "Customer",
-                    customer_filter_options(),
-                    index=0,
+                    cust_opts,
+                    index=cust_idx,
                     key=f"job_edit_cust_{jid}",
                 )
                 st.selectbox(

@@ -24,9 +24,6 @@ except ImportError:
         update_row,
     )
 
-# --- Normalizers (UI shape) ---
-
-
 def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
     """Use ``primary`` when the key is present (including 0); else first present fallback."""
     if primary in row:
@@ -93,19 +90,56 @@ def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _customer_name_by_id() -> dict[str, str]:
+    """Map customer UUID -> company name for job list normalization."""
+    try:
+        from app.services.customers_service import list_customers
+    except ImportError:
+        from services.customers_service import list_customers  # type: ignore
+    rows, _ = list_customers(demo=[])
+    return {
+        str(c.get("id") or "").strip(): str(c.get("customer_name") or c.get("name") or "").strip()
+        for c in rows
+        if str(c.get("id") or "").strip()
+    }
+
+
+def _resolve_customer_id_for_job(ui: dict[str, Any]) -> str:
+    cid = str(ui.get("customer_id") or "").strip()
+    if cid:
+        return cid
+    name = str(ui.get("customer") or "").strip()
+    if not name:
+        return ""
+    try:
+        from app.pages._core._data import customer_id_for_name
+    except ImportError:
+        from pages._core._data import customer_id_for_name  # type: ignore
+    return customer_id_for_name(name)
+
+
 def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
     jid = str(row.get("id") or row.get("job_id") or "").strip()
     num = str(row.get("job_number") or row.get("number") or jid[:8] or "—")
+    customer = str(row.get("customer_name") or row.get("customer") or "").strip()
+    if not customer:
+        cid = str(row.get("customer_id") or "").strip()
+        if cid:
+            customer = _customer_name_by_id().get(cid, "")
+    if not customer:
+        customer = "—"
+    end = str(row.get("end_date") or row.get("target_completion_date") or "")[:10]
     return {
         "id": jid or num,
         "job_number": num,
         "job_name": str(row.get("job_name") or row.get("name") or row.get("description") or "—"),
-        "customer": str(row.get("customer_name") or row.get("customer") or "—"),
+        "customer": customer,
+        "customer_id": str(row.get("customer_id") or "").strip(),
         "estimate_number": str(row.get("estimate_number") or row.get("quote_number") or "—"),
         "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
         "status": str(row.get("status") or "Draft"),
         "start_date": str(row.get("start_date") or "")[:10],
-        "end_date": str(row.get("end_date") or "")[:10],
+        "end_date": end,
         "progress": int(row.get("progress") or row.get("percent_complete") or 0),
         "description": str(row.get("notes") or row.get("description") or ""),
     }
@@ -408,21 +442,24 @@ def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) 
 
 
 def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    customer_name = str(ui.get("customer") or "").strip()
+    customer_id = _resolve_customer_id_for_job(ui)
+    if customer_name and not customer_id:
+        return ServiceResult(ok=False, error=f"Customer not found: {customer_name}")
+
     payload: dict[str, Any] = {
         "job_number": ui.get("job_number"),
         "job_name": ui.get("job_name"),
-        "customer_name": ui.get("customer"),
         "status": ui.get("status"),
         "supervisor": ui.get("supervisor"),
         "project_manager": ui.get("project_manager"),
         "location": ui.get("location"),
         "start_date": ui.get("start_date") or None,
-        "end_date": ui.get("end_date") or None,
         "target_completion_date": ui.get("end_date") or None,
-        "percent_complete": ui.get("progress"),
-        "notes": ui.get("description") or ui.get("notes"),
-        "scope_of_work": ui.get("scope_of_work") or "",
+        "notes": ui.get("description") or ui.get("notes") or "",
     }
+    if customer_id:
+        payload["customer_id"] = customer_id
     if row_id:
         return update_row("jobs", payload, {"id": row_id})
     return insert_row("jobs", payload)

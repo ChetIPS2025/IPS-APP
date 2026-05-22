@@ -1,8 +1,8 @@
 """
 Jobs module — Supabase reads/writes.
 
-Schema assumptions: table ``jobs`` with columns job_number, job_name, customer_name,
-status, start_date, end_date, notes, supervisor, estimate_number (optional).
+Schema assumptions: table ``jobs`` with columns job_number, job_name, customer_id,
+status, start_date, target_completion_date, notes, supervisor (optional).
 """
 
 from __future__ import annotations
