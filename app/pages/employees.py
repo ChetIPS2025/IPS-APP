@@ -166,7 +166,7 @@ def _render_detail(emp: dict) -> None:
             phone=str(emp.get("phone") or ""),
             last_login=str(emp.get("last_login") or ""),
         )
-        a1, a2, a3, a4 = st.columns([1, 1, 1, 1])
+        a1, a2, a3, a4 = st.columns(4, gap="small")
         with a1:
             st.button("Edit User", key=f"emp_edit_btn_{eid}", use_container_width=True)
         with a2:

@@ -506,7 +506,8 @@ a.ips-link, .ips-data-row a {{
 }}
 
 /* Compact Streamlit controls */
-section[data-testid="stMain"] .stButton > button {{
+section[data-testid="stMain"] .stButton > button,
+section[data-testid="stMain"] [data-testid="stButton"] > button {{
   border-radius: 8px !important;
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
@@ -515,6 +516,13 @@ section[data-testid="stMain"] .stButton > button {{
   border: 1px solid {BORDER} !important;
   background: #fff !important;
   color: {TEXT} !important;
+  white-space: nowrap !important;
+}}
+section[data-testid="stMain"] .stButton > button p,
+section[data-testid="stMain"] [data-testid="stButton"] > button p,
+section[data-testid="stMain"] .stButton > button span,
+section[data-testid="stMain"] [data-testid="stButton"] > button span {{
+  white-space: nowrap !important;
 }}
 section[data-testid="stMain"] .stButton > button[kind="primary"],
 section[data-testid="stMain"] .stButton > button[data-testid="baseButton-primary"] {{
@@ -1242,13 +1250,28 @@ section[data-testid="stSidebar"] hr {{
 }}
 
 /* Detail panel actions */
-.ips-detail-actions .stButton > button {{
+.ips-detail-panel [data-testid="stHorizontalBlock"] {{
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
+}}
+.ips-detail-panel [data-testid="stHorizontalBlock"] [data-testid="column"] {{
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}}
+.ips-detail-actions .stButton > button,
+.ips-detail-panel [data-testid="stHorizontalBlock"] .stButton > button {{
   min-height: 2rem !important;
   max-height: 2.15rem !important;
   font-size: 0.75rem !important;
   padding: 0.2rem 0.55rem !important;
+  white-space: nowrap !important;
 }}
-.ips-detail-actions .stButton > button[kind="primary"] {{
+.ips-detail-actions .stButton > button p,
+.ips-detail-panel [data-testid="stHorizontalBlock"] .stButton > button p {{
+  white-space: nowrap !important;
+}}
+.ips-detail-actions .stButton > button[kind="primary"],
+.ips-detail-panel [data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] {{
   background: {PRIMARY} !important;
   border-color: {PRIMARY} !important;
   color: #fff !important;
@@ -1270,6 +1293,10 @@ section[data-testid="stSidebar"] hr {{
 .ips-header-actions .stButton > button {{
   min-height: 2.1rem !important;
   font-size: 0.8125rem !important;
+  white-space: nowrap !important;
+}}
+.ips-header-actions .stButton > button p {{
+  white-space: nowrap !important;
 }}
 
 .ips-tab-placeholder {{

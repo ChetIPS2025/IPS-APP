@@ -43,19 +43,14 @@ def render_selected_detail_panel(
     if header_fn:
         header_fn()
     else:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.markdown(
-                f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
-                unsafe_allow_html=True,
-            )
-        with c2:
-            st.markdown(f'<{_OT} class="ips-detail-actions">', unsafe_allow_html=True)
-            if actions:
-                actions()
-            elif show_default_actions and session_select_key:
-                render_detail_actions(session_select_key)
-            st.markdown(f"<{_CT}>", unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="ips-detail-title">{html.escape(str(title))}</p>',
+            unsafe_allow_html=True,
+        )
+        if actions:
+            actions()
+        elif show_default_actions and session_select_key:
+            render_detail_actions(session_select_key)
     if tabs_fn:
         tabs_fn()
     if body_fn:
