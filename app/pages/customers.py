@@ -25,6 +25,7 @@ try:
         persist_customer,
     )
     from app.pages._core._session import select_key, tab_key
+    from app.styles import inject_customers_module_css
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -44,6 +45,7 @@ except ImportError:
         persist_customer,
     )
     from pages._core._session import select_key, tab_key  # type: ignore
+    from styles import inject_customers_module_css  # type: ignore
 
 _SEL = select_key("customers")
 _TAB = tab_key("customers")
@@ -286,8 +288,11 @@ def render() -> None:
     if not begin_module("customers"):
         return
 
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    st.markdown(f'<{ot} class="ips-module-page ips-customers-page">', unsafe_allow_html=True)
+    inject_customers_module_css()
+    st.markdown(
+        '<span class="ips-customers-page ips-module-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
 
     all_rows = load_customers()
     states = sorted({str(c.get("state") or "") for c in all_rows if c.get("state")})
@@ -296,45 +301,45 @@ def render() -> None:
     with hdr_l:
         render_page_header("Customers", "Manage customer companies, sites, and contacts.")
     with hdr_r:
-        st.markdown(f'<{ot} class="ips-header-actions">', unsafe_allow_html=True)
         if st.button("+ New Customer", key="cust_new", type="primary", use_container_width=True):
             st.session_state["ips_cust_form"] = True
-        st.markdown(f"</{ct}>", unsafe_allow_html=True)
 
     if st.session_state.get("ips_cust_form"):
-        st.markdown(f'<{ot} class="ips-card ips-form-card">', unsafe_allow_html=True)
-        st.markdown('<p class="ips-page-subtitle" style="margin:0 0 0.5rem;font-weight:600;color:#0f172a">New customer</p>', unsafe_allow_html=True)
-        nc1, nc2 = st.columns(2)
-        with nc1:
-            st.text_input("Company name", key="cust_new_name")
-            st.text_input("Address", key="cust_new_addr")
-            st.text_input("City", key="cust_new_city")
-        with nc2:
-            st.text_input("State", key="cust_new_state")
-            st.text_input("ZIP", key="cust_new_zip")
-            st.selectbox("Status", ["Active", "Inactive"], key="cust_new_status")
-        st.text_area("Notes", key="cust_new_notes")
-        sb1, sb2 = st.columns(2)
-        with sb1:
-            if st.button("Save customer", key="cust_save_new", type="primary", use_container_width=True):
-                ok, msg = persist_customer(
-                    {
-                        "customer_name": st.session_state.get("cust_new_name"),
-                        "address": st.session_state.get("cust_new_addr"),
-                        "city": st.session_state.get("cust_new_city"),
-                        "state": st.session_state.get("cust_new_state"),
-                        "zip": st.session_state.get("cust_new_zip"),
-                        "status": st.session_state.get("cust_new_status"),
-                        "notes": st.session_state.get("cust_new_notes"),
-                    }
-                )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_cust_form",)):
+        with st.container(border=True):
+            st.markdown(
+                '<p class="ips-page-subtitle" style="margin:0 0 0.5rem;font-weight:600;color:#0f172a">New customer</p>',
+                unsafe_allow_html=True,
+            )
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.text_input("Company name", key="cust_new_name")
+                st.text_input("Address", key="cust_new_addr")
+                st.text_input("City", key="cust_new_city")
+            with nc2:
+                st.text_input("State", key="cust_new_state")
+                st.text_input("ZIP", key="cust_new_zip")
+                st.selectbox("Status", ["Active", "Inactive"], key="cust_new_status")
+            st.text_area("Notes", key="cust_new_notes")
+            sb1, sb2 = st.columns(2)
+            with sb1:
+                if st.button("Save customer", key="cust_save_new", type="primary", use_container_width=True):
+                    ok, msg = persist_customer(
+                        {
+                            "customer_name": st.session_state.get("cust_new_name"),
+                            "address": st.session_state.get("cust_new_addr"),
+                            "city": st.session_state.get("cust_new_city"),
+                            "state": st.session_state.get("cust_new_state"),
+                            "zip": st.session_state.get("cust_new_zip"),
+                            "status": st.session_state.get("cust_new_status"),
+                            "notes": st.session_state.get("cust_new_notes"),
+                        }
+                    )
+                    if apply_persist_feedback(ok, msg, clear_keys=("ips_cust_form",)):
+                        st.rerun()
+            with sb2:
+                if st.button("Cancel", key="cust_cancel_new", use_container_width=True):
+                    st.session_state.pop("ips_cust_form", None)
                     st.rerun()
-        with sb2:
-            if st.button("Cancel", key="cust_cancel_new", use_container_width=True):
-                st.session_state.pop("ips_cust_form", None)
-                st.rerun()
-        st.markdown(f"</{ct}>", unsafe_allow_html=True)
 
     def _filters() -> None:
         c1, c2, c3, c4 = st.columns([2, 1, 1, 0.7])
@@ -375,8 +380,14 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _plain_cell(field: str, row: dict) -> str:
-        return str(row.get(field) or "—")
+    st.caption(f"{len(filtered)} customer(s)")
+
+    def _cell(field: str, row: dict) -> str:
+        if field == "status":
+            return status_pill_html(str(row.get("status") or ""))
+        if field == "customer_name":
+            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("customer_name") or "—"))}</span>'
+        return html.escape(str(row.get(field) or "—"))
 
     sel = render_clickable_table(
         filtered,
@@ -391,12 +402,12 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         selected_id=selected_id or None,
-        plain_cell=_plain_cell,
+        html_cell=_cell,
+        html_rows=True,
+        col_fr=["1.4fr", "1fr", "0.55fr", "0.65fr", "0.75fr"],
     )
 
     if sel:
         cust = get_customer(sel) or next((c for c in filtered if str(c.get("id")) == sel), None)
         if cust:
             _render_detail(cust)
-
-    st.markdown(f"</{ct}>", unsafe_allow_html=True)

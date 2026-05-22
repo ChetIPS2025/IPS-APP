@@ -26,7 +26,7 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key, tab_key
-    from app.styles import inject_global_css
+    from app.styles import inject_users_module_css
     from app.utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
@@ -50,7 +50,7 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key, tab_key  # type: ignore
-    from styles import inject_global_css  # type: ignore
+    from styles import inject_users_module_css  # type: ignore
     from utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
@@ -332,6 +332,8 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("employees"):
         return
+    inject_users_module_css()
+    st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     all_emp = load_employees()
     departments = sorted({str(e.get("department") or "") for e in all_emp if e.get("department")})
     roles = sorted({str(e.get("role") or "") for e in all_emp if e.get("role")})
@@ -384,6 +386,8 @@ def render() -> None:
         role=str(st.session_state.get("emp_role_filter") or "All Roles"),
     )
 
+    st.caption(f"{len(filtered)} user(s)")
+
     selected_id = str(st.session_state.get(_SEL) or "")
     if selected_id and not any(str(e.get("id")) == selected_id for e in filtered):
         st.session_state.pop(_SEL, None)
@@ -393,9 +397,6 @@ def render() -> None:
         if field == "status":
             return status_pill_html(str(row.get("status") or ""))
         return html.escape(str(row.get(field) or "—"))
-
-    def _plain_cell(field: str, row: dict) -> str:
-        return str(row.get(field) or "—")
 
     sel = render_clickable_table(
         filtered,
@@ -411,8 +412,8 @@ def render() -> None:
         row_id_key="id",
         session_select_key=_SEL,
         selected_id=selected_id or None,
-        plain_cell=_plain_cell,
         html_cell=_cell,
+        col_fr=["1.1fr", "1.3fr", "0.9fr", "1fr", "0.75fr", "0.9fr"],
     )
 
     if sel:

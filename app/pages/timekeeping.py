@@ -50,9 +50,6 @@ def _grid_key(emp_id: str) -> str:
 
 
 def _inject_timekeeping_styles() -> None:
-    if st.session_state.get("ips_timekeeping_styles_v1"):
-        return
-    st.session_state["ips_timekeeping_styles_v1"] = True
     st.markdown(
         """
         <style>
@@ -156,6 +153,22 @@ def _inject_timekeeping_styles() -> None:
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        .ips-timekeeping-page .ips-time-summary-table.ips-data-table-html .ips-time-table-head,
+        .ips-timekeeping-page .ips-time-summary-table.ips-data-table-html .ips-time-row {
+            display: grid !important;
+            box-sizing: border-box !important;
+        }
+        .ips-timekeeping-page .ips-time-summary-table.ips-data-table-html .ips-time-row {
+            min-height: 2.75rem;
+            cursor: pointer;
+        }
+        .ips-timekeeping-page .ips-time-summary-table.ips-data-table-html .ips-time-row:hover {
+            background: #f8fafc;
+        }
+        .ips-timekeeping-page .ips-time-summary-table.ips-data-table-html .ips-time-row.selected {
+            background: #eff6ff;
+            box-shadow: inset 3px 0 0 #2563eb;
         }
         .ips-time-detail-top {
             border-bottom: 1px solid #e5eaf2;
@@ -432,16 +445,60 @@ def _render_weekly_detail(emp: dict, week_start_d: date) -> None:
                     placeholder="Add notes...",
                 )
             with c[7]:
-                st.checkbox("Row complete", key=f"tk_done_{eid}_{week_sig}_{i}", label_visibility="collapsed")
+                if st.button("🗑", key=f"tk_del_{eid}_{week_sig}_{i}", help="Clear row"):
+                    grid[i]["job"] = job_opts[0] if job_opts else "— No job —"
+                    grid[i]["st"] = 0.0
+                    grid[i]["ot"] = 0.0
+                    grid[i]["dt"] = 0.0
+                    grid[i]["notes"] = ""
+                    st.session_state[gk] = grid
+                    st.rerun()
         st.session_state[gk] = grid
         st.caption("Last updated: May 12, 2025 9:42 AM by Leland Daigle")
 
 
 def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_d: date) -> None:
+    try:
+        from app.ui.clean_table import apply_clean_table_row_selection, render_clean_table_click_bridge
+    except ImportError:
+        from ui.clean_table import apply_clean_table_row_selection, render_clean_table_click_bridge  # type: ignore
+
+    table_class = "ips-time-summary-table"
+    row_parts: list[str] = []
+    records_by_id: dict[str, dict] = {}
+
+    for row in rows:
+        eid = str(row.get("id") or "").strip()
+        if not eid:
+            continue
+        records_by_id[eid] = row
+        st_total = float(row.get("st_total") or 0)
+        ot_total = float(row.get("ot_total") or 0)
+        dt_total = float(row.get("dt_total") or 0)
+        total = st_total + ot_total + dt_total
+        selected = eid == selected_id
+        row_cls = "ips-clean-row ips-time-row selected" if selected else "ips-clean-row ips-time-row"
+        eid_attr = html.escape(eid, quote=True)
+        row_parts.append(
+            f'<div class="{row_cls}" data-row-id="{eid_attr}" role="button" tabindex="0">'
+            f'<span class="ips-time-emp">{html.escape(str(row.get("name") or "—"))}</span>'
+            f'<span class="ips-time-cell">{html.escape(str(row.get("department") or "—"))}</span>'
+            f'<span class="ips-time-cell">{html.escape(fmt_date(row.get("week_start") or week_start_d))}</span>'
+            f'<span class="ips-time-cell">{html.escape(fmt_hours(st_total))}</span>'
+            f'<span class="ips-time-cell">{html.escape(fmt_hours(ot_total))}</span>'
+            f'<span class="ips-time-cell">{html.escape(fmt_hours(total))}</span>'
+            f'<span>{status_pill_html(str(row.get("status") or "Pending"))}</span>'
+            f'<span class="ips-time-cell" title="View">👁</span>'
+            "</div>"
+        )
+
     with st.container(border=True):
         st.markdown('<span class="ips-time-table-anchor ips-clean-table"></span>', unsafe_allow_html=True)
         st.markdown(
-            '<div class="ips-time-table-head">'
+            f'<div class="ips-data-table-wrap ips-data-table-stable ips-data-table-html {table_class}">'
+            f'<div class="ips-data-table-scroll">'
+            f'<span class="ips-data-table-anchor {table_class}-anchor" aria-hidden="true"></span>'
+            f'<div class="ips-time-table-head">'
             "<span>Employee ⇅</span>"
             "<span>Department ⇅</span>"
             "<span>Week Start ⇅</span>"
@@ -450,59 +507,26 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
             "<span>Total Hours ⇅</span>"
             "<span>Status ⇅</span>"
             "<span>Actions</span>"
-            "</div>",
+            "</div>"
+            + "".join(row_parts)
+            + "</div></div>",
             unsafe_allow_html=True,
         )
 
-        for row in rows:
-            eid = str(row.get("id") or "").strip()
-            if not eid:
-                continue
-            st_total = float(row.get("st_total") or 0)
-            ot_total = float(row.get("ot_total") or 0)
-            dt_total = float(row.get("dt_total") or 0)
-            total = st_total + ot_total + dt_total
-            selected = eid == selected_id
-            row_cls = (
-                "ips-clean-row ips-time-row selected"
-                if selected
-                else "ips-clean-row ips-time-row"
+    picked = render_clean_table_click_bridge(
+        table_selector=f".{table_class}",
+        row_selector=".ips-time-row[data-row-id]",
+        component_key="ips_timekeeping_row_bridge",
+    )
+    if picked:
+        pid = str(picked).strip()
+        if pid and pid in records_by_id:
+            apply_clean_table_row_selection(
+                pid,
+                session_select_key=_SEL,
+                records_by_id=records_by_id,
+                on_row_click=lambda _rid, _rec: st.session_state.pop(_COLLAPSED_KEY, None),
             )
-            eid_attr = html.escape(eid, quote=True)
-            with st.container():
-                st.markdown(
-                    '<span class="ips-tk-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<div class="{row_cls}" data-row-id="{eid_attr}" role="button" tabindex="0">'
-                    f'<span class="ips-time-emp">{html.escape(str(row.get("name") or "—"))}</span>'
-                    f'<span class="ips-time-cell">{html.escape(str(row.get("department") or "—"))}</span>'
-                    f'<span class="ips-time-cell">{html.escape(fmt_date(row.get("week_start") or week_start_d))}</span>'
-                    f'<span class="ips-time-cell">{html.escape(fmt_hours(st_total))}</span>'
-                    f'<span class="ips-time-cell">{html.escape(fmt_hours(ot_total))}</span>'
-                    f'<span class="ips-time-cell">{html.escape(fmt_hours(total))}</span>'
-                    f'<span>{status_pill_html(str(row.get("status") or "Pending"))}</span>'
-                    '<span class="ips-time-cell"></span>'
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<span class="ips-tk-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(" ", key=f"tk_row_select_{eid}", help=f"Select {row.get('name') or 'employee'}"):
-                    st.session_state[_SEL] = eid
-                    st.session_state.pop(_COLLAPSED_KEY, None)
-                    st.rerun()
-                st.markdown(
-                    '<span class="ips-tk-actions ips-clean-actions" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button("👁", key=f"tk_view_{eid}", help="View weekly time"):
-                    st.session_state[_SEL] = eid
-                    st.session_state.pop(_COLLAPSED_KEY, None)
-                    st.rerun()
 
 
 def render() -> None:
@@ -574,6 +598,8 @@ def render() -> None:
         filtered = [s for s in filtered if q in str(s.get("name", "")).lower()]
     if dept != "All Departments":
         filtered = [s for s in filtered if str(s.get("department", "")) == dept]
+
+    st.caption(f"{len(filtered)} employee(s) · Click a row to open the weekly grid")
 
     selected_id = str(st.session_state.get(_SEL) or "")
     if selected_id and not any(str(s.get("id")) == selected_id for s in filtered):

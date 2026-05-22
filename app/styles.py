@@ -21,6 +21,34 @@ SELECTED_BG = "#eff6ff"
 SELECTED_BORDER = "#2563eb"
 
 
+def inject_users_module_css() -> None:
+    """Users/Employees list table stability — call at the top of the users page render."""
+    st.markdown(
+        f"""
+<style id="ips-users-module-v1">
+.ips-users-page .ips-data-table-wrap,
+.ips-users-page .ips-data-table-stable .ips-data-table-header,
+.ips-users-page .ips-data-table-stable .ips-data-row {{
+  display: grid !important;
+  box-sizing: border-box !important;
+}}
+.ips-users-page .ips-data-table-html .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-users-page .ips-data-table-html .ips-data-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_documents_module_css() -> None:
     """Documents hub table stability — call at the top of documents page render."""
     st.markdown(
@@ -40,6 +68,34 @@ def inject_documents_module_css() -> None:
   text-overflow: ellipsis;
 }}
 .ips-documents-page .ips-data-table-html .ips-data-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_customers_module_css() -> None:
+    """Customers list table stability — call at the top of the customers page render."""
+    st.markdown(
+        f"""
+<style id="ips-customers-module-v1">
+.ips-customers-page .ips-data-table-wrap,
+.ips-customers-page .ips-data-table-stable .ips-data-table-header,
+.ips-customers-page .ips-data-table-stable .ips-data-row {{
+  display: grid !important;
+  box-sizing: border-box !important;
+}}
+.ips-customers-page .ips-data-table-html .ips-data-row {{
+  display: grid !important;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-customers-page .ips-data-table-html .ips-data-cell {{
   overflow: hidden;
   text-overflow: ellipsis;
 }}
