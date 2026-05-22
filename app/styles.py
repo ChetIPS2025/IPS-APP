@@ -188,112 +188,23 @@ def inject_customers_module_css() -> None:
 
 
 def inject_jobs_module_css() -> None:
-    """Jobs list table stability — call at the top of the jobs page render."""
+    """Jobs list table — native dataframe row selection styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v8">
-.ips-jobs-page .ips-data-table-wrap,
-.ips-jobs-page .ips-data-table-stable .ips-data-table-header,
-.ips-jobs-page .ips-data-table-stable .ips-data-row {{
-  display: grid !important;
-  box-sizing: border-box !important;
-}}
-.ips-jobs-page .ips-data-table-html .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+<style id="ips-jobs-module-v9">
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [role="grid"] {{
   cursor: pointer;
 }}
-.ips-jobs-page .ips-data-table-html .ips-data-cell {{
-  overflow: hidden;
-  text-overflow: ellipsis;
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [role="row"]:hover {{
+  background-color: #eef5ff !important;
 }}
-.ips-jobs-page .ips-row-open-link {{
-  color: #2563eb;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}}
-.ips-jobs-page .ips-row-open-link:hover {{
-  color: #1d4ed8;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  width: 100%;
-  min-width: 48rem;
-  box-sizing: border-box;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
-  background: #eef5ff;
-}}
-.ips-jobs-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
-  background: #eef5ff;
-  border-left: 4px solid #2563eb;
-}}
-/* Jobs list: invisible full-row select button layered under HTML row */
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-jobs_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap),
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn) {{
-  position: relative !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 1 !important;
-  height: auto !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  pointer-events: auto !important;
-}}
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stDataFrame"] [data-testid="stCheckbox"] {{
   opacity: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: transparent !important;
-  cursor: pointer !important;
-}}
-section[data-testid="stMain"]:has(.ips-jobs-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has(.ips-data-row) {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 2 !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  max-width: 1px !important;
+  overflow: hidden !important;
   pointer-events: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
 }}
 </style>
 """,

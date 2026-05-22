@@ -12,7 +12,7 @@ try:
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.layout import render_tab_placeholder
     from app.components.status import status_pill_html
-    from app.components.tables import render_clickable_table
+    from app.components.clickable_table import close_modal_and_clear_selection, render_clickable_table
     from app.components.tabs import render_tabs
     from app.pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
@@ -24,7 +24,7 @@ except ImportError:
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_clickable_table  # type: ignore
+    from components.clickable_table import close_modal_and_clear_selection, render_clickable_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages._core._data import customer_filter_options, load_jobs, lookup_options, persist_job  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
@@ -80,11 +80,14 @@ def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> lis
 
 
 def _clear_jobs_detail_modal() -> None:
-    st.session_state.pop(_SEL, None)
-    st.session_state.pop(_JOBS_MODAL_KEY, None)
+    close_modal_and_clear_selection(
+        table_key="jobs_list",
+        session_select_key=_SEL,
+        modal_key=_JOBS_MODAL_KEY,
+    )
 
 
-def _open_jobs_detail_modal(job_id: str) -> None:
+def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
     jid = str(job_id or "").strip()
     if not jid:
         return
@@ -186,19 +189,11 @@ def _render_detail_body(job: dict) -> None:
                     st.rerun()
 
 
-def _jobs_table_cell(field: str, row: dict) -> str:
-    if field == "status":
-        return status_pill_html(str(row.get("status") or ""))
-    if field == "job_number":
-        jid = html.escape(str(row.get("id") or ""), quote=True)
-        jnum = html.escape(str(row.get("job_number") or ""))
-        return (
-            f'<span class="ips-clean-link ips-row-open-link" data-row-id="{jid}" '
-            f'role="link" tabindex="0" title="Open job details">{jnum}</span>'
-        )
+def _jobs_display_cell(field: str, row: dict) -> str:
     if field in ("start_date", "end_date"):
-        return html.escape(fmt_date(row.get(field)))
-    return html.escape(str(row.get(field) or "—"))
+        return fmt_date(row.get(field))
+    val = row.get(field)
+    return str(val).strip() if val is not None and str(val).strip() else "—"
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
@@ -342,11 +337,6 @@ def render() -> None:
         customer=str(st.session_state.get("jobs_filter_customer") or "All Customers"),
     )
 
-    selected_id = str(st.session_state.get(_SEL) or "")
-    if selected_id and not any(str(j.get("id")) == selected_id for j in filtered):
-        st.session_state.pop(_SEL, None)
-        selected_id = ""
-
     st.caption(f"{len(filtered)} job(s)")
 
     st.session_state["_ips_jobs_modal_by_id"] = {
@@ -370,12 +360,9 @@ def render() -> None:
         "jobs_list",
         row_id_key="id",
         session_select_key=_SEL,
-        selected_id=selected_id or None,
-        html_cell=_jobs_table_cell,
-        col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
-        on_row_click=lambda rid, _rec: _open_jobs_detail_modal(rid),
-        html_rows=True,
-        click_caption="Click a job number to open details.",
+        format_cell=_jobs_display_cell,
+        click_caption="Click a row to open details.",
+        on_row_selected=_open_jobs_detail_modal,
     )
 
     _show_jobs_detail_modal_if_pending()
