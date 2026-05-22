@@ -125,6 +125,7 @@ def normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
         "subtotal": _money_field(row, "subtotal", "total", "grand_total"),
         "tax": float(row.get("tax") or 0),
         "markup": float(row.get("markup") or 0),
+        "customer_contact_id": str(row.get("customer_contact_id") or ""),
     }
 
 
@@ -427,6 +428,8 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "quote_number": ui.get("estimate_number"),
         "project_name": ui.get("project_name"),
         "customer_name": ui.get("customer"),
+        "customer_id": ui.get("customer_id") or None,
+        "customer_contact_id": ui.get("customer_contact_id") or None,
         "status": ui.get("status"),
         "estimate_date": ui.get("estimate_date") or None,
         "expiration_date": ui.get("expiration_date") or None,

@@ -487,6 +487,20 @@ def render_clean_table_click_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = "ipsCleanTableClick::{key_esc}";
+
+  function sendValue(id) {{
+    const payload = {{ type: "streamlit:setComponentValue", value: id }};
+    if (window.Streamlit && typeof window.Streamlit.setComponentValue === "function") {{
+      window.Streamlit.setComponentValue(id);
+      return;
+    }}
+    w.postMessage(payload, "*");
+  }}
+
+  function sendReady() {{
+    w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
+  }}
+
   if (!doc.ipsCleanTableBridgeRegistry) {{
     doc.ipsCleanTableBridgeRegistry = {{}};
     doc.addEventListener("click", function (e) {{
@@ -498,20 +512,22 @@ def render_clean_table_click_bridge(
         const row = t.closest(cfg.row);
         if (!row) continue;
         if (cfg.tbl) {{
-          let scope = row.closest(".ips-data-table-wrap");
-          if (!scope) {{
-            scope = row.closest(".jdb-tbl-host") || row.closest("[data-testid='stVerticalBlockBorderWrapper']");
-          }}
-          if (!scope || !scope.querySelector(cfg.tbl)) continue;
+          const wrap = row.closest(".ips-data-table-wrap");
+          if (!wrap) continue;
+          const anchor = wrap.querySelector(cfg.tbl);
+          if (!anchor) continue;
+          const scroll = anchor.closest(".ips-data-table-scroll");
+          if (scroll && !scroll.contains(row)) continue;
         }}
         const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
         if (!id) continue;
-        window.postMessage({{ type: "streamlit:setComponentValue", value: id }}, "*");
+        sendValue(id);
         return;
       }}
     }}, true);
   }}
   doc.ipsCleanTableBridgeRegistry[hookKey] = {{ tbl: "{tbl}", row: "{row}" }};
+  sendReady();
 }})();
 </script>
         """,

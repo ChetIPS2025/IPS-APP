@@ -124,6 +124,9 @@ def inject_jobs_module_css() -> None:
   text-overflow: ellipsis;
   cursor: pointer;
 }}
+.ips-jobs-page .ips-jobs-summary-table .ips-jobs-row {{
+  display: grid !important;
+}}
 .ips-jobs-page .ips-data-table-html .ips-data-row:hover {{
   background: #eef5ff;
 }}

@@ -17,7 +17,9 @@ try:
     from app.components.tabs import render_tabs
     from app.pages._core._data import (
         ACTIVE_ESTIMATE_KEY,
+        customer_contact_select_options,
         customer_filter_options,
+        customer_id_for_name,
         get_estimate,
         load_estimates,
         lookup_options,
@@ -40,7 +42,9 @@ except ImportError:
     from components.tabs import render_tabs  # type: ignore
     from pages._core._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
+        customer_contact_select_options,
         customer_filter_options,
+        customer_id_for_name,
         get_estimate,
         load_estimates,
         lookup_options,
@@ -55,6 +59,68 @@ except ImportError:
 
 _SEL = select_key("estimates")
 _TAB = tab_key("estimates")
+_NEW_CUST_PREV = "est_new_cust_prev"
+
+
+def _contact_label_for_estimate(est: dict) -> str:
+    ccid = str(est.get("customer_contact_id") or "").strip()
+    if not ccid:
+        return "—"
+    cid = customer_id_for_name(str(est.get("customer") or ""))
+    for label, contact_id in customer_contact_select_options(cid):
+        if contact_id == ccid:
+            return label
+    return "—"
+
+
+def _customer_contact_select(
+    *,
+    customer_name: str,
+    session_key: str,
+    prev_customer_key: str,
+    initial_contact_id: str = "",
+) -> str:
+    cust = str(customer_name or "").strip()
+    if st.session_state.get(prev_customer_key) != cust:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_customer_key] = cust
+
+    cid = customer_id_for_name(cust)
+    if not cust or not cid:
+        st.selectbox(
+            "Contact",
+            ["— Select customer first —"],
+            disabled=True,
+            key=session_key,
+        )
+        return ""
+
+    pairs = customer_contact_select_options(cid)
+    if not pairs:
+        st.selectbox(
+            "Contact",
+            ["— No contacts for this customer —"],
+            disabled=True,
+            key=session_key,
+        )
+        return ""
+
+    labels = ["— Select contact —", *[label for label, _ in pairs]]
+    ids = ["", *[contact_id for _, contact_id in pairs]]
+
+    if session_key not in st.session_state and initial_contact_id:
+        try:
+            st.session_state[session_key] = ids.index(initial_contact_id)
+        except ValueError:
+            st.session_state[session_key] = 0
+
+    idx = st.selectbox(
+        "Contact",
+        range(len(labels)),
+        format_func=lambda i: labels[i],
+        key=session_key,
+    )
+    return str(ids[int(idx)])
 
 
 def _filter_rows(rows: list[dict], *, q: str, status: str, customer: str) -> list[dict]:
@@ -123,6 +189,7 @@ def _render_detail(est: dict) -> None:
                 f"<dt>Estimate #</dt><dd>{html.escape(en)}</dd>"
                 f"<dt>Project</dt><dd>{html.escape(str(est.get('project_name') or '—'))}</dd>"
                 f"<dt>Customer</dt><dd>{html.escape(str(est.get('customer') or '—'))}</dd>"
+                f"<dt>Contact</dt><dd>{html.escape(_contact_label_for_estimate(est))}</dd>"
                 f"<dt>Status</dt><dd>{status_pill_html(str(est.get('status') or ''))}</dd>"
                 f"<dt>Linked Job</dt><dd>{html.escape(str(est.get('job_number') or '—'))}</dd>"
                 f"</dl>",
@@ -196,6 +263,12 @@ def _render_detail(est: dict) -> None:
                         customer_filter_options(include_names={str(est.get("customer") or "")}),
                         key=f"est_edit_cust_{eid}",
                     )
+                    contact_id = _customer_contact_select(
+                        customer_name=str(st.session_state.get(f"est_edit_cust_{eid}") or est.get("customer") or ""),
+                        session_key=f"est_edit_contact_{eid}",
+                        prev_customer_key=f"est_edit_cust_prev_{eid}",
+                        initial_contact_id=str(est.get("customer_contact_id") or ""),
+                    )
                     st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
                 with ec2:
                     st.number_input("Subtotal", value=float(est.get("subtotal") or 0), key=f"est_edit_sub_{eid}")
@@ -203,11 +276,14 @@ def _render_detail(est: dict) -> None:
                     st.number_input("Total", value=float(est.get("total") or 0), key=f"est_edit_total_{eid}")
                 st.text_area("Notes", value=str(est.get("description") or ""), key=f"est_edit_notes_{eid}")
                 if st.button("Save estimate", key=f"est_save_{eid}", type="primary"):
+                    cust_name = str(st.session_state.get(f"est_edit_cust_{eid}") or "")
                     ok, msg = persist_estimate(
                         {
                             "estimate_number": st.session_state.get(f"est_edit_num_{eid}"),
                             "project_name": st.session_state.get(f"est_edit_proj_{eid}"),
-                            "customer": st.session_state.get(f"est_edit_cust_{eid}"),
+                            "customer": cust_name,
+                            "customer_id": customer_id_for_name(cust_name) or None,
+                            "customer_contact_id": contact_id or None,
                             "status": st.session_state.get(f"est_edit_status_{eid}"),
                             "subtotal": st.session_state.get(f"est_edit_sub_{eid}"),
                             "tax": st.session_state.get(f"est_edit_tax_{eid}"),
@@ -255,6 +331,12 @@ def render() -> None:
                 st.text_input("Estimate #", key="est_new_num")
                 st.text_input("Project name", key="est_new_proj")
                 st.selectbox("Customer", customer_filter_options(), key="est_new_cust")
+                new_cust = str(st.session_state.get("est_new_cust") or "")
+                new_contact_id = _customer_contact_select(
+                    customer_name=new_cust,
+                    session_key="est_new_contact",
+                    prev_customer_key=_NEW_CUST_PREV,
+                )
                 st.selectbox("Status", lookup_options("estimate_statuses"), key="est_new_status")
             with nc2:
                 st.number_input("Total", value=0.0, key="est_new_total")
@@ -264,7 +346,9 @@ def render() -> None:
                     {
                         "estimate_number": st.session_state.get("est_new_num"),
                         "project_name": st.session_state.get("est_new_proj"),
-                        "customer": st.session_state.get("est_new_cust"),
+                        "customer": new_cust,
+                        "customer_id": customer_id_for_name(new_cust) or None,
+                        "customer_contact_id": new_contact_id or None,
                         "status": st.session_state.get("est_new_status"),
                         "total": st.session_state.get("est_new_total"),
                         "description": st.session_state.get("est_new_notes"),

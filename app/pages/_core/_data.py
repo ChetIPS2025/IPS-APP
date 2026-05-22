@@ -1267,6 +1267,37 @@ def customer_filter_options(*, include_names: set[str] | None = None) -> list[st
     return sorted(opts)
 
 
+def customer_id_for_name(customer_name: str) -> str:
+    """Resolve directory customer id from company name."""
+    needle = str(customer_name or "").strip().lower()
+    if not needle:
+        return ""
+    for c in load_customers():
+        if str(c.get("customer_name") or "").strip().lower() == needle:
+            return str(c.get("id") or "").strip()
+    return ""
+
+
+def customer_contact_select_options(customer_id: str) -> list[tuple[str, str]]:
+    """Active contacts for a customer as (label, contact_id). Primary contacts first."""
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    contacts = [
+        c
+        for c in load_customer_contacts(cid)
+        if str(c.get("status") or "Active") == "Active" and str(c.get("id") or "").strip()
+    ]
+    contacts.sort(key=lambda c: (not bool(c.get("is_primary")), str(c.get("contact_name") or "").lower()))
+    out: list[tuple[str, str]] = []
+    for c in contacts:
+        name = str(c.get("contact_name") or "—")
+        title = str(c.get("title") or "").strip()
+        label = f"{name} — {title}" if title else name
+        out.append((label, str(c.get("id") or "")))
+    return out
+
+
 def persist_customer(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
