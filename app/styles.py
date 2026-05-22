@@ -261,6 +261,262 @@ def inject_authenticated_shell_css() -> None:
     )
 
 
+def inject_ips_dialog_styles() -> None:
+    """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
+    st.markdown(
+        f"""
+<style id="ips-dialog-styles-v1">
+div[data-testid="stBackdrop"] {{
+  background: rgba(15, 23, 42, 0.42) !important;
+  backdrop-filter: blur(3px) !important;
+}}
+div[data-testid="stDialog"] {{
+  max-width: min(1180px, 96vw) !important;
+  width: min(1180px, 96vw) !important;
+}}
+div[data-testid="stDialog"]:has(.ips-modal-wide),
+div[data-testid="stDialog"]:has(.ips-dialog-shell) {{
+  max-width: min(1180px, 96vw) !important;
+  width: min(1180px, 96vw) !important;
+}}
+div[data-testid="stDialog"] > div,
+div[data-testid="stDialog"] div[role="dialog"] {{
+  background: #ffffff !important;
+  border: 1px solid #d8e0ea !important;
+  border-radius: 18px !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22) !important;
+  overflow: hidden !important;
+}}
+div[data-testid="stDialog"] h1,
+div[data-testid="stDialog"] [data-testid="stModalHeader"] h1 {{
+  color: {TEXT} !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}}
+div[data-testid="stDialog"] .stButton > button,
+div[data-testid="stDialog"] [data-testid="stButton"] > button {{
+  width: auto !important;
+  min-width: 4.75rem !important;
+  max-width: none !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 1rem !important;
+  border-radius: 9px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  border: 1px solid #d8e0ea !important;
+  background: #ffffff !important;
+  color: {TEXT} !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}}
+div[data-testid="stDialog"] .stButton > button p,
+div[data-testid="stDialog"] [data-testid="stButton"] > button p {{
+  white-space: nowrap !important;
+  margin: 0 !important;
+}}
+div[data-testid="stDialog"] .stButton > button[kind="primary"],
+div[data-testid="stDialog"] [data-testid="stButton"] > button[data-testid="baseButton-primary"] {{
+  background: {PRIMARY} !important;
+  border-color: {PRIMARY} !important;
+  color: #ffffff !important;
+}}
+div[data-testid="stDialog"] .ips-dialog-actions + div [data-testid="stHorizontalBlock"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) [data-testid="stHorizontalBlock"] {{
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
+  justify-content: flex-end !important;
+  margin-bottom: 0.85rem !important;
+}}
+div[data-testid="stDialog"] .ips-dialog-actions + div [data-testid="column"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}}
+div[data-testid="stDialog"] .ips-dialog-actions + div .stButton > button,
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) .stButton > button {{
+  width: auto !important;
+  min-width: 4.75rem !important;
+}}
+div[data-testid="stDialog"] .ips-dialog-actions {{
+  display: none !important;
+}}
+div[data-testid="stDialog"] div[data-testid="stTabs"] {{
+  margin-top: 0.35rem !important;
+}}
+div[data-testid="stDialog"] div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
+  gap: 0.15rem !important;
+  border-bottom: 1px solid #d8e0ea !important;
+  background: transparent !important;
+}}
+div[data-testid="stDialog"] div[data-testid="stTabs"] button[data-baseweb="tab"] {{
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: {TEXT_MUTED} !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  padding: 0.55rem 0.85rem !important;
+  min-height: 2.35rem !important;
+  box-shadow: none !important;
+}}
+div[data-testid="stDialog"] div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {{
+  color: {PRIMARY} !important;
+  font-weight: 600 !important;
+  border-bottom-color: {PRIMARY} !important;
+  background: transparent !important;
+}}
+div[data-testid="stDialog"] [data-testid="stTabContent"] {{
+  padding-top: 0.85rem !important;
+}}
+div[data-testid="stDialog"] [data-testid="stRadio"] {{
+  display: none !important;
+}}
+
+.ips-dialog-header {{
+  margin: 0 0 0.85rem 0;
+  padding: 0 0 0.85rem 0;
+  border-bottom: 1px solid #e8edf3;
+}}
+.ips-dialog-title-row {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}}
+.ips-dialog-title {{
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: {TEXT};
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}}
+.ips-dialog-subtitle {{
+  font-size: 0.875rem;
+  color: {TEXT_MUTED};
+  margin: 0.25rem 0 0;
+  line-height: 1.45;
+}}
+.ips-dialog-actions {{
+  margin: 0 0 0.85rem 0;
+}}
+.ips-dialog-meta-grid {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 0.85rem 0;
+}}
+@media (max-width: 900px) {{
+  .ips-dialog-meta-grid {{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+}}
+.ips-dialog-meta-card {{
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  min-height: 4.25rem;
+}}
+.ips-dialog-meta-label {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: {TEXT_MUTED};
+  margin: 0 0 0.25rem 0;
+}}
+.ips-dialog-meta-value {{
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: {TEXT};
+  line-height: 1.35;
+  word-break: break-word;
+}}
+.ips-dialog-card {{
+  background: #ffffff;
+  border: 1px solid #e8edf3;
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  margin: 0 0 0.75rem 0;
+}}
+.ips-dialog-card-title {{
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: {TEXT_MUTED};
+  margin: 0 0 0.65rem 0;
+}}
+.ips-detail-grid {{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1.25rem;
+}}
+@media (max-width: 760px) {{
+  .ips-detail-grid {{
+    grid-template-columns: 1fr;
+  }}
+}}
+.ips-detail-label {{
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: {TEXT_MUTED};
+  margin: 0 0 0.15rem 0;
+}}
+.ips-detail-value {{
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: {TEXT};
+  line-height: 1.35;
+}}
+.ips-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}}
+.ips-pill-draft {{ background: #f1f5f9; color: #475569; border-color: #e2e8f0; }}
+.ips-pill-active {{ background: #dcfce7; color: #166534; border-color: #bbf7d0; }}
+.ips-pill-awarded {{ background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }}
+.ips-pill-approved {{ background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }}
+.ips-pill-completed {{ background: #ecfdf5; color: #047857; border-color: #a7f3d0; }}
+.ips-pill-pending {{ background: #fef3c7; color: #92400e; border-color: #fde68a; }}
+.ips-pill-scheduled {{ background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }}
+.ips-pill-danger {{ background: #fee2e2; color: #b91c1c; border-color: #fecaca; }}
+.ips-dialog-placeholder {{
+  background: #f8fafc;
+  border: 1px dashed #d8e0ea;
+  border-radius: 12px;
+  padding: 1.35rem 1rem;
+  text-align: center;
+  color: {TEXT_MUTED};
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
@@ -595,7 +851,7 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
   cursor: default;
 }}
 
-/* Modal dialog */
+/* Modal dialog — legacy aliases + dialog shell hooks */
 .ips-modal-header {{
   margin-bottom: 0.5rem;
   padding-bottom: 0.5rem;
@@ -1350,3 +1606,4 @@ section[data-testid="stSidebar"] hr {{
     except ImportError:
         from ui.clean_table import inject_clean_table_css  # type: ignore
     inject_clean_table_css()
+    inject_ips_dialog_styles()
