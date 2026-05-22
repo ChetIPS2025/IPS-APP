@@ -580,6 +580,17 @@ section[data-testid="stMain"] [data-baseweb="select"] > div {{
 [data-testid="stDataFrame"] [role="grid"] {{
   cursor: pointer;
 }}
+[data-testid="stDataFrame"] [role="row"]:hover {{
+  background-color: #eef5ff !important;
+}}
+[data-testid="stDataFrame"] [data-testid="stCheckbox"] {{
+  opacity: 0 !important;
+  width: 1px !important;
+  min-width: 1px !important;
+  max-width: 1px !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}}
 .ips-data-table-nested .ips-data-row {{
   cursor: default;
 }}

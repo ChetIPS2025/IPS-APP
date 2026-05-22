@@ -7,6 +7,7 @@ import html
 import streamlit as st
 
 try:
+    from app.components.clickable_table import render_clickable_table
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.layout import render_tab_placeholder
     from app.components.status import status_pill_html
@@ -14,7 +15,6 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key, tab_key
     from app.ui.assets_components import (
-        asset_number_cell_html,
         detail_header_html,
         detail_meta_strip_html,
         inject_assets_page_styles,
@@ -23,10 +23,10 @@ try:
         status_badge_html,
         summary_card_html,
         tab_button_label,
-        table_header_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
+    from components.clickable_table import render_clickable_table  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
@@ -38,19 +38,16 @@ except ImportError:
         detail_meta_strip_html,
         inject_assets_page_styles,
         maintenance_table_html,
-        asset_number_cell_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
         tab_button_label,
-        table_header_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _SEL = select_key("assets")
 _TAB = tab_key("assets")
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
-_ASSET_GRID = "1.25fr 1.35fr 0.85fr 0.95fr 1fr 0.8fr 0.9fr 0.8fr"
 
 
 def _filter_rows(
@@ -391,100 +388,33 @@ def _render_detail(asset: dict) -> None:
                         st.rerun()
 
 
-def _select_asset_row(asset_id: str) -> None:
-    st.session_state[_SEL] = asset_id
-    st.session_state[_TAB] = "Overview"
+def _render_assets_table(rows: list[dict]) -> str | None:
+    def _display_cell(field: str, row: dict) -> str:
+        if field == "acquired_date":
+            return fmt_date(row.get("acquired_date"))
+        if field == "value":
+            return fmt_currency(row.get("value"))
+        val = row.get(field)
+        return str(val).strip() if val is not None and str(val).strip() else "—"
 
-
-def _render_assets_table(rows: list[dict], *, selected_id: str) -> None:
-    if not rows:
-        st.caption("No assets match the current filters.")
-        return
-
-    grid = f"grid-template-columns: {_ASSET_GRID};"
-
-    with st.container(border=True):
-        st.markdown(
-            '<span class="ips-assets-table-anchor ips-assets-click-table ips-clean-table"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="ips-clean-header ips-assets-table-head-row" style="{grid}">'
-            f"{table_header_html('Asset #')}"
-            f"{table_header_html('Asset Name')}"
-            f"{table_header_html('Category')}"
-            f"{table_header_html('Location')}"
-            f"{table_header_html('Department')}"
-            f"{table_header_html('Status')}"
-            f"{table_header_html('Acquired Date')}"
-            f"{table_header_html('Value')}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        records_by_id: dict[str, dict] = {}
-
-        for row_idx, asset in enumerate(rows):
-            aid = str(asset.get("id") or "").strip()
-            if not aid:
-                continue
-            records_by_id[aid] = asset
-            selected = aid == selected_id
-            row_cls = "ips-clean-row ips-assets-row selected" if selected else "ips-clean-row ips-assets-row"
-            aid_attr = html.escape(aid, quote=True)
-            number = html.escape(str(asset.get("asset_number") or "—"))
-            number_cell = asset_number_cell_html(asset)
-            name = html.escape(str(asset.get("asset_name") or "—"))
-            category = html.escape(str(asset.get("category") or "—"))
-            location = html.escape(str(asset.get("location") or "—"))
-            department = html.escape(str(asset.get("department") or "—"))
-            acquired = html.escape(fmt_date(asset.get("acquired_date")))
-            value = html.escape(fmt_currency(asset.get("value")))
-            row_html = (
-                f'<div class="{row_cls}" style="{grid}" data-row-id="{aid_attr}" role="button" tabindex="0">'
-                f"{number_cell}"
-                f'<span class="ips-assets-name-cell">{name}</span>'
-                f'<span class="ips-assets-muted-cell">{category}</span>'
-                f'<span class="ips-assets-muted-cell">{location}</span>'
-                f'<span class="ips-assets-muted-cell">{department}</span>'
-                f'<span>{status_badge_html(str(asset.get("status") or ""))}</span>'
-                f'<span class="ips-assets-muted-cell">{acquired}</span>'
-                f'<span class="ips-assets-muted-cell">{value}</span>'
-                "</div>"
-            )
-            with st.container():
-                st.markdown(
-                    '<span class="ips-assets-row-wrap ips-clean-row-wrap" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<span class="ips-assets-row-select-btn ips-clean-row-select-btn" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    " ",
-                    key=f"ast_row_sel_{row_idx}_{aid}",
-                    help=f"Open asset {number}",
-                    on_click=_select_asset_row,
-                    args=(aid,),
-                )
-                st.markdown(row_html, unsafe_allow_html=True)
-
-    try:
-        from app.ui.clean_table import render_clean_table_click_bridge
-    except ImportError:
-        from ui.clean_table import render_clean_table_click_bridge  # type: ignore
-
-    picked = render_clean_table_click_bridge(
-        table_selector=".ips-assets-click-table",
-        row_selector=".ips-assets-row[data-row-id]",
-        component_key="ips_assets_row_click_bridge",
+    return render_clickable_table(
+        rows,
+        [
+            ("asset_number", "ASSET #"),
+            ("asset_name", "ASSET NAME"),
+            ("category", "CATEGORY"),
+            ("location", "LOCATION"),
+            ("department", "DEPARTMENT"),
+            ("status", "STATUS"),
+            ("acquired_date", "ACQUIRED DATE"),
+            ("value", "VALUE"),
+        ],
+        "assets_list",
+        row_id_key="id",
+        session_select_key=_SEL,
+        format_cell=_display_cell,
+        click_caption=f"{len(rows)} asset(s) · Click a row to open details.",
     )
-    if picked:
-        pid = str(picked).strip()
-        if pid in records_by_id:
-            _select_asset_row(pid)
-            st.rerun()
 
 
 def render() -> None:
@@ -583,11 +513,12 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    st.caption(f"{len(filtered)} asset(s) · Click a row to open details")
+    prev_sel = str(st.session_state.get("_ast_prev_sel") or "")
+    sel = _render_assets_table(filtered)
+    if sel and sel != prev_sel:
+        st.session_state[_TAB] = "Overview"
+    st.session_state["_ast_prev_sel"] = sel or ""
 
-    _render_assets_table(filtered, selected_id=selected_id)
-
-    sel = str(st.session_state.get(_SEL) or "")
     if sel:
         asset = next((r for r in filtered if str(r.get("id")) == sel), None)
         if asset:

@@ -27,6 +27,7 @@ def render_detail_actions(
     key_prefix: str | None = None,
     show_edit: bool = True,
     show_details: bool = True,
+    table_key: str | None = None,
 ) -> None:
     """
     Standard detail panel actions: Edit, Details, More, Collapse.
@@ -42,8 +43,18 @@ def render_detail_actions(
     actions.extend([("More", "more", "secondary"), ("Collapse", "collapse", "secondary")])
     render_action_buttons(actions, key_prefix=prefix)
     if st.session_state.get(f"{prefix}_action") == "collapse":
+        resolved_table_key = table_key or st.session_state.get(f"ips_click_table_map_{session_select_key}")
         st.session_state.pop(session_select_key, None)
         st.session_state.pop(f"{prefix}_action", None)
+        if resolved_table_key:
+            try:
+                from app.components.clickable_table import clear_table_selection
+            except ImportError:
+                from components.clickable_table import clear_table_selection  # type: ignore
+            clear_table_selection(
+                table_key=str(resolved_table_key),
+                session_select_key=session_select_key,
+            )
         st.rerun()
 
 

@@ -35,6 +35,15 @@ def close_modal_and_clear_selection(
     st.session_state[_df_gen_key(table_key)] = int(st.session_state.get(_df_gen_key(table_key), 0) or 0) + 1
 
 
+def clear_table_selection(*, table_key: str, session_select_key: str) -> None:
+    """Reset native dataframe row selection (inline detail panels)."""
+    close_modal_and_clear_selection(
+        table_key=table_key,
+        session_select_key=session_select_key,
+        modal_key=None,
+    )
+
+
 def _cell_value(
     field: str,
     row: dict[str, Any],
@@ -106,6 +115,7 @@ def render_clickable_table(
     }
 
     df_key = dataframe_widget_key(table_key)
+    st.session_state[f"ips_click_table_map_{session_select_key}"] = table_key
     st.markdown(
         f'<span class="ips-native-click-table ips-native-click-table-{table_key}" aria-hidden="true"></span>',
         unsafe_allow_html=True,

@@ -13,7 +13,8 @@ try:
     from app.components.layout import render_tab_placeholder
     from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_clickable_table, render_data_table
+    from app.components.clickable_table import render_clickable_table
+    from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
     from app.pages._core._data import (
         ACTIVE_ESTIMATE_KEY,
@@ -38,7 +39,8 @@ except ImportError:
     from components.layout import render_tab_placeholder  # type: ignore
     from components.modals import render_record_detail_dialog  # type: ignore
     from components.status import status_pill_html  # type: ignore
-    from components.tables import render_clickable_table, render_data_table  # type: ignore
+    from components.clickable_table import render_clickable_table  # type: ignore
+    from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages._core._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
@@ -391,23 +393,13 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field == "estimate_number":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("estimate_number") or ""))}</span>'
-        if field == "total":
-            return html.escape(fmt_currency(row.get("total")))
-        if field in ("estimate_date", "expiration_date"):
-            return html.escape(fmt_date(row.get(field)))
-        return html.escape(str(row.get(field) or "—"))
-
-    def _plain_cell(field: str, row: dict) -> str:
+    def _display_cell(field: str, row: dict) -> str:
         if field == "total":
             return fmt_currency(row.get("total"))
         if field in ("estimate_date", "expiration_date"):
             return fmt_date(row.get(field))
-        return str(row.get(field) or "—")
+        val = row.get(field)
+        return str(val).strip() if val is not None and str(val).strip() else "—"
 
     sel = render_clickable_table(
         filtered,
@@ -424,8 +416,8 @@ def render() -> None:
         "estimates_list",
         row_id_key="id",
         session_select_key=_SEL,
-        selected_id=selected_id or None,
-        plain_cell=_plain_cell,
+        format_cell=_display_cell,
+        click_caption=f"{len(filtered)} estimate(s) · Click a row to open details.",
     )
 
     if sel:

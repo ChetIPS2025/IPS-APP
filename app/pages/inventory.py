@@ -12,7 +12,8 @@ try:
     from app.components.layout import render_tab_placeholder
     from app.components.modals import render_record_detail_dialog
     from app.components.status import status_pill_html
-    from app.components.tables import render_clickable_table, render_data_table
+    from app.components.clickable_table import render_clickable_table
+    from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
     from app.pages._core._data import load_inventory, lookup_options, persist_inventory
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
@@ -25,6 +26,7 @@ except ImportError:
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
     from components.status import status_pill_html  # type: ignore
+    from components.clickable_table import render_clickable_table  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from pages._core._data import load_inventory, lookup_options, persist_inventory  # type: ignore
@@ -227,19 +229,11 @@ def render() -> None:
         st.session_state.pop(_SEL, None)
         selected_id = ""
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field == "sku":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("sku") or ""))}</span>'
-        if field == "unit_cost":
-            return html.escape(fmt_currency(row.get("unit_cost")))
-        return html.escape(str(row.get(field) or "—"))
-
-    def _plain_cell(field: str, row: dict) -> str:
+    def _display_cell(field: str, row: dict) -> str:
         if field == "unit_cost":
             return fmt_currency(row.get("unit_cost"))
-        return str(row.get(field) or "—")
+        val = row.get(field)
+        return str(val).strip() if val is not None and str(val).strip() else "—"
 
     sel = render_clickable_table(
         filtered,
@@ -256,9 +250,8 @@ def render() -> None:
         "inventory_list",
         row_id_key="id",
         session_select_key=_SEL,
-        selected_id=selected_id or None,
-        plain_cell=_plain_cell,
-        html_cell=_cell,
+        format_cell=_display_cell,
+        click_caption=f"{len(filtered)} item(s) · Click a row to open details.",
     )
 
     if sel:
