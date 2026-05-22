@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v6"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v7"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -476,12 +476,33 @@ def inject_assets_page_styles() -> None:
         .ips-assets-page .ips-assets-summary-table .ips-assets-th {
             margin: 0;
         }
-        /* Assets list: one invisible full-row button under HTML row — no separate action buttons */
+        /* Assets list: invisible full-row select button layered under HTML row */
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
         div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) {
             position: relative !important;
             min-height: 2.75rem !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
+        div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+        > [data-testid="stElementContainer"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
+        div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+        > [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn) {
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
+            overflow: hidden !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
@@ -492,6 +513,7 @@ def inject_assets_page_styles() -> None:
             inset: 0 !important;
             z-index: 1 !important;
             height: auto !important;
+            min-height: 2.75rem !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
@@ -509,27 +531,57 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
         div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
         > [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
-        + [data-testid="stElementContainer"] [data-testid="stButton"] > button {
+        + [data-testid="stElementContainer"] .stButton {
             width: 100% !important;
-            min-height: 2.75rem !important;
             height: 100% !important;
+            min-height: 2.75rem !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
+        div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+        > [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
+        + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
+        div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+        > [data-testid="stElementContainer"]:has(.ips-clean-row-select-btn)
+        + [data-testid="stElementContainer"] .stButton > button {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 2.75rem !important;
             margin: 0 !important;
             padding: 0 !important;
             opacity: 0 !important;
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
+            color: transparent !important;
             cursor: pointer !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
         div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
         > [data-testid="stElementContainer"]:has(.ips-assets-row) {
-            position: relative !important;
+            position: absolute !important;
+            inset: 0 !important;
             z-index: 2 !important;
             pointer-events: none !important;
             margin: 0 !important;
             padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-click-table)
+        div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
+        .ips-assets-row {
+            cursor: pointer;
         }
         </style>
         """,

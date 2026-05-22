@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v5"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v6"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -405,9 +405,18 @@ def inject_clean_table_css() -> None:
 
 /* Suppress full-width gray bars: any stray button row inside row host */
 {vb_wrap}
-    > [data-testid="stElementContainer"]:has(.stButton):not(:has({act_markers})) {{
+    > [data-testid="stElementContainer"]:has([data-testid="stButton"]):not(:has({act_markers})) {{
     background: transparent !important;
     border: none !important;
+    box-shadow: none !important;
+}}
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stElementContainer"],
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({row_sel_markers})
+    + [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+    background: transparent !important;
     box-shadow: none !important;
 }}
 
