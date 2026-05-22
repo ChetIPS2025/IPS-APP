@@ -215,7 +215,7 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
             unsafe_allow_html=True,
         )
 
-        for row_idx, job in rows:
+        for row_idx, job in enumerate(rows):
             jid = str(job.get("id") or "").strip()
             if not jid:
                 continue
