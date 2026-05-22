@@ -1193,12 +1193,24 @@ _DEMO_CUSTOMER_CONTACTS: list[dict[str, Any]] = [
     {
         "id": "demo-cc-1",
         "customer_id": "demo-c-birla",
+        "customer_location_id": "demo-loc-1",
         "contact_name": "Sarah Chen",
         "title": "Project Manager",
         "email": "sarah.chen@example.com",
         "phone": "(318) 555-0101",
         "is_active": True,
         "is_primary": True,
+    },
+    {
+        "id": "demo-cc-2",
+        "customer_id": "demo-c-birla",
+        "customer_location_id": "demo-loc-1",
+        "contact_name": "Mike Torres",
+        "title": "Maintenance Supervisor",
+        "email": "mike.torres@example.com",
+        "phone": "(318) 555-0102",
+        "is_active": True,
+        "is_primary": False,
     },
 ]
 
@@ -1289,11 +1301,18 @@ def customer_contact_select_options(customer_id: str) -> list[tuple[str, str]]:
         if str(c.get("status") or "Active") == "Active" and str(c.get("id") or "").strip()
     ]
     contacts.sort(key=lambda c: (not bool(c.get("is_primary")), str(c.get("contact_name") or "").lower()))
+    locations = load_customer_locations(cid)
+    loc_by_id = {str(loc.get("id") or ""): loc for loc in locations}
     out: list[tuple[str, str]] = []
     for c in contacts:
         name = str(c.get("contact_name") or "—")
         title = str(c.get("title") or "").strip()
         label = f"{name} — {title}" if title else name
+        loc_id = str(c.get("customer_location_id") or "").strip()
+        if loc_id and loc_id in loc_by_id:
+            site = str(loc_by_id[loc_id].get("site_name") or "").strip()
+            if site:
+                label = f"{label} ({site})"
         out.append((label, str(c.get("id") or "")))
     return out
 
@@ -1316,6 +1335,50 @@ def delete_customer_row(row_id: str) -> tuple[bool, str]:
     except ImportError:
         from services.customers_service import delete_customer  # type: ignore
     return _persist_result(delete_customer(row_id), success="Customer removed.")
+
+
+def persist_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    cust_id = str(ui.get("customer_id") or "").strip()
+    if _demo_blocked(row_id) or _demo_blocked(cust_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import save_customer_contact
+    except ImportError:
+        from services.customers_service import save_customer_contact  # type: ignore
+    msg = "Contact updated." if row_id else "Contact added."
+    return _persist_result(save_customer_contact(ui, row_id=row_id), success=msg)
+
+
+def delete_customer_contact_row(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import delete_customer_contact
+    except ImportError:
+        from services.customers_service import delete_customer_contact  # type: ignore
+    return _persist_result(delete_customer_contact(row_id), success="Contact removed.")
+
+
+def persist_customer_location(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+    cust_id = str(ui.get("customer_id") or "").strip()
+    if _demo_blocked(row_id) or _demo_blocked(cust_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import save_customer_location
+    except ImportError:
+        from services.customers_service import save_customer_location  # type: ignore
+    msg = "Location updated." if row_id else "Location added."
+    return _persist_result(save_customer_location(ui, row_id=row_id), success=msg)
+
+
+def delete_customer_location_row(row_id: str) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.customers_service import delete_customer_location
+    except ImportError:
+        from services.customers_service import delete_customer_location  # type: ignore
+    return _persist_result(delete_customer_location(row_id), success="Location removed.")
 
 
 def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:

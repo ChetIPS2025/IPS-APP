@@ -257,7 +257,6 @@ def render() -> None:
         session_select_key=_SEL,
         selected_id=selected_id or None,
         html_cell=_cell,
-        html_rows=True,
         col_fr=["1.4fr", "0.9fr", "0.75fr", "1.2fr", "0.9fr", "0.7fr", "0.7fr", "0.65fr"],
     )
 

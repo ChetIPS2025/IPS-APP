@@ -68,24 +68,28 @@ def normalize_customer_location(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(row.get("id") or ""),
         "customer_id": str(row.get("customer_id") or ""),
-        "site_name": str(row.get("site_name") or row.get("name") or "—"),
+        "site_name": str(row.get("site_name") or row.get("location_name") or row.get("name") or "—"),
         "address": str(row.get("address_line1") or row.get("address") or ""),
         "city": str(row.get("city") or ""),
         "state": str(row.get("state") or ""),
         "zip": str(row.get("zip") or ""),
         "status": "Active" if row.get("is_active", True) else "Inactive",
+        "notes": str(row.get("notes") or ""),
     }
 
 
 def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(row.get("id") or ""),
+        "customer_id": str(row.get("customer_id") or ""),
+        "customer_location_id": str(row.get("customer_location_id") or ""),
         "contact_name": str(row.get("contact_name") or row.get("name") or "—"),
         "title": str(row.get("title") or row.get("role") or ""),
         "email": str(row.get("email") or ""),
         "phone": str(row.get("phone") or ""),
         "status": "Active" if row.get("is_active", True) else "Inactive",
         "is_primary": bool(row.get("is_primary")),
+        "notes": str(row.get("notes") or ""),
     }
 
 
@@ -712,6 +716,36 @@ def list_customer_locations(customer_id: str, *, demo: list[dict[str, Any]] | No
     return out, False
 
 
+def save_customer_location(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    cid = str(ui.get("customer_id") or "").strip()
+    if not cid:
+        return ServiceResult(ok=False, error="Customer is required.")
+    name = str(ui.get("site_name") or ui.get("location_name") or "").strip()
+    if not name:
+        return ServiceResult(ok=False, error="Location name is required.")
+    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    address = str(ui.get("address") or "").strip()
+    payload = {
+        "customer_id": cid,
+        "site_name": name,
+        "location_name": name,
+        "address_line1": address,
+        "address": address,
+        "city": str(ui.get("city") or "").strip(),
+        "state": str(ui.get("state") or "").strip(),
+        "zip": str(ui.get("zip") or "").strip(),
+        "is_active": active,
+        "notes": str(ui.get("notes") or "").strip(),
+    }
+    if row_id:
+        return update_row("customer_locations", payload, {"id": row_id})
+    return insert_row("customer_locations", payload)
+
+
+def delete_customer_location(row_id: str) -> ServiceResult:
+    return delete_row("customer_locations", {"id": row_id})
+
+
 def list_customer_contacts(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
     cid = str(customer_id or "").strip()
     rows, err = fetch_rows("customer_contacts", limit=200, alt_tables=("contacts",))
@@ -720,6 +754,72 @@ def list_customer_contacts(customer_id: str, *, demo: list[dict[str, Any]] | Non
         return demo_rows, True
     out = [normalize_customer_contact(r) for r in rows if str(r.get("customer_id")) == cid]
     return out, False
+
+
+def save_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    cid = str(ui.get("customer_id") or "").strip()
+    if not cid:
+        return ServiceResult(ok=False, error="Customer is required.")
+    name = str(ui.get("contact_name") or ui.get("name") or "").strip()
+    if not name:
+        return ServiceResult(ok=False, error="Contact name is required.")
+    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    is_primary = bool(ui.get("is_primary")) and active
+    title = str(ui.get("title") or "").strip()
+    loc_id = str(ui.get("customer_location_id") or "").strip() or None
+    payload = {
+        "customer_id": cid,
+        "contact_name": name,
+        "role": title,
+        "email": str(ui.get("email") or "").strip(),
+        "phone": str(ui.get("phone") or "").strip(),
+        "is_active": active,
+        "is_primary": is_primary,
+        "notes": str(ui.get("notes") or "").strip(),
+        "customer_location_id": loc_id,
+    }
+    if row_id:
+        result = update_row("customer_contacts", payload, {"id": row_id})
+        contact_id = str(row_id).strip()
+    else:
+        result = insert_row("customer_contacts", payload)
+        if not result.ok:
+            return result
+        row = result.data if isinstance(result.data, dict) else {}
+        contact_id = str(row.get("id") or "").strip()
+    if not result.ok:
+        return result
+    if is_primary and contact_id:
+        _apply_primary_contact_scope(customer_id=cid, contact_id=contact_id, location_id=loc_id)
+    return result
+
+
+def _apply_primary_contact_scope(*, customer_id: str, contact_id: str, location_id: str | None) -> None:
+    """Keep at most one primary contact per customer location scope (including company-wide)."""
+    cid = str(customer_id or "").strip()
+    keep = str(contact_id or "").strip()
+    scope_loc = str(location_id or "").strip()
+    if not cid or not keep:
+        return
+    rows, err = fetch_rows("customer_contacts", limit=500)
+    if err:
+        return
+    for row in rows:
+        if str(row.get("customer_id") or "").strip() != cid:
+            continue
+        rid = str(row.get("id") or "").strip()
+        if not rid or rid == keep:
+            continue
+        row_loc = str(row.get("customer_location_id") or "").strip()
+        if row_loc != scope_loc:
+            continue
+        if row.get("is_primary"):
+            update_row("customer_contacts", {"is_primary": False}, {"id": rid})
+    update_row("customer_contacts", {"is_primary": True}, {"id": keep})
+
+
+def delete_customer_contact(row_id: str) -> ServiceResult:
+    return delete_row("customer_contacts", {"id": row_id})
 
 
 def save_customer(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:

@@ -79,8 +79,8 @@ def render_clickable_table(
 
     Stores selected record id in ``session_select_key`` and returns it.
 
-    When ``html_rows`` is True (default), all data rows render in one HTML block so list
-    tables stay visible; set ``html_rows=False`` for the legacy Streamlit overlay buttons.
+    When ``html_rows`` is False (default), each row gets an invisible Streamlit button overlay
+    so clicks reliably open details. Set ``html_rows=True`` only for read-only nested tables.
     """
     try:
         from app.ui.clean_table import (
@@ -121,7 +121,7 @@ def render_clickable_table(
     ot = "d" + "iv"
     ct = "/" + ot
 
-    use_html_rows = True if html_rows is None else html_rows
+    use_html_rows = False if html_rows is None else html_rows
 
     st.caption("Click a row to open details.")
 
@@ -149,6 +149,20 @@ def render_clickable_table(
             + f"</{ct}></{ct}>",
             unsafe_allow_html=True,
         )
+        picked = render_clean_table_click_bridge(
+            table_selector=f".{table_class}",
+            row_selector=".ips-data-row[data-row-id]",
+            component_key=f"{key}_row_click_bridge",
+        )
+        if picked:
+            pid = str(picked).strip()
+            if pid and pid in records_by_id:
+                apply_clean_table_row_selection(
+                    pid,
+                    session_select_key=sel_key,
+                    records_by_id=records_by_id,
+                    on_row_click=on_row_click,
+                )
     else:
         st.markdown(
             f'<{ot} class="ips-data-table-wrap ips-data-table-stable">'
@@ -195,21 +209,6 @@ def render_clickable_table(
                     )
 
         st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
-
-    picked = render_clean_table_click_bridge(
-        table_selector=f".{table_class}",
-        row_selector=".ips-data-row[data-row-id]",
-        component_key=f"{key}_row_click_bridge",
-    )
-    if picked:
-        pid = str(picked).strip()
-        if pid and pid in records_by_id:
-            apply_clean_table_row_selection(
-                pid,
-                session_select_key=sel_key,
-                records_by_id=records_by_id,
-                on_row_click=on_row_click,
-            )
 
     return str(st.session_state.get(sel_key) or "").strip() or None
 
