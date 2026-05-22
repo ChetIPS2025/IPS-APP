@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v6"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v7"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -38,6 +38,7 @@ ROW_WRAP_SELECTORS = (
     ".ips-est-list-row-wrap",
     ".usr-row-wrap",
     ".ips-assets-row-wrap",
+    ".ips-jobs-row-wrap",
     ".ips-tk-row-wrap",
 )
 
@@ -69,6 +70,7 @@ ROW_HTML_SELECTORS = (
     ".usr-row",
     ".est-row",
     ".ips-assets-row",
+    ".ips-jobs-row",
     ".ips-time-row",
 )
 
@@ -81,6 +83,7 @@ ROW_SELECTED_SELECTORS = (
     ".ips-est-list-row.is-selected",
     ".usr-row.selected",
     ".ips-assets-row.selected",
+    ".ips-jobs-row.selected",
     ".ips-time-row.selected",
     ".ips-inv-row-selected",
 )
