@@ -22,7 +22,7 @@ try:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -59,7 +59,7 @@ except ImportError:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -357,11 +357,9 @@ def render_task_detail_dialog(task: dict) -> None:
         subtitle=f"{priority} priority · due {due}",
         status=status,
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=MODULE,
         record_key=rk,
-        record=task,
-        on_close=_clear_task_modal,
         key_prefix=f"task_modal_{rk}",
     )
     render_modal_meta_grid(

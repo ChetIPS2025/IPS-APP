@@ -48,45 +48,99 @@ def normalize_customer(row: dict[str, Any]) -> dict[str, Any]:
     active = row.get("is_active", True)
     if isinstance(active, str):
         active = active.lower() in ("true", "1", "active", "yes")
+    status = str(row.get("status") or "").strip()
+    if not status:
+        status = "Active" if active else "Inactive"
+    company = str(row.get("company_name") or row.get("customer_name") or row.get("name") or "—")
     return {
-        "id": cid or str(row.get("customer_name") or "—"),
-        "customer_name": str(row.get("customer_name") or row.get("name") or "—"),
+        "id": cid or company,
+        "customer_name": company,
+        "company_name": company,
+        "customer_number": str(row.get("customer_number") or ""),
         "address": str(row.get("address") or ""),
         "city": str(row.get("city") or ""),
         "state": str(row.get("state") or ""),
         "zip": str(row.get("zip") or row.get("zip_code") or ""),
+        "website": str(row.get("website") or ""),
+        "main_phone": str(row.get("main_phone") or row.get("phone") or ""),
+        "main_email": str(row.get("main_email") or row.get("email") or ""),
+        "billing_email": str(row.get("billing_email") or ""),
         "is_active": bool(active),
-        "status": "Active" if active else "Inactive",
+        "status": status,
         "notes": str(row.get("notes") or ""),
+        "created_at": str(row.get("created_at") or "")[:19],
+        "updated_at": str(row.get("updated_at") or "")[:19],
     }
 
 
 def normalize_customer_location(row: dict[str, Any]) -> dict[str, Any]:
+    name = str(row.get("location_name") or row.get("site_name") or row.get("name") or "—")
+    active = row.get("is_active", True)
+    if isinstance(active, str):
+        active = active.lower() in ("true", "1", "active", "yes")
+    status = str(row.get("status") or "").strip()
+    if not status:
+        status = "Active" if active else "Inactive"
+    addr1 = str(row.get("address_line_1") or row.get("address_line1") or row.get("address") or "")
     return {
         "id": str(row.get("id") or ""),
         "customer_id": str(row.get("customer_id") or ""),
-        "site_name": str(row.get("site_name") or row.get("location_name") or row.get("name") or "—"),
-        "address": str(row.get("address_line1") or row.get("address") or ""),
+        "location_name": name,
+        "site_name": name,
+        "location_type": str(row.get("location_type") or "Other"),
+        "address_line_1": addr1,
+        "address_line_2": str(row.get("address_line_2") or row.get("address_line2") or ""),
+        "address": addr1,
         "city": str(row.get("city") or ""),
         "state": str(row.get("state") or ""),
         "zip": str(row.get("zip") or ""),
-        "status": "Active" if row.get("is_active", True) else "Inactive",
+        "country": str(row.get("country") or "USA"),
+        "phone": str(row.get("phone") or ""),
+        "email": str(row.get("email") or ""),
+        "is_primary": bool(row.get("is_primary")),
+        "is_billing": bool(row.get("is_billing")),
+        "is_shipping": bool(row.get("is_shipping")),
+        "is_active": bool(active),
+        "status": status,
         "notes": str(row.get("notes") or ""),
+        "created_at": str(row.get("created_at") or "")[:19],
+        "updated_at": str(row.get("updated_at") or "")[:19],
     }
 
 
 def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
+    loc_id = str(row.get("location_id") or row.get("customer_location_id") or "")
+    full_name = str(row.get("full_name") or row.get("contact_name") or row.get("name") or "—")
+    active = row.get("is_active", True)
+    if isinstance(active, str):
+        active = active.lower() in ("true", "1", "active", "yes")
+    status = str(row.get("status") or "").strip()
+    if not status:
+        status = "Active" if active else "Inactive"
+    role_type = str(row.get("role_type") or row.get("title") or row.get("role") or "Other")
     return {
         "id": str(row.get("id") or ""),
         "customer_id": str(row.get("customer_id") or ""),
-        "customer_location_id": str(row.get("customer_location_id") or ""),
-        "contact_name": str(row.get("contact_name") or row.get("name") or "—"),
-        "title": str(row.get("title") or row.get("role") or ""),
+        "location_id": loc_id,
+        "customer_location_id": loc_id,
+        "full_name": full_name,
+        "contact_name": full_name,
+        "title": str(row.get("title") or role_type),
+        "department": str(row.get("department") or ""),
         "email": str(row.get("email") or ""),
         "phone": str(row.get("phone") or ""),
-        "status": "Active" if row.get("is_active", True) else "Inactive",
+        "mobile": str(row.get("mobile") or ""),
+        "role_type": role_type,
         "is_primary": bool(row.get("is_primary")),
+        "is_estimating_contact": bool(row.get("is_estimating_contact")),
+        "is_billing_contact": bool(row.get("is_billing_contact")),
+        "is_site_contact": bool(row.get("is_site_contact")),
+        "is_safety_contact": bool(row.get("is_safety_contact")),
+        "is_active": bool(active),
+        "status": status,
         "notes": str(row.get("notes") or ""),
+        "created_at": str(row.get("created_at") or "")[:19],
+        "updated_at": str(row.get("updated_at") or "")[:19],
     }
 
 
@@ -230,6 +284,8 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
     status = "Active" if active in (True, "true", "Active", 1) else "Inactive"
     if str(row.get("status") or "") in {"Active", "Inactive"}:
         status = str(row.get("status"))
+    is_employee_raw = row.get("is_employee")
+    is_employee = bool(is_employee_raw) if is_employee_raw is not None else True
     return {
         "id": eid,
         "name": str(row.get("name") or row.get("full_name") or "—"),
@@ -237,6 +293,7 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
         "role": str(row.get("role") or "Employee"),
         "department": str(row.get("department") or "—"),
         "status": status,
+        "is_employee": is_employee,
         "last_login": str(row.get("last_login") or "—"),
         "phone": str(row.get("phone") or "—"),
         "username": str(row.get("username") or eid[:8]),
@@ -462,6 +519,12 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         payload["percent_complete"] = int(ui.get("progress") or 0)
     if customer_id:
         payload["customer_id"] = customer_id
+    loc_id = str(ui.get("customer_location_id") or "").strip()
+    if loc_id:
+        payload["customer_location_id"] = loc_id
+    contact_id = str(ui.get("customer_contact_id") or "").strip()
+    if contact_id:
+        payload["customer_contact_id"] = contact_id
     if row_id:
         return update_row("jobs", payload, {"id": row_id})
     return insert_row("jobs", payload)
@@ -473,6 +536,7 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "project_name": ui.get("project_name"),
         "customer_name": ui.get("customer"),
         "customer_id": ui.get("customer_id") or None,
+        "customer_location_id": ui.get("customer_location_id") or None,
         "customer_contact_id": ui.get("customer_contact_id") or None,
         "status": ui.get("status"),
         "estimate_date": ui.get("estimate_date") or None,
@@ -555,7 +619,6 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "name": ui.get("name"),
         "email": ui.get("email"),
         "role": ui.get("role"),
-        "department": ui.get("department"),
         "phone": ui.get("phone"),
         "username": ui.get("username"),
         "crew": ui.get("crew") or "",
@@ -564,6 +627,10 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "is_active": active,
         "notes": ui.get("notes") or "",
     }
+    if "department" in ui:
+        payload["department"] = ui.get("department")
+    if "is_employee" in ui:
+        payload["is_employee"] = bool(ui.get("is_employee"))
     if row_id:
         return update_row("employees", payload, {"id": row_id})
     return insert_row("employees", payload)
@@ -760,39 +827,95 @@ def save_customer_location(ui: dict[str, Any], *, row_id: str | None = None) -> 
     cid = str(ui.get("customer_id") or "").strip()
     if not cid:
         return ServiceResult(ok=False, error="Customer is required.")
-    name = str(ui.get("site_name") or ui.get("location_name") or "").strip()
+    name = str(ui.get("location_name") or ui.get("site_name") or "").strip()
     if not name:
         return ServiceResult(ok=False, error="Location name is required.")
-    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
-    address = str(ui.get("address") or "").strip()
+    status = str(ui.get("status") or "Active").strip()
+    active = status.lower() in ("active", "true", "1")
+    addr1 = str(ui.get("address_line_1") or ui.get("address") or "").strip()
     payload = {
         "customer_id": cid,
         "site_name": name,
         "location_name": name,
-        "address_line1": address,
-        "address": address,
+        "location_type": str(ui.get("location_type") or "Other").strip(),
+        "address_line_1": addr1,
+        "address_line1": addr1,
+        "address": addr1,
+        "address_line_2": str(ui.get("address_line_2") or "").strip(),
         "city": str(ui.get("city") or "").strip(),
         "state": str(ui.get("state") or "").strip(),
         "zip": str(ui.get("zip") or "").strip(),
+        "country": str(ui.get("country") or "USA").strip(),
+        "phone": str(ui.get("phone") or "").strip(),
+        "email": str(ui.get("email") or "").strip(),
+        "is_primary": bool(ui.get("is_primary")),
+        "is_billing": bool(ui.get("is_billing")),
+        "is_shipping": bool(ui.get("is_shipping")),
         "is_active": active,
+        "status": status,
         "notes": str(ui.get("notes") or "").strip(),
     }
     if row_id:
-        return update_row("customer_locations", payload, {"id": row_id})
-    return insert_row("customer_locations", payload)
+        result = update_row("customer_locations", payload, {"id": row_id})
+        loc_id = str(row_id).strip()
+    else:
+        result = insert_row("customer_locations", payload)
+        row = result.data if isinstance(result.data, dict) else {}
+        loc_id = str(row.get("id") or "").strip()
+    if result.ok and payload.get("is_primary") and loc_id:
+        _apply_primary_location_scope(customer_id=cid, location_id=loc_id)
+    return result
+
+
+def _apply_primary_location_scope(*, customer_id: str, location_id: str) -> None:
+    cid = str(customer_id or "").strip()
+    keep = str(location_id or "").strip()
+    if not cid or not keep:
+        return
+    rows, err = fetch_rows("customer_locations", limit=500)
+    if err:
+        return
+    for row in rows:
+        if str(row.get("customer_id") or "").strip() != cid:
+            continue
+        rid = str(row.get("id") or "").strip()
+        if not rid or rid == keep:
+            continue
+        if row.get("is_primary"):
+            update_row("customer_locations", {"is_primary": False}, {"id": rid})
+    update_row("customer_locations", {"is_primary": True}, {"id": keep})
 
 
 def delete_customer_location(row_id: str) -> ServiceResult:
     return delete_row("customer_locations", {"id": row_id})
 
 
-def list_customer_contacts(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
+def list_customer_contacts(
+    customer_id: str,
+    *,
+    location_id: str | None = None,
+    demo: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
     cid = str(customer_id or "").strip()
-    rows, err = fetch_rows("customer_contacts", limit=200, alt_tables=("contacts",))
+    loc_filter = str(location_id or "").strip()
+    rows, err = fetch_rows("customer_contacts", limit=500, alt_tables=("contacts",))
     if err:
-        demo_rows = [normalize_customer_contact(r) for r in (demo or []) if str(r.get("customer_id")) == cid]
+        demo_rows = [
+            normalize_customer_contact(r)
+            for r in (demo or [])
+            if str(r.get("customer_id")) == cid
+            and (not loc_filter or str(r.get("customer_location_id") or r.get("location_id") or "") == loc_filter)
+        ]
         return demo_rows, True
-    out = [normalize_customer_contact(r) for r in rows if str(r.get("customer_id")) == cid]
+    out = []
+    for r in rows:
+        if str(r.get("customer_id")) != cid:
+            continue
+        if loc_filter:
+            row_loc = str(r.get("customer_location_id") or r.get("location_id") or "").strip()
+            if row_loc != loc_filter:
+                continue
+        out.append(normalize_customer_contact(r))
     return out, False
 
 
@@ -800,23 +923,38 @@ def save_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -> S
     cid = str(ui.get("customer_id") or "").strip()
     if not cid:
         return ServiceResult(ok=False, error="Customer is required.")
-    name = str(ui.get("contact_name") or ui.get("name") or "").strip()
+    name = str(ui.get("full_name") or ui.get("contact_name") or ui.get("name") or "").strip()
     if not name:
         return ServiceResult(ok=False, error="Contact name is required.")
-    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    loc_id = str(ui.get("location_id") or ui.get("customer_location_id") or "").strip()
+    if not loc_id:
+        return ServiceResult(ok=False, error="Location is required for every contact.")
+    status = str(ui.get("status") or "Active").strip()
+    active = status.lower() in ("active", "true", "1")
     is_primary = bool(ui.get("is_primary")) and active
     title = str(ui.get("title") or "").strip()
-    loc_id = str(ui.get("customer_location_id") or "").strip() or None
+    role_type = str(ui.get("role_type") or title or "Other").strip()
     payload = {
         "customer_id": cid,
         "contact_name": name,
-        "role": title,
+        "full_name": name,
+        "title": title or role_type,
+        "role": role_type,
+        "role_type": role_type,
+        "department": str(ui.get("department") or "").strip(),
         "email": str(ui.get("email") or "").strip(),
         "phone": str(ui.get("phone") or "").strip(),
+        "mobile": str(ui.get("mobile") or "").strip(),
         "is_active": active,
+        "status": status,
         "is_primary": is_primary,
+        "is_estimating_contact": bool(ui.get("is_estimating_contact")),
+        "is_billing_contact": bool(ui.get("is_billing_contact")),
+        "is_site_contact": bool(ui.get("is_site_contact")),
+        "is_safety_contact": bool(ui.get("is_safety_contact")),
         "notes": str(ui.get("notes") or "").strip(),
         "customer_location_id": loc_id,
+        "location_id": loc_id,
     }
     if row_id:
         result = update_row("customer_contacts", payload, {"id": row_id})
@@ -863,14 +1001,22 @@ def delete_customer_contact(row_id: str) -> ServiceResult:
 
 
 def save_customer(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    status = str(ui.get("status") or "Active").strip()
+    active = status.lower() in ("active", "true", "1")
+    company = ui.get("company_name") or ui.get("customer_name") or ui.get("name")
     payload = {
-        "customer_name": ui.get("customer_name") or ui.get("name"),
+        "customer_name": company,
+        "customer_number": str(ui.get("customer_number") or "").strip(),
         "address": ui.get("address") or "",
         "city": ui.get("city") or "",
         "state": ui.get("state") or "",
         "zip": ui.get("zip") or "",
+        "website": str(ui.get("website") or "").strip(),
+        "main_phone": str(ui.get("main_phone") or "").strip(),
+        "main_email": str(ui.get("main_email") or "").strip(),
+        "billing_email": str(ui.get("billing_email") or "").strip(),
         "is_active": active,
+        "status": status,
         "notes": ui.get("notes") or "",
     }
     if row_id:

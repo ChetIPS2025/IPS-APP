@@ -24,6 +24,7 @@ try:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -39,6 +40,7 @@ try:
         customer_contact_select_options,
         customer_filter_options,
         customer_id_for_name,
+        customer_location_select_options,
         get_estimate,
         load_estimates,
         lookup_options,
@@ -68,6 +70,7 @@ except ImportError:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -83,6 +86,7 @@ except ImportError:
         customer_contact_select_options,
         customer_filter_options,
         customer_id_for_name,
+        customer_location_select_options,
         get_estimate,
         load_estimates,
         lookup_options,
@@ -126,12 +130,12 @@ def _contact_label_for_estimate(est: dict) -> str:
     return "—"
 
 
-def _customer_contact_select(
+def _customer_location_select(
     *,
     customer_name: str,
     session_key: str,
     prev_customer_key: str,
-    initial_contact_id: str = "",
+    initial_location_id: str = "",
 ) -> str:
     cust = str(customer_name or "").strip()
     if st.session_state.get(prev_customer_key) != cust:
@@ -140,22 +144,60 @@ def _customer_contact_select(
 
     cid = customer_id_for_name(cust)
     if not cust or not cid:
-        st.selectbox(
-            "Contact",
-            ["— Select customer first —"],
-            disabled=True,
-            key=session_key,
-        )
+        st.selectbox("Location", ["— Select customer first —"], disabled=True, key=session_key)
         return ""
 
-    pairs = customer_contact_select_options(cid)
+    pairs = customer_location_select_options(cid)
     if not pairs:
-        st.selectbox(
-            "Contact",
-            ["— No contacts for this customer —"],
-            disabled=True,
-            key=session_key,
-        )
+        st.warning("Add a customer location before assigning contacts/jobs.")
+        st.selectbox("Location", ["— No locations —"], disabled=True, key=session_key)
+        return ""
+
+    labels = ["— Select location —", *[label for label, _ in pairs]]
+    ids = ["", *[loc_id for _, loc_id in pairs]]
+    if session_key not in st.session_state and initial_location_id:
+        try:
+            st.session_state[session_key] = ids.index(initial_location_id)
+        except ValueError:
+            st.session_state[session_key] = 0
+    idx = st.selectbox(
+        "Location",
+        range(len(labels)),
+        format_func=lambda i: labels[i],
+        key=session_key,
+    )
+    return str(ids[int(idx)])
+
+
+def _customer_contact_select(
+    *,
+    customer_name: str,
+    location_id: str,
+    session_key: str,
+    prev_customer_key: str,
+    prev_location_key: str,
+    initial_contact_id: str = "",
+) -> str:
+    cust = str(customer_name or "").strip()
+    loc_id = str(location_id or "").strip()
+    if st.session_state.get(prev_customer_key) != cust:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_customer_key] = cust
+    if st.session_state.get(prev_location_key) != loc_id:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_location_key] = loc_id
+
+    cid = customer_id_for_name(cust)
+    if not cust or not cid:
+        st.selectbox("Contact", ["— Select customer first —"], disabled=True, key=session_key)
+        return ""
+    if not loc_id:
+        st.selectbox("Contact", ["— Select location first —"], disabled=True, key=session_key)
+        return ""
+
+    pairs = customer_contact_select_options(cid, loc_id)
+    if not pairs:
+        st.selectbox("Contact", ["— No contacts for this location —"], disabled=True, key=session_key)
         return ""
 
     labels = ["— Select contact —", *[label for label, _ in pairs]]
@@ -262,7 +304,9 @@ def _seed_estimate_edit_form(est: dict) -> None:
     st.session_state[f"est_edit_total_{eid}"] = float(est.get("total") or 0)
     st.session_state[f"est_edit_notes_{eid}"] = str(est.get("description") or "")
     st.session_state.pop(f"est_edit_contact_{eid}", None)
+    st.session_state.pop(f"est_edit_location_{eid}", None)
     st.session_state.pop(f"est_edit_cust_prev_{eid}", None)
+    st.session_state.pop(f"est_edit_loc_prev_{eid}", None)
 
 
 def _set_estimate_view_mode(est: dict) -> None:
@@ -297,10 +341,19 @@ def _render_estimate_edit_form(est: dict) -> None:
             customer_filter_options(include_names={str(est.get("customer") or "")}),
             key=f"est_edit_cust_{eid}",
         )
+        cust_name = str(st.session_state.get(f"est_edit_cust_{eid}") or est.get("customer") or "")
+        location_id = _customer_location_select(
+            customer_name=cust_name,
+            session_key=f"est_edit_location_{eid}",
+            prev_customer_key=f"est_edit_cust_prev_{eid}",
+            initial_location_id=str(est.get("customer_location_id") or ""),
+        )
         contact_id = _customer_contact_select(
-            customer_name=str(st.session_state.get(f"est_edit_cust_{eid}") or est.get("customer") or ""),
+            customer_name=cust_name,
+            location_id=location_id,
             session_key=f"est_edit_contact_{eid}",
             prev_customer_key=f"est_edit_cust_prev_{eid}",
+            prev_location_key=f"est_edit_loc_prev_{eid}",
             initial_contact_id=str(est.get("customer_contact_id") or ""),
         )
         st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
@@ -326,6 +379,7 @@ def _render_estimate_edit_form(est: dict) -> None:
                 "project_name": st.session_state.get(f"est_edit_proj_{eid}"),
                 "customer": cust_name,
                 "customer_id": customer_id_for_name(cust_name) or None,
+                "customer_location_id": location_id or None,
                 "customer_contact_id": contact_id or None,
                 "status": st.session_state.get(f"est_edit_status_{eid}"),
                 "subtotal": st.session_state.get(f"est_edit_sub_{eid}"),
@@ -455,21 +509,12 @@ def render_estimate_detail_dialog(est: dict) -> None:
     render_modal_shell()
     render_modal_header(title=en, subtitle=project, status=status)
 
-    def _on_edit() -> None:
-        _set_estimate_edit_mode(est)
-
-    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
-    with act1:
-        st.button("View", key=f"estimates_modal_view_{rk}", on_click=_set_estimate_view_mode, args=(est,))
-    with act2:
-        st.button("Edit", key=f"estimates_modal_edit_{rk}", on_click=_on_edit)
-    with act3:
-        st.button("More", key=f"estimates_modal_more_{rk}")
-    with act4:
-        if st.button("Close", key=f"estimates_modal_close_{rk}"):
-            _clear_estimates_detail_modal()
-            st.rerun()
+    render_modal_edit_button(
+        module=_MOD,
+        record_key=rk,
+        on_edit=lambda: _set_estimate_edit_mode(est),
+        key_prefix=f"estimates_modal_{rk}",
+    )
 
     render_modal_meta_grid(
         [
@@ -531,10 +576,17 @@ def render() -> None:
                 st.text_input("Project name", key="est_new_proj")
                 st.selectbox("Customer", customer_filter_options(), key="est_new_cust")
                 new_cust = str(st.session_state.get("est_new_cust") or "")
+                new_location_id = _customer_location_select(
+                    customer_name=new_cust,
+                    session_key="est_new_location",
+                    prev_customer_key=_NEW_CUST_PREV,
+                )
                 new_contact_id = _customer_contact_select(
                     customer_name=new_cust,
+                    location_id=new_location_id,
                     session_key="est_new_contact",
                     prev_customer_key=_NEW_CUST_PREV,
+                    prev_location_key="est_new_loc_prev",
                 )
                 st.selectbox("Status", lookup_options("estimate_statuses"), key="est_new_status")
             with nc2:
@@ -547,6 +599,7 @@ def render() -> None:
                         "project_name": st.session_state.get("est_new_proj"),
                         "customer": new_cust,
                         "customer_id": customer_id_for_name(new_cust) or None,
+                        "customer_location_id": new_location_id or None,
                         "customer_contact_id": new_contact_id or None,
                         "status": st.session_state.get("est_new_status"),
                         "total": st.session_state.get("est_new_total"),

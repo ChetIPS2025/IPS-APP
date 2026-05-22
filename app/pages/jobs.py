@@ -10,9 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.clickable_table import close_modal_and_clear_selection, render_clickable_table
+    from app.components.clickable_table import clear_modal_selection_state, render_clickable_table
     from app.pages._core._data import (
+        customer_contact_select_options,
         customer_filter_options,
+        customer_id_for_name,
+        customer_location_select_options,
         employee_options,
         load_jobs,
         lookup_options,
@@ -25,7 +28,7 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.clickable_table import close_modal_and_clear_selection, render_clickable_table  # type: ignore
+    from components.clickable_table import clear_modal_selection_state, render_clickable_table  # type: ignore
     from pages._core._data import (  # type: ignore
         customer_filter_options,
         employee_options,
@@ -88,7 +91,8 @@ def _clear_jobs_detail_modal() -> None:
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
-    close_modal_and_clear_selection(
+    clear_modal_selection_state(
+        "jobs",
         table_key="jobs_list",
         session_select_key=_SEL,
         modal_key=_JOBS_MODAL_KEY,
@@ -134,6 +138,7 @@ def _supervisor_options(job: dict) -> list[str]:
 
 
 def _location_options(job: dict) -> list[str]:
+    """Legacy free-text location fallback when customer site FK is unavailable."""
     opts = lookup_options("locations")
     cur = str(job.get("location") or "").strip()
     if cur and cur not in opts:
@@ -141,11 +146,85 @@ def _location_options(job: dict) -> list[str]:
     return opts or ([cur] if cur else ["—"])
 
 
+def _customer_location_select(
+    *,
+    customer_name: str,
+    session_key: str,
+    prev_customer_key: str,
+    initial_location_id: str = "",
+) -> str:
+    cust = str(customer_name or "").strip()
+    if st.session_state.get(prev_customer_key) != cust:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_customer_key] = cust
+    cid = customer_id_for_name(cust)
+    if not cust or not cid:
+        st.selectbox("Location", ["— Select customer first —"], disabled=True, key=session_key)
+        return ""
+    pairs = customer_location_select_options(cid)
+    if not pairs:
+        st.warning("Add a customer location before assigning contacts/jobs.")
+        st.selectbox("Location", ["— No locations —"], disabled=True, key=session_key)
+        return ""
+    labels = ["— Select location —", *[label for label, _ in pairs]]
+    ids = ["", *[loc_id for _, loc_id in pairs]]
+    if session_key not in st.session_state and initial_location_id:
+        try:
+            st.session_state[session_key] = ids.index(initial_location_id)
+        except ValueError:
+            st.session_state[session_key] = 0
+    idx = st.selectbox("Location", range(len(labels)), format_func=lambda i: labels[i], key=session_key)
+    return str(ids[int(idx)])
+
+
+def _customer_contact_select(
+    *,
+    customer_name: str,
+    location_id: str,
+    session_key: str,
+    prev_customer_key: str,
+    prev_location_key: str,
+    initial_contact_id: str = "",
+) -> str:
+    cust = str(customer_name or "").strip()
+    loc_id = str(location_id or "").strip()
+    if st.session_state.get(prev_customer_key) != cust:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_customer_key] = cust
+    if st.session_state.get(prev_location_key) != loc_id:
+        st.session_state.pop(session_key, None)
+        st.session_state[prev_location_key] = loc_id
+    cid = customer_id_for_name(cust)
+    if not cust or not cid:
+        st.selectbox("Contact", ["— Select customer first —"], disabled=True, key=session_key)
+        return ""
+    if not loc_id:
+        st.selectbox("Contact", ["— Select location first —"], disabled=True, key=session_key)
+        return ""
+    pairs = customer_contact_select_options(cid, loc_id)
+    if not pairs:
+        st.selectbox("Contact", ["— No contacts for this location —"], disabled=True, key=session_key)
+        return ""
+    labels = ["— Select contact —", *[label for label, _ in pairs]]
+    ids = ["", *[contact_id for _, contact_id in pairs]]
+    if session_key not in st.session_state and initial_contact_id:
+        try:
+            st.session_state[session_key] = ids.index(initial_contact_id)
+        except ValueError:
+            st.session_state[session_key] = 0
+    idx = st.selectbox("Contact", range(len(labels)), format_func=lambda i: labels[i], key=session_key)
+    return str(ids[int(idx)])
+
+
 def _seed_job_edit_form(job: dict) -> None:
     job_key = _job_session_key(job)
     st.session_state[f"job_edit_num_{job_key}"] = str(job.get("job_number") or "")
     st.session_state[f"job_edit_name_{job_key}"] = str(job.get("job_name") or "")
     st.session_state[f"job_edit_cust_{job_key}"] = str(job.get("customer") or "")
+    st.session_state.pop(f"job_edit_location_{job_key}", None)
+    st.session_state.pop(f"job_edit_contact_{job_key}", None)
+    st.session_state.pop(f"job_edit_cust_prev_{job_key}", None)
+    st.session_state.pop(f"job_edit_loc_prev_{job_key}", None)
     st.session_state[f"job_edit_status_{job_key}"] = str(job.get("status") or "Draft")
     st.session_state[f"job_edit_sup_{job_key}"] = str(job.get("supervisor") or "")
     st.session_state[f"job_edit_loc_{job_key}"] = str(job.get("location") or "")
@@ -369,17 +448,30 @@ def _render_job_edit_form(job: dict) -> None:
     cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
     status_opts = lookup_options("job_statuses")
     sup_opts = _supervisor_options(job)
-    loc_opts = _location_options(job)
 
     ec1, ec2 = st.columns(2, gap="medium")
     with ec1:
         st.text_input("Job number", key=f"job_edit_num_{job_key}")
         st.text_input("Job name / project description", key=f"job_edit_name_{job_key}")
         st.selectbox("Customer", cust_opts, key=f"job_edit_cust_{job_key}")
+        cust_name = str(st.session_state.get(f"job_edit_cust_{job_key}") or job.get("customer") or "")
+        location_id = _customer_location_select(
+            customer_name=cust_name,
+            session_key=f"job_edit_location_{job_key}",
+            prev_customer_key=f"job_edit_cust_prev_{job_key}",
+            initial_location_id=str(job.get("customer_location_id") or ""),
+        )
+        contact_id = _customer_contact_select(
+            customer_name=cust_name,
+            location_id=location_id,
+            session_key=f"job_edit_contact_{job_key}",
+            prev_customer_key=f"job_edit_cust_prev_{job_key}",
+            prev_location_key=f"job_edit_loc_prev_{job_key}",
+            initial_contact_id=str(job.get("customer_contact_id") or ""),
+        )
         st.selectbox("Status", status_opts, key=f"job_edit_status_{job_key}")
         st.selectbox("Supervisor", sup_opts, key=f"job_edit_sup_{job_key}")
     with ec2:
-        st.selectbox("Location", loc_opts, key=f"job_edit_loc_{job_key}")
         st.date_input("Start date", key=f"job_edit_start_{job_key}")
         st.date_input("End date", key=f"job_edit_end_{job_key}")
         st.slider("Progress %", 0, 100, key=f"job_edit_prog_{job_key}")
@@ -400,9 +492,10 @@ def _render_job_edit_form(job: dict) -> None:
                 "job_number": st.session_state.get(f"job_edit_num_{job_key}"),
                 "job_name": st.session_state.get(f"job_edit_name_{job_key}"),
                 "customer": st.session_state.get(f"job_edit_cust_{job_key}"),
+                "customer_location_id": location_id or None,
+                "customer_contact_id": contact_id or None,
                 "status": st.session_state.get(f"job_edit_status_{job_key}"),
                 "supervisor": st.session_state.get(f"job_edit_sup_{job_key}"),
-                "location": st.session_state.get(f"job_edit_loc_{job_key}"),
                 "start_date": st.session_state.get(f"job_edit_start_{job_key}"),
                 "end_date": st.session_state.get(f"job_edit_end_{job_key}"),
                 "progress": st.session_state.get(f"job_edit_prog_{job_key}"),
@@ -450,28 +543,17 @@ def render_job_detail_dialog(job: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
-    with act1:
-        st.button(
-            "View",
-            key=f"jobs_modal_view_{job_key}",
-            on_click=_set_job_view_mode,
-            args=(job,),
-        )
-    with act2:
-        st.button(
-            "Edit",
-            key=f"jobs_modal_edit_{job_key}",
-            on_click=_set_job_edit_mode,
-            args=(job,),
-        )
-    with act3:
-        st.button("More", key=f"jobs_modal_more_{job_key}")
-    with act4:
-        if st.button("Close", key=f"jobs_modal_close_{job_key}"):
-            _clear_jobs_detail_modal()
-            st.rerun()
+    if not edit_mode:
+        st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+        _action_left, action_right = st.columns([8, 1], gap="small")
+        with action_right:
+            st.button(
+                "Edit",
+                key=f"jobs_modal_edit_{job_key}",
+                type="primary",
+                on_click=_set_job_edit_mode,
+                args=(job,),
+            )
 
     st.markdown(
         f'<div class="ips-dialog-meta-grid">'
@@ -496,9 +578,6 @@ def _show_jobs_detail_modal() -> None:
     job = jobs_by_id.get(sel) if isinstance(jobs_by_id, dict) and sel else None
     if not job:
         st.warning("That job could not be loaded.")
-        if st.button("Close", key="jobs_modal_missing_close"):
-            _clear_jobs_detail_modal()
-            st.rerun()
         return
 
     render_job_detail_dialog(job)
@@ -541,6 +620,19 @@ def render() -> None:
                 st.text_input("Job number", key="job_new_num")
                 st.text_input("Job name", key="job_new_name")
                 st.selectbox("Customer", customer_filter_options(), key="job_new_cust")
+                new_cust = str(st.session_state.get("job_new_cust") or "")
+                new_location_id = _customer_location_select(
+                    customer_name=new_cust,
+                    session_key="job_new_location",
+                    prev_customer_key="job_new_cust_prev",
+                )
+                new_contact_id = _customer_contact_select(
+                    customer_name=new_cust,
+                    location_id=new_location_id,
+                    session_key="job_new_contact",
+                    prev_customer_key="job_new_cust_prev",
+                    prev_location_key="job_new_loc_prev",
+                )
                 st.selectbox("Status", lookup_options("job_statuses"), key="job_new_status")
             with nc2:
                 st.text_input("Supervisor", key="job_new_sup")
@@ -555,6 +647,9 @@ def render() -> None:
                             "job_number": st.session_state.get("job_new_num"),
                             "job_name": st.session_state.get("job_new_name"),
                             "customer": st.session_state.get("job_new_cust"),
+                            "customer_id": customer_id_for_name(new_cust) or None,
+                            "customer_location_id": new_location_id or None,
+                            "customer_contact_id": new_contact_id or None,
                             "status": st.session_state.get("job_new_status"),
                             "supervisor": st.session_state.get("job_new_sup"),
                             "start_date": st.session_state.get("job_new_start"),

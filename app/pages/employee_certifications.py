@@ -21,7 +21,7 @@ try:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -59,7 +59,7 @@ except ImportError:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -222,11 +222,9 @@ def render_cert_detail_dialog(cert: dict) -> None:
         subtitle=str(cert.get("cert_number") or ""),
         status=str(cert.get("status") or ""),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=rk,
-        record=cert,
-        on_close=_clear_cert_modal,
         key_prefix=f"cert_modal_{rk}",
     )
     render_modal_meta_grid(

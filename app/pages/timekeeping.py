@@ -22,7 +22,7 @@ try:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -56,7 +56,7 @@ except ImportError:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -404,11 +404,9 @@ def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
         subtitle=str(emp.get("department") or ""),
         status=str(emp.get("status") or "Pending"),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=record_key,
-        record=emp,
-        on_close=_clear_timekeeping_modal,
         key_prefix=f"tk_modal_{record_key}",
     )
     render_modal_meta_grid(

@@ -9,9 +9,9 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.clickable_table import close_modal_and_clear_selection
+    from app.components.clickable_table import clear_modal_selection_state
 except ImportError:
-    from components.clickable_table import close_modal_and_clear_selection  # type: ignore
+    from components.clickable_table import clear_modal_selection_state  # type: ignore
 
 
 def safe_value(value: object, fallback: str = "—") -> str:
@@ -110,12 +110,34 @@ def clear_record_modal(
     modal_key: str,
     module: str,
 ) -> None:
+    """Clear modal selection and edit mode without rerun (for dialog ``on_dismiss``)."""
     clear_edit_modes(module)
-    close_modal_and_clear_selection(
+    clear_modal_selection_state(
+        module,
         table_key=table_key,
         session_select_key=session_select_key,
         modal_key=modal_key,
     )
+
+
+def modal_dismiss_handler(
+    *,
+    module: str,
+    table_key: str,
+    session_select_key: str,
+    modal_key: str,
+) -> Callable[[], None]:
+    """Return an ``on_dismiss`` callback that clears modal/table state."""
+
+    def _dismiss() -> None:
+        clear_record_modal(
+            table_key=table_key,
+            session_select_key=session_select_key,
+            modal_key=modal_key,
+            module=module,
+        )
+
+    return _dismiss
 
 
 def show_modal_if_pending(modal_key: str, dialog_fn: Callable[[], None]) -> None:
@@ -214,6 +236,31 @@ def render_modal_header(
     )
 
 
+def render_modal_edit_button(
+    *,
+    module: str,
+    record_key: str,
+    on_edit: Callable[[], None] | None = None,
+    key_prefix: str | None = None,
+) -> None:
+    """Show a single compact Edit button in view mode (dialog X handles close)."""
+    if is_edit_mode(module, record_key):
+        return
+
+    prefix = key_prefix or f"{module}_modal_{record_key}"
+    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+    def _edit() -> None:
+        if on_edit:
+            on_edit()
+        else:
+            set_edit_mode(module, record_key)
+
+    _action_left, action_right = st.columns([8, 1], gap="small")
+    with action_right:
+        st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
+
+
 def render_modal_actions(
     *,
     module: str,
@@ -222,26 +269,13 @@ def render_modal_actions(
     on_close: Callable[[], None],
     key_prefix: str | None = None,
 ) -> None:
-    prefix = key_prefix or f"{module}_modal_{record_key}"
-    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-    def _view() -> None:
-        set_view_mode(module, record_key)
-
-    def _edit() -> None:
-        set_edit_mode(module, record_key)
-
-    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
-    with act1:
-        st.button("View", key=f"{prefix}_view", on_click=_view)
-    with act2:
-        st.button("Edit", key=f"{prefix}_edit", on_click=_edit)
-    with act3:
-        st.button("More", key=f"{prefix}_more")
-    with act4:
-        if st.button("Close", key=f"{prefix}_close"):
-            on_close()
-            st.rerun()
+    """Deprecated: use ``render_modal_edit_button``."""
+    _ = record, on_close
+    render_modal_edit_button(
+        module=module,
+        record_key=record_key,
+        key_prefix=key_prefix,
+    )
 
 
 def render_modal_meta_grid(cards: list[tuple[str, object]]) -> None:
@@ -279,8 +313,6 @@ def render_save_cancel_actions(
     return cancelled, saved
 
 
-def render_missing_record(on_close: Callable[[], None], *, close_key: str = "modal_missing_close") -> None:
+def render_missing_record(on_close: Callable[[], None] | None = None, *, close_key: str = "modal_missing_close") -> None:
     st.warning("That record could not be loaded.")
-    if st.button("Close", key=close_key):
-        on_close()
-        st.rerun()
+    _ = on_close, close_key

@@ -22,7 +22,7 @@ try:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -63,7 +63,7 @@ except ImportError:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -234,11 +234,9 @@ def render_material_detail_dialog(mat: dict, *, estimate_id: str) -> None:
         title=str(mat.get("item_number") or "Material"),
         subtitle=str(mat.get("description") or ""),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=rk,
-        record=mat,
-        on_close=_clear_mat_modal,
         key_prefix=f"mat_modal_{rk}",
     )
     render_modal_meta_grid(

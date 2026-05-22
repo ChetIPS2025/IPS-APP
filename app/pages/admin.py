@@ -18,7 +18,7 @@ try:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_shell,
         render_missing_record,
@@ -44,7 +44,7 @@ except ImportError:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_shell,
         render_missing_record,
@@ -176,11 +176,9 @@ def render_lookup_detail_dialog(row: dict) -> None:
         title=str(row.get("value") or "Lookup Value"),
         subtitle=str(row.get("table") or ""),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=rk,
-        record=row,
-        on_close=_clear_lookup_modal,
         key_prefix=f"lookup_modal_{rk}",
     )
 

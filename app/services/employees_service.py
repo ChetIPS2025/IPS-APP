@@ -1,7 +1,7 @@
 """
 Employees / users module — profiles and HR records.
 
-Schema assumptions: ``employees`` with name, email, role, department, phone, is_active.
+Schema assumptions: ``employees`` with name, email, role, department, phone, is_active, is_employee.
 """
 
 from __future__ import annotations

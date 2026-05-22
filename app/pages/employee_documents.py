@@ -23,7 +23,7 @@ try:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -54,7 +54,7 @@ except ImportError:
         placeholder_html,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -175,11 +175,9 @@ def render_doc_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
         title=str(doc.get("file_name") or "Document"),
         subtitle=str(doc.get("doc_type") or ""),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=rk,
-        record=doc,
-        on_close=_clear_doc_modal,
         key_prefix=f"doc_modal_{rk}",
     )
     render_modal_meta_grid(

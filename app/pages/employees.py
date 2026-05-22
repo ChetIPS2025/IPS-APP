@@ -23,7 +23,7 @@ try:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -66,7 +66,7 @@ except ImportError:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -226,14 +226,12 @@ def _seed_employee_edit_form(emp: dict) -> None:
     st.session_state[f"emp_edit_name_{rk}"] = str(emp.get("name") or "")
     st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
     st.session_state[f"emp_edit_phone_{rk}"] = str(emp.get("phone") or "").replace("—", "")
-    dept_opts = lookup_options("departments")
     role_opts = lookup_options("user_roles")
-    dept = str(emp.get("department") or "")
     role = str(emp.get("role") or "")
-    st.session_state[f"emp_edit_dept_{rk}"] = dept if dept in dept_opts else (dept_opts[0] if dept_opts else dept)
     st.session_state[f"emp_edit_role_{rk}"] = role if role in role_opts else (role_opts[0] if role_opts else role)
     status = str(emp.get("status") or "Active")
     st.session_state[f"emp_edit_status_{rk}"] = status if status in ("Active", "Inactive") else "Active"
+    st.session_state[f"emp_edit_is_employee_{rk}"] = bool(emp.get("is_employee", False))
 
 
 def _render_employee_detail_tabs(emp: dict) -> None:
@@ -364,10 +362,10 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.text_input("Name", key=f"emp_edit_name_{rk}")
         st.text_input("Email", key=f"emp_edit_email_{rk}")
         st.text_input("Phone", key=f"emp_edit_phone_{rk}", placeholder="(337) 555-0100")
-        st.selectbox("Department", lookup_options("departments"), key=f"emp_edit_dept_{rk}")
     with ec2:
         st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{rk}")
         st.selectbox("Status", ["Active", "Inactive"], key=f"emp_edit_status_{rk}")
+        st.checkbox("This user is an employee", key=f"emp_edit_is_employee_{rk}")
 
     cancelled, saved = render_save_cancel_actions(
         module=MODULE,
@@ -383,9 +381,9 @@ def _render_employee_edit_form(emp: dict) -> None:
                 "name": st.session_state.get(f"emp_edit_name_{rk}"),
                 "email": st.session_state.get(f"emp_edit_email_{rk}"),
                 "phone": st.session_state.get(f"emp_edit_phone_{rk}"),
-                "department": st.session_state.get(f"emp_edit_dept_{rk}"),
                 "role": st.session_state.get(f"emp_edit_role_{rk}"),
                 "status": st.session_state.get(f"emp_edit_status_{rk}"),
+                "is_employee": bool(st.session_state.get(f"emp_edit_is_employee_{rk}")),
             },
             row_id=eid or None,
         )
@@ -410,11 +408,9 @@ def render_employee_detail_dialog(emp: dict) -> None:
         subtitle=f"{role} · {dept}" if role != "—" or dept != "—" else email,
         status=status,
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=MODULE,
         record_key=rk,
-        record=emp,
-        on_close=_clear_employee_modal,
         key_prefix=f"emp_modal_{rk}",
     )
     render_modal_meta_grid(

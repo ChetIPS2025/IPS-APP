@@ -397,6 +397,7 @@ _DEMO_EMPLOYEES: list[dict[str, Any]] = [
         "role": "Field Employee",
         "department": "Field Operations",
         "status": "Active",
+        "is_employee": True,
         "last_login": "2025-05-18 08:12",
         "phone": "(337) 555-0142",
         "username": "cburgess",
@@ -409,6 +410,7 @@ _DEMO_EMPLOYEES: list[dict[str, Any]] = [
         "role": "Supervisor",
         "department": "Field Operations",
         "status": "Active",
+        "is_employee": True,
         "last_login": "2025-05-18 07:45",
         "phone": "(337) 555-0198",
         "username": "mjohnson",
@@ -421,6 +423,7 @@ _DEMO_EMPLOYEES: list[dict[str, Any]] = [
         "role": "Administrator",
         "department": "Administration",
         "status": "Active",
+        "is_employee": False,
         "last_login": "2025-05-18 09:01",
         "phone": "(337) 555-0100",
         "username": "ldaigle",
@@ -433,6 +436,7 @@ _DEMO_EMPLOYEES: list[dict[str, Any]] = [
         "role": "Project Manager",
         "department": "Project Management",
         "status": "Active",
+        "is_employee": True,
         "last_login": "2025-05-17 16:22",
         "phone": "(337) 555-0165",
         "username": "schen",
@@ -445,6 +449,7 @@ _DEMO_EMPLOYEES: list[dict[str, Any]] = [
         "role": "Field Employee",
         "department": "Field Operations",
         "status": "Inactive",
+        "is_employee": True,
         "last_login": "2025-02-01 11:00",
         "phone": "(337) 555-0133",
         "username": "jortiz",
@@ -488,6 +493,14 @@ def load_employees() -> list[dict[str, Any]]:
     rows, used = list_employees(demo=list(_DEMO_EMPLOYEES))
     _mark_if_demo(used)
     return rows
+
+
+def is_workforce_employee(emp: dict[str, Any]) -> bool:
+    """True when the user should appear in employee/timekeeping pickers."""
+    raw = emp.get("is_employee")
+    if raw is None:
+        return True
+    return bool(raw)
 
 
 def get_employee(employee_id: str) -> dict[str, Any] | None:
@@ -621,7 +634,9 @@ def _active_employees() -> list[dict[str, Any]]:
     return [
         e
         for e in load_employees()
-        if str(e.get("status") or "Active") == "Active" and str(e.get("id") or "").strip()
+        if str(e.get("status") or "Active") == "Active"
+        and str(e.get("id") or "").strip()
+        and is_workforce_employee(e)
     ]
 
 
@@ -896,7 +911,11 @@ def document_link_ref_options(module: str) -> list[str]:
             if a.get("asset_number")
         ]
     if mod == "Employees":
-        return [str(e.get("name") or "") for e in load_employees() if e.get("name")]
+        return [
+            str(e.get("name") or "")
+            for e in load_employees()
+            if e.get("name") and is_workforce_employee(e)
+        ]
     if mod == "Certifications":
         out: list[str] = []
         for c in load_all_certifications():
@@ -1127,7 +1146,13 @@ def _demo_blocked(row_id: str | None) -> bool:
 
 
 def employee_options(*, include_blank: bool = True) -> list[str]:
-    names = sorted({str(e.get("name") or "") for e in load_employees() if e.get("name")})
+    names = sorted(
+        {
+            str(e.get("name") or "")
+            for e in load_employees()
+            if e.get("name") and is_workforce_employee(e)
+        }
+    )
     if include_blank:
         return ["— Select —", *names]
     return names
@@ -1136,13 +1161,19 @@ def employee_options(*, include_blank: bool = True) -> list[str]:
 _DEMO_CUSTOMERS: list[dict[str, Any]] = [
     {
         "id": "demo-c-birla",
-        "customer_name": "Birla Carbons - USA",
+        "customer_name": "Orion Engineered Carbons",
+        "customer_number": "C-1001",
         "address": "123 Industrial Park Rd",
         "city": "Alexandria",
         "state": "LA",
         "zip": "71301",
+        "website": "https://orioncarbons.example",
+        "main_phone": "(318) 555-0100",
+        "main_email": "info@orioncarbons.example",
+        "billing_email": "ap@orioncarbons.example",
         "is_active": True,
-        "notes": "Primary petrochemical account.",
+        "status": "Active",
+        "notes": "Primary petrochemical account with multiple sites.",
     },
     {
         "id": "demo-c-acme",
@@ -1180,12 +1211,81 @@ _DEMO_CUSTOMER_LOCATIONS: list[dict[str, Any]] = [
     {
         "id": "demo-loc-1",
         "customer_id": "demo-c-birla",
-        "site_name": "Main Plant",
-        "address_line1": "123 Industrial Park Rd",
+        "location_name": "Franklin Plant",
+        "site_name": "Franklin Plant",
+        "location_type": "Plant",
+        "address_line_1": "123 Industrial Park Rd",
+        "address": "123 Industrial Park Rd",
         "city": "Alexandria",
         "state": "LA",
         "zip": "71301",
+        "is_primary": True,
+        "is_billing": False,
+        "is_shipping": False,
         "is_active": True,
+        "status": "Active",
+    },
+    {
+        "id": "demo-loc-2",
+        "customer_id": "demo-c-birla",
+        "location_name": "Maintenance Office",
+        "site_name": "Maintenance Office",
+        "location_type": "Office",
+        "address_line_1": "125 Industrial Park Rd",
+        "address": "125 Industrial Park Rd",
+        "city": "Alexandria",
+        "state": "LA",
+        "zip": "71301",
+        "is_primary": False,
+        "is_active": True,
+        "status": "Active",
+    },
+    {
+        "id": "demo-loc-3",
+        "customer_id": "demo-c-birla",
+        "location_name": "Billing Office",
+        "site_name": "Billing Office",
+        "location_type": "Billing",
+        "address_line_1": "400 Commerce St",
+        "address": "400 Commerce St",
+        "city": "Alexandria",
+        "state": "LA",
+        "zip": "71301",
+        "is_primary": False,
+        "is_billing": True,
+        "is_active": True,
+        "status": "Active",
+    },
+    {
+        "id": "demo-loc-4",
+        "customer_id": "demo-c-birla",
+        "location_name": "Shipping/Receiving Gate",
+        "site_name": "Shipping/Receiving Gate",
+        "location_type": "Shipping",
+        "address_line_1": "Gate 3, Plant Rd",
+        "address": "Gate 3, Plant Rd",
+        "city": "Alexandria",
+        "state": "LA",
+        "zip": "71301",
+        "is_primary": False,
+        "is_shipping": True,
+        "is_active": True,
+        "status": "Active",
+    },
+    {
+        "id": "demo-loc-acme",
+        "customer_id": "demo-c-acme",
+        "location_name": "Acme Construction Main Location",
+        "site_name": "Acme Construction Main Location",
+        "location_type": "Office",
+        "address_line_1": "4500 Commerce Blvd",
+        "address": "4500 Commerce Blvd",
+        "city": "Lake Charles",
+        "state": "LA",
+        "zip": "70601",
+        "is_primary": True,
+        "is_active": True,
+        "status": "Active",
     },
 ]
 
@@ -1194,23 +1294,65 @@ _DEMO_CUSTOMER_CONTACTS: list[dict[str, Any]] = [
         "id": "demo-cc-1",
         "customer_id": "demo-c-birla",
         "customer_location_id": "demo-loc-1",
+        "location_id": "demo-loc-1",
+        "full_name": "Sarah Chen",
         "contact_name": "Sarah Chen",
-        "title": "Project Manager",
+        "title": "Plant Manager",
+        "role_type": "Site Contact",
         "email": "sarah.chen@example.com",
         "phone": "(318) 555-0101",
+        "mobile": "(318) 555-1101",
+        "is_site_contact": True,
         "is_active": True,
         "is_primary": True,
+        "status": "Active",
     },
     {
         "id": "demo-cc-2",
         "customer_id": "demo-c-birla",
         "customer_location_id": "demo-loc-1",
+        "location_id": "demo-loc-1",
+        "full_name": "Mike Torres",
         "contact_name": "Mike Torres",
-        "title": "Maintenance Supervisor",
+        "title": "Safety Coordinator",
+        "role_type": "Safety Contact",
         "email": "mike.torres@example.com",
         "phone": "(318) 555-0102",
+        "is_safety_contact": True,
         "is_active": True,
         "is_primary": False,
+        "status": "Active",
+    },
+    {
+        "id": "demo-cc-3",
+        "customer_id": "demo-c-birla",
+        "customer_location_id": "demo-loc-3",
+        "location_id": "demo-loc-3",
+        "full_name": "Lisa Nguyen",
+        "contact_name": "Lisa Nguyen",
+        "title": "Accounts Payable",
+        "role_type": "Billing Contact",
+        "email": "ap@orioncarbons.example",
+        "phone": "(318) 555-0103",
+        "is_billing_contact": True,
+        "is_active": True,
+        "is_primary": True,
+        "status": "Active",
+    },
+    {
+        "id": "demo-cc-4",
+        "customer_id": "demo-c-birla",
+        "customer_location_id": "demo-loc-4",
+        "location_id": "demo-loc-4",
+        "full_name": "James Reed",
+        "contact_name": "James Reed",
+        "title": "Shipping Coordinator",
+        "role_type": "Shipping Contact",
+        "email": "shipping@orioncarbons.example",
+        "phone": "(318) 555-0104",
+        "is_active": True,
+        "is_primary": True,
+        "status": "Active",
     },
 ]
 
@@ -1241,15 +1383,12 @@ def load_customer_locations(customer_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def load_customer_contacts(customer_id: str) -> list[dict[str, Any]]:
+def load_customer_contacts(customer_id: str, location_id: str | None = None) -> list[dict[str, Any]]:
     try:
-        from app.services.customers_service import list_customer_contacts
+        from app.services.customers_service import get_customer_contacts
     except ImportError:
-        from services.customers_service import list_customer_contacts  # type: ignore
-    rows, used = list_customer_contacts(customer_id, demo=list(_DEMO_CUSTOMER_CONTACTS))
-    if used:
-        _mark_if_demo(True)
-    return rows
+        from services.customers_service import get_customer_contacts  # type: ignore
+    return get_customer_contacts(customer_id, location_id=location_id)
 
 
 def jobs_for_customer(customer_name: str) -> list[dict[str, Any]]:
@@ -1290,31 +1429,31 @@ def customer_id_for_name(customer_name: str) -> str:
     return ""
 
 
-def customer_contact_select_options(customer_id: str) -> list[tuple[str, str]]:
-    """Active contacts for a customer as (label, contact_id). Primary contacts first."""
+def customer_location_select_options(customer_id: str) -> list[tuple[str, str]]:
+    """Active customer locations as (label, location_id)."""
     cid = str(customer_id or "").strip()
     if not cid:
         return []
-    contacts = [
-        c
-        for c in load_customer_contacts(cid)
-        if str(c.get("status") or "Active") == "Active" and str(c.get("id") or "").strip()
-    ]
-    contacts.sort(key=lambda c: (not bool(c.get("is_primary")), str(c.get("contact_name") or "").lower()))
-    locations = load_customer_locations(cid)
-    loc_by_id = {str(loc.get("id") or ""): loc for loc in locations}
-    out: list[tuple[str, str]] = []
-    for c in contacts:
-        name = str(c.get("contact_name") or "—")
-        title = str(c.get("title") or "").strip()
-        label = f"{name} — {title}" if title else name
-        loc_id = str(c.get("customer_location_id") or "").strip()
-        if loc_id and loc_id in loc_by_id:
-            site = str(loc_by_id[loc_id].get("site_name") or "").strip()
-            if site:
-                label = f"{label} ({site})"
-        out.append((label, str(c.get("id") or "")))
-    return out
+    try:
+        from app.services.customers_service import get_customer_location_options
+    except ImportError:
+        from services.customers_service import get_customer_location_options  # type: ignore
+    return get_customer_location_options(cid)
+
+
+def customer_contact_select_options(
+    customer_id: str,
+    location_id: str | None = None,
+) -> list[tuple[str, str]]:
+    """Active contacts scoped to customer/location as (label, contact_id)."""
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return []
+    try:
+        from app.services.customers_service import get_customer_contact_options
+    except ImportError:
+        from services.customers_service import get_customer_contact_options  # type: ignore
+    return get_customer_contact_options(cid, location_id)
 
 
 def persist_customer(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:

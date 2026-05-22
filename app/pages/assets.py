@@ -22,6 +22,7 @@ try:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -57,6 +58,7 @@ except ImportError:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -478,21 +480,12 @@ def render_asset_detail_dialog(asset: dict) -> None:
     render_modal_shell()
     render_modal_header(title=asset_number, subtitle=asset_name, status=status)
 
-    def _on_edit() -> None:
-        _set_asset_edit_mode(asset)
-
-    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
-    with act1:
-        st.button("View", key=f"assets_modal_view_{rk}", on_click=_set_asset_view_mode, args=(asset,))
-    with act2:
-        st.button("Edit", key=f"assets_modal_edit_{rk}", on_click=_on_edit)
-    with act3:
-        st.button("More", key=f"assets_modal_more_{rk}")
-    with act4:
-        if st.button("Close", key=f"assets_modal_close_{rk}"):
-            _clear_assets_detail_modal()
-            st.rerun()
+    render_modal_edit_button(
+        module=_MOD,
+        record_key=rk,
+        on_edit=lambda: _set_asset_edit_mode(asset),
+        key_prefix=f"assets_modal_{rk}",
+    )
 
     render_modal_meta_grid(
         [

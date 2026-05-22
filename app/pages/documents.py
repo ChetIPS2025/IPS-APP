@@ -23,7 +23,7 @@ try:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -61,7 +61,7 @@ except ImportError:
         record_session_key,
         render_edit_form_header,
         render_missing_record,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -350,11 +350,9 @@ def render_document_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
         subtitle=doc_type,
         status=_access_label(doc) if doc.get("is_restricted") else None,
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=MODULE,
         record_key=rk,
-        record=doc,
-        on_close=_clear_document_modal,
         key_prefix=f"doc_modal_{rk}",
     )
     render_modal_meta_grid(

@@ -21,23 +21,49 @@ def dataframe_widget_key(table_key: str) -> str:
     return f"ips_click_df_{table_key}_{gen}"
 
 
-def close_modal_and_clear_selection(
+def clear_modal_selection_state(
+    key: str,
     *,
-    table_key: str,
-    session_select_key: str,
+    table_key: str | None = None,
+    session_select_key: str | None = None,
     modal_key: str | None = None,
 ) -> None:
-    """Clear list selection and reset the dataframe widget so the same row can be selected again."""
-    st.session_state.pop(session_select_key, None)
-    if modal_key:
-        st.session_state.pop(modal_key, None)
-    st.session_state.pop(dataframe_widget_key(table_key), None)
-    st.session_state[_df_gen_key(table_key)] = int(st.session_state.get(_df_gen_key(table_key), 0) or 0) + 1
+    """Clear modal/table selection without forcing a rerun (for ``on_dismiss``)."""
+    version_key = f"{key}__table_version"
+    st.session_state[f"{key}__modal_open"] = False
+    st.session_state.pop(f"{key}__selected_id", None)
+    st.session_state.pop(f"{key}__selected_record", None)
+    st.session_state[version_key] = int(st.session_state.get(version_key, 0) or 0) + 1
+
+    if table_key and session_select_key:
+        st.session_state.pop(session_select_key, None)
+        if modal_key:
+            st.session_state.pop(modal_key, None)
+        st.session_state.pop(dataframe_widget_key(table_key), None)
+        st.session_state[_df_gen_key(table_key)] = int(st.session_state.get(_df_gen_key(table_key), 0) or 0) + 1
+
+
+def close_modal_and_clear_selection(
+    key: str,
+    *,
+    table_key: str | None = None,
+    session_select_key: str | None = None,
+    modal_key: str | None = None,
+) -> None:
+    """Clear list selection, reset the dataframe widget, and rerun."""
+    clear_modal_selection_state(
+        key,
+        table_key=table_key,
+        session_select_key=session_select_key,
+        modal_key=modal_key,
+    )
+    st.rerun()
 
 
 def clear_table_selection(*, table_key: str, session_select_key: str) -> None:
     """Reset native dataframe row selection (inline detail panels)."""
-    close_modal_and_clear_selection(
+    clear_modal_selection_state(
+        table_key,
         table_key=table_key,
         session_select_key=session_select_key,
         modal_key=None,

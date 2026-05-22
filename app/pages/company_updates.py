@@ -22,7 +22,7 @@ try:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -56,7 +56,7 @@ except ImportError:
         open_record_modal,
         record_session_key,
         render_edit_form_header,
-        render_modal_actions,
+        render_modal_edit_button,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
@@ -208,11 +208,9 @@ def render_cu_detail_dialog(update: dict) -> None:
         title=str(update.get("title") or "Update"),
         subtitle=str(update.get("category") or ""),
     )
-    render_modal_actions(
+    render_modal_edit_button(
         module=_MODULE,
         record_key=rk,
-        record=update,
-        on_close=_clear_cu_modal,
         key_prefix=f"cu_modal_{rk}",
     )
     render_modal_meta_grid(
