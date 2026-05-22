@@ -185,10 +185,6 @@ def _render_detail_body(job: dict) -> None:
                     st.rerun()
 
 
-def _select_job_row(job_id: str) -> None:
-    _open_jobs_detail_modal(job_id)
-
-
 def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
     if not rows:
         st.caption("No records to display.")
@@ -196,8 +192,35 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
 
     grid = f"grid-template-columns: {_JOB_GRID};"
     records_by_id: dict[str, dict] = {}
+    row_parts: list[str] = []
 
     st.caption("Click a row to open details.")
+
+    for job in rows:
+        jid = str(job.get("id") or "").strip()
+        if not jid:
+            continue
+        records_by_id[jid] = job
+        selected = jid == selected_id
+        row_cls = (
+            "ips-clean-row ips-jobs-row ips-data-row selected"
+            if selected
+            else "ips-clean-row ips-jobs-row ips-data-row"
+        )
+        jid_attr = html.escape(jid, quote=True)
+        jnum = html.escape(str(job.get("job_number") or ""))
+        row_parts.append(
+            f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
+            f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
+            f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
+            f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
+            f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
+            f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
+            f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
+            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
+            f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
+            "</div>"
+        )
 
     with st.container(border=True):
         st.markdown(
@@ -205,6 +228,8 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
             unsafe_allow_html=True,
         )
         st.markdown(
+            f'<div class="ips-data-table-wrap ips-data-table-stable ips-data-table-html">'
+            f'<div class="ips-data-table-scroll">'
             f'<div class="ips-data-table-header ips-clean-header" style="{grid}">'
             "<span>JOB #</span>"
             "<span>PROJECT / DESCRIPTION</span>"
@@ -214,53 +239,11 @@ def _render_jobs_table(rows: list[dict], *, selected_id: str) -> None:
             "<span>STATUS</span>"
             "<span>START DATE</span>"
             "<span>END DATE</span>"
-            "</div>",
+            "</div>"
+            + "".join(row_parts)
+            + "</div></div>",
             unsafe_allow_html=True,
         )
-
-        for row_idx, job in enumerate(rows):
-            jid = str(job.get("id") or "").strip()
-            if not jid:
-                continue
-            records_by_id[jid] = job
-            selected = jid == selected_id
-            row_cls = (
-                "ips-clean-row ips-jobs-row ips-data-row selected"
-                if selected
-                else "ips-clean-row ips-jobs-row ips-data-row"
-            )
-            jid_attr = html.escape(jid, quote=True)
-            jnum = html.escape(str(job.get("job_number") or ""))
-            jlabel = html.escape(str(job.get("job_number") or "job"), quote=True)
-            row_html = (
-                f'<div class="{row_cls}" style="{grid}" data-row-id="{jid_attr}" role="button" tabindex="0">'
-                f'<span class="ips-data-cell"><span style="color:#2563eb;font-weight:600">{jnum}</span></span>'
-                f'<span class="ips-data-cell">{html.escape(str(job.get("job_name") or "—"))}</span>'
-                f'<span class="ips-data-cell">{html.escape(str(job.get("customer") or "—"))}</span>'
-                f'<span class="ips-data-cell">{html.escape(str(job.get("estimate_number") or "—"))}</span>'
-                f'<span class="ips-data-cell">{html.escape(str(job.get("supervisor") or "—"))}</span>'
-                f'<span class="ips-data-cell">{status_pill_html(str(job.get("status") or ""))}</span>'
-                f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("start_date")))}</span>'
-                f'<span class="ips-data-cell">{html.escape(fmt_date(job.get("end_date")))}</span>'
-                "</div>"
-            )
-            with st.container():
-                st.markdown(
-                    '<span class="ips-clean-row-wrap ips-jobs-row-wrap" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<span class="ips-clean-row-select-btn" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.button(
-                    " ",
-                    key=f"jobs_row_sel_{row_idx}_{jid}",
-                    help=f"Select job {jlabel}",
-                    on_click=_select_job_row,
-                    args=(jid,),
-                )
-                st.markdown(row_html, unsafe_allow_html=True)
 
     st.session_state["_ips_jobs_modal_by_id"] = records_by_id
 
