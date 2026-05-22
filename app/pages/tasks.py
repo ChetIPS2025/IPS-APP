@@ -112,7 +112,8 @@ _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
-_TASK_COLS = [0.45, 4.8, 1.3, 1.3, 2.2, 3.0, 1.4]
+_ALL_TASK_IDS_KEY = "_ips_tasks_visible_ids"
+_TASK_COLS = [0.35, 4.8, 1.2, 1.2, 2.0, 2.8, 1.2]
 _TASK_HEADERS = ["", "TASK", "STATUS", "PRIORITY", "ASSIGNED TO", "JOB", "DUE"]
 
 _TASK_TABS = [
@@ -328,12 +329,47 @@ def _save_task_field(task_id: str, update_data: dict, *, job_options: list[dict]
     st.rerun()
 
 
-def _clear_task_modal() -> None:
-    st.session_state.pop(SELECTED_TASK_KEY, None)
+def _task_select_key(task_id: str) -> str:
+    return f"task_select_{task_id}"
+
+
+def _clear_task_selection(task_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_TASK_KEY] = None
     st.session_state[SHOW_MODAL_KEY] = False
+    ids = list(task_ids or [])
+    for tid in ids:
+        st.session_state[_task_select_key(tid)] = False
     for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("task_ck_"):
+        if isinstance(key, str) and key.startswith("task_select_"):
             st.session_state[key] = False
+
+
+def _on_task_checkbox_change(task_id: str, all_task_ids: list[str]) -> None:
+    key = _task_select_key(task_id)
+    if st.session_state.get(key):
+        for tid in all_task_ids:
+            if tid != task_id:
+                st.session_state[_task_select_key(tid)] = False
+        st.session_state[SELECTED_TASK_KEY] = task_id
+        st.session_state[SHOW_MODAL_KEY] = True
+        cache = st.session_state.get(CACHE_KEY) or {}
+        task = cache.get(task_id) if isinstance(cache, dict) else None
+        open_record_modal(
+            task_id,
+            task if isinstance(task, dict) else None,
+            session_select_key=_SEL,
+            modal_key=MODAL_KEY,
+            module=MODULE,
+            id_fields=("id", "title"),
+        )
+    elif st.session_state.get(SELECTED_TASK_KEY) == task_id:
+        st.session_state[SELECTED_TASK_KEY] = None
+        st.session_state[SHOW_MODAL_KEY] = False
+
+
+def _clear_task_modal() -> None:
+    task_ids = st.session_state.get(_ALL_TASK_IDS_KEY) or []
+    _clear_task_selection([str(tid) for tid in task_ids])
     clear_edit_modes(MODULE)
     clear_record_modal(
         table_key=_TABLE_KEY,
@@ -341,36 +377,6 @@ def _clear_task_modal() -> None:
         modal_key=MODAL_KEY,
         module=MODULE,
     )
-
-
-def _open_task_modal(task_id: str, task: dict | None = None) -> None:
-    tid = str(task_id or "").strip()
-    if not tid:
-        return
-    st.session_state[SELECTED_TASK_KEY] = tid
-    st.session_state[SHOW_MODAL_KEY] = True
-    open_record_modal(
-        tid,
-        task,
-        session_select_key=_SEL,
-        modal_key=MODAL_KEY,
-        module=MODULE,
-        id_fields=("id", "title"),
-    )
-
-
-def _sync_row_checkboxes(filtered: list[dict], selected_id: str | None) -> None:
-    selected = str(selected_id or "").strip()
-    visible_ids = {str(t.get("id") or "").strip() for t in filtered}
-    for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("task_ck_"):
-            tid = key.replace("task_ck_", "", 1)
-            if tid not in visible_ids:
-                st.session_state.pop(key, None)
-    for task in filtered:
-        tid = str(task.get("id") or "").strip()
-        if tid:
-            st.session_state[f"task_ck_{tid}"] = selected == tid
 
 
 def _as_date(value: object):
@@ -654,128 +660,119 @@ def _render_custom_task_table(
     assignee_lookup: dict[str, str],
     jobs_by_id: dict[str, dict],
     job_options: list[dict],
-) -> None:
+) -> list[str]:
     if not filtered:
         st.info("No tasks match your filters.")
-        return
+        st.session_state[_ALL_TASK_IDS_KEY] = []
+        return []
 
-    selected_id = str(st.session_state.get(SELECTED_TASK_KEY) or "").strip() or None
-    _sync_row_checkboxes(filtered, selected_id)
+    all_task_ids = [str(t.get("id") or "").strip() for t in filtered if str(t.get("id") or "").strip()]
+    st.session_state[_ALL_TASK_IDS_KEY] = all_task_ids
 
-    st.markdown('<div class="ips-task-table">', unsafe_allow_html=True)
+    with st.container(key="tasks_table_wrap"):
+        st.markdown('<div class="ips-task-table-wrap">', unsafe_allow_html=True)
 
-    header_cols = st.columns(_TASK_COLS, gap="small")
-    for col, label in zip(header_cols, _TASK_HEADERS):
-        with col:
-            st.markdown(
-                f'<div class="ips-task-header ips-task-cell">{html.escape(label)}</div>',
-                unsafe_allow_html=True,
-            )
-
-    for task in filtered:
-        tid = str(task.get("id") or "").strip()
-        if not tid:
-            continue
-        row_selected = selected_id == tid
-        row_class = "ips-task-row ips-task-row-selected" if row_selected else "ips-task-row"
-        st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
-
-        cols = st.columns(_TASK_COLS, gap="small")
-        status = normalize_task_status(task.get("status"))
-        priority = normalize_task_priority(task.get("priority"))
-        assignee = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup)
-        due = fmt_date(task.get("due_date"))
-        if due == "—":
-            due = "—"
-        current_job_id = _resolve_task_job_id(task, job_options, jobs_by_id)
-        job_labels = [str(o.get("label") or "") for o in job_options]
-        job_ids = [o.get("id") for o in job_options]
-        current_job_label = "— None —"
-        for opt in job_options:
-            if opt.get("id") == current_job_id:
-                current_job_label = str(opt.get("label") or "— None —")
-                break
-        if current_job_id is None and str(task.get("linked_job") or "") in job_labels:
-            current_job_label = str(task.get("linked_job"))
-
-        with cols[0]:
-            st.markdown('<div class="ips-task-cell ips-task-checkbox-cell">', unsafe_allow_html=True)
-            checked = st.checkbox(
-                "Select task",
-                key=f"task_ck_{tid}",
-                label_visibility="collapsed",
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-            if checked and selected_id != tid:
-                _open_task_modal(tid, task)
-                st.rerun()
-
-        with cols[1]:
-            title = html.escape(str(task.get("title") or ""))
-            st.markdown(
-                f'<div class="ips-task-cell ips-task-title">{title}</div>',
-                unsafe_allow_html=True,
-            )
-
-        with cols[2]:
-            st.markdown('<div class="ips-task-cell">', unsafe_allow_html=True)
-            btn_class = "ips-task-status-closed" if status == "Closed" else "ips-task-status-open"
-            st.markdown(f'<div class="{btn_class}">', unsafe_allow_html=True)
-            if status == "Open":
-                if st.button("Open", key=f"task_status_{tid}", use_container_width=True):
-                    _save_task_field(tid, {"status": "Closed"})
-            else:
-                if st.button("Closed", key=f"task_status_{tid}", use_container_width=True):
-                    _save_task_field(tid, {"status": "Open"})
-            st.markdown("</div></div>", unsafe_allow_html=True)
-
-        with cols[3]:
-            st.markdown(
-                f'<div class="ips-task-cell">{_priority_pill_html(priority)}</div>',
-                unsafe_allow_html=True,
-            )
-
-        with cols[4]:
-            st.markdown(
-                f'<div class="ips-task-cell">{html.escape(assignee)}</div>',
-                unsafe_allow_html=True,
-            )
-
-        with cols[5]:
-            st.markdown('<div class="ips-task-cell ips-task-job-cell">', unsafe_allow_html=True)
-            try:
-                job_index = job_labels.index(current_job_label)
-            except ValueError:
-                job_index = 0
-            prev_key = f"task_job_prev_{tid}"
-            picked_label = st.selectbox(
-                "Job",
-                job_labels,
-                index=job_index,
-                key=f"task_job_{tid}",
-                label_visibility="collapsed",
-            )
-            if prev_key not in st.session_state:
-                st.session_state[prev_key] = picked_label
-            elif st.session_state.get(prev_key) != picked_label:
-                picked_id = job_ids[job_labels.index(picked_label)]
-                st.session_state[prev_key] = picked_label
-                _save_task_field(
-                    tid,
-                    {"job_id": picked_id, "job_label": picked_label if picked_label != "— None —" else ""},
-                    job_options=job_options,
+        header_cols = st.columns(_TASK_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _TASK_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-task-header-row ips-task-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
                 )
-            st.markdown("</div>", unsafe_allow_html=True)
 
-        with cols[6]:
-            st.markdown(
-                f'<div class="ips-task-cell">{html.escape(due)}</div>',
-                unsafe_allow_html=True,
-            )
+        for task in filtered:
+            tid = str(task.get("id") or "").strip()
+            if not tid:
+                continue
+
+            status = normalize_task_status(task.get("status"))
+            priority = normalize_task_priority(task.get("priority"))
+            assignee = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup)
+            due = fmt_date(task.get("due_date"))
+            current_job_id = _resolve_task_job_id(task, job_options, jobs_by_id)
+            job_labels = [str(o.get("label") or "") for o in job_options]
+            job_ids = [o.get("id") for o in job_options]
+            current_job_label = "— None —"
+            for opt in job_options:
+                if opt.get("id") == current_job_id:
+                    current_job_label = str(opt.get("label") or "— None —")
+                    break
+            if current_job_id is None and str(task.get("linked_job") or "") in job_labels:
+                current_job_label = str(task.get("linked_job"))
+
+            cols = st.columns(_TASK_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_task_select_key(tid),
+                    label_visibility="collapsed",
+                    on_change=_on_task_checkbox_change,
+                    args=(tid, all_task_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-task-title">{html.escape(str(task.get("title") or ""))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                btn_class = "ips-task-status-closed" if status == "Closed" else "ips-task-status-open"
+                st.markdown(f'<div class="{btn_class}">', unsafe_allow_html=True)
+                if status == "Open":
+                    if st.button("Open", key=f"task_status_{tid}"):
+                        _save_task_field(tid, {"status": "Closed"})
+                else:
+                    if st.button("Closed", key=f"task_status_{tid}"):
+                        _save_task_field(tid, {"status": "Open"})
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with cols[3]:
+                st.markdown(_priority_pill_html(priority), unsafe_allow_html=True)
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-task-cell">{html.escape(assignee)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                try:
+                    job_index = job_labels.index(current_job_label)
+                except ValueError:
+                    job_index = 0
+                prev_key = f"task_job_prev_{tid}"
+                picked_label = st.selectbox(
+                    "Job",
+                    job_labels,
+                    index=job_index,
+                    key=f"task_job_{tid}",
+                    label_visibility="collapsed",
+                )
+                if prev_key not in st.session_state:
+                    st.session_state[prev_key] = picked_label
+                elif st.session_state.get(prev_key) != picked_label:
+                    picked_id = job_ids[job_labels.index(picked_label)]
+                    st.session_state[prev_key] = picked_label
+                    _save_task_field(
+                        tid,
+                        {
+                            "job_id": picked_id,
+                            "job_label": picked_label if picked_label != "— None —" else "",
+                        },
+                        job_options=job_options,
+                    )
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-task-cell ips-task-due">{html.escape(due)}</div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    return all_task_ids
 
 
 def render() -> None:
@@ -899,5 +896,6 @@ def render() -> None:
         job_options=job_options,
     )
 
-    if st.session_state.get(SHOW_MODAL_KEY):
+    selected_task_id = st.session_state.get(SELECTED_TASK_KEY)
+    if selected_task_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_task_modal(assignee_lookup, jobs_by_id, job_options)

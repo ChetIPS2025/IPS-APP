@@ -206,93 +206,67 @@ def inject_tasks_module_css() -> None:
     """Tasks custom interactive table styling."""
     st.markdown(
         f"""
-<style id="ips-tasks-module-v2">
-.ips-task-table {{
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
+<style id="ips-tasks-module-v3">
+.ips-task-table-wrap {{
   background: #ffffff;
-  margin-bottom: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
 }}
-.ips-task-header {{
+.ips-task-header-row {{
   background: #f8fafc;
-  color: {TEXT_MUTED};
-  font-size: 0.68rem;
-  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0.55rem 0.45rem;
-  border-bottom: 1px solid #e2e8f0;
-  min-height: 2.25rem;
+  min-height: 38px;
   display: flex;
   align-items: center;
 }}
 .ips-task-row {{
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  padding: 0.35rem 0.15rem;
+  padding: 6px 10px;
+  min-height: 52px;
 }}
 .ips-task-row:hover {{
   background: #eef5ff;
 }}
-.ips-task-row-selected {{
-  background: #eaf2ff !important;
-}}
 .ips-task-cell {{
   color: {TEXT};
   font-size: 0.8125rem;
-  min-height: 2.35rem;
-  display: flex;
-  align-items: center;
-  padding: 0.15rem 0.35rem;
+  line-height: 1.25;
   min-width: 0;
 }}
-.ips-task-checkbox-cell {{
-  justify-content: center;
-  padding-left: 0.15rem;
-  padding-right: 0.15rem;
-}}
 .ips-task-title {{
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
   word-break: break-word;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-status-open button {{
-  background: #ffffff !important;
-  color: #1d4ed8 !important;
-  border: 1px solid #93c5fd !important;
-  border-radius: 999px !important;
-  min-height: 1.85rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  padding: 0.15rem 0.75rem !important;
-  width: 100% !important;
-}}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-status-closed button {{
-  background: #ecfdf5 !important;
-  color: #047857 !important;
-  border: 1px solid #86efac !important;
-  border-radius: 999px !important;
-  min-height: 1.85rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  padding: 0.15rem 0.75rem !important;
-  width: 100% !important;
+.ips-task-due {{
+  white-space: nowrap;
+  font-size: 0.8125rem;
 }}
 .ips-priority-pill {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 26px;
+  padding: 0 12px;
   border-radius: 999px;
-  padding: 0.2rem 0.65rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 800;
   white-space: nowrap;
 }}
 .ips-priority-high {{
   background: #fee2e2;
-  color: #b91c1c;
+  color: #991b1b;
 }}
 .ips-priority-medium {{
   background: #ffedd5;
@@ -302,15 +276,69 @@ section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-status-closed butto
   background: #dcfce7;
   color: #166534;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-job-cell [data-baseweb="select"] > div {{
-  min-height: 2rem !important;
-  font-size: 0.78rem !important;
+.st-key-tasks_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-checkbox-cell [data-testid="stCheckbox"] {{
+.st-key-tasks_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-tasks_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-tasks_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-tasks_table_wrap .stButton > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
+}}
+.st-key-tasks_table_wrap .ips-task-status-open .stButton > button {{
+  background: #ffffff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #93c5fd !important;
+}}
+.st-key-tasks_table_wrap .ips-task-status-closed .stButton > button {{
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #86efac !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stSelectbox"] {{
   margin: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-tasks-page) .ips-task-checkbox-cell label {{
+.st-key-tasks_table_wrap [data-testid="stSelectbox"] > div {{
+  min-height: 34px !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] {{
+  min-height: 34px !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  min-height: 34px !important;
+  font-size: 0.78rem !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-tasks_table_wrap [data-testid="stCheckbox"] label {{
   min-height: 0 !important;
+  margin: 0 !important;
 }}
 </style>
 """,
