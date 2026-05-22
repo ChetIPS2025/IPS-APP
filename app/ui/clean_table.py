@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v7"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v8"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -258,6 +258,12 @@ def inject_clean_table_css() -> None:
     border: none !important;
     box-shadow: none !important;
 }}
+{vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers}) {{
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+}}
 
 /* Invisible row-select Streamlit button: full-row hit target under visual HTML row */
 {vb_wrap} > [data-testid="stElementContainer"]:has({row_sel_markers})
@@ -303,15 +309,14 @@ def inject_clean_table_css() -> None:
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
+    color: transparent !important;
     cursor: pointer !important;
 }}
 
 /* Visual HTML row sits above the invisible button and does not steal clicks */
 {vb_wrap} > [data-testid="stElementContainer"]:has({rows}) {{
     position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
+    inset: 0 !important;
     z-index: 2 !important;
     pointer-events: none !important;
     margin: 0 !important;
@@ -567,14 +572,17 @@ def apply_clean_table_row_selection(
     session_select_key: str,
     records_by_id: dict[str, dict[str, Any]],
     on_row_click: Any | None = None,
-) -> None:
-    """Store selected row id and rerun when selection changes."""
+) -> bool:
+    """Store selected row id. Returns True when selection changed.
+
+    Do not call ``st.rerun()`` here — widget callbacks rerun automatically, and
+    click-bridge callers should rerun after this returns True.
+    """
     rid = str(row_id or "").strip()
     if not rid or rid not in records_by_id:
-        return
+        return False
     prev = st.session_state.get(session_select_key)
     st.session_state[session_select_key] = rid
     if on_row_click:
         on_row_click(rid, records_by_id[rid])
-    if prev != rid:
-        st.rerun()
+    return prev != rid

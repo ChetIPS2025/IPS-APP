@@ -551,12 +551,13 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
     if picked:
         pid = str(picked).strip()
         if pid and pid in records_by_id:
-            apply_clean_table_row_selection(
+            if apply_clean_table_row_selection(
                 pid,
                 session_select_key=_SEL,
                 records_by_id=records_by_id,
                 on_row_click=lambda _rid, _rec: st.session_state.pop(_COLLAPSED_KEY, None),
-            )
+            ):
+                st.rerun()
 
 
 def render() -> None:

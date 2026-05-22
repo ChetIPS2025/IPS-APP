@@ -157,12 +157,13 @@ def render_clickable_table(
         if picked:
             pid = str(picked).strip()
             if pid and pid in records_by_id:
-                apply_clean_table_row_selection(
+                if apply_clean_table_row_selection(
                     pid,
                     session_select_key=sel_key,
                     records_by_id=records_by_id,
                     on_row_click=on_row_click,
-                )
+                ):
+                    st.rerun()
     else:
         with st.container(border=True):
             st.markdown(
@@ -215,6 +216,22 @@ def render_clickable_table(
                         on_click=_select_row,
                     )
                     st.markdown(row_html, unsafe_allow_html=True)
+
+        picked = render_clean_table_click_bridge(
+            table_selector=f".{table_class}",
+            row_selector=".ips-data-row[data-row-id]",
+            component_key=f"{key}_row_click_bridge",
+        )
+        if picked:
+            pid = str(picked).strip()
+            if pid and pid in records_by_id:
+                if apply_clean_table_row_selection(
+                    pid,
+                    session_select_key=sel_key,
+                    records_by_id=records_by_id,
+                    on_row_click=on_row_click,
+                ):
+                    st.rerun()
 
     return str(st.session_state.get(sel_key) or "").strip() or None
 
