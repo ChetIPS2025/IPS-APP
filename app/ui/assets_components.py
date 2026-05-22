@@ -435,6 +435,26 @@ def inject_assets_page_styles() -> None:
             padding: 0.22rem 0.35rem !important;
             border-radius: 6px 6px 0 0 !important;
         }
+        .ips-assets-page .ips-assets-summary-table.ips-data-table-html .ips-assets-table-head-row,
+        .ips-assets-page .ips-assets-summary-table.ips-data-table-html .ips-assets-row {
+            display: grid !important;
+            box-sizing: border-box !important;
+            align-items: center;
+        }
+        .ips-assets-page .ips-assets-summary-table.ips-data-table-html .ips-assets-row {
+            min-height: 2.75rem;
+            cursor: pointer;
+        }
+        .ips-assets-page .ips-assets-summary-table.ips-data-table-html .ips-assets-row:hover {
+            background: #eef5ff;
+        }
+        .ips-assets-page .ips-assets-summary-table.ips-data-table-html .ips-assets-row.selected {
+            background: #eef5ff;
+            border-left: 4px solid #2563eb;
+        }
+        .ips-assets-page .ips-assets-summary-table .ips-assets-th {
+            margin: 0;
+        }
         </style>
         """,
         unsafe_allow_html=True,
