@@ -9,12 +9,31 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_tab_placeholder
-    from app.components.modals import render_record_detail_dialog
-    from app.components.status import status_pill_html
     from app.components.clickable_table import render_clickable_table
+    from app.components.record_modal import (
+        build_modal_cache,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_edit_mode,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html as modal_status_pill_html,
+    )
+    from app.components.record_modal import clear_record_modal
+    from app.components.status import status_pill_html
     from app.components.tables import render_data_table
-    from app.components.tabs import render_tabs
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import (
         delete_customer_contact_row,
@@ -29,17 +48,36 @@ try:
         persist_customer_contact,
         persist_customer_location,
     )
-    from app.pages._core._session import select_key, tab_key
+    from app.pages._core._session import select_key
     from app.styles import inject_customers_module_css
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_tab_placeholder  # type: ignore
-    from components.modals import render_record_detail_dialog  # type: ignore
-    from components.status import status_pill_html  # type: ignore
     from components.clickable_table import render_clickable_table  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_edit_mode,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html as modal_status_pill_html,
+    )
+    from components.record_modal import clear_record_modal  # type: ignore
+    from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import (  # type: ignore
         delete_customer_contact_row,
@@ -54,14 +92,15 @@ except ImportError:
         persist_customer_contact,
         persist_customer_location,
     )
-    from pages._core._session import select_key, tab_key  # type: ignore
+    from pages._core._session import select_key  # type: ignore
     from styles import inject_customers_module_css  # type: ignore
 
 _SEL = select_key("customers")
-_TAB = tab_key("customers")
+_MOD = "customers"
+_CUSTOMERS_MODAL_KEY = "ips_customers_detail_modal_id"
+_CUSTOMERS_CACHE_KEY = "_ips_customers_modal_by_id"
 _CUSTOMER_TABS = [
     "Overview",
-    "Locations",
     "Contacts",
     "Jobs",
     "Estimates",
@@ -87,6 +126,26 @@ def _filter_customers(rows: list[dict], *, q: str, status: str, state: str) -> l
     if state and state != "All States":
         out = [c for c in out if str(c.get("state", "")) == state]
     return out
+
+
+def _clear_customers_detail_modal() -> None:
+    clear_record_modal(
+        table_key="customers_list",
+        session_select_key=_SEL,
+        modal_key=_CUSTOMERS_MODAL_KEY,
+        module=_MOD,
+    )
+
+
+def _open_customers_detail_modal(customer_id: str, customer: dict | None = None) -> None:
+    open_record_modal(
+        customer_id,
+        customer,
+        session_select_key=_SEL,
+        modal_key=_CUSTOMERS_MODAL_KEY,
+        module=_MOD,
+        id_fields=("id", "customer_name"),
+    )
 
 
 def _location_label(location_id: str, locations: list[dict]) -> str:
@@ -196,12 +255,10 @@ def _contact_group_sections(contacts: list[dict], locations: list[dict]) -> list
     return sections
 
 
-def _begin_new_contact(customer_id: str, *, location_id: str = "", switch_tab: bool = False) -> None:
+def _begin_new_contact(customer_id: str, *, location_id: str = "") -> None:
     cid = str(customer_id or "").strip()
     st.session_state[f"cust_show_new_contact_{cid}"] = True
     st.session_state[f"cust_new_contact_loc_{cid}"] = str(location_id or "").strip()
-    if switch_tab:
-        st.session_state[_TAB] = "Contacts"
 
 
 def _clear_new_contact_fields(key_prefix: str) -> None:
@@ -301,11 +358,10 @@ def _render_new_contact_form(
                 st.rerun()
 
 
-def _render_locations_tab(customer: dict) -> None:
+def _render_locations_section(customer: dict, *, demo: bool) -> None:
     cid = str(customer.get("id") or "")
     locations = load_customer_locations(cid)
     contacts = load_customer_contacts(cid)
-    demo = is_demo_id(cid)
 
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
@@ -361,7 +417,7 @@ def _render_locations_tab(customer: dict) -> None:
             ],
             row_id_key="id",
             selected_id=None,
-            session_select_key="_cust_loc",
+            session_select_key=f"_cust_loc_{cid}",
             hide_select=True,
             cell_renderer=_loc_cell,
         )
@@ -399,7 +455,7 @@ def _render_locations_tab(customer: dict) -> None:
                             key=f"cust_add_ct_at_loc_{edit_id}",
                             type="primary",
                         ):
-                            _begin_new_contact(cid, location_id=edit_id, switch_tab=True)
+                            _begin_new_contact(cid, location_id=edit_id)
                             st.rerun()
                     ec1, ec2 = st.columns(2)
                     with ec1:
@@ -435,11 +491,15 @@ def _render_locations_tab(customer: dict) -> None:
         st.caption("Add and edit locations after saving this customer to Supabase.")
 
 
-def _render_contacts_tab(customer: dict) -> None:
+def _render_contacts_section(customer: dict) -> None:
     cid = str(customer.get("id") or "")
     contacts = load_customer_contacts(cid)
     locations = load_customer_locations(cid)
     demo = is_demo_id(cid)
+
+    _render_locations_section(customer, demo=demo)
+
+    st.divider()
 
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
@@ -540,181 +600,263 @@ def _render_contacts_tab(customer: dict) -> None:
         st.caption("Add and edit contacts after saving this customer to Supabase.")
 
 
-def _render_detail(customer: dict) -> None:
+def _seed_customer_edit_form(customer: dict) -> None:
     cid = str(customer.get("id") or "")
-    title = str(customer.get("customer_name") or "Customer")
-    cname = str(customer.get("customer_name") or "")
+    st.session_state[f"cust_edit_name_{cid}"] = str(customer.get("customer_name") or "")
+    st.session_state[f"cust_edit_addr_{cid}"] = str(customer.get("address") or "")
+    st.session_state[f"cust_edit_city_{cid}"] = str(customer.get("city") or "")
+    st.session_state[f"cust_edit_state_{cid}"] = str(customer.get("state") or "")
+    st.session_state[f"cust_edit_zip_{cid}"] = str(customer.get("zip") or "")
+    st.session_state[f"cust_edit_status_{cid}"] = str(customer.get("status") or "Active")
+    st.session_state[f"cust_edit_notes_{cid}"] = str(customer.get("notes") or "")
 
-    def _tabs() -> None:
-        render_tabs(_CUSTOMER_TABS, session_key=_TAB, default="Overview")
 
-    def _body() -> None:
-        tab = str(st.session_state.get(_TAB) or "Overview")
-        ot = "d" + "iv"
-        st.markdown(
-            f'<{ot} class="ips-detail-meta-row">'
-            f"<span>Status<br>{status_pill_html(str(customer.get('status') or ''))}</span>"
-            f"<span>City<br><strong>{html.escape(str(customer.get('city') or '—'))}</strong></span>"
-            f"<span>State<br><strong>{html.escape(str(customer.get('state') or '—'))}</strong></span>"
-            f"</{ot}>",
-            unsafe_allow_html=True,
-        )
+def _set_customer_view_mode(customer: dict) -> None:
+    rk = record_session_key(customer, "id", "customer_name")
+    set_view_mode(_MOD, rk)
 
-        if tab == "Overview":
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**Company**")
-                st.markdown(
-                    f'<dl class="ips-info-grid">'
-                    f"<dt>Name</dt><dd>{html.escape(cname)}</dd>"
-                    f"<dt>Address</dt><dd>{html.escape(str(customer.get('address') or '—'))}</dd>"
-                    f"<dt>City / State / ZIP</dt><dd>{html.escape(str(customer.get('city') or '—'))}, "
-                    f"{html.escape(str(customer.get('state') or '—'))} {html.escape(str(customer.get('zip') or ''))}</dd>"
-                    f"</dl>",
-                    unsafe_allow_html=True,
-                )
-            with c2:
-                locs = load_customer_locations(cid)
-                contacts = load_customer_contacts(cid)
-                st.markdown("**Summary**")
-                st.markdown(
-                    f'<dl class="ips-info-grid">'
-                    f"<dt>Locations</dt><dd>{len(locs)}</dd>"
-                    f"<dt>Contacts</dt><dd>{len(contacts)}</dd>"
-                    f"<dt>Jobs</dt><dd>{len(jobs_for_customer(cname))}</dd>"
-                    f"<dt>Estimates</dt><dd>{len(estimates_for_customer(cname))}</dd>"
-                    f"</dl>",
-                    unsafe_allow_html=True,
-                )
-            if not is_demo_id(cid):
-                with st.expander("Edit customer", expanded=False):
-                    ec1, ec2 = st.columns(2)
-                    with ec1:
-                        st.text_input("Company name", value=cname, key=f"cust_edit_name_{cid}")
-                        st.text_input("Address", value=str(customer.get("address") or ""), key=f"cust_edit_addr_{cid}")
-                        st.text_input("City", value=str(customer.get("city") or ""), key=f"cust_edit_city_{cid}")
-                    with ec2:
-                        st.text_input("State", value=str(customer.get("state") or ""), key=f"cust_edit_state_{cid}")
-                        st.text_input("ZIP", value=str(customer.get("zip") or ""), key=f"cust_edit_zip_{cid}")
-                        st.selectbox("Status", ["Active", "Inactive"], key=f"cust_edit_status_{cid}")
-                    st.text_area("Notes", value=str(customer.get("notes") or ""), key=f"cust_edit_notes_{cid}")
-                    if st.button("Save customer", key=f"cust_save_{cid}", type="primary"):
-                        ok, msg = persist_customer(
-                            {
-                                "customer_name": st.session_state.get(f"cust_edit_name_{cid}"),
-                                "address": st.session_state.get(f"cust_edit_addr_{cid}"),
-                                "city": st.session_state.get(f"cust_edit_city_{cid}"),
-                                "state": st.session_state.get(f"cust_edit_state_{cid}"),
-                                "zip": st.session_state.get(f"cust_edit_zip_{cid}"),
-                                "status": st.session_state.get(f"cust_edit_status_{cid}"),
-                                "notes": st.session_state.get(f"cust_edit_notes_{cid}"),
-                            },
-                            row_id=cid,
-                        )
-                        if apply_persist_feedback(ok, msg):
-                            st.rerun()
-            return
 
-        if tab == "Locations":
-            _render_locations_tab(customer)
-            return
+def _set_customer_edit_mode(customer: dict) -> None:
+    rk = record_session_key(customer, "id", "customer_name")
+    set_edit_mode(_MOD, rk)
+    _seed_customer_edit_form(customer)
 
-        if tab == "Contacts":
-            _render_contacts_tab(customer)
-            return
 
-        if tab == "Jobs":
-            jobs = jobs_for_customer(cname)
-            if jobs:
+def _render_customer_edit_form(customer: dict) -> None:
+    cid = str(customer.get("id") or "")
+    rk = record_session_key(customer, "id", "customer_name")
+    if f"cust_edit_name_{cid}" not in st.session_state:
+        _seed_customer_edit_form(customer)
 
-                def _job_cell(field: str, row: dict) -> str:
-                    if field == "status":
-                        return status_pill_html(str(row.get("status") or ""))
-                    if field == "job_number":
-                        return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("job_number") or ""))}</span>'
-                    return html.escape(str(row.get(field) or "—"))
+    render_edit_form_header("Edit Customer")
 
-                render_data_table(
-                    jobs,
-                    [
-                        ("job_number", "JOB #"),
-                        ("job_name", "PROJECT"),
-                        ("status", "STATUS"),
-                        ("supervisor", "SUPERVISOR"),
-                    ],
-                    row_id_key="id",
-                    selected_id=None,
-                    session_select_key="_cust_jobs",
-                    hide_select=True,
-                    cell_renderer=_job_cell,
-                )
-            else:
-                st.caption("No jobs linked to this customer name yet.")
-            return
+    if is_demo_id(cid):
+        st.caption("Demo records cannot be edited until saved to Supabase.")
+        return
 
-        if tab == "Estimates":
-            ests = estimates_for_customer(cname)
-            if ests:
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        st.text_input("Company name", key=f"cust_edit_name_{cid}")
+        st.text_input("Address", key=f"cust_edit_addr_{cid}")
+        st.text_input("City", key=f"cust_edit_city_{cid}")
+    with ec2:
+        st.text_input("State", key=f"cust_edit_state_{cid}")
+        st.text_input("ZIP", key=f"cust_edit_zip_{cid}")
+        st.selectbox("Status", ["Active", "Inactive"], key=f"cust_edit_status_{cid}")
+    st.text_area("Notes", key=f"cust_edit_notes_{cid}", height=100)
 
-                def _est_cell(field: str, row: dict) -> str:
-                    if field == "status":
-                        return status_pill_html(str(row.get("status") or ""))
-                    return html.escape(str(row.get(field) or "—"))
-
-                render_data_table(
-                    ests,
-                    [
-                        ("estimate_number", "ESTIMATE #"),
-                        ("project_name", "PROJECT"),
-                        ("status", "STATUS"),
-                        ("total", "TOTAL"),
-                    ],
-                    row_id_key="id",
-                    selected_id=None,
-                    session_select_key="_cust_est",
-                    hide_select=True,
-                    cell_renderer=_est_cell,
-                )
-            else:
-                st.caption("No estimates for this customer yet.")
-            return
-
-        if tab == "Notes":
-            st.text_area("Customer notes", value=str(customer.get("notes") or ""), key=f"cust_notes_view_{cid}", height=120)
-            if not is_demo_id(cid) and st.button("Save notes", key=f"cust_notes_save_{cid}", type="primary"):
-                ok, msg = persist_customer(
-                    {
-                        "customer_name": cname,
-                        "address": customer.get("address"),
-                        "city": customer.get("city"),
-                        "state": customer.get("state"),
-                        "zip": customer.get("zip"),
-                        "status": customer.get("status"),
-                        "notes": st.session_state.get(f"cust_notes_view_{cid}"),
-                    },
-                    row_id=cid,
-                )
-                if apply_persist_feedback(ok, msg):
-                    st.rerun()
-            elif is_demo_id(cid):
-                st.caption("Notes save requires a live customer record.")
-            return
-
-        if tab in ("Documents", "Activity"):
-            render_tab_placeholder(f"{tab} will connect to Supabase in a later phase.")
-            return
-
-        render_tab_placeholder(f"{tab} content will connect in a later phase.")
-
-    render_record_detail_dialog(
-        f"{title} — Customer Details",
-        module_name="customers",
-        session_select_key=_SEL,
-        tab_labels=_CUSTOMER_TABS,
-        tab_session_key=_TAB,
-        tabs_fn=_tabs,
-        body_fn=_body,
+    cancelled, saved = render_save_cancel_actions(
+        module=_MOD,
+        record_key=rk,
+        cancel_key=f"cust_edit_cancel_{cid}",
+        save_key=f"cust_edit_save_{cid}",
     )
+    if cancelled:
+        st.rerun()
+    if saved:
+        ok, msg = persist_customer(
+            {
+                "customer_name": st.session_state.get(f"cust_edit_name_{cid}"),
+                "address": st.session_state.get(f"cust_edit_addr_{cid}"),
+                "city": st.session_state.get(f"cust_edit_city_{cid}"),
+                "state": st.session_state.get(f"cust_edit_state_{cid}"),
+                "zip": st.session_state.get(f"cust_edit_zip_{cid}"),
+                "status": st.session_state.get(f"cust_edit_status_{cid}"),
+                "notes": st.session_state.get(f"cust_edit_notes_{cid}"),
+            },
+            row_id=cid,
+        )
+        if ok:
+            set_view_mode(_MOD, rk)
+            st.success(msg or "Customer saved.")
+            st.rerun()
+        else:
+            st.error(msg or "Could not save customer.")
+
+
+def _render_customer_detail_tabs(customer: dict) -> None:
+    cid = str(customer.get("id") or "")
+    cname = str(customer.get("customer_name") or "")
+    status = safe_value(customer.get("status"))
+
+    (
+        tab_overview,
+        tab_contacts,
+        tab_jobs,
+        tab_estimates,
+        tab_documents,
+        tab_notes,
+        tab_activity,
+    ) = st.tabs(_CUSTOMER_TABS)
+
+    with tab_overview:
+        locs = load_customer_locations(cid)
+        contacts = load_customer_contacts(cid)
+        jobs_count = len(jobs_for_customer(cname))
+        est_count = len(estimates_for_customer(cname))
+        overview_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Company Name', cname)}"
+            f"{detail_field_html('Address', customer.get('address'))}"
+            f"{detail_field_html('City', customer.get('city'))}"
+            f"{detail_field_html('State', customer.get('state'))}"
+            f"{detail_field_html('ZIP', customer.get('zip'))}"
+            f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Company", overview_html), unsafe_allow_html=True)
+        summary_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Locations', len(locs))}"
+            f"{detail_field_html('Contacts', len(contacts))}"
+            f"{detail_field_html('Jobs', jobs_count)}"
+            f"{detail_field_html('Estimates', est_count)}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Summary", summary_html), unsafe_allow_html=True)
+        if locs:
+            loc_rows = "".join(
+                f"<li>{html.escape(_location_label(str(loc.get('id') or ''), locs))}</li>"
+                for loc in locs[:8]
+            )
+            if len(locs) > 8:
+                loc_rows += f"<li>… and {len(locs) - 8} more</li>"
+            st.markdown(
+                dialog_card_html("Locations", f'<ul style="margin:0;padding-left:1.1rem;">{loc_rows}</ul>'),
+                unsafe_allow_html=True,
+            )
+
+    with tab_contacts:
+        _render_contacts_section(customer)
+
+    with tab_jobs:
+        jobs = jobs_for_customer(cname)
+        if jobs:
+
+            def _job_cell(field: str, row: dict) -> str:
+                if field == "status":
+                    return status_pill_html(str(row.get("status") or ""))
+                if field == "job_number":
+                    return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("job_number") or ""))}</span>'
+                return html.escape(str(row.get(field) or "—"))
+
+            render_data_table(
+                jobs,
+                [
+                    ("job_number", "JOB #"),
+                    ("job_name", "PROJECT"),
+                    ("status", "STATUS"),
+                    ("supervisor", "SUPERVISOR"),
+                ],
+                row_id_key="id",
+                selected_id=None,
+                session_select_key=f"_cust_jobs_{cid}",
+                hide_select=True,
+                cell_renderer=_job_cell,
+            )
+        else:
+            st.caption("No jobs linked to this customer name yet.")
+
+    with tab_estimates:
+        ests = estimates_for_customer(cname)
+        if ests:
+
+            def _est_cell(field: str, row: dict) -> str:
+                if field == "status":
+                    return status_pill_html(str(row.get("status") or ""))
+                return html.escape(str(row.get(field) or "—"))
+
+            render_data_table(
+                ests,
+                [
+                    ("estimate_number", "ESTIMATE #"),
+                    ("project_name", "PROJECT"),
+                    ("status", "STATUS"),
+                    ("total", "TOTAL"),
+                ],
+                row_id_key="id",
+                selected_id=None,
+                session_select_key=f"_cust_est_{cid}",
+                hide_select=True,
+                cell_renderer=_est_cell,
+            )
+        else:
+            st.caption("No estimates for this customer yet.")
+
+    with tab_documents:
+        placeholder_html("Customer documents will appear here when connected to Supabase.")
+
+    with tab_notes:
+        notes_text = safe_value(customer.get("notes"), "No notes entered.")
+        notes_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes_text)}"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
+
+    with tab_activity:
+        placeholder_html("Customer activity history will appear here when connected to Supabase.")
+
+
+def render_customer_detail_dialog(customer: dict) -> None:
+    rk = record_session_key(customer, "id", "customer_name")
+    cname = safe_value(customer.get("customer_name"))
+    status = safe_value(customer.get("status"))
+    city = safe_value(customer.get("city"))
+    state = safe_value(customer.get("state"))
+    cid = str(customer.get("id") or "")
+    locs = load_customer_locations(cid)
+    contacts = load_customer_contacts(cid)
+
+    render_modal_shell()
+    render_modal_header(title=cname, subtitle="Customer", status=status)
+
+    def _on_edit() -> None:
+        _set_customer_edit_mode(customer)
+
+    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
+    with act1:
+        st.button("View", key=f"customers_modal_view_{rk}", on_click=_set_customer_view_mode, args=(customer,))
+    with act2:
+        st.button("Edit", key=f"customers_modal_edit_{rk}", on_click=_on_edit)
+    with act3:
+        st.button("More", key=f"customers_modal_more_{rk}")
+    with act4:
+        if st.button("Close", key=f"customers_modal_close_{rk}"):
+            _clear_customers_detail_modal()
+            st.rerun()
+
+    render_modal_meta_grid(
+        [
+            ("City", city),
+            ("State", state),
+            ("Locations", len(locs)),
+            ("Contacts", len(contacts)),
+        ]
+    )
+
+    if is_edit_mode(_MOD, rk):
+        _render_customer_edit_form(customer)
+    else:
+        _render_customer_detail_tabs(customer)
+
+
+@st.dialog("Customer Details", width="large", on_dismiss=_clear_customers_detail_modal)
+def _show_customers_detail_modal() -> None:
+    customer = get_modal_record(
+        cache_key=_CUSTOMERS_CACHE_KEY,
+        modal_key=_CUSTOMERS_MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not customer:
+        sel = str(st.session_state.get(_CUSTOMERS_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
+        customer = get_customer(sel) if sel else None
+    if not customer:
+        render_missing_record(_clear_customers_detail_modal, close_key="customers_modal_missing_close")
+        return
+    render_customer_detail_dialog(customer)
 
 
 def render() -> None:
@@ -812,16 +954,13 @@ def render() -> None:
         state=str(st.session_state.get("cust_filter_state") or "All States"),
     )
 
-    selected_id = str(st.session_state.get(_SEL) or "")
-    if selected_id and not any(str(c.get("id")) == selected_id for c in filtered):
-        st.session_state.pop(_SEL, None)
-        selected_id = ""
-
     def _display_cell(field: str, row: dict) -> str:
         val = row.get(field)
         return str(val).strip() if val is not None and str(val).strip() else "—"
 
-    sel = render_clickable_table(
+    build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
+
+    render_clickable_table(
         filtered,
         [
             ("customer_name", "CUSTOMER"),
@@ -835,9 +974,7 @@ def render() -> None:
         session_select_key=_SEL,
         format_cell=_display_cell,
         click_caption=f"{len(filtered)} customer(s) · Click a row to open details.",
+        on_row_selected=_open_customers_detail_modal,
     )
 
-    if sel:
-        cust = get_customer(sel) or next((c for c in filtered if str(c.get("id")) == sel), None)
-        if cust:
-            _render_detail(cust)
+    show_modal_if_pending(_CUSTOMERS_MODAL_KEY, _show_customers_detail_modal)

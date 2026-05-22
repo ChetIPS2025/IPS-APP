@@ -8,24 +8,72 @@ import streamlit as st
 
 try:
     from app.auth import current_role
+    from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.tables import render_data_table
+    from app.components.record_modal import (
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        edit_mode_key,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_missing_record,
+        render_save_cancel_actions,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from app.pages._core._data import ACTIVE_EMPLOYEE_KEY, get_employee, load_employee_documents, load_employees
-    from app.styles import inject_global_css
     from app.utils.constants import DOCUMENT_TYPES
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
+    from app.pages._core._session import select_key
 except ImportError:
     from auth import current_role  # type: ignore
+    from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        edit_mode_key,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_missing_record,
+        render_save_cancel_actions,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from pages._core._data import ACTIVE_EMPLOYEE_KEY, get_employee, load_employee_documents, load_employees  # type: ignore
-    from styles import inject_global_css  # type: ignore
     from utils.constants import DOCUMENT_TYPES  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
+    from pages._core._session import select_key  # type: ignore
+
+_SEL = select_key("employee_documents")
+_MODULE = "employee_documents"
+_TABLE_KEY = "doc_list"
+_MODAL_KEY = "ips_doc_detail_modal_id"
+_CACHE_KEY = "_ips_emp_doc_modal_by_id"
 
 
 def _filter_docs(rows: list[dict], *, q: str, doc_type: str) -> list[dict]:
@@ -36,6 +84,142 @@ def _filter_docs(rows: list[dict], *, q: str, doc_type: str) -> list[dict]:
     if doc_type and doc_type != "All Types":
         out = [d for d in out if str(d.get("doc_type", "")) == doc_type]
     return out
+
+
+def _access_label(row: dict) -> str:
+    return "Restricted" if row.get("is_restricted") else "Standard"
+
+
+def _clear_doc_modal() -> None:
+    clear_record_modal(
+        table_key=_TABLE_KEY,
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
+    )
+
+
+def _open_doc_modal(doc_id: str, doc: dict | None = None) -> None:
+    open_record_modal(
+        doc_id,
+        doc,
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
+        id_fields=("id",),
+    )
+
+
+def _seed_doc_edit_form(doc: dict) -> None:
+    rk = record_session_key(doc, "id")
+    st.session_state[f"doc_edit_type_{rk}"] = str(doc.get("doc_type") or DOCUMENT_TYPES[0])
+    st.session_state[f"doc_edit_exp_{rk}"] = doc.get("expiration_date")
+    st.session_state[f"doc_edit_restricted_{rk}"] = bool(doc.get("is_restricted"))
+
+
+def _render_doc_view_tabs(doc: dict) -> None:
+    tab_overview, tab_access, tab_attachments = st.tabs(["Overview", "Access", "Attachments"])
+    with tab_overview:
+        overview_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Document Type', doc.get('doc_type'))}"
+            f"{detail_field_html('File Name', doc.get('file_name'))}"
+            f"{detail_field_html('Uploaded', fmt_date(doc.get('upload_date')))}"
+            f"{detail_field_html('Uploaded By', doc.get('uploaded_by'))}"
+            f"{detail_field_html('Expiration', fmt_date(doc.get('expiration_date')) if doc.get('expiration_date') else '—')}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Document", overview_html), unsafe_allow_html=True)
+    with tab_access:
+        access_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Access Level', _access_label(doc))}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Access", access_html), unsafe_allow_html=True)
+    with tab_attachments:
+        placeholder_html("Document preview and download will appear here when connected to Supabase.")
+
+
+def _render_doc_edit_form(doc: dict, *, hr_ok: bool) -> None:
+    rk = record_session_key(doc, "id")
+    if f"doc_edit_type_{rk}" not in st.session_state:
+        _seed_doc_edit_form(doc)
+
+    render_edit_form_header("Edit Document")
+    st.selectbox("Document type", DOCUMENT_TYPES, key=f"doc_edit_type_{rk}")
+    st.date_input("Expiration date (optional)", key=f"doc_edit_exp_{rk}", value=None)
+    st.checkbox("Restricted / private (HR only)", key=f"doc_edit_restricted_{rk}", disabled=not hr_ok)
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_MODULE,
+        record_key=rk,
+        cancel_key=f"doc_edit_cancel_{rk}",
+        save_key=f"doc_edit_save_{rk}",
+    )
+    if cancelled:
+        st.rerun()
+    if saved:
+        set_view_mode(_MODULE, rk)
+        st.success("Document updated (demo).")
+        st.rerun()
+
+
+def render_doc_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
+    rk = record_session_key(doc, "id")
+    st.session_state.setdefault(edit_mode_key(_MODULE, rk), False)
+    edit_mode = is_edit_mode(_MODULE, rk)
+
+    render_modal_shell()
+    render_modal_header(
+        title=str(doc.get("file_name") or "Document"),
+        subtitle=str(doc.get("doc_type") or ""),
+    )
+    render_modal_actions(
+        module=_MODULE,
+        record_key=rk,
+        record=doc,
+        on_close=_clear_doc_modal,
+        key_prefix=f"doc_modal_{rk}",
+    )
+    render_modal_meta_grid(
+        [
+            ("Uploaded", fmt_date(doc.get("upload_date"))),
+            ("Uploaded By", doc.get("uploaded_by")),
+            ("Expires", fmt_date(doc.get("expiration_date")) if doc.get("expiration_date") else "—"),
+            ("Access", _access_label(doc)),
+        ]
+    )
+
+    if edit_mode:
+        _render_doc_edit_form(doc, hr_ok=hr_ok)
+    else:
+        _render_doc_view_tabs(doc)
+        st.button("Download", key=f"doc_modal_dl_{rk}", type="primary")
+
+
+@st.dialog("Document Details", width="large", on_dismiss=_clear_doc_modal)
+def _show_doc_detail_modal() -> None:
+    doc = get_modal_record(
+        cache_key=_CACHE_KEY,
+        modal_key=_MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not doc:
+        render_missing_record(_clear_doc_modal, close_key="doc_modal_missing_close")
+        return
+    role_norm = normalize_role(current_role())
+    hr_ok = can_view_hr_documents(role_norm)
+    render_doc_detail_dialog(doc, hr_ok=hr_ok)
+
+
+def _doc_display_cell(field: str, row: dict) -> str:
+    if field == "access":
+        return _access_label(row)
+    if field in ("upload_date", "expiration_date"):
+        return fmt_date(row.get(field)) if row.get(field) else "—"
+    val = row.get(field)
+    return str(val).strip() if val is not None and str(val).strip() else "—"
 
 
 def render() -> None:
@@ -105,16 +289,8 @@ def render() -> None:
                 st.session_state["ips_doc_form_open"] = False
                 st.rerun()
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "access":
-            if row.get("is_restricted"):
-                return '<span class="ips-restricted-tag">RESTRICTED</span>'
-            return '<span style="color:#64748b;font-size:0.75rem;">Standard</span>'
-        if field in ("upload_date", "expiration_date"):
-            return html.escape(fmt_date(row.get(field)))
-        return html.escape(str(row.get(field) or "—"))
-
-    render_data_table(
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+    render_clickable_table(
         filtered,
         [
             ("doc_type", "DOCUMENT TYPE"),
@@ -124,13 +300,14 @@ def render() -> None:
             ("expiration_date", "EXPIRES"),
             ("access", "ACCESS"),
         ],
+        _TABLE_KEY,
         row_id_key="id",
-        selected_id=None,
-        session_select_key="_doc_list",
-        col_fr=["1.1fr", "1.2fr", "0.85fr", "0.9fr", "0.8fr", "0.7fr"],
-        cell_renderer=_cell,
-        hide_select=True,
+        session_select_key=_SEL,
+        format_cell=_doc_display_cell,
+        click_caption="Click a row to open document details.",
+        on_row_selected=_open_doc_modal,
     )
+    show_modal_if_pending(_MODAL_KEY, _show_doc_detail_modal)
 
     emp = get_employee(eid) if eid else None
     if emp:

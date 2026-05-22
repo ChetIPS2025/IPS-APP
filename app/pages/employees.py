@@ -8,16 +8,35 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.components.headers import render_page_header, render_person_profile_header
+    from app.components.clickable_table import render_clickable_table
+    from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_tab_placeholder
-    from app.components.modals import render_record_detail_dialog
-    from app.components.status import status_pill_html
-    from app.components.tables import render_clickable_table, render_data_table
-    from app.components.tabs import render_tabs
+    from app.components.record_modal import (
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html,
+    )
+    from app.components.tables import render_data_table
+    from app.components.status import status_pill_html as legacy_status_pill_html
     from app.pages._core._data import (
         ACTIVE_EMPLOYEE_KEY,
-        get_employee,
         load_certifications,
         load_employee_documents,
         load_employees,
@@ -25,23 +44,42 @@ try:
         persist_employee,
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key, tab_key
+    from app.pages._core._session import select_key
     from app.styles import inject_users_module_css
-    from app.utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY
+    from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
     from auth import current_role  # type: ignore
-    from components.headers import render_page_header, render_person_profile_header  # type: ignore
+    from components.clickable_table import render_clickable_table  # type: ignore
+    from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_tab_placeholder  # type: ignore
-    from components.modals import render_record_detail_dialog  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from components.tables import render_clickable_table, render_data_table  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html,
+    )
+    from components.tables import render_data_table  # type: ignore
+    from components.status import status_pill_html as legacy_status_pill_html  # type: ignore
     from pages._core._data import (  # type: ignore
         ACTIVE_EMPLOYEE_KEY,
-        get_employee,
         load_certifications,
         load_employee_documents,
         load_employees,
@@ -49,14 +87,17 @@ except ImportError:
         persist_employee,
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key, tab_key  # type: ignore
+    from pages._core._session import select_key  # type: ignore
     from styles import inject_users_module_css  # type: ignore
-    from utils.constants import DEPARTMENTS, ROLES, SESSION_NAV_KEY  # type: ignore
+    from utils.constants import DEPARTMENTS, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
 
 _SEL = select_key("employees")
-_TAB = tab_key("employees")
+_TABLE_KEY = "employees_list"
+MODULE = "employees"
+MODAL_KEY = "ips_employees_detail_modal_id"
+CACHE_KEY = "_ips_employees_modal_by_id"
 
 _EMPLOYEE_TABS = [
     "Overview",
@@ -92,6 +133,35 @@ def _filter_employees(rows: list[dict], *, q: str, dept: str, status: str, role:
     return out
 
 
+def _clear_employee_modal() -> None:
+    clear_record_modal(
+        table_key=_TABLE_KEY,
+        session_select_key=_SEL,
+        modal_key=MODAL_KEY,
+        module=MODULE,
+    )
+
+
+def _open_employee_modal(employee_id: str, employee: dict | None = None) -> None:
+    open_record_modal(
+        employee_id,
+        employee,
+        session_select_key=_SEL,
+        modal_key=MODAL_KEY,
+        module=MODULE,
+        id_fields=("id", "email"),
+    )
+    if isinstance(employee, dict) and employee.get("id"):
+        st.session_state[ACTIVE_EMPLOYEE_KEY] = str(employee.get("id"))
+
+
+def _employees_display_cell(field: str, row: dict) -> str:
+    if field == "last_login":
+        return safe_value(row.get(field))
+    val = row.get(field)
+    return str(val).strip() if val is not None and str(val).strip() else "—"
+
+
 def _cert_table(certs: list[dict]) -> None:
     if not certs:
         st.caption("No certifications on file.")
@@ -99,7 +169,7 @@ def _cert_table(certs: list[dict]) -> None:
 
     def _cell(field: str, row: dict) -> str:
         if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
+            return legacy_status_pill_html(str(row.get("status") or ""))
         return html.escape(str(row.get(field) or "—"))
 
     render_data_table(
@@ -151,186 +221,228 @@ def _doc_table(docs: list[dict]) -> None:
     )
 
 
-def _render_detail(emp: dict) -> None:
+def _seed_employee_edit_form(emp: dict) -> None:
+    rk = record_session_key(emp, "id")
+    st.session_state[f"emp_edit_name_{rk}"] = str(emp.get("name") or "")
+    st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
+    st.session_state[f"emp_edit_phone_{rk}"] = str(emp.get("phone") or "").replace("—", "")
+    dept_opts = lookup_options("departments")
+    role_opts = lookup_options("user_roles")
+    dept = str(emp.get("department") or "")
+    role = str(emp.get("role") or "")
+    st.session_state[f"emp_edit_dept_{rk}"] = dept if dept in dept_opts else (dept_opts[0] if dept_opts else dept)
+    st.session_state[f"emp_edit_role_{rk}"] = role if role in role_opts else (role_opts[0] if role_opts else role)
+    status = str(emp.get("status") or "Active")
+    st.session_state[f"emp_edit_status_{rk}"] = status if status in ("Active", "Inactive") else "Active"
+
+
+def _render_employee_detail_tabs(emp: dict) -> None:
     eid = str(emp.get("id") or "")
-    title = str(emp.get("name") or "User")
     role_norm = normalize_role(current_role())
+    name = safe_value(emp.get("name"))
+    email = safe_value(emp.get("email"))
+    role = safe_value(emp.get("role"))
+    dept = safe_value(emp.get("department"))
+    status = safe_value(emp.get("status"))
 
-    def _profile_header() -> None:
-        render_person_profile_header(
-            title,
-            role=str(emp.get("role") or ""),
-            department=str(emp.get("department") or ""),
-            status=str(emp.get("status") or "Active"),
-            email=str(emp.get("email") or ""),
-            phone=str(emp.get("phone") or ""),
-            last_login=str(emp.get("last_login") or ""),
+    (
+        tab_overview,
+        tab_role,
+        tab_depts,
+        tab_jobs,
+        tab_certs,
+        tab_docs,
+        tab_time,
+        tab_notes,
+        tab_activity,
+    ) = st.tabs(_EMPLOYEE_TABS)
+
+    with tab_overview:
+        overview_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Full Name', name)}"
+            f"{detail_field_html('Email', email)}"
+            f"{detail_field_html('Phone', emp.get('phone'))}"
+            f"{detail_field_html('Username', emp.get('username'))}"
+            f"{detail_field_html('Member Since', fmt_date(emp.get('member_since')))}"
+            f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
+            f"</div>"
         )
-        a1, a2, a3, a4 = st.columns(4, gap="small")
-        with a1:
-            st.button("Edit User", key=f"emp_edit_btn_{eid}", use_container_width=True)
-        with a2:
-            st.button("Reset Password", key=f"emp_reset_btn_{eid}", type="primary", use_container_width=True)
-        with a3:
-            st.button("More", key=f"emp_more_btn_{eid}", use_container_width=True)
-        with a4:
-            if st.button("Collapse", key=f"emp_collapse_{eid}", use_container_width=True):
-                st.session_state.pop(_SEL, None)
-                st.rerun()
+        st.markdown(dialog_card_html("User Information", overview_html), unsafe_allow_html=True)
+        security_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Last Login', emp.get('last_login'))}"
+            f"{detail_field_html('Two-Factor Auth', 'Enabled')}"
+            f"{detail_field_html('Failed Attempts', '0')}"
+            f"{detail_field_html('Account Locked', 'No')}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Security", security_html), unsafe_allow_html=True)
 
-    def _tabs() -> None:
-        render_tabs(_EMPLOYEE_TABS, session_key=_TAB, default="Overview")
+    with tab_role:
+        role_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('System Role', role)}"
+            f"{detail_field_html('Department', dept)}"
+            f"</div>"
+            f'<p style="margin:0.75rem 0 0;font-size:0.8125rem;color:#64748b;">'
+            f"View Dashboard · Create &amp; Edit Jobs · Manage Inventory"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Role & Permissions", role_html), unsafe_allow_html=True)
 
-    def _body() -> None:
-        tab = str(st.session_state.get(_TAB) or "Overview")
-        ot = "d" + "iv"
-        if tab != "Overview":
+    with tab_depts:
+        dept_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Primary Department', dept)}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Departments", dept_html), unsafe_allow_html=True)
+        st.caption(f"Available departments: {', '.join(DEPARTMENTS)}")
+
+    with tab_jobs:
+        placeholder_html("Assigned jobs will load from Supabase in a later phase.")
+
+    with tab_certs:
+        certs = load_certifications(eid)
+        expired = [c for c in certs if str(c.get("status", "")).lower() == "expired"]
+        expiring = [c for c in certs if str(c.get("status", "")).lower() == "expiring soon"]
+        if expired or expiring:
+            msg = []
+            if expired:
+                msg.append(f"{len(expired)} expired")
+            if expiring:
+                msg.append(f"{len(expiring)} expiring soon")
             st.markdown(
-                f'<{ot} class="ips-detail-meta-row">'
-                f"<span>Status<br>{status_pill_html(str(emp.get('status') or ''))}</span>"
-                f"<span>Role<br><strong>{html.escape(str(emp.get('role') or '—'))}</strong></span>"
-                f"<span>Department<br><strong>{html.escape(str(emp.get('department') or '—'))}</strong></span>"
-                f"</{ot}>",
+                f'<p class="ips-alert-banner">Certification alerts: {html.escape(", ".join(msg))}</p>',
                 unsafe_allow_html=True,
             )
+        _cert_table(certs)
+        if st.button("Open Certifications Module", key=f"emp_open_certs_{eid}"):
+            st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
+            st.session_state[SESSION_NAV_KEY] = "employee_certifications"
+            st.rerun()
 
-        if tab == "Overview":
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                st.markdown("**User Information**")
-                st.markdown(
-                    f'<dl class="ips-info-grid">'
-                    f"<dt>Full Name</dt><dd>{html.escape(str(emp.get('name') or '—'))}</dd>"
-                    f"<dt>Email</dt><dd>{html.escape(str(emp.get('email') or '—'))}</dd>"
-                    f"<dt>Phone</dt><dd>{html.escape(str(emp.get('phone') or '—'))}</dd>"
-                    f"<dt>Username</dt><dd>{html.escape(str(emp.get('username') or '—'))}</dd>"
-                    f"<dt>Member Since</dt><dd>{html.escape(fmt_date(emp.get('member_since')))}</dd>"
-                    f"</dl>",
-                    unsafe_allow_html=True,
-                )
-            with c2:
-                st.markdown("**Role & Permissions**")
-                st.markdown(
-                    f'<dl class="ips-info-grid">'
-                    f"<dt>Role</dt><dd>{html.escape(str(emp.get('role') or '—'))}</dd>"
-                    f"<dt>Department</dt><dd>{html.escape(str(emp.get('department') or '—'))}</dd>"
-                    f"</dl>",
-                    unsafe_allow_html=True,
-                )
-                st.caption("✓ View Dashboard · ✓ Create & Edit Jobs · ✓ Manage Inventory")
-            with c3:
-                st.markdown("**Security**")
-                st.markdown(
-                    f'<dl class="ips-info-grid">'
-                    f"<dt>Last Login</dt><dd>{html.escape(str(emp.get('last_login') or '—'))}</dd>"
-                    f"<dt>Two-Factor Auth</dt><dd>Enabled</dd>"
-                    f"<dt>Failed Attempts</dt><dd>0</dd>"
-                    f"<dt>Account Locked</dt><dd>No</dd>"
-                    f"</dl>",
-                    unsafe_allow_html=True,
-                )
-            with c4:
-                st.markdown("**Assigned Departments**")
-                dept = html.escape(str(emp.get("department") or "—"))
-                st.markdown(f'<span class="ips-status-pill ips-status-sent">{dept}</span>', unsafe_allow_html=True)
-            if not is_demo_id(eid):
-                with st.expander("Edit employee", expanded=False):
-                    ec1, ec2 = st.columns(2)
-                    with ec1:
-                        st.text_input("Name", value=str(emp.get("name") or ""), key=f"emp_edit_name_{eid}")
-                        st.text_input("Email", value=str(emp.get("email") or ""), key=f"emp_edit_email_{eid}")
-                        st.text_input(
-                            "Phone",
-                            value=str(emp.get("phone") or "").replace("—", ""),
-                            key=f"emp_edit_phone_{eid}",
-                            placeholder="(337) 555-0100",
-                        )
-                        st.selectbox("Department", lookup_options("departments"), key=f"emp_edit_dept_{eid}")
-                    with ec2:
-                        st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{eid}")
-                        st.selectbox("Status", ["Active", "Inactive"], key=f"emp_edit_status_{eid}")
-                    if st.button("Save employee", key=f"emp_save_{eid}", type="primary"):
-                        ok, msg = persist_employee(
-                            {
-                                "name": st.session_state.get(f"emp_edit_name_{eid}"),
-                                "email": st.session_state.get(f"emp_edit_email_{eid}"),
-                                "phone": st.session_state.get(f"emp_edit_phone_{eid}"),
-                                "department": st.session_state.get(f"emp_edit_dept_{eid}"),
-                                "role": st.session_state.get(f"emp_edit_role_{eid}"),
-                                "status": st.session_state.get(f"emp_edit_status_{eid}"),
-                            },
-                            row_id=eid,
-                        )
-                        if apply_persist_feedback(ok, msg):
-                            st.rerun()
-            return
+    with tab_docs:
+        docs = load_employee_documents(eid, role=role_norm)
+        if not can_view_hr_documents(role_norm):
+            st.caption("Restricted HR documents are visible to administrators only.")
+        _doc_table(docs)
+        if st.button("Open Documents Module", key=f"emp_open_docs_{eid}"):
+            st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
+            st.session_state[SESSION_NAV_KEY] = "employee_documents"
+            st.rerun()
 
-        if tab == "Role & Permissions":
-            c1, c2 = st.columns(2)
-            with c1:
-                role_opts = list(ROLES)
-                cur_role = str(emp.get("role") or "Employee")
-                role_idx = next(
-                    (i for i, r in enumerate(role_opts) if r.lower() in cur_role.lower() or cur_role.lower() in r.lower()),
-                    0,
-                )
-                st.selectbox("System Role", role_opts, index=role_idx, key=f"emp_role_{eid}")
-            with c2:
-                st.multiselect("Page Access", ["Dashboard", "Jobs", "Timekeeping", "Reports"], default=["Dashboard", "Jobs"], key=f"emp_pages_{eid}")
-            st.caption("Permission changes save to Supabase when connected.")
-            return
+    with tab_time:
+        placeholder_html("Time history will load from Supabase in a later phase.")
 
-        if tab == "Departments":
-            st.multiselect("Assigned Departments", list(DEPARTMENTS), default=[str(emp.get("department") or DEPARTMENTS[0])], key=f"emp_depts_{eid}")
-            return
+    with tab_notes:
+        notes_text = safe_value(emp.get("notes"), "No notes entered.")
+        notes_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes_text)}"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
-        if tab == "Certifications":
-            certs = load_certifications(eid)
-            expired = [c for c in certs if str(c.get("status", "")).lower() == "expired"]
-            expiring = [c for c in certs if str(c.get("status", "")).lower() == "expiring soon"]
-            if expired or expiring:
-                msg = []
-                if expired:
-                    msg.append(f"{len(expired)} expired")
-                if expiring:
-                    msg.append(f"{len(expiring)} expiring soon")
-                st.markdown(
-                    f'<p class="ips-alert-banner">⚠ Certification alerts: {html.escape(", ".join(msg))}</p>',
-                    unsafe_allow_html=True,
-                )
-            _cert_table(certs)
-            if st.button("Open Certifications Module", key=f"emp_open_certs_{eid}"):
-                st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
-                st.session_state[SESSION_NAV_KEY] = "employee_certifications"
-                st.rerun()
-            return
+    with tab_activity:
+        placeholder_html("Activity log will load from Supabase in a later phase.")
 
-        if tab == "Documents":
-            docs = load_employee_documents(eid, role=role_norm)
-            if not can_view_hr_documents(role_norm):
-                st.caption("Restricted HR documents are visible to administrators only.")
-            _doc_table(docs)
-            if st.button("Open Documents Module", key=f"emp_open_docs_{eid}"):
-                st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
-                st.session_state[SESSION_NAV_KEY] = "employee_documents"
-                st.rerun()
-            return
 
-        if tab in ("Activity Log", "Assigned Jobs", "Time History", "Notes"):
-            render_tab_placeholder(f"{tab} will load from Supabase in a later phase.")
-            return
+def _render_employee_edit_form(emp: dict) -> None:
+    rk = record_session_key(emp, "id")
+    eid = str(emp.get("id") or "")
+    if f"emp_edit_name_{rk}" not in st.session_state:
+        _seed_employee_edit_form(emp)
 
-        render_tab_placeholder(f"{tab} content will connect to Supabase in a later phase.")
+    render_edit_form_header("Edit User")
+    if is_demo_id(eid):
+        st.caption("Demo records cannot be saved to the database.")
 
-    render_record_detail_dialog(
-        title,
-        module_name="employees",
-        session_select_key=_SEL,
-        tabs_fn=_tabs,
-        body_fn=_body,
-        header_fn=_profile_header,
-        show_actions=False,
+    ec1, ec2 = st.columns(2, gap="medium")
+    with ec1:
+        st.text_input("Name", key=f"emp_edit_name_{rk}")
+        st.text_input("Email", key=f"emp_edit_email_{rk}")
+        st.text_input("Phone", key=f"emp_edit_phone_{rk}", placeholder="(337) 555-0100")
+        st.selectbox("Department", lookup_options("departments"), key=f"emp_edit_dept_{rk}")
+    with ec2:
+        st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{rk}")
+        st.selectbox("Status", ["Active", "Inactive"], key=f"emp_edit_status_{rk}")
+
+    cancelled, saved = render_save_cancel_actions(
+        module=MODULE,
+        record_key=rk,
+        cancel_key=f"emp_modal_save_cancel_{rk}",
+        save_key=f"emp_modal_save_{rk}",
     )
+    if cancelled:
+        st.rerun()
+    if saved and not is_demo_id(eid):
+        ok, msg = persist_employee(
+            {
+                "name": st.session_state.get(f"emp_edit_name_{rk}"),
+                "email": st.session_state.get(f"emp_edit_email_{rk}"),
+                "phone": st.session_state.get(f"emp_edit_phone_{rk}"),
+                "department": st.session_state.get(f"emp_edit_dept_{rk}"),
+                "role": st.session_state.get(f"emp_edit_role_{rk}"),
+                "status": st.session_state.get(f"emp_edit_status_{rk}"),
+            },
+            row_id=eid or None,
+        )
+        if ok:
+            set_view_mode(MODULE, rk)
+            st.success(msg or "Employee saved.")
+            st.rerun()
+        st.error(msg or "Could not save employee.")
+
+
+def render_employee_detail_dialog(emp: dict) -> None:
+    rk = record_session_key(emp, "id", "email")
+    name = safe_value(emp.get("name"))
+    email = safe_value(emp.get("email"))
+    role = safe_value(emp.get("role"))
+    dept = safe_value(emp.get("department"))
+    status = safe_value(emp.get("status"))
+
+    render_modal_shell()
+    render_modal_header(
+        title=name,
+        subtitle=f"{role} · {dept}" if role != "—" or dept != "—" else email,
+        status=status,
+    )
+    render_modal_actions(
+        module=MODULE,
+        record_key=rk,
+        record=emp,
+        on_close=_clear_employee_modal,
+        key_prefix=f"emp_modal_{rk}",
+    )
+    render_modal_meta_grid(
+        [
+            ("Role", role),
+            ("Department", dept),
+            ("Email", email),
+            ("Last Login", emp.get("last_login")),
+        ]
+    )
+
+    if is_edit_mode(MODULE, rk):
+        _render_employee_edit_form(emp)
+    else:
+        _render_employee_detail_tabs(emp)
+
+
+@st.dialog("User Details", width="large", on_dismiss=_clear_employee_modal)
+def _show_employee_modal() -> None:
+    emp = get_modal_record(
+        cache_key=CACHE_KEY,
+        modal_key=MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not emp:
+        render_missing_record(_clear_employee_modal, close_key="emp_modal_missing_close")
+        return
+    render_employee_detail_dialog(emp)
 
 
 def render() -> None:
@@ -406,17 +518,9 @@ def render() -> None:
 
     st.caption(f"{len(filtered)} user(s)")
 
-    selected_id = str(st.session_state.get(_SEL) or "")
-    if selected_id and not any(str(e.get("id")) == selected_id for e in filtered):
-        st.session_state.pop(_SEL, None)
-        selected_id = ""
+    build_modal_cache(filtered, cache_key=CACHE_KEY)
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        return html.escape(str(row.get(field) or "—"))
-
-    sel = render_clickable_table(
+    render_clickable_table(
         filtered,
         [
             ("name", "NAME"),
@@ -426,16 +530,12 @@ def render() -> None:
             ("status", "STATUS"),
             ("last_login", "LAST LOGIN"),
         ],
-        "employees_list",
+        _TABLE_KEY,
         row_id_key="id",
         session_select_key=_SEL,
-        selected_id=selected_id or None,
-        html_cell=_cell,
-        col_fr=["1.1fr", "1.3fr", "0.9fr", "1fr", "0.75fr", "0.9fr"],
+        format_cell=_employees_display_cell,
+        click_caption="Click a row to open details.",
+        on_row_selected=_open_employee_modal,
     )
 
-    if sel:
-        emp = get_employee(sel) or next((e for e in filtered if str(e.get("id")) == sel), None)
-        if emp:
-            st.session_state[ACTIVE_EMPLOYEE_KEY] = str(emp.get("id"))
-            _render_detail(emp)
+    show_modal_if_pending(MODAL_KEY, _show_employee_modal)

@@ -2,42 +2,85 @@
 
 from __future__ import annotations
 
-import html
-
 import streamlit as st
 
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_tab_placeholder
-    from app.components.modals import render_record_detail_dialog
-    from app.components.status import status_pill_html
     from app.components.clickable_table import render_clickable_table
-    from app.components.tables import render_data_table
-    from app.components.tabs import render_tabs
+    from app.components.record_modal import (
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_missing_record,
+        render_save_cancel_actions,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html,
+    )
     from app.pages._core._data import load_inventory, lookup_options, persist_inventory
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key, tab_key
+    from app.pages._core._session import select_key
     from app.styles import inject_global_css
     from app.utils.constants import INVENTORY_STATUSES
     from app.utils.formatting import fmt_currency
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_selected_detail_panel, render_tab_placeholder  # type: ignore
-    from components.status import status_pill_html  # type: ignore
     from components.clickable_table import render_clickable_table  # type: ignore
-    from components.tables import render_data_table  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_missing_record,
+        render_save_cancel_actions,
+        set_view_mode,
+        show_modal_if_pending,
+        status_pill_html,
+    )
     from pages._core._data import load_inventory, lookup_options, persist_inventory  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key, tab_key  # type: ignore
+    from pages._core._session import select_key  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.constants import INVENTORY_STATUSES  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
 _SEL = select_key("inventory")
-_TAB = tab_key("inventory")
+_MODAL_KEY = "ips_inventory_detail_modal_id"
+_CACHE_KEY = "_ips_inventory_modal_by_id"
+_MODULE = "inventory"
+
+_INV_TABS = [
+    "Overview",
+    "Stock History",
+    "Transactions",
+    "Purchase Orders",
+    "Vendors",
+    "Notes",
+    "Attachments",
+]
 
 
 def _filter_rows(rows: list[dict], *, q: str, category: str, location: str, status: str) -> list[dict]:
@@ -58,99 +101,178 @@ def _filter_rows(rows: list[dict], *, q: str, category: str, location: str, stat
     return out
 
 
-def _render_detail(item: dict) -> None:
-    title = str(item.get("name") or item.get("sku") or "")
+def _clear_inventory_modal() -> None:
+    clear_record_modal(
+        table_key="inventory_list",
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
+    )
 
-    def _tabs() -> None:
-        render_tabs(
-            [
-                "Overview",
-                "Stock History",
-                "Transactions",
-                "Purchase Orders",
-                "Vendors",
-                "Notes",
-                "Attachments",
-            ],
-            session_key=_TAB,
-            default="Overview",
-        )
 
-    def _body() -> None:
-        ot = "d" + "iv"
-        st.markdown(
-            f'<{ot} class="ips-detail-meta-row">'
-            f"<span>Status<br>{status_pill_html(str(item.get('status') or ''))}</span>"
-            f"<span>SKU<br><strong>{html.escape(str(item.get('sku') or '—'))}</strong></span>"
-            f"<span>On Hand<br><strong>{int(item.get('qty_on_hand') or 0)}</strong></span>"
-            f"</{ot}>",
-            unsafe_allow_html=True,
-        )
-        tab = str(st.session_state.get(_TAB) or "Overview")
-        if tab != "Overview":
-            render_tab_placeholder(f"{tab} will connect to Supabase in a later phase.")
-            return
+def _open_inventory_modal(record_id: str, record: dict | None) -> None:
+    open_record_modal(
+        record_id,
+        record,
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
+    )
+
+
+def _seed_inventory_edit_form(item: dict) -> None:
+    iid = str(item.get("id") or "")
+    st.session_state[f"inv_edit_sku_{iid}"] = str(item.get("sku") or "")
+    st.session_state[f"inv_edit_name_{iid}"] = str(item.get("name") or "")
+    st.session_state[f"inv_edit_cat_{iid}"] = str(item.get("category") or "")
+    st.session_state[f"inv_edit_status_{iid}"] = str(item.get("status") or "")
+    st.session_state[f"inv_edit_loc_{iid}"] = str(item.get("location") or "")
+    st.session_state[f"inv_edit_qty_{iid}"] = int(item.get("qty_on_hand") or 0)
+    st.session_state[f"inv_edit_cost_{iid}"] = float(item.get("unit_cost") or 0)
+
+
+def _render_inventory_detail_tabs(item: dict) -> None:
+    status = str(item.get("status") or "")
+    (
+        tab_overview,
+        tab_stock,
+        tab_transactions,
+        tab_pos,
+        tab_vendors,
+        tab_notes,
+        tab_attachments,
+    ) = st.tabs(_INV_TABS)
+
+    with tab_overview:
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**Item Details**")
-            st.markdown(
-                f'<dl class="ips-info-grid">'
-                f"<dt>SKU</dt><dd>{html.escape(str(item.get('sku') or '—'))}</dd>"
-                f"<dt>Name</dt><dd>{html.escape(str(item.get('name') or '—'))}</dd>"
-                f"<dt>Category</dt><dd>{html.escape(str(item.get('category') or '—'))}</dd>"
-                f"<dt>Status</dt><dd>{status_pill_html(str(item.get('status') or ''))}</dd>"
-                f"<dt>Location</dt><dd>{html.escape(str(item.get('location') or '—'))}</dd>"
-                f"<dt>Department</dt><dd>{html.escape(str(item.get('department') or '—'))}</dd>"
-                f"</dl>",
-                unsafe_allow_html=True,
+            details_html = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('SKU', item.get('sku'))}"
+                f"{detail_field_html('Name', item.get('name'))}"
+                f"{detail_field_html('Category', item.get('category'))}"
+                f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
+                f"{detail_field_html('Location', item.get('location'))}"
+                f"{detail_field_html('Department', item.get('department'))}"
+                f"</div>"
             )
+            st.markdown(dialog_card_html("Item Details", details_html), unsafe_allow_html=True)
         with c2:
-            st.markdown("**Stock**")
-            st.markdown(
-                f'<dl class="ips-info-grid">'
-                f"<dt>Qty On Hand</dt><dd>{int(item.get('qty_on_hand') or 0)}</dd>"
-                f"<dt>Reorder Point</dt><dd>{int(item.get('reorder_point') or 0)}</dd>"
-                f"<dt>Unit Cost</dt><dd>{html.escape(fmt_currency(item.get('unit_cost')))}</dd>"
-                f"<dt>Vendor</dt><dd>{html.escape(str(item.get('vendor') or '—'))}</dd>"
-                f"</dl>",
-                unsafe_allow_html=True,
+            stock_html = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
+                f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
+                f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
+                f"{detail_field_html('Vendor', item.get('vendor'))}"
+                f"</div>"
             )
-        iid = str(item.get("id") or "")
-        if not is_demo_id(iid):
-            with st.expander("Edit item", expanded=False):
-                ic1, ic2 = st.columns(2)
-                with ic1:
-                    st.text_input("SKU", value=str(item.get("sku") or ""), key=f"inv_edit_sku_{iid}")
-                    st.text_input("Name", value=str(item.get("name") or ""), key=f"inv_edit_name_{iid}")
-                    st.selectbox("Category", lookup_options("inventory_categories"), key=f"inv_edit_cat_{iid}")
-                    st.selectbox("Status", lookup_options("inventory_statuses"), key=f"inv_edit_status_{iid}")
-                with ic2:
-                    st.text_input("Location", value=str(item.get("location") or ""), key=f"inv_edit_loc_{iid}")
-                    st.number_input("Qty on hand", value=int(item.get("qty_on_hand") or 0), key=f"inv_edit_qty_{iid}")
-                    st.number_input("Unit cost", value=float(item.get("unit_cost") or 0), key=f"inv_edit_cost_{iid}")
-                if st.button("Save item", key=f"inv_save_{iid}", type="primary"):
-                    ok, msg = persist_inventory(
-                        {
-                            "sku": st.session_state.get(f"inv_edit_sku_{iid}"),
-                            "name": st.session_state.get(f"inv_edit_name_{iid}"),
-                            "category": st.session_state.get(f"inv_edit_cat_{iid}"),
-                            "status": st.session_state.get(f"inv_edit_status_{iid}"),
-                            "location": st.session_state.get(f"inv_edit_loc_{iid}"),
-                            "qty_on_hand": st.session_state.get(f"inv_edit_qty_{iid}"),
-                            "unit_cost": st.session_state.get(f"inv_edit_cost_{iid}"),
-                        },
-                        row_id=iid,
-                    )
-                    if apply_persist_feedback(ok, msg):
-                        st.rerun()
+            st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
 
-    render_record_detail_dialog(
-        f"{title} — Inventory Details",
-        module_name="inventory",
-        session_select_key=_SEL,
-        tabs_fn=_tabs,
-        body_fn=_body,
+    with tab_stock:
+        placeholder_html("Stock History will connect to Supabase in a later phase.")
+
+    with tab_transactions:
+        placeholder_html("Transactions will connect to Supabase in a later phase.")
+
+    with tab_pos:
+        placeholder_html("Purchase Orders will connect to Supabase in a later phase.")
+
+    with tab_vendors:
+        placeholder_html("Vendors will connect to Supabase in a later phase.")
+
+    with tab_notes:
+        placeholder_html("Notes will connect to Supabase in a later phase.")
+
+    with tab_attachments:
+        placeholder_html("Attachments will connect to Supabase in a later phase.")
+
+
+def _render_inventory_edit_form(item: dict) -> None:
+    iid = str(item.get("id") or "")
+    record_key = record_session_key(item, "id")
+    if f"inv_edit_sku_{iid}" not in st.session_state:
+        _seed_inventory_edit_form(item)
+
+    render_edit_form_header("Edit Item")
+
+    ic1, ic2 = st.columns(2)
+    with ic1:
+        st.text_input("SKU", key=f"inv_edit_sku_{iid}")
+        st.text_input("Name", key=f"inv_edit_name_{iid}")
+        st.selectbox("Category", lookup_options("inventory_categories"), key=f"inv_edit_cat_{iid}")
+        st.selectbox("Status", lookup_options("inventory_statuses"), key=f"inv_edit_status_{iid}")
+    with ic2:
+        st.text_input("Location", key=f"inv_edit_loc_{iid}")
+        st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}")
+        st.number_input("Unit cost", key=f"inv_edit_cost_{iid}")
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_MODULE,
+        record_key=record_key,
+        cancel_key=f"inv_modal_cancel_{record_key}",
+        save_key=f"inv_modal_save_{record_key}",
     )
+    if cancelled:
+        st.rerun()
+    if saved and not is_demo_id(iid):
+        ok, msg = persist_inventory(
+            {
+                "sku": st.session_state.get(f"inv_edit_sku_{iid}"),
+                "name": st.session_state.get(f"inv_edit_name_{iid}"),
+                "category": st.session_state.get(f"inv_edit_cat_{iid}"),
+                "status": st.session_state.get(f"inv_edit_status_{iid}"),
+                "location": st.session_state.get(f"inv_edit_loc_{iid}"),
+                "qty_on_hand": st.session_state.get(f"inv_edit_qty_{iid}"),
+                "unit_cost": st.session_state.get(f"inv_edit_cost_{iid}"),
+            },
+            row_id=iid,
+        )
+        if apply_persist_feedback(ok, msg):
+            set_view_mode(_MODULE, record_key)
+            st.rerun()
+
+
+def render_inventory_detail_dialog(item: dict) -> None:
+    record_key = record_session_key(item, "id")
+    title = str(item.get("name") or item.get("sku") or "")
+    subtitle = str(item.get("sku") or "")
+    status = str(item.get("status") or "")
+
+    render_modal_shell()
+    render_modal_header(title=title, subtitle=subtitle, status=status)
+    render_modal_actions(
+        module=_MODULE,
+        record_key=record_key,
+        record=item,
+        on_close=_clear_inventory_modal,
+        key_prefix=f"inv_modal_{record_key}",
+    )
+    render_modal_meta_grid(
+        [
+            ("SKU", item.get("sku")),
+            ("On Hand", int(item.get("qty_on_hand") or 0)),
+            ("Location", item.get("location")),
+            ("Unit Cost", fmt_currency(item.get("unit_cost"))),
+        ]
+    )
+
+    if is_edit_mode(_MODULE, record_key) and not is_demo_id(str(item.get("id") or "")):
+        _render_inventory_edit_form(item)
+    else:
+        _render_inventory_detail_tabs(item)
+
+
+@st.dialog("Inventory Item Details", width="large", on_dismiss=_clear_inventory_modal)
+def _show_inventory_detail_modal() -> None:
+    item = get_modal_record(
+        cache_key=_CACHE_KEY,
+        modal_key=_MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not item:
+        render_missing_record(_clear_inventory_modal, close_key="inv_modal_missing_close")
+        return
+    render_inventory_detail_dialog(item)
 
 
 def render() -> None:
@@ -227,6 +349,7 @@ def render() -> None:
     selected_id = str(st.session_state.get(_SEL) or "")
     if selected_id and not any(str(r.get("id")) == selected_id for r in filtered):
         st.session_state.pop(_SEL, None)
+        st.session_state.pop(_MODAL_KEY, None)
         selected_id = ""
 
     def _display_cell(field: str, row: dict) -> str:
@@ -235,7 +358,9 @@ def render() -> None:
         val = row.get(field)
         return str(val).strip() if val is not None and str(val).strip() else "—"
 
-    sel = render_clickable_table(
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+
+    render_clickable_table(
         filtered,
         [
             ("sku", "SKU"),
@@ -252,9 +377,7 @@ def render() -> None:
         session_select_key=_SEL,
         format_cell=_display_cell,
         click_caption=f"{len(filtered)} item(s) · Click a row to open details.",
+        on_row_selected=_open_inventory_modal,
     )
 
-    if sel:
-        item = next((r for r in filtered if str(r.get("id")) == sel), None)
-        if item:
-            _render_detail(item)
+    show_modal_if_pending(_MODAL_KEY, _show_inventory_detail_modal)

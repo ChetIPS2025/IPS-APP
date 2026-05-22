@@ -8,10 +8,30 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
+    from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.modals import render_record_detail_dialog
-    from app.components.tables import render_clickable_table, render_data_table
+    from app.components.record_modal import (
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import (
         document_link_ref_options,
@@ -26,10 +46,30 @@ try:
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
+    from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.modals import render_record_detail_dialog  # type: ignore
-    from components.tables import render_clickable_table, render_data_table  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_actions,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import (  # type: ignore
         document_link_ref_options,
@@ -44,7 +84,21 @@ except ImportError:
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
 
 _SEL = select_key("documents")
+_TABLE_KEY = "documents_list"
+MODULE = "documents"
+MODAL_KEY = "ips_documents_detail_modal_id"
+CACHE_KEY = "_ips_documents_modal_by_id"
+
 _LINK_MODULES = [m for m in DOCUMENT_LINK_MODULES if m != "All Modules"]
+
+_DOCUMENT_TABS = [
+    "Overview",
+    "Linked Record",
+    "Access",
+    "Expiration",
+    "Notes",
+    "Activity",
+]
 
 
 def _filter_docs(rows: list[dict], *, q: str, module: str, doc_type: str) -> list[dict]:
@@ -103,59 +157,234 @@ def _render_upload_form(*, hr_ok: bool) -> None:
                 st.rerun()
 
 
-def _render_detail(doc: dict, *, hr_ok: bool) -> None:
-    did = str(doc.get("id") or "")
-    title = str(doc.get("file_name") or "Document")
-
-    def _body() -> None:
-        restricted = bool(doc.get("is_restricted"))
-        flag = '<span class="ips-restricted-tag">RESTRICTED</span>' if restricted else "Standard access"
-        st.markdown(
-            f'<dl class="ips-info-grid">'
-            f"<dt>Document type</dt><dd>{html.escape(str(doc.get('doc_type') or '—'))}</dd>"
-            f"<dt>Linked module</dt><dd>{html.escape(str(doc.get('linked_module') or '—'))}</dd>"
-            f"<dt>Linked record</dt><dd>{html.escape(str(doc.get('linked_ref') or '—'))}</dd>"
-            f"<dt>Uploaded by</dt><dd>{html.escape(str(doc.get('uploaded_by') or '—'))}</dd>"
-            f"<dt>Upload date</dt><dd>{html.escape(fmt_date(doc.get('upload_date')))}</dd>"
-            f"<dt>Expiration</dt><dd>{html.escape(fmt_date(doc.get('expiration_date')) if doc.get('expiration_date') else '—')}</dd>"
-            f"<dt>Access</dt><dd>{flag}</dd>"
-            f"</dl>",
-            unsafe_allow_html=True,
-        )
-        st.button("Download", key=f"doc_dl_{did}", type="primary")
-        if not is_demo_id(did):
-            with st.expander("Edit metadata", expanded=False):
-                st.selectbox("Document type", lookup_options("document_types"), key=f"doc_edit_type_{did}")
-                st.selectbox("Module", _LINK_MODULES, key=f"doc_edit_mod_{did}")
-                refs = document_link_ref_options(str(st.session_state.get(f"doc_edit_mod_{did}") or ""))
-                if refs:
-                    st.selectbox("Linked record", refs, key=f"doc_edit_ref_{did}")
-                else:
-                    st.text_input("Linked record", value=str(doc.get("linked_ref") or ""), key=f"doc_edit_ref_{did}")
-                st.date_input("Expiration", key=f"doc_edit_exp_{did}", value=None)
-                st.checkbox("Restricted", key=f"doc_edit_rest_{did}", value=restricted, disabled=not hr_ok)
-                if st.button("Save changes", key=f"doc_save_{did}", type="primary"):
-                    ok, msg = persist_document(
-                        {
-                            "file_name": doc.get("file_name"),
-                            "doc_type": st.session_state.get(f"doc_edit_type_{did}"),
-                            "linked_module": st.session_state.get(f"doc_edit_mod_{did}"),
-                            "linked_ref": st.session_state.get(f"doc_edit_ref_{did}"),
-                            "uploaded_by": doc.get("uploaded_by"),
-                            "expiration_date": st.session_state.get(f"doc_edit_exp_{did}"),
-                            "is_restricted": st.session_state.get(f"doc_edit_rest_{did}"),
-                        },
-                        row_id=did,
-                    )
-                    if apply_persist_feedback(ok, msg):
-                        st.rerun()
-
-    render_record_detail_dialog(
-        f"{title} — Document Details",
-        module_name="documents",
+def _clear_document_modal() -> None:
+    clear_record_modal(
+        table_key=_TABLE_KEY,
         session_select_key=_SEL,
-        body_fn=_body,
+        modal_key=MODAL_KEY,
+        module=MODULE,
     )
+
+
+def _open_document_modal(document_id: str, document: dict | None = None) -> None:
+    open_record_modal(
+        document_id,
+        document,
+        session_select_key=_SEL,
+        modal_key=MODAL_KEY,
+        module=MODULE,
+        id_fields=("id", "file_name"),
+    )
+
+
+def _documents_display_cell(field: str, row: dict) -> str:
+    if field == "access":
+        return "RESTRICTED" if row.get("is_restricted") else "Standard"
+    if field in ("upload_date", "expiration_date"):
+        return fmt_date(row.get(field)) if row.get(field) else "—"
+    val = row.get(field)
+    return str(val).strip() if val is not None and str(val).strip() else "—"
+
+
+def _access_label(doc: dict) -> str:
+    return "RESTRICTED" if doc.get("is_restricted") else "Standard access"
+
+
+def _seed_document_edit_form(doc: dict, *, hr_ok: bool) -> None:
+    rk = record_session_key(doc, "id")
+    mod = str(doc.get("linked_module") or "")
+    if mod in _LINK_MODULES:
+        st.session_state[f"doc_edit_mod_{rk}"] = mod
+    elif _LINK_MODULES:
+        st.session_state[f"doc_edit_mod_{rk}"] = _LINK_MODULES[0]
+    type_opts = lookup_options("document_types")
+    dtype = str(doc.get("doc_type") or "")
+    st.session_state[f"doc_edit_type_{rk}"] = dtype if dtype in type_opts else (type_opts[0] if type_opts else dtype)
+    st.session_state[f"doc_edit_ref_{rk}"] = str(doc.get("linked_ref") or "")
+    exp = doc.get("expiration_date")
+    if exp:
+        try:
+            from datetime import date
+
+            if isinstance(exp, date):
+                st.session_state[f"doc_edit_exp_{rk}"] = exp
+            else:
+                st.session_state[f"doc_edit_exp_{rk}"] = date.fromisoformat(str(exp)[:10])
+        except ValueError:
+            st.session_state[f"doc_edit_exp_{rk}"] = None
+    else:
+        st.session_state[f"doc_edit_exp_{rk}"] = None
+    st.session_state[f"doc_edit_rest_{rk}"] = bool(doc.get("is_restricted")) and hr_ok
+
+
+def _render_document_detail_tabs(doc: dict) -> None:
+    restricted = bool(doc.get("is_restricted"))
+    access = _access_label(doc)
+    file_name = safe_value(doc.get("file_name"))
+    doc_type = safe_value(doc.get("doc_type"))
+    linked_module = safe_value(doc.get("linked_module"))
+    linked_ref = safe_value(doc.get("linked_ref"))
+
+    (
+        tab_overview,
+        tab_linked,
+        tab_access,
+        tab_expiration,
+        tab_notes,
+        tab_activity,
+    ) = st.tabs(_DOCUMENT_TABS)
+
+    with tab_overview:
+        overview_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('File Name', file_name)}"
+            f"{detail_field_html('Document Type', doc_type)}"
+            f"{detail_field_html('Uploaded By', doc.get('uploaded_by'))}"
+            f"{detail_field_html('Upload Date', fmt_date(doc.get('upload_date')))}"
+            f"{detail_field_html('Access', access)}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Overview", overview_html), unsafe_allow_html=True)
+        st.button("Download", key=f"doc_dl_{doc.get('id')}", type="primary")
+
+    with tab_linked:
+        linked_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Module', linked_module)}"
+            f"{detail_field_html('Linked Record', linked_ref)}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Linked Record", linked_html), unsafe_allow_html=True)
+
+    with tab_access:
+        access_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Access Level', access)}"
+            f"{detail_field_html('Restricted', 'Yes' if restricted else 'No')}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Access", access_html), unsafe_allow_html=True)
+
+    with tab_expiration:
+        exp_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Expiration Date', fmt_date(doc.get('expiration_date')) if doc.get('expiration_date') else '—')}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Expiration", exp_html), unsafe_allow_html=True)
+
+    with tab_notes:
+        notes_text = safe_value(doc.get("notes"), "No notes entered.")
+        notes_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes_text)}"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
+
+    with tab_activity:
+        placeholder_html("Document activity history will load from Supabase in a later phase.")
+
+
+def _render_document_edit_form(doc: dict, *, hr_ok: bool) -> None:
+    rk = record_session_key(doc, "id")
+    did = str(doc.get("id") or "")
+    if f"doc_edit_type_{rk}" not in st.session_state:
+        _seed_document_edit_form(doc, hr_ok=hr_ok)
+
+    render_edit_form_header("Edit Document")
+    if is_demo_id(did):
+        st.caption("Demo records cannot be saved to the database.")
+
+    ec1, ec2 = st.columns(2, gap="medium")
+    with ec1:
+        st.selectbox("Document type", lookup_options("document_types"), key=f"doc_edit_type_{rk}")
+        st.selectbox("Module", _LINK_MODULES, key=f"doc_edit_mod_{rk}")
+        refs = document_link_ref_options(str(st.session_state.get(f"doc_edit_mod_{rk}") or ""))
+        if refs:
+            st.selectbox("Linked record", refs, key=f"doc_edit_ref_{rk}")
+        else:
+            st.text_input("Linked record", key=f"doc_edit_ref_{rk}")
+    with ec2:
+        st.date_input("Expiration", key=f"doc_edit_exp_{rk}", value=None)
+        st.checkbox("Restricted", key=f"doc_edit_rest_{rk}", disabled=not hr_ok)
+
+    cancelled, saved = render_save_cancel_actions(
+        module=MODULE,
+        record_key=rk,
+        cancel_key=f"doc_modal_cancel_{rk}",
+        save_key=f"doc_modal_save_{rk}",
+    )
+    if cancelled:
+        st.rerun()
+    if saved and not is_demo_id(did):
+        ok, msg = persist_document(
+            {
+                "file_name": doc.get("file_name"),
+                "doc_type": st.session_state.get(f"doc_edit_type_{rk}"),
+                "linked_module": st.session_state.get(f"doc_edit_mod_{rk}"),
+                "linked_ref": st.session_state.get(f"doc_edit_ref_{rk}"),
+                "uploaded_by": doc.get("uploaded_by"),
+                "expiration_date": st.session_state.get(f"doc_edit_exp_{rk}"),
+                "is_restricted": st.session_state.get(f"doc_edit_rest_{rk}"),
+            },
+            row_id=did or None,
+        )
+        if ok:
+            set_view_mode(MODULE, rk)
+            st.success(msg or "Document saved.")
+            st.rerun()
+        st.error(msg or "Could not save document.")
+
+
+def render_document_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
+    rk = record_session_key(doc, "id", "file_name")
+    file_name = safe_value(doc.get("file_name"))
+    doc_type = safe_value(doc.get("doc_type"))
+    linked_module = safe_value(doc.get("linked_module"))
+    linked_ref = safe_value(doc.get("linked_ref"))
+
+    render_modal_shell()
+    render_modal_header(
+        title=file_name,
+        subtitle=doc_type,
+        status=_access_label(doc) if doc.get("is_restricted") else None,
+    )
+    render_modal_actions(
+        module=MODULE,
+        record_key=rk,
+        record=doc,
+        on_close=_clear_document_modal,
+        key_prefix=f"doc_modal_{rk}",
+    )
+    render_modal_meta_grid(
+        [
+            ("Type", doc_type),
+            ("Module", linked_module),
+            ("Linked To", linked_ref),
+            ("Uploaded", fmt_date(doc.get("upload_date"))),
+        ]
+    )
+
+    if is_edit_mode(MODULE, rk):
+        _render_document_edit_form(doc, hr_ok=hr_ok)
+    else:
+        _render_document_detail_tabs(doc)
+
+
+@st.dialog("Document Details", width="large", on_dismiss=_clear_document_modal)
+def _show_document_modal() -> None:
+    doc = get_modal_record(
+        cache_key=CACHE_KEY,
+        modal_key=MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not doc:
+        render_missing_record(_clear_document_modal, close_key="doc_modal_missing_close")
+        return
+    role_norm = normalize_role(current_role())
+    hr_ok = can_view_hr_documents(role_norm)
+    render_document_detail_dialog(doc, hr_ok=hr_ok)
 
 
 def render() -> None:
@@ -224,23 +453,9 @@ def render() -> None:
     if st.session_state.get("ips_doc_hub_form"):
         _render_upload_form(hr_ok=hr_ok)
 
-    selected_id = str(st.session_state.get(_SEL) or "")
-    if selected_id and not any(str(d.get("id")) == selected_id for d in filtered):
-        st.session_state.pop(_SEL, None)
-        selected_id = ""
+    build_modal_cache(filtered, cache_key=CACHE_KEY)
 
-    def _cell(field: str, row: dict) -> str:
-        if field == "access":
-            if row.get("is_restricted"):
-                return '<span class="ips-restricted-tag">RESTRICTED</span>'
-            return '<span style="color:#64748b;font-size:0.75rem;">Standard</span>'
-        if field == "linked_module":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get(field) or ""))}</span>'
-        if field in ("upload_date", "expiration_date"):
-            return html.escape(fmt_date(row.get(field)) if row.get(field) else "—")
-        return html.escape(str(row.get(field) or "—"))
-
-    sel = render_clickable_table(
+    render_clickable_table(
         filtered,
         [
             ("file_name", "FILE"),
@@ -252,15 +467,12 @@ def render() -> None:
             ("expiration_date", "EXPIRES"),
             ("access", "ACCESS"),
         ],
-        "documents_list",
+        _TABLE_KEY,
         row_id_key="id",
         session_select_key=_SEL,
-        selected_id=selected_id or None,
-        html_cell=_cell,
-        col_fr=["1.4fr", "0.9fr", "0.75fr", "1.2fr", "0.9fr", "0.7fr", "0.7fr", "0.65fr"],
+        format_cell=_documents_display_cell,
+        click_caption="Click a row to open details.",
+        on_row_selected=_open_document_modal,
     )
 
-    if sel:
-        doc = next((d for d in filtered if str(d.get("id")) == sel), None)
-        if doc:
-            _render_detail(doc, hr_ok=hr_ok)
+    show_modal_if_pending(MODAL_KEY, _show_document_modal)

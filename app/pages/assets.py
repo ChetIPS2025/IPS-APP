@@ -9,44 +9,78 @@ import streamlit as st
 try:
     from app.components.clickable_table import render_clickable_table
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.layout import render_tab_placeholder
-    from app.components.status import status_pill_html
+    from app.components.record_modal import (
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_edit_mode,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from app.pages._core._data import load_assets, lookup_options, persist_asset
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key, tab_key
+    from app.pages._core._session import select_key
     from app.ui.assets_components import (
-        detail_header_html,
-        detail_meta_strip_html,
         inject_assets_page_styles,
         maintenance_table_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
-        tab_button_label,
     )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from components.clickable_table import render_clickable_table  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.layout import render_tab_placeholder  # type: ignore
-    from components.status import status_pill_html  # type: ignore
+    from components.record_modal import (  # type: ignore
+        build_modal_cache,
+        clear_record_modal,
+        detail_field_html,
+        dialog_card_html,
+        get_modal_record,
+        is_edit_mode,
+        open_record_modal,
+        placeholder_html,
+        record_session_key,
+        render_edit_form_header,
+        render_missing_record,
+        render_modal_header,
+        render_modal_meta_grid,
+        render_modal_shell,
+        render_save_cancel_actions,
+        safe_value,
+        set_edit_mode,
+        set_view_mode,
+        show_modal_if_pending,
+    )
     from pages._core._data import load_assets, lookup_options, persist_asset  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key, tab_key  # type: ignore
+    from pages._core._session import select_key  # type: ignore
     from ui.assets_components import (  # type: ignore
-        detail_header_html,
-        detail_meta_strip_html,
         inject_assets_page_styles,
         maintenance_table_html,
         render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
-        tab_button_label,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _SEL = select_key("assets")
-_TAB = tab_key("assets")
+_MOD = "assets"
+_ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
+_ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
 
 
@@ -79,6 +113,26 @@ def _clear_asset_filters() -> None:
     st.session_state["ast_loc"] = "All Locations"
     st.session_state["ast_status"] = "All Statuses"
     st.session_state["ast_dept"] = "All Departments"
+
+
+def _clear_assets_detail_modal() -> None:
+    clear_record_modal(
+        table_key="assets_list",
+        session_select_key=_SEL,
+        modal_key=_ASSETS_MODAL_KEY,
+        module=_MOD,
+    )
+
+
+def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:
+    open_record_modal(
+        asset_id,
+        asset,
+        session_select_key=_SEL,
+        modal_key=_ASSETS_MODAL_KEY,
+        module=_MOD,
+        id_fields=("id", "asset_number"),
+    )
 
 
 def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
@@ -216,205 +270,261 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
                 pass
 
 
-def _render_detail(asset: dict) -> None:
+def _seed_asset_edit_form(asset: dict) -> None:
     aid = str(asset.get("id") or "")
-    asset_number = str(asset.get("asset_number") or "—")
-    asset_name = str(asset.get("asset_name") or "Untitled asset")
-    current_tab = str(st.session_state.get(_TAB) or "Overview")
-    if current_tab not in _ASSET_TABS:
-        current_tab = "Overview"
-        st.session_state[_TAB] = current_tab
+    st.session_state[f"ast_edit_num_{aid}"] = str(asset.get("asset_number") or "")
+    st.session_state[f"ast_edit_name_{aid}"] = str(asset.get("asset_name") or "")
+    st.session_state[f"ast_edit_cat_{aid}"] = str(asset.get("category") or lookup_options("asset_categories")[0])
+    st.session_state[f"ast_edit_status_{aid}"] = str(asset.get("status") or lookup_options("asset_statuses")[0])
+    st.session_state[f"ast_edit_loc_{aid}"] = str(asset.get("location") or "")
+    st.session_state[f"ast_edit_serial_{aid}"] = str(asset.get("serial_number") or "")
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-assets-detail-anchor"></span>', unsafe_allow_html=True)
-        top_l, top_meta, top_actions = st.columns([2.2, 3.7, 2.2], gap="medium")
-        with top_l:
+
+def _set_asset_view_mode(asset: dict) -> None:
+    rk = record_session_key(asset, "id", "asset_number")
+    set_view_mode(_MOD, rk)
+
+
+def _set_asset_edit_mode(asset: dict) -> None:
+    rk = record_session_key(asset, "id", "asset_number")
+    set_edit_mode(_MOD, rk)
+    _seed_asset_edit_form(asset)
+
+
+def _render_asset_edit_form(asset: dict) -> None:
+    aid = str(asset.get("id") or "")
+    rk = record_session_key(asset, "id", "asset_number")
+    if f"ast_edit_num_{aid}" not in st.session_state:
+        _seed_asset_edit_form(asset)
+
+    render_edit_form_header("Edit Asset")
+
+    if is_demo_id(aid):
+        st.caption("Demo records cannot be edited until saved to Supabase.")
+        return
+
+    ac1, ac2 = st.columns(2)
+    with ac1:
+        st.text_input("Asset #", key=f"ast_edit_num_{aid}")
+        st.text_input("Name", key=f"ast_edit_name_{aid}")
+        st.selectbox("Category", lookup_options("asset_categories"), key=f"ast_edit_cat_{aid}")
+        st.selectbox("Status", lookup_options("asset_statuses"), key=f"ast_edit_status_{aid}")
+    with ac2:
+        st.text_input("Location", key=f"ast_edit_loc_{aid}")
+        st.text_input("Serial", key=f"ast_edit_serial_{aid}")
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_MOD,
+        record_key=rk,
+        cancel_key=f"ast_edit_cancel_{aid}",
+        save_key=f"ast_edit_save_{aid}",
+    )
+    if cancelled:
+        st.rerun()
+    if saved:
+        ok, msg = persist_asset(
+            {
+                "asset_number": st.session_state.get(f"ast_edit_num_{aid}"),
+                "asset_name": st.session_state.get(f"ast_edit_name_{aid}"),
+                "category": st.session_state.get(f"ast_edit_cat_{aid}"),
+                "status": st.session_state.get(f"ast_edit_status_{aid}"),
+                "location": st.session_state.get(f"ast_edit_loc_{aid}"),
+                "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
+            },
+            row_id=aid,
+        )
+        if ok:
+            set_view_mode(_MOD, rk)
+            st.success(msg or "Asset saved.")
+            st.rerun()
+        else:
+            st.error(msg or "Could not save asset.")
+
+
+def _render_asset_detail_tabs(asset: dict) -> None:
+    aid = str(asset.get("id") or "")
+    asset_number = safe_value(asset.get("asset_number"))
+    asset_name = safe_value(asset.get("asset_name"))
+    status = safe_value(asset.get("status"))
+
+    (
+        tab_overview,
+        tab_maintenance,
+        tab_documents,
+        tab_assignments,
+        tab_depreciation,
+        tab_notes,
+        tab_activity,
+    ) = st.tabs(_ASSET_TABS)
+
+    with tab_overview:
+        c1, c2 = st.columns([1.2, 1])
+        with c1:
             st.markdown(
-                detail_header_html(
-                    asset_id=asset_number,
-                    asset_name=asset_name,
-                    status=str(asset.get("status") or ""),
-                ),
-                unsafe_allow_html=True,
-            )
-        with top_meta:
-            st.markdown(
-                detail_meta_strip_html(
+                summary_card_html(
+                    "Asset Details",
                     [
+                        ("Asset Number", asset_number),
+                        ("Asset Name", asset_name),
                         ("Category", str(asset.get("category") or "—")),
+                        ("Status", status_badge_html(str(asset.get("status") or ""))),
                         ("Location", str(asset.get("location") or "—")),
                         ("Department", str(asset.get("department") or "—")),
+                        ("Manufacturer", str(asset.get("manufacturer") or "—")),
+                        ("Model", str(asset.get("model") or "—")),
                         ("Serial Number", str(asset.get("serial_number") or "—")),
-                        ("Acquired Date", fmt_date(asset.get("acquired_date"))),
-                        ("Current Value", fmt_currency(asset.get("value"))),
-                    ]
+                        ("Description", str(asset.get("description") or "—")),
+                    ],
+                    html_value_keys=frozenset({"Status"}),
                 ),
                 unsafe_allow_html=True,
             )
-        with top_actions:
-            st.markdown('<span class="ips-assets-detail-actions"></span>', unsafe_allow_html=True)
-            a1, a2, a3 = st.columns([1, 1.35, 0.9], gap="small")
-            with a1:
-                if st.button("✎ Edit", key=f"ast_detail_edit_{aid}", use_container_width=True, disabled=is_demo_id(aid)):
-                    st.session_state[f"ast_edit_open_{aid}"] = not st.session_state.get(f"ast_edit_open_{aid}", False)
-            with a2:
-                st.markdown('<span class="ips-assets-maint-primary"></span>', unsafe_allow_html=True)
-                if st.button("⚒ Maintenance", key=f"ast_detail_maint_{aid}", type="primary", use_container_width=True):
-                    st.session_state[_TAB] = "Maintenance"
-                    st.rerun()
-            with a3:
-                if st.button("⌃", key=f"ast_detail_close_{aid}", use_container_width=True, help="Close details"):
-                    st.session_state.pop(_SEL, None)
-                    st.rerun()
-
-        tabs = st.columns(len(_ASSET_TABS), gap="small")
-        for col, tab in zip(tabs, _ASSET_TABS):
-            with col:
-                st.markdown('<span class="ips-assets-tabs-anchor"></span>', unsafe_allow_html=True)
-                if st.button(
-                    tab_button_label(tab),
-                    key=f"ast_tab_{aid}_{tab}",
-                    type="primary" if tab == current_tab else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state[_TAB] = tab
-                    st.rerun()
-
-        if current_tab != "Overview":
-            if current_tab == "Maintenance":
-                st.markdown(
-                    '<div class="ips-assets-maint-section">'
-                    '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
-                    f"{maintenance_table_html(_maintenance_rows(asset))}"
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                render_tab_placeholder(f"{current_tab} will connect to Supabase in a later phase.")
-        else:
-            c1, c2, c3, c4 = st.columns([1.2, 1.1, 1.1, 1.15], gap="medium")
-            with c1:
-                st.markdown(
-                    summary_card_html(
-                        "Asset Details",
-                        [
-                            ("Asset Number", asset_number),
-                            ("Asset Name", asset_name),
-                            ("Category", str(asset.get("category") or "—")),
-                            ("Status", status_badge_html(str(asset.get("status") or ""))),
-                            ("Location", str(asset.get("location") or "—")),
-                            ("Department", str(asset.get("department") or "—")),
-                            ("Manufacturer", str(asset.get("manufacturer") or "—")),
-                            ("Model", str(asset.get("model") or "—")),
-                            ("Serial Number", str(asset.get("serial_number") or "—")),
-                            ("Description", str(asset.get("description") or "—")),
-                        ],
-                        html_value_keys=frozenset({"Status"}),
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with c2:
-                st.markdown(
-                    summary_card_html(
-                        "Usage Information",
-                        [
-                            ("Current Operator", str(asset.get("operator") or "—")),
-                            ("Primary Use", str(asset.get("primary_use") or asset.get("description") or "Equipment Transport")),
-                            ("Hours/Miles", str(asset.get("hours_miles") or "—")),
-                            ("Last Used", str(asset.get("last_used") or "—")),
-                            ("Condition", str(asset.get("condition") or "Good")),
-                            ("Next Service Due", str(asset.get("next_service_due") or "—")),
-                        ],
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with c3:
-                value = fmt_currency(asset.get("value"))
-                st.markdown(
-                    summary_card_html(
-                        "Financial Information",
-                        [
-                            ("Acquired Date", fmt_date(asset.get("acquired_date"))),
-                            ("Purchase Price", fmt_currency(asset.get("purchase_price") or asset.get("value"))),
-                            ("Current Value", value),
-                            ("Salvage Value", fmt_currency(asset.get("salvage_value"))),
-                            ("Depreciation Method", str(asset.get("depreciation_method") or "Straight Line")),
-                            ("Useful Life", str(asset.get("useful_life") or "7 years")),
-                            ("Annual Depreciation", fmt_currency(asset.get("annual_depreciation"))),
-                        ],
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with c4:
-                st.markdown(
-                    '<div class="ips-assets-summary-card"><h4>Image</h4>'
-                    f"{_asset_image_html(asset)}</div>",
-                    unsafe_allow_html=True,
-                )
-                _render_asset_qr_block(asset, aid)
-
+        with c2:
             st.markdown(
-                '<div class="ips-assets-maint-section">'
-                '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
-                f"{maintenance_table_html(_maintenance_rows(asset))}"
-                "</div>",
+                summary_card_html(
+                    "Usage Information",
+                    [
+                        ("Current Operator", str(asset.get("operator") or "—")),
+                        ("Primary Use", str(asset.get("primary_use") or asset.get("description") or "Equipment Transport")),
+                        ("Hours/Miles", str(asset.get("hours_miles") or "—")),
+                        ("Last Used", str(asset.get("last_used") or "—")),
+                        ("Condition", str(asset.get("condition") or "Good")),
+                        ("Next Service Due", str(asset.get("next_service_due") or "—")),
+                    ],
+                ),
                 unsafe_allow_html=True,
             )
 
-        if st.session_state.get(f"ast_edit_open_{aid}") and not is_demo_id(aid):
-            with st.expander("Edit asset", expanded=True):
-                ac1, ac2 = st.columns(2)
-                with ac1:
-                    st.text_input("Asset #", value=str(asset.get("asset_number") or ""), key=f"ast_edit_num_{aid}")
-                    st.text_input("Name", value=str(asset.get("asset_name") or ""), key=f"ast_edit_name_{aid}")
-                    st.selectbox("Category", lookup_options("asset_categories"), key=f"ast_edit_cat_{aid}")
-                    st.selectbox("Status", lookup_options("asset_statuses"), key=f"ast_edit_status_{aid}")
-                with ac2:
-                    st.text_input("Location", value=str(asset.get("location") or ""), key=f"ast_edit_loc_{aid}")
-                    st.text_input("Serial", value=str(asset.get("serial_number") or ""), key=f"ast_edit_serial_{aid}")
-                if st.button("Save asset", key=f"ast_save_{aid}", type="primary"):
-                    ok, msg = persist_asset(
-                        {
-                            "asset_number": st.session_state.get(f"ast_edit_num_{aid}"),
-                            "asset_name": st.session_state.get(f"ast_edit_name_{aid}"),
-                            "category": st.session_state.get(f"ast_edit_cat_{aid}"),
-                            "status": st.session_state.get(f"ast_edit_status_{aid}"),
-                            "location": st.session_state.get(f"ast_edit_loc_{aid}"),
-                            "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
-                        },
-                        row_id=aid,
-                    )
-                    if apply_persist_feedback(ok, msg):
-                        st.rerun()
+        c3, c4 = st.columns([1, 1])
+        with c3:
+            st.markdown(
+                summary_card_html(
+                    "Financial Information",
+                    [
+                        ("Acquired Date", fmt_date(asset.get("acquired_date"))),
+                        ("Purchase Price", fmt_currency(asset.get("purchase_price") or asset.get("value"))),
+                        ("Current Value", fmt_currency(asset.get("value"))),
+                        ("Salvage Value", fmt_currency(asset.get("salvage_value"))),
+                        ("Depreciation Method", str(asset.get("depreciation_method") or "Straight Line")),
+                        ("Useful Life", str(asset.get("useful_life") or "7 years")),
+                        ("Annual Depreciation", fmt_currency(asset.get("annual_depreciation"))),
+                    ],
+                ),
+                unsafe_allow_html=True,
+            )
+        with c4:
+            st.markdown(
+                f'<div class="ips-assets-summary-card"><h4>Image</h4>{_asset_image_html(asset)}</div>',
+                unsafe_allow_html=True,
+            )
+            _render_asset_qr_block(asset, aid)
+
+    with tab_maintenance:
+        st.markdown(
+            '<div class="ips-assets-maint-section">'
+            '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
+            f"{maintenance_table_html(_maintenance_rows(asset))}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    with tab_documents:
+        placeholder_html("Asset documents will appear here when connected to Supabase.")
+
+    with tab_assignments:
+        assign_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Current Operator', asset.get('operator'))}"
+            f"{detail_field_html('Department', asset.get('department'))}"
+            f"{detail_field_html('Location', asset.get('location'))}"
+            f"{detail_field_html('Primary Use', asset.get('primary_use') or asset.get('description'))}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Assignments", assign_html), unsafe_allow_html=True)
+
+    with tab_depreciation:
+        dep_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Acquired Date', fmt_date(asset.get('acquired_date')))}"
+            f"{detail_field_html('Purchase Price', fmt_currency(asset.get('purchase_price') or asset.get('value')))}"
+            f"{detail_field_html('Current Value', fmt_currency(asset.get('value')))}"
+            f"{detail_field_html('Salvage Value', fmt_currency(asset.get('salvage_value')))}"
+            f"{detail_field_html('Depreciation Method', asset.get('depreciation_method') or 'Straight Line')}"
+            f"{detail_field_html('Useful Life', asset.get('useful_life') or '7 years')}"
+            f"{detail_field_html('Annual Depreciation', fmt_currency(asset.get('annual_depreciation')))}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Depreciation", dep_html), unsafe_allow_html=True)
+
+    with tab_notes:
+        notes_text = safe_value(asset.get("description"), "No notes entered.")
+        notes_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes_text)}"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
+
+    with tab_activity:
+        placeholder_html("Asset activity history will appear here when connected to Supabase.")
 
 
-def _render_assets_table(rows: list[dict]) -> str | None:
-    def _display_cell(field: str, row: dict) -> str:
-        if field == "acquired_date":
-            return fmt_date(row.get("acquired_date"))
-        if field == "value":
-            return fmt_currency(row.get("value"))
-        val = row.get(field)
-        return str(val).strip() if val is not None and str(val).strip() else "—"
+def render_asset_detail_dialog(asset: dict) -> None:
+    rk = record_session_key(asset, "id", "asset_number")
+    asset_number = safe_value(asset.get("asset_number"))
+    asset_name = safe_value(asset.get("asset_name"))
+    status = safe_value(asset.get("status"))
 
-    return render_clickable_table(
-        rows,
+    render_modal_shell()
+    render_modal_header(title=asset_number, subtitle=asset_name, status=status)
+
+    def _on_edit() -> None:
+        _set_asset_edit_mode(asset)
+
+    st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
+    act1, act2, act3, act4 = st.columns([1, 1, 1, 1], gap="small")
+    with act1:
+        st.button("View", key=f"assets_modal_view_{rk}", on_click=_set_asset_view_mode, args=(asset,))
+    with act2:
+        st.button("Edit", key=f"assets_modal_edit_{rk}", on_click=_on_edit)
+    with act3:
+        st.button("More", key=f"assets_modal_more_{rk}")
+    with act4:
+        if st.button("Close", key=f"assets_modal_close_{rk}"):
+            _clear_assets_detail_modal()
+            st.rerun()
+
+    render_modal_meta_grid(
         [
-            ("asset_number", "ASSET #"),
-            ("asset_name", "ASSET NAME"),
-            ("category", "CATEGORY"),
-            ("location", "LOCATION"),
-            ("department", "DEPARTMENT"),
-            ("status", "STATUS"),
-            ("acquired_date", "ACQUIRED DATE"),
-            ("value", "VALUE"),
-        ],
-        "assets_list",
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_display_cell,
-        click_caption=f"{len(rows)} asset(s) · Click a row to open details.",
+            ("Category", safe_value(asset.get("category"))),
+            ("Location", safe_value(asset.get("location"))),
+            ("Department", safe_value(asset.get("department"))),
+            ("Current Value", fmt_currency(asset.get("value"))),
+        ]
     )
+
+    if is_edit_mode(_MOD, rk):
+        _render_asset_edit_form(asset)
+    else:
+        _render_asset_detail_tabs(asset)
+
+
+@st.dialog("Asset Details", width="large", on_dismiss=_clear_assets_detail_modal)
+def _show_assets_detail_modal() -> None:
+    asset = get_modal_record(
+        cache_key=_ASSETS_CACHE_KEY,
+        modal_key=_ASSETS_MODAL_KEY,
+        session_select_key=_SEL,
+    )
+    if not asset:
+        sel = str(st.session_state.get(_ASSETS_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
+        rows = st.session_state.get(_ASSETS_CACHE_KEY)
+        if isinstance(rows, dict) and sel:
+            asset = rows.get(sel)
+    if not asset:
+        render_missing_record(_clear_assets_detail_modal, close_key="assets_modal_missing_close")
+        return
+    render_asset_detail_dialog(asset)
 
 
 def render() -> None:
@@ -508,18 +618,40 @@ def render() -> None:
         department=str(st.session_state.get("ast_dept") or "All Departments"),
     )
 
-    selected_id = str(st.session_state.get(_SEL) or "")
-    if selected_id and not any(str(r.get("id")) == selected_id for r in filtered):
-        st.session_state.pop(_SEL, None)
-        selected_id = ""
+    def _display_cell(field: str, row: dict) -> str:
+        if field == "acquired_date":
+            return fmt_date(row.get("acquired_date"))
+        if field == "value":
+            return fmt_currency(row.get("value"))
+        val = row.get(field)
+        return str(val).strip() if val is not None and str(val).strip() else "—"
 
-    prev_sel = str(st.session_state.get("_ast_prev_sel") or "")
-    sel = _render_assets_table(filtered)
-    if sel and sel != prev_sel:
-        st.session_state[_TAB] = "Overview"
-    st.session_state["_ast_prev_sel"] = sel or ""
+    build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
 
-    if sel:
-        asset = next((r for r in filtered if str(r.get("id")) == sel), None)
-        if asset:
-            _render_detail(asset)
+    deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
+    if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
+        cached = st.session_state.get(_ASSETS_CACHE_KEY)
+        if isinstance(cached, dict) and deeplink_sel in cached:
+            _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
+
+    render_clickable_table(
+        filtered,
+        [
+            ("asset_number", "ASSET #"),
+            ("asset_name", "ASSET NAME"),
+            ("category", "CATEGORY"),
+            ("location", "LOCATION"),
+            ("department", "DEPARTMENT"),
+            ("status", "STATUS"),
+            ("acquired_date", "ACQUIRED DATE"),
+            ("value", "VALUE"),
+        ],
+        "assets_list",
+        row_id_key="id",
+        session_select_key=_SEL,
+        format_cell=_display_cell,
+        click_caption=f"{len(filtered)} asset(s) · Click a row to open details.",
+        on_row_selected=_open_assets_detail_modal,
+    )
+
+    show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
