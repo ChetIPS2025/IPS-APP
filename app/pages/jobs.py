@@ -11,7 +11,6 @@ try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.layout import render_tab_placeholder
-    from app.components.buttons import render_modal_header_actions
     from app.components.status import status_pill_html
     from app.components.tables import render_clickable_table
     from app.components.tabs import render_tabs
@@ -24,7 +23,6 @@ except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.layout import render_tab_placeholder  # type: ignore
-    from components.buttons import render_modal_header_actions  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_clickable_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
@@ -36,6 +34,7 @@ except ImportError:
 
 _SEL = select_key("jobs")
 _TAB = tab_key("jobs")
+_JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
 _JOB_TABS = [
     "Overview",
     "Scope",
@@ -82,6 +81,11 @@ def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> lis
 
 def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(_SEL, None)
+    st.session_state.pop(_JOBS_MODAL_KEY, None)
+
+
+def _queue_jobs_detail_modal(rid: str, _rec: dict) -> None:
+    st.session_state[_JOBS_MODAL_KEY] = rid
 
 
 def _render_detail_body(job: dict) -> None:
@@ -180,7 +184,7 @@ def _show_jobs_detail_modal() -> None:
     ensure_modal_styles()
     modal_wide_marker()
 
-    sel = str(st.session_state.get(_SEL) or "").strip()
+    sel = str(st.session_state.get(_JOBS_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
     jobs_by_id = st.session_state.get("_ips_jobs_modal_by_id")
     job = jobs_by_id.get(sel) if isinstance(jobs_by_id, dict) and sel else None
     if not job:
@@ -196,7 +200,17 @@ def _show_jobs_detail_modal() -> None:
         f'<p class="ips-modal-subtitle">{html.escape(title)}</p>',
         unsafe_allow_html=True,
     )
-    render_modal_header_actions(_SEL, key_prefix="jobs_modal")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.button("View", key="jobs_modal_view", use_container_width=True)
+    with c2:
+        st.button("Edit", key="jobs_modal_edit", use_container_width=True)
+    with c3:
+        st.button("More", key="jobs_modal_more", use_container_width=True)
+    with c4:
+        if st.button("Close", key="jobs_modal_close", use_container_width=True):
+            _clear_jobs_detail_modal()
+            st.rerun()
     render_tabs(_JOB_TABS, session_key=_TAB, default="Overview")
     _render_detail_body(job)
 
@@ -323,6 +337,10 @@ def render() -> None:
             )
         return html.escape(_plain_cell(field, row))
 
+    st.session_state["_ips_jobs_modal_by_id"] = {
+        str(j.get("id") or ""): j for j in filtered if j.get("id")
+    }
+
     render_clickable_table(
         filtered,
         [
@@ -341,12 +359,9 @@ def render() -> None:
         selected_id=selected_id or None,
         html_cell=_html_cell,
         html_rows=True,
+        on_row_click=_queue_jobs_detail_modal,
         col_fr=["0.75fr", "1.4fr", "1fr", "0.85fr", "1fr", "0.85fr", "0.85fr", "0.85fr"],
     )
 
-    st.session_state["_ips_jobs_modal_by_id"] = {
-        str(j.get("id") or ""): j for j in filtered if j.get("id")
-    }
-
-    if str(st.session_state.get(_SEL) or "").strip():
+    if str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
         _show_jobs_detail_modal()

@@ -197,7 +197,7 @@ def render_clickable_table(
         st.markdown(f"<{ct}><{ct}>", unsafe_allow_html=True)
 
     picked = render_clean_table_click_bridge(
-        table_selector=f".ips-data-table-stable:has(.{table_class})",
+        table_selector=f".{table_class}",
         row_selector=".ips-data-row[data-row-id]",
         component_key=f"{key}_row_click_bridge",
     )

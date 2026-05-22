@@ -495,8 +495,15 @@ def render_clean_table_click_bridge(
       if (t.closest("[data-testid='stButton'], button, a, input, select, textarea, label, [data-testid='stPopover']")) return;
       const reg = doc.ipsCleanTableBridgeRegistry || {{}};
       for (const cfg of Object.values(reg)) {{
-        const row = t.closest(cfg.tbl + " " + cfg.row);
+        const row = t.closest(cfg.row);
         if (!row) continue;
+        if (cfg.tbl) {{
+          let scope = row.closest(".ips-data-table-wrap");
+          if (!scope) {{
+            scope = row.closest(".jdb-tbl-host") || row.closest("[data-testid='stVerticalBlockBorderWrapper']");
+          }}
+          if (!scope || !scope.querySelector(cfg.tbl)) continue;
+        }}
         const id = row.getAttribute("data-row-id") || row.getAttribute("data-jid") || row.getAttribute("data-est-id");
         if (!id) continue;
         window.postMessage({{ type: "streamlit:setComponentValue", value: id }}, "*");
