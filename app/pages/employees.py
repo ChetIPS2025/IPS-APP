@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 
 import streamlit as st
 
@@ -97,8 +98,8 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.35, 2.4, 3.2, 1.5, 1.4, 1.2, 1.6]
-_USER_HEADERS = ["", "NAME", "EMAIL", "ROLE", "EMPLOYEE", "STATUS", "LAST LOGIN"]
+_USER_COLS = [0.35, 2.2, 3.0, 1.5, 1.4, 1.3, 1.1, 1.4]
+_USER_HEADERS = ["", "NAME", "EMAIL", "PHONE", "ROLE", "EMPLOYEE", "STATUS", "LAST LOGIN"]
 _STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Locked", "Pending"]
 _EMPLOYEE_TYPE_FILTER_OPTS = ["All Employee Types", "Employees Only", "System Users Only"]
 
@@ -145,6 +146,30 @@ def _user_display_role(user: dict) -> str:
 def _user_display_email(user: dict) -> str:
     email = str(user.get("email") or "").strip()
     return email or "—"
+
+
+def _user_phone_raw(user: dict) -> str:
+    for key in ("phone", "phone_number", "mobile", "cell", "contact_phone"):
+        val = str(user.get(key) or "").strip()
+        if val and val not in {"—", "None", "-"}:
+            return val
+    return ""
+
+
+def _format_phone(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw or raw in {"—", "None", "null", "-"}:
+        return "—"
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    return raw
+
+
+def _user_display_phone(user: dict) -> str:
+    return _format_phone(_user_phone_raw(user))
 
 
 def _fmt_last_login(val: object) -> str:
@@ -204,6 +229,8 @@ def _filter_employees(
             or ql in _user_display_email(e).lower()
             or ql in str(e.get("username") or "").lower()
             or ql in _user_display_role(e).lower()
+            or ql in _user_phone_raw(e).lower()
+            or ql in re.sub(r"\D", "", _user_phone_raw(e))
         ]
     if status and status != "All Statuses":
         out = [e for e in out if _normalize_user_status(e.get("status")) == status]
@@ -297,6 +324,7 @@ def _render_custom_users_table(filtered: list[dict]) -> list[str]:
 
             name = _user_display_name(user)
             email = _user_display_email(user)
+            phone = _user_display_phone(user)
             role = _user_display_role(user)
             status = _normalize_user_status(user.get("status"))
             last_login = _fmt_last_login(user.get("last_login"))
@@ -326,17 +354,23 @@ def _render_custom_users_table(filtered: list[dict]) -> list[str]:
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
+                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
-                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
+                    unsafe_allow_html=True,
+                )
 
             with cols[5]:
-                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
+                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
 
             with cols[6]:
+                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-users-cell ips-users-muted">{html.escape(last_login)}</div>',
                     unsafe_allow_html=True,
@@ -410,7 +444,7 @@ def _seed_employee_edit_form(emp: dict) -> None:
     rk = record_session_key(emp, "id")
     st.session_state[f"emp_edit_name_{rk}"] = str(emp.get("name") or "")
     st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
-    st.session_state[f"emp_edit_phone_{rk}"] = str(emp.get("phone") or "").replace("—", "")
+    st.session_state[f"emp_edit_phone_{rk}"] = _user_phone_raw(emp)
     role_opts = lookup_options("user_roles")
     role = str(emp.get("role") or "")
     st.session_state[f"emp_edit_role_{rk}"] = role if role in role_opts else (role_opts[0] if role_opts else role)
@@ -445,7 +479,7 @@ def _render_employee_detail_tabs(emp: dict) -> None:
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Full Name', name)}"
             f"{detail_field_html('Email', email)}"
-            f"{detail_field_html('Phone', emp.get('phone'))}"
+            f"{detail_field_html('Phone', _format_phone(_user_phone_raw(emp)))}"
             f"{detail_field_html('Username', emp.get('username'))}"
             f"{detail_field_html('Member Since', fmt_date(emp.get('member_since')))}"
             f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
@@ -605,8 +639,10 @@ def render_employee_detail_dialog(emp: dict) -> None:
             [
                 ("Role", role),
                 ("Email", email),
+                ("Phone", _user_display_phone(emp)),
                 ("Employee", _employee_type_label(emp)),
-                ("Last Login", emp.get("last_login")),
+                ("Status", status),
+                ("Last Login", _fmt_last_login(emp.get("last_login"))),
             ]
         )
 
@@ -686,7 +722,7 @@ def render() -> None:
         with c1:
             st.text_input(
                 "Search",
-                placeholder="Search name, email, username...",
+                placeholder="Search name, email, phone, username...",
                 key="emp_search",
                 label_visibility="collapsed",
             )

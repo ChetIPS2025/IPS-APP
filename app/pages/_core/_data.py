@@ -820,6 +820,7 @@ _DEMO_TASKS: list[dict[str, Any]] = [
         "status": "Open",
         "priority": "High",
         "assigned_to": "Mark Johnson",
+        "job_id": "demo-j26047",
         "linked_job": "J26047 — Maintenance Shop Bathroom Remodel",
         "linked_estimate": "— None —",
         "due_date": "2025-05-20",

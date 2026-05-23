@@ -286,6 +286,12 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
         status = str(row.get("status"))
     is_employee_raw = row.get("is_employee")
     is_employee = bool(is_employee_raw) if is_employee_raw is not None else True
+    phone = ""
+    for key in ("phone", "phone_number", "mobile", "cell", "contact_phone"):
+        val = str(row.get(key) or "").strip()
+        if val and val not in {"—", "None", "-"}:
+            phone = val
+            break
     return {
         "id": eid,
         "name": str(row.get("name") or row.get("full_name") or "—"),
@@ -295,7 +301,7 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "is_employee": is_employee,
         "last_login": str(row.get("last_login") or "—"),
-        "phone": str(row.get("phone") or "—"),
+        "phone": phone or "—",
         "username": str(row.get("username") or eid[:8]),
         "member_since": str(row.get("created_at") or row.get("member_since") or "")[:10],
     }
@@ -349,16 +355,19 @@ def normalize_task(row: dict[str, Any]) -> dict[str, Any]:
     status = str(row.get("status") or "Open")
     if status == "Complete":
         status = "Done"
+    jid = row.get("job_id")
     return {
         "id": str(row.get("id") or ""),
         "title": str(row.get("title") or ""),
         "status": status,
         "priority": pri,
         "assigned_to": str(row.get("assignee_name") or row.get("assigned_to") or "—"),
+        "job_id": str(jid).strip() if jid else None,
         "linked_job": str(row.get("job_label") or row.get("linked_job") or "— None —"),
         "linked_estimate": str(row.get("estimate_label") or row.get("linked_estimate") or "— None —"),
         "due_date": str(row.get("due_date") or "")[:10],
         "description": str(row.get("description") or ""),
+        "notes": str(row.get("notes") or ""),
         "activity": list(row.get("activity") or []),
     }
 
@@ -707,6 +716,18 @@ def save_task(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult
     status = str(ui.get("status") or "Open")
     if status == "Done":
         status = "Complete"
+    linked_job = str(ui.get("linked_job") or "").strip()
+    job_id = ui.get("job_id")
+    if job_id is not None:
+        resolved_job_id = str(job_id).strip() if job_id else None
+    elif linked_job and linked_job not in {"— None —", "None", "—", "-"}:
+        try:
+            from app.services.jobs_service import resolve_job_id_from_label
+        except ImportError:
+            from services.jobs_service import resolve_job_id_from_label  # type: ignore
+        resolved_job_id = resolve_job_id_from_label(linked_job)
+    else:
+        resolved_job_id = None
     payload = {
         "title": ui.get("title"),
         "description": ui.get("description"),
@@ -714,7 +735,8 @@ def save_task(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult
         "priority": pri,
         "due_date": ui.get("due_date") or None,
         "assignee_name": ui.get("assigned_to"),
-        "job_label": ui.get("linked_job"),
+        "job_id": resolved_job_id,
+        "job_label": "" if linked_job in {"— None —", "None", "—", "-", ""} else linked_job,
         "estimate_label": ui.get("linked_estimate"),
     }
     table = "todos"

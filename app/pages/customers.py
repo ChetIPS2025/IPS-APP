@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 
 import streamlit as st
@@ -10,7 +11,6 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.clickable_table import render_clickable_table
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -32,7 +32,6 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from app.components.status import status_pill_html
@@ -60,7 +59,6 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -82,7 +80,6 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from components.status import status_pill_html  # type: ignore
@@ -182,6 +179,21 @@ SHOW_CONTACT_MODAL_KEY = "show_contact_detail_modal"
 _ALL_CONTACT_IDS_KEY = "_ips_contacts_visible_ids"
 _CONTACT_COLS = [0.35, 2.0, 2.0, 2.0, 1.8, 3.0, 1.5]
 _CONTACT_HEADERS = ["", "NAME", "TITLE", "LOCATION", "ROLE", "EMAIL", "PHONE"]
+_ALL_LOCATION_IDS_KEY = "_ips_locations_visible_ids"
+_LOCATION_COLS = [0.35, 2.6, 1.4, 1.5, 0.8, 1.4, 0.9, 0.9, 0.9, 1.1]
+_LOCATION_HEADERS = [
+    "",
+    "LOCATION",
+    "TYPE",
+    "CITY",
+    "STATE",
+    "PHONE",
+    "PRIMARY",
+    "BILLING",
+    "SHIPPING",
+    "STATUS",
+]
+_LOCATION_STATUS_OPTS = ["Active", "Inactive", "On Hold"]
 
 
 def _normalize_customer_status(raw: object) -> str:
@@ -508,6 +520,75 @@ def _contact_select_key(contact_id: str) -> str:
     return f"contact_select_{contact_id}"
 
 
+def _customer_contact_select_key(customer_id: str, contact_id: str) -> str:
+    return f"customer_{customer_id}_contact_select_{contact_id}"
+
+
+def _selected_customer_contact_key(customer_id: str) -> str:
+    return f"selected_customer_contact_id_{customer_id}"
+
+
+def _show_customer_contact_detail_key(customer_id: str) -> str:
+    return f"show_customer_contact_detail_{customer_id}"
+
+
+def _selected_customer_location_key(customer_id: str) -> str:
+    return f"selected_customer_location_id_{customer_id}"
+
+
+def _show_customer_location_detail_key(customer_id: str) -> str:
+    return f"show_customer_location_detail_{customer_id}"
+
+
+def _inline_contact_edit_key(contact_id: str) -> str:
+    return f"contact_edit_mode_{contact_id}"
+
+
+def _clear_customer_contact_selection(customer_id: str, contact_ids: list[str] | None = None) -> None:
+    st.session_state[_selected_customer_contact_key(customer_id)] = None
+    st.session_state[_show_customer_contact_detail_key(customer_id)] = False
+    ids = list(contact_ids or [])
+    for cid in ids:
+        st.session_state[_customer_contact_select_key(customer_id, cid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith(f"customer_{customer_id}_contact_select_"):
+            st.session_state[key] = False
+
+
+def _on_customer_contact_checkbox_change(
+    customer_id: str,
+    contact_id: str,
+    all_contact_ids: list[str],
+) -> None:
+    key = _customer_contact_select_key(customer_id, contact_id)
+    if st.session_state.get(key):
+        for cid in all_contact_ids:
+            if cid != contact_id:
+                st.session_state[_customer_contact_select_key(customer_id, cid)] = False
+        st.session_state[_selected_customer_contact_key(customer_id)] = contact_id
+        st.session_state[_show_customer_contact_detail_key(customer_id)] = True
+        st.session_state[_inline_contact_edit_key(contact_id)] = False
+    elif st.session_state.get(_selected_customer_contact_key(customer_id)) == contact_id:
+        st.session_state[_selected_customer_contact_key(customer_id)] = None
+        st.session_state[_show_customer_contact_detail_key(customer_id)] = False
+        st.session_state[_inline_contact_edit_key(contact_id)] = False
+
+
+def _clear_customer_nested_detail_state(customer_id: str) -> None:
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return
+    contact_ids = st.session_state.get(_ALL_CONTACT_IDS_KEY) or []
+    _clear_customer_contact_selection(cid, [str(x) for x in contact_ids])
+    location_ids = st.session_state.get(_ALL_LOCATION_IDS_KEY) or []
+    _clear_customer_location_selection(cid, [str(x) for x in location_ids])
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and (
+            key.startswith("contact_edit_mode_") or key.startswith("location_edit_mode_")
+        ):
+            st.session_state[key] = False
+
+
 def _clear_contact_selection(contact_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_CONTACT_KEY] = None
     st.session_state[SHOW_CONTACT_MODAL_KEY] = False
@@ -535,7 +616,12 @@ def _on_contact_checkbox_change(contact_id: str, all_contact_ids: list[str]) -> 
         st.session_state[SHOW_CONTACT_MODAL_KEY] = False
 
 
-def _render_custom_contacts_table(contacts: list[dict]) -> list[str]:
+def _render_custom_contacts_table(
+    contacts: list[dict],
+    *,
+    customer_id: str | None = None,
+    inline: bool = False,
+) -> list[str]:
     if not contacts:
         st.session_state[_ALL_CONTACT_IDS_KEY] = []
         return []
@@ -572,12 +658,27 @@ def _render_custom_contacts_table(contacts: list[dict]) -> list[str]:
             cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
+                checkbox_key = (
+                    _customer_contact_select_key(customer_id, ct_id)
+                    if inline and customer_id
+                    else _contact_select_key(ct_id)
+                )
+                checkbox_args = (
+                    (customer_id, ct_id, all_contact_ids)
+                    if inline and customer_id
+                    else (ct_id, all_contact_ids)
+                )
+                checkbox_handler = (
+                    _on_customer_contact_checkbox_change
+                    if inline and customer_id
+                    else _on_contact_checkbox_change
+                )
                 st.checkbox(
                     "",
-                    key=_contact_select_key(ct_id),
+                    key=checkbox_key,
                     label_visibility="collapsed",
-                    on_change=_on_contact_checkbox_change,
-                    args=(ct_id, all_contact_ids),
+                    on_change=checkbox_handler,
+                    args=checkbox_args,
                 )
 
             with cols[1]:
@@ -618,13 +719,38 @@ def _render_custom_contacts_table(contacts: list[dict]) -> list[str]:
     return all_contact_ids
 
 
-def _render_contacts_table_block(contacts: list[dict], *, empty_caption: str) -> None:
+def _render_contacts_table_block(
+    contacts: list[dict],
+    *,
+    empty_caption: str,
+    customer: dict | None = None,
+    inline: bool = False,
+) -> None:
     if not contacts:
         st.caption(empty_caption)
         return
     build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
     st.caption(f"{len(contacts)} contact(s)")
-    _render_custom_contacts_table(contacts)
+    customer_id = str((customer or {}).get("id") or "").strip()
+    _render_custom_contacts_table(
+        contacts,
+        customer_id=customer_id or None,
+        inline=inline and bool(customer_id),
+    )
+
+    if inline and customer_id:
+        selected_contact_id = st.session_state.get(_selected_customer_contact_key(customer_id))
+        show_contact_detail = st.session_state.get(_show_customer_contact_detail_key(customer_id), False)
+        if selected_contact_id and show_contact_detail:
+            selected_contact = next(
+                (c for c in contacts if str(c.get("id")) == str(selected_contact_id)),
+                None,
+            )
+            if selected_contact:
+                locations = get_customer_locations(customer_id)
+                _render_contact_inline_detail(selected_contact, customer, locations)
+        return
+
     if st.session_state.get(SELECTED_CONTACT_KEY) and st.session_state.get(SHOW_CONTACT_MODAL_KEY):
         _show_contact_detail_modal()
 
@@ -632,6 +758,13 @@ def _render_contacts_table_block(contacts: list[dict], *, empty_caption: str) ->
 
 def _clear_customers_detail_modal() -> None:
     customer_ids = st.session_state.get(_ALL_CUSTOMER_IDS_KEY) or []
+    active_customer_id = str(
+        st.session_state.get(SELECTED_CUSTOMER_KEY)
+        or st.session_state.get(_CUSTOMERS_MODAL_KEY)
+        or ""
+    ).strip()
+    if active_customer_id:
+        _clear_customer_nested_detail_state(active_customer_id)
     _clear_customer_selection([str(cid) for cid in customer_ids])
     clear_record_modal(
         table_key=_CUSTOMERS_TABLE_KEY,
@@ -710,6 +843,94 @@ def _location_label(loc: dict) -> str:
     state = str(loc.get("state") or "").strip()
     tail = ", ".join(part for part in (city, state) if part)
     return f"{name} — {tail}" if tail else name
+
+
+def _location_select_key(customer_id: str, location_id: str) -> str:
+    return f"customer_{customer_id}_location_select_{location_id}"
+
+
+def _inline_location_edit_key(location_id: str) -> str:
+    return f"location_edit_mode_{location_id}"
+
+
+def _location_display_name(location: dict) -> str:
+    return str(
+        location.get("location_name") or location.get("site_name") or location.get("name") or "Unnamed Location"
+    ).strip()
+
+
+def _location_display_type(location: dict) -> str:
+    val = str(location.get("location_type") or location.get("type") or "Other").strip()
+    return val or "Other"
+
+
+def _location_display_status(location: dict) -> str:
+    val = str(location.get("status") or "Active").strip()
+    return val or "Active"
+
+
+def _format_phone(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw or raw in {"—", "None", "null", "-"}:
+        return "—"
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    return raw
+
+
+def _location_status_pill_html(status: str) -> str:
+    key = str(status or "Active").strip().lower().replace("_", " ")
+    cls_map = {
+        "active": "ips-location-status-active",
+        "inactive": "ips-location-status-inactive",
+        "on hold": "ips-location-status-on-hold",
+    }
+    label = str(status or "Active").strip() or "Active"
+    cls = cls_map.get(key, "ips-location-status-active")
+    return f'<span class="ips-location-pill {cls}">{html.escape(label)}</span>'
+
+
+def _location_flag_html(value: object) -> str:
+    if value in (True, "true", "True", 1, "Yes", "yes", "Y"):
+        return '<span class="ips-location-pill ips-location-flag-yes">Yes</span>'
+    return '<span class="ips-location-pill ips-location-flag-no">—</span>'
+
+
+def _clear_customer_location_selection(
+    customer_id: str,
+    location_ids: list[str] | None = None,
+) -> None:
+    cid = str(customer_id or "").strip()
+    st.session_state[_selected_customer_location_key(cid)] = None
+    st.session_state[_show_customer_location_detail_key(cid)] = False
+    ids = list(location_ids or [])
+    for lid in ids:
+        st.session_state[_location_select_key(cid, lid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith(f"customer_{cid}_location_select_"):
+            st.session_state[key] = False
+
+
+def _on_customer_location_checkbox_change(
+    customer_id: str,
+    location_id: str,
+    all_location_ids: list[str],
+) -> None:
+    key = _location_select_key(customer_id, location_id)
+    if st.session_state.get(key):
+        for lid in all_location_ids:
+            if lid != location_id:
+                st.session_state[_location_select_key(customer_id, lid)] = False
+        st.session_state[_selected_customer_location_key(customer_id)] = location_id
+        st.session_state[_show_customer_location_detail_key(customer_id)] = True
+        st.session_state[_inline_location_edit_key(location_id)] = False
+    elif st.session_state.get(_selected_customer_location_key(customer_id)) == location_id:
+        st.session_state[_selected_customer_location_key(customer_id)] = None
+        st.session_state[_show_customer_location_detail_key(customer_id)] = False
+        st.session_state[_inline_location_edit_key(location_id)] = False
 
 
 def _jobs_table(
@@ -911,56 +1132,161 @@ def _render_add_location_form(customer: dict, *, demo: bool) -> None:
     if demo:
         st.caption("Add locations after saving this customer to Supabase.")
         return
-    with st.expander("Add Location", expanded=bool(st.session_state.get(f"{pk}_open"))):
-        lc1, lc2 = st.columns(2)
-        with lc1:
-            st.text_input("Location name", key=f"{pk}_name")
-            st.selectbox("Type", LOCATION_TYPES, key=f"{pk}_type")
-            st.text_input("Address line 1", key=f"{pk}_addr1")
-            st.text_input("City", key=f"{pk}_city")
-        with lc2:
-            st.text_input("State", key=f"{pk}_state")
-            st.text_input("ZIP", key=f"{pk}_zip")
-            st.text_input("Phone", key=f"{pk}_phone")
-            st.selectbox("Status", ["Active", "Inactive"], index=0, key=f"{pk}_status")
+
+    add_l, _ = st.columns([1, 3])
+    with add_l:
+        if st.button("+ Add Location", key=f"{pk}_open_btn", use_container_width=True):
+            st.session_state[f"{pk}_open"] = True
+            st.rerun()
+
+    if not st.session_state.get(f"{pk}_open"):
+        return
+
+    st.markdown('<div class="ips-locations-add-form">', unsafe_allow_html=True)
+    lc1, lc2 = st.columns(2)
+    with lc1:
+        st.text_input("Location name", key=f"{pk}_name")
+        st.selectbox("Type", LOCATION_TYPES, key=f"{pk}_type")
+        st.text_input("Address line 1", key=f"{pk}_addr1")
+        st.text_input("Address line 2", key=f"{pk}_addr2")
+        st.text_input("City", key=f"{pk}_city")
+    with lc2:
+        st.text_input("State", key=f"{pk}_state")
+        st.text_input("ZIP", key=f"{pk}_zip")
+        st.text_input("Phone", key=f"{pk}_phone")
         st.text_input("Email", key=f"{pk}_email")
-        flags = st.columns(3)
-        with flags[0]:
-            st.checkbox("Primary", key=f"{pk}_primary")
-        with flags[1]:
-            st.checkbox("Billing", key=f"{pk}_billing")
-        with flags[2]:
-            st.checkbox("Shipping", key=f"{pk}_shipping")
-        st.text_area("Notes", key=f"{pk}_notes", height=70)
-        sb1, sb2 = st.columns(2)
-        with sb1:
-            save = st.button("Save location", key=f"{pk}_save", type="primary", use_container_width=True)
-        with sb2:
-            if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
-                st.session_state.pop(f"{pk}_open", None)
-                st.rerun()
-        if save:
-            payload = {
-                "location_name": st.session_state.get(f"{pk}_name"),
-                "location_type": st.session_state.get(f"{pk}_type"),
-                "address_line_1": st.session_state.get(f"{pk}_addr1"),
-                "city": st.session_state.get(f"{pk}_city"),
-                "state": st.session_state.get(f"{pk}_state"),
-                "zip": st.session_state.get(f"{pk}_zip"),
-                "phone": st.session_state.get(f"{pk}_phone"),
-                "email": st.session_state.get(f"{pk}_email"),
-                "is_primary": st.session_state.get(f"{pk}_primary"),
-                "is_billing": st.session_state.get(f"{pk}_billing"),
-                "is_shipping": st.session_state.get(f"{pk}_shipping"),
-                "status": st.session_state.get(f"{pk}_status"),
-                "notes": st.session_state.get(f"{pk}_notes"),
-            }
-            ok, msg = _service_feedback(
-                create_customer_location(cid, payload),
-                success="Location added.",
-            )
-            if apply_persist_feedback(ok, msg, clear_keys=(f"{pk}_open",)):
-                st.rerun()
+        st.selectbox("Status", _LOCATION_STATUS_OPTS, index=0, key=f"{pk}_status")
+    flags = st.columns(3)
+    with flags[0]:
+        st.checkbox("Primary", key=f"{pk}_primary")
+    with flags[1]:
+        st.checkbox("Billing", key=f"{pk}_billing")
+    with flags[2]:
+        st.checkbox("Shipping", key=f"{pk}_shipping")
+    st.text_area("Notes", key=f"{pk}_notes", height=70)
+    sb1, sb2 = st.columns(2)
+    with sb1:
+        save = st.button("Save location", key=f"{pk}_save", type="primary", use_container_width=True)
+    with sb2:
+        if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
+            st.session_state.pop(f"{pk}_open", None)
+            st.rerun()
+    if save:
+        payload = {
+            "location_name": st.session_state.get(f"{pk}_name"),
+            "location_type": st.session_state.get(f"{pk}_type"),
+            "address_line_1": st.session_state.get(f"{pk}_addr1"),
+            "address_line_2": st.session_state.get(f"{pk}_addr2"),
+            "city": st.session_state.get(f"{pk}_city"),
+            "state": st.session_state.get(f"{pk}_state"),
+            "zip": st.session_state.get(f"{pk}_zip"),
+            "phone": st.session_state.get(f"{pk}_phone"),
+            "email": st.session_state.get(f"{pk}_email"),
+            "is_primary": st.session_state.get(f"{pk}_primary"),
+            "is_billing": st.session_state.get(f"{pk}_billing"),
+            "is_shipping": st.session_state.get(f"{pk}_shipping"),
+            "status": st.session_state.get(f"{pk}_status"),
+            "notes": st.session_state.get(f"{pk}_notes"),
+        }
+        ok, msg = _service_feedback(
+            create_customer_location(cid, payload),
+            success="Location added.",
+        )
+        if apply_persist_feedback(ok, msg, clear_keys=(f"{pk}_open",)):
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_custom_locations_table(locations: list[dict], *, customer_id: str) -> list[str]:
+    if not locations:
+        st.session_state[_ALL_LOCATION_IDS_KEY] = []
+        return []
+
+    all_location_ids = [
+        str(loc.get("id") or "").strip() for loc in locations if str(loc.get("id") or "").strip()
+    ]
+    st.session_state[_ALL_LOCATION_IDS_KEY] = all_location_ids
+
+    with st.container(key="locations_table_wrap"):
+        st.markdown('<div class="ips-locations-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_LOCATION_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _LOCATION_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-locations-header-row ips-locations-cell">'
+                    f"{html.escape(label)}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        for location in locations:
+            lid = str(location.get("id") or "").strip()
+            if not lid:
+                continue
+
+            name = _location_display_name(location)
+            loc_type = _location_display_type(location)
+            city = str(location.get("city") or "—").strip() or "—"
+            state = str(location.get("state") or "—").strip() or "—"
+            phone = _format_phone(location.get("phone"))
+            status = _location_display_status(location)
+
+            cols = st.columns(_LOCATION_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_location_select_key(customer_id, lid),
+                    label_visibility="collapsed",
+                    on_change=_on_customer_location_checkbox_change,
+                    args=(customer_id, lid, all_location_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-locations-name">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-locations-cell">{html.escape(loc_type)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-locations-cell">{html.escape(city)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-locations-cell">{html.escape(state)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-locations-muted ips-locations-cell">{html.escape(phone)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(_location_flag_html(location.get("is_primary")), unsafe_allow_html=True)
+
+            with cols[7]:
+                st.markdown(_location_flag_html(location.get("is_billing")), unsafe_allow_html=True)
+
+            with cols[8]:
+                st.markdown(_location_flag_html(location.get("is_shipping")), unsafe_allow_html=True)
+
+            with cols[9]:
+                st.markdown(_location_status_pill_html(status), unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_location_ids
 
 
 def _render_customer_locations_tab(customer: dict) -> None:
@@ -974,27 +1300,17 @@ def _render_customer_locations_tab(customer: dict) -> None:
         return
 
     build_modal_cache(locations, cache_key=_LOCATIONS_CACHE_KEY)
-    render_clickable_table(
-        locations,
-        [
-            ("location_name", "LOCATION"),
-            ("location_type", "TYPE"),
-            ("city", "CITY"),
-            ("state", "STATE"),
-            ("phone", "PHONE"),
-            ("is_primary", "PRIMARY"),
-            ("is_billing", "BILLING"),
-            ("is_shipping", "SHIPPING"),
-            ("status", "STATUS"),
-        ],
-        _LOCATIONS_TABLE_KEY,
-        row_id_key="id",
-        session_select_key=_LOC_SEL,
-        format_cell=_list_display_cell,
-        click_caption=f"{len(locations)} location(s) · Click a row for location details.",
-        on_row_selected=_open_location_detail_modal,
-    )
-    show_modal_if_pending(_LOCATION_MODAL_KEY, _show_location_detail_modal)
+    st.caption(f"{len(locations)} location(s)")
+    _render_custom_locations_table(locations, customer_id=cid)
+
+    selected_location_id = st.session_state.get(_selected_customer_location_key(cid))
+    if st.session_state.get(_show_customer_location_detail_key(cid)) and selected_location_id:
+        selected_location = next(
+            (loc for loc in locations if str(loc.get("id")) == str(selected_location_id)),
+            None,
+        )
+        if selected_location:
+            _render_location_inline_detail(selected_location, customer)
 
 
 def _render_add_contact_form(customer: dict, *, locations: list[dict], demo: bool) -> None:
@@ -1075,6 +1391,265 @@ def _render_add_contact_form(customer: dict, *, locations: list[dict], demo: boo
                 st.rerun()
 
 
+def _inline_meta_grid(items: list[tuple[str, str]]) -> None:
+    if not items:
+        return
+    st.markdown('<div class="ips-inline-meta-grid">', unsafe_allow_html=True)
+    cols = st.columns(min(len(items), 4))
+    for idx, (label, value) in enumerate(items):
+        with cols[idx % len(cols)]:
+            val = safe_value(value)
+            st.markdown(
+                f'<div class="ips-inline-meta-card">'
+                f'<div class="ips-inline-meta-label">{html.escape(label)}</div>'
+                f'<div class="ips-inline-meta-value">{html.escape(val)}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_contact_inline_edit_form(
+    contact: dict,
+    *,
+    customer: dict | None,
+    locations: list[dict],
+) -> None:
+    ct_id = str(contact.get("id") or "")
+    cid = str(contact.get("customer_id") or (customer or {}).get("id") or "")
+    rk = record_session_key(contact, "id", "full_name", "contact_name")
+    if f"ct_edit_name_{rk}" not in st.session_state:
+        _seed_contact_edit_form(contact)
+
+    render_edit_form_header("Edit Contact")
+    if is_demo_id(ct_id) or is_demo_id(cid):
+        st.caption("Demo records cannot be edited until saved to Supabase.")
+        return
+
+    loc_opts = [(_location_label(loc), str(loc.get("id") or "")) for loc in locations if str(loc.get("id") or "")]
+    labels = [label for label, _ in loc_opts]
+    ids = [lid for _, lid in loc_opts]
+    cur_loc = str(contact.get("location_id") or contact.get("customer_location_id") or "")
+    if f"ct_edit_loc_{rk}" not in st.session_state and cur_loc in ids:
+        st.session_state[f"ct_edit_loc_{rk}"] = ids.index(cur_loc)
+    elif f"ct_edit_loc_{rk}" not in st.session_state and ids:
+        st.session_state[f"ct_edit_loc_{rk}"] = 0
+
+    if labels:
+        loc_idx = st.selectbox(
+            "Location",
+            range(len(labels)),
+            format_func=lambda i: labels[i],
+            key=f"ct_edit_loc_{rk}",
+        )
+        loc_id = ids[int(loc_idx)]
+    else:
+        st.caption("No locations available.")
+        loc_id = cur_loc
+
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        st.text_input("Full name", key=f"ct_edit_name_{rk}")
+        st.text_input("Title", key=f"ct_edit_title_{rk}")
+        st.selectbox("Role", CONTACT_ROLE_TYPES, key=f"ct_edit_role_{rk}")
+    with ec2:
+        st.text_input("Email", key=f"ct_edit_email_{rk}")
+        st.text_input("Phone", key=f"ct_edit_phone_{rk}")
+        st.text_input("Mobile", key=f"ct_edit_mobile_{rk}")
+        st.selectbox("Status", ["Active", "Inactive"], key=f"ct_edit_status_{rk}")
+        st.checkbox("Primary for location", key=f"ct_edit_primary_{rk}")
+    st.text_area("Notes", key=f"ct_edit_notes_{rk}", height=90)
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_CT_MOD,
+        record_key=rk,
+        cancel_key=f"inline_ct_edit_cancel_{rk}",
+        save_key=f"inline_ct_edit_save_{rk}",
+    )
+    if cancelled:
+        st.session_state[_inline_contact_edit_key(ct_id)] = False
+        st.rerun()
+    if saved and loc_id:
+        payload = {
+            "customer_id": cid,
+            "location_id": loc_id,
+            "customer_location_id": loc_id,
+            "full_name": st.session_state.get(f"ct_edit_name_{rk}"),
+            "contact_name": st.session_state.get(f"ct_edit_name_{rk}"),
+            "title": st.session_state.get(f"ct_edit_title_{rk}"),
+            "role_type": st.session_state.get(f"ct_edit_role_{rk}"),
+            "email": st.session_state.get(f"ct_edit_email_{rk}"),
+            "phone": st.session_state.get(f"ct_edit_phone_{rk}"),
+            "mobile": st.session_state.get(f"ct_edit_mobile_{rk}"),
+            "is_primary": st.session_state.get(f"ct_edit_primary_{rk}"),
+            "status": st.session_state.get(f"ct_edit_status_{rk}"),
+            "notes": st.session_state.get(f"ct_edit_notes_{rk}"),
+        }
+        ok, msg = _service_feedback(update_customer_contact(ct_id, payload), success="Contact saved.")
+        if ok:
+            st.session_state[_inline_contact_edit_key(ct_id)] = False
+            st.success(msg)
+            st.rerun()
+        st.error(msg or "Could not save contact.")
+
+
+def _render_contact_inline_detail(
+    contact: dict,
+    customer: dict | None = None,
+    locations: list[dict] | None = None,
+) -> None:
+    ct_id = str(contact.get("id") or "")
+    cid = str(contact.get("customer_id") or (customer or {}).get("id") or "")
+    cname = str((customer or {}).get("customer_name") or (customer or {}).get("company_name") or "")
+    title = safe_value(contact.get("full_name") or contact.get("contact_name"))
+    status = safe_value(contact.get("status"))
+    role = _normalize_contact_role(contact.get("role_type"), contact.get("title"))
+    loc_name = safe_value(contact.get("location_name"))
+    lid = str(contact.get("location_id") or contact.get("customer_location_id") or "")
+    location = next((loc for loc in (locations or []) if str(loc.get("id") or "") == lid), None)
+    if location:
+        loc_name = safe_value(location.get("location_name") or location.get("site_name"))
+    editing = bool(st.session_state.get(_inline_contact_edit_key(ct_id)))
+
+    with st.container(key=f"inline_contact_detail_{ct_id}"):
+        st.markdown('<div class="ips-inline-detail-card">', unsafe_allow_html=True)
+        header_l, header_r = st.columns([4, 1], vertical_alignment="center")
+        with header_l:
+            subtitle = f"{cname} · {loc_name}" if cname and loc_name != "—" else (cname or loc_name or "Contact")
+            st.markdown(
+                f'<div class="ips-inline-detail-header">'
+                f'<div class="ips-inline-detail-title">{html.escape(title)}</div>'
+                f'<div class="ips-inline-detail-subtitle">{html.escape(subtitle)}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(modal_status_pill_html(status), unsafe_allow_html=True)
+        with header_r:
+            if not editing and st.button("Edit", key=f"inline_ct_edit_btn_{ct_id}", use_container_width=True):
+                st.session_state[_inline_contact_edit_key(ct_id)] = True
+                _seed_contact_edit_form(contact)
+                st.rerun()
+
+        if editing:
+            _render_contact_inline_edit_form(
+                contact,
+                customer=customer,
+                locations=locations or get_customer_locations(cid),
+            )
+        else:
+            _inline_meta_grid(
+                [
+                    ("Title", safe_value(contact.get("title"))),
+                    ("Role", role),
+                    ("Location", loc_name),
+                    ("Email", safe_value(contact.get("email"))),
+                    ("Phone", safe_value(contact.get("phone"))),
+                    ("Mobile", safe_value(contact.get("mobile"))),
+                ]
+            )
+
+            if location:
+                loc_html = (
+                    f'<div class="ips-detail-grid">'
+                    f"{detail_field_html('Location', location.get('location_name') or location.get('site_name'))}"
+                    f"{detail_field_html('Type', location.get('location_type'))}"
+                    f"{detail_field_html('City', location.get('city'))}"
+                    f"{detail_field_html('State', location.get('state'))}"
+                    f"{detail_field_html('Phone', location.get('phone'))}"
+                    f"</div>"
+                )
+                st.markdown(dialog_card_html("Location", loc_html), unsafe_allow_html=True)
+
+            jobs = jobs_for_customer(cname)
+            contact_name = str(contact.get("full_name") or contact.get("contact_name") or "").strip().lower()
+            if contact_name:
+                jobs = [
+                    j
+                    for j in jobs
+                    if str(j.get("contact_name") or j.get("customer_contact") or "").strip().lower()
+                    == contact_name
+                    or str(j.get("customer_contact_id") or j.get("contact_id") or "") == ct_id
+                ]
+            st.markdown("**Linked Jobs**")
+            _jobs_table(jobs, session_key=f"_inline_ct_jobs_{ct_id}")
+
+            ests = estimates_for_customer(cname)
+            if contact_name:
+                ests = [
+                    e
+                    for e in ests
+                    if str(e.get("contact_name") or e.get("customer_contact") or "").strip().lower()
+                    == contact_name
+                    or str(e.get("customer_contact_id") or e.get("contact_id") or "") == ct_id
+                ]
+            st.markdown("**Linked Estimates**")
+            _estimates_table(ests, session_key=f"_inline_ct_est_{ct_id}")
+
+            notes_text = safe_value(contact.get("notes"), "No notes entered.")
+            notes_html = (
+                f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+                f"{html.escape(notes_text)}"
+                f"</p>"
+            )
+            st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
+            placeholder_html("Contact activity history will appear here when connected to Supabase.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_location_inline_detail(location: dict, customer: dict | None = None) -> None:
+    lid = str(location.get("id") or "")
+    cid = str(location.get("customer_id") or (customer or {}).get("id") or "")
+    title = safe_value(location.get("location_name") or location.get("site_name"))
+    status = safe_value(location.get("status"))
+    cname = safe_value((customer or {}).get("customer_name") or (customer or {}).get("company_name"))
+    editing = bool(st.session_state.get(_inline_location_edit_key(lid)))
+
+    with st.container(key=f"inline_location_detail_{lid}"):
+        st.markdown('<div class="ips-inline-detail-card">', unsafe_allow_html=True)
+        header_l, header_r = st.columns([4, 1], vertical_alignment="center")
+        with header_l:
+            st.markdown(
+                f'<div class="ips-inline-detail-header">'
+                f'<div class="ips-inline-detail-title">{html.escape(title)}</div>'
+                f'<div class="ips-inline-detail-subtitle">{html.escape(cname)} · Location</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(_location_status_pill_html(status), unsafe_allow_html=True)
+        with header_r:
+            if not editing and st.button(
+                "Edit",
+                key=f"inline_loc_edit_btn_{lid}",
+                use_container_width=True,
+            ):
+                st.session_state[_inline_location_edit_key(lid)] = True
+                _seed_location_edit_form(location)
+                st.rerun()
+
+        if editing:
+            _render_location_inline_edit_form(location, customer=customer)
+        else:
+            city_state = ", ".join(
+                part
+                for part in (str(location.get("city") or "").strip(), str(location.get("state") or "").strip())
+                if part
+            )
+            _inline_meta_grid(
+                [
+                    ("Type", safe_value(location.get("location_type"))),
+                    ("City / State", city_state or "—"),
+                    ("Phone", _format_phone(location.get("phone"))),
+                    ("Primary", _yes_dash(location.get("is_primary"))),
+                    ("Billing", _yes_dash(location.get("is_billing"))),
+                    ("Shipping", _yes_dash(location.get("is_shipping"))),
+                ]
+            )
+            _render_location_detail_tabs(location, customer, inline_contacts=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _render_customer_contacts_tab(customer: dict) -> None:
     cid = str(customer.get("id") or "")
     demo = is_demo_id(cid)
@@ -1110,6 +1685,8 @@ def _render_customer_contacts_tab(customer: dict) -> None:
     _render_contacts_table_block(
         contacts,
         empty_caption="No contacts match this filter.",
+        customer=customer,
+        inline=True,
     )
 
 
@@ -1257,6 +1834,76 @@ def _set_location_edit_mode(location: dict) -> None:
     _seed_location_edit_form(location)
 
 
+def _render_location_inline_edit_form(location: dict, *, customer: dict | None = None) -> None:
+    lid = str(location.get("id") or "")
+    cid = str(location.get("customer_id") or (customer or {}).get("id") or "")
+    rk = record_session_key(location, "id", "location_name", "site_name")
+    if f"loc_edit_name_{rk}" not in st.session_state:
+        _seed_location_edit_form(location)
+
+    render_edit_form_header("Edit Location")
+    if is_demo_id(lid) or is_demo_id(cid):
+        st.caption("Demo records cannot be edited until saved to Supabase.")
+        return
+
+    lc1, lc2 = st.columns(2)
+    with lc1:
+        st.text_input("Location name", key=f"loc_edit_name_{rk}")
+        st.selectbox("Type", LOCATION_TYPES, key=f"loc_edit_type_{rk}")
+        st.text_input("Address line 1", key=f"loc_edit_addr1_{rk}")
+        st.text_input("Address line 2", key=f"loc_edit_addr2_{rk}")
+        st.text_input("City", key=f"loc_edit_city_{rk}")
+    with lc2:
+        st.text_input("State", key=f"loc_edit_state_{rk}")
+        st.text_input("ZIP", key=f"loc_edit_zip_{rk}")
+        st.text_input("Phone", key=f"loc_edit_phone_{rk}")
+        st.text_input("Email", key=f"loc_edit_email_{rk}")
+        st.selectbox("Status", _LOCATION_STATUS_OPTS, key=f"loc_edit_status_{rk}")
+    flags = st.columns(3)
+    with flags[0]:
+        st.checkbox("Primary", key=f"loc_edit_primary_{rk}")
+    with flags[1]:
+        st.checkbox("Billing", key=f"loc_edit_billing_{rk}")
+    with flags[2]:
+        st.checkbox("Shipping", key=f"loc_edit_shipping_{rk}")
+    st.text_area("Notes", key=f"loc_edit_notes_{rk}", height=90)
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_LOC_MOD,
+        record_key=rk,
+        cancel_key=f"inline_loc_edit_cancel_{rk}",
+        save_key=f"inline_loc_edit_save_{rk}",
+    )
+    if cancelled:
+        st.session_state[_inline_location_edit_key(lid)] = False
+        st.rerun()
+    if saved:
+        payload = {
+            "customer_id": cid,
+            "location_name": st.session_state.get(f"loc_edit_name_{rk}"),
+            "location_type": st.session_state.get(f"loc_edit_type_{rk}"),
+            "address_line_1": st.session_state.get(f"loc_edit_addr1_{rk}"),
+            "address_line_2": st.session_state.get(f"loc_edit_addr2_{rk}"),
+            "city": st.session_state.get(f"loc_edit_city_{rk}"),
+            "state": st.session_state.get(f"loc_edit_state_{rk}"),
+            "zip": st.session_state.get(f"loc_edit_zip_{rk}"),
+            "country": st.session_state.get(f"loc_edit_country_{rk}"),
+            "phone": st.session_state.get(f"loc_edit_phone_{rk}"),
+            "email": st.session_state.get(f"loc_edit_email_{rk}"),
+            "is_primary": st.session_state.get(f"loc_edit_primary_{rk}"),
+            "is_billing": st.session_state.get(f"loc_edit_billing_{rk}"),
+            "is_shipping": st.session_state.get(f"loc_edit_shipping_{rk}"),
+            "status": st.session_state.get(f"loc_edit_status_{rk}"),
+            "notes": st.session_state.get(f"loc_edit_notes_{rk}"),
+        }
+        ok, msg = _service_feedback(update_customer_location(lid, payload), success="Location saved.")
+        if ok:
+            st.session_state[_inline_location_edit_key(lid)] = False
+            st.success(msg)
+            st.rerun()
+        st.error(msg or "Could not save location.")
+
+
 def _render_location_edit_form(location: dict) -> None:
     lid = str(location.get("id") or "")
     cid = str(location.get("customer_id") or "")
@@ -1282,7 +1929,7 @@ def _render_location_edit_form(location: dict) -> None:
         st.text_input("Country", key=f"loc_edit_country_{rk}")
         st.text_input("Phone", key=f"loc_edit_phone_{rk}")
         st.text_input("Email", key=f"loc_edit_email_{rk}")
-        st.selectbox("Status", ["Active", "Inactive"], key=f"loc_edit_status_{rk}")
+        st.selectbox("Status", _LOCATION_STATUS_OPTS, key=f"loc_edit_status_{rk}")
     flags = st.columns(3)
     with flags[0]:
         st.checkbox("Primary", key=f"loc_edit_primary_{rk}")
@@ -1327,7 +1974,12 @@ def _render_location_edit_form(location: dict) -> None:
         st.error(msg or "Could not save location.")
 
 
-def _render_location_detail_tabs(location: dict, customer: dict | None) -> None:
+def _render_location_detail_tabs(
+    location: dict,
+    customer: dict | None,
+    *,
+    inline_contacts: bool = False,
+) -> None:
     lid = str(location.get("id") or "")
     cid = str(location.get("customer_id") or "")
     cname = str((customer or {}).get("customer_name") or (customer or {}).get("company_name") or "")
@@ -1372,6 +2024,8 @@ def _render_location_detail_tabs(location: dict, customer: dict | None) -> None:
         _render_contacts_table_block(
             contacts,
             empty_caption="No contacts assigned to this location.",
+            customer=customer if inline_contacts else None,
+            inline=inline_contacts,
         )
 
     with tab_jobs:

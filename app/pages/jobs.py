@@ -22,7 +22,8 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback
     from app.pages._core._session import select_key
-    from app.styles import inject_jobs_module_css
+    from app.pages.tasks import render_job_linked_tasks_tab
+    from app.styles import inject_jobs_module_css, inject_tasks_module_css
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_header  # type: ignore
@@ -36,7 +37,8 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback  # type: ignore
     from pages._core._session import select_key  # type: ignore
-    from styles import inject_jobs_module_css  # type: ignore
+    from pages.tasks import render_job_linked_tasks_tab  # type: ignore
+    from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("jobs")
@@ -46,6 +48,7 @@ _JOB_TABS = [
     "Scope",
     "Financials",
     "Schedule",
+    "Tasks",
     "Documents",
     "Photos",
     "Daily Updates",
@@ -574,6 +577,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_scope,
         tab_financials,
         tab_schedule,
+        tab_tasks,
         tab_documents,
         tab_photos,
         tab_daily,
@@ -625,6 +629,10 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</div>"
         )
         st.markdown(_dialog_card("Schedule", sched_html), unsafe_allow_html=True)
+
+    with tab_tasks:
+        inject_tasks_module_css()
+        render_job_linked_tasks_tab(job)
 
     with tab_documents:
         _render_dialog_placeholder("Job documents will appear here when connected to Supabase.")

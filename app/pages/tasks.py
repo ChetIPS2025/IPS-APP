@@ -50,7 +50,12 @@ try:
         priority_to_db,
         status_to_db,
     )
-    from app.services.tasks_service import clear_tasks_cache, get_tasks, update_task
+    from app.services.tasks_service import (
+        clear_tasks_cache,
+        get_tasks,
+        get_tasks_by_job,
+        update_task,
+    )
     from app.styles import inject_tasks_module_css
     from app.utils.formatting import fmt_date
 except ImportError:
@@ -96,7 +101,12 @@ except ImportError:
         priority_to_db,
         status_to_db,
     )
-    from services.tasks_service import clear_tasks_cache, get_tasks, update_task  # type: ignore
+    from services.tasks_service import (  # type: ignore
+        clear_tasks_cache,
+        get_tasks,
+        get_tasks_by_job,
+        update_task,
+    )
     from styles import inject_tasks_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
@@ -124,8 +134,11 @@ _TASK_TABS = [
     "Activity",
 ]
 
-_STATUS_FILTER_OPTS = ["All Statuses", "Open", "Closed"]
+_TASK_STATUS_OPTS = ["Open", "Closed"]
 _PRIORITY_FILTER_OPTS = ["All Priorities", "High", "Medium", "Low"]
+TASK_VIEW_KEY = "task_view_filter"
+TASK_VIEW_OPTS = ["Open Tasks", "Closed Tasks", "All Tasks"]
+JOB_TASK_VIEW_OPTS = ["Open", "Closed", "All"]
 
 
 def _build_assignee_lookup() -> dict[str, str]:
@@ -231,11 +244,48 @@ def _priority_pill_html(priority: object) -> str:
     return f'<span class="ips-priority-pill {css}">{html.escape(pri)}</span>'
 
 
+def _apply_task_view_filter(rows: list[dict], view: str) -> list[dict]:
+    if view == "Closed Tasks":
+        return [t for t in rows if normalize_task_status(t.get("status")) == "Closed"]
+    if view == "Open Tasks":
+        return [t for t in rows if normalize_task_status(t.get("status")) == "Open"]
+    return list(rows)
+
+
+def _task_count_caption(count: int, view: str) -> str:
+    if view == "Open Tasks":
+        return f"{count} open task(s)"
+    if view == "Closed Tasks":
+        return f"{count} closed task(s)"
+    return f"{count} task(s)"
+
+
+def _render_task_view_selector() -> None:
+    if TASK_VIEW_KEY not in st.session_state:
+        st.session_state[TASK_VIEW_KEY] = "Open Tasks"
+    st.markdown('<div class="ips-task-view-toggle">', unsafe_allow_html=True)
+    if hasattr(st, "segmented_control"):
+        st.segmented_control(
+            "Task view",
+            TASK_VIEW_OPTS,
+            key=TASK_VIEW_KEY,
+            label_visibility="collapsed",
+        )
+    else:
+        st.radio(
+            "Task view",
+            TASK_VIEW_OPTS,
+            key=TASK_VIEW_KEY,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _filter_tasks(
     rows: list[dict],
     *,
     q: str,
-    status: str,
     priority: str,
     assignee: str,
     assignee_lookup: dict[str, str],
@@ -252,8 +302,6 @@ def _filter_tasks(
             or ql in str(t.get("description", "")).lower()
             or ql in _format_job_label(t, jobs_by_id, job_options).lower()
         ]
-    if status and status != "All Statuses":
-        out = [t for t in out if normalize_task_status(t.get("status")) == status]
     if priority and priority != "All Priorities":
         out = [t for t in out if normalize_task_priority(t.get("priority")) == priority]
     if assignee and assignee != "All Assignees":
@@ -548,7 +596,7 @@ def _render_task_edit_form(task: dict, job_options: list[dict]) -> None:
 
     c1, c2 = st.columns(2, gap="medium")
     with c1:
-        st.selectbox("Status", _STATUS_FILTER_OPTS[1:], key=f"task_edit_status_{rk}")
+        st.selectbox("Status", _TASK_STATUS_OPTS, key=f"task_edit_status_{rk}")
         st.selectbox("Priority", _PRIORITY_FILTER_OPTS[1:], key=f"task_edit_pri_{rk}")
         st.selectbox("Assigned to", _assignee_options(task), key=f"task_edit_assign_{rk}")
     with c2:
@@ -778,6 +826,187 @@ def _render_custom_task_table(
     return all_task_ids
 
 
+def _job_friendly_label(job: dict) -> str:
+    num = str(job.get("job_number") or "").strip()
+    name = str(job.get("job_name") or "").strip()
+    if num and name:
+        return f"{num} — {name}"
+    return num or name or str(job.get("id") or "")
+
+
+def _resolve_job_id_from_label(label: str, job_options: list[dict]) -> str | None:
+    for opt in job_options:
+        if str(opt.get("label") or "") == label:
+            jid = opt.get("id")
+            return str(jid).strip() if jid else None
+    return None
+
+
+def _render_job_task_status_button(task: dict) -> None:
+    tid = str(task.get("id") or "").strip()
+    if not tid:
+        return
+    status = normalize_task_status(task.get("status"))
+    status_wrap = f"job_task_status_open_{tid}" if status == "Open" else f"job_task_status_closed_{tid}"
+    with st.container(key=status_wrap):
+        if status == "Open":
+            if st.button("Open", key=f"job_task_status_{tid}"):
+                _save_task_field(tid, {"status": "Closed"})
+        else:
+            if st.button("Closed", key=f"job_task_status_{tid}"):
+                _save_task_field(tid, {"status": "Open"})
+
+
+def _render_job_linked_tasks_table(
+    tasks: list[dict],
+    *,
+    assignee_lookup: dict[str, str],
+) -> None:
+    cols = [4.8, 1.2, 1.2, 2.0, 1.2]
+    headers = ["TASK", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE"]
+    st.markdown('<div class="ips-job-tasks-table">', unsafe_allow_html=True)
+    with st.container(key="job_tasks_table_wrap"):
+        header_cols = st.columns(cols, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, headers):
+            with col:
+                st.markdown(
+                    f'<div class="ips-job-tasks-header-row ips-task-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
+                )
+        for task in tasks:
+            tid = str(task.get("id") or "").strip()
+            if not tid:
+                continue
+            status = normalize_task_status(task.get("status"))
+            priority = normalize_task_priority(task.get("priority"))
+            assignee = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup)
+            due = fmt_date(task.get("due_date"))
+            row_cols = st.columns(cols, gap="small", vertical_alignment="center")
+            with row_cols[0]:
+                st.markdown(
+                    f'<div class="ips-job-tasks-row ips-task-title">{html.escape(str(task.get("title") or ""))}</div>',
+                    unsafe_allow_html=True,
+                )
+            with row_cols[1]:
+                _render_job_task_status_button(task)
+            with row_cols[2]:
+                st.markdown(_priority_pill_html(priority), unsafe_allow_html=True)
+            with row_cols[3]:
+                st.markdown(
+                    f'<div class="ips-job-tasks-row ips-task-cell">{html.escape(assignee)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with row_cols[4]:
+                st.markdown(
+                    f'<div class="ips-job-tasks-row ips-task-cell ips-task-due">{html.escape(due)}</div>',
+                    unsafe_allow_html=True,
+                )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_job_linked_tasks_tab(job: dict) -> None:
+    """Tasks tab inside Job Details — linked IPS tasks for this job."""
+    job_id = str(job.get("id") or "").strip()
+    if not job_id:
+        st.info("No job selected.")
+        return
+
+    assignee_lookup = _build_assignee_lookup()
+    job_options = get_job_options(include_all=True)
+    job_label = _job_friendly_label(job)
+    view_key = f"job_tasks_view_{job_id}"
+    form_key = f"job_task_form_{job_id}"
+
+    if view_key not in st.session_state:
+        st.session_state[view_key] = "Open"
+
+    head_l, head_r = st.columns([3, 1])
+    with head_l:
+        st.markdown(
+            '<div class="ips-task-view-toggle ips-job-tasks-view">',
+            unsafe_allow_html=True,
+        )
+        if hasattr(st, "segmented_control"):
+            st.segmented_control(
+                "Job task view",
+                JOB_TASK_VIEW_OPTS,
+                key=view_key,
+                label_visibility="collapsed",
+            )
+        else:
+            st.radio(
+                "Job task view",
+                JOB_TASK_VIEW_OPTS,
+                key=view_key,
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+    with head_r:
+        if st.button("+ Add Task", key=f"job_add_task_{job_id}", use_container_width=True):
+            st.session_state[form_key] = True
+
+    all_for_job = _merge_task_overrides(get_tasks_by_job(job_id, include_closed=True))
+    view = str(st.session_state.get(view_key) or "Open")
+    if view == "Closed":
+        linked = [t for t in all_for_job if normalize_task_status(t.get("status")) == "Closed"]
+    elif view == "Open":
+        linked = [t for t in all_for_job if normalize_task_status(t.get("status")) == "Open"]
+    else:
+        linked = all_for_job
+
+    if st.session_state.get(form_key):
+        with st.expander("New task", expanded=True):
+            st.text_input("Title", key=f"job_task_new_title_{job_id}")
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.selectbox("Status", _TASK_STATUS_OPTS, key=f"job_task_new_status_{job_id}")
+                st.selectbox("Priority", _PRIORITY_FILTER_OPTS[1:], key=f"job_task_new_priority_{job_id}")
+            with nc2:
+                st.selectbox(
+                    "Assigned to",
+                    ["— Unassigned —", *task_assignee_options()],
+                    key=f"job_task_new_assignee_{job_id}",
+                )
+                st.date_input("Due date", key=f"job_task_new_due_{job_id}", value=None)
+            st.text_input("Linked job", value=job_label, disabled=True, key=f"job_task_new_job_display_{job_id}")
+            st.text_area("Description", key=f"job_task_new_desc_{job_id}")
+            btn_l, btn_r = st.columns(2)
+            with btn_l:
+                if st.button("Create Task", key=f"job_task_create_{job_id}", type="primary"):
+                    assignee = st.session_state.get(f"job_task_new_assignee_{job_id}")
+                    if assignee == "— Unassigned —":
+                        assignee = ""
+                    ui = {
+                        "title": st.session_state.get(f"job_task_new_title_{job_id}"),
+                        "description": st.session_state.get(f"job_task_new_desc_{job_id}"),
+                        "status": status_to_db(st.session_state.get(f"job_task_new_status_{job_id}")),
+                        "priority": priority_to_db(st.session_state.get(f"job_task_new_priority_{job_id}")),
+                        "assigned_to": assignee,
+                        "job_id": job_id,
+                        "linked_job": job_label,
+                        "linked_estimate": "— None —",
+                        "due_date": st.session_state.get(f"job_task_new_due_{job_id}"),
+                    }
+                    ok, msg = persist_task(ui)
+                    if apply_persist_feedback(ok, msg, clear_keys=(form_key,)):
+                        clear_tasks_cache()
+                        st.rerun()
+            with btn_r:
+                if st.button("Cancel", key=f"job_task_cancel_{job_id}"):
+                    st.session_state[form_key] = False
+                    st.rerun()
+
+    if not linked:
+        st.markdown(
+            '<p class="ips-job-tasks-empty">No tasks linked to this job.</p>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    _render_job_linked_tasks_table(linked, assignee_lookup=assignee_lookup)
+
+
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
@@ -809,34 +1038,28 @@ def render() -> None:
             st.session_state["ips_task_form"] = True
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.6])
+        _render_task_view_selector()
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.6])
         with c1:
             st.text_input("Search", placeholder="Search tasks…", key="task_search", label_visibility="collapsed")
         with c2:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="task_filter_status",
-                label_visibility="collapsed",
-            )
-        with c3:
             st.selectbox(
                 "Priority",
                 _PRIORITY_FILTER_OPTS,
                 key="task_filter_priority",
                 label_visibility="collapsed",
             )
-        with c4:
+        with c3:
             st.selectbox(
                 "Assigned to",
                 ["All Assignees", *assignees],
                 key="task_filter_assignee",
                 label_visibility="collapsed",
             )
-        with c5:
+        with c4:
             if st.button("Clear", key="task_clear", use_container_width=True):
                 st.session_state["task_search"] = ""
-                st.session_state["task_filter_status"] = "All Statuses"
+                st.session_state[TASK_VIEW_KEY] = "Open Tasks"
                 st.session_state["task_filter_priority"] = "All Priorities"
                 st.session_state["task_filter_assignee"] = "All Assignees"
                 st.rerun()
@@ -844,20 +1067,32 @@ def render() -> None:
     layout_filter_bar(_filters)
 
     if st.session_state.get("ips_task_form"):
+        pre_job_id = st.session_state.get("ips_task_form_job_id")
+        pre_job_label = str(st.session_state.get("ips_task_form_job_label") or "").strip()
+        job_labels = [str(o.get("label") or "") for o in job_options]
+        default_job_label = pre_job_label if pre_job_label in job_labels else job_labels[0]
+        if "task_new_job" not in st.session_state and pre_job_label:
+            st.session_state["task_new_job"] = default_job_label
         with st.expander("New task", expanded=True):
             st.text_input("Title", key="task_new_title")
             nc1, nc2 = st.columns(2)
             with nc1:
-                st.selectbox("Status", _STATUS_FILTER_OPTS[1:], key="task_new_status")
+                st.selectbox("Status", _TASK_STATUS_OPTS, key="task_new_status")
                 st.selectbox("Priority", _PRIORITY_FILTER_OPTS[1:], key="task_new_priority")
             with nc2:
                 st.selectbox("Assigned to", ["— Unassigned —", *task_assignee_options()], key="task_new_assignee")
                 st.date_input("Due date", key="task_new_due", value=None)
-            st.selectbox(
-                "Linked job",
-                [str(o.get("label") or "") for o in job_options],
-                key="task_new_job",
-            )
+            if pre_job_id:
+                st.text_input("Linked job", value=default_job_label, disabled=True, key="task_new_job_locked")
+                picked_job_label = default_job_label
+                picked_job_id = pre_job_id
+            else:
+                picked_job_label = st.selectbox(
+                    "Linked job",
+                    job_labels,
+                    key="task_new_job",
+                )
+                picked_job_id = _resolve_job_id_from_label(picked_job_label, job_options)
             st.selectbox("Linked estimate", _estimate_options({}), key="task_new_est")
             st.text_area("Description", key="task_new_desc")
             if st.button("Create Task", key="task_create", type="primary"):
@@ -870,18 +1105,29 @@ def render() -> None:
                     "status": status_to_db(st.session_state.get("task_new_status")),
                     "priority": priority_to_db(st.session_state.get("task_new_priority")),
                     "assigned_to": assignee,
-                    "linked_job": st.session_state.get("task_new_job"),
+                    "job_id": picked_job_id,
+                    "linked_job": picked_job_label,
                     "linked_estimate": st.session_state.get("task_new_est"),
                     "due_date": st.session_state.get("task_new_due"),
                 }
                 ok, msg = persist_task(ui)
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_task_form",)):
+                if apply_persist_feedback(
+                    ok,
+                    msg,
+                    clear_keys=("ips_task_form", "ips_task_form_job_id", "ips_task_form_job_label"),
+                ):
+                    clear_tasks_cache()
                     st.rerun()
 
+    view = str(st.session_state.get(TASK_VIEW_KEY) or "Open Tasks")
+    if view not in TASK_VIEW_OPTS:
+        view = "Open Tasks"
+        st.session_state[TASK_VIEW_KEY] = view
+
+    viewed = _apply_task_view_filter(all_tasks, view)
     filtered = _filter_tasks(
-        all_tasks,
+        viewed,
         q=str(st.session_state.get("task_search") or "").strip(),
-        status=str(st.session_state.get("task_filter_status") or "All Statuses"),
         priority=str(st.session_state.get("task_filter_priority") or "All Priorities"),
         assignee=str(st.session_state.get("task_filter_assignee") or "All Assignees"),
         assignee_lookup=assignee_lookup,
@@ -889,7 +1135,7 @@ def render() -> None:
         job_options=job_options,
     )
 
-    st.caption(f"{len(filtered)} task(s)")
+    st.caption(_task_count_caption(len(filtered), view))
 
     build_modal_cache(filtered, cache_key=CACHE_KEY)
     _render_custom_task_table(
