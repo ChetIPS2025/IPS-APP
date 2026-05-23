@@ -9,7 +9,6 @@ import streamlit as st
 
 try:
     from app.components.clickable_table import render_clickable_table
-    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
         clear_record_modal,
@@ -43,7 +42,6 @@ try:
     from app.utils.formatting import fmt_date, fmt_hours
 except ImportError:
     from components.clickable_table import render_clickable_table  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_record_modal,
@@ -102,63 +100,81 @@ def _inject_timekeeping_styles() -> None:
         """
         <style>
         section[data-testid="stMain"]:has(.ips-timekeeping-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-header-anchor),
-        section[data-testid="stMain"]:has(.ips-timekeeping-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-filter-anchor) {
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-top-bar) {
             background: #ffffff !important;
             border: 1px solid #e5eaf2 !important;
-            border-radius: 14px !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-            margin-bottom: 0.65rem !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+            margin-bottom: 0.5rem !important;
         }
         section[data-testid="stMain"]:has(.ips-timekeeping-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-header-anchor) > div,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-top-bar) > div {
+            padding: 0.5rem 0.75rem 0.55rem !important;
+        }
         section[data-testid="stMain"]:has(.ips-timekeeping-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-filter-anchor) > div {
-            padding: 0.75rem 0.9rem !important;
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-top-bar)
+        [data-testid="stVerticalBlock"] {
+            gap: 0.35rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-timekeeping-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-time-top-bar)
+        .stButton > button {
+            min-height: 2rem !important;
+            font-size: 0.78rem !important;
+            padding: 0.2rem 0.55rem !important;
+        }
+        .ips-time-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
         }
         .ips-time-header-inner {
             display: flex;
-            align-items: flex-start;
-            gap: 0.7rem;
+            align-items: center;
+            gap: 0.55rem;
+            min-width: 0;
         }
         .ips-time-header-icon {
-            width: 2.4rem;
-            height: 2.4rem;
-            border-radius: 10px;
+            width: 1.85rem;
+            height: 1.85rem;
+            border-radius: 8px;
             background: #eff6ff;
             color: #2563eb;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 0.95rem;
             flex-shrink: 0;
         }
         .ips-time-title {
             margin: 0;
             color: #111827;
-            font-size: 1.35rem;
-            font-weight: 750;
-            line-height: 1.1;
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.15;
         }
         .ips-time-subtitle {
-            margin: 0.18rem 0 0;
-            color: #6b7280;
-            font-size: 0.82rem;
+            margin: 0.1rem 0 0;
+            color: #64748b;
+            font-size: 0.74rem;
             font-weight: 500;
+            line-height: 1.2;
         }
         .ips-time-week-label {
-            margin: 0.25rem 0 0;
+            margin: 0;
             text-align: right;
-            color: #111827;
-            font-size: 0.92rem;
+            color: #0f172a;
+            font-size: 0.82rem;
             font-weight: 700;
+            white-space: nowrap;
         }
         .ips-time-week-sub {
-            margin: 0.1rem 0 0;
+            margin: 0.08rem 0 0;
             text-align: right;
-            color: #6b7280;
-            font-size: 0.78rem;
+            color: #64748b;
+            font-size: 0.72rem;
             font-weight: 600;
         }
         .ips-time-day-head {
@@ -462,56 +478,61 @@ def render() -> None:
     )
     ws = _current_week_start()
     we = week_end(ws)
-
-    with st.container(border=True):
-        st.markdown('<span class="ips-time-header-anchor"></span>', unsafe_allow_html=True)
-        h1, h2, h3 = st.columns([2.5, 2.7, 1.7], gap="medium")
-        with h1:
-            st.markdown(
-                '<div class="ips-time-header-inner">'
-                '<div class="ips-time-header-icon">◷</div>'
-                '<div><p class="ips-time-title">Timekeeping</p>'
-                '<p class="ips-time-subtitle">View and edit employee weekly time entries.</p></div>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
-        with h2:
-            n1, n2, n3 = st.columns(3, gap="small")
-            with n1:
-                if st.button("‹  Previous Week", key="tk_prev_week", use_container_width=True):
-                    st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
-                    st.rerun()
-            with n2:
-                if st.button("▣  Current Week", key="tk_current_week", use_container_width=True):
-                    st.session_state[_WEEK_KEY] = week_start()
-                    st.rerun()
-            with n3:
-                if st.button("Next Week  ›", key="tk_next_week", use_container_width=True):
-                    st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
-                    st.rerun()
-        with h3:
-            st.markdown(
-                f'<p class="ips-time-week-label">▣ {html.escape(fmt_date(ws))} – {html.escape(fmt_date(we))}</p>'
-                f'<p class="ips-time-week-sub">Week {ws.isocalendar()[1]}</p>',
-                unsafe_allow_html=True,
-            )
-
     summaries = load_timekeeping_summaries(ws)
     departments = sorted({str(s.get("department") or "") for s in summaries if s.get("department")})
 
     with st.container(border=True):
-        st.markdown('<span class="ips-time-filter-anchor"></span>', unsafe_allow_html=True)
+        st.markdown('<span class="ips-time-top-bar" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-        def _filters() -> None:
-            c1, c2, c3 = st.columns([2, 1, 0.75])
-            with c1:
-                st.text_input("Search", placeholder="Search employee…", key="tk_search", label_visibility="collapsed")
-            with c2:
-                st.selectbox("Department", ["All Departments", *departments], key="tk_dept", label_visibility="collapsed")
-            with c3:
-                st.button("⇩ Export", key="tk_export", use_container_width=True)
+        title_col, week_col = st.columns([2.4, 1.6], gap="small")
+        with title_col:
+            st.markdown(
+                '<div class="ips-time-header-inner">'
+                '<div class="ips-time-header-icon">◷</div>'
+                '<div><p class="ips-time-title">Timekeeping</p>'
+                '<p class="ips-time-subtitle">Weekly employee time entries</p></div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with week_col:
+            st.markdown(
+                f'<p class="ips-time-week-label">{html.escape(fmt_date(ws))} – {html.escape(fmt_date(we))}</p>'
+                f'<p class="ips-time-week-sub">Week {ws.isocalendar()[1]}</p>',
+                unsafe_allow_html=True,
+            )
 
-        layout_filter_bar(_filters)
+        nav1, nav2, nav3, search_col, dept_col, export_col = st.columns(
+            [0.85, 0.95, 0.85, 2.4, 1.2, 0.75],
+            gap="small",
+        )
+        with nav1:
+            if st.button("‹ Prev", key="tk_prev_week", use_container_width=True):
+                st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
+                st.rerun()
+        with nav2:
+            if st.button("Current", key="tk_current_week", use_container_width=True):
+                st.session_state[_WEEK_KEY] = week_start()
+                st.rerun()
+        with nav3:
+            if st.button("Next ›", key="tk_next_week", use_container_width=True):
+                st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
+                st.rerun()
+        with search_col:
+            st.text_input(
+                "Search",
+                placeholder="Search employee…",
+                key="tk_search",
+                label_visibility="collapsed",
+            )
+        with dept_col:
+            st.selectbox(
+                "Department",
+                ["All Departments", *departments],
+                key="tk_dept",
+                label_visibility="collapsed",
+            )
+        with export_col:
+            st.button("Export", key="tk_export", use_container_width=True)
 
     q = str(st.session_state.get("tk_search") or "").strip().lower()
     dept = str(st.session_state.get("tk_dept") or "All Departments")
