@@ -16,6 +16,7 @@ try:
         customer_id_for_name,
         customer_location_select_options,
         employee_options,
+        load_estimates,
         load_jobs,
         lookup_options,
         persist_job,
@@ -31,6 +32,7 @@ except ImportError:
     from pages._core._data import (  # type: ignore
         customer_filter_options,
         employee_options,
+        load_estimates,
         load_jobs,
         lookup_options,
         persist_job,
@@ -47,6 +49,7 @@ _JOB_TABS = [
     "Overview",
     "Scope",
     "Financials",
+    "Estimates",
     "Schedule",
     "Tasks",
     "Documents",
@@ -576,6 +579,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_overview,
         tab_scope,
         tab_financials,
+        tab_estimates,
         tab_schedule,
         tab_tasks,
         tab_documents,
@@ -619,6 +623,31 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</div>"
         )
         st.markdown(_dialog_card("Financial Summary", fin_html), unsafe_allow_html=True)
+
+    with tab_estimates:
+        jid = str(job.get("id") or "")
+        linked = [e for e in load_estimates() if str(e.get("job_id") or "") == jid]
+        if not linked:
+            _render_dialog_placeholder("No estimates linked to this job yet.")
+        else:
+            for est in linked:
+                est_no = str(est.get("estimate_number") or "—")
+                project = str(est.get("project_name") or "—")
+                status_lbl = str(est.get("status") or "Draft")
+                total = est.get("customer_price") or est.get("total") or 0
+                try:
+                    from app.utils.formatting import fmt_currency
+                except ImportError:
+                    from utils.formatting import fmt_currency  # type: ignore
+                st.markdown(
+                    f'<div class="ips-detail-grid">'
+                    f"{_detail_field('Estimate #', est_no)}"
+                    f"{_detail_field('Project', project)}"
+                    f"{_detail_field('Status', status_lbl)}"
+                    f"{_detail_field('Customer Price', fmt_currency(total))}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
     with tab_schedule:
         sched_html = (

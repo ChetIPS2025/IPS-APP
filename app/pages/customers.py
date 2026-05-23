@@ -2111,7 +2111,6 @@ def _seed_contact_edit_form(contact: dict) -> None:
     st.session_state[f"ct_edit_name_{rk}"] = str(contact.get("full_name") or contact.get("contact_name") or "")
     st.session_state[f"ct_edit_title_{rk}"] = str(contact.get("title") or "")
     st.session_state[f"ct_edit_role_{rk}"] = str(contact.get("role_type") or contact.get("title") or "Other")
-    st.session_state[f"ct_edit_dept_{rk}"] = str(contact.get("department") or "")
     st.session_state[f"ct_edit_email_{rk}"] = str(contact.get("email") or "")
     st.session_state[f"ct_edit_phone_{rk}"] = str(contact.get("phone") or "")
     st.session_state[f"ct_edit_mobile_{rk}"] = str(contact.get("mobile") or "")
@@ -2164,7 +2163,6 @@ def _render_contact_edit_form(contact: dict, *, locations: list[dict]) -> None:
         st.text_input("Full name", key=f"ct_edit_name_{rk}")
         st.text_input("Title", key=f"ct_edit_title_{rk}")
         st.selectbox("Role", CONTACT_ROLE_TYPES, key=f"ct_edit_role_{rk}")
-        st.text_input("Department", key=f"ct_edit_dept_{rk}")
     with ec2:
         st.text_input("Email", key=f"ct_edit_email_{rk}")
         st.text_input("Phone", key=f"ct_edit_phone_{rk}")
@@ -2190,7 +2188,6 @@ def _render_contact_edit_form(contact: dict, *, locations: list[dict]) -> None:
             "contact_name": st.session_state.get(f"ct_edit_name_{rk}"),
             "title": st.session_state.get(f"ct_edit_title_{rk}"),
             "role_type": st.session_state.get(f"ct_edit_role_{rk}"),
-            "department": st.session_state.get(f"ct_edit_dept_{rk}"),
             "email": st.session_state.get(f"ct_edit_email_{rk}"),
             "phone": st.session_state.get(f"ct_edit_phone_{rk}"),
             "mobile": st.session_state.get(f"ct_edit_mobile_{rk}"),
@@ -2227,7 +2224,6 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Full Name', contact.get('full_name') or contact.get('contact_name'))}"
             f"{detail_field_html('Title', contact.get('title'))}"
-            f"{detail_field_html('Department', contact.get('department'))}"
             f"{detail_field_html('Customer', cname)}"
             f"{detail_field_html('Location', loc_name)}"
             f'{detail_field_html("Role Type", role, html_value=_contact_role_pill_html(role))}'

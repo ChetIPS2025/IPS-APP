@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import html
-from datetime import date
+from datetime import date, timedelta
 
 import streamlit as st
 
 try:
-    from app.components.charts import render_donut_chart
-    from app.components.headers import render_page_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -25,7 +22,6 @@ try:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
-        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -34,7 +30,18 @@ try:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
-    from app.components.tables import render_data_table
+    from app.pages.estimate_builder_ui import (
+        render_cost_builder_tab,
+        render_equipment_tab,
+        render_labor_tab,
+        render_markups_tab,
+        render_materials_tab,
+        render_other_costs_tab,
+        render_proposal_preview_tab,
+        render_subcontractors_tab,
+        render_summary_tab,
+        render_travel_tab,
+    )
     from app.pages._core._data import (
         ACTIVE_ESTIMATE_KEY,
         customer_contact_select_options,
@@ -42,20 +49,20 @@ try:
         customer_id_for_name,
         customer_location_select_options,
         get_estimate,
+        load_assets,
         load_estimates,
+        load_inventory,
+        load_jobs,
         lookup_options,
         persist_estimate,
     )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
+    from app.components.headers import render_page_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_estimates_module_css
-    from app.utils.constants import SESSION_NAV_KEY
-    from app.estimates.utils import resolve_estimate_subtotal
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
-    from components.charts import render_donut_chart  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -70,7 +77,6 @@ except ImportError:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
-        render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
         render_save_cancel_actions,
@@ -79,7 +85,18 @@ except ImportError:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
-    from components.tables import render_data_table  # type: ignore
+    from pages.estimate_builder_ui import (  # type: ignore
+        render_cost_builder_tab,
+        render_equipment_tab,
+        render_labor_tab,
+        render_markups_tab,
+        render_materials_tab,
+        render_other_costs_tab,
+        render_proposal_preview_tab,
+        render_subcontractors_tab,
+        render_summary_tab,
+        render_travel_tab,
+    )
     from pages._core._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
         customer_contact_select_options,
@@ -87,15 +104,18 @@ except ImportError:
         customer_id_for_name,
         customer_location_select_options,
         get_estimate,
+        load_assets,
         load_estimates,
+        load_inventory,
+        load_jobs,
         lookup_options,
         persist_estimate,
     )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
+    from components.headers import render_page_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_estimates_module_css  # type: ignore
-    from utils.constants import SESSION_NAV_KEY  # type: ignore
-    from estimates.utils import resolve_estimate_subtotal  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _SEL = select_key("estimates")
@@ -105,32 +125,37 @@ _ESTIMATES_CACHE_KEY = "_ips_estimates_modal_by_id"
 _NEW_CUST_PREV = "est_new_cust_prev"
 _ESTIMATE_TABS = [
     "Overview",
-    "Line Items",
-    "Labor",
+    "Cost Builder",
     "Materials",
+    "Labor",
     "Equipment",
+    "Travel",
     "Subcontractors",
     "Markups",
+    "Summary",
+    "Proposal Preview",
     "Attachments",
     "Notes",
     "Activity",
-    "Proposal Preview",
 ]
-SELECTED_ESTIMATE_KEY = "selected_estimate_id"
-SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
-_ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
-_ESTIMATE_COLS = [0.35, 1.2, 3.2, 2.1, 1.2, 1.6, 1.3, 1.3, 1.2]
+_ESTIMATE_COLS = [0.35, 1.1, 2.6, 1.8, 1.0, 1.2, 1.1, 1.1, 1.1, 1.1]
 _ESTIMATE_HEADERS = [
     "",
     "ESTIMATE #",
     "PROJECT / DESCRIPTION",
     "CUSTOMER",
+    "JOB",
     "STATUS",
-    "CREATED BY",
     "ESTIMATE DATE",
-    "EXPIRATION DATE",
-    "TOTAL",
+    "TOTAL COST",
+    "CUSTOMER PRICE",
+    "CREATED BY",
 ]
+_NEW_ESTIMATE_DIALOG_KEY = "ips_est_new_dialog_open"
+_BUILD_MODE_PREFIX = "est_build_mode_"
+SELECTED_ESTIMATE_KEY = "selected_estimate_id"
+SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
+_ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
 _STATUS_FILTER_OPTS = [
     "All Statuses",
     "Draft",
@@ -204,6 +229,95 @@ def _estimate_customer(row: dict) -> str:
 def _estimate_created_by(row: dict) -> str:
     val = str(row.get("created_by") or row.get("created_by_name") or "").strip()
     return val or "—"
+
+
+def _estimate_job(row: dict) -> str:
+    val = str(row.get("job_number") or row.get("linked_job") or "").strip()
+    return val if val and val != "—" else "—"
+
+
+def _estimate_total_cost(row: dict) -> str:
+    val = row.get("total_cost")
+    if val in (None, ""):
+        val = row.get("subtotal")
+    return fmt_currency(val)
+
+
+def _estimate_customer_price(row: dict) -> str:
+    val = row.get("customer_price")
+    if val in (None, ""):
+        val = row.get("total")
+    return fmt_currency(val)
+
+
+def _inventory_options() -> list[tuple[str, dict]]:
+    out: list[tuple[str, dict]] = []
+    for item in load_inventory():
+        sku = str(item.get("sku") or item.get("id") or "")
+        name = str(item.get("name") or "")
+        label = f"{sku} — {name}".strip(" —")
+        out.append((label or name or sku, item))
+    return out
+
+
+def _asset_options() -> list[tuple[str, dict]]:
+    out: list[tuple[str, dict]] = []
+    for asset in load_assets():
+        num = str(asset.get("asset_number") or asset.get("id") or "")
+        name = str(asset.get("asset_name") or "")
+        out.append((f"{num} — {name}".strip(" —"), asset))
+    return out
+
+
+def _vendor_options() -> list[str]:
+    vendors: set[str] = set()
+    for item in load_inventory():
+        v = str(item.get("vendor") or "").strip()
+        if v and v != "—":
+            vendors.add(v)
+    return sorted(vendors)
+
+
+def _job_select_options(customer_name: str) -> list[tuple[str, str]]:
+    cid = customer_id_for_name(customer_name)
+    out: list[tuple[str, str]] = [("— None —", "")]
+    for job in load_jobs():
+        if cid and str(job.get("customer_id") or "") != cid:
+            jcust = str(job.get("customer_name") or job.get("customer") or "")
+            if jcust != customer_name:
+                continue
+        label = str(job.get("job_number") or job.get("id") or "")
+        proj = str(job.get("project_name") or job.get("job_name") or "")
+        if proj:
+            label = f"{label} — {proj}"
+        out.append((label, str(job.get("id") or "")))
+    return out
+
+
+def _build_mode_key(est: dict) -> str:
+    rk = record_session_key(est, "id", "estimate_number")
+    return f"{_BUILD_MODE_PREFIX}{rk}"
+
+
+def _set_estimate_build_mode(est: dict) -> None:
+    st.session_state[_build_mode_key(est)] = True
+    rk = record_session_key(est, "id", "estimate_number")
+    set_view_mode(_MOD, rk)
+
+
+def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
+    est = get_estimate(row_id) or {}
+    ok, msg = persist_estimate(
+        {
+            "estimate_number": est.get("estimate_number"),
+            "project_name": est.get("project_name"),
+            "customer": est.get("customer"),
+            "customer_id": est.get("customer_id") or customer_id_for_name(str(est.get("customer") or "")),
+            **data,
+        },
+        row_id=row_id,
+    )
+    return ok, msg
 
 
 def _estimate_status_pill_html(status: str) -> str:
@@ -285,8 +399,9 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
             status = _normalize_estimate_status(est.get("status"))
             created_by = _estimate_created_by(est)
             est_date = fmt_date(est.get("estimate_date"))
-            exp_date = fmt_date(est.get("expiration_date"))
-            total = fmt_currency(est.get("total"))
+            job_no = _estimate_job(est)
+            total_cost = _estimate_total_cost(est)
+            customer_price = _estimate_customer_price(est)
 
             cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
 
@@ -318,13 +433,13 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
                 )
 
             with cols[4]:
-                st.markdown(_estimate_status_pill_html(status), unsafe_allow_html=True)
-
-            with cols[5]:
                 st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(created_by)}</div>',
+                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(job_no)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            with cols[5]:
+                st.markdown(_estimate_status_pill_html(status), unsafe_allow_html=True)
 
             with cols[6]:
                 st.markdown(
@@ -334,13 +449,19 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
 
             with cols[7]:
                 st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(exp_date)}</div>',
+                    f'<div class="ips-estimates-cell">{html.escape(total_cost)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[8]:
                 st.markdown(
-                    f'<div class="ips-estimates-cell">{html.escape(total)}</div>',
+                    f'<div class="ips-estimates-cell ips-estimates-number">{html.escape(customer_price)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[9]:
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(created_by)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -511,53 +632,19 @@ def _open_estimates_detail_modal(estimate_id: str, estimate: dict | None = None)
         st.session_state[ACTIVE_ESTIMATE_KEY] = str(estimate.get("id") or "")
 
 
-def _estimate_line_items() -> list[dict]:
-    return [
-        {"id": "li1", "item": "Labor — Rough-in", "description": "Plumbing rough-in", "qty": 40, "unit": "HR", "unit_price": 85, "total": 3400},
-        {"id": "li2", "item": "MAT-1001", "description": "2x4x8 PT Lumber", "qty": 120, "unit": "EA", "unit_price": 8.45, "total": 1014},
-    ]
-
-
-def _render_line_items_table(*, session_key: str) -> None:
-    line_items = _estimate_line_items()
-
-    def _li_cell(field: str, row: dict) -> str:
-        if field == "total":
-            return html.escape(fmt_currency(row.get("total")))
-        if field in ("unit_price",):
-            return html.escape(fmt_currency(row.get(field)))
-        return html.escape(str(row.get(field) or "—"))
-
-    render_data_table(
-        line_items,
-        [
-            ("item", "ITEM"),
-            ("description", "DESCRIPTION"),
-            ("qty", "QTY"),
-            ("unit", "UNIT"),
-            ("unit_price", "UNIT PRICE"),
-            ("total", "TOTAL"),
-        ],
-        row_id_key="id",
-        selected_id=None,
-        session_select_key=session_key,
-        col_fr=["0.8fr", "1.5fr", "0.5fr", "0.5fr", "0.7fr", "0.7fr"],
-        cell_renderer=_li_cell,
-    )
-
-
 def _seed_estimate_edit_form(est: dict) -> None:
     eid = str(est.get("id") or "")
     st.session_state[f"est_edit_num_{eid}"] = str(est.get("estimate_number") or "")
     st.session_state[f"est_edit_proj_{eid}"] = str(est.get("project_name") or "")
     st.session_state[f"est_edit_cust_{eid}"] = str(est.get("customer") or "")
     st.session_state[f"est_edit_status_{eid}"] = str(est.get("status") or "Draft")
-    st.session_state[f"est_edit_sub_{eid}"] = float(est.get("subtotal") or 0)
-    st.session_state[f"est_edit_tax_{eid}"] = float(est.get("tax") or 0)
-    st.session_state[f"est_edit_total_{eid}"] = float(est.get("total") or 0)
-    st.session_state[f"est_edit_notes_{eid}"] = str(est.get("description") or "")
+    st.session_state[f"est_edit_desc_{eid}"] = str(est.get("description") or est.get("scope_of_work") or "")
+    st.session_state[f"est_edit_notes_{eid}"] = str(est.get("notes") or "")
+    st.session_state[f"est_edit_est_date_{eid}"] = _as_date(est.get("estimate_date")) or date.today()
+    st.session_state[f"est_edit_exp_date_{eid}"] = _as_date(est.get("expiration_date")) or (date.today() + timedelta(days=30))
     st.session_state.pop(f"est_edit_contact_{eid}", None)
     st.session_state.pop(f"est_edit_location_{eid}", None)
+    st.session_state.pop(f"est_edit_job_{eid}", None)
     st.session_state.pop(f"est_edit_cust_prev_{eid}", None)
     st.session_state.pop(f"est_edit_loc_prev_{eid}", None)
 
@@ -610,11 +697,25 @@ def _render_estimate_edit_form(est: dict) -> None:
             initial_contact_id=str(est.get("customer_contact_id") or ""),
         )
         st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
+        st.date_input("Estimate date", key=f"est_edit_est_date_{eid}")
+        st.date_input("Expiration date", key=f"est_edit_exp_date_{eid}")
     with ec2:
-        st.number_input("Subtotal", key=f"est_edit_sub_{eid}")
-        st.number_input("Tax", key=f"est_edit_tax_{eid}")
-        st.number_input("Total", key=f"est_edit_total_{eid}")
-    st.text_area("Notes", key=f"est_edit_notes_{eid}", height=100)
+        job_opts = _job_select_options(cust_name)
+        job_labels = [label for label, _ in job_opts]
+        job_ids = [jid for _, jid in job_opts]
+        cur_job = str(est.get("job_id") or "")
+        if f"est_edit_job_{eid}" not in st.session_state and cur_job in job_ids:
+            st.session_state[f"est_edit_job_{eid}"] = job_ids.index(cur_job)
+        elif f"est_edit_job_{eid}" not in st.session_state:
+            st.session_state[f"est_edit_job_{eid}"] = 0
+        st.selectbox(
+            "Linked job (optional)",
+            range(len(job_labels)),
+            format_func=lambda i: job_labels[i],
+            key=f"est_edit_job_{eid}",
+        )
+    st.text_area("Description / scope summary", key=f"est_edit_desc_{eid}", height=90)
+    st.text_area("Notes", key=f"est_edit_notes_{eid}", height=70)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MOD,
@@ -626,6 +727,9 @@ def _render_estimate_edit_form(est: dict) -> None:
         st.rerun()
     if saved:
         cust_name = str(st.session_state.get(f"est_edit_cust_{eid}") or "")
+        job_opts = _job_select_options(cust_name)
+        job_idx = int(st.session_state.get(f"est_edit_job_{eid}") or 0)
+        job_id = job_opts[job_idx][1] if job_opts else ""
         ok, msg = persist_estimate(
             {
                 "estimate_number": st.session_state.get(f"est_edit_num_{eid}"),
@@ -634,11 +738,12 @@ def _render_estimate_edit_form(est: dict) -> None:
                 "customer_id": customer_id_for_name(cust_name) or None,
                 "customer_location_id": location_id or None,
                 "customer_contact_id": contact_id or None,
+                "job_id": job_id or None,
                 "status": st.session_state.get(f"est_edit_status_{eid}"),
-                "subtotal": st.session_state.get(f"est_edit_sub_{eid}"),
-                "tax": st.session_state.get(f"est_edit_tax_{eid}"),
-                "total": st.session_state.get(f"est_edit_total_{eid}"),
-                "description": st.session_state.get(f"est_edit_notes_{eid}"),
+                "estimate_date": str(st.session_state.get(f"est_edit_est_date_{eid}")),
+                "expiration_date": str(st.session_state.get(f"est_edit_exp_date_{eid}")),
+                "description": st.session_state.get(f"est_edit_desc_{eid}"),
+                "notes": st.session_state.get(f"est_edit_notes_{eid}"),
             },
             row_id=eid,
         )
@@ -655,20 +760,27 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     en = safe_value(est.get("estimate_number"))
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
-    subtotal_display = float(resolve_estimate_subtotal(est))
+    inv_opts = _inventory_options()
+    asset_opts = _asset_options()
+    vendor_opts = _vendor_options()
+
+    if st.session_state.get(_build_mode_key(est)):
+        st.info("Build mode — add materials, labor, equipment, travel, and review totals in the tabs below.")
 
     (
         tab_overview,
-        tab_line_items,
-        tab_labor,
+        tab_cost_builder,
         tab_materials,
+        tab_labor,
         tab_equipment,
+        tab_travel,
         tab_subcontractors,
         tab_markups,
+        tab_summary,
+        tab_proposal,
         tab_attachments,
         tab_notes,
         tab_activity,
-        tab_proposal,
     ) = st.tabs(_ESTIMATE_TABS)
 
     with tab_overview:
@@ -679,64 +791,66 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             f"{detail_field_html('Customer', customer)}"
             f"{detail_field_html('Contact', _contact_label_for_estimate(est))}"
             f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
+            f"{detail_field_html('Estimate date', fmt_date(est.get('estimate_date')))}"
+            f"{detail_field_html('Expiration', fmt_date(est.get('expiration_date')))}"
             f"{detail_field_html('Linked Job', est.get('job_number'))}"
             f"</div>"
         )
         st.markdown(dialog_card_html("Estimate Summary", overview_html), unsafe_allow_html=True)
 
+        margin_pct = f"{float(est.get('gross_margin_percent') or 0):.1f}%"
         fin_html = (
             f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Subtotal', fmt_currency(subtotal_display))}"
+            f"{detail_field_html('Total cost', _estimate_total_cost(est))}"
+            f"{detail_field_html('Customer price', _estimate_customer_price(est))}"
             f"{detail_field_html('Tax', fmt_currency(est.get('tax')))}"
-            f"{detail_field_html('Markup', fmt_currency(est.get('markup')))}"
-            f"{detail_field_html('Grand Total', fmt_currency(est.get('total')))}"
+            f"{detail_field_html('Gross profit', fmt_currency(est.get('gross_profit')))}"
+            f"{detail_field_html('Margin %', margin_pct)}"
             f"</div>"
         )
         st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
+        scope = safe_value(est.get("description") or est.get("scope_of_work"), "No scope entered.")
+        st.markdown(dialog_card_html("Scope", f"<p style='margin:0;font-size:0.875rem;'>{html.escape(scope)}</p>"), unsafe_allow_html=True)
 
-        c1, c2 = st.columns([1, 1])
-        with c2:
-            breakdown_base = subtotal_display
-            breakdown = {
-                "Labor": breakdown_base * 0.4,
-                "Materials": breakdown_base * 0.3,
-                "Equipment": breakdown_base * 0.2,
-                "Other": breakdown_base * 0.1,
-            }
-            render_donut_chart(
-                breakdown,
-                center_label="Total",
-                center_value=fmt_currency(est.get("total")),
-                money_legend=True,
-            )
-
-    with tab_line_items:
-        st.markdown("**Top Line Items**")
-        _render_line_items_table(session_key=f"ips_sel_est_line_items_{eid}")
-
-    with tab_labor:
-        placeholder_html("Labor line items will appear here when connected to Supabase.")
+    with tab_cost_builder:
+        render_cost_builder_tab(
+            est,
+            inventory_options=inv_opts,
+            asset_options=asset_opts,
+            vendor_options=vendor_opts,
+            on_saved=lambda: None,
+        )
 
     with tab_materials:
-        st.session_state[ACTIVE_ESTIMATE_KEY] = eid
-        if st.button("Open Estimate Materials", key=f"est_open_materials_{eid}", type="primary"):
-            st.session_state[SESSION_NAV_KEY] = "estimate_materials"
-            st.rerun()
+        render_materials_tab(est, inventory_options=inv_opts)
+
+    with tab_labor:
+        render_labor_tab(est)
 
     with tab_equipment:
-        placeholder_html("Equipment line items will appear here when connected to Supabase.")
+        render_equipment_tab(est, asset_options=asset_opts)
+
+    with tab_travel:
+        render_travel_tab(est)
 
     with tab_subcontractors:
-        placeholder_html("Subcontractor line items will appear here when connected to Supabase.")
+        render_subcontractors_tab(est, vendor_options=vendor_opts)
+        render_other_costs_tab(est)
 
     with tab_markups:
-        placeholder_html("Markup rules will appear here when connected to Supabase.")
+        render_markups_tab(est, persist_fn=_persist_markup_settings)
+
+    with tab_summary:
+        render_summary_tab(est)
+
+    with tab_proposal:
+        render_proposal_preview_tab(est)
 
     with tab_attachments:
-        placeholder_html("Estimate attachments will appear here when connected to Supabase.")
+        placeholder_html("Estimate attachments will appear here when connected to document storage.")
 
     with tab_notes:
-        notes_text = safe_value(est.get("description"), "No notes entered.")
+        notes_text = safe_value(est.get("notes") or est.get("description"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
             f"{html.escape(notes_text)}"
@@ -746,9 +860,6 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
     with tab_activity:
         placeholder_html("Estimate activity history will appear here when connected to Supabase.")
-
-    with tab_proposal:
-        placeholder_html("Proposal preview will appear here when connected to Supabase.")
 
 
 def render_estimate_detail_dialog(est: dict) -> None:
@@ -762,12 +873,15 @@ def render_estimate_detail_dialog(est: dict) -> None:
     render_modal_shell()
     render_modal_header(title=en, subtitle=project, status=status)
 
-    render_modal_edit_button(
-        module=_MOD,
-        record_key=rk,
-        on_edit=lambda: _set_estimate_edit_mode(est),
-        key_prefix=f"estimates_modal_{rk}",
-    )
+    btn1, btn2 = st.columns(2, gap="small")
+    with btn1:
+        if st.button("Edit", key=f"estimates_modal_edit_{rk}", use_container_width=True):
+            _set_estimate_edit_mode(est)
+            st.rerun()
+    with btn2:
+        if st.button("Build Estimate", key=f"estimates_modal_build_{rk}", type="primary", use_container_width=True):
+            _set_estimate_build_mode(est)
+            st.rerun()
 
     render_modal_meta_grid(
         [
@@ -801,6 +915,103 @@ def _show_estimates_detail_modal() -> None:
     render_estimate_detail_dialog(est)
 
 
+@st.dialog("New Estimate", width="large")
+def _show_new_estimate_dialog() -> None:
+    customers = customer_filter_options()
+    nc1, nc2 = st.columns(2)
+    with nc1:
+        st.text_input("Estimate # (auto if blank)", key="est_new_num")
+        st.text_input("Project name", key="est_new_proj")
+        st.selectbox("Customer", customers, key="est_new_cust")
+        new_cust = str(st.session_state.get("est_new_cust") or "")
+        new_location_id = _customer_location_select(
+            customer_name=new_cust,
+            session_key="est_new_location",
+            prev_customer_key=_NEW_CUST_PREV,
+        )
+        new_contact_id = _customer_contact_select(
+            customer_name=new_cust,
+            location_id=new_location_id,
+            session_key="est_new_contact",
+            prev_customer_key=_NEW_CUST_PREV,
+            prev_location_key="est_new_loc_prev",
+        )
+    with nc2:
+        job_opts = _job_select_options(new_cust)
+        job_labels = [label for label, _ in job_opts]
+        job_ids = [jid for _, jid in job_opts]
+        if "est_new_job" not in st.session_state:
+            st.session_state["est_new_job"] = 0
+        st.selectbox(
+            "Linked job (optional)",
+            range(len(job_labels)),
+            format_func=lambda i: job_labels[i],
+            key="est_new_job",
+        )
+        st.date_input("Estimate date", value=date.today(), key="est_new_est_date")
+        st.date_input("Expiration date", value=date.today() + timedelta(days=30), key="est_new_exp_date")
+        st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
+    st.text_area("Description / scope summary", key="est_new_desc", height=80)
+    st.text_area("Notes", key="est_new_notes", height=60)
+
+    sb1, sb2 = st.columns(2)
+    with sb1:
+        if st.button("Save Draft", key="est_save_new", type="primary", use_container_width=True):
+            job_idx = int(st.session_state.get("est_new_job") or 0)
+            job_id = job_ids[job_idx] if job_opts else ""
+            ok, msg = persist_estimate(
+                {
+                    "estimate_number": st.session_state.get("est_new_num"),
+                    "project_name": st.session_state.get("est_new_proj"),
+                    "customer": new_cust,
+                    "customer_id": customer_id_for_name(new_cust) or None,
+                    "customer_location_id": new_location_id or None,
+                    "customer_contact_id": new_contact_id or None,
+                    "job_id": job_id or None,
+                    "status": st.session_state.get("est_new_status") or "Draft",
+                    "estimate_date": str(st.session_state.get("est_new_est_date")),
+                    "expiration_date": str(st.session_state.get("est_new_exp_date")),
+                    "description": st.session_state.get("est_new_desc"),
+                    "notes": st.session_state.get("est_new_notes"),
+                }
+            )
+            if ok:
+                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = False
+                st.success(msg or "Estimate saved.")
+                st.rerun()
+            st.error(msg or "Could not save estimate.")
+    with sb2:
+        if st.button("Cancel", key="est_cancel_new", use_container_width=True):
+            st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = False
+            st.rerun()
+
+
+def _export_estimates_csv(rows: list[dict]) -> str:
+    import csv
+    from io import StringIO
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["Estimate #", "Project", "Customer", "Job", "Status", "Estimate Date", "Total Cost", "Customer Price", "Created By"]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                _estimate_number(row),
+                _estimate_project(row),
+                _estimate_customer(row),
+                _estimate_job(row),
+                _normalize_estimate_status(row.get("status")),
+                fmt_date(row.get("estimate_date")),
+                _estimate_total_cost(row).replace("$", ""),
+                _estimate_customer_price(row).replace("$", ""),
+                _estimate_created_by(row),
+            ]
+        )
+    return buf.getvalue()
+
+
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
@@ -815,55 +1026,18 @@ def render() -> None:
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
-        render_page_header("Estimates", "Create, review, and manage all project estimates.")
+        render_page_header("Estimates", "Create, review, price, and send customer proposals.")
     with act_r:
         exp_col, add_col = st.columns(2, gap="small")
         with exp_col:
-            st.button("Export", key="est_export", use_container_width=True)
+            if st.button("Export", key="est_export", use_container_width=True):
+                st.session_state["est_export_ready"] = True
         with add_col:
             if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
-                st.session_state["ips_est_form"] = True
+                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
 
-    if st.session_state.get("ips_est_form"):
-        with st.expander("New Estimate", expanded=True):
-            nc1, nc2 = st.columns(2)
-            with nc1:
-                st.text_input("Estimate #", key="est_new_num")
-                st.text_input("Project name", key="est_new_proj")
-                st.selectbox("Customer", customer_filter_options(), key="est_new_cust")
-                new_cust = str(st.session_state.get("est_new_cust") or "")
-                new_location_id = _customer_location_select(
-                    customer_name=new_cust,
-                    session_key="est_new_location",
-                    prev_customer_key=_NEW_CUST_PREV,
-                )
-                new_contact_id = _customer_contact_select(
-                    customer_name=new_cust,
-                    location_id=new_location_id,
-                    session_key="est_new_contact",
-                    prev_customer_key=_NEW_CUST_PREV,
-                    prev_location_key="est_new_loc_prev",
-                )
-                st.selectbox("Status", lookup_options("estimate_statuses"), key="est_new_status")
-            with nc2:
-                st.number_input("Total", value=0.0, key="est_new_total")
-            st.text_area("Notes", key="est_new_notes")
-            if st.button("Save estimate", key="est_save_new", type="primary"):
-                ok, msg = persist_estimate(
-                    {
-                        "estimate_number": st.session_state.get("est_new_num"),
-                        "project_name": st.session_state.get("est_new_proj"),
-                        "customer": new_cust,
-                        "customer_id": customer_id_for_name(new_cust) or None,
-                        "customer_location_id": new_location_id or None,
-                        "customer_contact_id": new_contact_id or None,
-                        "status": st.session_state.get("est_new_status"),
-                        "total": st.session_state.get("est_new_total"),
-                        "description": st.session_state.get("est_new_notes"),
-                    }
-                )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_est_form",)):
-                    st.rerun()
+    if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+        _show_new_estimate_dialog()
 
     created_by_opts = sorted(
         {_estimate_created_by(e) for e in rows if _estimate_created_by(e) != "—"}
@@ -929,6 +1103,15 @@ def render() -> None:
         created_by=str(st.session_state.get("est_filter_created_by") or "All Created By"),
         date_range=date_range,
     )
+
+    if st.session_state.pop("est_export_ready", False):
+        st.download_button(
+            "Download CSV",
+            data=_export_estimates_csv(filtered),
+            file_name="estimates_export.csv",
+            mime="text/csv",
+            key="est_export_download",
+        )
 
     st.caption(f"{len(filtered)} estimate(s)")
 

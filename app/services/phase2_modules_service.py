@@ -8,6 +8,7 @@ from typing import Any
 try:
     from app.services.repository import (
         ServiceResult,
+        clear_all_data_caches,
         delete_row,
         fetch_list,
         fetch_rows,
@@ -17,6 +18,7 @@ try:
 except ImportError:
     from services.repository import (  # type: ignore
         ServiceResult,
+        clear_all_data_caches,
         delete_row,
         fetch_list,
         fetch_rows,
@@ -202,22 +204,54 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
 def normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
     eid = str(row.get("id") or "").strip()
     num = str(row.get("quote_number") or row.get("estimate_number") or eid[:8] or "—")
+    total_cost = float(row.get("total_cost") or row.get("subtotal") or 0)
+    customer_price = float(row.get("customer_price") or row.get("total") or row.get("grand_total") or 0)
     return {
         "id": eid or num,
         "estimate_number": num,
         "project_name": str(row.get("project_name") or row.get("job_name") or row.get("title") or "—"),
         "customer": str(row.get("customer_name") or row.get("customer") or "—"),
+        "customer_id": str(row.get("customer_id") or ""),
+        "customer_location_id": str(row.get("customer_location_id") or ""),
+        "customer_contact_id": str(row.get("customer_contact_id") or ""),
+        "job_id": str(row.get("job_id") or ""),
         "estimate_date": str(row.get("estimate_date") or row.get("created_at") or "")[:10],
         "expiration_date": str(row.get("expiration_date") or row.get("valid_through") or "")[:10],
-        "total": float(row.get("total") or row.get("grand_total") or 0),
+        "total": customer_price,
+        "customer_price": customer_price,
+        "total_cost": total_cost,
         "status": str(row.get("status") or "Draft"),
-        "created_by": str(row.get("created_by") or row.get("prepared_by") or "—"),
+        "created_by": str(row.get("created_by") or row.get("prepared_by_name") or row.get("prepared_by") or "—"),
         "job_number": str(row.get("job_number") or "—"),
-        "description": str(row.get("description") or row.get("notes") or ""),
-        "subtotal": _money_field(row, "subtotal", "total", "grand_total"),
-        "tax": float(row.get("tax") or 0),
-        "markup": float(row.get("markup") or 0),
-        "customer_contact_id": str(row.get("customer_contact_id") or ""),
+        "description": str(row.get("description") or row.get("scope_of_work") or row.get("notes") or ""),
+        "scope_of_work": str(row.get("scope_of_work") or row.get("description") or ""),
+        "notes": str(row.get("notes") or ""),
+        "subtotal": _money_field(row, "subtotal", "total_cost", "total", "grand_total"),
+        "tax": float(row.get("tax_amount") or row.get("tax") or 0),
+        "tax_rate": float(row.get("tax_rate") or 0),
+        "markup": float(row.get("total_markup") or row.get("markup") or 0),
+        "material_cost": float(row.get("material_cost") or row.get("material_total") or 0),
+        "labor_cost": float(row.get("labor_cost") or row.get("labor_total") or 0),
+        "equipment_cost": float(row.get("equipment_cost") or row.get("equipment_total") or 0),
+        "travel_cost": float(row.get("travel_cost") or 0),
+        "travel_markup": float(row.get("travel_markup") or 0),
+        "travel_price": float(row.get("travel_price") or 0),
+        "subcontractor_cost": float(row.get("subcontractor_cost") or 0),
+        "other_cost": float(row.get("other_cost") or 0),
+        "gross_profit": float(row.get("gross_profit") or 0),
+        "gross_margin_percent": float(row.get("gross_margin_percent") or 0),
+        "default_material_markup_pct": float(row.get("default_material_markup_pct") or 0),
+        "default_labor_markup_pct": float(row.get("default_labor_markup_pct") or 0),
+        "default_equipment_markup_pct": float(row.get("default_equipment_markup_pct") or 0),
+        "default_travel_markup_pct": float(row.get("default_travel_markup_pct") or 0),
+        "default_subcontractor_markup_pct": float(row.get("default_subcontractor_markup_pct") or 0),
+        "default_other_markup_pct": float(row.get("default_other_markup_pct") or 0),
+        "global_markup_pct": float(row.get("global_markup_pct") or 0),
+        "overhead_pct": float(row.get("overhead_pct") or 0),
+        "profit_pct": float(row.get("profit_pct") or 0),
+        "proposal_show_line_items": bool(row.get("proposal_show_line_items")),
+        "proposal_show_category_totals": row.get("proposal_show_category_totals", True),
+        "proposal_show_final_price_only": bool(row.get("proposal_show_final_price_only")),
     }
 
 
@@ -545,26 +579,67 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 
 
 def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    quote_number = str(ui.get("estimate_number") or ui.get("quote_number") or "").strip()
+    if not quote_number and not row_id:
+        try:
+            from app.db import next_quote_number
+        except ImportError:
+            from db import next_quote_number  # type: ignore
+        quote_number = next_quote_number()
     payload = {
-        "quote_number": ui.get("estimate_number"),
+        "quote_number": quote_number or None,
         "project_name": ui.get("project_name"),
         "customer_name": ui.get("customer"),
         "customer_id": ui.get("customer_id") or None,
         "customer_location_id": ui.get("customer_location_id") or None,
         "customer_contact_id": ui.get("customer_contact_id") or None,
-        "status": ui.get("status"),
+        "job_id": ui.get("job_id") or None,
+        "status": ui.get("status") or "Draft",
         "estimate_date": ui.get("estimate_date") or None,
         "expiration_date": ui.get("expiration_date") or None,
         "prepared_by_name": ui.get("created_by") or ui.get("prepared_by_name"),
-        "subtotal": ui.get("subtotal"),
-        "tax": ui.get("tax"),
-        "markup": ui.get("markup"),
-        "total": ui.get("total"),
-        "notes": ui.get("description") or ui.get("notes"),
+        "description": ui.get("description") or ui.get("scope_of_work") or "",
+        "notes": ui.get("notes") or ui.get("description") or "",
+        "subtotal": ui.get("subtotal") or ui.get("total_cost") or 0,
+        "total_cost": ui.get("total_cost") or ui.get("subtotal") or 0,
+        "tax": ui.get("tax") or ui.get("tax_amount") or 0,
+        "tax_amount": ui.get("tax_amount") or ui.get("tax") or 0,
+        "tax_rate": ui.get("tax_rate") or 0,
+        "markup": ui.get("markup") or ui.get("total_markup") or 0,
+        "total_markup": ui.get("total_markup") or ui.get("markup") or 0,
+        "total": ui.get("total") or ui.get("customer_price") or 0,
+        "customer_price": ui.get("customer_price") or ui.get("total") or 0,
+        "material_cost": ui.get("material_cost"),
+        "labor_cost": ui.get("labor_cost"),
+        "equipment_cost": ui.get("equipment_cost"),
+        "travel_cost": ui.get("travel_cost"),
+        "travel_markup": ui.get("travel_markup"),
+        "travel_price": ui.get("travel_price"),
+        "subcontractor_cost": ui.get("subcontractor_cost"),
+        "other_cost": ui.get("other_cost"),
+        "gross_profit": ui.get("gross_profit"),
+        "gross_margin_percent": ui.get("gross_margin_percent"),
+        "default_material_markup_pct": ui.get("default_material_markup_pct"),
+        "default_labor_markup_pct": ui.get("default_labor_markup_pct"),
+        "default_equipment_markup_pct": ui.get("default_equipment_markup_pct"),
+        "default_travel_markup_pct": ui.get("default_travel_markup_pct"),
+        "default_subcontractor_markup_pct": ui.get("default_subcontractor_markup_pct"),
+        "default_other_markup_pct": ui.get("default_other_markup_pct"),
+        "global_markup_pct": ui.get("global_markup_pct"),
+        "overhead_pct": ui.get("overhead_pct"),
+        "profit_pct": ui.get("profit_pct"),
+        "proposal_show_line_items": ui.get("proposal_show_line_items"),
+        "proposal_show_category_totals": ui.get("proposal_show_category_totals"),
+        "proposal_show_final_price_only": ui.get("proposal_show_final_price_only"),
     }
+    payload = {k: v for k, v in payload.items() if v is not None}
     if row_id:
-        return update_row("estimates", payload, {"id": row_id})
-    return insert_row("estimates", payload)
+        result = update_row("estimates", payload, {"id": row_id})
+    else:
+        result = insert_row("estimates", payload)
+    if result.ok:
+        clear_all_data_caches()
+    return result
 
 
 def save_estimate_line_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
@@ -1021,6 +1096,87 @@ def list_customer_contacts(
     return out, False
 
 
+def _customer_contact_write_payloads(ui: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build insert/update payloads from newest to oldest supported schemas."""
+    cid = str(ui.get("customer_id") or "").strip()
+    name = str(ui.get("full_name") or ui.get("contact_name") or ui.get("name") or "").strip()
+    loc_id = str(ui.get("location_id") or ui.get("customer_location_id") or "").strip()
+    status = str(ui.get("status") or "Active").strip()
+    active = status.lower() in ("active", "true", "1")
+    is_primary = bool(ui.get("is_primary")) and active
+    title = str(ui.get("title") or "").strip()
+    role_type = str(ui.get("role_type") or title or "Other").strip()
+    notes = str(ui.get("notes") or "").strip()
+    email = str(ui.get("email") or "").strip()
+    phone = str(ui.get("phone") or "").strip()
+    mobile = str(ui.get("mobile") or "").strip()
+
+    extended_063 = {
+        "customer_id": cid,
+        "contact_name": name,
+        "full_name": name,
+        "title": title or role_type,
+        "role": role_type,
+        "role_type": role_type,
+        "email": email,
+        "phone": phone,
+        "mobile": mobile,
+        "is_active": active,
+        "status": status,
+        "is_primary": is_primary,
+        "is_estimating_contact": bool(ui.get("is_estimating_contact")),
+        "is_billing_contact": bool(ui.get("is_billing_contact")),
+        "is_site_contact": bool(ui.get("is_site_contact")),
+        "is_safety_contact": bool(ui.get("is_safety_contact")),
+        "notes": notes,
+        "customer_location_id": loc_id,
+        "location_id": loc_id,
+    }
+    mid_025_018 = {
+        "customer_id": cid,
+        "contact_name": name,
+        "title": title or role_type,
+        "role": role_type,
+        "email": email,
+        "phone": phone,
+        "mobile": mobile,
+        "is_active": active,
+        "is_primary": is_primary,
+        "notes": notes,
+        "customer_location_id": loc_id,
+    }
+    base_016 = {
+        "customer_id": cid,
+        "contact_name": name,
+        "role": role_type,
+        "email": email,
+        "phone": phone,
+        "is_active": active,
+        "is_primary": is_primary,
+        "notes": notes,
+    }
+    return [extended_063, mid_025_018, base_016]
+
+
+def _write_customer_contact(
+    payloads: list[dict[str, Any]],
+    *,
+    row_id: str | None = None,
+) -> ServiceResult:
+    last_result = ServiceResult(ok=False, error="Could not save contact.")
+    for payload in payloads:
+        if row_id:
+            result = update_row("customer_contacts", payload, {"id": row_id})
+        else:
+            result = insert_row("customer_contacts", payload)
+        if result.ok:
+            return result
+        last_result = result
+        if not _is_unknown_column_error(result.error):
+            return result
+    return last_result
+
+
 def save_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     cid = str(ui.get("customer_id") or "").strip()
     if not cid:
@@ -1034,37 +1190,10 @@ def save_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -> S
     status = str(ui.get("status") or "Active").strip()
     active = status.lower() in ("active", "true", "1")
     is_primary = bool(ui.get("is_primary")) and active
-    title = str(ui.get("title") or "").strip()
-    role_type = str(ui.get("role_type") or title or "Other").strip()
-    payload = {
-        "customer_id": cid,
-        "contact_name": name,
-        "full_name": name,
-        "title": title or role_type,
-        "role": role_type,
-        "role_type": role_type,
-        "department": str(ui.get("department") or "").strip(),
-        "email": str(ui.get("email") or "").strip(),
-        "phone": str(ui.get("phone") or "").strip(),
-        "mobile": str(ui.get("mobile") or "").strip(),
-        "is_active": active,
-        "status": status,
-        "is_primary": is_primary,
-        "is_estimating_contact": bool(ui.get("is_estimating_contact")),
-        "is_billing_contact": bool(ui.get("is_billing_contact")),
-        "is_site_contact": bool(ui.get("is_site_contact")),
-        "is_safety_contact": bool(ui.get("is_safety_contact")),
-        "notes": str(ui.get("notes") or "").strip(),
-        "customer_location_id": loc_id,
-        "location_id": loc_id,
-    }
-    if row_id:
-        result = update_row("customer_contacts", payload, {"id": row_id})
-        contact_id = str(row_id).strip()
-    else:
-        result = insert_row("customer_contacts", payload)
-        if not result.ok:
-            return result
+    payloads = _customer_contact_write_payloads({**ui, "customer_id": cid})
+    result = _write_customer_contact(payloads, row_id=row_id)
+    contact_id = str(row_id or "").strip()
+    if result.ok and not contact_id:
         row = result.data if isinstance(result.data, dict) else {}
         contact_id = str(row.get("id") or "").strip()
     if not result.ok:

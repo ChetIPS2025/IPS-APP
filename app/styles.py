@@ -1145,6 +1145,54 @@ def inject_estimates_module_css() -> None:
   font-size: 14px !important;
   width: auto !important;
 }}
+.ips-est-summary-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-height: 72px;
+}}
+.ips-est-summary-label {{
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}}
+.ips-est-summary-value {{
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}}
+.ips-est-line-table-wrap {{
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 6px 0 10px;
+}}
+.ips-est-line-table {{
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}}
+.ips-est-li-th {{
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}}
+.ips-est-li-td {{
+  font-size: 12px;
+  color: #0f172a;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef2f7;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -1291,11 +1339,23 @@ def inject_inventory_module_css() -> None:
 }}
 .st-key-inventory_table_wrap [data-testid="stImage"] {{
   margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }}
 .st-key-inventory_table_wrap [data-testid="stImage"] img {{
+  width: 40px !important;
+  height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background: #ffffff;
+  object-fit: contain;
+}}
+.ips-inventory-qr-cell {{
+  width: 40px;
+  height: 40px;
 }}
 </style>
 """,
