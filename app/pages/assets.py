@@ -35,6 +35,11 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_assets_module_css
+    from app.services.assets_service import (
+        clear_assets_cache,
+        get_asset_image_url,
+        upload_asset_image,
+    )
     from app.ui.assets_components import (
         inject_assets_page_styles,
         maintenance_table_html,
@@ -71,6 +76,11 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_assets_module_css  # type: ignore
+    from services.assets_service import (  # type: ignore
+        clear_assets_cache,
+        get_asset_image_url,
+        upload_asset_image,
+    )
     from ui.assets_components import (  # type: ignore
         inject_assets_page_styles,
         maintenance_table_html,
@@ -86,10 +96,10 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
-_ASSET_COLS = [0.35, 1.4, 3.0, 1.5, 1.7, 1.7, 1.5, 1.8, 1.4]
+_ASSET_COLS = [0.35, 0.9, 3.2, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
 _ASSET_HEADERS = [
     "",
-    "ASSET #",
+    "IMAGE",
     "ASSET NAME",
     "CATEGORY",
     "LOCATION",
@@ -189,6 +199,11 @@ def _asset_next_service(row: dict) -> str:
     return "—"
 
 
+def _asset_serial(row: dict) -> str:
+    val = str(row.get("serial_number") or "").strip()
+    return val if val and val != "—" else "—"
+
+
 def _asset_status_pill_html(status: str) -> str:
     cls_map = {
         "Available": "ips-asset-status-available",
@@ -202,6 +217,48 @@ def _asset_status_pill_html(status: str) -> str:
     }
     cls = cls_map.get(status, "ips-asset-status-available")
     return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _render_asset_thumbnail(asset: dict) -> None:
+    image_url = get_asset_image_url(asset)
+    if image_url:
+        st.markdown(
+            (
+                f'<div class="ips-asset-thumb-cell">'
+                f'<img class="ips-asset-thumb-img" src="{html.escape(image_url, quote=True)}" '
+                f'alt="Asset image" />'
+                f"</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div class="ips-asset-thumb-cell">'
+            '<div class="ips-asset-thumb-placeholder">—</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _current_user_id() -> str | None:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    uid = str((current_profile() or {}).get("id") or "").strip()
+    return uid or None
+
+
+def _render_asset_detail_image(asset: dict) -> None:
+    image_url = get_asset_image_url(asset)
+    if image_url:
+        st.markdown(
+            f'<img class="ips-asset-detail-image" src="{html.escape(image_url, quote=True)}" '
+            f'alt="Asset image" />',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("No asset image uploaded.")
 
 
 def _asset_select_key(asset_id: str) -> str:
@@ -260,7 +317,6 @@ def _render_custom_assets_table(filtered: list[dict]) -> list[str]:
             if not aid:
                 continue
 
-            asset_no = _asset_number(asset)
             name = _asset_name(asset)
             category = _asset_category(asset)
             location = _asset_location(asset)
@@ -281,10 +337,7 @@ def _render_custom_assets_table(filtered: list[dict]) -> list[str]:
                 )
 
             with cols[1]:
-                st.markdown(
-                    f'<div class="ips-assets-number">{html.escape(asset_no)}</div>',
-                    unsafe_allow_html=True,
-                )
+                _render_asset_thumbnail(asset)
 
             with cols[2]:
                 st.markdown(
@@ -352,6 +405,7 @@ def _filter_rows(
             or ql in _asset_department(r).lower()
             or ql in _asset_assigned_to(r).lower()
             or ql in _normalize_asset_status(r.get("status")).lower()
+            or ql in _asset_serial(r).lower()
         ]
     if category and category != "All Categories":
         out = [r for r in out if _asset_category(r) == category]
@@ -434,20 +488,13 @@ def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
 
 
 def _asset_image_html(asset: dict) -> str:
-    url = str(
-        asset.get("image_url")
-        or asset.get("photo_url")
-        or asset.get("asset_image_url")
-        or ""
-    ).strip()
+    url = get_asset_image_url(asset)
     if url:
         safe = html.escape(url, quote=True)
         alt = html.escape(str(asset.get("asset_name") or "Asset image"), quote=True)
-        return f'<div class="ips-assets-img-wrap"><img src="{safe}" alt="{alt}" style="width:100%;display:block;"></div>'
+        return f'<img class="ips-asset-detail-image" src="{safe}" alt="{alt}" />'
     return (
-        '<div class="ips-assets-img-wrap">'
-        '<div class="ips-assets-img-empty">Asset image<br><span style="font-weight:500;">Upload photo</span></div>'
-        "</div>"
+        '<p style="margin:0;color:#64748b;font-size:0.875rem;">No asset image uploaded.</p>'
     )
 
 
@@ -578,6 +625,13 @@ def _render_asset_edit_form(asset: dict) -> None:
         st.text_input("Location", key=f"ast_edit_loc_{aid}")
         st.text_input("Serial", key=f"ast_edit_serial_{aid}")
 
+    st.file_uploader(
+        "Upload asset image",
+        type=["png", "jpg", "jpeg", "webp"],
+        key=f"ast_edit_image_{aid}",
+    )
+    st.caption("PNG, JPG, JPEG, or WEBP. Image is saved when you click Save Changes.")
+
     cancelled, saved = render_save_cancel_actions(
         module=_MOD,
         record_key=rk,
@@ -599,6 +653,16 @@ def _render_asset_edit_form(asset: dict) -> None:
             row_id=aid,
         )
         if ok:
+            uploaded_file = st.session_state.get(f"ast_edit_image_{aid}")
+            if uploaded_file is not None and not is_demo_id(aid):
+                upload_result = upload_asset_image(
+                    aid,
+                    uploaded_file,
+                    uploaded_by=_current_user_id(),
+                )
+                if not upload_result.ok:
+                    st.warning(upload_result.error or "Asset saved, but image upload failed.")
+            clear_assets_cache()
             set_view_mode(_MOD, rk)
             st.success(msg or "Asset saved.")
             st.rerun()
@@ -823,8 +887,17 @@ def render() -> None:
             st.text_input("Asset name", key="ast_new_name")
             st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
             st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
+            st.file_uploader(
+                "Upload asset image",
+                type=["png", "jpg", "jpeg", "webp"],
+                key="ast_new_image",
+            )
             if st.button("Save asset", key="ast_save_new", type="primary"):
-                ok, msg = persist_asset(
+                try:
+                    from app.services.assets_service import save_asset
+                except ImportError:
+                    from services.assets_service import save_asset  # type: ignore
+                result = save_asset(
                     {
                         "asset_number": st.session_state.get("ast_new_num"),
                         "asset_name": st.session_state.get("ast_new_name"),
@@ -832,7 +905,24 @@ def render() -> None:
                         "status": st.session_state.get("ast_new_status"),
                     }
                 )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_ast_form",)):
+                if not result.ok:
+                    st.error(result.error or "Could not save asset.")
+                else:
+                    new_id = ""
+                    if isinstance(result.data, dict):
+                        new_id = str(result.data.get("id") or "").strip()
+                    uploaded_file = st.session_state.get("ast_new_image")
+                    if uploaded_file is not None and new_id and not is_demo_id(new_id):
+                        upload_result = upload_asset_image(
+                            new_id,
+                            uploaded_file,
+                            uploaded_by=_current_user_id(),
+                        )
+                        if not upload_result.ok:
+                            st.warning(upload_result.error or "Asset saved, but image upload failed.")
+                    clear_assets_cache()
+                    st.session_state.pop("ips_ast_form", None)
+                    st.success("Asset saved.")
                     st.rerun()
 
     def _filters() -> None:

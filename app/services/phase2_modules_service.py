@@ -333,6 +333,14 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "hourly_rate": _money_field(row, "hourly_rate"),
         "daily_rate": _money_field(row, "daily_rate", "rental_daily_rate"),
         "weekly_rate": _money_field(row, "weekly_rate", "rental_weekly_rate"),
+        "image_path": str(row.get("image_path") or ""),
+        "image_url": str(row.get("image_url") or ""),
+        "image_file_name": str(row.get("image_file_name") or ""),
+        "image_mime_type": str(row.get("image_mime_type") or ""),
+        "image_uploaded_at": str(row.get("image_uploaded_at") or "")[:19],
+        "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
+        "photo_path": str(row.get("photo_path") or ""),
+        "photo_url": str(row.get("photo_url") or ""),
     }
 
 

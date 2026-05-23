@@ -1848,13 +1848,49 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
+.ips-asset-thumb-cell {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+}}
+.ips-asset-thumb-img {{
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}}
+.ips-asset-thumb-placeholder {{
+  width: 42px;
+  height: 42px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}}
+.ips-asset-detail-image {{
+  max-width: 300px;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 4px;
+}}
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"] {{
   gap: 0.35rem !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
   padding: 6px 10px !important;
   margin: 0 !important;
-  min-height: 52px;
+  min-height: 58px;
 }}
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
