@@ -31,6 +31,15 @@ try:
     )
     from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
     from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
+    from app.services.estimate_builder_helpers import (
+        equipment_line_totals,
+        labor_line_totals,
+        labor_options_as_select,
+        material_line_totals,
+        resolve_equipment_cost_rate,
+        simple_line_totals,
+        travel_defaults,
+    )
     from app.utils.estimate_calculations import margin_warning_class
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
@@ -53,8 +62,16 @@ except ImportError:
         get_estimate_bundle,
         recalculate_and_save_estimate_totals,
     )
-    from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
-    from utils.estimate_calculations import margin_warning_class  # type: ignore
+    from utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total, margin_warning_class  # type: ignore
+    from services.estimate_builder_helpers import (  # type: ignore
+        equipment_line_totals,
+        labor_line_totals,
+        labor_options_as_select,
+        material_line_totals,
+        resolve_equipment_cost_rate,
+        simple_line_totals,
+        travel_defaults,
+    )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 
@@ -108,6 +125,89 @@ def _line_form_key(prefix: str, eid: str, field: str) -> str:
     return f"{prefix}_{field}_{eid}"
 
 
+def _display_field(label: str, value: str) -> None:
+    st.markdown(
+        f'<div class="ips-estimate-field-muted">{html.escape(label)}</div>'
+        f'<div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;">{html.escape(value)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _live_totals_card(items: list[tuple[str, str]]) -> None:
+    rows = "".join(
+        f'<div style="display:flex;justify-content:space-between;gap:10px;margin:5px 0;">'
+        f'<span class="ips-estimate-field-muted">{html.escape(label)}</span>'
+        f'<span style="font-weight:700;color:#0f172a;">{html.escape(value)}</span>'
+        f"</div>"
+        for label, value in items
+    )
+    st.markdown(f'<div class="ips-estimate-live-total-card">{rows}</div>', unsafe_allow_html=True)
+
+
+def _compact_form_card(title: str) -> None:
+    st.markdown('<div class="ips-estimate-add-card ips-estimate-compact-form">', unsafe_allow_html=True)
+    st.markdown(f"##### {html.escape(title)}")
+
+
+def _close_compact_form_card() -> None:
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _sync_pick_state(
+    k: Callable[[str], str],
+    pick: str | None,
+    inv_map: dict[str, dict[str, Any]],
+    *,
+    taxable_key: str = "tax",
+) -> dict[str, Any]:
+    last_key = k("last_pick")
+    if pick and st.session_state.get(last_key) != pick:
+        item = inv_map.get(pick, {})
+        st.session_state[k("desc")] = str(item.get("description") or item.get("name") or "")
+        st.session_state[k("sku")] = str(item.get("sku") or "")
+        st.session_state[k("cat")] = str(item.get("category") or "")
+        st.session_state[k("unit")] = str(item.get("unit") or "EA")
+        st.session_state[k("vendor")] = str(item.get("vendor") or item.get("vendor_name") or "")
+        st.session_state[k("vendor_id")] = item.get("vendor_id")
+        st.session_state[taxable_key] = bool(item.get("taxable", True))
+        st.session_state[last_key] = pick
+        return item
+    return inv_map.get(pick or "", {})
+
+
+def _sync_labor_role_state(
+    k: Callable[[str], str],
+    role: str,
+    lab_map: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    last_key = k("last_role")
+    if st.session_state.get(last_key) != role:
+        opt = lab_map.get(role, {})
+        st.session_state[k("str")] = float(opt.get("st_rate") or 0)
+        st.session_state[k("otr")] = float(opt.get("ot_rate") or 0)
+        st.session_state[k("dtr")] = float(opt.get("dt_rate") or 0)
+        st.session_state[last_key] = role
+        return opt
+    return lab_map.get(role, {})
+
+
+def _sync_asset_pick_state(
+    k: Callable[[str], str],
+    pick: str | None,
+    asset_map: dict[str, dict[str, Any]],
+    dur_unit: str,
+) -> dict[str, Any]:
+    last_key = k("last_asset")
+    if pick and st.session_state.get(last_key) != pick:
+        asset = asset_map.get(pick, {})
+        st.session_state[k("name")] = str(asset.get("asset_name") or "")
+        st.session_state[k("type")] = str(asset.get("category") or "")
+        st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
+        st.session_state[last_key] = pick
+        return asset
+    return asset_map.get(pick or "", {})
+
+
 def _line_table(headers: list[str], rows: list[list[str]]) -> None:
     if not rows:
         st.caption("No line items yet.")
@@ -143,6 +243,7 @@ def render_cost_builder_tab(
     totals = calculate_estimate_totals(eid)
     render_cost_summary_cards(est, totals)
 
+    st.markdown('<div class="ips-estimate-builder-actions">', unsafe_allow_html=True)
     qa1, qa2, qa3, qa4, qa5, qa6 = st.columns(6, gap="small")
     with qa1:
         add_mat = st.button("+ Material", key=f"ecb_add_mat_{eid}", use_container_width=True)
@@ -156,16 +257,18 @@ def render_cost_builder_tab(
         add_sub = st.button("+ Subcontractor", key=f"ecb_add_sub_{eid}", use_container_width=True)
     with qa6:
         add_other = st.button("+ Other", key=f"ecb_add_other_{eid}", use_container_width=True)
-
-    if st.button("Recalculate Totals", key=f"ecb_recalc_{eid}", type="primary"):
-        ok, err = _service_ok(recalculate_and_save_estimate_totals(eid))
-        if ok:
-            st.success("Totals updated.")
-            if on_saved:
-                on_saved()
-            st.rerun()
-        else:
-            st.error(err)
+    recalc_col, _ = st.columns([1, 3], gap="small")
+    with recalc_col:
+        if st.button("Recalculate Totals", key=f"ecb_recalc_{eid}", type="primary", use_container_width=True):
+            ok, err = _service_ok(recalculate_and_save_estimate_totals(eid))
+            if ok:
+                st.success("Totals updated.")
+                if on_saved:
+                    on_saved()
+                st.rerun()
+            else:
+                st.error(err)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("#### Recent Lines")
     preview_rows: list[list[str]] = []
@@ -234,39 +337,83 @@ def _render_add_material_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_mat_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Material")
-    source = st.radio("Source", ["Inventory", "Custom"], horizontal=True, key=k("src"))
     default_markup = float(est.get("default_material_markup_pct") or 0)
     inv_map = {label: item for label, item in inventory_options}
-    c1, c2 = st.columns(2)
+    labels = [label for label, _ in inventory_options]
+
+    _compact_form_card("Add Material")
+    c1, c2 = st.columns(2, gap="small")
     with c1:
-        if source == "Inventory" and inventory_options:
-            labels = [label for label, _ in inventory_options]
+        custom = False
+        if inventory_options:
             pick = st.selectbox("Inventory item", labels, key=k("inv"))
-            item = inv_map.get(pick, {})
-            description = st.text_input("Description", value=str(item.get("name") or ""), key=k("desc"))
-            sku = st.text_input("SKU", value=str(item.get("sku") or ""), key=k("sku"))
-            category = st.text_input("Category", value=str(item.get("category") or ""), key=k("cat"))
-            unit = st.text_input("Unit", value="EA", key=k("unit"))
-            unit_cost = st.number_input("Unit cost", value=float(item.get("unit_cost") or 0), key=k("uc"))
-            vendor = st.text_input("Vendor", value=str(item.get("vendor") or ""), key=k("vendor"))
-            inv_id = str(item.get("id") or "")
+            item = _sync_pick_state(k, pick, inv_map, taxable_key=k("tax"))
+            custom = st.session_state.get(k("custom"), False)
         else:
-            description = st.text_input("Description", key=k("desc"))
-            sku = st.text_input("SKU / Item #", key=k("sku"))
-            category = st.text_input("Category", key=k("cat"))
-            unit = st.text_input("Unit", value="EA", key=k("unit"))
-            unit_cost = st.number_input("Unit cost", value=0.0, key=k("uc"))
-            vendor = st.text_input("Vendor", key=k("vendor"))
-            inv_id = ""
-    with c2:
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"))
+            pick = None
+            item = {}
+            custom = True
+            st.info("No inventory items available — enter custom material details below.")
+
+        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-        taxable = st.checkbox("Taxable", value=True, key=k("tax"))
-        notes = st.text_area("Notes", key=k("notes"), height=70)
-    b1, b2 = st.columns(2)
+        if k("tax") not in st.session_state:
+            st.session_state[k("tax")] = bool(item.get("taxable", True))
+        taxable = st.checkbox("Taxable", key=k("tax"))
+
+    with c2:
+        override = st.checkbox("Override inventory cost", key=k("ovr"), disabled=custom or not inventory_options)
+        if override or custom or not inventory_options:
+            unit_cost = st.number_input(
+                "Unit cost",
+                min_value=0.0,
+                value=float(st.session_state.get(k("uc"), item.get("unit_cost") or 0)),
+                key=k("uc"),
+            )
+        else:
+            unit_cost = float(item.get("unit_cost") or 0)
+            _display_field("Unit Cost", fmt_currency(unit_cost))
+            if unit_cost <= 0:
+                st.warning("No inventory price found. Add a unit cost to inventory or enable cost override.")
+
+        unit = str(item.get("unit") or st.session_state.get(k("unit")) or "EA")
+        if custom or override:
+            unit = st.text_input("Unit", value=unit, key=k("unit"))
+        else:
+            _display_field("Unit", unit)
+
+        totals = material_line_totals(qty, unit_cost, markup)
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(totals["cost_total"])),
+                ("Markup Amount", fmt_currency(totals["markup_amount"])),
+                ("Customer Price", fmt_currency(totals["price_total"])),
+            ]
+        )
+
+    with st.expander("Advanced material details", expanded=False):
+        st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
+        if inventory_options:
+            custom = st.checkbox("Custom material (not from inventory)", key=k("custom"))
+        st.text_input("Description", key=k("desc"))
+        st.text_input("SKU", key=k("sku"))
+        st.text_input("Category", key=k("cat"))
+        st.text_input("Vendor", key=k("vendor"))
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    b1, b2 = st.columns(2, gap="small")
     with b1:
-        if st.button("Save material", key=k("save"), type="primary", use_container_width=True):
+        if st.button("Save Material", key=k("save"), type="primary", use_container_width=True):
+            pick_save = st.session_state.get(k("inv"))
+            item_save = inv_map.get(pick_save, {}) if pick_save else {}
+            inv_id = ""
+            if inventory_options and pick_save and not st.session_state.get(k("custom")):
+                inv_id = str(item_save.get("id") or "")
+            if override or custom or not inventory_options:
+                unit_cost_save = float(st.session_state.get(k("uc")) or 0)
+            else:
+                unit_cost_save = float(item_save.get("unit_cost") or 0)
             ok, err = _service_ok(
                 add_estimate_material(
                     eid,
@@ -275,12 +422,13 @@ def _render_add_material_form(
                         "sku": st.session_state.get(k("sku")),
                         "description": st.session_state.get(k("desc")),
                         "category": st.session_state.get(k("cat")),
-                        "unit": st.session_state.get(k("unit")),
-                        "unit_cost": st.session_state.get(k("uc")),
+                        "unit": st.session_state.get(k("unit")) or unit,
+                        "unit_cost": unit_cost_save,
                         "quantity": qty,
                         "markup_percent": markup,
                         "taxable": taxable,
                         "vendor": st.session_state.get(k("vendor")),
+                        "vendor_id": st.session_state.get(k("vendor_id")),
                         "notes": notes,
                     },
                 )
@@ -294,6 +442,7 @@ def _render_add_material_form(
         if st.button("Cancel", key=k("cancel"), use_container_width=True):
             st.session_state.pop(fk, None)
             st.rerun()
+    _close_compact_form_card()
 
 
 def _render_add_labor_form(
@@ -305,29 +454,54 @@ def _render_add_labor_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_lab_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Labor")
     default_markup = float(est.get("default_labor_markup_pct") or 0)
-    c1, c2 = st.columns(2)
+    labor_options = labor_options_as_select()
+    lab_map = {label: opt for label, opt in labor_options}
+    role_labels = [label for label, _ in labor_options] or list(LABOR_ROLE_TYPES)
+
+    _compact_form_card("Add Labor")
+    c1, c2 = st.columns(2, gap="small")
     with c1:
-        role = st.selectbox("Labor role", LABOR_ROLE_TYPES, key=k("role"))
-        description = st.text_input("Description", key=k("desc"))
-        st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=k("sth"))
-        ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=k("oth"))
-        dt_h = st.number_input("DT hours", min_value=0.0, value=0.0, key=k("dth"))
-    with c2:
-        st_r = st.number_input("ST rate", min_value=0.0, value=0.0, key=k("str"))
-        ot_r = st.number_input("OT rate", min_value=0.0, value=0.0, key=k("otr"))
-        dt_r = st.number_input("DT rate", min_value=0.0, value=0.0, key=k("dtr"))
+        role = st.selectbox("Labor role", role_labels, key=k("role"))
+        opt = _sync_labor_role_state(k, role, lab_map)
+        st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=k("sth"), step=0.5)
+        ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=k("oth"), step=0.5)
+        dt_h = st.number_input("DT hours", min_value=0.0, value=0.0, key=k("dth"), step=0.5)
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-        notes = st.text_area("Notes", key=k("notes"), height=70)
-    if st.button("Save labor", key=k("save"), type="primary"):
+
+    with c2:
+        override = st.checkbox("Override labor rates", key=k("ovr"))
+        if override:
+            st_r = st.number_input("ST rate", min_value=0.0, value=float(opt.get("st_rate") or 0), key=k("str"))
+            ot_r = st.number_input("OT rate", min_value=0.0, value=float(opt.get("ot_rate") or 0), key=k("otr"))
+            dt_r = st.number_input("DT rate", min_value=0.0, value=float(opt.get("dt_rate") or 0), key=k("dtr"))
+        else:
+            st_r = float(opt.get("st_rate") or st.session_state.get(k("str")) or 0)
+            ot_r = float(opt.get("ot_rate") or st.session_state.get(k("otr")) or 0)
+            dt_r = float(opt.get("dt_rate") or st.session_state.get(k("dtr")) or 0)
+            _display_field("ST Rate", fmt_currency(st_r))
+            _display_field("OT Rate", fmt_currency(ot_r))
+            _display_field("DT Rate", fmt_currency(dt_r))
+
+        totals = labor_line_totals(st_h, ot_h, dt_h, st_r, ot_r, dt_r, markup)
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(totals["cost_total"])),
+                ("Markup Amount", fmt_currency(totals["markup_amount"])),
+                ("Customer Price", fmt_currency(totals["price_total"])),
+            ]
+        )
+
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    if st.button("Save Labor", key=k("save"), type="primary", use_container_width=True):
+        description = st.session_state.get(k("desc")) or role
         ok, err = _service_ok(
             add_estimate_labor(
                 eid,
                 {
                     "labor_type": role,
                     "role_name": role,
-                    "description": description or role,
+                    "description": description,
                     "st_hours": st_h,
                     "ot_hours": ot_h,
                     "dt_hours": dt_h,
@@ -344,6 +518,10 @@ def _render_add_labor_form(
             st.success("Labor line added.")
             st.rerun()
         st.error(err)
+    if st.button("Cancel", key=k("cancel"), use_container_width=True):
+        st.session_state.pop(fk, None)
+        st.rerun()
+    _close_compact_form_card()
 
 
 def _render_add_equipment_form(
@@ -356,41 +534,77 @@ def _render_add_equipment_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_eq_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Equipment")
     default_markup = float(est.get("default_equipment_markup_pct") or 0)
     asset_map = {label: asset for label, asset in asset_options}
-    c1, c2 = st.columns(2)
+    labels = [label for label, _ in asset_options]
+
+    _compact_form_card("Add Equipment")
+    c1, c2 = st.columns(2, gap="small")
     with c1:
         if asset_options:
-            labels = [label for label, _ in asset_options]
-            pick = st.selectbox("Asset", labels, key=k("asset"))
-            asset = asset_map.get(pick, {})
-            name = st.text_input("Equipment name", value=str(asset.get("asset_name") or ""), key=k("name"))
-            eq_type = st.text_input("Type", value=str(asset.get("category") or ""), key=k("type"))
-            asset_id = str(asset.get("id") or "")
+            pick = st.selectbox("Equipment / Asset", labels, key=k("asset"))
         else:
-            name = st.text_input("Equipment name", key=k("name"))
-            eq_type = st.text_input("Type", key=k("type"))
-            asset_id = ""
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"))
-        duration = st.number_input("Duration", min_value=0.0, value=0.0, key=k("dur"))
+            pick = None
+            st.info("No assets available.")
         dur_unit = st.selectbox("Duration unit", DURATION_UNITS, key=k("dunit"))
-    with c2:
-        cost_rate = st.number_input("Cost rate", min_value=0.0, value=0.0, key=k("rate"))
+        asset = _sync_asset_pick_state(k, pick, asset_map, dur_unit) if pick else {}
+        dur_last = k("last_dunit")
+        if pick and st.session_state.get(dur_last) != dur_unit:
+            st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
+            st.session_state[dur_last] = dur_unit
+        duration = st.number_input("Duration", min_value=0.0, value=1.0, key=k("dur"), step=0.5)
+        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-        notes = st.text_area("Notes", key=k("notes"), height=70)
-    if st.button("Save equipment", key=k("save"), type="primary"):
+
+    with c2:
+        override = st.checkbox("Override equipment rate", key=k("ovr"), disabled=not asset_options)
+        preset_rate = resolve_equipment_cost_rate(asset, dur_unit)
+        if override or not asset_options:
+            cost_rate = st.number_input(
+                "Cost rate",
+                min_value=0.0,
+                value=float(st.session_state.get(k("rate"), preset_rate)),
+                key=k("rate"),
+            )
+        else:
+            cost_rate = float(st.session_state.get(k("rate"), preset_rate) or preset_rate)
+            _display_field("Cost Rate", fmt_currency(cost_rate))
+            if cost_rate <= 0:
+                st.warning("No equipment rate found. Add a rate to the asset or enable rate override.")
+
+        totals = equipment_line_totals(qty, duration, cost_rate, markup)
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(totals["cost_total"])),
+                ("Markup Amount", fmt_currency(totals["markup_amount"])),
+                ("Customer Price", fmt_currency(totals["price_total"])),
+            ]
+        )
+
+    with st.expander("Advanced equipment details", expanded=False):
+        st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
+        st.text_input("Equipment name", key=k("name"))
+        st.text_input("Type / category", key=k("type"))
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    if st.button("Save Equipment", key=k("save"), type="primary", use_container_width=True):
+        asset_id = str(asset.get("id") or "") if pick else ""
+        if override or not asset_options:
+            cost_rate_save = float(st.session_state.get(k("rate")) or 0)
+        else:
+            cost_rate_save = float(preset_rate or 0)
         ok, err = _service_ok(
             add_estimate_equipment(
                 eid,
                 {
                     "asset_id": asset_id or None,
-                    "equipment_name": name,
-                    "equipment_type": eq_type,
+                    "equipment_name": st.session_state.get(k("name")) or asset.get("asset_name"),
+                    "equipment_type": st.session_state.get(k("type")) or asset.get("category"),
                     "quantity": qty,
                     "duration": duration,
                     "duration_unit": dur_unit,
-                    "cost_rate": cost_rate,
+                    "cost_rate": cost_rate_save,
                     "markup_percent": markup,
                     "notes": notes,
                 },
@@ -401,6 +615,10 @@ def _render_add_equipment_form(
             st.success("Equipment line added.")
             st.rerun()
         st.error(err)
+    if st.button("Cancel", key=k("cancel"), use_container_width=True):
+        st.session_state.pop(fk, None)
+        st.rerun()
+    _close_compact_form_card()
 
 
 def _render_add_subcontractor_form(
@@ -413,20 +631,29 @@ def _render_add_subcontractor_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_sub_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Subcontractor")
     default_markup = float(est.get("default_subcontractor_markup_pct") or 0)
-    c1, c2 = st.columns(2)
+
+    _compact_form_card("Add Subcontractor")
+    c1, c2 = st.columns(2, gap="small")
     with c1:
         if vendor_options:
             vendor = st.selectbox("Vendor", vendor_options, key=k("vendor"))
         else:
             vendor = st.text_input("Subcontractor", key=k("vendor"))
-        description = st.text_area("Scope / description", key=k("desc"), height=80)
-    with c2:
+        description = st.text_input("Scope / description", key=k("desc"))
         cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-        notes = st.text_area("Notes", key=k("notes"), height=80)
-    if st.button("Save subcontractor", key=k("save"), type="primary"):
+    with c2:
+        totals = simple_line_totals(cost, markup)
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(totals["cost_total"])),
+                ("Markup Amount", fmt_currency(totals["markup_amount"])),
+                ("Customer Price", fmt_currency(totals["price_total"])),
+            ]
+        )
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    if st.button("Save Subcontractor", key=k("save"), type="primary", use_container_width=True):
         ok, err = _service_ok(
             add_estimate_subcontractor(
                 eid,
@@ -444,6 +671,10 @@ def _render_add_subcontractor_form(
             st.success("Subcontractor line added.")
             st.rerun()
         st.error(err)
+    if st.button("Cancel", key=k("cancel"), use_container_width=True):
+        st.session_state.pop(fk, None)
+        st.rerun()
+    _close_compact_form_card()
 
 
 def _render_add_other_form(
@@ -455,24 +686,34 @@ def _render_add_other_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_other_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Other Cost")
     default_markup = float(est.get("default_other_markup_pct") or 0)
-    c1, c2 = st.columns(2)
+
+    _compact_form_card("Add Other Cost")
+    c1, c2 = st.columns(2, gap="small")
     with c1:
         description = st.text_input("Description", key=k("desc"))
-        category = st.text_input("Category", key=k("cat"))
         cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
-    with c2:
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
         taxable = st.checkbox("Taxable", value=False, key=k("tax"))
-        notes = st.text_area("Notes", key=k("notes"), height=80)
-    if st.button("Save other cost", key=k("save"), type="primary"):
+    with c2:
+        totals = simple_line_totals(cost, markup)
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(totals["cost_total"])),
+                ("Markup Amount", fmt_currency(totals["markup_amount"])),
+                ("Customer Price", fmt_currency(totals["price_total"])),
+            ]
+        )
+    with st.expander("Advanced details", expanded=False):
+        st.text_input("Category", key=k("cat"))
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    if st.button("Save Other Cost", key=k("save"), type="primary", use_container_width=True):
         ok, err = _service_ok(
             add_estimate_other_cost(
                 eid,
                 {
                     "description": description,
-                    "category": category,
+                    "category": st.session_state.get(k("cat")),
                     "cost_total": cost,
                     "markup_percent": markup,
                     "taxable": taxable,
@@ -485,6 +726,10 @@ def _render_add_other_form(
             st.success("Other cost added.")
             st.rerun()
         st.error(err)
+    if st.button("Cancel", key=k("cancel"), use_container_width=True):
+        st.session_state.pop(fk, None)
+        st.rerun()
+    _close_compact_form_card()
 
 
 def _travel_basis_text(row: dict[str, Any]) -> str:
@@ -536,6 +781,17 @@ def _travel_form_data(eid: str, *, key_prefix: str = "ecb_trv") -> dict[str, Any
     }
 
 
+def _seed_travel_rate_defaults(k: Callable[[str], str]) -> None:
+    if st.session_state.get(k("seeded")):
+        return
+    defaults = travel_defaults()
+    st.session_state.setdefault(k("mrate"), defaults["mileage_rate"])
+    st.session_state.setdefault(k("prate"), defaults["per_diem_rate"])
+    st.session_state.setdefault(k("lrate"), defaults["lodging_rate"])
+    st.session_state.setdefault(k("hrate"), defaults["hourly_travel_rate"])
+    st.session_state[k("seeded")] = True
+
+
 def _render_add_travel_form(
     eid: str,
     est: dict[str, Any],
@@ -545,37 +801,35 @@ def _render_add_travel_form(
 ) -> None:
     fk = form_state_key or f"ecb_form_trv_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
-    st.markdown("##### Add Travel Cost")
     default_markup = float(est.get("default_travel_markup_pct") or 0)
     if k("mk") not in st.session_state:
         st.session_state[k("mk")] = default_markup
+    _seed_travel_rate_defaults(k)
+    defaults = travel_defaults()
+
+    _compact_form_card("Add Travel Cost")
     travel_type = st.selectbox("Travel type", TRAVEL_TYPES, key=k("type"))
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     with c1:
-        st.text_input("Description", key=k("desc"))
-        if travel_type in ("Mileage", "Drive Time", "Airfare"):
-            st.text_input("Origin", key=k("origin"))
-        if travel_type in ("Mileage", "Drive Time", "Lodging", "Per Diem", "Airfare"):
-            st.text_input("Destination", key=k("dest"))
         if travel_type == "Mileage":
-            st.number_input("Miles", min_value=0.0, value=0.0, key=k("miles"))
-            st.number_input("Mileage rate", min_value=0.0, value=0.0, key=k("mrate"))
-            st.number_input("Trips", min_value=0.0, value=1.0, key=k("trips"))
+            st.number_input("Miles", min_value=0.0, value=0.0, key=k("miles"), step=1.0)
+            st.number_input("Trips", min_value=0.0, value=1.0, key=k("trips"), step=1.0)
+            _display_field("Mileage rate", fmt_currency(st.session_state.get(k("mrate"), defaults["mileage_rate"])))
         elif travel_type == "Drive Time":
-            st.number_input("Travel hours", min_value=0.0, value=0.0, key=k("hours"))
-            st.number_input("Hourly rate", min_value=0.0, value=0.0, key=k("hrate"))
-            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
+            st.number_input("Travel hours", min_value=0.0, value=0.0, key=k("hours"), step=0.5)
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
+            _display_field("Hourly rate", fmt_currency(st.session_state.get(k("hrate"), defaults["hourly_travel_rate"])))
         elif travel_type == "Lodging":
-            st.number_input("Nights", min_value=0.0, value=0.0, key=k("nights"))
-            st.number_input("Lodging rate", min_value=0.0, value=0.0, key=k("lrate"))
-            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
+            st.number_input("Nights", min_value=0.0, value=0.0, key=k("nights"), step=1.0)
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
+            _display_field("Lodging rate", fmt_currency(st.session_state.get(k("lrate"), defaults["lodging_rate"])))
         elif travel_type == "Per Diem":
-            st.number_input("Per diem days", min_value=0.0, value=0.0, key=k("pdays"))
-            st.number_input("Per diem rate", min_value=0.0, value=0.0, key=k("prate"))
-            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
+            st.number_input("Per diem days", min_value=0.0, value=0.0, key=k("pdays"), step=1.0)
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
+            _display_field("Per diem rate", fmt_currency(st.session_state.get(k("prate"), defaults["per_diem_rate"])))
         elif travel_type == "Airfare":
             st.number_input("Airfare cost", min_value=0.0, value=0.0, key=k("air"))
-            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
         elif travel_type == "Rental Vehicle":
             st.number_input("Rental vehicle cost", min_value=0.0, value=0.0, key=k("rental"))
         elif travel_type == "Fuel":
@@ -584,19 +838,34 @@ def _render_add_travel_form(
             st.number_input("Parking / tolls cost", min_value=0.0, value=0.0, key=k("park"))
         else:
             st.number_input("Other travel cost", min_value=0.0, value=0.0, key=k("other"))
+        markup = st.number_input("Markup %", value=float(st.session_state.get(k("mk"), default_markup)), key=k("mk"))
+
     with c2:
-        st.number_input("Markup %", value=float(st.session_state.get(k("mk"), default_markup)), key=k("mk"))
+        calc = calc_travel_line(_travel_form_data(eid, key_prefix=key_prefix))
+        _live_totals_card(
+            [
+                ("Cost Total", fmt_currency(calc["cost_total"])),
+                ("Markup Amount", fmt_currency(calc["markup_amount"])),
+                ("Customer Price", fmt_currency(calc["price_total"])),
+            ]
+        )
         st.checkbox("Taxable", value=False, key=k("tax"))
-        st.text_area("Notes", key=k("notes"), height=120)
 
-    calc = calc_travel_line(_travel_form_data(eid, key_prefix=key_prefix))
-    st.markdown(
-        f"**Cost total:** {fmt_currency(calc['cost_total'])} · "
-        f"**Markup:** {fmt_currency(calc['markup_amount'])} · "
-        f"**Customer price:** {fmt_currency(calc['price_total'])}"
-    )
+    with st.expander("Advanced travel details", expanded=False):
+        st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
+        st.text_input("Description", key=k("desc"))
+        st.text_input("Origin", key=k("origin"))
+        st.text_input("Destination", key=k("dest"))
+        override = st.checkbox("Override travel rates", key=k("ovr"))
+        if override:
+            st.number_input("Mileage rate", min_value=0.0, value=float(defaults["mileage_rate"]), key=k("mrate"))
+            st.number_input("Hourly rate", min_value=0.0, value=float(defaults["hourly_travel_rate"]), key=k("hrate"))
+            st.number_input("Lodging rate", min_value=0.0, value=float(defaults["lodging_rate"]), key=k("lrate"))
+            st.number_input("Per diem rate", min_value=0.0, value=float(defaults["per_diem_rate"]), key=k("prate"))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    b1, b2 = st.columns(2)
+    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
+    b1, b2 = st.columns(2, gap="small")
     with b1:
         if st.button("Save Travel Cost", key=k("save"), type="primary", use_container_width=True):
             ok, err = _service_ok(add_estimate_travel(eid, _travel_form_data(eid, key_prefix=key_prefix)))
@@ -609,6 +878,7 @@ def _render_add_travel_form(
         if st.button("Cancel", key=k("cancel"), use_container_width=True):
             st.session_state.pop(fk, None)
             st.rerun()
+    _close_compact_form_card()
 
 
 def render_travel_tab(est: dict[str, Any]) -> None:

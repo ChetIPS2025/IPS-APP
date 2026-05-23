@@ -1415,6 +1415,52 @@ def inject_estimates_module_css() -> None:
   padding: 8px 10px;
   border-bottom: 1px solid #eef2f7;
 }}
+.ips-estimate-builder-actions {{
+  margin: 6px 0 12px;
+}}
+.ips-estimate-builder-actions [data-testid="stButton"] > button {{
+  min-height: 38px !important;
+  max-height: 40px !important;
+  padding: 0 10px !important;
+  font-size: 13px !important;
+  border-radius: 10px !important;
+}}
+.ips-estimate-add-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 8px 0 12px;
+}}
+.ips-estimate-compact-form [data-testid="stNumberInput"] input,
+.ips-estimate-compact-form [data-testid="stTextInput"] input,
+.ips-estimate-compact-form [data-testid="stSelectbox"] > div > div,
+.ips-estimate-compact-form textarea {{
+  min-height: 38px !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe3ee !important;
+  border-radius: 10px !important;
+}}
+.ips-estimate-compact-form [data-testid="stNumberInput"] > div {{
+  background: transparent !important;
+}}
+.ips-estimate-live-total-card {{
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 4px;
+}}
+.ips-estimate-field-muted {{
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}}
+.ips-estimate-advanced-details {{
+  padding-top: 4px;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -1615,6 +1661,82 @@ def inject_inventory_module_css() -> None:
   background: #ffffff;
   padding: 4px;
 }}
+.ips-inventory-txn-table {{
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 8px;
+}}
+.ips-inventory-txn-head,
+.ips-inventory-txn-row {{
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.6fr 1.4fr 1fr 0.9fr 1.2fr;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  align-items: center;
+}}
+.ips-inventory-txn-head {{
+  background: #f8fafc;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #e2e8f0;
+}}
+.ips-inventory-txn-row {{
+  border-bottom: 1px solid #eef2f7;
+  color: #0f172a;
+}}
+.ips-inventory-txn-row:last-child {{
+  border-bottom: none;
+}}
+.ips-job-inventory-txn-row {{
+  grid-template-columns: 1fr 1.1fr 0.8fr 0.9fr 0.5fr 0.5fr 0.9fr 0.8fr 1fr;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_inventory_qr_scan_css() -> None:
+    """Mobile inventory QR scan page."""
+    st.markdown(
+        """
+<style id="ips-inventory-qr-scan-v1">
+.ips-inv-qr-item-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 8px 0 12px;
+}
+.ips-inv-qr-item-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+.ips-inv-qr-item-meta {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) label {
+  font-size: 1rem !important;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) input,
+div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) textarea {
+  min-height: 44px !important;
+  font-size: 1rem !important;
+  background: #ffffff !important;
+  border-radius: 10px !important;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) button[kind="primary"] {
+  min-height: 48px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
 </style>
 """,
         unsafe_allow_html=True,

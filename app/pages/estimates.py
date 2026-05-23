@@ -251,22 +251,19 @@ def _estimate_customer_price(row: dict) -> str:
 
 
 def _inventory_options() -> list[tuple[str, dict]]:
-    out: list[tuple[str, dict]] = []
-    for item in load_inventory():
-        sku = str(item.get("sku") or item.get("id") or "")
-        name = str(item.get("name") or "")
-        label = f"{sku} — {name}".strip(" —")
-        out.append((label or name or sku, item))
-    return out
+    try:
+        from app.services.estimate_builder_helpers import inventory_options_as_select
+    except ImportError:
+        from services.estimate_builder_helpers import inventory_options_as_select  # type: ignore
+    return inventory_options_as_select()
 
 
 def _asset_options() -> list[tuple[str, dict]]:
-    out: list[tuple[str, dict]] = []
-    for asset in load_assets():
-        num = str(asset.get("asset_number") or asset.get("id") or "")
-        name = str(asset.get("asset_name") or "")
-        out.append((f"{num} — {name}".strip(" —"), asset))
-    return out
+    try:
+        from app.services.estimate_builder_helpers import asset_options_as_select
+    except ImportError:
+        from services.estimate_builder_helpers import asset_options_as_select  # type: ignore
+    return asset_options_as_select()
 
 
 def _vendor_options() -> list[str]:

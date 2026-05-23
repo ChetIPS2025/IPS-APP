@@ -39,19 +39,30 @@ def resolve_inventory_qr_value(row: dict[str, Any]) -> str:
     return inventory_qr_from_item_id(iid)
 
 
-def inventory_qr_embed_subject(qr_code_value: str) -> str:
-    """Payload encoded in inventory QR images."""
-    qrv = str(qr_code_value or "").strip()
-    if not qrv:
-        return ""
+def inventory_qr_embed_subject(row: dict[str, Any]) -> str:
+    """Payload encoded in inventory QR images (tokenized URL when possible)."""
     try:
         from app.config import settings
         from app.services.qr_codes import inventory_scan_link_url
+        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     except ImportError:
         from config import settings  # type: ignore
         from services.qr_codes import inventory_scan_link_url  # type: ignore
+        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
-    if base:
+    sku = resolve_inventory_sku(row)
+    token = str(row.get("qr_token") or "").strip()
+    qrv = resolve_inventory_qr_value(row)
+    if base and sku and token:
+        url = inventory_scan_link_url(
+            qr_code_value=qrv,
+            app_base_url=base,
+            sku=sku,
+            qr_token=token,
+        )
+        if url:
+            return url
+    if base and qrv:
         return inventory_scan_link_url(qr_code_value=qrv, app_base_url=base)
     return qrv
 
@@ -59,13 +70,14 @@ def inventory_qr_embed_subject(qr_code_value: str) -> str:
 def inventory_qr_png_bytes(row: dict[str, Any]) -> bytes | None:
     """PNG bytes for the inventory item QR, or None if generation fails."""
     qrv = resolve_inventory_qr_value(row)
-    if not qrv:
+    if not qrv and not row.get("qr_token"):
         return None
     try:
         from app.services.qr_codes import generate_qr_png_bytes
     except ImportError:
         from services.qr_codes import generate_qr_png_bytes  # type: ignore
-    for cand in (inventory_qr_embed_subject(qrv), qrv):
+    subject = inventory_qr_embed_subject(row)
+    for cand in (subject, qrv):
         if not cand:
             continue
         try:

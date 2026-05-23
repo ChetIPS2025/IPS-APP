@@ -26,6 +26,8 @@ try:
     from app.pages.tasks import render_job_linked_tasks_tab
     from app.styles import inject_jobs_module_css, inject_tasks_module_css
     from app.utils.formatting import fmt_date
+    from app.services.inventory_service import get_inventory_transactions
+    from app.utils.phone_helpers import format_phone_display
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -50,6 +52,7 @@ _JOB_TABS = [
     "Scope",
     "Financials",
     "Estimates",
+    "Inventory",
     "Schedule",
     "Tasks",
     "Documents",
@@ -567,6 +570,52 @@ def _render_dialog_placeholder(message: str) -> None:
     )
 
 
+def _job_inventory_action_label(txn_type: str) -> str:
+    labels = {
+        "check_out": "Check Out",
+        "check_in": "Check In",
+        "issue_to_job": "Issue to Job",
+        "return_from_job": "Return From Job",
+        "consume_on_job": "Consume On Job",
+        "TO_JOB": "Issue to Job",
+        "OUT": "Check Out",
+        "IN": "Check In",
+        "CONSUME": "Consume On Job",
+        "RETURN": "Return From Job",
+    }
+    return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
+
+
+def _render_job_inventory_tab(job: dict) -> None:
+    jid = str(job.get("id") or "")
+    txns = get_inventory_transactions(job_id=jid, limit=200)
+    if not txns:
+        _render_dialog_placeholder("No inventory scan transactions linked to this job yet.")
+        return
+    head = (
+        '<div class="ips-inventory-txn-head">'
+        '<span>Date</span><span>Item</span><span>SKU</span><span>Action</span>'
+        '<span>Qty</span><span>Unit</span><span>Scanned By</span><span>Phone</span><span>Notes</span>'
+        "</div>"
+    )
+    rows_html = ""
+    for row in txns:
+        rows_html += (
+            '<div class="ips-inventory-txn-row ips-job-inventory-txn-row">'
+            f'<span>{html.escape(fmt_date(row.get("created_at")))}</span>'
+            f'<span>{html.escape(str(row.get("item_name") or "—"))}</span>'
+            f'<span>{html.escape(str(row.get("sku") or "—"))}</span>'
+            f'<span>{html.escape(_job_inventory_action_label(row.get("transaction_type")))}</span>'
+            f'<span>{html.escape(str(row.get("quantity_display") or ""))}</span>'
+            f'<span>{html.escape(str(row.get("unit") or "—"))}</span>'
+            f'<span>{html.escape(str(row.get("scanned_by_name") or "—"))}</span>'
+            f'<span>{html.escape(format_phone_display(str(row.get("scanned_by_phone") or "")))}</span>'
+            f'<span>{html.escape(str(row.get("notes") or ""))}</span>'
+            "</div>"
+        )
+    st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
+
+
 def _render_job_detail_tabs(job: dict) -> None:
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
@@ -580,6 +629,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_scope,
         tab_financials,
         tab_estimates,
+        tab_inventory,
         tab_schedule,
         tab_tasks,
         tab_documents,
@@ -648,6 +698,9 @@ def _render_job_detail_tabs(job: dict) -> None:
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+
+    with tab_inventory:
+        _render_job_inventory_tab(job)
 
     with tab_schedule:
         sched_html = (

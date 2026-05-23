@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import secrets
 import uuid
 from typing import Any, Callable
 from urllib.parse import quote
@@ -10,16 +11,36 @@ from urllib.parse import quote
 _TABLE = "inventory_items"
 
 
-def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str) -> str:
+def generate_inventory_qr_token() -> str:
+    """Random URL-safe token for inventory QR deep links."""
+    return secrets.token_urlsafe(24)
+
+
+def inventory_qr_link_url(*, sku: str, qr_token: str, app_base_url: str) -> str:
+    """
+    Mobile inventory scan URL.
+
+    Format: ``{APP_BASE_URL}/?qr=inventory&sku={sku}&token={qr_token}``
+    """
+    base = str(app_base_url or "").strip().rstrip("/")
+    sku_q = quote(str(sku or "").strip(), safe="")
+    token_q = quote(str(qr_token or "").strip(), safe="")
+    if not base or not sku_q or not token_q:
+        return ""
+    return f"{base}/?qr=inventory&sku={sku_q}&token={token_q}"
+
+
+def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str, sku: str = "", qr_token: str = "") -> str:
     """
     Full URL for inventory QR labels.
 
-    Uses the **root** Streamlit URL with query params (``main.py`` reads ``page`` + ``code``).
-    Path-style ``/inventory_scan?code=`` is not used because a single ``main.py`` entrypoint
-    does not serve arbitrary paths unless the host rewrites them.
-
-    Format: ``{APP_BASE_URL}/?page=Scan%20Inventory&code=<qr_code_value>`` (``APP_BASE_URL`` from env / settings).
+    Prefers tokenized mobile URL when ``sku`` and ``qr_token`` are provided.
+    Falls back to legacy ``?page=Scan%20Inventory&code=`` format.
     """
+    if sku and qr_token:
+        link = inventory_qr_link_url(sku=sku, qr_token=qr_token, app_base_url=app_base_url)
+        if link:
+            return link
     b = str(app_base_url or "").strip().rstrip("/")
     v = str(qr_code_value or "").strip()
     if not b or not v:

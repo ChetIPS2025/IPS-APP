@@ -291,14 +291,19 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "qty_on_hand": int(float(qty or 0)),
         "reorder_point": int(float(row.get("reorder_point") or 0)),
         "unit_cost": float(row.get("unit_cost") or 0),
+        "vendor_id": str(row.get("vendor_id") or "") or None,
         "vendor": str(row.get("vendor") or row.get("vendor_name") or "—"),
         "description": str(row.get("description") or row.get("item_name") or row.get("name") or "—"),
+        "taxable": row.get("taxable") if row.get("taxable") is not None else True,
         "image_path": str(row.get("image_path") or ""),
         "image_url": str(row.get("image_url") or ""),
         "image_file_name": str(row.get("image_file_name") or ""),
         "image_mime_type": str(row.get("image_mime_type") or ""),
         "image_uploaded_at": str(row.get("image_uploaded_at") or "")[:19],
         "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
+        "qr_token": str(row.get("qr_token") or "").strip(),
+        "quantity_checked_out": float(row.get("quantity_checked_out") or 0),
+        "quantity_allocated": float(row.get("quantity_allocated") or 0),
     }
 
 
@@ -321,6 +326,13 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "operator": str(row.get("operator") or row.get("assigned_employee") or "—"),
         "description": str(row.get("description") or row.get("notes") or ""),
         "qr_code_value": str(row.get("qr_code_value") or "").strip(),
+        "is_rental": bool(row.get("is_rental")),
+        "rental_daily_rate": _money_field(row, "rental_daily_rate", "daily_rate"),
+        "rental_weekly_rate": _money_field(row, "rental_weekly_rate", "weekly_rate"),
+        "rental_monthly_rate": _money_field(row, "rental_monthly_rate"),
+        "hourly_rate": _money_field(row, "hourly_rate"),
+        "daily_rate": _money_field(row, "daily_rate", "rental_daily_rate"),
+        "weekly_rate": _money_field(row, "weekly_rate", "rental_weekly_rate"),
     }
 
 

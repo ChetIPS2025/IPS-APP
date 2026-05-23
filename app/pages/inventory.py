@@ -39,12 +39,16 @@ try:
     )
     from app.services.inventory_service import (
         clear_inventory_cache,
+        ensure_inventory_qr_tokens,
+        generate_inventory_qr_value,
         get_inventory_image_url,
+        get_inventory_transactions,
         update_inventory_item,
         upload_inventory_image,
     )
     from app.styles import inject_inventory_module_css
-    from app.utils.formatting import fmt_currency
+    from app.utils.formatting import fmt_currency, fmt_date
+    from app.utils.phone_helpers import format_phone_display
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -451,6 +455,70 @@ def _seed_inventory_edit_form(item: dict) -> None:
     st.session_state[f"inv_edit_cost_{iid}"] = float(item.get("unit_cost") or 0)
 
 
+def _txn_action_label(txn_type: str) -> str:
+    labels = {
+        "check_out": "Check Out",
+        "check_in": "Check In",
+        "issue_to_job": "Issue to Job",
+        "return_from_job": "Return From Job",
+        "consume_on_job": "Consume On Job",
+        "adjustment": "Adjustment",
+        "TO_JOB": "Issue to Job",
+        "OUT": "Check Out",
+        "IN": "Check In",
+        "SHOP": "Shop Use",
+        "ADJUST": "Adjustment",
+    }
+    return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
+
+
+def _render_inventory_transactions_tab(item: dict) -> None:
+    iid = str(item.get("id") or "")
+    txns = get_inventory_transactions(inventory_id=iid, limit=100)
+    last_scan = "—"
+    if txns:
+        last_scan = fmt_date(txns[0].get("created_at"))
+
+    c1, c2, c3, c4 = st.columns(4, gap="small")
+    with c1:
+        st.metric("On Hand", int(item.get("qty_on_hand") or 0))
+    with c2:
+        st.metric("Checked Out", int(float(item.get("quantity_checked_out") or 0)))
+    with c3:
+        st.metric("Allocated", int(float(item.get("quantity_allocated") or 0)))
+    with c4:
+        st.metric("Last Scan", last_scan)
+
+    scan_url = generate_inventory_qr_value(item)
+    if scan_url:
+        st.link_button("Open Scan Link", scan_url, use_container_width=False)
+
+    if not txns:
+        st.caption("No scan transactions yet.")
+        return
+
+    head = (
+        '<div class="ips-inventory-txn-head">'
+        '<span>Date</span><span>Action</span><span>Qty</span><span>Job</span>'
+        '<span>Scanned By</span><span>Phone</span><span>Notes</span>'
+        "</div>"
+    )
+    rows_html = ""
+    for row in txns:
+        rows_html += (
+            '<div class="ips-inventory-txn-row">'
+            f'<span>{html.escape(fmt_date(row.get("created_at")))}</span>'
+            f'<span>{html.escape(_txn_action_label(row.get("transaction_type")))}</span>'
+            f'<span>{html.escape(str(row.get("quantity_display") or ""))}</span>'
+            f'<span>{html.escape(str(row.get("job_label") or "—"))}</span>'
+            f'<span>{html.escape(str(row.get("scanned_by_name") or "—"))}</span>'
+            f'<span>{html.escape(format_phone_display(str(row.get("scanned_by_phone") or "")))}</span>'
+            f'<span>{html.escape(str(row.get("notes") or ""))}</span>'
+            "</div>"
+        )
+    st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
+
+
 def _render_inventory_detail_tabs(item: dict) -> None:
     status = str(item.get("status") or "")
     (
@@ -492,6 +560,8 @@ def _render_inventory_detail_tabs(item: dict) -> None:
         stock_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
+            f"{detail_field_html('Checked Out', int(float(item.get('quantity_checked_out') or 0)))}"
+            f"{detail_field_html('Allocated to Jobs', int(float(item.get('quantity_allocated') or 0)))}"
             f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
             f"{detail_field_html('Unit', _inventory_unit(item))}"
             f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
@@ -503,7 +573,7 @@ def _render_inventory_detail_tabs(item: dict) -> None:
         placeholder_html("Stock History will connect to Supabase in a later phase.")
 
     with tab_transactions:
-        placeholder_html("Transactions will connect to Supabase in a later phase.")
+        _render_inventory_transactions_tab(item)
 
     with tab_pos:
         placeholder_html("Purchase Orders will connect to Supabase in a later phase.")
@@ -635,6 +705,10 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     rows = load_inventory()
+    if not st.session_state.get("_inv_qr_tokens_seeded"):
+        ensure_inventory_qr_tokens(rows)
+        st.session_state["_inv_qr_tokens_seeded"] = True
+        rows = load_inventory()
     categories = sorted({_inventory_category(r) for r in rows if _inventory_category(r) != "—"})
     locations = sorted({_inventory_location(r) for r in rows if _inventory_location(r) != "—"})
     vendors = sorted({_inventory_vendor(r) for r in rows if _inventory_vendor(r) != "—"})

@@ -179,6 +179,12 @@ def main() -> None:
         from services.asset_qr import capture_asset_deeplink_from_query  # type: ignore
     capture_asset_deeplink_from_query()
 
+    try:
+        from app.pages.inventory_qr_action import capture_inventory_qr_from_query
+    except ImportError:
+        from pages.inventory_qr_action import capture_inventory_qr_from_query  # type: ignore
+    capture_inventory_qr_from_query()
+
     if not is_authenticated():
         _render_login()
         if not is_authenticated():
@@ -193,6 +199,19 @@ def main() -> None:
         _render_password_reset()
         if must_reset_password():
             st.stop()
+
+    try:
+        qr_kind = str(st.query_params.get("qr") or "").strip().lower()
+    except Exception:
+        qr_kind = ""
+    if qr_kind == "inventory" or st.session_state.get("_ips_qr_inventory_page"):
+        try:
+            from app.pages.inventory_qr_action import render_inventory_qr_action_page
+        except ImportError:
+            from pages.inventory_qr_action import render_inventory_qr_action_page  # type: ignore
+        inject_authenticated_shell_css()
+        render_inventory_qr_action_page()
+        st.stop()
 
     ensure_nav_defaults()
     prev_slug = st.session_state.get("_ips_last_slug")
