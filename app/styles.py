@@ -22,108 +22,135 @@ SELECTED_BORDER = "#2563eb"
 
 
 def inject_users_module_css() -> None:
-    """Users/Employees list table stability — call at the top of the users page render."""
+    """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v3">
-.ips-users-page .ips-data-table-wrap,
-.ips-users-page .ips-data-table-stable .ips-data-table-header,
-.ips-users-page .ips-data-table-stable .ips-data-row {{
-  display: grid !important;
-  box-sizing: border-box !important;
-}}
-.ips-users-page .ips-data-table-html .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  white-space: nowrap;
+<style id="ips-users-module-v4">
+.ips-users-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
 }}
-.ips-users-page .ips-data-table-html .ips-data-cell {{
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ips-users-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
 }}
-.ips-users-page .ips-employees-summary-table .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ips-users-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
 }}
-.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
-  width: 100%;
-  min-width: 48rem;
-  box-sizing: border-box;
-}}
-.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row:hover {{
+.ips-users-row:hover {{
   background: #eef5ff;
 }}
-.ips-users-page div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap) .ips-data-row.selected {{
+.ips-users-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-users-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-users-name {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-users-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-user-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-user-employee {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-user-system {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-user-status-active {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-user-status-inactive {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-user-status-locked {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-user-status-pending {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
-  border-left: 4px solid #2563eb;
 }}
-/* Users list: invisible full-row select button layered under HTML row */
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-click-table-employees_list)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap),
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn) {{
-  position: relative !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
 }}
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 1 !important;
-  height: auto !important;
-  min-height: 2.75rem !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  pointer-events: auto !important;
+.st-key-users_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stButton"] > button,
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has([data-testid="stButton"]) .stButton > button {{
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 2.75rem !important;
+.st-key-users_table_wrap [data-testid="stCheckbox"] {{
   margin: 0 !important;
-  padding: 0 !important;
-  opacity: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: transparent !important;
-  cursor: pointer !important;
 }}
-section[data-testid="stMain"]:has(.ips-users-page)
-div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap):has(.ips-clean-row-select-btn)
-[data-testid="stElementContainer"]:has(.ips-data-row) {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 2 !important;
-  pointer-events: none !important;
+.st-key-users_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
   margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+}}
+.st-key-users_table_wrap .stButton > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
 }}
 </style>
 """,
@@ -160,26 +187,114 @@ def inject_documents_module_css() -> None:
 
 
 def inject_customers_module_css() -> None:
-    """Customers list table stability — call at the top of the customers page render."""
+    """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v1">
-.ips-customers-page .ips-data-table-wrap,
-.ips-customers-page .ips-data-table-stable .ips-data-table-header,
-.ips-customers-page .ips-data-table-stable .ips-data-row {{
-  display: grid !important;
-  box-sizing: border-box !important;
+<style id="ips-customers-module-v2">
+.ips-customers-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
 }}
-.ips-customers-page .ips-data-table-html .ips-data-row {{
-  display: grid !important;
-  min-height: 2.75rem;
+.ips-customers-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-customers-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-customers-row:hover {{
+  background: #eef5ff;
+}}
+.ips-customers-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-customers-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-customers-name {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-customer-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }}
-.ips-customers-page .ips-data-table-html .ips-data-cell {{
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ips-customer-status-active {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-customer-status-inactive {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-customer-status-prospect {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-customer-status-on-hold {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.st-key-customers_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-customers_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-customers_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-customers_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
 }}
 </style>
 """,
@@ -188,13 +303,154 @@ def inject_customers_module_css() -> None:
 
 
 def inject_jobs_module_css() -> None:
-    """Jobs list table — native dataframe row selection styling."""
+    """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v10">
-section[data-testid="stMain"]:has(.ips-jobs-page) .ips-selectable-table ~ div [data-testid="stDataFrame"] [role="grid"],
-section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"]:has(.ips-native-click-table-jobs_list) [data-testid="stDataFrame"] [role="grid"] {{
-  cursor: pointer;
+<style id="ips-jobs-module-v11">
+.ips-jobs-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-jobs-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-jobs-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-jobs-row:hover {{
+  background: #eef5ff;
+}}
+.ips-jobs-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-jobs-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-jobs-number {{
+  font-size: 14px;
+  font-weight: 800;
+  color: #2563eb;
+  line-height: 1.25;
+  white-space: nowrap;
+}}
+.ips-jobs-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-jobs-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-job-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-job-status-draft {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-job-status-planning {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-job-status-scheduled {{
+  background: #e0e7ff;
+  color: #4338ca;
+}}
+.ips-job-status-active {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-job-status-awarded {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-job-status-on-hold {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-job-status-completed {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-job-status-closed {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-job-status-cancelled {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+.st-key-jobs_table_wrap .stButton > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
 }}
 </style>
 """,
@@ -311,14 +567,14 @@ def inject_tasks_module_css() -> None:
   width: auto !important;
 }}
 .st-key-tasks_table_wrap .ips-task-status-open .stButton > button {{
-  background: #ffffff !important;
-  color: #1d4ed8 !important;
-  border: 1px solid #93c5fd !important;
+  background: #dcfce7 !important;
+  color: #166534 !important;
+  border: 1px solid #86efac !important;
 }}
 .st-key-tasks_table_wrap .ips-task-status-closed .stButton > button {{
-  background: #ecfdf5 !important;
-  color: #047857 !important;
-  border: 1px solid #86efac !important;
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fca5a5 !important;
 }}
 .st-key-tasks_table_wrap [data-testid="stSelectbox"] {{
   margin: 0 !important;
@@ -347,31 +603,149 @@ def inject_tasks_module_css() -> None:
 
 
 def inject_estimates_module_css() -> None:
-    """
-    Estimate list/detail table stability — always call at the top of the estimates page render.
-
-    Uses unique class names so other pages cannot affect estimate layout on navigation.
-    """
+    """Estimates list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-estimates-module-v1">
-.ips-estimates-page .ips-data-table-wrap,
-.ips-estimates-page .ips-data-table-stable .ips-data-table-header,
-.ips-estimates-page .ips-data-table-stable .ips-data-row {{
-  display: grid !important;
-  box-sizing: border-box !important;
-}}
-.ips-estimates-page .ips-data-table-stable .ips-data-row {{
-  white-space: nowrap;
+<style id="ips-estimates-module-v2">
+.ips-estimates-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
 }}
-.ips-estimates-page .ips-detail-panel {{
-  border-left: 3px solid {PRIMARY};
+.ips-estimates-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
 }}
-.ips-estimates-page section[data-testid="stMain"] .stButton > button {{
-  min-height: 2.1rem !important;
-  max-height: 2.35rem !important;
+.ips-estimates-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-estimates-row:hover {{
+  background: #eef5ff;
+}}
+.ips-estimates-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-estimates-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-estimates-number {{
+  font-size: 14px;
+  font-weight: 800;
+  color: #2563eb;
+  line-height: 1.25;
+  white-space: nowrap;
+}}
+.ips-estimates-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-estimates-muted {{
+  font-size: 13px;
+  color: #64748b;
+}}
+.ips-estimate-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-estimate-status-draft {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-estimate-status-pending {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-estimate-status-sent {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-estimate-status-approved {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-estimate-status-awarded {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-estimate-status-rejected {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-estimate-status-expired {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
+.ips-estimate-status-cancelled {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.st-key-estimates_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-estimates_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-estimates_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-estimates_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+.st-key-estimates_table_wrap .stButton > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
 }}
 </style>
 """,

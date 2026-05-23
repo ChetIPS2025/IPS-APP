@@ -10,7 +10,6 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.clickable_table import clear_modal_selection_state, render_clickable_table
     from app.pages._core._data import (
         customer_contact_select_options,
         customer_filter_options,
@@ -28,7 +27,6 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.clickable_table import clear_modal_selection_state, render_clickable_table  # type: ignore
     from pages._core._data import (  # type: ignore
         customer_filter_options,
         employee_options,
@@ -54,11 +52,101 @@ _JOB_TABS = [
     "Notes",
     "Activity",
 ]
+SELECTED_JOB_KEY = "selected_job_id"
+SHOW_MODAL_KEY = "show_job_detail_modal"
+_ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
+CACHE_KEY = "_ips_jobs_modal_by_id"
+_JOB_COLS = [0.35, 1.1, 3.2, 2.2, 1.8, 1.3, 1.2, 1.2]
+_JOB_HEADERS = ["", "JOB #", "PROJECT / DESCRIPTION", "CUSTOMER", "SUPERVISOR", "STATUS", "START DATE", "END DATE"]
+_STATUS_FILTER_OPTS = [
+    "All Statuses",
+    "Draft",
+    "Planning",
+    "Scheduled",
+    "Active",
+    "Awarded",
+    "On Hold",
+    "Completed",
+    "Closed",
+    "Cancelled",
+]
 
 
-def _default_jobs_date_range() -> tuple[date, date]:
-    today = date.today()
-    return today.replace(day=1), today
+def _normalize_job_status(raw: object) -> str:
+    s = str(raw or "").strip().lower().replace("_", " ")
+    mapping = {
+        "": "Draft",
+        "draft": "Draft",
+        "planning": "Planning",
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "awarded": "Awarded",
+        "on hold": "On Hold",
+        "completed": "Completed",
+        "closed": "Closed",
+        "cancelled": "Cancelled",
+        "canceled": "Cancelled",
+    }
+    if s in mapping:
+        return mapping[s]
+    label = str(raw or "").strip()
+    return label if label else "Draft"
+
+
+def _job_number(job: dict) -> str:
+    for key in ("job_number", "number"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _job_project(job: dict) -> str:
+    for key in ("job_name", "project_name", "project_description", "description"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _job_customer(job: dict) -> str:
+    for key in ("customer_name", "customer"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _job_supervisor(job: dict) -> str:
+    for key in ("supervisor_name", "supervisor"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _job_location(job: dict) -> str:
+    for key in ("location_name", "location"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _job_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Draft": "ips-job-status-draft",
+        "Planning": "ips-job-status-planning",
+        "Scheduled": "ips-job-status-scheduled",
+        "Active": "ips-job-status-active",
+        "Awarded": "ips-job-status-awarded",
+        "On Hold": "ips-job-status-on-hold",
+        "Completed": "ips-job-status-completed",
+        "Closed": "ips-job-status-closed",
+        "Cancelled": "ips-job-status-cancelled",
+    }
+    cls = cls_map.get(status, "ips-job-status-draft")
+    return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
 
 
 def _clear_jobs_filters() -> None:
@@ -66,37 +154,169 @@ def _clear_jobs_filters() -> None:
     st.session_state["jobs_search"] = ""
     st.session_state["jobs_filter_status"] = "All Statuses"
     st.session_state["jobs_filter_customer"] = "All Customers"
-    st.session_state["jobs_filter_dates"] = _default_jobs_date_range()
+    st.session_state["jobs_filter_supervisor"] = "All Supervisors"
+    st.session_state["jobs_filter_location"] = "All Locations"
 
 
-def _filter_jobs(rows: list[dict], *, q: str, status: str, customer: str) -> list[dict]:
+def _filter_jobs(
+    rows: list[dict],
+    *,
+    q: str,
+    status: str,
+    customer: str,
+    supervisor: str,
+    location: str,
+) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
         out = [
             r
             for r in out
-            if ql in str(r.get("job_number", "")).lower()
-            or ql in str(r.get("job_name", "")).lower()
-            or ql in str(r.get("customer", "")).lower()
+            if ql in _job_number(r).lower()
+            or ql in _job_project(r).lower()
+            or ql in _job_customer(r).lower()
+            or ql in _job_supervisor(r).lower()
+            or ql in _normalize_job_status(r.get("status")).lower()
         ]
     if status and status != "All Statuses":
-        out = [r for r in out if str(r.get("status", "")) == status]
+        out = [r for r in out if _normalize_job_status(r.get("status")) == status]
     if customer and customer != "All Customers":
-        out = [r for r in out if str(r.get("customer", "")) == customer]
+        out = [r for r in out if _job_customer(r) == customer]
+    if supervisor and supervisor != "All Supervisors":
+        out = [r for r in out if _job_supervisor(r) == supervisor]
+    if location and location != "All Locations":
+        out = [r for r in out if _job_location(r) == location]
     return out
 
 
+def _job_select_key(job_id: str) -> str:
+    return f"job_select_{job_id}"
+
+
+def _clear_job_selection(job_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_JOB_KEY] = None
+    st.session_state[SHOW_MODAL_KEY] = False
+    ids = list(job_ids or [])
+    for jid in ids:
+        st.session_state[_job_select_key(jid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("job_select_"):
+            st.session_state[key] = False
+    st.session_state.pop(_SEL, None)
+    st.session_state.pop(_JOBS_MODAL_KEY, None)
+
+
+def _on_job_checkbox_change(job_id: str, all_job_ids: list[str]) -> None:
+    key = _job_select_key(job_id)
+    if st.session_state.get(key):
+        for jid in all_job_ids:
+            if jid != job_id:
+                st.session_state[_job_select_key(jid)] = False
+        st.session_state[SELECTED_JOB_KEY] = job_id
+        st.session_state[SHOW_MODAL_KEY] = True
+        cache = st.session_state.get(CACHE_KEY) or {}
+        job = cache.get(job_id) if isinstance(cache, dict) else None
+        _open_jobs_detail_modal(job_id, job)
+    elif st.session_state.get(SELECTED_JOB_KEY) == job_id:
+        st.session_state[SELECTED_JOB_KEY] = None
+        st.session_state[SHOW_MODAL_KEY] = False
+
+
 def _clear_jobs_detail_modal() -> None:
+    job_ids = st.session_state.get(_ALL_JOB_IDS_KEY) or []
+    _clear_job_selection([str(jid) for jid in job_ids])
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
-    clear_modal_selection_state(
-        "jobs",
-        table_key="jobs_list",
-        session_select_key=_SEL,
-        modal_key=_JOBS_MODAL_KEY,
-    )
+
+
+def _render_custom_jobs_table(filtered: list[dict]) -> list[str]:
+    if not filtered:
+        st.info("No jobs match your filters.")
+        st.session_state[_ALL_JOB_IDS_KEY] = []
+        return []
+
+    all_job_ids = [str(j.get("id") or "").strip() for j in filtered if str(j.get("id") or "").strip()]
+    st.session_state[_ALL_JOB_IDS_KEY] = all_job_ids
+
+    with st.container(key="jobs_table_wrap"):
+        st.markdown('<div class="ips-jobs-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _JOB_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-jobs-header-row ips-jobs-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        for job in filtered:
+            jid = str(job.get("id") or "").strip()
+            if not jid:
+                continue
+
+            job_no = _job_number(job)
+            project = _job_project(job)
+            customer = _job_customer(job)
+            supervisor = _job_supervisor(job)
+            status = _normalize_job_status(job.get("status"))
+            start = fmt_date(job.get("start_date"))
+            end = fmt_date(job.get("end_date"))
+
+            cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_job_select_key(jid),
+                    label_visibility="collapsed",
+                    on_change=_on_job_checkbox_change,
+                    args=(jid, all_job_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-jobs-number">{html.escape(job_no)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-jobs-title">{html.escape(project)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-jobs-cell">{html.escape(customer)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(supervisor)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                st.markdown(_job_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(start)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[7]:
+                st.markdown(
+                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(end)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_job_ids
 
 
 def _job_session_key(job: dict) -> str:
@@ -239,17 +459,14 @@ def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
     jid = str(job_id or "").strip()
     if not jid:
         return
+    st.session_state[SELECTED_JOB_KEY] = jid
+    st.session_state[SHOW_MODAL_KEY] = True
     st.session_state[_SEL] = jid
     st.session_state[_JOBS_MODAL_KEY] = jid
     if isinstance(_job, dict):
         st.session_state[_job_edit_mode_key(_job)] = False
     else:
         st.session_state[f"job_edit_mode_{''.join(ch if ch.isalnum() else '_' for ch in jid) or 'job'}"] = False
-
-
-def _show_jobs_detail_modal_if_pending() -> None:
-    if str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
-        _show_jobs_detail_modal()
 
 
 def _safe_value(value: object, fallback: str = "—") -> str:
@@ -583,13 +800,6 @@ def _show_jobs_detail_modal() -> None:
     render_job_detail_dialog(job)
 
 
-def _jobs_display_cell(field: str, row: dict) -> str:
-    if field in ("start_date", "end_date"):
-        return fmt_date(row.get(field))
-    val = row.get(field)
-    return str(val).strip() if val is not None and str(val).strip() else "—"
-
-
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
@@ -604,17 +814,29 @@ def render() -> None:
     inject_jobs_module_css()
     all_jobs = load_jobs()
     customers = customer_filter_options()
+    supervisors = sorted(
+        {_job_supervisor(j) for j in all_jobs if _job_supervisor(j) != "—"}
+    )
+    locations = sorted(
+        {_job_location(j) for j in all_jobs if _job_location(j) != "—"}
+    )
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
-        render_page_header("Jobs", "Manage active projects, schedules, and job details.")
+        render_page_header(
+            "Jobs",
+            "Track and manage all company jobs, assignments, and costing.",
+        )
     with act_r:
-        st.button("Export", key="jobs_export", use_container_width=True)
-        if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
-            st.session_state["ips_job_form"] = True
+        exp_col, add_col = st.columns(2, gap="small")
+        with exp_col:
+            st.button("Export", key="jobs_export", use_container_width=True)
+        with add_col:
+            if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+                st.session_state["ips_job_form"] = True
 
     if st.session_state.get("ips_job_form"):
-        with st.expander("New job", expanded=True):
+        with st.expander("New Job", expanded=True):
             nc1, nc2 = st.columns(2)
             with nc1:
                 st.text_input("Job number", key="job_new_num")
@@ -665,13 +887,18 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.7])
+        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
         with c1:
-            st.text_input("Search", placeholder="Search jobs…", key="jobs_search", label_visibility="collapsed")
+            st.text_input(
+                "Search",
+                placeholder="Search jobs...",
+                key="jobs_search",
+                label_visibility="collapsed",
+            )
         with c2:
             st.selectbox(
                 "Status",
-                ["All Statuses", *lookup_options("job_statuses")],
+                _STATUS_FILTER_OPTS,
                 key="jobs_filter_status",
                 label_visibility="collapsed",
             )
@@ -683,13 +910,20 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c4:
-            st.date_input(
-                "Range",
-                value=_default_jobs_date_range(),
-                key="jobs_filter_dates",
+            st.selectbox(
+                "Supervisor",
+                ["All Supervisors", *supervisors],
+                key="jobs_filter_supervisor",
                 label_visibility="collapsed",
             )
         with c5:
+            st.selectbox(
+                "Location",
+                ["All Locations", *locations],
+                key="jobs_filter_location",
+                label_visibility="collapsed",
+            )
+        with c6:
             st.button(
                 "Clear",
                 key="jobs_clear_filters",
@@ -704,43 +938,20 @@ def render() -> None:
         q=str(st.session_state.get("jobs_search") or "").strip(),
         status=str(st.session_state.get("jobs_filter_status") or "All Statuses"),
         customer=str(st.session_state.get("jobs_filter_customer") or "All Customers"),
+        supervisor=str(st.session_state.get("jobs_filter_supervisor") or "All Supervisors"),
+        location=str(st.session_state.get("jobs_filter_location") or "All Locations"),
     )
 
     st.caption(f"{len(filtered)} job(s)")
 
-    st.session_state["_ips_jobs_modal_by_id"] = {
+    st.session_state[CACHE_KEY] = {
         str(job.get("id") or "").strip(): job
         for job in filtered
         if str(job.get("id") or "").strip()
     }
 
-    render_clickable_table(
-        filtered,
-        [
-            ("job_number", "JOB #"),
-            ("job_name", "PROJECT / DESCRIPTION"),
-            ("customer", "CUSTOMER"),
-            ("estimate_number", "ESTIMATE #"),
-            ("supervisor", "SUPERVISOR"),
-            ("status", "STATUS"),
-            ("start_date", "START DATE"),
-            ("end_date", "END DATE"),
-        ],
-        "jobs_list",
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_jobs_display_cell,
-        on_row_selected=_open_jobs_detail_modal,
-        column_widths={
-            "job_number": "small",
-            "job_name": "large",
-            "customer": "medium",
-            "estimate_number": "small",
-            "supervisor": "medium",
-            "status": "small",
-            "start_date": "small",
-            "end_date": "small",
-        },
-    )
+    _render_custom_jobs_table(filtered)
 
-    _show_jobs_detail_modal_if_pending()
+    selected_job_id = st.session_state.get(SELECTED_JOB_KEY)
+    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
+        _show_jobs_detail_modal()

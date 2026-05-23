@@ -8,11 +8,11 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -29,7 +29,6 @@ try:
         render_save_cancel_actions,
         safe_value,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html,
     )
     from app.components.tables import render_data_table
@@ -50,11 +49,11 @@ try:
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
     from auth import current_role  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -71,7 +70,6 @@ except ImportError:
         render_save_cancel_actions,
         safe_value,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html,
     )
     from components.tables import render_data_table  # type: ignore
@@ -96,6 +94,13 @@ _TABLE_KEY = "employees_list"
 MODULE = "employees"
 MODAL_KEY = "ips_employees_detail_modal_id"
 CACHE_KEY = "_ips_employees_modal_by_id"
+SELECTED_USER_KEY = "selected_user_id"
+SHOW_MODAL_KEY = "show_user_detail_modal"
+_ALL_USER_IDS_KEY = "_ips_users_visible_ids"
+_USER_COLS = [0.35, 2.4, 3.2, 1.5, 1.4, 1.2, 1.6]
+_USER_HEADERS = ["", "NAME", "EMAIL", "ROLE", "EMPLOYEE", "STATUS", "LAST LOGIN"]
+_STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Locked", "Pending"]
+_EMPLOYEE_TYPE_FILTER_OPTS = ["All Employee Types", "Employees Only", "System Users Only"]
 
 _EMPLOYEE_TABS = [
     "Overview",
@@ -110,26 +115,151 @@ _EMPLOYEE_TABS = [
 ]
 
 
-def _filter_employees(rows: list[dict], *, q: str, status: str, role: str) -> list[dict]:
+def _normalize_user_status(raw: object) -> str:
+    s = str(raw or "").strip().lower()
+    if s in ("", "active", "enabled"):
+        return "Active"
+    if s in ("inactive", "disabled"):
+        return "Inactive"
+    if s in ("locked", "blocked"):
+        return "Locked"
+    if s in ("pending", "invited"):
+        return "Pending"
+    label = str(raw or "").strip()
+    return label if label else "Active"
+
+
+def _user_display_name(user: dict) -> str:
+    for key in ("full_name", "name", "username", "email"):
+        val = str(user.get(key) or "").strip()
+        if val:
+            return val
+    return "Unnamed User"
+
+
+def _user_display_role(user: dict) -> str:
+    role = str(user.get("role") or user.get("role_name") or "").strip()
+    return role or "—"
+
+
+def _user_display_email(user: dict) -> str:
+    email = str(user.get("email") or "").strip()
+    return email or "—"
+
+
+def _fmt_last_login(val: object) -> str:
+    from datetime import datetime
+
+    if val is None or str(val).strip() in ("", "—"):
+        return "—"
+    s = str(val).strip()
+    try:
+        if "T" in s:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        elif len(s) >= 16 and " " in s:
+            dt = datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
+        else:
+            return fmt_date(val)
+        return dt.strftime("%b %d, %Y %I:%M %p").replace(" 0", " ")
+    except Exception:
+        return s
+
+
+def _employee_type_pill_html(user: dict) -> str:
+    if user.get("is_employee") is False:
+        cls = "ips-user-system"
+        label = "System User"
+    else:
+        cls = "ips-user-employee"
+        label = "Employee"
+    return f'<span class="ips-user-pill {cls}">{html.escape(label)}</span>'
+
+
+def _user_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Active": "ips-user-status-active",
+        "Inactive": "ips-user-status-inactive",
+        "Locked": "ips-user-status-locked",
+        "Pending": "ips-user-status-pending",
+    }
+    cls = cls_map.get(status, "ips-user-status-active")
+    return f'<span class="ips-user-pill {cls}">{html.escape(status)}</span>'
+
+
+def _filter_employees(
+    rows: list[dict],
+    *,
+    q: str,
+    status: str,
+    role: str,
+    employee_type: str,
+) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
         out = [
             e
             for e in out
-            if ql in str(e.get("name", "")).lower()
-            or ql in str(e.get("email", "")).lower()
-            or ql in str(e.get("username", "")).lower()
-            or ql in str(e.get("phone", "")).lower()
+            if ql in _user_display_name(e).lower()
+            or ql in _user_display_email(e).lower()
+            or ql in str(e.get("username") or "").lower()
+            or ql in _user_display_role(e).lower()
         ]
     if status and status != "All Statuses":
-        out = [e for e in out if str(e.get("status", "")) == status]
+        out = [e for e in out if _normalize_user_status(e.get("status")) == status]
     if role and role != "All Roles":
-        out = [e for e in out if str(e.get("role", "")) == role]
+        out = [e for e in out if _user_display_role(e) == role]
+    if employee_type == "Employees Only":
+        out = [e for e in out if e.get("is_employee") is not False]
+    elif employee_type == "System Users Only":
+        out = [e for e in out if e.get("is_employee") is False]
     return out
 
 
+def _user_select_key(user_id: str) -> str:
+    return f"user_select_{user_id}"
+
+
+def _clear_user_selection(user_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_USER_KEY] = None
+    st.session_state[SHOW_MODAL_KEY] = False
+    ids = list(user_ids or [])
+    for uid in ids:
+        st.session_state[_user_select_key(uid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("user_select_"):
+            st.session_state[key] = False
+
+
+def _on_user_checkbox_change(user_id: str, all_user_ids: list[str]) -> None:
+    key = _user_select_key(user_id)
+    if st.session_state.get(key):
+        for uid in all_user_ids:
+            if uid != user_id:
+                st.session_state[_user_select_key(uid)] = False
+        st.session_state[SELECTED_USER_KEY] = user_id
+        st.session_state[SHOW_MODAL_KEY] = True
+        cache = st.session_state.get(CACHE_KEY) or {}
+        user = cache.get(user_id) if isinstance(cache, dict) else None
+        open_record_modal(
+            user_id,
+            user if isinstance(user, dict) else None,
+            session_select_key=_SEL,
+            modal_key=MODAL_KEY,
+            module=MODULE,
+            id_fields=("id", "email"),
+        )
+        if isinstance(user, dict) and user.get("id"):
+            st.session_state[ACTIVE_EMPLOYEE_KEY] = str(user.get("id"))
+    elif st.session_state.get(SELECTED_USER_KEY) == user_id:
+        st.session_state[SELECTED_USER_KEY] = None
+        st.session_state[SHOW_MODAL_KEY] = False
+
+
 def _clear_employee_modal() -> None:
+    user_ids = st.session_state.get(_ALL_USER_IDS_KEY) or []
+    _clear_user_selection([str(uid) for uid in user_ids])
+    clear_edit_modes(MODULE)
     clear_record_modal(
         table_key=_TABLE_KEY,
         session_select_key=_SEL,
@@ -138,26 +268,83 @@ def _clear_employee_modal() -> None:
     )
 
 
-def _open_employee_modal(employee_id: str, employee: dict | None = None) -> None:
-    open_record_modal(
-        employee_id,
-        employee,
-        session_select_key=_SEL,
-        modal_key=MODAL_KEY,
-        module=MODULE,
-        id_fields=("id", "email"),
-    )
-    if isinstance(employee, dict) and employee.get("id"):
-        st.session_state[ACTIVE_EMPLOYEE_KEY] = str(employee.get("id"))
+def _render_custom_users_table(filtered: list[dict]) -> list[str]:
+    if not filtered:
+        st.info("No users match your filters.")
+        st.session_state[_ALL_USER_IDS_KEY] = []
+        return []
 
+    all_user_ids = [
+        str(u.get("id") or "").strip() for u in filtered if str(u.get("id") or "").strip()
+    ]
+    st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
-def _employees_display_cell(field: str, row: dict) -> str:
-    if field == "last_login":
-        return safe_value(row.get(field))
-    if field == "is_employee":
-        return "Employee" if row.get("is_employee") is not False else "System User"
-    val = row.get(field)
-    return str(val).strip() if val is not None and str(val).strip() else "—"
+    with st.container(key="users_table_wrap"):
+        st.markdown('<div class="ips-users-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _USER_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-users-header-row ips-users-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        for user in filtered:
+            uid = str(user.get("id") or "").strip()
+            if not uid:
+                continue
+
+            name = _user_display_name(user)
+            email = _user_display_email(user)
+            role = _user_display_role(user)
+            status = _normalize_user_status(user.get("status"))
+            last_login = _fmt_last_login(user.get("last_login"))
+
+            cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_user_select_key(uid),
+                    label_visibility="collapsed",
+                    on_change=_on_user_checkbox_change,
+                    args=(uid, all_user_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-users-name">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
+
+            with cols[5]:
+                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-users-cell ips-users-muted">{html.escape(last_login)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_user_ids
 
 
 def _cert_table(certs: list[dict]) -> None:
@@ -452,18 +639,23 @@ def render() -> None:
     inject_users_module_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     all_emp = load_employees()
-    roles = sorted({str(e.get("role") or "") for e in all_emp if e.get("role")})
+    roles = sorted(
+        {_user_display_role(e) for e in all_emp if _user_display_role(e) != "—"}
+    )
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
         render_page_header("Users", "Manage system users, roles, and permissions.")
     with act_r:
-        st.button("Export", key="users_export", use_container_width=True)
-        if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
-            st.session_state["ips_emp_form"] = True
+        exp_col, add_col = st.columns(2, gap="small")
+        with exp_col:
+            st.button("Export", key="users_export", use_container_width=True)
+        with add_col:
+            if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
+                st.session_state["ips_emp_form"] = True
 
     if st.session_state.get("ips_emp_form"):
-        with st.expander("New employee", expanded=True):
+        with st.expander("New User", expanded=True):
             nc1, nc2 = st.columns(2)
             with nc1:
                 st.text_input("Name", key="emp_new_name")
@@ -473,17 +665,15 @@ def render() -> None:
                     "Phone",
                     key="emp_new_phone",
                     placeholder="(337) 555-0100",
-                    help="Mobile or office number for this employee.",
+                    help="Mobile or office number for this user.",
                 )
-                st.selectbox("Department", lookup_options("departments"), key="emp_new_dept")
-            st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
-            if st.button("Save employee", key="emp_save_new", type="primary"):
+                st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
+            if st.button("Save User", key="emp_save_new", type="primary"):
                 ok, msg = persist_employee(
                     {
                         "name": st.session_state.get("emp_new_name"),
                         "email": st.session_state.get("emp_new_email"),
                         "phone": st.session_state.get("emp_new_phone"),
-                        "department": st.session_state.get("emp_new_dept"),
                         "role": st.session_state.get("emp_new_role"),
                         "status": "Active",
                     }
@@ -492,50 +682,58 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([2, 1, 1])
+        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.6])
         with c1:
-            st.text_input("Search", placeholder="Search name, email, username…", key="emp_search", label_visibility="collapsed")
+            st.text_input(
+                "Search",
+                placeholder="Search name, email, username...",
+                key="emp_search",
+                label_visibility="collapsed",
+            )
         with c2:
-            st.selectbox("Status", ["All Statuses", "Active", "Inactive"], key="emp_status", label_visibility="collapsed")
+            st.selectbox(
+                "Status",
+                _STATUS_FILTER_OPTS,
+                key="emp_status",
+                label_visibility="collapsed",
+            )
         with c3:
-            st.selectbox("Role", ["All Roles", *roles], key="emp_role_filter", label_visibility="collapsed")
+            st.selectbox(
+                "Role",
+                ["All Roles", *roles],
+                key="emp_role_filter",
+                label_visibility="collapsed",
+            )
+        with c4:
+            st.selectbox(
+                "Employee Type",
+                _EMPLOYEE_TYPE_FILTER_OPTS,
+                key="emp_type_filter",
+                label_visibility="collapsed",
+            )
+        with c5:
+            if st.button("Clear", key="emp_clear", use_container_width=True):
+                st.session_state["emp_search"] = ""
+                st.session_state["emp_status"] = "All Statuses"
+                st.session_state["emp_role_filter"] = "All Roles"
+                st.session_state["emp_type_filter"] = "All Employee Types"
+                st.rerun()
 
     layout_filter_bar(_filters)
 
     filtered = _filter_employees(
         all_emp,
-        q=str(st.session_state.get("emp_search") or ""),
+        q=str(st.session_state.get("emp_search") or "").strip(),
         status=str(st.session_state.get("emp_status") or "All Statuses"),
         role=str(st.session_state.get("emp_role_filter") or "All Roles"),
+        employee_type=str(st.session_state.get("emp_type_filter") or "All Employee Types"),
     )
 
     st.caption(f"{len(filtered)} user(s)")
 
     build_modal_cache(filtered, cache_key=CACHE_KEY)
+    _render_custom_users_table(filtered)
 
-    render_clickable_table(
-        filtered,
-        [
-            ("name", "NAME"),
-            ("email", "EMAIL"),
-            ("role", "ROLE"),
-            ("is_employee", "EMPLOYEE"),
-            ("status", "STATUS"),
-            ("last_login", "LAST LOGIN"),
-        ],
-        _TABLE_KEY,
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_employees_display_cell,
-        column_widths={
-            "name": "medium",
-            "email": "large",
-            "role": "small",
-            "is_employee": "small",
-            "status": "small",
-            "last_login": "small",
-        },
-        on_row_selected=_open_employee_modal,
-    )
-
-    show_modal_if_pending(MODAL_KEY, _show_employee_modal)
+    selected_user_id = st.session_state.get(SELECTED_USER_KEY)
+    if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
+        _show_employee_modal()

@@ -159,6 +159,197 @@ _CONTACT_TABS = [
 _CLOSED_JOB_STATUSES = frozenset({"completed", "complete", "closed", "cancelled", "canceled"})
 _CLOSED_EST_STATUSES = frozenset({"awarded", "completed", "complete", "closed", "cancelled", "canceled"})
 
+SELECTED_CUSTOMER_KEY = "selected_customer_id"
+SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
+_ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
+_CUSTOMER_COLS = [0.35, 3.0, 2.4, 1.6, 0.9, 1.0, 1.1, 1.2, 1.2]
+_CUSTOMER_HEADERS = [
+    "",
+    "CUSTOMER",
+    "PRIMARY LOCATION",
+    "CITY",
+    "STATE",
+    "CONTACTS",
+    "OPEN JOBS",
+    "OPEN ESTIMATES",
+    "STATUS",
+]
+_STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"]
+
+
+def _normalize_customer_status(raw: object) -> str:
+    s = str(raw or "").strip().lower().replace("_", " ")
+    mapping = {
+        "": "Active",
+        "active": "Active",
+        "inactive": "Inactive",
+        "prospect": "Prospect",
+        "on hold": "On Hold",
+    }
+    if s in mapping:
+        return mapping[s]
+    label = str(raw or "").strip()
+    return label if label else "Active"
+
+
+def _customer_name(row: dict) -> str:
+    val = str(row.get("customer_name") or row.get("company_name") or "").strip()
+    return val or "—"
+
+
+def _customer_primary_location(row: dict) -> str:
+    val = str(row.get("primary_location_name") or row.get("location_name") or "").strip()
+    return val or "—"
+
+
+def _customer_city(row: dict) -> str:
+    val = str(row.get("primary_location_city") or row.get("city") or "").strip()
+    return val or "—"
+
+
+def _customer_state(row: dict) -> str:
+    val = str(row.get("primary_location_state") or row.get("state") or "").strip()
+    return val or "—"
+
+
+def _customer_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Active": "ips-customer-status-active",
+        "Inactive": "ips-customer-status-inactive",
+        "Prospect": "ips-customer-status-prospect",
+        "On Hold": "ips-customer-status-on-hold",
+    }
+    cls = cls_map.get(status, "ips-customer-status-active")
+    return f'<span class="ips-customer-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _customer_select_key(customer_id: str) -> str:
+    return f"customer_select_{customer_id}"
+
+
+def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_CUSTOMER_KEY] = None
+    st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+    ids = list(customer_ids or [])
+    for cid in ids:
+        st.session_state[_customer_select_key(cid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("customer_select_"):
+            st.session_state[key] = False
+
+
+def _on_customer_checkbox_change(customer_id: str, all_customer_ids: list[str]) -> None:
+    key = _customer_select_key(customer_id)
+    if st.session_state.get(key):
+        for cid in all_customer_ids:
+            if cid != customer_id:
+                st.session_state[_customer_select_key(cid)] = False
+        st.session_state[SELECTED_CUSTOMER_KEY] = customer_id
+        st.session_state[SHOW_CUSTOMER_MODAL_KEY] = True
+        cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
+        customer = cache.get(customer_id) if isinstance(cache, dict) else None
+        _open_customers_detail_modal(customer_id, customer)
+    elif st.session_state.get(SELECTED_CUSTOMER_KEY) == customer_id:
+        st.session_state[SELECTED_CUSTOMER_KEY] = None
+        st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+
+
+def _render_custom_customers_table(filtered: list[dict]) -> list[str]:
+    if not filtered:
+        st.info("No customers match your filters.")
+        st.session_state[_ALL_CUSTOMER_IDS_KEY] = []
+        return []
+
+    all_customer_ids = [
+        str(c.get("id") or "").strip() for c in filtered if str(c.get("id") or "").strip()
+    ]
+    st.session_state[_ALL_CUSTOMER_IDS_KEY] = all_customer_ids
+
+    with st.container(key="customers_table_wrap"):
+        st.markdown('<div class="ips-customers-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _CUSTOMER_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-customers-header-row ips-customers-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        for customer in filtered:
+            cid = str(customer.get("id") or "").strip()
+            if not cid:
+                continue
+
+            name = _customer_name(customer)
+            location = _customer_primary_location(customer)
+            city = _customer_city(customer)
+            state = _customer_state(customer)
+            contacts = str(customer.get("contact_count") or 0)
+            open_jobs = str(customer.get("open_jobs") or 0)
+            open_estimates = str(customer.get("open_estimates") or 0)
+            status = _normalize_customer_status(customer.get("status"))
+
+            cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_customer_select_key(cid),
+                    label_visibility="collapsed",
+                    on_change=_on_customer_checkbox_change,
+                    args=(cid, all_customer_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-customers-name">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(city)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(state)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(contacts)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(open_jobs)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[7]:
+                st.markdown(
+                    f'<div class="ips-customers-cell">{html.escape(open_estimates)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[8]:
+                st.markdown(_customer_status_pill_html(status), unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_customer_ids
+
 
 def _service_feedback(result: Any, *, success: str) -> tuple[bool, str]:
     try:
@@ -192,26 +383,31 @@ def _enrich_list_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _filter_customers(rows: list[dict], *, q: str, status: str, state: str) -> list[dict]:
+def _filter_customers(
+    rows: list[dict],
+    *,
+    q: str,
+    status: str,
+    state: str,
+    location: str,
+) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
         out = [
             c
             for c in out
-            if ql in str(c.get("customer_name") or c.get("company_name") or "").lower()
-            or ql in str(c.get("primary_location_city") or c.get("city") or "").lower()
-            or ql in str(c.get("primary_location_state") or c.get("state") or "").lower()
-            or ql in str(c.get("primary_location_name") or "").lower()
+            if ql in _customer_name(c).lower()
+            or ql in _customer_city(c).lower()
+            or ql in _customer_state(c).lower()
+            or ql in _customer_primary_location(c).lower()
         ]
     if status and status != "All Statuses":
-        out = [c for c in out if str(c.get("status", "")) == status]
+        out = [c for c in out if _normalize_customer_status(c.get("status")) == status]
     if state and state != "All States":
-        out = [
-            c
-            for c in out
-            if str(c.get("primary_location_state") or c.get("state") or "") == state
-        ]
+        out = [c for c in out if _customer_state(c) == state]
+    if location and location != "All Locations":
+        out = [c for c in out if _customer_primary_location(c) == location]
     return out
 
 
@@ -232,6 +428,8 @@ def _contacts_with_location_names(contacts: list[dict], locations: list[dict]) -
 
 
 def _clear_customers_detail_modal() -> None:
+    customer_ids = st.session_state.get(_ALL_CUSTOMER_IDS_KEY) or []
+    _clear_customer_selection([str(cid) for cid in customer_ids])
     clear_record_modal(
         table_key=_CUSTOMERS_TABLE_KEY,
         session_select_key=_SEL,
@@ -1334,16 +1532,15 @@ def render() -> None:
 
     all_rows = _enrich_list_rows(get_customers())
     states = sorted(
-        {
-            str(c.get("primary_location_state") or c.get("state") or "")
-            for c in all_rows
-            if c.get("primary_location_state") or c.get("state")
-        }
+        {_customer_state(c) for c in all_rows if _customer_state(c) != "—"}
+    )
+    locations = sorted(
+        {_customer_primary_location(c) for c in all_rows if _customer_primary_location(c) != "—"}
     )
 
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
-        render_page_header("Customers", "Manage customer companies, sites, and contacts.")
+        render_page_header("Customers", "Manage customer companies, locations, and contacts.")
     with hdr_r:
         if st.button("+ New Customer", key="cust_new", type="primary", use_container_width=True):
             st.session_state["ips_cust_form"] = True
@@ -1400,13 +1597,18 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.7])
+        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.6])
         with c1:
-            st.text_input("Search", placeholder="Search customers…", key="cust_search", label_visibility="collapsed")
+            st.text_input(
+                "Search",
+                placeholder="Search customers...",
+                key="cust_search",
+                label_visibility="collapsed",
+            )
         with c2:
             st.selectbox(
                 "Status",
-                ["All Statuses", "Active", "Inactive"],
+                _STATUS_FILTER_OPTS,
                 key="cust_filter_status",
                 label_visibility="collapsed",
             )
@@ -1418,10 +1620,18 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c4:
+            st.selectbox(
+                "Location",
+                ["All Locations", *locations],
+                key="cust_filter_location",
+                label_visibility="collapsed",
+            )
+        with c5:
             if st.button("Clear", key="cust_clear", use_container_width=True):
                 st.session_state["cust_search"] = ""
                 st.session_state["cust_filter_status"] = "All Statuses"
                 st.session_state["cust_filter_state"] = "All States"
+                st.session_state["cust_filter_location"] = "All Locations"
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1431,28 +1641,14 @@ def render() -> None:
         q=str(st.session_state.get("cust_search") or "").strip(),
         status=str(st.session_state.get("cust_filter_status") or "All Statuses"),
         state=str(st.session_state.get("cust_filter_state") or "All States"),
+        location=str(st.session_state.get("cust_filter_location") or "All Locations"),
     )
+
+    st.caption(f"{len(filtered)} customer(s)")
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
+    _render_custom_customers_table(filtered)
 
-    render_clickable_table(
-        filtered,
-        [
-            ("customer_name", "CUSTOMER"),
-            ("primary_location_name", "PRIMARY SITE"),
-            ("primary_location_city", "CITY"),
-            ("primary_location_state", "STATE"),
-            ("contact_count", "CONTACTS"),
-            ("open_jobs", "OPEN JOBS"),
-            ("open_estimates", "OPEN EST."),
-            ("status", "STATUS"),
-        ],
-        _CUSTOMERS_TABLE_KEY,
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_list_display_cell,
-        click_caption=f"{len(filtered)} customer(s) · Click a row to open details.",
-        on_row_selected=_open_customers_detail_modal,
-    )
-
-    show_modal_if_pending(_CUSTOMERS_MODAL_KEY, _show_customers_detail_modal)
+    selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
+    if selected_customer_id and st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):
+        _show_customers_detail_modal()
