@@ -236,23 +236,28 @@ def normalize_material_line(row: dict[str, Any], estimate_id: str) -> dict[str, 
 
 
 def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
+    except ImportError:
+        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
     iid = str(row.get("id") or "").strip()
-    sku = str(row.get("sku") or row.get("item_number") or iid[:8])
+    sku = resolve_inventory_sku(row)
     qty = row.get("qty_on_hand")
     if qty is None:
         qty = row.get("quantity_on_hand")
     return {
         "id": iid or sku,
         "sku": sku,
+        "qr_code_value": resolve_inventory_qr_value(row),
         "name": str(row.get("name") or row.get("item_name") or "—"),
         "category": str(row.get("category") or "—"),
-        "location": str(row.get("location") or row.get("storage_location") or "—"),
+        "location": str(row.get("location") or row.get("storage_location") or row.get("location_name") or "—"),
         "department": str(row.get("department") or "—"),
         "status": str(row.get("status") or "In Stock"),
         "qty_on_hand": int(float(qty or 0)),
         "reorder_point": int(float(row.get("reorder_point") or 0)),
         "unit_cost": float(row.get("unit_cost") or 0),
-        "vendor": str(row.get("vendor") or "—"),
+        "vendor": str(row.get("vendor") or row.get("vendor_name") or "—"),
     }
 
 
@@ -584,9 +589,14 @@ def save_estimate_line_item(ui: dict[str, Any], *, row_id: str | None = None) ->
 
 
 def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
+    except ImportError:
+        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
+    sku = str(ui.get("sku") or ui.get("item_number") or "").strip()
     payload = {
         "item_name": ui.get("name") or ui.get("item_name"),
-        "sku": ui.get("sku") or ui.get("item_number"),
+        "sku": sku or None,
         "category": ui.get("category"),
         "storage_location": ui.get("location"),
         "department": ui.get("department") or "",
@@ -596,10 +606,15 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
         "vendor": ui.get("vendor"),
         "status": ui.get("status") or "In Stock",
     }
-    table = "inventory_items"
     if row_id:
-        return update_row(table, payload, {"id": row_id})
-    return insert_row(table, payload)
+        rid = str(row_id).strip()
+        if not payload.get("sku"):
+            payload["sku"] = resolve_inventory_sku({"id": rid, **ui})
+        if not str(ui.get("qr_code_value") or "").strip():
+            payload["qr_code_value"] = resolve_inventory_qr_value({"id": rid, **ui})
+        return update_row("inventory_items", payload, {"id": rid})
+    result = insert_row("inventory_items", payload)
+    return result
 
 
 def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:

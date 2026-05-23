@@ -8,7 +8,7 @@ import streamlit as st
 def is_demo_id(row_id: str | None) -> bool:
     """True when row id is from demo fallback — skip Supabase writes."""
     rid = str(row_id or "").strip()
-    return not rid or rid.startswith("demo-")
+    return bool(rid) and rid.startswith("demo-")
 
 
 def apply_persist_feedback(ok: bool, msg: str, *, clear_keys: tuple[str, ...] = ()) -> bool:

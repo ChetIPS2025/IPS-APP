@@ -33,6 +33,10 @@ try:
     from app.pages._core._data import load_inventory, lookup_options, persist_inventory
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.services.inventory_display_helpers import (
+        inventory_qr_png_bytes,
+        resolve_inventory_sku,
+    )
     from app.styles import inject_inventory_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
@@ -62,6 +66,10 @@ except ImportError:
     from pages._core._data import load_inventory, lookup_options, persist_inventory  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from services.inventory_display_helpers import (  # type: ignore
+        inventory_qr_png_bytes,
+        resolve_inventory_sku,
+    )
     from styles import inject_inventory_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
@@ -72,10 +80,10 @@ _MODULE = "inventory"
 SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
-_INV_COLS = [0.35, 1.2, 3.0, 1.5, 1.7, 1.1, 0.8, 1.0, 1.3, 1.6]
+_INV_COLS = [0.35, 1.7, 2.7, 1.5, 1.7, 1.1, 0.8, 1.0, 1.3, 1.6]
 _INV_HEADERS = [
     "",
-    "ITEM #",
+    "SKU",
     "DESCRIPTION",
     "CATEGORY",
     "LOCATION",
@@ -116,12 +124,12 @@ def _normalize_inventory_status(raw: object) -> str:
     return label if label else "In Stock"
 
 
+def _inventory_sku(row: dict) -> str:
+    return resolve_inventory_sku(row)
+
+
 def _inventory_item_number(row: dict) -> str:
-    for key in ("item_number", "item_no", "sku"):
-        val = str(row.get(key) or "").strip()
-        if val:
-            return val
-    return "—"
+    return _inventory_sku(row)
 
 
 def _inventory_description(row: dict) -> str:
@@ -236,7 +244,7 @@ def _render_custom_inventory_table(filtered: list[dict]) -> list[str]:
             if not iid:
                 continue
 
-            item_no = _inventory_item_number(item)
+            item_no = _inventory_sku(item)
             description = _inventory_description(item)
             category = _inventory_category(item)
             location = _inventory_location(item)
@@ -259,9 +267,14 @@ def _render_custom_inventory_table(filtered: list[dict]) -> list[str]:
 
             with cols[1]:
                 st.markdown(
-                    f'<div class="ips-inventory-number">{html.escape(item_no)}</div>',
+                    f'<div class="ips-inventory-sku-cell">'
+                    f'<div class="ips-inventory-sku">{html.escape(item_no)}</div>'
+                    f"</div>",
                     unsafe_allow_html=True,
                 )
+                qr_png = inventory_qr_png_bytes(item)
+                if qr_png:
+                    st.image(qr_png, width=48)
 
             with cols[2]:
                 st.markdown(
@@ -328,7 +341,8 @@ def _filter_rows(
         out = [
             r
             for r in out
-            if ql in _inventory_item_number(r).lower()
+            if ql in _inventory_sku(r).lower()
+            or ql in str(r.get("qr_code_value") or "").lower()
             or ql in _inventory_description(r).lower()
             or ql in _inventory_category(r).lower()
             or ql in _inventory_location(r).lower()
@@ -402,6 +416,7 @@ def _render_inventory_detail_tabs(item: dict) -> None:
             details_html = (
                 f'<div class="ips-detail-grid">'
                 f"{detail_field_html('SKU', item.get('sku'))}"
+                f"{detail_field_html('QR Code', item.get('qr_code_value'))}"
                 f"{detail_field_html('Name', item.get('name'))}"
                 f"{detail_field_html('Category', item.get('category'))}"
                 f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'

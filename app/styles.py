@@ -1198,6 +1198,19 @@ def inject_inventory_module_css() -> None:
   line-height: 1.25;
   white-space: nowrap;
 }}
+.ips-inventory-sku-cell {{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}}
+.ips-inventory-sku {{
+  font-size: 12px;
+  font-weight: 800;
+  color: #1d4ed8;
+  line-height: 1.2;
+  word-break: break-word;
+}}
 .ips-inventory-title {{
   font-size: 14px;
   font-weight: 700;
@@ -1252,7 +1265,7 @@ def inject_inventory_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 6px 10px !important;
   margin: 0 !important;
-  min-height: 52px;
+  min-height: 72px;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
@@ -1275,6 +1288,14 @@ def inject_inventory_module_css() -> None:
 .st-key-inventory_table_wrap [data-testid="stCheckbox"] label {{
   min-height: 24px !important;
   margin: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stImage"] {{
+  margin: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stImage"] img {{
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
 }}
 </style>
 """,
