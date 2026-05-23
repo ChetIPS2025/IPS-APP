@@ -594,11 +594,21 @@ def _on_contact_checkbox_change(contact_id: str, all_contact_ids: list[str]) -> 
         st.session_state[SHOW_CONTACT_MODAL_KEY] = False
 
 
+def _contacts_table_wrap_key(*, customer_id: str = "", location_id: str = "") -> str:
+    if location_id:
+        return f"contacts_table_wrap_loc_{location_id}"
+    if customer_id:
+        return f"contacts_table_wrap_cust_{customer_id}"
+    return "contacts_table_wrap_main"
+
+
 def _render_custom_contacts_table(
     contacts: list[dict],
     *,
     customer_id: str | None = None,
+    location_id: str | None = None,
     inline: bool = False,
+    table_wrap_key: str | None = None,
 ) -> list[str]:
     if not contacts:
         st.session_state[_ALL_CONTACT_IDS_KEY] = []
@@ -609,7 +619,11 @@ def _render_custom_contacts_table(
     ]
     st.session_state[_ALL_CONTACT_IDS_KEY] = all_contact_ids
 
-    with st.container(key="contacts_table_wrap"):
+    wrap_key = table_wrap_key or _contacts_table_wrap_key(
+        customer_id=str(customer_id or ""),
+        location_id=str(location_id or ""),
+    )
+    with st.container(key=wrap_key):
         st.markdown('<div class="ips-contacts-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
@@ -702,7 +716,9 @@ def _render_contacts_table_block(
     *,
     empty_caption: str,
     customer: dict | None = None,
+    location_id: str = "",
     inline: bool = False,
+    table_wrap_key: str | None = None,
 ) -> None:
     if not contacts:
         st.caption(empty_caption)
@@ -710,10 +726,13 @@ def _render_contacts_table_block(
     build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
     st.caption(f"{len(contacts)} contact(s)")
     customer_id = str((customer or {}).get("id") or "").strip()
+    loc_id = str(location_id or "").strip()
     _render_custom_contacts_table(
         contacts,
         customer_id=customer_id or None,
+        location_id=loc_id or None,
         inline=inline and bool(customer_id),
+        table_wrap_key=table_wrap_key,
     )
 
     if inline and customer_id:
@@ -2003,6 +2022,7 @@ def _render_location_detail_tabs(
             contacts,
             empty_caption="No contacts assigned to this location.",
             customer=customer if inline_contacts else None,
+            location_id=lid,
             inline=inline_contacts,
         )
 

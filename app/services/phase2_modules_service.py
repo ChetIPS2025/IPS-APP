@@ -292,6 +292,13 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "reorder_point": int(float(row.get("reorder_point") or 0)),
         "unit_cost": float(row.get("unit_cost") or 0),
         "vendor": str(row.get("vendor") or row.get("vendor_name") or "—"),
+        "description": str(row.get("description") or row.get("item_name") or row.get("name") or "—"),
+        "image_path": str(row.get("image_path") or ""),
+        "image_url": str(row.get("image_url") or ""),
+        "image_file_name": str(row.get("image_file_name") or ""),
+        "image_mime_type": str(row.get("image_mime_type") or ""),
+        "image_uploaded_at": str(row.get("image_uploaded_at") or "")[:19],
+        "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
     }
 
 
@@ -706,6 +713,16 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
         "vendor": ui.get("vendor"),
         "status": ui.get("status") or "In Stock",
     }
+    for key in (
+        "image_path",
+        "image_url",
+        "image_file_name",
+        "image_mime_type",
+        "image_uploaded_at",
+        "image_uploaded_by",
+    ):
+        if key in ui:
+            payload[key] = ui.get(key)
     if row_id:
         rid = str(row_id).strip()
         if not payload.get("sku"):

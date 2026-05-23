@@ -401,10 +401,12 @@ def inject_customers_module_css() -> None:
   background: #f1f5f9;
   color: #475569;
 }}
-.st-key-contacts_table_wrap [data-testid="stVerticalBlock"] {{
+.st-key-contacts_table_wrap_main [data-testid="stVerticalBlock"],
+[class*="st-key-contacts_table_wrap_"] [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
-.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"] {{
+.st-key-contacts_table_wrap_main [data-testid="stHorizontalBlock"],
+[class*="st-key-contacts_table_wrap_"] [data-testid="stHorizontalBlock"] {{
   gap: 0.35rem !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
@@ -412,25 +414,31 @@ def inject_customers_module_css() -> None:
   margin: 0 !important;
   min-height: 52px;
 }}
-.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+.st-key-contacts_table_wrap_main [data-testid="stHorizontalBlock"]:first-of-type,
+[class*="st-key-contacts_table_wrap_"] [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 40px;
   padding: 8px 10px !important;
 }}
-.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+.st-key-contacts_table_wrap_main [data-testid="stHorizontalBlock"]:not(:first-of-type):hover,
+[class*="st-key-contacts_table_wrap_"] [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
 }}
-.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+.st-key-contacts_table_wrap_main [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked),
+[class*="st-key-contacts_table_wrap_"] [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
   background: #eaf2ff !important;
 }}
-.st-key-contacts_table_wrap [data-testid="stElementContainer"] {{
+.st-key-contacts_table_wrap_main [data-testid="stElementContainer"],
+[class*="st-key-contacts_table_wrap_"] [data-testid="stElementContainer"] {{
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }}
-.st-key-contacts_table_wrap [data-testid="stCheckbox"] {{
+.st-key-contacts_table_wrap_main [data-testid="stCheckbox"],
+[class*="st-key-contacts_table_wrap_"] [data-testid="stCheckbox"] {{
   margin: 0 !important;
 }}
-.st-key-contacts_table_wrap [data-testid="stCheckbox"] label {{
+.st-key-contacts_table_wrap_main [data-testid="stCheckbox"] label,
+[class*="st-key-contacts_table_wrap_"] [data-testid="stCheckbox"] label {{
   min-height: 24px !important;
   margin: 0 !important;
 }}
@@ -1527,7 +1535,7 @@ def inject_inventory_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 6px 10px !important;
   margin: 0 !important;
-  min-height: 72px;
+  min-height: 62px;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
@@ -1570,6 +1578,42 @@ def inject_inventory_module_css() -> None:
 .ips-inventory-qr-cell {{
   width: 40px;
   height: 40px;
+}}
+.ips-inventory-thumb-cell {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+}}
+.ips-inventory-thumb-img {{
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}}
+.ips-inventory-thumb-placeholder {{
+  width: 42px;
+  height: 42px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}}
+.ips-inventory-detail-image {{
+  max-width: 260px;
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 4px;
 }}
 </style>
 """,

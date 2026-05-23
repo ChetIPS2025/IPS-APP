@@ -30,12 +30,18 @@ try:
         set_view_mode,
         status_pill_html,
     )
-    from app.pages._core._data import load_inventory, lookup_options, persist_inventory
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
+    from app.pages._core._data import load_inventory, lookup_options
+    from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.inventory_display_helpers import (
         inventory_qr_png_bytes,
         resolve_inventory_sku,
+    )
+    from app.services.inventory_service import (
+        clear_inventory_cache,
+        get_inventory_image_url,
+        update_inventory_item,
+        upload_inventory_image,
     )
     from app.styles import inject_inventory_module_css
     from app.utils.formatting import fmt_currency
@@ -63,12 +69,18 @@ except ImportError:
         set_view_mode,
         status_pill_html,
     )
-    from pages._core._data import load_inventory, lookup_options, persist_inventory  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
+    from pages._core._data import load_inventory, lookup_options  # type: ignore
+    from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.inventory_display_helpers import (  # type: ignore
         inventory_qr_png_bytes,
         resolve_inventory_sku,
+    )
+    from services.inventory_service import (  # type: ignore
+        clear_inventory_cache,
+        get_inventory_image_url,
+        update_inventory_item,
+        upload_inventory_image,
     )
     from styles import inject_inventory_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
@@ -80,10 +92,11 @@ _MODULE = "inventory"
 SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
-_INV_COLS = [0.35, 0.75, 4.0, 2.0, 1.7, 1.1, 0.8, 1.0, 1.3, 1.8]
+_INV_COLS = [0.35, 0.75, 0.9, 3.6, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
 _INV_HEADERS = [
     "",
     "",
+    "IMAGE",
     "DESCRIPTION",
     "CATEGORY",
     "LOCATION",
@@ -188,6 +201,48 @@ def _inventory_status_pill_html(status: str) -> str:
     return f'<span class="ips-inventory-status-pill {cls}">{html.escape(status)}</span>'
 
 
+def _current_user_id() -> str | None:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    uid = str((current_profile() or {}).get("id") or "").strip()
+    return uid or None
+
+
+def _render_inventory_thumbnail(item: dict) -> None:
+    image_url = get_inventory_image_url(item)
+    if image_url:
+        st.markdown(
+            (
+                f'<div class="ips-inventory-thumb-cell">'
+                f'<img class="ips-inventory-thumb-img" src="{html.escape(image_url, quote=True)}" '
+                f'alt="Inventory item image" />'
+                f"</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div class="ips-inventory-thumb-cell">'
+            '<div class="ips-inventory-thumb-placeholder">—</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_inventory_detail_image(item: dict) -> None:
+    image_url = get_inventory_image_url(item)
+    if image_url:
+        st.markdown(
+            f'<img class="ips-inventory-detail-image" src="{html.escape(image_url, quote=True)}" '
+            f'alt="Inventory item image" />',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("No item image uploaded.")
+
+
 def _inventory_select_key(item_id: str) -> str:
     return f"inventory_select_{item_id}"
 
@@ -272,45 +327,48 @@ def _render_custom_inventory_table(filtered: list[dict]) -> list[str]:
                     st.markdown('<div class="ips-inventory-qr-cell"></div>', unsafe_allow_html=True)
 
             with cols[2]:
+                _render_inventory_thumbnail(item)
+
+            with cols[3]:
                 st.markdown(
                     f'<div class="ips-inventory-title">{html.escape(description)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[3]:
+            with cols[4]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[5]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(location)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-inventory-cell ips-inventory-qty">{html.escape(qty)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[6]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(unit)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[8]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(unit_cost)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[8]:
+            with cols[9]:
                 st.markdown(_inventory_status_pill_html(status), unsafe_allow_html=True)
 
-            with cols[9]:
+            with cols[10]:
                 st.markdown(
                     f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>',
                     unsafe_allow_html=True,
@@ -406,30 +464,40 @@ def _render_inventory_detail_tabs(item: dict) -> None:
     ) = st.tabs(_INV_TABS)
 
     with tab_overview:
-        c1, c2 = st.columns(2)
-        with c1:
+        media1, media2, details = st.columns([1.1, 0.9, 2.0])
+        with media1:
+            st.markdown("**Item Image**")
+            _render_inventory_detail_image(item)
+        with media2:
+            st.markdown("**QR Code**")
+            qr_png = inventory_qr_png_bytes(item)
+            if qr_png:
+                st.image(qr_png, width=140)
+            else:
+                st.caption(str(item.get("qr_code_value") or "—"))
+        with details:
             details_html = (
                 f'<div class="ips-detail-grid">'
                 f"{detail_field_html('SKU', item.get('sku'))}"
-                f"{detail_field_html('QR Code', item.get('qr_code_value'))}"
-                f"{detail_field_html('Name', item.get('name'))}"
+                f"{detail_field_html('Description', _inventory_description(item))}"
                 f"{detail_field_html('Category', item.get('category'))}"
                 f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
                 f"{detail_field_html('Location', item.get('location'))}"
                 f"{detail_field_html('Department', item.get('department'))}"
-                f"</div>"
-            )
-            st.markdown(dialog_card_html("Item Details", details_html), unsafe_allow_html=True)
-        with c2:
-            stock_html = (
-                f'<div class="ips-detail-grid">'
-                f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
-                f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
-                f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
                 f"{detail_field_html('Vendor', item.get('vendor'))}"
                 f"</div>"
             )
-            st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
+            st.markdown(dialog_card_html("Item Details", details_html), unsafe_allow_html=True)
+
+        stock_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
+            f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
+            f"{detail_field_html('Unit', _inventory_unit(item))}"
+            f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
 
     with tab_stock:
         placeholder_html("Stock History will connect to Supabase in a later phase.")
@@ -469,6 +537,13 @@ def _render_inventory_edit_form(item: dict) -> None:
         st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}")
         st.number_input("Unit cost", key=f"inv_edit_cost_{iid}")
 
+    st.file_uploader(
+        "Upload item image",
+        type=["png", "jpg", "jpeg", "webp"],
+        key=f"inv_edit_image_{iid}",
+    )
+    st.caption("PNG, JPG, JPEG, or WEBP. Image is saved when you click Save Changes.")
+
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
         record_key=record_key,
@@ -478,7 +553,8 @@ def _render_inventory_edit_form(item: dict) -> None:
     if cancelled:
         st.rerun()
     if saved and not is_demo_id(iid):
-        ok, msg = persist_inventory(
+        result = update_inventory_item(
+            iid,
             {
                 "sku": st.session_state.get(f"inv_edit_sku_{iid}"),
                 "name": st.session_state.get(f"inv_edit_name_{iid}"),
@@ -488,11 +564,21 @@ def _render_inventory_edit_form(item: dict) -> None:
                 "qty_on_hand": st.session_state.get(f"inv_edit_qty_{iid}"),
                 "unit_cost": st.session_state.get(f"inv_edit_cost_{iid}"),
             },
-            row_id=iid,
         )
-        if apply_persist_feedback(ok, msg):
-            set_view_mode(_MODULE, record_key)
-            st.rerun()
+        if not result.ok:
+            st.error(result.error or "Could not save inventory item.")
+            return
+
+        uploaded_file = st.session_state.get(f"inv_edit_image_{iid}")
+        if uploaded_file is not None:
+            upload_result = upload_inventory_image(iid, uploaded_file, uploaded_by=_current_user_id())
+            if not upload_result.ok:
+                st.warning(upload_result.error or "Item saved, but image upload failed.")
+
+        clear_inventory_cache()
+        set_view_mode(_MODULE, record_key)
+        st.success("Inventory item saved.")
+        st.rerun()
 
 
 def render_inventory_detail_dialog(item: dict) -> None:
@@ -570,8 +656,17 @@ def render() -> None:
             st.text_input("Item name", key="inv_new_name")
             st.selectbox("Category", lookup_options("inventory_categories"), key="inv_new_cat")
             st.selectbox("Status", lookup_options("inventory_statuses"), key="inv_new_status")
+            st.file_uploader(
+                "Upload item image",
+                type=["png", "jpg", "jpeg", "webp"],
+                key="inv_new_image",
+            )
             if st.button("Save item", key="inv_save_new", type="primary"):
-                ok, msg = persist_inventory(
+                try:
+                    from app.services.inventory_service import save_inventory_item
+                except ImportError:
+                    from services.inventory_service import save_inventory_item  # type: ignore
+                result = save_inventory_item(
                     {
                         "sku": st.session_state.get("inv_new_sku"),
                         "name": st.session_state.get("inv_new_name"),
@@ -579,7 +674,24 @@ def render() -> None:
                         "status": st.session_state.get("inv_new_status"),
                     }
                 )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_inv_form",)):
+                if not result.ok:
+                    st.error(result.error or "Could not save inventory item.")
+                else:
+                    new_id = ""
+                    if isinstance(result.data, dict):
+                        new_id = str(result.data.get("id") or "").strip()
+                    uploaded_file = st.session_state.get("inv_new_image")
+                    if uploaded_file is not None and new_id and not is_demo_id(new_id):
+                        upload_result = upload_inventory_image(
+                            new_id,
+                            uploaded_file,
+                            uploaded_by=_current_user_id(),
+                        )
+                        if not upload_result.ok:
+                            st.warning(upload_result.error or "Item saved, but image upload failed.")
+                    clear_inventory_cache()
+                    st.session_state.pop("ips_inv_form", None)
+                    st.success("Inventory item saved.")
                     st.rerun()
 
     def _filters() -> None:
