@@ -104,6 +104,10 @@ def render_cost_summary_cards(est: dict[str, Any], totals: dict[str, float] | No
     st.markdown(_margin_banner_html(float(t.get("gross_margin_percent") or 0)), unsafe_allow_html=True)
 
 
+def _line_form_key(prefix: str, eid: str, field: str) -> str:
+    return f"{prefix}_{field}_{eid}"
+
+
 def _line_table(headers: list[str], rows: list[list[str]]) -> None:
     if not rows:
         st.caption("No line items yet.")
@@ -189,103 +193,134 @@ def render_cost_builder_tab(
         st.session_state[f"ecb_form_other_{eid}"] = True
 
     if st.session_state.get(f"ecb_form_mat_{eid}"):
-        _render_add_material_form(eid, est, inventory_options or [])
+        _render_add_material_form(
+            eid,
+            est,
+            inventory_options or [],
+            key_prefix="ecb_mat",
+            form_state_key=f"ecb_form_mat_{eid}",
+        )
     if st.session_state.get(f"ecb_form_lab_{eid}"):
-        _render_add_labor_form(eid, est)
+        _render_add_labor_form(eid, est, key_prefix="ecb_lab", form_state_key=f"ecb_form_lab_{eid}")
     if st.session_state.get(f"ecb_form_eq_{eid}"):
-        _render_add_equipment_form(eid, est, asset_options or [])
+        _render_add_equipment_form(
+            eid,
+            est,
+            asset_options or [],
+            key_prefix="ecb_eq",
+            form_state_key=f"ecb_form_eq_{eid}",
+        )
     if st.session_state.get(f"ecb_form_trv_{eid}"):
-        _render_add_travel_form(eid, est)
+        _render_add_travel_form(eid, est, key_prefix="ecb_trv", form_state_key=f"ecb_form_trv_{eid}")
     if st.session_state.get(f"ecb_form_sub_{eid}"):
-        _render_add_subcontractor_form(eid, est, vendor_options or [])
+        _render_add_subcontractor_form(
+            eid,
+            est,
+            vendor_options or [],
+            key_prefix="ecb_sub",
+            form_state_key=f"ecb_form_sub_{eid}",
+        )
     if st.session_state.get(f"ecb_form_other_{eid}"):
-        _render_add_other_form(eid, est)
+        _render_add_other_form(eid, est, key_prefix="ecb_oth", form_state_key=f"ecb_form_other_{eid}")
 
 
 def _render_add_material_form(
     eid: str,
     est: dict[str, Any],
     inventory_options: list[tuple[str, dict[str, Any]]],
+    *,
+    key_prefix: str = "ecb_mat",
+    form_state_key: str | None = None,
 ) -> None:
+    fk = form_state_key or f"ecb_form_mat_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Material")
-    source = st.radio("Source", ["Inventory", "Custom"], horizontal=True, key=f"mat_src_{eid}")
+    source = st.radio("Source", ["Inventory", "Custom"], horizontal=True, key=k("src"))
     default_markup = float(est.get("default_material_markup_pct") or 0)
     inv_map = {label: item for label, item in inventory_options}
     c1, c2 = st.columns(2)
     with c1:
         if source == "Inventory" and inventory_options:
             labels = [label for label, _ in inventory_options]
-            pick = st.selectbox("Inventory item", labels, key=f"mat_inv_{eid}")
+            pick = st.selectbox("Inventory item", labels, key=k("inv"))
             item = inv_map.get(pick, {})
-            description = st.text_input("Description", value=str(item.get("name") or ""), key=f"mat_desc_{eid}")
-            sku = st.text_input("SKU", value=str(item.get("sku") or ""), key=f"mat_sku_{eid}")
-            category = st.text_input("Category", value=str(item.get("category") or ""), key=f"mat_cat_{eid}")
-            unit = st.text_input("Unit", value="EA", key=f"mat_unit_{eid}")
-            unit_cost = st.number_input("Unit cost", value=float(item.get("unit_cost") or 0), key=f"mat_uc_{eid}")
-            vendor = st.text_input("Vendor", value=str(item.get("vendor") or ""), key=f"mat_vendor_{eid}")
+            description = st.text_input("Description", value=str(item.get("name") or ""), key=k("desc"))
+            sku = st.text_input("SKU", value=str(item.get("sku") or ""), key=k("sku"))
+            category = st.text_input("Category", value=str(item.get("category") or ""), key=k("cat"))
+            unit = st.text_input("Unit", value="EA", key=k("unit"))
+            unit_cost = st.number_input("Unit cost", value=float(item.get("unit_cost") or 0), key=k("uc"))
+            vendor = st.text_input("Vendor", value=str(item.get("vendor") or ""), key=k("vendor"))
             inv_id = str(item.get("id") or "")
         else:
-            description = st.text_input("Description", key=f"mat_desc_{eid}")
-            sku = st.text_input("SKU / Item #", key=f"mat_sku_{eid}")
-            category = st.text_input("Category", key=f"mat_cat_{eid}")
-            unit = st.text_input("Unit", value="EA", key=f"mat_unit_{eid}")
-            unit_cost = st.number_input("Unit cost", value=0.0, key=f"mat_uc_{eid}")
-            vendor = st.text_input("Vendor", key=f"mat_vendor_{eid}")
+            description = st.text_input("Description", key=k("desc"))
+            sku = st.text_input("SKU / Item #", key=k("sku"))
+            category = st.text_input("Category", key=k("cat"))
+            unit = st.text_input("Unit", value="EA", key=k("unit"))
+            unit_cost = st.number_input("Unit cost", value=0.0, key=k("uc"))
+            vendor = st.text_input("Vendor", key=k("vendor"))
             inv_id = ""
     with c2:
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=f"mat_qty_{eid}")
-        markup = st.number_input("Markup %", value=default_markup, key=f"mat_mk_{eid}")
-        taxable = st.checkbox("Taxable", value=True, key=f"mat_tax_{eid}")
-        notes = st.text_area("Notes", key=f"mat_notes_{eid}", height=70)
+        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"))
+        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        taxable = st.checkbox("Taxable", value=True, key=k("tax"))
+        notes = st.text_area("Notes", key=k("notes"), height=70)
     b1, b2 = st.columns(2)
     with b1:
-        if st.button("Save material", key=f"mat_save_{eid}", type="primary", use_container_width=True):
+        if st.button("Save material", key=k("save"), type="primary", use_container_width=True):
             ok, err = _service_ok(
                 add_estimate_material(
                     eid,
                     {
                         "inventory_item_id": inv_id or None,
-                        "sku": st.session_state.get(f"mat_sku_{eid}"),
-                        "description": st.session_state.get(f"mat_desc_{eid}"),
-                        "category": st.session_state.get(f"mat_cat_{eid}"),
-                        "unit": st.session_state.get(f"mat_unit_{eid}"),
-                        "unit_cost": st.session_state.get(f"mat_uc_{eid}"),
+                        "sku": st.session_state.get(k("sku")),
+                        "description": st.session_state.get(k("desc")),
+                        "category": st.session_state.get(k("cat")),
+                        "unit": st.session_state.get(k("unit")),
+                        "unit_cost": st.session_state.get(k("uc")),
                         "quantity": qty,
                         "markup_percent": markup,
                         "taxable": taxable,
-                        "vendor": st.session_state.get(f"mat_vendor_{eid}"),
+                        "vendor": st.session_state.get(k("vendor")),
                         "notes": notes,
                     },
                 )
             )
             if ok:
-                st.session_state.pop(f"ecb_form_mat_{eid}", None)
+                st.session_state.pop(fk, None)
                 st.success("Material added.")
                 st.rerun()
             st.error(err)
     with b2:
-        if st.button("Cancel", key=f"mat_cancel_{eid}", use_container_width=True):
-            st.session_state.pop(f"ecb_form_mat_{eid}", None)
+        if st.button("Cancel", key=k("cancel"), use_container_width=True):
+            st.session_state.pop(fk, None)
             st.rerun()
 
 
-def _render_add_labor_form(eid: str, est: dict[str, Any]) -> None:
+def _render_add_labor_form(
+    eid: str,
+    est: dict[str, Any],
+    *,
+    key_prefix: str = "ecb_lab",
+    form_state_key: str | None = None,
+) -> None:
+    fk = form_state_key or f"ecb_form_lab_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Labor")
     default_markup = float(est.get("default_labor_markup_pct") or 0)
     c1, c2 = st.columns(2)
     with c1:
-        role = st.selectbox("Labor role", LABOR_ROLE_TYPES, key=f"lab_role_{eid}")
-        description = st.text_input("Description", key=f"lab_desc_{eid}")
-        st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=f"lab_sth_{eid}")
-        ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=f"lab_oth_{eid}")
-        dt_h = st.number_input("DT hours", min_value=0.0, value=0.0, key=f"lab_dth_{eid}")
+        role = st.selectbox("Labor role", LABOR_ROLE_TYPES, key=k("role"))
+        description = st.text_input("Description", key=k("desc"))
+        st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=k("sth"))
+        ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=k("oth"))
+        dt_h = st.number_input("DT hours", min_value=0.0, value=0.0, key=k("dth"))
     with c2:
-        st_r = st.number_input("ST rate", min_value=0.0, value=0.0, key=f"lab_str_{eid}")
-        ot_r = st.number_input("OT rate", min_value=0.0, value=0.0, key=f"lab_otr_{eid}")
-        dt_r = st.number_input("DT rate", min_value=0.0, value=0.0, key=f"lab_dtr_{eid}")
-        markup = st.number_input("Markup %", value=default_markup, key=f"lab_mk_{eid}")
-        notes = st.text_area("Notes", key=f"lab_notes_{eid}", height=70)
-    if st.button("Save labor", key=f"lab_save_{eid}", type="primary"):
+        st_r = st.number_input("ST rate", min_value=0.0, value=0.0, key=k("str"))
+        ot_r = st.number_input("OT rate", min_value=0.0, value=0.0, key=k("otr"))
+        dt_r = st.number_input("DT rate", min_value=0.0, value=0.0, key=k("dtr"))
+        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        notes = st.text_area("Notes", key=k("notes"), height=70)
+    if st.button("Save labor", key=k("save"), type="primary"):
         ok, err = _service_ok(
             add_estimate_labor(
                 eid,
@@ -305,7 +340,7 @@ def _render_add_labor_form(eid: str, est: dict[str, Any]) -> None:
             )
         )
         if ok:
-            st.session_state.pop(f"ecb_form_lab_{eid}", None)
+            st.session_state.pop(fk, None)
             st.success("Labor line added.")
             st.rerun()
         st.error(err)
@@ -315,7 +350,12 @@ def _render_add_equipment_form(
     eid: str,
     est: dict[str, Any],
     asset_options: list[tuple[str, dict[str, Any]]],
+    *,
+    key_prefix: str = "ecb_eq",
+    form_state_key: str | None = None,
 ) -> None:
+    fk = form_state_key or f"ecb_form_eq_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Equipment")
     default_markup = float(est.get("default_equipment_markup_pct") or 0)
     asset_map = {label: asset for label, asset in asset_options}
@@ -323,23 +363,23 @@ def _render_add_equipment_form(
     with c1:
         if asset_options:
             labels = [label for label, _ in asset_options]
-            pick = st.selectbox("Asset", labels, key=f"eq_asset_{eid}")
+            pick = st.selectbox("Asset", labels, key=k("asset"))
             asset = asset_map.get(pick, {})
-            name = st.text_input("Equipment name", value=str(asset.get("asset_name") or ""), key=f"eq_name_{eid}")
-            eq_type = st.text_input("Type", value=str(asset.get("category") or ""), key=f"eq_type_{eid}")
+            name = st.text_input("Equipment name", value=str(asset.get("asset_name") or ""), key=k("name"))
+            eq_type = st.text_input("Type", value=str(asset.get("category") or ""), key=k("type"))
             asset_id = str(asset.get("id") or "")
         else:
-            name = st.text_input("Equipment name", key=f"eq_name_{eid}")
-            eq_type = st.text_input("Type", key=f"eq_type_{eid}")
+            name = st.text_input("Equipment name", key=k("name"))
+            eq_type = st.text_input("Type", key=k("type"))
             asset_id = ""
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=f"eq_qty_{eid}")
-        duration = st.number_input("Duration", min_value=0.0, value=0.0, key=f"eq_dur_{eid}")
-        dur_unit = st.selectbox("Duration unit", DURATION_UNITS, key=f"eq_dunit_{eid}")
+        qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"))
+        duration = st.number_input("Duration", min_value=0.0, value=0.0, key=k("dur"))
+        dur_unit = st.selectbox("Duration unit", DURATION_UNITS, key=k("dunit"))
     with c2:
-        cost_rate = st.number_input("Cost rate", min_value=0.0, value=0.0, key=f"eq_rate_{eid}")
-        markup = st.number_input("Markup %", value=default_markup, key=f"eq_mk_{eid}")
-        notes = st.text_area("Notes", key=f"eq_notes_{eid}", height=70)
-    if st.button("Save equipment", key=f"eq_save_{eid}", type="primary"):
+        cost_rate = st.number_input("Cost rate", min_value=0.0, value=0.0, key=k("rate"))
+        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        notes = st.text_area("Notes", key=k("notes"), height=70)
+    if st.button("Save equipment", key=k("save"), type="primary"):
         ok, err = _service_ok(
             add_estimate_equipment(
                 eid,
@@ -357,27 +397,36 @@ def _render_add_equipment_form(
             )
         )
         if ok:
-            st.session_state.pop(f"ecb_form_eq_{eid}", None)
+            st.session_state.pop(fk, None)
             st.success("Equipment line added.")
             st.rerun()
         st.error(err)
 
 
-def _render_add_subcontractor_form(eid: str, est: dict[str, Any], vendor_options: list[str]) -> None:
+def _render_add_subcontractor_form(
+    eid: str,
+    est: dict[str, Any],
+    vendor_options: list[str],
+    *,
+    key_prefix: str = "ecb_sub",
+    form_state_key: str | None = None,
+) -> None:
+    fk = form_state_key or f"ecb_form_sub_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Subcontractor")
     default_markup = float(est.get("default_subcontractor_markup_pct") or 0)
     c1, c2 = st.columns(2)
     with c1:
         if vendor_options:
-            vendor = st.selectbox("Vendor", vendor_options, key=f"sub_vendor_{eid}")
+            vendor = st.selectbox("Vendor", vendor_options, key=k("vendor"))
         else:
-            vendor = st.text_input("Subcontractor", key=f"sub_vendor_{eid}")
-        description = st.text_area("Scope / description", key=f"sub_desc_{eid}", height=80)
+            vendor = st.text_input("Subcontractor", key=k("vendor"))
+        description = st.text_area("Scope / description", key=k("desc"), height=80)
     with c2:
-        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=f"sub_cost_{eid}")
-        markup = st.number_input("Markup %", value=default_markup, key=f"sub_mk_{eid}")
-        notes = st.text_area("Notes", key=f"sub_notes_{eid}", height=80)
-    if st.button("Save subcontractor", key=f"sub_save_{eid}", type="primary"):
+        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
+        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        notes = st.text_area("Notes", key=k("notes"), height=80)
+    if st.button("Save subcontractor", key=k("save"), type="primary"):
         ok, err = _service_ok(
             add_estimate_subcontractor(
                 eid,
@@ -391,25 +440,33 @@ def _render_add_subcontractor_form(eid: str, est: dict[str, Any], vendor_options
             )
         )
         if ok:
-            st.session_state.pop(f"ecb_form_sub_{eid}", None)
+            st.session_state.pop(fk, None)
             st.success("Subcontractor line added.")
             st.rerun()
         st.error(err)
 
 
-def _render_add_other_form(eid: str, est: dict[str, Any]) -> None:
+def _render_add_other_form(
+    eid: str,
+    est: dict[str, Any],
+    *,
+    key_prefix: str = "ecb_oth",
+    form_state_key: str | None = None,
+) -> None:
+    fk = form_state_key or f"ecb_form_other_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Other Cost")
     default_markup = float(est.get("default_other_markup_pct") or 0)
     c1, c2 = st.columns(2)
     with c1:
-        description = st.text_input("Description", key=f"oth_desc_{eid}")
-        category = st.text_input("Category", key=f"oth_cat_{eid}")
-        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=f"oth_cost_{eid}")
+        description = st.text_input("Description", key=k("desc"))
+        category = st.text_input("Category", key=k("cat"))
+        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
     with c2:
-        markup = st.number_input("Markup %", value=default_markup, key=f"oth_mk_{eid}")
-        taxable = st.checkbox("Taxable", value=False, key=f"oth_tax_{eid}")
-        notes = st.text_area("Notes", key=f"oth_notes_{eid}", height=80)
-    if st.button("Save other cost", key=f"oth_save_{eid}", type="primary"):
+        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        taxable = st.checkbox("Taxable", value=False, key=k("tax"))
+        notes = st.text_area("Notes", key=k("notes"), height=80)
+    if st.button("Save other cost", key=k("save"), type="primary"):
         ok, err = _service_ok(
             add_estimate_other_cost(
                 eid,
@@ -424,7 +481,7 @@ def _render_add_other_form(eid: str, est: dict[str, Any]) -> None:
             )
         )
         if ok:
-            st.session_state.pop(f"ecb_form_other_{eid}", None)
+            st.session_state.pop(fk, None)
             st.success("Other cost added.")
             st.rerun()
         st.error(err)
@@ -451,79 +508,88 @@ def _travel_basis_text(row: dict[str, Any]) -> str:
     return fmt_currency(row.get("other_cost"))
 
 
-def _travel_form_data(eid: str) -> dict[str, Any]:
+def _travel_form_data(eid: str, *, key_prefix: str = "ecb_trv") -> dict[str, Any]:
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     return {
-        "travel_type": st.session_state.get(f"trv_type_{eid}", "Mileage"),
-        "description": st.session_state.get(f"trv_desc_{eid}", ""),
-        "origin": st.session_state.get(f"trv_origin_{eid}", ""),
-        "destination": st.session_state.get(f"trv_dest_{eid}", ""),
-        "miles": st.session_state.get(f"trv_miles_{eid}", 0.0),
-        "mileage_rate": st.session_state.get(f"trv_mrate_{eid}", 0.0),
-        "trips": st.session_state.get(f"trv_trips_{eid}", 1.0),
-        "people": st.session_state.get(f"trv_people_{eid}", 1.0),
-        "travel_hours": st.session_state.get(f"trv_hours_{eid}", 0.0),
-        "hourly_rate": st.session_state.get(f"trv_hrate_{eid}", 0.0),
-        "nights": st.session_state.get(f"trv_nights_{eid}", 0.0),
-        "lodging_rate": st.session_state.get(f"trv_lrate_{eid}", 0.0),
-        "per_diem_days": st.session_state.get(f"trv_pdays_{eid}", 0.0),
-        "per_diem_rate": st.session_state.get(f"trv_prate_{eid}", 0.0),
-        "airfare_cost": st.session_state.get(f"trv_air_{eid}", 0.0),
-        "rental_vehicle_cost": st.session_state.get(f"trv_rental_{eid}", 0.0),
-        "fuel_cost": st.session_state.get(f"trv_fuel_{eid}", 0.0),
-        "parking_tolls_cost": st.session_state.get(f"trv_park_{eid}", 0.0),
-        "other_cost": st.session_state.get(f"trv_other_{eid}", 0.0),
-        "markup_percent": st.session_state.get(f"trv_mk_{eid}", 0.0),
-        "taxable": st.session_state.get(f"trv_tax_{eid}", False),
-        "notes": st.session_state.get(f"trv_notes_{eid}", ""),
+        "travel_type": st.session_state.get(k("type"), "Mileage"),
+        "description": st.session_state.get(k("desc"), ""),
+        "origin": st.session_state.get(k("origin"), ""),
+        "destination": st.session_state.get(k("dest"), ""),
+        "miles": st.session_state.get(k("miles"), 0.0),
+        "mileage_rate": st.session_state.get(k("mrate"), 0.0),
+        "trips": st.session_state.get(k("trips"), 1.0),
+        "people": st.session_state.get(k("people"), 1.0),
+        "travel_hours": st.session_state.get(k("hours"), 0.0),
+        "hourly_rate": st.session_state.get(k("hrate"), 0.0),
+        "nights": st.session_state.get(k("nights"), 0.0),
+        "lodging_rate": st.session_state.get(k("lrate"), 0.0),
+        "per_diem_days": st.session_state.get(k("pdays"), 0.0),
+        "per_diem_rate": st.session_state.get(k("prate"), 0.0),
+        "airfare_cost": st.session_state.get(k("air"), 0.0),
+        "rental_vehicle_cost": st.session_state.get(k("rental"), 0.0),
+        "fuel_cost": st.session_state.get(k("fuel"), 0.0),
+        "parking_tolls_cost": st.session_state.get(k("park"), 0.0),
+        "other_cost": st.session_state.get(k("other"), 0.0),
+        "markup_percent": st.session_state.get(k("mk"), 0.0),
+        "taxable": st.session_state.get(k("tax"), False),
+        "notes": st.session_state.get(k("notes"), ""),
     }
 
 
-def _render_add_travel_form(eid: str, est: dict[str, Any]) -> None:
+def _render_add_travel_form(
+    eid: str,
+    est: dict[str, Any],
+    *,
+    key_prefix: str = "ecb_trv",
+    form_state_key: str | None = None,
+) -> None:
+    fk = form_state_key or f"ecb_form_trv_{eid}"
+    k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     st.markdown("##### Add Travel Cost")
     default_markup = float(est.get("default_travel_markup_pct") or 0)
-    if f"trv_mk_{eid}" not in st.session_state:
-        st.session_state[f"trv_mk_{eid}"] = default_markup
-    travel_type = st.selectbox("Travel type", TRAVEL_TYPES, key=f"trv_type_{eid}")
+    if k("mk") not in st.session_state:
+        st.session_state[k("mk")] = default_markup
+    travel_type = st.selectbox("Travel type", TRAVEL_TYPES, key=k("type"))
     c1, c2 = st.columns(2)
     with c1:
-        st.text_input("Description", key=f"trv_desc_{eid}")
+        st.text_input("Description", key=k("desc"))
         if travel_type in ("Mileage", "Drive Time", "Airfare"):
-            st.text_input("Origin", key=f"trv_origin_{eid}")
+            st.text_input("Origin", key=k("origin"))
         if travel_type in ("Mileage", "Drive Time", "Lodging", "Per Diem", "Airfare"):
-            st.text_input("Destination", key=f"trv_dest_{eid}")
+            st.text_input("Destination", key=k("dest"))
         if travel_type == "Mileage":
-            st.number_input("Miles", min_value=0.0, value=0.0, key=f"trv_miles_{eid}")
-            st.number_input("Mileage rate", min_value=0.0, value=0.0, key=f"trv_mrate_{eid}")
-            st.number_input("Trips", min_value=0.0, value=1.0, key=f"trv_trips_{eid}")
+            st.number_input("Miles", min_value=0.0, value=0.0, key=k("miles"))
+            st.number_input("Mileage rate", min_value=0.0, value=0.0, key=k("mrate"))
+            st.number_input("Trips", min_value=0.0, value=1.0, key=k("trips"))
         elif travel_type == "Drive Time":
-            st.number_input("Travel hours", min_value=0.0, value=0.0, key=f"trv_hours_{eid}")
-            st.number_input("Hourly rate", min_value=0.0, value=0.0, key=f"trv_hrate_{eid}")
-            st.number_input("People", min_value=0.0, value=1.0, key=f"trv_people_{eid}")
+            st.number_input("Travel hours", min_value=0.0, value=0.0, key=k("hours"))
+            st.number_input("Hourly rate", min_value=0.0, value=0.0, key=k("hrate"))
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
         elif travel_type == "Lodging":
-            st.number_input("Nights", min_value=0.0, value=0.0, key=f"trv_nights_{eid}")
-            st.number_input("Lodging rate", min_value=0.0, value=0.0, key=f"trv_lrate_{eid}")
-            st.number_input("People", min_value=0.0, value=1.0, key=f"trv_people_{eid}")
+            st.number_input("Nights", min_value=0.0, value=0.0, key=k("nights"))
+            st.number_input("Lodging rate", min_value=0.0, value=0.0, key=k("lrate"))
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
         elif travel_type == "Per Diem":
-            st.number_input("Per diem days", min_value=0.0, value=0.0, key=f"trv_pdays_{eid}")
-            st.number_input("Per diem rate", min_value=0.0, value=0.0, key=f"trv_prate_{eid}")
-            st.number_input("People", min_value=0.0, value=1.0, key=f"trv_people_{eid}")
+            st.number_input("Per diem days", min_value=0.0, value=0.0, key=k("pdays"))
+            st.number_input("Per diem rate", min_value=0.0, value=0.0, key=k("prate"))
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
         elif travel_type == "Airfare":
-            st.number_input("Airfare cost", min_value=0.0, value=0.0, key=f"trv_air_{eid}")
-            st.number_input("People", min_value=0.0, value=1.0, key=f"trv_people_{eid}")
+            st.number_input("Airfare cost", min_value=0.0, value=0.0, key=k("air"))
+            st.number_input("People", min_value=0.0, value=1.0, key=k("people"))
         elif travel_type == "Rental Vehicle":
-            st.number_input("Rental vehicle cost", min_value=0.0, value=0.0, key=f"trv_rental_{eid}")
+            st.number_input("Rental vehicle cost", min_value=0.0, value=0.0, key=k("rental"))
         elif travel_type == "Fuel":
-            st.number_input("Fuel cost", min_value=0.0, value=0.0, key=f"trv_fuel_{eid}")
+            st.number_input("Fuel cost", min_value=0.0, value=0.0, key=k("fuel"))
         elif travel_type == "Parking / Tolls":
-            st.number_input("Parking / tolls cost", min_value=0.0, value=0.0, key=f"trv_park_{eid}")
+            st.number_input("Parking / tolls cost", min_value=0.0, value=0.0, key=k("park"))
         else:
-            st.number_input("Other travel cost", min_value=0.0, value=0.0, key=f"trv_other_{eid}")
+            st.number_input("Other travel cost", min_value=0.0, value=0.0, key=k("other"))
     with c2:
-        st.number_input("Markup %", value=float(st.session_state.get(f"trv_mk_{eid}", default_markup)), key=f"trv_mk_{eid}")
-        st.checkbox("Taxable", value=False, key=f"trv_tax_{eid}")
-        st.text_area("Notes", key=f"trv_notes_{eid}", height=120)
+        st.number_input("Markup %", value=float(st.session_state.get(k("mk"), default_markup)), key=k("mk"))
+        st.checkbox("Taxable", value=False, key=k("tax"))
+        st.text_area("Notes", key=k("notes"), height=120)
 
-    calc = calc_travel_line(_travel_form_data(eid))
+    calc = calc_travel_line(_travel_form_data(eid, key_prefix=key_prefix))
     st.markdown(
         f"**Cost total:** {fmt_currency(calc['cost_total'])} · "
         f"**Markup:** {fmt_currency(calc['markup_amount'])} · "
@@ -532,16 +598,16 @@ def _render_add_travel_form(eid: str, est: dict[str, Any]) -> None:
 
     b1, b2 = st.columns(2)
     with b1:
-        if st.button("Save Travel Cost", key=f"trv_save_{eid}", type="primary", use_container_width=True):
-            ok, err = _service_ok(add_estimate_travel(eid, _travel_form_data(eid)))
+        if st.button("Save Travel Cost", key=k("save"), type="primary", use_container_width=True):
+            ok, err = _service_ok(add_estimate_travel(eid, _travel_form_data(eid, key_prefix=key_prefix)))
             if ok:
-                st.session_state.pop(f"ecb_form_trv_{eid}", None)
+                st.session_state.pop(fk, None)
                 st.success("Travel cost added.")
                 st.rerun()
             st.error(err)
     with b2:
-        if st.button("Cancel", key=f"trv_cancel_{eid}", use_container_width=True):
-            st.session_state.pop(f"ecb_form_trv_{eid}", None)
+        if st.button("Cancel", key=k("cancel"), use_container_width=True):
+            st.session_state.pop(fk, None)
             st.rerun()
 
 
@@ -571,7 +637,7 @@ def render_travel_tab(est: dict[str, Any]) -> None:
             )
 
     if st.button("+ Add Travel Cost", key=f"trv_tab_add_{eid}"):
-        st.session_state[f"ecb_form_trv_{eid}"] = True
+        st.session_state[f"trv_tab_form_{eid}"] = True
         st.rerun()
 
     if not travel_lines:
@@ -603,8 +669,13 @@ def render_travel_tab(est: dict[str, Any]) -> None:
                         st.rerun()
                     st.error(err)
 
-    if st.session_state.get(f"ecb_form_trv_{eid}"):
-        _render_add_travel_form(eid, est)
+    if st.session_state.get(f"trv_tab_form_{eid}"):
+        _render_add_travel_form(
+            eid,
+            est,
+            key_prefix="trv_tab",
+            form_state_key=f"trv_tab_form_{eid}",
+        )
 
 
 def _render_deletable_lines(
@@ -657,10 +728,16 @@ def render_materials_tab(
         key_prefix="mat_tab",
     )
     if st.button("+ Add Material", key=f"mat_tab_add_{eid}"):
-        st.session_state[f"ecb_form_mat_{eid}"] = True
+        st.session_state[f"mat_tab_form_{eid}"] = True
         st.rerun()
-    if st.session_state.get(f"ecb_form_mat_{eid}"):
-        _render_add_material_form(eid, est, inventory_options or [])
+    if st.session_state.get(f"mat_tab_form_{eid}"):
+        _render_add_material_form(
+            eid,
+            est,
+            inventory_options or [],
+            key_prefix="mat_tab",
+            form_state_key=f"mat_tab_form_{eid}",
+        )
 
 
 def render_labor_tab(est: dict[str, Any]) -> None:
@@ -680,10 +757,15 @@ def render_labor_tab(est: dict[str, Any]) -> None:
         key_prefix="lab_tab",
     )
     if st.button("+ Add Labor", key=f"lab_tab_add_{eid}"):
-        st.session_state[f"ecb_form_lab_{eid}"] = True
+        st.session_state[f"lab_tab_form_{eid}"] = True
         st.rerun()
-    if st.session_state.get(f"ecb_form_lab_{eid}"):
-        _render_add_labor_form(eid, est)
+    if st.session_state.get(f"lab_tab_form_{eid}"):
+        _render_add_labor_form(
+            eid,
+            est,
+            key_prefix="lab_tab",
+            form_state_key=f"lab_tab_form_{eid}",
+        )
 
 
 def render_equipment_tab(est: dict[str, Any], *, asset_options: list[tuple[str, dict[str, Any]]] | None = None) -> None:
@@ -703,10 +785,16 @@ def render_equipment_tab(est: dict[str, Any], *, asset_options: list[tuple[str, 
         key_prefix="eq_tab",
     )
     if st.button("+ Add Equipment", key=f"eq_tab_add_{eid}"):
-        st.session_state[f"ecb_form_eq_{eid}"] = True
+        st.session_state[f"eq_tab_form_{eid}"] = True
         st.rerun()
-    if st.session_state.get(f"ecb_form_eq_{eid}"):
-        _render_add_equipment_form(eid, est, asset_options or [])
+    if st.session_state.get(f"eq_tab_form_{eid}"):
+        _render_add_equipment_form(
+            eid,
+            est,
+            asset_options or [],
+            key_prefix="eq_tab",
+            form_state_key=f"eq_tab_form_{eid}",
+        )
 
 
 def render_subcontractors_tab(est: dict[str, Any], *, vendor_options: list[str] | None = None) -> None:
@@ -726,10 +814,16 @@ def render_subcontractors_tab(est: dict[str, Any], *, vendor_options: list[str] 
         key_prefix="sub_tab",
     )
     if st.button("+ Add Subcontractor", key=f"sub_tab_add_{eid}"):
-        st.session_state[f"ecb_form_sub_{eid}"] = True
+        st.session_state[f"sub_tab_form_{eid}"] = True
         st.rerun()
-    if st.session_state.get(f"ecb_form_sub_{eid}"):
-        _render_add_subcontractor_form(eid, est, vendor_options or [])
+    if st.session_state.get(f"sub_tab_form_{eid}"):
+        _render_add_subcontractor_form(
+            eid,
+            est,
+            vendor_options or [],
+            key_prefix="sub_tab",
+            form_state_key=f"sub_tab_form_{eid}",
+        )
 
 
 def render_other_costs_tab(est: dict[str, Any]) -> None:
@@ -749,10 +843,15 @@ def render_other_costs_tab(est: dict[str, Any]) -> None:
         key_prefix="oth_tab",
     )
     if st.button("+ Add Other Cost", key=f"oth_tab_add_{eid}"):
-        st.session_state[f"ecb_form_other_{eid}"] = True
+        st.session_state[f"oth_tab_form_{eid}"] = True
         st.rerun()
-    if st.session_state.get(f"ecb_form_other_{eid}"):
-        _render_add_other_form(eid, est)
+    if st.session_state.get(f"oth_tab_form_{eid}"):
+        _render_add_other_form(
+            eid,
+            est,
+            key_prefix="oth_tab",
+            form_state_key=f"oth_tab_form_{eid}",
+        )
 
 
 def render_markups_tab(est: dict[str, Any], *, persist_fn: Callable[[dict[str, Any], str], tuple[bool, str]]) -> None:
