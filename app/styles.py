@@ -1004,6 +1004,159 @@ def inject_tasks_module_css() -> None:
     )
 
 
+def inject_certifications_module_css() -> None:
+    """Employee certifications custom table styling."""
+    st.markdown(
+        f"""
+<style id="ips-certifications-module-v1">
+.ips-certifications-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-certifications-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-certifications-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-certifications-row:hover {{
+  background: #eef5ff;
+}}
+.ips-certifications-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-certifications-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-certifications-type {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-certifications-muted {{
+  font-size: 13px;
+  color: #64748b;
+}}
+.ips-cert-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-cert-status-active {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-cert-status-expiring-soon {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-cert-status-expired {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-cert-status-missing {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-cert-status-not-required {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.st-key-certifications_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-certifications_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-certifications_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-certifications_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-certifications_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-certifications_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-certifications_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-certifications_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-emp_certifications_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_estimates_module_css() -> None:
     """Estimates list custom table styling."""
     st.markdown(

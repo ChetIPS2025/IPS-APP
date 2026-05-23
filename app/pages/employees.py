@@ -385,28 +385,19 @@ def _cert_table(certs: list[dict]) -> None:
     if not certs:
         st.caption("No certifications on file.")
         return
-
-    def _cell(field: str, row: dict) -> str:
-        if field == "status":
-            return legacy_status_pill_html(str(row.get("status") or ""))
-        return html.escape(str(row.get(field) or "—"))
-
-    render_data_table(
+    try:
+        from app.pages.employee_certifications import render_certifications_table_block
+        from app.styles import inject_certifications_module_css
+    except ImportError:
+        from pages.employee_certifications import render_certifications_table_block  # type: ignore
+        from styles import inject_certifications_module_css  # type: ignore
+    inject_certifications_module_css()
+    render_certifications_table_block(
         certs,
-        [
-            ("cert_type", "TYPE"),
-            ("cert_number", "NUMBER"),
-            ("issuer", "ISSUER"),
-            ("issue_date", "ISSUED"),
-            ("expiration_date", "EXPIRES"),
-            ("status", "STATUS"),
-        ],
-        row_id_key="id",
-        selected_id=None,
-        session_select_key="_emp_cert_nested",
-        col_fr=["1fr", "0.9fr", "1fr", "0.75fr", "0.75fr", "0.7fr"],
-        cell_renderer=_cell,
-        hide_select=True,
+        hide_employee=True,
+        table_wrap_key="emp_certifications_table_wrap",
+        session_prefix="emp_cert_",
+        inline_detail=True,
     )
 
 

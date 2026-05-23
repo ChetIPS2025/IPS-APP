@@ -347,18 +347,38 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_cert(row: dict[str, Any], employee_name: str = "") -> dict[str, Any]:
-    return {
+    try:
+        from app.services.certification_helpers import compute_certification_status
+    except ImportError:
+        from services.certification_helpers import compute_certification_status  # type: ignore
+
+    normalized = {
         "id": str(row.get("id") or ""),
         "employee_id": str(row.get("employee_id") or ""),
         "employee_name": employee_name or str(row.get("employee_name") or ""),
-        "cert_type": str(row.get("cert_type") or row.get("type") or ""),
-        "cert_number": str(row.get("cert_number") or row.get("number") or ""),
+        "cert_type": str(
+            row.get("cert_type")
+            or row.get("certification_type")
+            or row.get("type")
+            or ""
+        ),
+        "cert_number": str(
+            row.get("cert_number")
+            or row.get("certification_number")
+            or row.get("number")
+            or ""
+        ),
         "issuer": str(row.get("issuer") or row.get("issuing_organization") or ""),
         "issue_date": str(row.get("issue_date") or "")[:10],
         "expiration_date": str(row.get("expiration_date") or "")[:10],
         "status": str(row.get("status") or "Active"),
+        "attachment_path": str(row.get("attachment_path") or ""),
         "notes": str(row.get("notes") or ""),
+        "created_at": str(row.get("created_at") or "")[:19],
+        "updated_at": str(row.get("updated_at") or "")[:19],
     }
+    normalized["status"] = compute_certification_status(normalized)
+    return normalized
 
 
 def normalize_document_hub(row: dict[str, Any]) -> dict[str, Any]:
@@ -485,8 +505,8 @@ def list_certifications(employee_id: str, *, demo: list[dict[str, Any]]) -> tupl
         out = [normalize_cert(r) for r in rows if not eid or str(r.get("employee_id") or "") == eid]
         if out:
             return out, False
-    demo_match = [c for c in demo if c.get("employee_id") == eid] if eid else demo
-    return (demo_match if demo_match else demo[:2]), True
+    demo_match = [normalize_cert(c) for c in demo if c.get("employee_id") == eid] if eid else [normalize_cert(c) for c in demo]
+    return (demo_match if demo_match else [normalize_cert(c) for c in demo[:2]]), True
 
 
 def list_all_certifications(*, demo: list[dict[str, Any]], employees: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
@@ -497,7 +517,7 @@ def list_all_certifications(*, demo: list[dict[str, Any]], employees: list[dict[
     out = []
     for c in demo:
         emp = next((e for e in employees if e.get("id") == c.get("employee_id")), None)
-        out.append({**c, "employee_name": str((emp or {}).get("name") or "")})
+        out.append(normalize_cert(c, str((emp or {}).get("name") or "")))
     return out, True
 
 
@@ -753,20 +773,40 @@ def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> 
 
 
 def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.certification_helpers import compute_certification_status
+    except ImportError:
+        from services.certification_helpers import compute_certification_status  # type: ignore
+
     payload = {
         "employee_id": ui.get("employee_id"),
-        "cert_type": ui.get("cert_type"),
-        "cert_number": ui.get("cert_number"),
-        "issuer": ui.get("issuer"),
+        "cert_type": ui.get("cert_type") or ui.get("certification_type"),
+        "cert_number": ui.get("cert_number") or ui.get("certification_number") or "",
+        "issuer": ui.get("issuer") or ui.get("issuing_organization") or "",
         "issue_date": ui.get("issue_date") or None,
         "expiration_date": ui.get("expiration_date") or None,
-        "status": ui.get("status"),
-        "notes": ui.get("notes"),
+        "notes": ui.get("notes") or "",
+        "attachment_path": ui.get("attachment_path") or "",
     }
+    manual_status = str(ui.get("status") or "").strip()
+    if manual_status == "Not Required":
+        payload["status"] = "Not Required"
+    else:
+        payload["status"] = compute_certification_status(
+            {
+                **payload,
+                "cert_type": payload["cert_type"],
+                "expiration_date": payload["expiration_date"],
+            }
+        )
     table = "employee_certifications"
     if row_id:
-        return update_row(table, payload, {"id": row_id})
-    return insert_row(table, payload)
+        result = update_row(table, payload, {"id": row_id})
+    else:
+        result = insert_row(table, payload)
+    if result.ok:
+        clear_all_data_caches()
+    return result
 
 
 def save_document_hub(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
@@ -856,7 +896,10 @@ def delete_employee(row_id: str) -> ServiceResult:
 
 
 def delete_certification(row_id: str) -> ServiceResult:
-    return delete_row("employee_certifications", {"id": row_id})
+    result = delete_row("employee_certifications", {"id": row_id})
+    if result.ok:
+        clear_all_data_caches()
+    return result
 
 
 def delete_document(row_id: str) -> ServiceResult:

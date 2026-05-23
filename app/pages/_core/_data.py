@@ -593,9 +593,11 @@ def load_all_certifications() -> list[dict[str, Any]]:
 
 
 def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
-    expired = sum(1 for c in certs if str(c.get("status", "")).lower() == "expired")
-    expiring = sum(1 for c in certs if str(c.get("status", "")).lower() == "expiring soon")
-    return expired, expiring
+    try:
+        from app.services.certification_helpers import certification_alerts_counts
+    except ImportError:
+        from services.certification_helpers import certification_alerts_counts  # type: ignore
+    return certification_alerts_counts(certs)
 
 
 def job_options_for_timekeeping() -> list[str]:
