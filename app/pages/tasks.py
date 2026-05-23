@@ -718,15 +718,18 @@ def _render_custom_task_table(
                 )
 
             with cols[2]:
-                btn_class = "ips-task-status-closed" if status == "Closed" else "ips-task-status-open"
-                st.markdown(f'<div class="{btn_class}">', unsafe_allow_html=True)
-                if status == "Open":
-                    if st.button("Open", key=f"task_status_{tid}"):
-                        _save_task_field(tid, {"status": "Closed"})
-                else:
-                    if st.button("Closed", key=f"task_status_{tid}"):
-                        _save_task_field(tid, {"status": "Open"})
-                st.markdown("</div>", unsafe_allow_html=True)
+                status_wrap = (
+                    f"task_status_open_{tid}"
+                    if status == "Open"
+                    else f"task_status_closed_{tid}"
+                )
+                with st.container(key=status_wrap):
+                    if status == "Open":
+                        if st.button("Open", key=f"task_status_{tid}"):
+                            _save_task_field(tid, {"status": "Closed"})
+                    else:
+                        if st.button("Closed", key=f"task_status_{tid}"):
+                            _save_task_field(tid, {"status": "Open"})
 
             with cols[3]:
                 st.markdown(_priority_pill_html(priority), unsafe_allow_html=True)

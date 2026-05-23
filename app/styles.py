@@ -566,12 +566,12 @@ def inject_tasks_module_css() -> None:
   font-size: 14px !important;
   width: auto !important;
 }}
-.st-key-tasks_table_wrap .ips-task-status-open .stButton > button {{
+.st-key-tasks_table_wrap [class*="st-key-task_status_open_"] .stButton > button {{
   background: #dcfce7 !important;
   color: #166534 !important;
   border: 1px solid #86efac !important;
 }}
-.st-key-tasks_table_wrap .ips-task-status-closed .stButton > button {{
+.st-key-tasks_table_wrap [class*="st-key-task_status_closed_"] .stButton > button {{
   background: #fee2e2 !important;
   color: #991b1b !important;
   border: 1px solid #fca5a5 !important;
