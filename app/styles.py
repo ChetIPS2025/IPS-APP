@@ -296,6 +296,135 @@ def inject_customers_module_css() -> None:
   min-height: 24px !important;
   margin: 0 !important;
 }}
+.ips-contacts-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-contacts-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-contacts-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-contacts-row:hover {{
+  background: #eef5ff;
+}}
+.ips-contacts-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-contacts-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+  word-break: break-word;
+}}
+.ips-contacts-name {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-contacts-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-contacts-email {{
+  font-size: 13px;
+  color: #0f172a;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}}
+.ips-contact-role-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-contact-role-primary {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-contact-role-project {{
+  background: #e0e7ff;
+  color: #4338ca;
+}}
+.ips-contact-role-site {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-contact-role-safety {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-contact-role-billing {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-contact-role-estimating {{
+  background: #ede9fe;
+  color: #6d28d9;
+}}
+.ips-contact-role-other {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.st-key-contacts_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-contacts_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-contacts_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-contacts_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-contacts_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -2346,6 +2475,108 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
 .ips-deadline-badge.warn {{ background: #ffedd5; color: #c2410c; }}
 .ips-deadline-badge.ok {{ background: #dcfce7; color: #166534; }}
 
+.ips-quick-actions-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 16px 16px 16px;
+  margin-bottom: 0.65rem;
+}}
+.ips-quick-actions-header {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}}
+.ips-quick-actions-title {{
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}}
+.ips-quick-actions-grid {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}}
+.ips-quick-action-tile {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 12px;
+  color: #0f172a;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.15s ease;
+}}
+.ips-quick-action-tile:hover {{
+  background: #f8fbff;
+  border-color: #bfd3f2;
+}}
+.ips-quick-action-icon {{
+  font-size: 16px;
+  line-height: 1;
+}}
+.ips-quick-action-label {{
+  font-size: 14px;
+  line-height: 1.2;
+}}
+.st-key-dashboard_quick_actions {{
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 14px !important;
+  padding: 14px 16px 16px 16px !important;
+  margin-bottom: 0.65rem !important;
+}}
+.st-key-dashboard_quick_actions [data-testid="stVerticalBlock"] {{
+  gap: 12px !important;
+}}
+.st-key-dashboard_quick_actions [data-testid="stHorizontalBlock"] {{
+  gap: 12px !important;
+  align-items: stretch !important;
+}}
+.st-key-dashboard_quick_actions [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+}}
+.st-key-dashboard_quick_actions .stButton > button {{
+  min-height: 52px !important;
+  height: auto !important;
+  padding: 10px 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe3ee !important;
+  border-radius: 12px !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}}
+.st-key-dashboard_quick_actions .stButton > button:hover {{
+  background: #f8fbff !important;
+  border-color: #bfd3f2 !important;
+  color: #0f172a !important;
+}}
+.st-key-dashboard_quick_actions .stButton > button p {{
+  white-space: pre-line !important;
+  line-height: 1.25 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}}
+@media (max-width: 1200px) {{
+  .ips-quick-actions-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+}}
+@media (max-width: 900px) {{
+  .ips-quick-actions-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
+@media (max-width: 560px) {{
+  .ips-quick-actions-grid {{ grid-template-columns: 1fr; }}
+}}
 .ips-quick-actions {{
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

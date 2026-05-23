@@ -813,9 +813,96 @@ def list_customers(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
     return fetch_list("customers", order_by="customer_name", normalize=normalize_customer, demo=demo)
 
 
+def _is_unknown_column_error(message: str | None) -> bool:
+    if not message:
+        return False
+    text = message.lower()
+    return "pgrst204" in text or ("could not find" in text and "column" in text)
+
+
+def _customer_location_write_payloads(ui: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build insert/update payloads from newest to oldest supported schemas."""
+    cid = str(ui.get("customer_id") or "").strip()
+    name = str(ui.get("location_name") or ui.get("site_name") or "").strip()
+    status = str(ui.get("status") or "Active").strip()
+    active = status.lower() in ("active", "true", "1")
+    addr1 = str(ui.get("address_line_1") or ui.get("address") or "").strip()
+    addr2 = str(ui.get("address_line_2") or "").strip()
+    city = str(ui.get("city") or "").strip()
+    state = str(ui.get("state") or "").strip()
+    zip_code = str(ui.get("zip") or "").strip()
+    notes = str(ui.get("notes") or "").strip()
+
+    extended = {
+        "customer_id": cid,
+        "site_name": name,
+        "location_name": name,
+        "location_type": str(ui.get("location_type") or "Other").strip(),
+        "address_line_1": addr1,
+        "address_line_2": addr2,
+        "address": addr1,
+        "city": city,
+        "state": state,
+        "zip": zip_code,
+        "country": str(ui.get("country") or "USA").strip(),
+        "phone": str(ui.get("phone") or "").strip(),
+        "email": str(ui.get("email") or "").strip(),
+        "is_primary": bool(ui.get("is_primary")),
+        "is_billing": bool(ui.get("is_billing")),
+        "is_shipping": bool(ui.get("is_shipping")),
+        "is_active": active,
+        "status": status,
+        "notes": notes,
+    }
+    modern_024 = {
+        "customer_id": cid,
+        "location_name": name,
+        "address": addr1,
+        "city": city,
+        "state": state,
+        "zip": zip_code,
+        "is_active": active,
+    }
+    legacy_001 = {
+        "customer_id": cid,
+        "site_name": name,
+        "address_line1": addr1,
+        "address_line2": addr2,
+        "city": city,
+        "state": state,
+        "zip": zip_code,
+        "is_active": active,
+        "notes": notes,
+    }
+    return [extended, modern_024, legacy_001]
+
+
+def _write_customer_location(
+    payloads: list[dict[str, Any]],
+    *,
+    row_id: str | None = None,
+) -> ServiceResult:
+    last_result = ServiceResult(ok=False, error="Could not save location.")
+    for payload in payloads:
+        if row_id:
+            result = update_row("customer_locations", payload, {"id": row_id})
+        else:
+            result = insert_row("customer_locations", payload)
+        if result.ok:
+            return result
+        last_result = result
+        if not _is_unknown_column_error(result.error):
+            return result
+    return last_result
+
+
 def list_customer_locations(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
     cid = str(customer_id or "").strip()
     rows, err = fetch_rows("customer_locations", limit=200, order_by="site_name")
+    if err:
+        rows, err = fetch_rows("customer_locations", limit=200, order_by="location_name")
+    if err:
+        rows, err = fetch_rows("customer_locations", limit=200)
     if err:
         demo_rows = [normalize_customer_location(r) for r in (demo or []) if str(r.get("customer_id")) == cid]
         return demo_rows, True
@@ -830,39 +917,13 @@ def save_customer_location(ui: dict[str, Any], *, row_id: str | None = None) -> 
     name = str(ui.get("location_name") or ui.get("site_name") or "").strip()
     if not name:
         return ServiceResult(ok=False, error="Location name is required.")
-    status = str(ui.get("status") or "Active").strip()
-    active = status.lower() in ("active", "true", "1")
-    addr1 = str(ui.get("address_line_1") or ui.get("address") or "").strip()
-    payload = {
-        "customer_id": cid,
-        "site_name": name,
-        "location_name": name,
-        "location_type": str(ui.get("location_type") or "Other").strip(),
-        "address_line_1": addr1,
-        "address_line1": addr1,
-        "address": addr1,
-        "address_line_2": str(ui.get("address_line_2") or "").strip(),
-        "city": str(ui.get("city") or "").strip(),
-        "state": str(ui.get("state") or "").strip(),
-        "zip": str(ui.get("zip") or "").strip(),
-        "country": str(ui.get("country") or "USA").strip(),
-        "phone": str(ui.get("phone") or "").strip(),
-        "email": str(ui.get("email") or "").strip(),
-        "is_primary": bool(ui.get("is_primary")),
-        "is_billing": bool(ui.get("is_billing")),
-        "is_shipping": bool(ui.get("is_shipping")),
-        "is_active": active,
-        "status": status,
-        "notes": str(ui.get("notes") or "").strip(),
-    }
-    if row_id:
-        result = update_row("customer_locations", payload, {"id": row_id})
-        loc_id = str(row_id).strip()
-    else:
-        result = insert_row("customer_locations", payload)
+    payloads = _customer_location_write_payloads({**ui, "customer_id": cid})
+    result = _write_customer_location(payloads, row_id=row_id)
+    loc_id = str(row_id or "").strip()
+    if result.ok and not loc_id:
         row = result.data if isinstance(result.data, dict) else {}
         loc_id = str(row.get("id") or "").strip()
-    if result.ok and payload.get("is_primary") and loc_id:
+    if result.ok and bool(ui.get("is_primary")) and loc_id:
         _apply_primary_location_scope(customer_id=cid, location_id=loc_id)
     return result
 
@@ -882,8 +943,12 @@ def _apply_primary_location_scope(*, customer_id: str, location_id: str) -> None
         if not rid or rid == keep:
             continue
         if row.get("is_primary"):
-            update_row("customer_locations", {"is_primary": False}, {"id": rid})
-    update_row("customer_locations", {"is_primary": True}, {"id": keep})
+            clear_result = update_row("customer_locations", {"is_primary": False}, {"id": rid})
+            if not clear_result.ok and _is_unknown_column_error(clear_result.error):
+                return
+    set_result = update_row("customer_locations", {"is_primary": True}, {"id": keep})
+    if not set_result.ok and _is_unknown_column_error(set_result.error):
+        return
 
 
 def delete_customer_location(row_id: str) -> ServiceResult:

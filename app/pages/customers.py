@@ -13,6 +13,7 @@ try:
     from app.components.clickable_table import render_clickable_table
     from app.components.record_modal import (
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -62,6 +63,7 @@ except ImportError:
     from components.clickable_table import render_clickable_table  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -175,6 +177,11 @@ _CUSTOMER_HEADERS = [
     "STATUS",
 ]
 _STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"]
+SELECTED_CONTACT_KEY = "selected_contact_id"
+SHOW_CONTACT_MODAL_KEY = "show_contact_detail_modal"
+_ALL_CONTACT_IDS_KEY = "_ips_contacts_visible_ids"
+_CONTACT_COLS = [0.35, 2.0, 2.0, 2.0, 1.8, 3.0, 1.5]
+_CONTACT_HEADERS = ["", "NAME", "TITLE", "LOCATION", "ROLE", "EMAIL", "PHONE"]
 
 
 def _normalize_customer_status(raw: object) -> str:
@@ -422,9 +429,205 @@ def _contacts_with_location_names(contacts: list[dict], locations: list[dict]) -
         row = dict(contact)
         lid = str(contact.get("location_id") or contact.get("customer_location_id") or "").strip()
         loc = loc_by_id.get(lid, {})
-        row["location_name"] = str(loc.get("location_name") or loc.get("site_name") or "—")
+        loc_name = str(loc.get("location_name") or loc.get("site_name") or "").strip()
+        row["location_name"] = loc_name or "—"
+        row["display_name"] = _contact_display_name(row)
+        row["display_role"] = _normalize_contact_role(row.get("role_type"), row.get("title"))
+        row["display_phone"] = _contact_phone(row)
+        row["display_status"] = str(row.get("status") or "Active").strip() or "Active"
         rows.append(row)
     return rows
+
+
+def _contact_display_name(contact: dict) -> str:
+    name = str(contact.get("full_name") or contact.get("contact_name") or contact.get("name") or "").strip()
+    return name or "Unnamed Contact"
+
+
+def _contact_phone(contact: dict) -> str:
+    for key in ("phone", "mobile"):
+        val = str(contact.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _normalize_contact_role(raw: object, title: object = None) -> str:
+    s = str(raw or "").strip().lower()
+    mapping = {
+        "primary contact": "Primary",
+        "primary": "Primary",
+        "project contact": "Project",
+        "project": "Project",
+        "site contact": "Site",
+        "site": "Site",
+        "safety contact": "Safety",
+        "safety": "Safety",
+        "billing contact": "Billing",
+        "billing": "Billing",
+        "estimating contact": "Estimating",
+        "estimating": "Estimating",
+        "purchasing contact": "Purchasing",
+        "purchasing": "Purchasing",
+        "shipping contact": "Shipping",
+        "shipping": "Shipping",
+        "emergency contact": "Emergency",
+        "emergency": "Emergency",
+        "other": "Other",
+    }
+    if s in mapping:
+        return mapping[s]
+    if s and s not in ("", "—", "-"):
+        label = str(raw or "").strip()
+        if label.lower().endswith(" contact"):
+            return label[: -len(" contact")].strip() or "Other"
+        return label
+    title_s = str(title or "").strip()
+    if title_s and title_s.lower() not in ("—", "-", "other"):
+        return title_s
+    return "Other"
+
+
+def _contact_role_pill_html(role: str) -> str:
+    cls_map = {
+        "Primary": "ips-contact-role-primary",
+        "Project": "ips-contact-role-project",
+        "Site": "ips-contact-role-site",
+        "Safety": "ips-contact-role-safety",
+        "Billing": "ips-contact-role-billing",
+        "Estimating": "ips-contact-role-estimating",
+        "Purchasing": "ips-contact-role-other",
+        "Shipping": "ips-contact-role-other",
+        "Emergency": "ips-contact-role-safety",
+    }
+    cls = cls_map.get(role, "ips-contact-role-other")
+    return f'<span class="ips-contact-role-pill {cls}">{html.escape(role)}</span>'
+
+
+def _contact_select_key(contact_id: str) -> str:
+    return f"contact_select_{contact_id}"
+
+
+def _clear_contact_selection(contact_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_CONTACT_KEY] = None
+    st.session_state[SHOW_CONTACT_MODAL_KEY] = False
+    ids = list(contact_ids or [])
+    for cid in ids:
+        st.session_state[_contact_select_key(cid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("contact_select_"):
+            st.session_state[key] = False
+
+
+def _on_contact_checkbox_change(contact_id: str, all_contact_ids: list[str]) -> None:
+    key = _contact_select_key(contact_id)
+    if st.session_state.get(key):
+        for cid in all_contact_ids:
+            if cid != contact_id:
+                st.session_state[_contact_select_key(cid)] = False
+        st.session_state[SELECTED_CONTACT_KEY] = contact_id
+        st.session_state[SHOW_CONTACT_MODAL_KEY] = True
+        cache = st.session_state.get(_CONTACTS_CACHE_KEY) or {}
+        contact = cache.get(contact_id) if isinstance(cache, dict) else None
+        _open_contact_detail_modal(contact_id, contact if isinstance(contact, dict) else None)
+    elif st.session_state.get(SELECTED_CONTACT_KEY) == contact_id:
+        st.session_state[SELECTED_CONTACT_KEY] = None
+        st.session_state[SHOW_CONTACT_MODAL_KEY] = False
+
+
+def _render_custom_contacts_table(contacts: list[dict]) -> list[str]:
+    if not contacts:
+        st.session_state[_ALL_CONTACT_IDS_KEY] = []
+        return []
+
+    all_contact_ids = [
+        str(c.get("id") or "").strip() for c in contacts if str(c.get("id") or "").strip()
+    ]
+    st.session_state[_ALL_CONTACT_IDS_KEY] = all_contact_ids
+
+    with st.container(key="contacts_table_wrap"):
+        st.markdown('<div class="ips-contacts-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _CONTACT_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-contacts-header-row ips-contacts-cell">'
+                    f"{html.escape(label)}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        for contact in contacts:
+            ct_id = str(contact.get("id") or "").strip()
+            if not ct_id:
+                continue
+
+            name = _contact_display_name(contact)
+            title = str(contact.get("title") or "—").strip() or "—"
+            location = str(contact.get("location_name") or "—").strip() or "—"
+            role = _normalize_contact_role(contact.get("role_type"), contact.get("title"))
+            email = str(contact.get("email") or "—").strip() or "—"
+            phone = _contact_phone(contact)
+
+            cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_contact_select_key(ct_id),
+                    label_visibility="collapsed",
+                    on_change=_on_contact_checkbox_change,
+                    args=(ct_id, all_contact_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-contacts-name">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-contacts-cell">{html.escape(title)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-contacts-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(_contact_role_pill_html(role), unsafe_allow_html=True)
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-contacts-email ips-contacts-cell">{html.escape(email)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-contacts-muted ips-contacts-cell">{html.escape(phone)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_contact_ids
+
+
+def _render_contacts_table_block(contacts: list[dict], *, empty_caption: str) -> None:
+    if not contacts:
+        st.caption(empty_caption)
+        return
+    build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
+    st.caption(f"{len(contacts)} contact(s)")
+    _render_custom_contacts_table(contacts)
+    if st.session_state.get(SELECTED_CONTACT_KEY) and st.session_state.get(SHOW_CONTACT_MODAL_KEY):
+        _show_contact_detail_modal()
+
 
 
 def _clear_customers_detail_modal() -> None:
@@ -448,6 +651,9 @@ def _clear_location_detail_modal() -> None:
 
 
 def _clear_contact_detail_modal() -> None:
+    contact_ids = st.session_state.get(_ALL_CONTACT_IDS_KEY) or []
+    _clear_contact_selection([str(cid) for cid in contact_ids])
+    clear_edit_modes(_CT_MOD)
     clear_record_modal(
         table_key=_CONTACTS_TABLE_KEY,
         session_select_key=_CT_SEL,
@@ -798,12 +1004,25 @@ def _render_add_contact_form(customer: dict, *, locations: list[dict], demo: boo
         st.caption("Add contacts after saving this customer to Supabase.")
         return
 
-    loc_opts = [( _location_label(loc), str(loc.get("id") or "")) for loc in locations if str(loc.get("id") or "")]
+    loc_opts = [(_location_label(loc), str(loc.get("id") or "")) for loc in locations if str(loc.get("id") or "")]
+    hdr_l, hdr_r = st.columns([3, 1])
+    with hdr_l:
+        if not loc_opts:
+            st.info("Add a customer location before creating a new contact.")
+        elif not st.session_state.get(f"{pk}_open"):
+            st.caption("Use Add Contact to create a contact tied to a customer location.")
+    with hdr_r:
+        if loc_opts and st.button("+ Add Contact", key=f"{pk}_open_btn", use_container_width=True):
+            st.session_state[f"{pk}_open"] = True
+            st.rerun()
+
     if not loc_opts:
-        st.caption("Add a location before creating contacts.")
         return
 
-    with st.expander("Add Contact", expanded=bool(st.session_state.get(f"{pk}_open"))):
+    if not st.session_state.get(f"{pk}_open"):
+        return
+
+    with st.expander("Add Contact", expanded=True):
         labels = [label for label, _ in loc_opts]
         ids = [lid for _, lid in loc_opts]
         if f"{pk}_loc" not in st.session_state:
@@ -888,32 +1107,10 @@ def _render_customer_contacts_tab(customer: dict) -> None:
 
     _render_add_contact_form(customer, locations=locations, demo=demo)
 
-    if not contacts:
-        st.caption("No contacts match this filter.")
-        return
-
-    build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
-    render_clickable_table(
+    _render_contacts_table_block(
         contacts,
-        [
-            ("full_name", "NAME"),
-            ("title", "TITLE"),
-            ("location_name", "LOCATION"),
-            ("role_type", "ROLE"),
-            ("email", "EMAIL"),
-            ("phone", "PHONE"),
-            ("mobile", "MOBILE"),
-            ("is_primary", "PRIMARY"),
-            ("status", "STATUS"),
-        ],
-        _CONTACTS_TABLE_KEY,
-        row_id_key="id",
-        session_select_key=_CT_SEL,
-        format_cell=_list_display_cell,
-        click_caption=f"{len(contacts)} contact(s) · Click a row for contact details.",
-        on_row_selected=_open_contact_detail_modal,
+        empty_caption="No contacts match this filter.",
     )
-    show_modal_if_pending(_CONTACT_MODAL_KEY, _show_contact_detail_modal)
 
 
 def _render_customer_detail_tabs(customer: dict) -> None:
@@ -1172,29 +1369,10 @@ def _render_location_detail_tabs(location: dict, customer: dict | None) -> None:
         st.markdown(dialog_card_html("Site", overview_html), unsafe_allow_html=True)
 
     with tab_contacts:
-        if contacts:
-            build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
-            render_clickable_table(
-                contacts,
-                [
-                    ("full_name", "NAME"),
-                    ("title", "TITLE"),
-                    ("role_type", "ROLE"),
-                    ("email", "EMAIL"),
-                    ("phone", "PHONE"),
-                    ("is_primary", "PRIMARY"),
-                    ("status", "STATUS"),
-                ],
-                _CONTACTS_TABLE_KEY,
-                row_id_key="id",
-                session_select_key=_CT_SEL,
-                format_cell=_list_display_cell,
-                click_caption=f"{len(contacts)} contact(s) at this location.",
-                on_row_selected=_open_contact_detail_modal,
-            )
-            show_modal_if_pending(_CONTACT_MODAL_KEY, _show_contact_detail_modal)
-        else:
-            st.caption("No contacts assigned to this location.")
+        _render_contacts_table_block(
+            contacts,
+            empty_caption="No contacts assigned to this location.",
+        )
 
     with tab_jobs:
         _jobs_table(jobs_for_customer(cname), session_key=f"_loc_jobs_{lid}", location_id=lid)
@@ -1389,16 +1567,24 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
 
     with tab_overview:
         status = safe_value(contact.get("status"))
+        role = _normalize_contact_role(contact.get("role_type"), contact.get("title"))
+        loc_name = safe_value((location or {}).get("location_name") or contact.get("location_name"))
         overview_html = (
             f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Name', contact.get('full_name') or contact.get('contact_name'))}"
+            f"{detail_field_html('Full Name', contact.get('full_name') or contact.get('contact_name'))}"
             f"{detail_field_html('Title', contact.get('title'))}"
-            f"{detail_field_html('Role', contact.get('role_type'))}"
             f"{detail_field_html('Department', contact.get('department'))}"
+            f"{detail_field_html('Customer', cname)}"
+            f"{detail_field_html('Location', loc_name)}"
+            f'{detail_field_html("Role Type", role, html_value=_contact_role_pill_html(role))}'
             f"{detail_field_html('Email', contact.get('email'))}"
             f"{detail_field_html('Phone', contact.get('phone'))}"
             f"{detail_field_html('Mobile', contact.get('mobile'))}"
             f"{detail_field_html('Primary', _yes_dash(contact.get('is_primary')))}"
+            f"{detail_field_html('Billing', _yes_dash(contact.get('is_billing_contact')))}"
+            f"{detail_field_html('Site', _yes_dash(contact.get('is_site_contact')))}"
+            f"{detail_field_html('Safety', _yes_dash(contact.get('is_safety_contact')))}"
+            f"{detail_field_html('Estimating', _yes_dash(contact.get('is_estimating_contact')))}"
             f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
             f"</div>"
         )
@@ -1505,8 +1691,17 @@ def _show_contact_detail_modal() -> None:
         session_select_key=_CT_SEL,
     )
     if not contact:
-        sel = str(st.session_state.get(_CONTACT_MODAL_KEY) or st.session_state.get(_CT_SEL) or "").strip()
-        contact = get_customer_contact(sel) if sel else None
+        sel = str(
+            st.session_state.get(SELECTED_CONTACT_KEY)
+            or st.session_state.get(_CONTACT_MODAL_KEY)
+            or st.session_state.get(_CT_SEL)
+            or ""
+        ).strip()
+        cache = st.session_state.get(_CONTACTS_CACHE_KEY) or {}
+        if isinstance(cache, dict) and sel:
+            contact = cache.get(sel)
+        if not contact and sel:
+            contact = get_customer_contact(sel)
     if not contact:
         render_missing_record(_clear_contact_detail_modal, close_key="contact_modal_missing_close")
         return

@@ -97,29 +97,47 @@ def render_person_profile_header(
     )
 
 
+def render_dashboard_quick_actions(
+    actions: list[tuple[str, str, str]],
+    *,
+    key_prefix: str = "ips_dash_qa",
+    title: str = "Quick Actions",
+) -> None:
+    """
+    Compact dashboard quick-action card with a 4-column button grid.
+
+    Each item: (icon, label, nav_slug_or_empty).
+    """
+    with st.container(key="dashboard_quick_actions"):
+        st.markdown(
+            f'<div class="ips-quick-actions-header">'
+            f'<p class="ips-quick-actions-title">{html.escape(title)}</p>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        row_size = 4
+        for row_start in range(0, len(actions), row_size):
+            cols = st.columns(row_size, gap="small")
+            for j, col in enumerate(cols):
+                idx = row_start + j
+                if idx >= len(actions):
+                    break
+                icon, label, slug = actions[idx]
+                with col:
+                    if st.button(
+                        f"{icon}\n{label}",
+                        key=f"{key_prefix}_{idx}",
+                        use_container_width=True,
+                    ):
+                        if slug:
+                            st.session_state["ips_nav_page"] = slug
+                            st.rerun()
+
+
 def render_quick_actions_grid(
     actions: list[tuple[str, str, str]],
     *,
     key_prefix: str = "ips_qa",
 ) -> None:
-    """
-    Quick-action button grid (Dashboard style).
-
-    Each item: (icon, label, nav_slug_or_empty).
-    """
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    st.markdown(f'<{ot} class="ips-quick-actions">', unsafe_allow_html=True)
-    row_size = 4
-    for row_start in range(0, len(actions), row_size):
-        cols = st.columns(row_size)
-        for j, col in enumerate(cols):
-            idx = row_start + j
-            if idx >= len(actions):
-                break
-            icon, label, slug = actions[idx]
-            with col:
-                if st.button(f"{icon}  {label}", key=f"{key_prefix}_{idx}", use_container_width=True):
-                    if slug:
-                        st.session_state["ips_nav_page"] = slug
-                        st.rerun()
-    st.markdown(f"</{ct}>", unsafe_allow_html=True)
+    """Backward-compatible alias for ``render_dashboard_quick_actions``."""
+    render_dashboard_quick_actions(actions, key_prefix=key_prefix)

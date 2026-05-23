@@ -11,7 +11,7 @@ try:
     from app.auth import current_profile
     from app.components.cards import render_kpi_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
-    from app.components.headers import render_page_header, render_quick_actions_grid
+    from app.components.headers import render_dashboard_quick_actions, render_page_header
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.pages._core._data import (
@@ -29,7 +29,7 @@ except ImportError:
     from auth import current_profile  # type: ignore
     from components.cards import render_kpi_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
-    from components.headers import render_page_header, render_quick_actions_grid  # type: ignore
+    from components.headers import render_dashboard_quick_actions, render_page_header  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from pages._core._data import (  # type: ignore
@@ -193,8 +193,7 @@ def render() -> None:
     )
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
-    st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Quick Actions</p>', unsafe_allow_html=True)
-    render_quick_actions_grid(
+    render_dashboard_quick_actions(
         [
             ("💼", "New Job", "jobs"),
             ("📋", "New Estimate", "estimates"),
@@ -207,4 +206,3 @@ def render() -> None:
         ],
         key_prefix="ips_dash_qa",
     )
-    st.markdown(f"</{ot}>", unsafe_allow_html=True)
