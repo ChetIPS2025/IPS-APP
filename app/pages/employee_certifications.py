@@ -37,13 +37,19 @@ try:
     )
     from app.services.certification_helpers import (
         CERT_STATUS_VALUES,
+        can_view_certification_attachment,
+        cert_document_pill_html,
         cert_status_pill_html,
+        coerce_date,
         days_until_expiration,
     )
+    from app.services.certification_attachments_service import cert_has_attachment
     from app.services.employees_service import (
         clear_certifications_cache,
         create_employee_certification,
+        get_certification_attachment_url,
         update_employee_certification,
+        upload_certification_attachment,
     )
     from app.styles import inject_certifications_module_css
     from app.utils.constants import CERTIFICATION_TYPES
@@ -77,13 +83,19 @@ except ImportError:
     )
     from services.certification_helpers import (  # type: ignore
         CERT_STATUS_VALUES,
+        can_view_certification_attachment,
+        cert_document_pill_html,
         cert_status_pill_html,
+        coerce_date,
         days_until_expiration,
     )
+    from services.certification_attachments_service import cert_has_attachment  # type: ignore
     from services.employees_service import (  # type: ignore
         clear_certifications_cache,
         create_employee_certification,
+        get_certification_attachment_url,
         update_employee_certification,
+        upload_certification_attachment,
     )
     from styles import inject_certifications_module_css  # type: ignore
     from utils.constants import CERTIFICATION_TYPES  # type: ignore
@@ -93,10 +105,10 @@ _MODULE = "employee_certifications"
 _ALL_CERT_IDS_KEY = "_cert_page_all_ids"
 _STATUS_FILTERS = ["All Statuses", *CERT_STATUS_VALUES]
 
-_CERT_COLS_ALL = [0.35, 2.2, 1.5, 1.6, 1.8, 1.2, 1.2, 1.4]
-_CERT_HEADERS_ALL = ["", "EMPLOYEE", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS"]
-_CERT_COLS_EMP = [0.35, 2.0, 1.8, 2.0, 1.3, 1.3, 1.4]
-_CERT_HEADERS_EMP = ["", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS"]
+_CERT_COLS_ALL = [0.35, 2.0, 1.4, 1.5, 1.6, 1.1, 1.1, 1.2, 0.9]
+_CERT_HEADERS_ALL = ["", "EMPLOYEE", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS", "DOCUMENT"]
+_CERT_COLS_EMP = [0.35, 1.8, 1.6, 1.8, 1.2, 1.2, 1.2, 0.9]
+_CERT_HEADERS_EMP = ["", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS", "DOCUMENT"]
 
 
 def _cert_select_key(cert_id: str, *, prefix: str = "") -> str:
@@ -151,15 +163,139 @@ def _filter_certs(rows: list[dict], *, q: str, status: str, cert_type: str) -> l
     return out
 
 
-def _as_date(value: object):
-    if isinstance(value, date):
-        return value
-    if value in (None, ""):
-        return None
+def _current_profile() -> dict:
     try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    prof = current_profile()
+    return prof if isinstance(prof, dict) else {}
+
+
+def _current_employee_id() -> str:
+    return str(_current_profile().get("employee_id") or "").strip()
+
+
+def _current_user_id() -> str | None:
+    uid = str(_current_profile().get("id") or "").strip()
+    return uid or None
+
+
+def _current_role() -> str:
+    try:
+        from app.auth import current_role
+    except ImportError:
+        from auth import current_role  # type: ignore
+    return current_role()
+
+
+def _can_view_cert_attachment(cert: dict) -> bool:
+    return can_view_certification_attachment(
+        _current_role(),
+        cert,
+        current_employee_id=_current_employee_id(),
+    )
+
+
+def _show_doc_key(cert_id: str, *, prefix: str = "") -> str:
+    return f"{prefix}show_cert_doc_{cert_id}"
+
+
+def _sanitize_cert_date_state(key: str, raw: object) -> None:
+    if key not in st.session_state:
+        coerced = coerce_date(raw)
+        if coerced is not None:
+            st.session_state[key] = coerced
+        return
+    val = st.session_state.get(key)
+    if isinstance(val, date):
+        return
+    coerced = coerce_date(val if val not in (None, "") else raw)
+    if coerced is not None:
+        st.session_state[key] = coerced
+    else:
+        st.session_state.pop(key, None)
+
+
+def _attachment_view_label(cert: dict) -> str:
+    mime = str(cert.get("attachment_mime_type") or "").lower()
+    if mime.startswith("image/"):
+        return "View Image"
+    return "View Document"
+
+
+def _render_attachment_preview(cert: dict, *, key_prefix: str = "") -> None:
+    cid = str(cert.get("id") or "")
+    if not _can_view_cert_attachment(cert):
+        st.caption("You do not have permission to view this attachment.")
+        return
+    url = get_certification_attachment_url(cert)
+    if not url:
+        st.warning("Storage bucket not configured. Create certification-documents bucket in Supabase.")
+        return
+
+    mime = str(cert.get("attachment_mime_type") or "").lower()
+    st.markdown('<div class="ips-attachment-preview">', unsafe_allow_html=True)
+    if mime.startswith("image/"):
+        st.image(url, use_container_width=True)
+    elif mime == "application/pdf" or url.lower().endswith(".pdf"):
+        st.markdown(
+            f'<iframe src="{html.escape(url, quote=True)}" title="Certification PDF"></iframe>',
+            unsafe_allow_html=True,
+        )
+        st.link_button("Open PDF", url, key=f"{key_prefix}cert_pdf_open_{cid}")
+    else:
+        st.link_button("Download file", url, key=f"{key_prefix}cert_file_open_{cid}")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_attachment_section(
+    cert: dict,
+    *,
+    rk: str,
+    key_prefix: str = "",
+    edit_mode: bool = False,
+) -> None:
+    cid = str(cert.get("id") or "")
+    has_attachment = cert_has_attachment(cert)
+    fname = str(cert.get("attachment_file_name") or "").strip()
+    uploaded_at = str(cert.get("attachment_uploaded_at") or "")[:19].replace("T", " ")
+
+    st.markdown('<div class="ips-attachment-card">', unsafe_allow_html=True)
+
+    if edit_mode:
+        st.file_uploader(
+            "Upload certification image or document",
+            type=["png", "jpg", "jpeg", "webp", "pdf"],
+            key=f"{key_prefix}cert_upload_{cid or rk}",
+        )
+        st.caption("Upload PNG, JPG, WEBP, or PDF. File is saved when you click Save Changes.")
+        if has_attachment and fname:
+            st.markdown(
+                f'<p class="ips-attachment-file-name">Current file: {html.escape(fname)}</p>',
+                unsafe_allow_html=True,
+            )
+    elif has_attachment:
+        if not _can_view_cert_attachment(cert):
+            st.caption("Attachment on file. View restricted for your role.")
+        else:
+            label = _attachment_view_label(cert)
+            toggle_key = _show_doc_key(cid, prefix=key_prefix)
+            if st.button(label, key=f"{key_prefix}view_cert_doc_{cid}"):
+                st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
+            if fname:
+                st.markdown(
+                    f'<p class="ips-attachment-file-name">{html.escape(fname)}</p>',
+                    unsafe_allow_html=True,
+                )
+            if uploaded_at:
+                st.caption(f"Uploaded {uploaded_at}")
+            if st.session_state.get(toggle_key, False):
+                _render_attachment_preview(cert, key_prefix=key_prefix)
+    else:
+        st.caption("No certification document uploaded.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _employee_options() -> tuple[list[str], dict[str, str]]:
@@ -212,6 +348,7 @@ def _render_certifications_table(
             expires = fmt_date(cert.get("expiration_date"))
             status = str(cert.get("status") or "—")
             employee_name = str(cert.get("employee_name") or "—")
+            attached = cert_has_attachment(cert)
 
             cols = st.columns(col_ratios, gap="small", vertical_alignment="center")
 
@@ -267,6 +404,11 @@ def _render_certifications_table(
                     f'<div class="ips-certifications-cell">{cert_status_pill_html(status)}</div>',
                     unsafe_allow_html=True,
                 )
+            with cols[col_idx + 6]:
+                st.markdown(
+                    f'<div class="ips-certifications-cell">{cert_document_pill_html(attached)}</div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -284,8 +426,8 @@ def _seed_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict[s
     st.session_state[f"cert_edit_type_{rk}"] = str(cert.get("cert_type") or CERTIFICATION_TYPES[0])
     st.session_state[f"cert_edit_num_{rk}"] = str(cert.get("cert_number") or "")
     st.session_state[f"cert_edit_issuer_{rk}"] = str(cert.get("issuer") or "")
-    st.session_state[f"cert_edit_issue_{rk}"] = _as_date(cert.get("issue_date"))
-    st.session_state[f"cert_edit_exp_{rk}"] = _as_date(cert.get("expiration_date"))
+    _sanitize_cert_date_state(f"cert_edit_issue_{rk}", cert.get("issue_date"))
+    _sanitize_cert_date_state(f"cert_edit_expiration_{rk}", cert.get("expiration_date"))
     st.session_state[f"cert_edit_notes_{rk}"] = str(cert.get("notes") or "")
 
 
@@ -295,6 +437,13 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
     if f"cert_edit_type_{rk}" not in st.session_state:
         _seed_cert_edit_form(cert, employee_names, emp_opts)
 
+    issue_key = f"cert_edit_issue_{rk}"
+    exp_key = f"cert_edit_expiration_{rk}"
+    _sanitize_cert_date_state(issue_key, cert.get("issue_date"))
+    _sanitize_cert_date_state(exp_key, cert.get("expiration_date"))
+    issue_date_value = coerce_date(st.session_state.get(issue_key) or cert.get("issue_date"))
+    expiration_date_value = coerce_date(st.session_state.get(exp_key) or cert.get("expiration_date"))
+
     render_edit_form_header("Edit Certification")
     ec1, ec2 = st.columns(2)
     with ec1:
@@ -303,11 +452,18 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
         st.text_input("Certification Number", key=f"cert_edit_num_{rk}")
         st.text_input("Issuing Organization", key=f"cert_edit_issuer_{rk}")
     with ec2:
-        st.date_input("Issue Date", key=f"cert_edit_issue_{rk}")
-        st.date_input("Expiration Date", key=f"cert_edit_exp_{rk}")
-        st.file_uploader("Attachment", key=f"cert_edit_file_{rk}", disabled=True)
-        st.caption("File upload will be enabled in a later phase.")
+        st.date_input(
+            "Issue Date",
+            value=issue_date_value if issue_date_value is not None else date.today(),
+            key=issue_key,
+        )
+        st.date_input(
+            "Expiration Date",
+            value=expiration_date_value if expiration_date_value is not None else date.today(),
+            key=exp_key,
+        )
     st.text_area("Notes", key=f"cert_edit_notes_{rk}", height=80)
+    _render_attachment_section(cert, rk=rk, edit_mode=True)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -325,8 +481,8 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
             "cert_type": st.session_state.get(f"cert_edit_type_{rk}"),
             "cert_number": st.session_state.get(f"cert_edit_num_{rk}"),
             "issuer": st.session_state.get(f"cert_edit_issuer_{rk}"),
-            "issue_date": st.session_state.get(f"cert_edit_issue_{rk}"),
-            "expiration_date": st.session_state.get(f"cert_edit_exp_{rk}"),
+            "issue_date": st.session_state.get(issue_key),
+            "expiration_date": st.session_state.get(exp_key),
             "notes": st.session_state.get(f"cert_edit_notes_{rk}"),
         }
         row_id = None if is_demo_id(cid) else cid
@@ -334,18 +490,32 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
             result = update_employee_certification(row_id, ui)
         else:
             result = create_employee_certification(ui)
-        if result.ok:
-            clear_certifications_cache()
-            set_view_mode(_MODULE, rk)
-            st.success("Certification saved.")
-            st.rerun()
-        else:
+        if not result.ok:
             st.error(result.error or "Could not save certification.")
+            return
+
+        uploaded_file = st.session_state.get(f"cert_upload_{cid or rk}")
+        if uploaded_file is not None and row_id:
+            upload_result = upload_certification_attachment(
+                row_id,
+                uploaded_file,
+                uploaded_by=_current_user_id(),
+            )
+            if not upload_result.ok:
+                st.warning(upload_result.error or "Certification saved, but attachment upload failed.")
+            else:
+                clear_certifications_cache()
+
+        clear_certifications_cache()
+        set_view_mode(_MODULE, rk)
+        st.success("Certification saved.")
+        st.rerun()
 
 
-def _render_cert_detail_tabs(cert: dict) -> None:
+def _render_cert_detail_tabs(cert: dict, *, key_prefix: str = "") -> None:
     emp = get_employee(str(cert.get("employee_id") or ""))
     status = str(cert.get("status") or "")
+    rk = record_session_key(cert, "id")
 
     tab_overview, tab_employee, tab_attachment, tab_notes, tab_activity = st.tabs(
         ["Overview", "Employee", "Attachment", "Notes", "Activity"]
@@ -361,10 +531,12 @@ def _render_cert_detail_tabs(cert: dict) -> None:
             f"{detail_field_html('Expiration Date', fmt_date(cert.get('expiration_date')))}"
             f'{detail_field_html("Status", status, html_value=cert_status_pill_html(status))}'
             f"{detail_field_html('Days Until Expiration', days_until_expiration(cert.get('expiration_date')))}"
-            f"{detail_field_html('Notes', cert.get('notes') or '—')}"
+            f"{detail_field_html('Employee', cert.get('employee_name'))}"
             f"</div>"
         )
         st.markdown(dialog_card_html("Certification", overview_html), unsafe_allow_html=True)
+        st.markdown("**Attachment**")
+        _render_attachment_section(cert, rk=rk, key_prefix=key_prefix, edit_mode=False)
 
     with tab_employee:
         if emp:
@@ -382,11 +554,7 @@ def _render_cert_detail_tabs(cert: dict) -> None:
             st.caption("Employee record not found.")
 
     with tab_attachment:
-        path = str(cert.get("attachment_path") or "").strip()
-        if path:
-            st.markdown(f"Attachment: `{html.escape(path)}`")
-        else:
-            placeholder_html("Attachment upload and preview will be enabled in a later phase.")
+        _render_attachment_section(cert, rk=rk, key_prefix=key_prefix, edit_mode=False)
 
     with tab_notes:
         notes = str(cert.get("notes") or "").strip() or "No notes entered."
@@ -437,7 +605,7 @@ def render_certification_detail_dialog(
     if edit_mode:
         _render_cert_edit_form(cert, employee_names, emp_opts)
     else:
-        _render_cert_detail_tabs(cert)
+        _render_cert_detail_tabs(cert, key_prefix=session_prefix)
 
 
 def _clear_cert_detail_dialog() -> None:
@@ -506,8 +674,11 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
     with c2:
         st.date_input("Issue Date", key="cert_new_issue")
         st.date_input("Expiration Date", key="cert_new_exp")
-        st.file_uploader("Attachment", key="cert_new_file", disabled=True)
-        st.caption("File upload will be enabled in a later phase.")
+    st.file_uploader(
+        "Upload certification image or document",
+        type=["png", "jpg", "jpeg", "webp", "pdf"],
+        key="cert_new_file",
+    )
     st.text_area("Notes", key="cert_new_notes", height=80)
 
     bc1, bc2 = st.columns(2)
@@ -524,6 +695,18 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
             }
             result = create_employee_certification(ui)
             if result.ok:
+                new_id = ""
+                if isinstance(result.data, dict):
+                    new_id = str(result.data.get("id") or "").strip()
+                uploaded_file = st.session_state.get("cert_new_file")
+                if uploaded_file is not None and new_id and not is_demo_id(new_id):
+                    upload_result = upload_certification_attachment(
+                        new_id,
+                        uploaded_file,
+                        uploaded_by=_current_user_id(),
+                    )
+                    if not upload_result.ok:
+                        st.warning(upload_result.error or "Certification saved, but attachment upload failed.")
                 clear_certifications_cache()
                 st.session_state["ips_cert_form_open"] = False
                 st.success("Certification saved.")

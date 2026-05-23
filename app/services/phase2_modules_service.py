@@ -373,6 +373,11 @@ def normalize_cert(row: dict[str, Any], employee_name: str = "") -> dict[str, An
         "expiration_date": str(row.get("expiration_date") or "")[:10],
         "status": str(row.get("status") or "Active"),
         "attachment_path": str(row.get("attachment_path") or ""),
+        "attachment_url": str(row.get("attachment_url") or ""),
+        "attachment_file_name": str(row.get("attachment_file_name") or ""),
+        "attachment_mime_type": str(row.get("attachment_mime_type") or ""),
+        "attachment_uploaded_at": str(row.get("attachment_uploaded_at") or "")[:19],
+        "attachment_uploaded_by": str(row.get("attachment_uploaded_by") or ""),
         "notes": str(row.get("notes") or ""),
         "created_at": str(row.get("created_at") or "")[:19],
         "updated_at": str(row.get("updated_at") or "")[:19],
@@ -787,7 +792,22 @@ def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> Serv
         "expiration_date": ui.get("expiration_date") or None,
         "notes": ui.get("notes") or "",
         "attachment_path": ui.get("attachment_path") or "",
+        "attachment_url": ui.get("attachment_url") or "",
+        "attachment_file_name": ui.get("attachment_file_name") or "",
+        "attachment_mime_type": ui.get("attachment_mime_type") or "",
+        "attachment_uploaded_at": ui.get("attachment_uploaded_at") or None,
+        "attachment_uploaded_by": ui.get("attachment_uploaded_by") or None,
     }
+    for key in (
+        "attachment_path",
+        "attachment_url",
+        "attachment_file_name",
+        "attachment_mime_type",
+        "attachment_uploaded_at",
+        "attachment_uploaded_by",
+    ):
+        if key not in ui:
+            payload.pop(key, None)
     manual_status = str(ui.get("status") or "").strip()
     if manual_status == "Not Required":
         payload["status"] = "Not Required"

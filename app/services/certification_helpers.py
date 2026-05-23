@@ -22,14 +22,23 @@ CERT_STATUS_VALUES = (
 
 
 def _parse_date(value: object) -> date | None:
-    if isinstance(value, date):
+    return coerce_date(value)
+
+
+def coerce_date(value: object) -> date | None:
+    if value is None or value == "" or value == "—":
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
         return value
-    if value in (None, ""):
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d", "%b %d, %Y", "%m/%d/%Y"):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                pass
+    return None
 
 
 def compute_certification_status(row: dict[str, Any]) -> str:
@@ -92,3 +101,35 @@ def certification_alerts_counts(certs: list[dict[str, Any]]) -> tuple[int, int]:
         elif status == "Expiring Soon":
             expiring += 1
     return expired, expiring
+
+
+def cert_document_pill_html(attached: bool) -> str:
+    if attached:
+        return '<span class="ips-cert-doc-pill ips-cert-doc-attached">Attached</span>'
+    return '<span class="ips-cert-doc-empty">—</span>'
+
+
+def can_view_certification_attachment(
+    role: str,
+    cert: dict[str, Any],
+    *,
+    current_employee_id: str = "",
+) -> bool:
+    """Gate attachment view/download by role until storage RLS is fully enforced."""
+    try:
+        from app.utils.permissions import can_view_field_certifications, normalize_role
+    except ImportError:
+        from utils.permissions import can_view_field_certifications, normalize_role  # type: ignore
+
+    norm = normalize_role(role)
+    if norm == "admin":
+        return True
+    if norm == "viewer":
+        return False
+    if can_view_field_certifications(role):
+        return True
+    if norm == "employee":
+        cert_emp = str(cert.get("employee_id") or "").strip()
+        viewer_emp = str(current_employee_id or "").strip()
+        return bool(cert_emp and viewer_emp and cert_emp == viewer_emp)
+    return False

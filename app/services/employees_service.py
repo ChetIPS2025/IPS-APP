@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.certification_attachments_service import (
+    cert_has_attachment,
+    get_certification_attachment_url,
+    upload_certification_attachment,
+)
 from app.services.phase2_modules_service import (
     delete_certification,
     delete_employee,
@@ -27,6 +32,7 @@ __all__ = [
     "delete_certification",
     "delete_employee_certification",
     "delete_employee",
+    "get_certification_attachment_url",
     "get_employee_certifications",
     "list_all_certifications",
     "list_certifications",
@@ -36,6 +42,7 @@ __all__ = [
     "save_certification",
     "save_employee",
     "update_employee_certification",
+    "upload_certification_attachment",
 ]
 
 

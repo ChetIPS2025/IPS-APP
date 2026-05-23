@@ -1151,6 +1151,63 @@ def inject_certifications_module_css() -> None:
   min-height: 24px !important;
   margin: 0 !important;
 }}
+.ips-cert-doc-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-cert-doc-attached {{
+  background: #e0f2fe;
+  color: #0369a1;
+}}
+.ips-cert-doc-empty {{
+  color: #94a3b8;
+  font-size: 13px;
+}}
+.ips-attachment-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-top: 0.35rem;
+}}
+.ips-attachment-file-name {{
+  font-size: 0.8125rem;
+  color: #475569;
+  margin: 0.35rem 0 0;
+}}
+.ips-attachment-actions {{
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}}
+.ips-attachment-preview {{
+  margin-top: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+  max-height: 600px;
+}}
+.ips-attachment-preview iframe {{
+  width: 100%;
+  height: 560px;
+  border: 0;
+  background: #ffffff;
+}}
+.ips-attachment-preview img {{
+  display: block;
+  width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+}}
 </style>
 """,
         unsafe_allow_html=True,
