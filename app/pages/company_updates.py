@@ -8,11 +8,11 @@ from datetime import datetime
 import streamlit as st
 
 try:
-    from app.components.cards import render_metric_card
-    from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -20,6 +20,7 @@ try:
         get_modal_record,
         is_edit_mode,
         open_record_modal,
+        placeholder_html,
         record_session_key,
         render_edit_form_header,
         render_modal_edit_button,
@@ -28,25 +29,20 @@ try:
         render_modal_shell,
         render_missing_record,
         render_save_cancel_actions,
+        set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
     )
-    from app.components.tabs import render_tabs
-    from app.pages._core._data import (
-        demo_update_metrics,
-        load_company_updates,
-        load_upcoming_events,
-        lookup_options,
-        persist_company_update,
-    )
+    from app.pages._core._data import load_company_updates, load_employees, persist_company_update
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.styles import inject_updates_module_css
+    from app.utils.formatting import fmt_date
 except ImportError:
-    from components.cards import render_metric_card  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -54,6 +50,7 @@ except ImportError:
         get_modal_record,
         is_edit_mode,
         open_record_modal,
+        placeholder_html,
         record_session_key,
         render_edit_form_header,
         render_modal_edit_button,
@@ -62,54 +59,269 @@ except ImportError:
         render_modal_shell,
         render_missing_record,
         render_save_cancel_actions,
+        set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
     )
-    from components.tabs import render_tabs  # type: ignore
-    from pages._core._data import (  # type: ignore
-        demo_update_metrics,
-        load_company_updates,
-        load_upcoming_events,
-        lookup_options,
-        persist_company_update,
-    )
+    from pages._core._data import load_company_updates, load_employees, persist_company_update  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from styles import inject_updates_module_css  # type: ignore
+    from utils.formatting import fmt_date  # type: ignore
 
-_TAB_KEY = "ips_company_updates_cat"
-_SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
 _TABLE_KEY = "company_updates_list"
 _MODAL_KEY = "ips_cu_detail_modal_id"
 _CACHE_KEY = "_ips_cu_modal_by_id"
-
-_QUICK_LINKS = [
-    ("📘", "Company Handbook"),
-    ("🦺", "Safety Procedures"),
-    ("👥", "HR Policies"),
-    ("🎓", "Training Portal"),
+SELECTED_UPDATE_KEY = "selected_update_id"
+SHOW_UPDATE_MODAL_KEY = "show_update_detail_modal"
+_ALL_UPDATE_IDS_KEY = "_ips_updates_visible_ids"
+_UPD_COLS = [0.35, 3.2, 1.5, 1.6, 1.2, 1.4, 1.7, 1.3]
+_UPD_HEADERS = [
+    "",
+    "TITLE",
+    "CATEGORY",
+    "AUDIENCE",
+    "STATUS",
+    "EVENT DATE",
+    "CREATED BY",
+    "CREATED",
 ]
+_CATEGORY_FILTER_OPTS = [
+    "All Categories",
+    "Announcement",
+    "Safety Alert",
+    "Event",
+    "HR Update",
+    "Project Update",
+    "General",
+]
+_STATUS_FILTER_OPTS = ["All Statuses", "Draft", "Published", "Scheduled", "Archived"]
+_AUDIENCE_FILTER_OPTS = [
+    "All Audiences",
+    "All",
+    "Admin",
+    "Supervisors",
+    "Employees",
+    "Field Crew",
+    "Office",
+    "Management",
+]
+_CATEGORY_EDIT_OPTS = [
+    "Announcement",
+    "Safety Alert",
+    "Event",
+    "HR Update",
+    "Project Update",
+    "General",
+]
+_STATUS_EDIT_OPTS = ["Draft", "Published", "Scheduled", "Archived"]
+_SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
+
+
+def _user_name_lookup() -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for emp in load_employees():
+        eid = str(emp.get("id") or "").strip()
+        name = str(emp.get("name") or "").strip()
+        if eid and name:
+            lookup[eid] = name
+        email = str(emp.get("email") or "").strip().lower()
+        if email and name:
+            lookup[email] = name
+    return lookup
+
+
+def _normalize_update_category(raw: object) -> str:
+    s = str(raw or "").strip().lower()
+    if s in ("", "general"):
+        return "General"
+    if "announcement" in s:
+        return "Announcement"
+    if "safety" in s:
+        return "Safety Alert"
+    if "event" in s:
+        return "Event"
+    if "hr" in s:
+        return "HR Update"
+    if "project" in s:
+        return "Project Update"
+    return "General"
+
+
+def _normalize_update_status(raw: object, *, is_active: object = None) -> str:
+    s = str(raw or "").strip().lower()
+    if s in ("published", "active"):
+        return "Published"
+    if s == "draft":
+        return "Draft"
+    if s == "scheduled":
+        return "Scheduled"
+    if s in ("archived", "inactive"):
+        return "Archived"
+    if is_active is False:
+        return "Archived"
+    return "Published"
+
+
+def _normalize_audience(raw: object) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return "All"
+    known = {
+        "all": "All",
+        "admin": "Admin",
+        "supervisors": "Supervisors",
+        "supervisor": "Supervisors",
+        "employees": "Employees",
+        "employee": "Employees",
+        "field crew": "Field Crew",
+        "field": "Field Crew",
+        "office": "Office",
+        "management": "Management",
+    }
+    return known.get(s.lower(), s)
+
+
+def _resolve_created_by(row: dict, lookup: dict[str, str]) -> str:
+    raw = row.get("created_by_name") or row.get("created_by") or row.get("author") or row.get("author_name")
+    if raw is None:
+        return "—"
+    text = str(raw).strip()
+    if not text:
+        return "—"
+    if text in lookup:
+        return lookup[text]
+    if len(text) >= 32 and text.count("-") >= 4:
+        return lookup.get(text, "—")
+    return text
+
+
+def _fmt_event_date(row: dict) -> str:
+    raw = row.get("event_date") or row.get("event_at") or row.get("event_datetime")
+    if not raw and _normalize_update_category(row.get("category")) == "Event":
+        raw = row.get("date")
+    if not raw:
+        return "—"
+    text = str(raw).strip()
+    if not text:
+        return "—"
+    if "T" in text or " " in text:
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            return dt.strftime("%b %d, %Y %I:%M %p").lstrip("0").replace(" 0", " ")
+        except ValueError:
+            pass
+    return fmt_date(text)
+
+
+def _fmt_created_date(row: dict) -> str:
+    return fmt_date(row.get("created_at") or row.get("created_date") or row.get("date"))
+
+
+def _build_update_row(row: dict, lookup: dict[str, str]) -> dict:
+    category = _normalize_update_category(row.get("category"))
+    status = _normalize_update_status(row.get("status"), is_active=row.get("is_active"))
+    audience = _normalize_audience(row.get("audience") or row.get("visibility"))
+    is_pinned = bool(row.get("pinned") or row.get("is_pinned"))
+    return {
+        **row,
+        "title": str(row.get("title") or row.get("subject") or "Untitled Update"),
+        "category": category,
+        "audience": audience,
+        "status": status,
+        "event_date_display": _fmt_event_date(row),
+        "created_by_display": _resolve_created_by(row, lookup),
+        "created_display": _fmt_created_date(row),
+        "is_pinned": is_pinned,
+    }
+
+
+def _category_pill_html(category: str) -> str:
+    cls_map = {
+        "Announcement": "ips-update-category-announcement",
+        "Safety Alert": "ips-update-category-safety-alert",
+        "Event": "ips-update-category-event",
+        "HR Update": "ips-update-category-hr-update",
+        "Project Update": "ips-update-category-project-update",
+        "General": "ips-update-category-general",
+    }
+    cls = cls_map.get(category, "ips-update-category-general")
+    return f'<span class="ips-update-pill {cls}">{html.escape(category)}</span>'
+
+
+def _status_pill_html(status: str) -> str:
+    cls_map = {
+        "Published": "ips-update-status-published",
+        "Draft": "ips-update-status-draft",
+        "Scheduled": "ips-update-status-scheduled",
+        "Archived": "ips-update-status-archived",
+    }
+    cls = cls_map.get(status, "ips-update-status-published")
+    return f'<span class="ips-update-pill {cls}">{html.escape(status)}</span>'
+
+
+def _title_cell_html(title: str, is_pinned: bool) -> str:
+    pinned = '<span class="ips-update-pinned">Pinned</span>' if is_pinned else ""
+    return f'<div class="ips-updates-title">{html.escape(title)}{pinned}</div>'
 
 
 def _sort_updates(rows: list[dict], sort: str) -> list[dict]:
     out = list(rows)
     if sort == "Oldest First":
-        return sorted(out, key=lambda u: str(u.get("date") or ""))
+        return sorted(out, key=lambda u: str(u.get("created_display") or u.get("date") or ""))
     if sort == "Title A–Z":
         return sorted(out, key=lambda u: str(u.get("title") or "").lower())
-    return sorted(out, key=lambda u: str(u.get("date") or ""), reverse=True)
+    return sorted(
+        out,
+        key=lambda u: str(u.get("created_display") or u.get("date") or ""),
+        reverse=True,
+    )
 
 
-def _event_date_block(iso: str) -> str:
-    try:
-        d = datetime.strptime(str(iso)[:10], "%Y-%m-%d")
-        return f"{d.strftime('%b').upper()}<br>{d.day}"
-    except ValueError:
-        return "—"
+def _update_select_key(update_id: str) -> str:
+    return f"update_select_{update_id}"
 
 
-def _clear_cu_modal() -> None:
+def _clear_update_selection(update_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_UPDATE_KEY] = None
+    st.session_state[SHOW_UPDATE_MODAL_KEY] = False
+    ids = list(update_ids or [])
+    for uid in ids:
+        st.session_state[_update_select_key(uid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("update_select_"):
+            st.session_state[key] = False
+
+
+def _on_update_checkbox_change(update_id: str, all_update_ids: list[str]) -> None:
+    key = _update_select_key(update_id)
+    if st.session_state.get(key):
+        for uid in all_update_ids:
+            if uid != update_id:
+                st.session_state[_update_select_key(uid)] = False
+        st.session_state[SELECTED_UPDATE_KEY] = update_id
+        st.session_state[SHOW_UPDATE_MODAL_KEY] = True
+        st.session_state[_MODAL_KEY] = update_id
+        cache = st.session_state.get(_CACHE_KEY) or {}
+        update = cache.get(update_id) if isinstance(cache, dict) else None
+        open_record_modal(
+            update_id,
+            update if isinstance(update, dict) else None,
+            session_select_key=_SEL,
+            modal_key=_MODAL_KEY,
+            module=_MODULE,
+            id_fields=("id",),
+        )
+    elif st.session_state.get(SELECTED_UPDATE_KEY) == update_id:
+        st.session_state[SELECTED_UPDATE_KEY] = None
+        st.session_state[SHOW_UPDATE_MODAL_KEY] = False
+
+
+def _clear_update_modal() -> None:
+    update_ids = st.session_state.get(_ALL_UPDATE_IDS_KEY) or []
+    _clear_update_selection([str(uid) for uid in update_ids])
+    clear_edit_modes(_MODULE)
     clear_record_modal(
         table_key=_TABLE_KEY,
         session_select_key=_SEL,
@@ -118,47 +330,109 @@ def _clear_cu_modal() -> None:
     )
 
 
-def _open_cu_modal(update_id: str, update: dict | None = None) -> None:
-    open_record_modal(
-        update_id,
-        update,
-        session_select_key=_SEL,
-        modal_key=_MODAL_KEY,
-        module=_MODULE,
-        id_fields=("id",),
-    )
+def _status_to_active(status: str) -> bool:
+    return status not in ("Archived", "Draft")
 
 
 def _seed_cu_edit_form(update: dict) -> None:
     rk = record_session_key(update, "id")
     st.session_state[f"cu_edit_title_{rk}"] = str(update.get("title") or "")
     st.session_state[f"cu_edit_body_{rk}"] = str(update.get("body") or "")
-    st.session_state[f"cu_edit_cat_{rk}"] = str(update.get("category") or lookup_options("update_categories")[0])
-    st.session_state[f"cu_edit_pinned_{rk}"] = bool(update.get("pinned"))
+    st.session_state[f"cu_edit_cat_{rk}"] = _normalize_update_category(update.get("category"))
+    st.session_state[f"cu_edit_status_{rk}"] = _normalize_update_status(
+        update.get("status"),
+        is_active=update.get("is_active"),
+    )
+    st.session_state[f"cu_edit_audience_{rk}"] = _normalize_audience(
+        update.get("audience") or update.get("visibility")
+    )
+    st.session_state[f"cu_edit_event_date_{rk}"] = str(
+        update.get("event_date") or update.get("date") or ""
+    )[:10]
+    st.session_state[f"cu_edit_pinned_{rk}"] = bool(update.get("pinned") or update.get("is_pinned"))
+    st.session_state[f"cu_edit_notes_{rk}"] = str(update.get("notes") or "")
 
 
 def _render_cu_view_tabs(update: dict) -> None:
-    tab_message, tab_details = st.tabs(["Message", "Details"])
-    with tab_message:
-        body = str(update.get("body") or "").strip() or "No message body."
-        body_html = (
-            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-            f"{html.escape(body)}"
-            f"</p>"
+    category = _normalize_update_category(update.get("category"))
+    status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
+    audience = _normalize_audience(update.get("audience") or update.get("visibility"))
+    is_pinned = bool(update.get("pinned") or update.get("is_pinned"))
+    body = str(update.get("body") or "").strip() or "No message body."
+    body_html = (
+        '<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+        f"{html.escape(body)}"
+        "</p>"
+    )
+
+    tab_overview, tab_audience, tab_attachments, tab_event, tab_read, tab_notes, tab_activity = st.tabs(
+        ["Overview", "Audience", "Attachments", "Event Details", "Read Status", "Notes", "Activity"]
+    )
+
+    with tab_overview:
+        overview_html = (
+            '<div class="ips-detail-grid">'
+            f"{detail_field_html('Title', update.get('title'))}"
+            f'{detail_field_html("Category", category, html_value=_category_pill_html(category))}'
+            f'{detail_field_html("Status", status, html_value=_status_pill_html(status))}'
+            f"{detail_field_html('Created By', update.get('created_by_display'))}"
+            f"{detail_field_html('Created', update.get('created_display'))}"
+            f"{detail_field_html('Pinned', 'Yes' if is_pinned else 'No')}"
+            "</div>"
         )
-        st.markdown(dialog_card_html("Announcement", body_html), unsafe_allow_html=True)
-    with tab_details:
-        pinned = "Yes" if update.get("pinned") else "No"
-        new_flag = "Yes" if update.get("is_new") else "No"
-        details_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Category', update.get('category'))}"
-            f"{detail_field_html('Date', update.get('date'))}"
-            f"{detail_field_html('Pinned', pinned)}"
-            f"{detail_field_html('Unread', new_flag)}"
-            f"</div>"
+        st.markdown(dialog_card_html("Overview", overview_html), unsafe_allow_html=True)
+        st.markdown(dialog_card_html("Content", body_html), unsafe_allow_html=True)
+
+    with tab_audience:
+        audience_html = (
+            '<div class="ips-detail-grid">'
+            f"{detail_field_html('Audience', audience)}"
+            f"{detail_field_html('Departments / Roles', update.get('departments') or '—')}"
+            "</div>"
         )
-        st.markdown(dialog_card_html("Details", details_html), unsafe_allow_html=True)
+        st.markdown(dialog_card_html("Audience", audience_html), unsafe_allow_html=True)
+
+    with tab_attachments:
+        placeholder_html("Linked documents and attachments will appear here when connected to Supabase.")
+
+    with tab_event:
+        if category == "Event" or update.get("event_date") or update.get("event_at"):
+            event_html = (
+                '<div class="ips-detail-grid">'
+                f"{detail_field_html('Event Date', update.get('event_date_display'))}"
+                f"{detail_field_html('Location', update.get('event_location') or update.get('location') or '—')}"
+                "</div>"
+            )
+            st.markdown(dialog_card_html("Event Details", event_html), unsafe_allow_html=True)
+        else:
+            st.caption("No event details for this update.")
+
+    with tab_read:
+        read_flag = "Unread" if update.get("is_new") else "Read"
+        st.markdown(
+            dialog_card_html(
+                "Read Status",
+                f'<div class="ips-detail-grid">{detail_field_html("Your Status", read_flag)}</div>',
+            ),
+            unsafe_allow_html=True,
+        )
+        placeholder_html("Read receipts and viewer history will appear here when connected to Supabase.")
+
+    with tab_notes:
+        notes = str(update.get("notes") or "").strip()
+        if notes:
+            st.markdown(
+                dialog_card_html(
+                    "Notes",
+                    f'<p style="margin:0;white-space:pre-wrap;">{html.escape(notes)}</p>',
+                ),
+                unsafe_allow_html=True,
+            )
+        else:
+            placeholder_html("Notes will appear here when added.")
+
+    with tab_activity:
+        placeholder_html("Created and updated activity will appear here when connected to Supabase.")
 
 
 def _render_cu_edit_form(update: dict) -> None:
@@ -169,9 +443,16 @@ def _render_cu_edit_form(update: dict) -> None:
 
     render_edit_form_header("Edit Update")
     st.text_input("Title", key=f"cu_edit_title_{rk}")
-    st.text_area("Message", key=f"cu_edit_body_{rk}", height=120)
-    st.selectbox("Category", lookup_options("update_categories"), key=f"cu_edit_cat_{rk}")
-    st.checkbox("Pin to top", key=f"cu_edit_pinned_{rk}")
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        st.selectbox("Category", _CATEGORY_EDIT_OPTS, key=f"cu_edit_cat_{rk}")
+        st.selectbox("Status", _STATUS_EDIT_OPTS, key=f"cu_edit_status_{rk}")
+    with ec2:
+        st.selectbox("Audience", _AUDIENCE_FILTER_OPTS[1:], key=f"cu_edit_audience_{rk}")
+        st.text_input("Event date", key=f"cu_edit_event_date_{rk}", placeholder="YYYY-MM-DD")
+    st.text_area("Body / content", key=f"cu_edit_body_{rk}", height=120)
+    st.text_area("Notes", key=f"cu_edit_notes_{rk}", height=80)
+    st.checkbox("Pinned", key=f"cu_edit_pinned_{rk}")
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -182,11 +463,17 @@ def _render_cu_edit_form(update: dict) -> None:
     if cancelled:
         st.rerun()
     if saved:
+        status = str(st.session_state.get(f"cu_edit_status_{rk}") or "Published")
         ui = {
             "title": st.session_state.get(f"cu_edit_title_{rk}"),
             "body": st.session_state.get(f"cu_edit_body_{rk}"),
             "category": st.session_state.get(f"cu_edit_cat_{rk}"),
             "pinned": st.session_state.get(f"cu_edit_pinned_{rk}"),
+            "status": status,
+            "audience": st.session_state.get(f"cu_edit_audience_{rk}"),
+            "event_date": st.session_state.get(f"cu_edit_event_date_{rk}"),
+            "notes": st.session_state.get(f"cu_edit_notes_{rk}"),
+            "is_active": _status_to_active(status),
         }
         row_id = None if is_demo_id(uid) else uid
         ok, msg = persist_company_update(ui, row_id=row_id)
@@ -198,15 +485,19 @@ def _render_cu_edit_form(update: dict) -> None:
             st.error(msg or "Could not save update.")
 
 
-def render_cu_detail_dialog(update: dict) -> None:
+def render_company_update_detail_dialog(update: dict) -> None:
     rk = record_session_key(update, "id")
     st.session_state.setdefault(edit_mode_key(_MODULE, rk), False)
     edit_mode = is_edit_mode(_MODULE, rk)
 
+    category = _normalize_update_category(update.get("category"))
+    status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
+
     render_modal_shell()
     render_modal_header(
         title=str(update.get("title") or "Update"),
-        subtitle=str(update.get("category") or ""),
+        subtitle=category,
+        status=status,
     )
     render_modal_edit_button(
         module=_MODULE,
@@ -215,10 +506,10 @@ def render_cu_detail_dialog(update: dict) -> None:
     )
     render_modal_meta_grid(
         [
-            ("Date", update.get("date")),
-            ("Category", update.get("category")),
-            ("Pinned", "Yes" if update.get("pinned") else "No"),
-            ("Status", "New" if update.get("is_new") else "Read"),
+            ("Category", category),
+            ("Audience", _normalize_audience(update.get("audience") or update.get("visibility"))),
+            ("Created", update.get("created_display")),
+            ("Event Date", update.get("event_date_display")),
         ]
     )
 
@@ -228,26 +519,133 @@ def render_cu_detail_dialog(update: dict) -> None:
         _render_cu_view_tabs(update)
 
 
-@st.dialog("Company Update", width="large", on_dismiss=_clear_cu_modal)
-def _show_cu_detail_modal() -> None:
+@st.dialog("Company Update Details", width="large", on_dismiss=_clear_update_modal)
+def _show_update_detail_modal() -> None:
     update = get_modal_record(
         cache_key=_CACHE_KEY,
         modal_key=_MODAL_KEY,
         session_select_key=_SEL,
     )
     if not update:
-        render_missing_record(_clear_cu_modal, close_key="cu_modal_missing_close")
+        render_missing_record(_clear_update_modal, close_key="cu_modal_missing_close")
         return
-    render_cu_detail_dialog(update)
+    render_company_update_detail_dialog(update)
 
 
-def _cu_display_cell(field: str, row: dict) -> str:
-    if field == "pinned":
-        return "Pinned" if row.get("pinned") else "—"
-    if field == "is_new":
-        return "New" if row.get("is_new") else "—"
-    val = row.get(field)
-    return str(val).strip() if val is not None and str(val).strip() else "—"
+def _filter_updates(
+    updates: list[dict],
+    *,
+    q: str,
+    category: str,
+    status: str,
+    audience: str,
+    sort: str,
+    lookup: dict[str, str],
+) -> list[dict]:
+    rows = [_build_update_row(u, lookup) for u in updates]
+    if q:
+        ql = q.lower()
+        rows = [
+            r
+            for r in rows
+            if ql in str(r.get("title") or "").lower()
+            or ql in str(r.get("body") or "").lower()
+            or ql in str(r.get("category") or "").lower()
+            or ql in str(r.get("audience") or "").lower()
+            or ql in str(r.get("created_by_display") or "").lower()
+            or ql in str(r.get("status") or "").lower()
+        ]
+    if category != "All Categories":
+        rows = [r for r in rows if r.get("category") == category]
+    if status != "All Statuses":
+        rows = [r for r in rows if r.get("status") == status]
+    if audience != "All Audiences":
+        rows = [r for r in rows if r.get("audience") == audience]
+    return _sort_updates(rows, sort)
+
+
+def _render_custom_updates_table(filtered: list[dict]) -> list[str]:
+    if not filtered:
+        st.info("No updates match your filters.")
+        st.session_state[_ALL_UPDATE_IDS_KEY] = []
+        return []
+
+    all_update_ids = [
+        str(u.get("id") or "").strip() for u in filtered if str(u.get("id") or "").strip()
+    ]
+    st.session_state[_ALL_UPDATE_IDS_KEY] = all_update_ids
+
+    with st.container(key="updates_table_wrap"):
+        st.markdown('<div class="ips-updates-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_UPD_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _UPD_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-updates-header-row ips-updates-cell">'
+                    f"{html.escape(label)}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        for update in filtered:
+            uid = str(update.get("id") or "").strip()
+            if not uid:
+                continue
+
+            title = str(update.get("title") or "Untitled Update")
+            category = _normalize_update_category(update.get("category"))
+            audience = _normalize_audience(update.get("audience") or update.get("visibility"))
+            status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
+            is_pinned = bool(update.get("pinned") or update.get("is_pinned"))
+
+            cols = st.columns(_UPD_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_update_select_key(uid),
+                    label_visibility="collapsed",
+                    on_change=_on_update_checkbox_change,
+                    args=(uid, all_update_ids),
+                )
+
+            with cols[1]:
+                st.markdown(_title_cell_html(title, is_pinned), unsafe_allow_html=True)
+
+            with cols[2]:
+                st.markdown(_category_pill_html(category), unsafe_allow_html=True)
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-updates-muted ips-updates-cell">{html.escape(audience)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-updates-cell">{html.escape(str(update.get("event_date_display") or "—"))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-updates-cell">{html.escape(str(update.get("created_by_display") or "—"))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[7]:
+                st.markdown(
+                    f'<div class="ips-updates-muted ips-updates-cell">'
+                    f"{html.escape(str(update.get('created_display') or '—'))}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_update_ids
 
 
 def render() -> None:
@@ -257,13 +655,20 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("company_updates"):
         return
-    metrics = demo_update_metrics()
+
+    inject_updates_module_css()
+    st.markdown(
+        '<span class="ips-updates-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
+    lookup = _user_name_lookup()
 
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
         render_page_header(
             "Company Updates",
-            "Stay informed with the latest company news, announcements, and important updates.",
+            "Share announcements, safety alerts, events, and company news.",
         )
     with hdr_r:
         if st.button("+ New Update", key="cu_new", type="primary", use_container_width=True):
@@ -272,98 +677,97 @@ def render() -> None:
     if st.session_state.get("ips_cu_form"):
         with st.expander("New company update", expanded=True):
             st.text_input("Title", key="cu_new_title")
-            st.text_area("Message", key="cu_new_body", height=100)
-            st.selectbox("Category", lookup_options("update_categories"), key="cu_new_cat")
-            st.checkbox("Pin to top", key="cu_new_pinned")
+            nc1, nc2 = st.columns(2)
+            with nc1:
+                st.selectbox("Category", _CATEGORY_EDIT_OPTS, key="cu_new_cat")
+                st.selectbox("Status", _STATUS_EDIT_OPTS, key="cu_new_status")
+            with nc2:
+                st.selectbox("Audience", _AUDIENCE_FILTER_OPTS[1:], key="cu_new_audience")
+                st.text_input("Event date", key="cu_new_event_date", placeholder="YYYY-MM-DD")
+            st.text_area("Body / content", key="cu_new_body", height=100)
+            st.text_area("Notes", key="cu_new_notes", height=60)
+            st.checkbox("Pinned", key="cu_new_pinned")
             if st.button("Publish", key="cu_save_new", type="primary"):
+                status = str(st.session_state.get("cu_new_status") or "Published")
                 ok, msg = persist_company_update(
                     {
                         "title": st.session_state.get("cu_new_title"),
                         "body": st.session_state.get("cu_new_body"),
                         "category": st.session_state.get("cu_new_cat"),
                         "pinned": st.session_state.get("cu_new_pinned"),
+                        "status": status,
+                        "audience": st.session_state.get("cu_new_audience"),
+                        "event_date": st.session_state.get("cu_new_event_date"),
+                        "notes": st.session_state.get("cu_new_notes"),
+                        "is_active": _status_to_active(status),
                     }
                 )
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_cu_form",)):
                     st.rerun()
 
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        render_metric_card("Unread Updates", str(metrics.get("unread", 0)), delta="View all")
-    with m2:
-        render_metric_card("Pinned Updates", str(metrics.get("pinned", 0)), delta="View all")
-    with m3:
-        render_metric_card("Upcoming Events", str(metrics.get("events", 0)), delta="View calendar")
-    with m4:
-        render_metric_card("All Updates", str(metrics.get("all", 0)), delta="View all")
-
-    main, side = st.columns([2.1, 1])
-
-    with main:
-        cats = ["All Updates", *lookup_options("update_categories")]
-        cat = render_tabs(cats, session_key=_TAB_KEY, default="All Updates")
-        ctrl_l, ctrl_r = st.columns([1, 1.2])
-        with ctrl_l:
-            sort = st.selectbox("Sort by", _SORT_OPTS, key="cu_sort", label_visibility="collapsed")
-        with ctrl_r:
-            st.text_input("Search updates", placeholder="Search updates…", key="cu_search", label_visibility="collapsed")
-
-        updates = load_company_updates(category=cat)
-        q = str(st.session_state.get("cu_search") or "").strip().lower()
-        if q:
-            updates = [
-                u
-                for u in updates
-                if q in str(u.get("title", "")).lower() or q in str(u.get("body", "")).lower()
-            ]
-        updates = _sort_updates(updates, sort)
-
-        display_updates = updates[:50]
-        build_modal_cache(display_updates, cache_key=_CACHE_KEY)
-        render_clickable_table(
-            display_updates,
-            [
-                ("title", "TITLE"),
-                ("category", "CATEGORY"),
-                ("date", "DATE"),
-                ("pinned", "PINNED"),
-                ("is_new", "STATUS"),
-            ],
-            _TABLE_KEY,
-            row_id_key="id",
-            session_select_key=_SEL,
-            format_cell=_cu_display_cell,
-            click_caption=f"Showing {len(display_updates)} update(s) · Click a row to open details.",
-            on_row_selected=_open_cu_modal,
-        )
-        show_modal_if_pending(_MODAL_KEY, _show_cu_detail_modal)
-
-        st.caption(f"Showing 1 to {min(len(display_updates), 50)} of {metrics.get('all', len(updates))} updates")
-
-    with side:
-        st.markdown("**Upcoming Events**")
-        events = load_upcoming_events()
-        ot = "d" + "iv"
-        for ev in events:
-            st.markdown(
-                f'<{ot} class="ips-event-block">'
-                f'<{ot} class="ips-event-date">{_event_date_block(str(ev.get("date") or ""))}</{ot}>'
-                f"<{ot}><strong>{html.escape(str(ev.get('title') or ''))}</strong><br>"
-                f"{html.escape(str(ev.get('time') or ''))} · {html.escape(str(ev.get('location') or ''))}</{ot}>"
-                f"</{ot}>",
-                unsafe_allow_html=True,
+    def _filters() -> None:
+        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 0.6, 1])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search updates...",
+                key="cu_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Category",
+                _CATEGORY_FILTER_OPTS,
+                key="cu_cat_filter",
+                label_visibility="collapsed",
+            )
+        with c3:
+            st.selectbox(
+                "Status",
+                _STATUS_FILTER_OPTS,
+                key="cu_status_filter",
+                label_visibility="collapsed",
+            )
+        with c4:
+            st.selectbox(
+                "Audience",
+                _AUDIENCE_FILTER_OPTS,
+                key="cu_audience_filter",
+                label_visibility="collapsed",
+            )
+        with c5:
+            if st.button("Clear", key="cu_clear", use_container_width=True):
+                st.session_state["cu_search"] = ""
+                st.session_state["cu_cat_filter"] = "All Categories"
+                st.session_state["cu_status_filter"] = "All Statuses"
+                st.session_state["cu_audience_filter"] = "All Audiences"
+                st.session_state["cu_sort"] = "Newest First"
+                st.rerun()
+        with c6:
+            st.selectbox(
+                "Sort",
+                _SORT_OPTS,
+                key="cu_sort",
+                label_visibility="collapsed",
             )
 
-        st.markdown("---")
-        st.markdown("**Quick Links**")
-        for icon, label in _QUICK_LINKS:
-            st.markdown(
-                f'<p class="ips-quick-link"><span>{icon} {html.escape(label)}</span><span>›</span></p>',
-                unsafe_allow_html=True,
-            )
+    layout_filter_bar(_filters)
 
-        st.markdown("---")
-        st.markdown("**Recent Updates**")
-        recent = _sort_updates(load_company_updates(), "Newest First")[:4]
-        for u in recent:
-            st.caption(f"• {u.get('title')} — {u.get('date')}")
+    updates = load_company_updates(category="All Updates")
+    filtered = _filter_updates(
+        updates,
+        q=str(st.session_state.get("cu_search") or "").strip(),
+        category=str(st.session_state.get("cu_cat_filter") or "All Categories"),
+        status=str(st.session_state.get("cu_status_filter") or "All Statuses"),
+        audience=str(st.session_state.get("cu_audience_filter") or "All Audiences"),
+        sort=str(st.session_state.get("cu_sort") or "Newest First"),
+        lookup=lookup,
+    )
+
+    st.caption(f"{len(filtered)} update(s)")
+
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+    _render_custom_updates_table(filtered)
+
+    if st.session_state.get(SELECTED_UPDATE_KEY) and st.session_state.get(SHOW_UPDATE_MODAL_KEY):
+        _show_update_detail_modal()

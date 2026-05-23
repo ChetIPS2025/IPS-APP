@@ -1033,6 +1033,323 @@ def inject_assets_module_css() -> None:
     )
 
 
+def inject_timekeeping_module_css() -> None:
+    """Timekeeping list custom table styling."""
+    st.markdown(
+        f"""
+<style id="ips-timekeeping-module-v1">
+.ips-timekeeping-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-timekeeping-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-timekeeping-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-timekeeping-row:hover {{
+  background: #eef5ff;
+}}
+.ips-timekeeping-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-timekeeping-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-timekeeping-employee {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-timekeeping-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-timekeeping-hours {{
+  font-size: 13px;
+  color: #0f172a;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}}
+.ips-timekeeping-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-timekeeping-status-draft {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-timekeeping-status-pending {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-timekeeping-status-approved {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-timekeeping-status-rejected {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-time-week-range {{
+  margin: 0;
+  text-align: right;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+}}
+.ips-time-week-sub {{
+  margin: 0.15rem 0 0;
+  text-align: right;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+}}
+.ips-time-day-head {{
+  color: #9ca3af;
+  font-size: 0.66rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5eaf2;
+  padding: 0.45rem 0;
+}}
+.ips-time-day-row {{
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0.22rem 0;
+  color: #111827;
+  font-size: 0.82rem;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_updates_module_css() -> None:
+    """Company Updates list custom table styling."""
+    st.markdown(
+        f"""
+<style id="ips-updates-module-v1">
+.ips-updates-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-updates-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-updates-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-updates-row:hover {{
+  background: #eef5ff;
+}}
+.ips-updates-row-selected {{
+  background: #eaf2ff !important;
+}}
+.ips-updates-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-updates-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-updates-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-update-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-update-category-announcement {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-update-category-safety-alert {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-update-category-event {{
+  background: #ede9fe;
+  color: #6d28d9;
+}}
+.ips-update-category-hr-update {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-update-category-project-update {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-update-category-general {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-update-status-published {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-update-status-draft {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-update-status-scheduled {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-update-status-archived {{
+  background: #e5e7eb;
+  color: #374151;
+}}
+.ips-update-pinned {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #fef3c7;
+  color: #92400e;
+  margin-left: 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+}}
+.st-key-updates_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-updates_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-updates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-updates_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-updates_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-updates_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-updates_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-updates_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_unauthenticated_shell_css() -> None:
     """Login-only layout: centered card, no sidebar navigation."""
     st.markdown(
