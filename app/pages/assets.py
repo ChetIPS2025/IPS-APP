@@ -7,10 +7,11 @@ import html
 import streamlit as st
 
 try:
-    from app.components.clickable_table import render_clickable_table
+    from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -29,24 +30,24 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
     )
     from app.pages._core._data import load_assets, lookup_options, persist_asset
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.styles import inject_assets_module_css
     from app.ui.assets_components import (
         inject_assets_page_styles,
         maintenance_table_html,
-        render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
-    from components.clickable_table import render_clickable_table  # type: ignore
+    from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
+        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
@@ -65,15 +66,14 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
     )
     from pages._core._data import load_assets, lookup_options, persist_asset  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from styles import inject_assets_module_css  # type: ignore
     from ui.assets_components import (  # type: ignore
         inject_assets_page_styles,
         maintenance_table_html,
-        render_assets_header_inner_html,
         status_badge_html,
         summary_card_html,
     )
@@ -83,11 +83,261 @@ _SEL = select_key("assets")
 _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
 _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
+SELECTED_ASSET_KEY = "selected_asset_id"
+SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
+_ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
+_ASSET_COLS = [0.35, 1.4, 3.0, 1.5, 1.7, 1.7, 1.5, 1.8, 1.4]
+_ASSET_HEADERS = [
+    "",
+    "ASSET #",
+    "ASSET NAME",
+    "CATEGORY",
+    "LOCATION",
+    "DEPARTMENT",
+    "STATUS",
+    "ASSIGNED TO",
+    "NEXT SERVICE DUE",
+]
+_STATUS_FILTER_OPTS = [
+    "All Statuses",
+    "Available",
+    "In Service",
+    "Assigned",
+    "Out for Repair",
+    "Maintenance Due",
+    "Retired",
+    "Sold",
+    "Lost",
+]
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
 
 
+def _normalize_asset_status(raw: object) -> str:
+    s = str(raw or "").strip().lower().replace("_", " ")
+    mapping = {
+        "": "Available",
+        "available": "Available",
+        "in service": "In Service",
+        "in_service": "In Service",
+        "assigned": "Assigned",
+        "out for repair": "Out for Repair",
+        "repair": "Out for Repair",
+        "maintenance due": "Maintenance Due",
+        "maintenance_due": "Maintenance Due",
+        "maintenance": "Maintenance Due",
+        "retired": "Retired",
+        "sold": "Sold",
+        "lost": "Lost",
+    }
+    if s in mapping:
+        return mapping[s]
+    label = str(raw or "").strip()
+    return label if label else "Available"
+
+
+def _asset_number(row: dict) -> str:
+    for key in ("asset_number", "asset_id", "asset_no"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _asset_name(row: dict) -> str:
+    for key in ("asset_name", "name", "description"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _asset_category(row: dict) -> str:
+    return str(row.get("category") or "").strip() or "—"
+
+
+def _asset_location(row: dict) -> str:
+    for key in ("location_name", "location"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _asset_department(row: dict) -> str:
+    for key in ("department_name", "department"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val
+    return "—"
+
+
+def _asset_assigned_to(row: dict) -> str:
+    for key in ("current_operator", "assigned_to_name", "assigned_to", "operator"):
+        val = str(row.get(key) or "").strip()
+        if val and val != "—":
+            return val
+    return "—"
+
+
+def _asset_next_service(row: dict) -> str:
+    for key in ("next_service_due", "next_service", "service_due"):
+        val = row.get(key)
+        if val not in (None, ""):
+            formatted = fmt_date(val)
+            if formatted != "—":
+                return formatted
+    return "—"
+
+
+def _asset_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Available": "ips-asset-status-available",
+        "In Service": "ips-asset-status-in-service",
+        "Assigned": "ips-asset-status-assigned",
+        "Out for Repair": "ips-asset-status-out-for-repair",
+        "Maintenance Due": "ips-asset-status-maintenance-due",
+        "Retired": "ips-asset-status-retired",
+        "Sold": "ips-asset-status-sold",
+        "Lost": "ips-asset-status-lost",
+    }
+    cls = cls_map.get(status, "ips-asset-status-available")
+    return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _asset_select_key(asset_id: str) -> str:
+    return f"asset_select_{asset_id}"
+
+
+def _clear_asset_selection(asset_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_ASSET_KEY] = None
+    st.session_state[SHOW_ASSET_MODAL_KEY] = False
+    ids = list(asset_ids or [])
+    for aid in ids:
+        st.session_state[_asset_select_key(aid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("asset_select_"):
+            st.session_state[key] = False
+
+
+def _on_asset_checkbox_change(asset_id: str, all_asset_ids: list[str]) -> None:
+    key = _asset_select_key(asset_id)
+    if st.session_state.get(key):
+        for aid in all_asset_ids:
+            if aid != asset_id:
+                st.session_state[_asset_select_key(aid)] = False
+        st.session_state[SELECTED_ASSET_KEY] = asset_id
+        st.session_state[SHOW_ASSET_MODAL_KEY] = True
+        cache = st.session_state.get(_ASSETS_CACHE_KEY) or {}
+        asset = cache.get(asset_id) if isinstance(cache, dict) else None
+        _open_assets_detail_modal(asset_id, asset)
+    elif st.session_state.get(SELECTED_ASSET_KEY) == asset_id:
+        st.session_state[SELECTED_ASSET_KEY] = None
+        st.session_state[SHOW_ASSET_MODAL_KEY] = False
+
+
+def _render_custom_assets_table(filtered: list[dict]) -> list[str]:
+    if not filtered:
+        st.info("No assets match your filters.")
+        st.session_state[_ALL_ASSET_IDS_KEY] = []
+        return []
+
+    all_asset_ids = [str(a.get("id") or "").strip() for a in filtered if str(a.get("id") or "").strip()]
+    st.session_state[_ALL_ASSET_IDS_KEY] = all_asset_ids
+
+    with st.container(key="assets_table_wrap"):
+        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
+        for col, label in zip(header_cols, _ASSET_HEADERS):
+            with col:
+                st.markdown(
+                    f'<div class="ips-assets-header-row ips-assets-cell">{html.escape(label)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        for asset in filtered:
+            aid = str(asset.get("id") or "").strip()
+            if not aid:
+                continue
+
+            asset_no = _asset_number(asset)
+            name = _asset_name(asset)
+            category = _asset_category(asset)
+            location = _asset_location(asset)
+            department = _asset_department(asset)
+            status = _normalize_asset_status(asset.get("status"))
+            assigned = _asset_assigned_to(asset)
+            next_service = _asset_next_service(asset)
+
+            cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_asset_select_key(aid),
+                    label_visibility="collapsed",
+                    on_change=_on_asset_checkbox_change,
+                    args=(aid, all_asset_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-assets-number">{html.escape(asset_no)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(category)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(department)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[7]:
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(assigned)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[8]:
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_asset_ids
+
+
 def _filter_rows(
-    rows: list[dict], *, q: str, category: str, location: str, status: str, department: str
+    rows: list[dict],
+    *,
+    q: str,
+    category: str,
+    location: str,
+    status: str,
+    department: str,
 ) -> list[dict]:
     out = rows
     if q:
@@ -95,17 +345,22 @@ def _filter_rows(
         out = [
             r
             for r in out
-            if ql in str(r.get("asset_number", "")).lower()
-            or ql in str(r.get("asset_name", "")).lower()
+            if ql in _asset_number(r).lower()
+            or ql in _asset_name(r).lower()
+            or ql in _asset_category(r).lower()
+            or ql in _asset_location(r).lower()
+            or ql in _asset_department(r).lower()
+            or ql in _asset_assigned_to(r).lower()
+            or ql in _normalize_asset_status(r.get("status")).lower()
         ]
     if category and category != "All Categories":
-        out = [r for r in out if str(r.get("category", "")) == category]
+        out = [r for r in out if _asset_category(r) == category]
     if location and location != "All Locations":
-        out = [r for r in out if str(r.get("location", "")) == location]
+        out = [r for r in out if _asset_location(r) == location]
     if status and status != "All Statuses":
-        out = [r for r in out if str(r.get("status", "")) == status]
+        out = [r for r in out if _normalize_asset_status(r.get("status")) == status]
     if department and department != "All Departments":
-        out = [r for r in out if str(r.get("department", "")) == department]
+        out = [r for r in out if _asset_department(r) == department]
     return out
 
 
@@ -118,6 +373,9 @@ def _clear_asset_filters() -> None:
 
 
 def _clear_assets_detail_modal() -> None:
+    asset_ids = st.session_state.get(_ALL_ASSET_IDS_KEY) or []
+    _clear_asset_selection([str(aid) for aid in asset_ids])
+    clear_edit_modes(_MOD)
     clear_record_modal(
         table_key="assets_list",
         session_select_key=_SEL,
@@ -127,8 +385,13 @@ def _clear_assets_detail_modal() -> None:
 
 
 def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return
+    st.session_state[SELECTED_ASSET_KEY] = aid
+    st.session_state[SHOW_ASSET_MODAL_KEY] = True
     open_record_modal(
-        asset_id,
+        aid,
         asset,
         session_select_key=_SEL,
         modal_key=_ASSETS_MODAL_KEY,
@@ -533,33 +796,29 @@ def render() -> None:
         from services.asset_qr import apply_pending_asset_deeplink  # type: ignore
     apply_pending_asset_deeplink()
     inject_assets_page_styles()
+    inject_assets_module_css()
     st.markdown(
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     rows = load_assets()
-    categories = sorted({str(r.get("category") or "") for r in rows if r.get("category")})
-    locations = sorted({str(r.get("location") or "") for r in rows if r.get("location")})
-    departments = sorted({str(r.get("department") or "") for r in rows if r.get("department")})
+    categories = sorted({_asset_category(r) for r in rows if _asset_category(r) != "—"})
+    locations = sorted({_asset_location(r) for r in rows if _asset_location(r) != "—"})
+    departments = sorted({_asset_department(r) for r in rows if _asset_department(r) != "—"})
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-assets-header-anchor"></span>', unsafe_allow_html=True)
-        act_l, act_r = st.columns([5.5, 1.8], gap="small")
-        with act_l:
-            st.markdown(render_assets_header_inner_html(), unsafe_allow_html=True)
-        with act_r:
-            st.markdown('<div style="height:1.35rem"></div>', unsafe_allow_html=True)
-            e1, e2 = st.columns(2, gap="small")
-            with e1:
-                st.markdown('<span class="ips-assets-export-btn"></span>', unsafe_allow_html=True)
-                st.button("⇩ Export", key="ast_export", use_container_width=True)
-            with e2:
-                st.markdown('<span class="ips-assets-new-btn"></span>', unsafe_allow_html=True)
-                if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
-                    st.session_state["ips_ast_form"] = True
+    act_l, act_r = st.columns([3, 1])
+    with act_l:
+        render_page_header("Assets", "Track and manage all company assets and equipment.")
+    with act_r:
+        exp_col, add_col = st.columns(2, gap="small")
+        with exp_col:
+            st.button("Export", key="ast_export", use_container_width=True)
+        with add_col:
+            if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
+                st.session_state["ips_ast_form"] = True
 
     if st.session_state.get("ips_ast_form"):
-        with st.expander("New asset", expanded=True):
+        with st.expander("New Asset", expanded=True):
             st.text_input("Asset #", key="ast_new_num")
             st.text_input("Asset name", key="ast_new_name")
             st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
@@ -576,31 +835,47 @@ def render() -> None:
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_ast_form",)):
                     st.rerun()
 
-    with st.container(border=True):
-        st.markdown('<span class="ips-assets-filter-anchor"></span>', unsafe_allow_html=True)
+    def _filters() -> None:
+        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search assets...",
+                key="ast_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Category",
+                ["All Categories", *categories],
+                key="ast_cat",
+                label_visibility="collapsed",
+            )
+        with c3:
+            st.selectbox(
+                "Location",
+                ["All Locations", *locations],
+                key="ast_loc",
+                label_visibility="collapsed",
+            )
+        with c4:
+            st.selectbox(
+                "Status",
+                _STATUS_FILTER_OPTS,
+                key="ast_status",
+                label_visibility="collapsed",
+            )
+        with c5:
+            st.selectbox(
+                "Department",
+                ["All Departments", *departments],
+                key="ast_dept",
+                label_visibility="collapsed",
+            )
+        with c6:
+            st.button("Clear", key="ast_clear", use_container_width=True, on_click=_clear_asset_filters)
 
-        def _filters() -> None:
-            c1, c2, c3, c4, c5, c6 = st.columns([1.8, 1, 1, 1, 1, 0.7])
-            with c1:
-                st.text_input("Search", placeholder="Search assets…", key="ast_search", label_visibility="collapsed")
-            with c2:
-                st.selectbox("Category", ["All Categories", *categories], key="ast_cat", label_visibility="collapsed")
-            with c3:
-                st.selectbox("Location", ["All Locations", *locations], key="ast_loc", label_visibility="collapsed")
-            with c4:
-                st.selectbox(
-                    "Status",
-                    ["All Statuses", *lookup_options("asset_statuses")],
-                    key="ast_status",
-                    label_visibility="collapsed",
-                )
-            with c5:
-                st.selectbox("Department", ["All Departments", *departments], key="ast_dept", label_visibility="collapsed")
-            with c6:
-                st.markdown('<span class="ips-assets-clear-filters"></span>', unsafe_allow_html=True)
-                st.button("Clear Filters", key="ast_clear", use_container_width=True, on_click=_clear_asset_filters)
-
-        layout_filter_bar(_filters)
+    layout_filter_bar(_filters)
 
     filtered = _filter_rows(
         rows,
@@ -611,13 +886,7 @@ def render() -> None:
         department=str(st.session_state.get("ast_dept") or "All Departments"),
     )
 
-    def _display_cell(field: str, row: dict) -> str:
-        if field == "acquired_date":
-            return fmt_date(row.get("acquired_date"))
-        if field == "value":
-            return fmt_currency(row.get("value"))
-        val = row.get(field)
-        return str(val).strip() if val is not None and str(val).strip() else "—"
+    st.caption(f"{len(filtered)} asset(s)")
 
     build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
 
@@ -627,24 +896,10 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    render_clickable_table(
-        filtered,
-        [
-            ("asset_number", "ASSET #"),
-            ("asset_name", "ASSET NAME"),
-            ("category", "CATEGORY"),
-            ("location", "LOCATION"),
-            ("department", "DEPARTMENT"),
-            ("status", "STATUS"),
-            ("acquired_date", "ACQUIRED DATE"),
-            ("value", "VALUE"),
-        ],
-        "assets_list",
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_display_cell,
-        click_caption=f"{len(filtered)} asset(s) · Click a row to open details.",
-        on_row_selected=_open_assets_detail_modal,
-    )
+    _render_custom_assets_table(filtered)
 
-    show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
+    selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
+    if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):
+        _show_assets_detail_modal()
+    elif str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
+        _show_assets_detail_modal()

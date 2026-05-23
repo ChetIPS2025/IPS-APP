@@ -753,6 +753,286 @@ def inject_estimates_module_css() -> None:
     )
 
 
+def inject_inventory_module_css() -> None:
+    """Inventory list custom table styling."""
+    st.markdown(
+        f"""
+<style id="ips-inventory-module-v1">
+.ips-inventory-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-inventory-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-inventory-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-inventory-row:hover {{
+  background: #eef5ff;
+}}
+.ips-inventory-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-inventory-number {{
+  font-size: 14px;
+  font-weight: 800;
+  color: #2563eb;
+  line-height: 1.25;
+  white-space: nowrap;
+}}
+.ips-inventory-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-inventory-muted {{
+  font-size: 13px;
+  color: #64748b;
+}}
+.ips-inventory-qty {{
+  text-align: right;
+}}
+.ips-inventory-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-inventory-status-in-stock {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-inventory-status-low-stock {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-inventory-status-out-of-stock {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-inventory-status-on-order {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-inventory-status-discontinued {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.st-key-inventory_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_assets_module_css() -> None:
+    """Assets list custom table styling."""
+    st.markdown(
+        f"""
+<style id="ips-assets-module-v1">
+.ips-assets-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-assets-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-assets-row {{
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  min-height: 52px;
+}}
+.ips-assets-row:hover {{
+  background: #eef5ff;
+}}
+.ips-assets-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-assets-number {{
+  font-size: 14px;
+  font-weight: 800;
+  color: #2563eb;
+  line-height: 1.25;
+  white-space: nowrap;
+}}
+.ips-assets-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-assets-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-asset-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-asset-status-available {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-asset-status-in-service {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-asset-status-assigned {{
+  background: #dbeafe;
+  color: #1d4ed8;
+}}
+.ips-asset-status-out-for-repair {{
+  background: #ffedd5;
+  color: #c2410c;
+}}
+.ips-asset-status-maintenance-due {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-asset-status-retired {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-asset-status-sold {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
+.ips-asset-status-lost {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 52px;
+}}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-assets_table_wrap [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-assets_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-assets_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+.st-key-assets_table_wrap .stButton > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_unauthenticated_shell_css() -> None:
     """Login-only layout: centered card, no sidebar navigation."""
     st.markdown(
