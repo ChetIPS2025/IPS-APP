@@ -161,18 +161,17 @@ _CLOSED_EST_STATUSES = frozenset({"awarded", "completed", "complete", "closed", 
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
-_CUSTOMER_COLS = [0.35, 3.0, 2.4, 1.6, 0.9, 1.0, 1.1, 1.2, 1.2]
+_CUSTOMER_COLS = [0.35, 4.5, 1.2, 1.2, 1.4, 1.3]
 _CUSTOMER_HEADERS = [
     "",
     "CUSTOMER",
-    "PRIMARY LOCATION",
-    "CITY",
-    "STATE",
     "CONTACTS",
     "OPEN JOBS",
     "OPEN ESTIMATES",
     "STATUS",
 ]
+_STATE_FILTER_ALL = "Filter by Location State"
+_LOCATION_FILTER_ALL = "Filter by Customer Location"
 _STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"]
 SELECTED_CONTACT_KEY = "selected_contact_id"
 SHOW_CONTACT_MODAL_KEY = "show_contact_detail_modal"
@@ -301,9 +300,6 @@ def _render_custom_customers_table(filtered: list[dict]) -> list[str]:
                 continue
 
             name = _customer_name(customer)
-            location = _customer_primary_location(customer)
-            city = _customer_city(customer)
-            state = _customer_state(customer)
             contacts = str(customer.get("contact_count") or 0)
             open_jobs = str(customer.get("open_jobs") or 0)
             open_estimates = str(customer.get("open_estimates") or 0)
@@ -328,41 +324,23 @@ def _render_custom_customers_table(filtered: list[dict]) -> list[str]:
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(location)}</div>',
+                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(contacts)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(city)}</div>',
+                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_jobs)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(state)}</div>',
+                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_estimates)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
-                st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(contacts)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(open_jobs)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-customers-cell">{html.escape(open_estimates)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[8]:
                 st.markdown(_customer_status_pill_html(status), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -423,9 +401,9 @@ def _filter_customers(
         ]
     if status and status != "All Statuses":
         out = [c for c in out if _normalize_customer_status(c.get("status")) == status]
-    if state and state != "All States":
+    if state and state not in ("All States", _STATE_FILTER_ALL):
         out = [c for c in out if _customer_state(c) == state]
-    if location and location != "All Locations":
+    if location and location not in ("All Locations", _LOCATION_FILTER_ALL):
         out = [c for c in out if _customer_primary_location(c) == location]
     return out
 
@@ -2460,14 +2438,14 @@ def render() -> None:
         with c3:
             st.selectbox(
                 "State",
-                ["All States", *states],
+                [_STATE_FILTER_ALL, *states],
                 key="cust_filter_state",
                 label_visibility="collapsed",
             )
         with c4:
             st.selectbox(
                 "Location",
-                ["All Locations", *locations],
+                [_LOCATION_FILTER_ALL, *locations],
                 key="cust_filter_location",
                 label_visibility="collapsed",
             )
@@ -2475,8 +2453,8 @@ def render() -> None:
             if st.button("Clear", key="cust_clear", use_container_width=True):
                 st.session_state["cust_search"] = ""
                 st.session_state["cust_filter_status"] = "All Statuses"
-                st.session_state["cust_filter_state"] = "All States"
-                st.session_state["cust_filter_location"] = "All Locations"
+                st.session_state["cust_filter_state"] = _STATE_FILTER_ALL
+                st.session_state["cust_filter_location"] = _LOCATION_FILTER_ALL
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -2485,8 +2463,8 @@ def render() -> None:
         all_rows,
         q=str(st.session_state.get("cust_search") or "").strip(),
         status=str(st.session_state.get("cust_filter_status") or "All Statuses"),
-        state=str(st.session_state.get("cust_filter_state") or "All States"),
-        location=str(st.session_state.get("cust_filter_location") or "All Locations"),
+        state=str(st.session_state.get("cust_filter_state") or _STATE_FILTER_ALL),
+        location=str(st.session_state.get("cust_filter_location") or _LOCATION_FILTER_ALL),
     )
 
     st.caption(f"{len(filtered)} customer(s)")

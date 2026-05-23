@@ -241,6 +241,10 @@ def inject_customers_module_css() -> None:
   line-height: 1.25;
   word-break: break-word;
 }}
+.ips-customers-count-cell {{
+  text-align: center;
+  font-weight: 600;
+}}
 .ips-customer-status-pill {{
   display: inline-flex;
   align-items: center;
