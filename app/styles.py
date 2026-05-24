@@ -25,7 +25,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v4">
+<style id="ips-users-module-v5">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -156,6 +156,75 @@ def inject_users_module_css() -> None:
   border-radius: 9px !important;
   font-size: 14px !important;
   width: auto !important;
+}}
+.ips-user-delete-actions {{
+  margin: 0.35rem 0 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+}}
+div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button {{
+  border: 1px solid #dc2626 !important;
+  background: #ffffff !important;
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}}
+div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button:hover {{
+  background: #fef2f2 !important;
+  border-color: #b91c1c !important;
+  color: #b91c1c !important;
+}}
+.ips-user-delete-warning {{
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #7c2d12;
+}}
+.ips-user-delete-warning ul {{
+  margin: 0.5rem 0 0.35rem;
+  padding-left: 0;
+  list-style: none;
+}}
+.ips-user-delete-warning ul li {{
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid #ffedd5;
+}}
+.ips-user-delete-warning ul li span {{
+  color: #9a3412;
+  font-weight: 600;
+}}
+.ips-user-delete-warning ul li strong {{
+  color: #431407;
+  font-weight: 700;
+  text-align: right;
+}}
+.ips-user-delete-warning p {{
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 600;
+}}
+.ips-user-delete-consequences {{
+  margin: 0.25rem 0 0 !important;
+  padding-left: 1.1rem !important;
+  list-style: disc !important;
+}}
+.ips-user-delete-consequences li {{
+  display: list-item !important;
+  border: none !important;
+  padding: 2px 0 !important;
+  color: #9a3412;
+}}
+div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="stButton"]:last-of-type > button {{
+  border-color: #dc2626 !important;
+  background: #ffffff !important;
+  color: #dc2626 !important;
+}}
+div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="stButton"]:last-of-type > button:hover {{
+  background: #fef2f2 !important;
 }}
 </style>
 """,

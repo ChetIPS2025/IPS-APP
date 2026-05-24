@@ -8,7 +8,7 @@ import re
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_profile, current_role
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -50,12 +50,18 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.services.users_service import (
+        can_delete_user,
+        deactivate_user,
+        get_user_delete_context,
+        hard_delete_user,
+    )
     from app.styles import inject_users_module_css
     from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_profile, current_role  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -97,6 +103,12 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from services.users_service import (  # type: ignore
+        can_delete_user,
+        deactivate_user,
+        get_user_delete_context,
+        hard_delete_user,
+    )
     from styles import inject_users_module_css  # type: ignore
     from utils.constants import DEPARTMENTS, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -238,6 +250,11 @@ def _user_status_pill_html(status: str) -> str:
 
 def _filter_employees(rows: list[dict], *, q: str) -> list[dict]:
     out = rows
+    activity = str(st.session_state.get("users_activity_filter") or "Active")
+    if activity == "Active":
+        out = [e for e in out if _normalize_user_status(e.get("status")) == "Active"]
+    elif activity == "Inactive":
+        out = [e for e in out if _normalize_user_status(e.get("status")) == "Inactive"]
     if q:
         ql = q.lower()
         out = [
@@ -634,6 +651,145 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.error(msg or "Could not save employee.")
 
 
+def _delete_confirm_key(rk: str) -> str:
+    return f"emp_delete_confirm_{rk}"
+
+
+def _delete_keep_employee_key(rk: str) -> str:
+    return f"emp_delete_keep_employee_{rk}"
+
+
+def _render_user_delete_panel(emp: dict, rk: str) -> None:
+    """Danger zone: deactivate or permanently delete a user (with confirmation)."""
+    role_norm = normalize_role(current_role())
+    if role_norm not in {"admin", "supervisor"}:
+        return
+
+    eid = str(emp.get("id") or "").strip()
+    if not eid:
+        return
+
+    confirm_key = _delete_confirm_key(rk)
+    is_admin = role_norm == "admin"
+    check = can_delete_user(eid, current_user=current_profile())
+
+    if not st.session_state.get(confirm_key):
+        st.markdown('<div class="ips-user-delete-actions">', unsafe_allow_html=True)
+        if st.button(
+            "Delete User",
+            key=f"emp_delete_open_{rk}",
+            disabled=not check.allowed,
+            help=check.reason or "Remove this user's system access",
+        ):
+            st.session_state[confirm_key] = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        if not check.allowed and check.reason:
+            st.caption(check.reason)
+        return
+
+    ctx = get_user_delete_context(eid)
+    login_label = "Yes" if ctx.get("has_login") else "No"
+    employee_label = "Yes" if ctx.get("employee_linked") else "No"
+    te_count = int(ctx.get("time_entry_count") or 0)
+
+    warning_lines = [
+        "This action removes the user's access to the system.",
+        "Login access will be disabled.",
+        "Historical records (timecards, certifications, audits) are preserved.",
+        "Assigned jobs and activity history remain on record.",
+    ]
+    if check.warnings:
+        warning_lines.extend(check.warnings)
+
+    st.markdown(
+        (
+            '<div class="ips-user-delete-warning">'
+            f"<strong>Are you sure you want to delete/deactivate this user?</strong>"
+            f"<ul>"
+            f"<li><span>User</span><strong>{html.escape(str(ctx.get('name') or '—'))}</strong></li>"
+            f"<li><span>Role</span><strong>{html.escape(str(ctx.get('role') or '—'))}</strong></li>"
+            f"<li><span>Employee linked</span><strong>{employee_label}</strong></li>"
+            f"<li><span>Login profile</span><strong>{login_label}</strong></li>"
+            f"<li><span>Last login</span><strong>{html.escape(str(ctx.get('last_login') or '—'))}</strong></li>"
+            f"<li><span>Time entries</span><strong>{te_count}</strong></li>"
+            f"</ul>"
+            f"<p>{html.escape(warning_lines[0])}</p>"
+            f"<ul class='ips-user-delete-consequences'>"
+            + "".join(f"<li>{html.escape(line)}</li>" for line in warning_lines[1:])
+            + "</ul></div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+    keep_key = _delete_keep_employee_key(rk)
+    if keep_key not in st.session_state:
+        st.session_state[keep_key] = True
+    keep_employee = st.checkbox(
+        "Keep employee record",
+        key=keep_key,
+        help="Recommended. Preserves workforce history without login access.",
+    )
+
+    actor = current_profile()
+    actor_id = str(actor.get("id") or "").strip() or None
+
+    btn_cancel, btn_deactivate, btn_hard = st.columns([1, 1.2, 1.2], gap="small")
+    with btn_cancel:
+        if st.button("Cancel", key=f"emp_delete_cancel_{rk}", use_container_width=True):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+    with btn_deactivate:
+        if st.button(
+            "Deactivate User",
+            key=f"emp_delete_deactivate_{rk}",
+            type="primary",
+            use_container_width=True,
+            disabled=not check.allowed,
+        ):
+            result = deactivate_user(
+                eid,
+                deleted_by=actor_id,
+                actor=actor,
+            )
+            if result.ok:
+                st.session_state.pop(confirm_key, None)
+                _clear_employee_modal()
+                if isinstance(result.data, dict) and result.data.get("warning"):
+                    st.session_state["users_action_flash"] = (
+                        "warning",
+                        f"User deactivated. {result.data['warning']}",
+                    )
+                else:
+                    st.session_state["users_action_flash"] = ("success", "User deactivated.")
+                st.rerun()
+            st.error(result.error or "Could not deactivate user.")
+    with btn_hard:
+        if is_admin and st.button(
+            "Permanently Delete",
+            key=f"emp_delete_hard_{rk}",
+            use_container_width=True,
+            disabled=not check.allowed,
+        ):
+            result = hard_delete_user(
+                eid,
+                delete_employee=not keep_employee,
+                deleted_by=actor_id,
+                actor=actor,
+            )
+            if result.ok:
+                st.session_state.pop(confirm_key, None)
+                _clear_employee_modal()
+                flash_msg = "User permanently deleted."
+                if isinstance(result.data, dict):
+                    warns = result.data.get("warnings") or []
+                    if warns:
+                        flash_msg = f"{flash_msg} {' '.join(str(w) for w in warns)}"
+                st.session_state["users_action_flash"] = ("success", flash_msg)
+                st.rerun()
+            st.error(result.error or "Could not permanently delete user.")
+
+
 def _employee_type_label(emp: dict) -> str:
     return "Employee" if emp.get("is_employee") is not False else "System User"
 
@@ -673,6 +829,7 @@ def render_employee_detail_dialog(emp: dict) -> None:
                 ("Status", status),
             ]
         )
+        _render_user_delete_panel(emp, rk)
 
     if is_edit_mode(MODULE, rk):
         _render_employee_edit_form(emp)
@@ -702,6 +859,13 @@ def render() -> None:
         return
     inject_users_module_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    flash = st.session_state.pop("users_action_flash", None)
+    if flash:
+        kind, message = flash
+        if kind == "warning":
+            st.warning(message)
+        else:
+            st.success(message)
     if not st.session_state.get("_ips_core_employees_seeded"):
         try:
             from app.services.employee_seed_service import ensure_core_employee_seed
@@ -751,7 +915,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
+        c1, c2, c3 = st.columns([5, 1.8, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -760,8 +924,17 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
+            st.selectbox(
+                "User status",
+                ["Active", "Inactive", "All Users"],
+                key="users_activity_filter",
+                label_visibility="collapsed",
+            )
+        with c3:
             if st.button("Clear", key="emp_clear", use_container_width=True):
                 clear_table_filters(_TABLE_KEY, _USER_FILTER_FIELDS, extra_keys=["emp_search"])
+                st.session_state["users_activity_filter"] = "Active"
+                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
                 st.rerun()
 
     layout_filter_bar(_filters)
