@@ -16,7 +16,17 @@ This repo is **a single Streamlit application**, not multiple separate apps.
 | **Supabase** | `app/db.py` (`get_client()` / `get_admin_client()`) |
 | **Theme / CSS** | `app/styles.py` (`inject_global_css()` on every module) |
 
-Each business area is a **module/page** inside that shell — Jobs, Estimates, Inventory, Assets, Timekeeping, Users/Employees, Reports, etc. They are not standalone Streamlit apps.
+Each business area is a **module/page** inside that shell — Jobs, Estimates, **Pricing Guide**, Inventory, Assets, Timekeeping, Users/Employees, Reports, etc. They are not standalone Streamlit apps.
+
+### Pricing Guide vs Inventory vs Estimate Materials
+
+| Concept | Purpose |
+|---------|---------|
+| **Pricing Guide** | Master list of default material, labor, equipment, travel, and other costs used when building estimates |
+| **Inventory** | Physical stock on hand — QR tracking, check-in/check-out, job issue transactions |
+| **Estimate Materials** | Material lines selected on a specific estimate (Cost Builder / estimate detail) |
+
+The Pricing Guide reads and writes the `estimate_materials` catalog table (and legacy `materials_catalog` merge where present). Inventory remains a separate module and table.
 
 Helper launchers (`run_streamlit.ps1`, `run_streamlit.bat`, `run_app.py`) all start the same `app/main.py`. See [LAUNCHERS.md](LAUNCHERS.md).
 
@@ -115,7 +125,7 @@ See [SUPABASE_SCHEMA_NOTES.md](SUPABASE_SCHEMA_NOTES.md) for table/column mappin
 | Area | Tables |
 |------|--------|
 | Jobs | `jobs` |
-| Estimates | `estimates`, `estimate_line_items` / `estimate_materials` |
+| Estimates | `estimates`, `estimate_line_items`, `estimate_materials` (catalog + lines) |
 | Inventory | `inventory_items` |
 | Assets | `assets` |
 | Time | `employee_timekeeping_weeks`, `time_entries` |

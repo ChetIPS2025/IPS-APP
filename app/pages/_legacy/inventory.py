@@ -769,7 +769,7 @@ def render() -> None:
         with st.expander("Import vendor quote (adds stocked Materials rows)", expanded=False):
             st.caption(
                 "Creates **inventory_items** in the **Materials** category for stock tracking. "
-                "Copy into the quote catalog from **Estimate Materials** when you need estimate lines."
+                "Use **Pricing Guide** for default estimate costs. Import or link inventory items when needed."
             )
             try:
                 from app.pages.material_quote_import import render_material_quote_import_form

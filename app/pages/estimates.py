@@ -266,6 +266,14 @@ def _inventory_options() -> list[tuple[str, dict]]:
     return inventory_options_as_select()
 
 
+def _pricing_guide_options() -> list[tuple[str, dict]]:
+    try:
+        from app.services.estimate_builder_helpers import pricing_guide_options_as_select
+    except ImportError:
+        from services.estimate_builder_helpers import pricing_guide_options_as_select  # type: ignore
+    return pricing_guide_options_as_select()
+
+
 def _asset_options() -> list[tuple[str, dict]]:
     try:
         from app.services.estimate_builder_helpers import asset_options_as_select
@@ -777,6 +785,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
     inv_opts = _inventory_options()
+    pg_opts = _pricing_guide_options()
     asset_opts = _asset_options()
     vendor_opts = _vendor_options()
 
@@ -831,6 +840,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     with tab_cost_builder:
         render_cost_builder_tab(
             est,
+            pricing_guide_options=pg_opts,
             inventory_options=inv_opts,
             asset_options=asset_opts,
             vendor_options=vendor_opts,
@@ -838,7 +848,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         )
 
     with tab_materials:
-        render_materials_tab(est, inventory_options=inv_opts)
+        render_materials_tab(est, pricing_guide_options=pg_opts, inventory_options=inv_opts)
 
     with tab_labor:
         render_labor_tab(est)

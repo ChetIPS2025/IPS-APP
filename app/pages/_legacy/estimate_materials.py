@@ -283,7 +283,7 @@ def _dialog_add_from_inventory(est: dict, materials_df: pd.DataFrame, material_m
     mat_keys = filtered["item_key"].tolist() if not filtered.empty else []
     label_by_key = {str(row["item_key"]): _material_selectbox_label(row) for _, row in filtered.iterrows()}
     if not mat_keys:
-        st.info("No catalog materials match this filter.")
+        st.info("No pricing guide items match this filter.")
         return
     pick = st.selectbox(
         "Material",
@@ -655,7 +655,7 @@ def render() -> None:
     if not eid:
         _render_estimate_picker()
         if can_catalog:
-            with st.expander("Quote catalog administration (admin)", expanded=False):
+            with st.expander("Pricing Guide administration (admin)", expanded=False):
                 _render_catalog_admin_section()
         return
 
@@ -805,7 +805,7 @@ def render() -> None:
     _render_export_dialog(est, totals, pe)
 
     if can_catalog:
-        with st.expander("Quote catalog administration", expanded=False):
+        with st.expander("Pricing Guide administration", expanded=False):
             _render_catalog_admin_section()
 
 

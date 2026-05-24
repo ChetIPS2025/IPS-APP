@@ -85,13 +85,14 @@ _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
     "Estimates",
+    "Pricing Guide",
     "Estimate Materials",
     "Customers",
     "Job Costing",
 )
 # Routable asset-area pages (sidebar: nested under **Assets** expander when shown).
 _NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
-# Labor catalog lives on **Labor** page. Quote materials: ``estimate_materials`` (Estimate Materials).
+# Labor catalog lives on **Labor** page. Pricing Guide: ``estimate_materials`` table (master quote catalog).
 # Inventory / Supplies: stocked consumables (separate from Asset Database).
 _NAV_RESOURCES: tuple[str, ...] = ("Inventory",)
 
@@ -107,7 +108,7 @@ _NAV_JOBS_SIDEBAR_PAGES: tuple[str, ...] = (
     "Work & Plan (Supervisor)",
     "Job Costing",
 )
-_NAV_ESTIMATING_SIDEBAR_PAGES: tuple[str, ...] = ("Estimates", "Estimate Materials")
+_NAV_ESTIMATING_SIDEBAR_PAGES: tuple[str, ...] = ("Estimates", "Pricing Guide")
 
 # Role-based page access (UI hiding + routing validation; main.py enforces too).
 # Supported roles: admin, manager, employee, viewer.
@@ -152,6 +153,7 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Assign Tasks (PM)",
             "Work & Plan (Supervisor)",
             "Estimates",
+            "Pricing Guide",
             "Estimate Materials",
             "Job Costing",
             "Inventory",
@@ -270,7 +272,9 @@ def apply_pending_navigation() -> None:
         st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
         return
     if pending == "Materials":
-        st.session_state[IPS_NAV_PAGE_KEY] = "Estimate Materials"
+        st.session_state[IPS_NAV_PAGE_KEY] = "Pricing Guide"
+    if pending in {"Materials Catalog", "Material Catalog"}:
+        st.session_state[IPS_NAV_PAGE_KEY] = "Pricing Guide"
         st.session_state.pop(IPS_ACTIVE_PAGE_KEY, None)
         return
     if pending == "Asset Detail":
@@ -543,8 +547,8 @@ def _ensure_valid_nav_page() -> None:
         st.session_state["people_section_radio"] = "Employees"
     elif cur0 == "Inventory scan":
         st.session_state[IPS_NAV_PAGE_KEY] = "Scan Inventory"
-    elif cur0 == "Materials":
-        st.session_state[IPS_NAV_PAGE_KEY] = "Estimate Materials"
+    elif cur0 in {"Materials", "Materials Catalog", "Material Catalog"}:
+        st.session_state[IPS_NAV_PAGE_KEY] = "Pricing Guide"
     elif cur0 == "Equipment":
         # Legacy standalone route; equipment is managed in Asset Database (category = Equipment).
         st.session_state[IPS_NAV_PAGE_KEY] = "Asset Database"
@@ -716,7 +720,7 @@ def _render_sidebar_office(*, role: str) -> None:
             _, e_inner = st.columns([0.03, 0.97])
             with e_inner:
                 st.markdown(
-                    '<p class="ips-nav-expander-hint">Quote catalog — proposals and pricing</p>',
+                    '<p class="ips-nav-expander-hint">Estimates and default pricing for quotes</p>',
                     unsafe_allow_html=True,
                 )
                 if role_can_open_page(role, "Estimates"):
@@ -728,16 +732,16 @@ def _render_sidebar_office(*, role: str) -> None:
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Estimates")
-                if role_can_open_page(role, "Estimate Materials"):
+                if role_can_open_page(role, "Pricing Guide"):
                     cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
-                    active = cur == "Estimate Materials"
+                    active = cur == "Pricing Guide"
                     if st.button(
-                        "Materials",
-                        key=_nav_btn_key("Estimate_Materials__est_exp"),
+                        "Pricing Guide",
+                        key=_nav_btn_key("Pricing_Guide__est_exp"),
                         type="primary" if active else "secondary",
                         use_container_width=True,
                     ):
-                        _set_sidebar_nav_page("Estimate Materials")
+                        _set_sidebar_nav_page("Pricing Guide")
 
     _render_assets_sidebar_group(role=role)
 

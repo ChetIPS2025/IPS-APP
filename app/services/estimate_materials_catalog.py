@@ -95,7 +95,7 @@ def estimate_material_row_to_catalog_shape(row: dict[str, Any]) -> dict[str, Any
         "id": row.get("id"),
         "item_key": str(row.get("item_key") or "").strip(),
         "description": str(row.get("description") or "").strip(),
-        "category": str(row.get("category") or "Quote Catalog").strip() or "Quote Catalog",
+        "category": str(row.get("category") or "Pricing Guide").strip() or "Pricing Guide",
         "subgroup": str(row.get("subgroup") or "").strip(),
         "unit": str(row.get("unit") or "EA").strip() or "EA",
         "purchase_price": pc,

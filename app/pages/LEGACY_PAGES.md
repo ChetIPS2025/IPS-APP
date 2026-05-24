@@ -13,7 +13,8 @@ There is only one `st.set_page_config` and one sidebar (`app/components/sidebar.
 | `dashboard` | `pages/dashboard.py` | `pages/modules/dashboard.py` |
 | `jobs` | `pages/jobs.py` | `pages/modules/jobs.py` |
 | `estimates` | `pages/estimates.py` | `pages/modules/estimates.py` |
-| `estimate_materials` | `pages/estimate_materials.py` | `pages/modules/estimate_materials.py` |
+| `pricing_guide` | `pages/pricing_guide.py` | Master estimating price list (`estimate_materials` catalog) |
+| `estimate_materials` | `pages/estimate_materials.py` | Per-estimate material lines |
 | `inventory` | `pages/inventory.py` | `pages/modules/inventory.py` |
 | `assets` | `pages/assets.py` | `pages/modules/assets.py` |
 | `timekeeping` | `pages/timekeeping.py` | `pages/modules/timekeeping.py` |

@@ -33,6 +33,7 @@ def render_sidebar(active_slug: str) -> None:
     role = normalize_role(current_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
     nav_items = FIELD_NAV_PAGES if field_mode else filter_nav_for_role(NAV_PAGES, role)
+    _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
 
     with st.sidebar:
         st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
@@ -47,11 +48,18 @@ def render_sidebar(active_slug: str) -> None:
         )
 
         st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
+        estimating_header_shown = False
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
             else:
                 slug, label = item  # type: ignore[misc]
+            if slug in _ESTIMATING_SLUGS and not estimating_header_shown:
+                st.markdown(
+                    '<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">Estimating</p>',
+                    unsafe_allow_html=True,
+                )
+                estimating_header_shown = True
             is_active = slug == active_slug
             if st.button(
                 label,

@@ -227,9 +227,34 @@ def _line_table(headers: list[str], rows: list[list[str]]) -> None:
     )
 
 
+def _sync_pricing_guide_pick_state(
+    k: Callable[[str], str],
+    pick: str | None,
+    pg_map: dict[str, dict[str, Any]],
+    *,
+    taxable_key: str = "tax",
+) -> dict[str, Any]:
+    last_key = k("last_pg_pick")
+    if pick and st.session_state.get(last_key) != pick:
+        item = pg_map.get(pick, {})
+        st.session_state[k("desc")] = str(item.get("description") or "")
+        st.session_state[k("sku")] = str(item.get("sku") or item.get("item_key") or "")
+        st.session_state[k("cat")] = str(item.get("category") or "")
+        st.session_state[k("unit")] = str(item.get("unit") or "EA")
+        st.session_state[k("vendor")] = str(item.get("vendor") or item.get("vendor_name") or "")
+        st.session_state[k("vendor_id")] = item.get("vendor_id")
+        st.session_state[k("uc")] = float(item.get("unit_cost") or 0)
+        st.session_state[k("mk")] = float(item.get("markup_pct") or 0)
+        st.session_state[taxable_key] = bool(item.get("taxable", True))
+        st.session_state[last_key] = pick
+        return item
+    return pg_map.get(pick or "", {})
+
+
 def render_cost_builder_tab(
     est: dict[str, Any],
     *,
+    pricing_guide_options: list[tuple[str, dict[str, Any]]] | None = None,
     inventory_options: list[tuple[str, dict[str, Any]]] | None = None,
     asset_options: list[tuple[str, dict[str, Any]]] | None = None,
     vendor_options: list[str] | None = None,
@@ -300,7 +325,8 @@ def render_cost_builder_tab(
         _render_add_material_form(
             eid,
             est,
-            inventory_options or [],
+            pricing_guide_options=pricing_guide_options,
+            inventory_options=inventory_options,
             key_prefix="ecb_mat",
             form_state_key=f"ecb_form_mat_{eid}",
         )
@@ -331,40 +357,70 @@ def render_cost_builder_tab(
 def _render_add_material_form(
     eid: str,
     est: dict[str, Any],
-    inventory_options: list[tuple[str, dict[str, Any]]],
     *,
+    pricing_guide_options: list[tuple[str, dict[str, Any]]] | None = None,
+    inventory_options: list[tuple[str, dict[str, Any]]] | None = None,
     key_prefix: str = "ecb_mat",
     form_state_key: str | None = None,
 ) -> None:
     fk = form_state_key or f"ecb_form_mat_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     default_markup = float(est.get("default_material_markup_pct") or 0)
-    inv_map = {label: item for label, item in inventory_options}
-    labels = [label for label, _ in inventory_options]
+    pg_opts = pricing_guide_options or []
+    inv_opts = inventory_options or []
+    pg_map = {label: item for label, item in pg_opts}
+    inv_map = {label: item for label, item in inv_opts}
+    pg_labels = [label for label, _ in pg_opts]
+    inv_labels = [label for label, _ in inv_opts]
+    source_options = ["Pricing Guide", "Inventory", "Custom Item"]
+    if k("src") not in st.session_state:
+        st.session_state[k("src")] = "Pricing Guide" if pg_opts else ("Inventory" if inv_opts else "Custom Item")
 
     _compact_form_card("Add Material")
+    source = st.selectbox("Material source", source_options, key=k("src"))
+    custom = source == "Custom Item"
+    pick = None
+    item: dict[str, Any] = {}
+
     c1, c2 = st.columns(2, gap="small")
     with c1:
-        custom = False
-        if inventory_options:
-            pick = st.selectbox("Inventory item", labels, key=k("inv"))
-            item = _sync_pick_state(k, pick, inv_map, taxable_key=k("tax"))
-            custom = st.session_state.get(k("custom"), False)
+        if source == "Pricing Guide":
+            if pg_opts:
+                pick = st.selectbox("Pricing item", pg_labels, key=k("pg"))
+                item = _sync_pricing_guide_pick_state(k, pick, pg_map, taxable_key=k("tax"))
+            else:
+                custom = True
+                st.info("No pricing guide items available — add items under Pricing Guide or use Custom Item.")
+        elif source == "Inventory":
+            if inv_opts:
+                pick = st.selectbox("Inventory item", inv_labels, key=k("inv"))
+                item = _sync_pick_state(k, pick, inv_map, taxable_key=k("tax"))
+            else:
+                custom = True
+                st.info("No inventory items available — enter custom material details below.")
         else:
-            pick = None
             item = {}
-            custom = True
-            st.info("No inventory items available — enter custom material details below.")
 
         qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
-        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        if source == "Pricing Guide" and item.get("markup_pct") is not None:
+            markup = st.number_input(
+                "Markup %",
+                value=float(st.session_state.get(k("mk"), item.get("markup_pct") or default_markup)),
+                key=k("mk"),
+            )
+        else:
+            markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
         if k("tax") not in st.session_state:
             st.session_state[k("tax")] = bool(item.get("taxable", True))
         taxable = st.checkbox("Taxable", key=k("tax"))
 
     with c2:
-        override = st.checkbox("Override inventory cost", key=k("ovr"), disabled=custom or not inventory_options)
-        if override or custom or not inventory_options:
+        override = st.checkbox(
+            "Override cost",
+            key=k("ovr"),
+            disabled=custom or (source == "Custom Item"),
+        )
+        if override or custom or (source == "Custom Item") or not item:
             unit_cost = st.number_input(
                 "Unit cost",
                 min_value=0.0,
@@ -375,10 +431,10 @@ def _render_add_material_form(
             unit_cost = float(item.get("unit_cost") or 0)
             _display_field("Unit Cost", fmt_currency(unit_cost))
             if unit_cost <= 0:
-                st.warning("No inventory price found. Add a unit cost to inventory or enable cost override.")
+                st.warning("No default cost found. Enter a unit cost or enable cost override.")
 
         unit = str(item.get("unit") or st.session_state.get(k("unit")) or "EA")
-        if custom or override:
+        if custom or override or source == "Custom Item":
             unit = st.text_input("Unit", value=unit, key=k("unit"))
         else:
             _display_field("Unit", unit)
@@ -394,8 +450,6 @@ def _render_add_material_form(
 
     with st.expander("Advanced material details", expanded=False):
         st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
-        if inventory_options:
-            custom = st.checkbox("Custom material (not from inventory)", key=k("custom"))
         st.text_input("Description", key=k("desc"))
         st.text_input("SKU", key=k("sku"))
         st.text_input("Category", key=k("cat"))
@@ -406,12 +460,16 @@ def _render_add_material_form(
     b1, b2 = st.columns(2, gap="small")
     with b1:
         if st.button("Save Material", key=k("save"), type="primary", use_container_width=True):
-            pick_save = st.session_state.get(k("inv"))
-            item_save = inv_map.get(pick_save, {}) if pick_save else {}
+            item_save: dict[str, Any] = {}
             inv_id = ""
-            if inventory_options and pick_save and not st.session_state.get(k("custom")):
+            if source == "Pricing Guide":
+                pick_save = st.session_state.get(k("pg"))
+                item_save = pg_map.get(pick_save, {}) if pick_save else {}
+            elif source == "Inventory":
+                pick_save = st.session_state.get(k("inv"))
+                item_save = inv_map.get(pick_save, {}) if pick_save else {}
                 inv_id = str(item_save.get("id") or "")
-            if override or custom or not inventory_options:
+            if override or custom or source == "Custom Item" or not item_save:
                 unit_cost_save = float(st.session_state.get(k("uc")) or 0)
             else:
                 unit_cost_save = float(item_save.get("unit_cost") or 0)
@@ -420,6 +478,7 @@ def _render_add_material_form(
                     eid,
                     {
                         "inventory_item_id": inv_id or None,
+                        "pricing_guide_item_key": item_save.get("item_key") if source == "Pricing Guide" else None,
                         "sku": st.session_state.get(k("sku")),
                         "description": st.session_state.get(k("desc")),
                         "category": st.session_state.get(k("cat")),
@@ -978,6 +1037,7 @@ def _render_deletable_lines(
 def render_materials_tab(
     est: dict[str, Any],
     *,
+    pricing_guide_options: list[tuple[str, dict[str, Any]]] | None = None,
     inventory_options: list[tuple[str, dict[str, Any]]] | None = None,
 ) -> None:
     eid = str(est.get("id") or "")
@@ -1005,7 +1065,8 @@ def render_materials_tab(
         _render_add_material_form(
             eid,
             est,
-            inventory_options or [],
+            pricing_guide_options=pricing_guide_options,
+            inventory_options=inventory_options,
             key_prefix="mat_tab",
             form_state_key=f"mat_tab_form_{eid}",
         )

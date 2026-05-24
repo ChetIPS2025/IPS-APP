@@ -52,7 +52,7 @@ def estimate_materials_payload_from_inventory(
 
     ik = (item_key or _item_key_from_inventory_row(row)).strip()
     desc = str(row.get("item_name") or "").strip() or str(row.get("sku") or "").strip() or ik
-    cat = str(row.get("category") or "").strip() or "Quote Catalog"
+    cat = str(row.get("category") or "").strip() or "Pricing Guide"
     iid = str(row.get("id") or "").strip()
 
     return {
