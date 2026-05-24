@@ -1276,6 +1276,11 @@ def render_summary_tab(est: dict[str, Any]) -> None:
 def render_proposal_preview_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
     totals = calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
+    try:
+        from app.services.proposal_pdf_service import merge_proposal_totals
+    except ImportError:
+        from services.proposal_pdf_service import merge_proposal_totals  # type: ignore
+    totals = merge_proposal_totals(totals, est)
 
     preview_fields = [
         detail_field_html("Estimate #", est.get("estimate_number")),
@@ -1286,7 +1291,7 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
     travel_price = float(totals.get("travel_price") or 0)
     if travel_price > 0:
         preview_fields.append(detail_field_html("Travel (customer)", fmt_currency(travel_price)))
-    preview_fields.append(detail_field_html("Proposal total", fmt_currency(totals.get("customer_price"))))
+    preview_fields.append(detail_field_html("Proposal total", fmt_currency(totals.get("proposal_total"))))
     st.markdown(
         dialog_card_html(
             "Customer Quote",

@@ -361,7 +361,7 @@ def render() -> None:
     )
 
     rows = _load_rows()
-    build_modal_cache(rows, cache_key=_CACHE_KEY, id_field="id")
+    build_modal_cache(rows, cache_key=_CACHE_KEY)
 
     def _filters() -> None:
         c1, c2 = st.columns([3, 1])

@@ -13,6 +13,7 @@ try:
         fetch_list,
         fetch_rows,
         insert_row,
+        table_column_names,
         update_row,
     )
 except ImportError:
@@ -23,6 +24,7 @@ except ImportError:
         fetch_list,
         fetch_rows,
         insert_row,
+        table_column_names,
         update_row,
     )
 
@@ -781,6 +783,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "proposal_show_final_price_only": ui.get("proposal_show_final_price_only"),
     }
     payload = {k: v for k, v in payload.items() if v is not None}
+    cols = table_column_names("estimates")
+    if cols and "customer_name" not in cols:
+        payload.pop("customer_name", None)
     if row_id:
         result = update_row("estimates", payload, {"id": row_id})
     else:

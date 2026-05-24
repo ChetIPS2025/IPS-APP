@@ -79,7 +79,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v9"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v10"):
         return
     st.markdown(
         """
@@ -108,7 +108,8 @@ def _inject_proposal_preview_styles() -> None:
             font-size: 11pt;
             line-height: 1.45;
             border-radius: 0;
-            padding: 0.62in 0.68in 0.65in 0.68in;
+            /* Match Word template narrow margins (0.5in on all sides). */
+            padding: 0.5in;
             margin: 0 auto;
             border: 1px solid #b0b0b0;
             box-shadow: none;
@@ -398,7 +399,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v9"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v10"] = True
 
 
 def _render_proposal_preview_html(

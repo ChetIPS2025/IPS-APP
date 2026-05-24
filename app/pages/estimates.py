@@ -66,6 +66,7 @@ try:
     )
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
+    from app.services.job_from_estimate import approve_estimate_and_create_job
     from app.styles import inject_estimates_module_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
@@ -127,6 +128,7 @@ except ImportError:
     )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from services.job_from_estimate import approve_estimate_and_create_job  # type: ignore
     from styles import inject_estimates_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
@@ -890,24 +892,57 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
+    eid = str(est.get("id") or "")
     en = safe_value(est.get("estimate_number"))
     project = safe_value(est.get("project_name"))
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
     total = fmt_currency(est.get("total"))
+    linked_job = str(est.get("job_id") or est.get("job_number") or "").strip()
 
     render_modal_shell()
     render_modal_header(title=en, subtitle=project, status=status)
 
-    btn1, btn2 = st.columns(2, gap="small")
+    btn1, btn2, btn3 = st.columns(3, gap="small")
     with btn1:
         if st.button("Edit", key=f"estimates_modal_edit_{rk}", use_container_width=True):
             _set_estimate_edit_mode(est)
             st.rerun()
     with btn2:
-        if st.button("Build Estimate", key=f"estimates_modal_build_{rk}", type="primary", use_container_width=True):
+        if st.button("Build Estimate", key=f"estimates_modal_build_{rk}", use_container_width=True):
             _set_estimate_build_mode(est)
             st.rerun()
+    with btn3:
+        show_approve_job = (
+            eid
+            and not is_demo_id(eid)
+            and not linked_job
+            and not is_edit_mode(_MOD, rk)
+        )
+        if show_approve_job:
+            if st.button(
+                "Approve & Create Job",
+                key=f"estimates_modal_approve_job_{rk}",
+                type="primary",
+                use_container_width=True,
+            ):
+                res = approve_estimate_and_create_job(eid)
+                if res.ok and res.job:
+                    st.success(res.message)
+                    try:
+                        from app.services.phase2_modules_service import clear_all_data_caches
+                    except ImportError:
+                        from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                    clear_all_data_caches()
+                    st.rerun()
+                elif res.message:
+                    st.error(res.message)
+
+    if eid and not linked_job and not is_demo_id(eid) and not is_edit_mode(_MOD, rk):
+        st.caption(
+            "One click sets status to **Approved**, creates job **J#####** from quote **Q#####**, "
+            "and links the estimate to the new job."
+        )
 
     render_modal_meta_grid(
         [

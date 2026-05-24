@@ -110,9 +110,8 @@ SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
 _TABLE_KEY = "inventory_list"
-_INV_COLS = [0.35, 0.75, 0.9, 3.6, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
+_INV_COLS = [0.35, 0.9, 4.35, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
 _INV_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
     ("", None),
     ("IMAGE", None),
     ("DESCRIPTION", None),
@@ -357,55 +356,48 @@ def _render_custom_inventory_table(
                 )
 
             with cols[1]:
-                qr_png = inventory_qr_png_bytes(item)
-                if qr_png:
-                    st.image(qr_png, width=40)
-                else:
-                    st.markdown('<div class="ips-inventory-qr-cell"></div>', unsafe_allow_html=True)
-
-            with cols[2]:
                 _render_inventory_thumbnail(item)
 
-            with cols[3]:
+            with cols[2]:
                 st.markdown(
                     f'<div class="ips-inventory-title">{html.escape(description)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[3]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[4]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(location)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[6]:
+            with cols[5]:
                 st.markdown(
                     f'<div class="ips-inventory-cell ips-inventory-qty">{html.escape(qty)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(unit)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[8]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-inventory-cell">{html.escape(unit_cost)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[9]:
+            with cols[8]:
                 st.markdown(_inventory_status_pill_html(status), unsafe_allow_html=True)
 
-            with cols[10]:
+            with cols[9]:
                 st.markdown(
                     f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>',
                     unsafe_allow_html=True,

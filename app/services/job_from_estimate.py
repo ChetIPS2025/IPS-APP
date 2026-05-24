@@ -156,6 +156,112 @@ def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
     return fetch_one("estimates", {"id": eid})
 
 
+def _patch_estimate_row(estimate_id: str, payload: dict[str, Any]) -> None:
+    """Update estimate with only columns present in the live schema."""
+    eid = str(estimate_id or "").strip()
+    if not eid or not payload:
+        return
+    try:
+        from app.services.repository import filter_payload_to_table
+
+        filtered = filter_payload_to_table("estimates", payload)
+    except ImportError:
+        from services.repository import filter_payload_to_table  # type: ignore
+
+        filtered = filter_payload_to_table("estimates", payload)
+    if not filtered:
+        return
+    filtered["updated_at"] = datetime.utcnow().isoformat()
+    update_rows_admin("estimates", filtered, {"id": eid})
+
+
+def _resolve_customer_id_for_estimate(row: dict[str, Any]) -> str:
+    cid = str(row.get("customer_id") or "").strip()
+    if cid:
+        return cid
+    ej = _as_json_dict(row.get("estimate_json"))
+    cid = str(ej.get("customer_id") or "").strip()
+    if cid:
+        return cid
+    name = str(row.get("customer_name") or row.get("customer") or ej.get("customer") or "").strip()
+    if not name:
+        return ""
+    try:
+        rows = fetch_by_match_admin("customers", {"customer_name": name}, columns="id,customer_name", limit=5)
+        if rows:
+            return str(rows[0].get("id") or "").strip()
+    except Exception:
+        pass
+    try:
+        rows = fetch_table("customers", columns="id,customer_name", limit=5000, order_by="customer_name")
+        needle = name.lower()
+        for r in rows or []:
+            if str(r.get("customer_name") or "").strip().lower() == needle:
+                return str(r.get("id") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _estimate_awarded_amount(row: dict[str, Any]) -> float:
+    for key in ("proposal_total", "final_bid", "total", "customer_price", "grand_total"):
+        val = row.get(key)
+        if val in (None, ""):
+            continue
+        try:
+            amount = float(val)
+        except (TypeError, ValueError):
+            continue
+        if amount != 0 or key in ("proposal_total", "total", "customer_price"):
+            return amount
+    return 0.0
+
+
+def approve_estimate_and_create_job(
+    estimate_id: str,
+    *,
+    mark_job_received: bool = False,
+) -> CreateJobFromEstimateResult:
+    """
+    One-click workflow: ensure customer is linked, set status to Approved if needed,
+    then create the matching job (Q##### → J#####).
+    """
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return CreateJobFromEstimateResult(ok=False, message="Invalid estimate id.", error_code="invalid_id")
+
+    row = _fetch_estimate_row_for_create(eid)
+    if not row:
+        return CreateJobFromEstimateResult(ok=False, message="Estimate not found.", error_code="not_found")
+
+    existing = _existing_job_for_estimate(eid, row)
+    if existing:
+        jn = job_number_display(existing.get("job_number"))
+        label = jn or str(existing.get("job_name") or "").strip() or "existing job"
+        return CreateJobFromEstimateResult(
+            ok=True,
+            message=f"This estimate already has job {label}.",
+            job=existing,
+            error_code="duplicate",
+        )
+
+    customer_id = _resolve_customer_id_for_estimate(row)
+    if not customer_id:
+        return CreateJobFromEstimateResult(
+            ok=False,
+            message="Choose a customer on the estimate before creating a job.",
+            error_code="no_customer",
+        )
+
+    if not str(row.get("customer_id") or "").strip():
+        _patch_estimate_row(eid, {"customer_id": customer_id})
+
+    if not estimate_status_allows_job_creation(str(row.get("status") or "")):
+        _patch_estimate_row(eid, {"status": "Approved"})
+
+    return create_job_from_estimate(eid, mark_job_received=mark_job_received)
+
+
 def estimate_quote_to_job_number(quote_number: str) -> str:
     """
     Map an estimate **quote_number** (e.g. ``Q26025`` or ``26025``) to a related **job_number**
@@ -355,13 +461,7 @@ def create_job_from_estimate(
 
     _, has_job_number_column = fetch_jobs_for_job_database(limit=1, admin_read=True)
 
-    awarded = row.get("proposal_total")
-    if awarded is None:
-        awarded = row.get("final_bid")
-    try:
-        awarded_f = float(awarded or 0)
-    except (TypeError, ValueError):
-        awarded_f = 0.0
+    awarded_f = _estimate_awarded_amount(row)
 
     site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
     merged_location = site_loc or _safe_location(ej)

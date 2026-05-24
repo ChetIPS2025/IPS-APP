@@ -116,9 +116,19 @@ def build_proposal_view_model(
     minus customer location).
     """
     from proposal import _proposal_prepared_by_display
+    try:
+        from app.services.proposal_pdf_service import _stored_estimate_price
+    except ImportError:
+        from services.proposal_pdf_service import _stored_estimate_price  # type: ignore
 
     cust = _s(customer_name or est.get("customer_name"))
-    pt = _fmt_money(totals.get("proposal_total", 0) or 0)
+    pt = _fmt_money(
+        totals.get("proposal_total")
+        or totals.get("customer_price")
+        or totals.get("total")
+        or _stored_estimate_price(est)
+        or 0
+    )
     prepared = _proposal_prepared_by_display(est)
     # Quote title line: Estimate Description – Quote (Word {{JOB_NAME}} – Quote); fall back to job name.
     desc = _estimate_description_for_title(est)

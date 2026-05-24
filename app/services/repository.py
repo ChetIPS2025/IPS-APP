@@ -121,7 +121,23 @@ def fetch_by_id(
     return normalize(row) if normalize else row
 
 
+def table_column_names(table: str) -> frozenset[str]:
+    """Best-effort column set from one sample row (handles legacy schemas)."""
+    rows, err = fetch_rows(table, limit=1)
+    if err or not rows:
+        return frozenset()
+    return frozenset(str(k) for k in rows[0].keys())
+
+
+def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, Any]:
+    cols = table_column_names(table)
+    if not cols:
+        return payload
+    return {k: v for k, v in payload.items() if k in cols}
+
+
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
+    payload = filter_payload_to_table(table, payload)
     try:
         row = _db().insert_row(table, payload)
         clear_all_data_caches()
@@ -133,6 +149,7 @@ def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
+    payload = filter_payload_to_table(table, payload)
     try:
         rows = _db().update_rows(table, payload, match)
         clear_all_data_caches()

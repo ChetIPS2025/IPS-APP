@@ -42,7 +42,8 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
                 {"id": eid},
                 columns=(
                     "id,quote_number,scope_of_work,customer_responsibilities,estimate_description,"
-                    "prepared_by_id,prepared_by_name,customer_id,customer_contact_id,contact_name,job_id"
+                    "prepared_by_id,prepared_by_name,customer_id,customer_contact_id,contact_name,job_id,"
+                    "proposal_total,final_bid,total,customer_price,grand_total"
                 ),
             )
         except Exception:
@@ -59,6 +60,11 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
                 "customer_contact_id",
                 "contact_name",
                 "job_id",
+                "proposal_total",
+                "final_bid",
+                "total",
+                "customer_price",
+                "grand_total",
             ):
                 if row.get(key) not in (None, ""):
                     out[key] = row[key]
@@ -68,12 +74,51 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
     return out
 
 
-def _totals_for_proposal(totals: dict[str, Any]) -> dict[str, Any]:
-    """Legacy proposal layout expects ``proposal_total`` (Phase 2 costing uses ``customer_price``)."""
-    merged = dict(totals)
-    if merged.get("proposal_total") in (None, "", 0):
-        merged["proposal_total"] = merged.get("customer_price") or merged.get("total") or 0
+def _float_money(val: Any) -> float | None:
+    if val in (None, ""):
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _stored_estimate_price(est: dict[str, Any] | None) -> float:
+    """Persisted quote total on the estimate row (legacy imports often have no line items yet)."""
+    if not est:
+        return 0.0
+    for key in ("customer_price", "total", "proposal_total", "final_bid", "grand_total"):
+        val = _float_money(est.get(key))
+        if val is None:
+            continue
+        if val != 0 or key in ("customer_price", "proposal_total", "final_bid"):
+            return val
+    return 0.0
+
+
+def merge_proposal_totals(
+    totals: dict[str, Any] | None,
+    est: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Map Phase 2 costing totals onto legacy ``proposal_total`` with estimate-row fallback."""
+    merged = dict(totals or {})
+    calc_amount = (
+        _float_money(merged.get("customer_price"))
+        or _float_money(merged.get("proposal_total"))
+        or _float_money(merged.get("total"))
+        or 0.0
+    )
+    stored_amount = _stored_estimate_price(est)
+    amount = calc_amount if calc_amount else stored_amount
+    merged["customer_price"] = amount
+    merged["proposal_total"] = amount
+    if not merged.get("total"):
+        merged["total"] = amount
     return merged
+
+
+def _totals_for_proposal(totals: dict[str, Any], est: dict[str, Any] | None = None) -> dict[str, Any]:
+    return merge_proposal_totals(totals, est)
 
 
 def _proposal_context(est: dict[str, Any]) -> dict[str, str]:
@@ -113,7 +158,10 @@ def build_customer_quote_bundle(
     from app.services.estimate_costing_service import calculate_estimate_totals
 
     est = _merge_proposal_estimate(estimate, estimate_id)
-    calc = _totals_for_proposal(totals or calculate_estimate_totals(str(estimate_id or est.get("id") or "")))
+    calc = merge_proposal_totals(
+        totals or calculate_estimate_totals(str(estimate_id or est.get("id") or "")),
+        est,
+    )
     pe = _proposal_context(est)
     _vals, docx, err, page_html, pdf_b = build_proposal_view_bundle(est, calc, pe)
     pdf_note = "" if pdf_b else PROPOSAL_PDF_UNAVAILABLE_SHORT
