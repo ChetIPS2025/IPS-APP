@@ -247,10 +247,15 @@ def _estimate_total_cost(row: dict) -> str:
 
 
 def _estimate_customer_price(row: dict) -> str:
-    val = row.get("customer_price")
-    if val in (None, ""):
-        val = row.get("total")
-    return fmt_currency(val)
+    for key in ("customer_price", "total", "proposal_total", "final_bid"):
+        val = row.get(key)
+        if val not in (None, ""):
+            try:
+                if float(val) != 0 or key in ("customer_price", "proposal_total", "final_bid"):
+                    return fmt_currency(val)
+            except (TypeError, ValueError):
+                continue
+    return fmt_currency(0)
 
 
 def _inventory_options() -> list[tuple[str, dict]]:

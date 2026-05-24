@@ -45,6 +45,31 @@ def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
     return 0.0
 
 
+def _estimate_json_get(row: dict[str, Any], key: str) -> str:
+    ej = row.get("estimate_json")
+    if isinstance(ej, dict):
+        return str(ej.get(key) or "").strip()
+    return ""
+
+
+def _normalize_estimate_status(raw: Any) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return "Draft"
+    mapping = {
+        "draft": "Draft",
+        "pending": "Pending",
+        "sent": "Sent",
+        "approved": "Approved",
+        "awarded": "Awarded",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "cancelled": "Cancelled",
+        "canceled": "Cancelled",
+    }
+    return mapping.get(s.lower(), s)
+
+
 def normalize_customer(row: dict[str, Any]) -> dict[str, Any]:
     cid = str(row.get("id") or "").strip()
     active = row.get("is_active", True)
@@ -147,12 +172,31 @@ def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _customer_name_by_id() -> dict[str, str]:
-    """Map customer UUID -> company name for job list normalization."""
+    """Map customer UUID -> company name for job/estimate normalization."""
+    rows: list[dict[str, Any]] = []
     try:
         from app.services.customers_service import list_customers
     except ImportError:
         from services.customers_service import list_customers  # type: ignore
-    rows, _ = list_customers(demo=[])
+    try:
+        listed, _ = list_customers(demo=[])
+        rows = listed or []
+    except Exception:
+        rows = []
+    if not rows:
+        try:
+            from app.db import fetch_table_admin
+        except ImportError:
+            from db import fetch_table_admin  # type: ignore
+        try:
+            rows = fetch_table_admin(
+                "customers",
+                columns="id,customer_name",
+                limit=5000,
+                order_by="customer_name",
+            ) or []
+        except Exception:
+            rows = []
     return {
         str(c.get("id") or "").strip(): str(c.get("customer_name") or c.get("name") or "").strip()
         for c in rows
@@ -201,16 +245,40 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
+def normalize_estimate(
+    row: dict[str, Any],
+    *,
+    customer_names: dict[str, str] | None = None,
+) -> dict[str, Any]:
     eid = str(row.get("id") or "").strip()
     num = str(row.get("quote_number") or row.get("estimate_number") or eid[:8] or "—")
-    total_cost = float(row.get("total_cost") or row.get("subtotal") or 0)
-    customer_price = float(row.get("customer_price") or row.get("total") or row.get("grand_total") or 0)
+    total_cost = _money_field(row, "total_cost", "subtotal", "material_sell_basis")
+    customer_price = _money_field(
+        row,
+        "customer_price",
+        "total",
+        "grand_total",
+        "proposal_total",
+        "final_bid",
+    )
+    customer = str(row.get("customer_name") or row.get("customer") or "").strip()
+    if not customer:
+        cid = str(row.get("customer_id") or "").strip()
+        if cid:
+            names = customer_names if customer_names is not None else _customer_name_by_id()
+            customer = names.get(cid, "")
+    if not customer:
+        customer = "—"
+    project_name = str(row.get("project_name") or row.get("job_name") or row.get("title") or "").strip()
+    if not project_name:
+        project_name = _estimate_json_get(row, "estimate_description")
+    if not project_name:
+        project_name = "—"
     return {
         "id": eid or num,
         "estimate_number": num,
-        "project_name": str(row.get("project_name") or row.get("job_name") or row.get("title") or "—"),
-        "customer": str(row.get("customer_name") or row.get("customer") or "—"),
+        "project_name": project_name,
+        "customer": customer,
         "customer_id": str(row.get("customer_id") or ""),
         "customer_location_id": str(row.get("customer_location_id") or ""),
         "customer_contact_id": str(row.get("customer_contact_id") or ""),
@@ -220,7 +288,7 @@ def normalize_estimate(row: dict[str, Any]) -> dict[str, Any]:
         "total": customer_price,
         "customer_price": customer_price,
         "total_cost": total_cost,
-        "status": str(row.get("status") or "Draft"),
+        "status": _normalize_estimate_status(row.get("status")),
         "created_by": str(row.get("created_by") or row.get("prepared_by_name") or row.get("prepared_by") or "—"),
         "job_number": str(row.get("job_number") or "—"),
         "description": str(row.get("description") or row.get("scope_of_work") or row.get("notes") or ""),
@@ -489,8 +557,22 @@ def list_jobs(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool
 
 
 def list_estimates(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
-    rows, used = fetch_list("estimates", order_by="quote_number", normalize=normalize_estimate, demo=demo)
-    return rows if rows or not used else demo, used
+    rows, err = fetch_rows("estimates", limit=5000)
+    if not rows:
+        try:
+            from app.db import fetch_table_admin
+        except ImportError:
+            from db import fetch_table_admin  # type: ignore
+        try:
+            rows = fetch_table_admin("estimates", limit=5000, order_by="quote_number") or []
+        except Exception:
+            rows = []
+    if not rows:
+        return (demo if demo else []), True
+    cust_names = _customer_name_by_id()
+    out = [normalize_estimate(r, customer_names=cust_names) for r in rows]
+    out.sort(key=lambda r: str(r.get("estimate_number") or ""))
+    return out, False
 
 
 def list_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
