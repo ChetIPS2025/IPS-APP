@@ -108,6 +108,10 @@ def inject_users_module_css() -> None:
   background: #f1f5f9;
   color: #475569;
 }}
+.ips-user-status-deleted {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
 .ips-user-status-locked {{
   background: #fee2e2;
   color: #991b1b;
@@ -3378,11 +3382,13 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marke
     color: #475569;
     margin-bottom: 12px;
 }
-div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) {
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker),
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) {
     margin-top: 0.65rem !important;
     margin-bottom: 0.35rem !important;
 }
-.ips-job-actions-title {
+.ips-job-actions-title,
+.ips-user-actions-title {
     margin: 0 0 0.45rem 0;
     font-size: 0.72rem;
     font-weight: 800;
@@ -3390,26 +3396,34 @@ div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) {
     text-transform: uppercase;
     color: #475569;
 }
-div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"] {
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"],
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="stHorizontalBlock"] {
     gap: 12px !important;
     flex-wrap: wrap !important;
     align-items: center !important;
 }
-div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"] {
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"],
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="column"] {
     flex: 0 0 auto !important;
     width: auto !important;
     min-width: 0 !important;
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
-div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
 }
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
-div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;

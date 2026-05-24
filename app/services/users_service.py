@@ -193,6 +193,130 @@ def can_delete_user(user_id: str, current_user: dict[str, Any] | None = None) ->
     )
 
 
+def can_manage_user_actions(actor: dict[str, Any] | None = None) -> bool:
+    """Admin or supervisor may activate, deactivate, or archive users."""
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import normalize_role
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import normalize_role  # type: ignore
+    _ = actor
+    role = normalize_role(current_role())
+    return role in {"admin", "supervisor"}
+
+
+def activate_user(
+    user_id: str,
+    *,
+    activated_by: str | None = None,
+    actor: dict[str, Any] | None = None,
+) -> ServiceResult:
+    """Restore an inactive or deleted user to Active status."""
+    _ = actor
+    uid = str(user_id or "").strip()
+    if not uid:
+        return ServiceResult(ok=False, error="User id is required.")
+    if uid.startswith("emp-"):
+        return ServiceResult(ok=False, error="Demo users cannot be modified.")
+
+    employee = _employee_row(uid)
+    if not employee:
+        return ServiceResult(ok=False, error="User record not found.")
+
+    profile = _find_profile_for_employee(uid, email=str(employee.get("email") or ""))
+    activated_by_id = str(activated_by or "").strip() or None
+
+    emp_payload: dict[str, Any] = {
+        "is_active": True,
+        "status": "Active",
+        "deleted_at": None,
+        "deactivation_reason": None,
+    }
+    if activated_by_id:
+        emp_payload["deleted_by"] = None
+    emp_result = update_row("employees", emp_payload, {"id": uid})
+    if not emp_result.ok:
+        return emp_result
+
+    auth_warning: str | None = None
+    if profile and profile.get("id"):
+        prof_payload: dict[str, Any] = {
+            "is_active": True,
+            "status": "Active",
+            "deleted_at": None,
+            "deactivation_reason": None,
+        }
+        prof_payload = filter_payload_to_table("profiles", prof_payload)
+        try:
+            update_rows_admin("profiles", prof_payload, {"id": str(profile["id"])})
+        except Exception as exc:
+            auth_warning = f"User activated, but profile update failed: {exc}"
+
+    clear_all_data_caches()
+    data: dict[str, Any] = {"employee_id": uid}
+    if auth_warning:
+        data["warning"] = auth_warning
+    return ServiceResult(ok=True, data=data)
+
+
+def soft_delete_user(
+    user_id: str,
+    *,
+    reason: str | None = None,
+    deleted_by: str | None = None,
+    actor: dict[str, Any] | None = None,
+) -> ServiceResult:
+    """Archive a user (soft delete). Historical records are preserved."""
+    check = can_delete_user(user_id, current_user=actor)
+    if not check.allowed:
+        return ServiceResult(ok=False, error=check.reason or "Cannot delete user.")
+
+    uid = str(user_id or "").strip()
+    now = _utc_now_iso()
+    reason_text = str(reason or "Deleted by administrator").strip() or None
+    deleted_by_id = str(deleted_by or "").strip() or None
+    profile = check.profile
+
+    emp_payload: dict[str, Any] = {
+        "is_active": False,
+        "status": "Deleted",
+        "deleted_at": now,
+        "deactivation_reason": reason_text,
+    }
+    if deleted_by_id:
+        emp_payload["deleted_by"] = deleted_by_id
+
+    emp_result = update_row("employees", emp_payload, {"id": uid})
+    if not emp_result.ok:
+        return emp_result
+
+    auth_warning: str | None = None
+    if profile and profile.get("id"):
+        prof_payload: dict[str, Any] = {
+            "is_active": False,
+            "status": "Deleted",
+            "deleted_at": now,
+            "deactivation_reason": reason_text,
+        }
+        if deleted_by_id:
+            prof_payload["deleted_by"] = deleted_by_id
+        prof_payload = filter_payload_to_table("profiles", prof_payload)
+        try:
+            update_rows_admin("profiles", prof_payload, {"id": str(profile["id"])})
+        except Exception as exc:
+            auth_warning = f"User archived, but profile update failed: {exc}"
+
+    clear_all_data_caches()
+    data: dict[str, Any] = {
+        "employee_id": uid,
+        "profile_id": str(profile.get("id") or "") if profile else "",
+    }
+    if auth_warning:
+        data["warning"] = auth_warning
+    return ServiceResult(ok=True, data=data)
+
+
 def deactivate_user(
     user_id: str,
     *,
@@ -322,10 +446,13 @@ def hard_delete_user(
 
 __all__ = [
     "DeleteUserCheck",
+    "activate_user",
     "can_delete_user",
+    "can_manage_user_actions",
     "deactivate_user",
     "get_profile_by_user_id",
     "get_user_delete_context",
     "hard_delete_user",
     "list_profiles",
+    "soft_delete_user",
 ]
