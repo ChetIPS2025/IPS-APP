@@ -244,6 +244,10 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "end_date": end,
         "progress": int(row.get("progress") or row.get("percent_complete") or 0),
         "description": str(row.get("notes") or row.get("description") or ""),
+        "is_deleted": bool(row.get("is_deleted")),
+        "completed_at": row.get("completed_at"),
+        "cancelled_at": row.get("cancelled_at"),
+        "deleted_at": row.get("deleted_at"),
     }
 
 

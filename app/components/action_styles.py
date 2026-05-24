@@ -9,6 +9,8 @@ import streamlit as st
 # Streamlit adds st-key-{button_key} on the widget wrapper — target these in CSS.
 OUTLINE_BTN_PREFIX = "ips_dng_o_"
 SOLID_BTN_PREFIX = "ips_dng_s_"
+SUCCESS_SOLID_PREFIX = "ips_succ_s_"
+WARNING_SOLID_PREFIX = "ips_warn_s_"
 
 # Legacy container prefixes (kept for any remaining wrappers).
 DANGER_OUTLINE_PREFIX = "ips_danger_outline_"
@@ -21,6 +23,14 @@ def outline_btn_key(suffix: str) -> str:
 
 def solid_btn_key(suffix: str) -> str:
     return f"{SOLID_BTN_PREFIX}{suffix}"
+
+
+def success_btn_key(suffix: str) -> str:
+    return f"{SUCCESS_SOLID_PREFIX}{suffix}"
+
+
+def warning_btn_key(suffix: str) -> str:
+    return f"{WARNING_SOLID_PREFIX}{suffix}"
 
 
 def danger_outline_button(
@@ -57,6 +67,48 @@ def danger_solid_button(
     return st.button(
         label,
         key=solid_btn_key(suffix),
+        type="secondary",
+        disabled=disabled,
+        help=help,
+        use_container_width=use_container_width,
+        **kwargs,
+    )
+
+
+def success_solid_button(
+    label: str,
+    suffix: str,
+    *,
+    disabled: bool = False,
+    help: str | None = None,
+    use_container_width: bool = True,
+    **kwargs,
+) -> bool:
+    """Solid green action button."""
+    return st.button(
+        label,
+        key=success_btn_key(suffix),
+        type="secondary",
+        disabled=disabled,
+        help=help,
+        use_container_width=use_container_width,
+        **kwargs,
+    )
+
+
+def warning_solid_button(
+    label: str,
+    suffix: str,
+    *,
+    disabled: bool = False,
+    help: str | None = None,
+    use_container_width: bool = True,
+    **kwargs,
+) -> bool:
+    """Solid orange/yellow action button."""
+    return st.button(
+        label,
+        key=warning_btn_key(suffix),
         type="secondary",
         disabled=disabled,
         help=help,

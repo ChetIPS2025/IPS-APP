@@ -787,6 +787,10 @@ def inject_jobs_module_css() -> None:
   background: #f1f5f9;
   color: #475569;
 }}
+.ips-job-status-deleted {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
 .ips-job-status-estimate-pending {{
   background: #fef3c7;
   color: #92400e;
@@ -2766,8 +2770,8 @@ div[data-testid="stDialog"] [data-testid="stModalHeader"] h1 {{
   padding: 0 !important;
   border: none !important;
 }}
-div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) [data-testid="stButton"] > button,
-div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) .stButton > button {{
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) .stButton > button {{
   width: auto !important;
   min-width: 4.75rem !important;
   max-width: none !important;
@@ -2824,8 +2828,8 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) div[data-testid="stTa
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stTabContent"] {{
   padding-top: 0.55rem !important;
 }}
-div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) [data-testid="stButton"] > button,
-div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) .stButton > button {{
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) [data-testid="stButton"] > button,
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) .stButton > button {{
   height: 36px !important;
   min-height: 36px !important;
   padding: 0 16px !important;
@@ -3122,7 +3126,7 @@ def inject_action_colors_css() -> None:
     """Shared destructive buttons and semantic status pill colors."""
     st.markdown(
         """
-<style id="ips-action-colors-v4">
+<style id="ips-action-colors-v5">
 /* ----- Destructive buttons (st-key on widget wrapper) ----- */
 [class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
 [class*="st-key-ips_dng_o_"] .stButton > button,
@@ -3180,6 +3184,50 @@ div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] [data-testid="
     color: #ffffff !important;
 }
 
+[class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+[class*="st-key-ips_succ_s_"] .stButton > button,
+[class*="st-key-ips_succ_s_"][data-testid="stButton"] > button,
+.stButton[class*="st-key-ips_succ_s_"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border: 1px solid #16a34a !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    height: 38px !important;
+    padding: 0 16px !important;
+    width: auto !important;
+    max-width: none !important;
+}
+[class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-ips_succ_s_"] .stButton > button:hover,
+[class*="st-key-ips_succ_s_"][data-testid="stButton"] > button:hover {
+    background: #15803d !important;
+    border-color: #15803d !important;
+}
+
+[class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+[class*="st-key-ips_warn_s_"] .stButton > button,
+[class*="st-key-ips_warn_s_"][data-testid="stButton"] > button,
+.stButton[class*="st-key-ips_warn_s_"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    border: 1px solid #f59e0b !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    height: 38px !important;
+    padding: 0 16px !important;
+    width: auto !important;
+    max-width: none !important;
+}
+[class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-ips_warn_s_"] .stButton > button:hover,
+[class*="st-key-ips_warn_s_"][data-testid="stButton"] > button:hover {
+    background: #d97706 !important;
+    border-color: #d97706 !important;
+}
+
 /* Legacy container-key wrappers */
 [class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button,
 [class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button {
@@ -3220,6 +3268,26 @@ div[data-testid="stDialog"] .stButton[class*="st-key-ips_dng_o_"] > button:hover
     background: #fee2e2 !important;
     color: #b91c1c !important;
     border-color: #b91c1c !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_succ_s_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-ips_succ_s_"][data-testid="stButton"] > button {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border: 1px solid #16a34a !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 38px !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_warn_s_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-ips_warn_s_"][data-testid="stButton"] > button {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    border: 1px solid #f59e0b !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 38px !important;
 }
 div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] .stButton > button,
@@ -3283,6 +3351,68 @@ div[data-testid="stDialog"] div[data-testid="stVerticalBlockBorderWrapper"]:has(
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) hr {
     display: none !important;
+}
+
+.ips-action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+.ips-confirm-card {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+}
+.ips-confirm-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+.ips-confirm-text {
+    font-size: 14px;
+    color: #475569;
+    margin-bottom: 12px;
+}
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) {
+    margin-top: 0.65rem !important;
+    margin-bottom: 0.35rem !important;
+}
+.ips-job-actions-title {
+    margin: 0 0 0.45rem 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #475569;
+}
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"] {
+    gap: 12px !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+}
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"] {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+}
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
 }
 
 /* ----- Semantic status pills ----- */

@@ -8,8 +8,7 @@ from datetime import date
 import streamlit as st
 
 try:
-    from app.components.action_styles import danger_outline_button
-    from app.components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel
+    from app.components.job_actions import render_job_action_buttons
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -37,8 +36,7 @@ try:
     from app.services.inventory_service import get_inventory_transactions
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
-    from components.action_styles import danger_outline_button  # type: ignore
-    from components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel  # type: ignore
+    from components.job_actions import render_job_action_buttons  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -94,6 +92,14 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("END DATE", None),
 ]
 _JOB_FILTER_FIELDS = ["customer", "supervisor", "status"]
+_JOBS_VIEW_OPTIONS = (
+    "Active Jobs",
+    "Completed Jobs",
+    "Cancelled Jobs",
+    "Deleted/Archived Jobs",
+    "All Jobs",
+)
+_JOBS_VIEW_KEY = "jobs_view_filter"
 
 
 def _normalize_job_status(raw: object) -> str:
@@ -111,6 +117,7 @@ def _normalize_job_status(raw: object) -> str:
         "cancelled": "Cancelled",
         "canceled": "Cancelled",
         "archived": "Archived",
+        "deleted": "Deleted",
         "estimate pending": "Estimate Pending",
     }
     if s in mapping:
@@ -177,6 +184,7 @@ def _job_status_pill_html(status: str) -> str:
         "Completed": "ips-job-status-completed",
         "Closed": "ips-job-status-closed",
         "Cancelled": "ips-job-status-cancelled",
+        "Deleted": "ips-job-status-deleted",
         "Archived": "ips-job-status-archived",
         "Estimate Pending": "ips-job-status-estimate-pending",
     }
@@ -187,10 +195,39 @@ def _job_status_pill_html(status: str) -> str:
 def _clear_jobs_filters() -> None:
     """Reset filter widgets (must run via button ``on_click``, not after widgets render)."""
     clear_table_filters(_TABLE_KEY, _JOB_FILTER_FIELDS, extra_keys=["jobs_search"])
+    st.session_state[_JOBS_VIEW_KEY] = "Active Jobs"
 
 
-def _filter_jobs(rows: list[dict], *, q: str) -> list[dict]:
-    out = rows
+def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
+    view_norm = str(view or "Active Jobs").strip()
+    if view_norm == "All Jobs":
+        return rows
+    if view_norm == "Deleted/Archived Jobs":
+        return [
+            r
+            for r in rows
+            if bool(r.get("is_deleted"))
+            or _normalize_job_status(r.get("status")) in {"Deleted", "Archived"}
+        ]
+    alive = [
+        r
+        for r in rows
+        if not bool(r.get("is_deleted"))
+        and _normalize_job_status(r.get("status")) not in {"Deleted", "Archived"}
+    ]
+    if view_norm == "Completed Jobs":
+        return [r for r in alive if _normalize_job_status(r.get("status")) in {"Completed", "Closed"}]
+    if view_norm == "Cancelled Jobs":
+        return [r for r in alive if _normalize_job_status(r.get("status")) == "Cancelled"]
+    return [
+        r
+        for r in alive
+        if _normalize_job_status(r.get("status")) not in {"Completed", "Closed", "Cancelled"}
+    ]
+
+
+def _filter_jobs(rows: list[dict], *, q: str, view: str) -> list[dict]:
+    out = _apply_jobs_view_filter(rows, view)
     if q:
         ql = q.lower()
         out = [
@@ -872,60 +909,21 @@ def _render_job_edit_form(job: dict) -> None:
 
 
 def _render_job_actions_panel(job: dict) -> None:
-    """Cancel or permanently delete a job from the detail modal."""
-    job_key = _job_session_key(job)
+    """Complete, cancel, or archive a job from the detail modal."""
     if bool(st.session_state.get(_job_edit_mode_key(job))):
         return
     jid = str(job.get("id") or "").strip()
     if not jid or is_demo_id(jid):
         return
 
-    can_mutate = can_admin_mutate()
-    with modal_danger_zone():
-        if danger_outline_button(
-            "Cancel Job",
-            f"job_cancel_{job_key}",
-            disabled=not can_mutate,
-            help="Sets job status to Cancelled.",
-        ):
-            try:
-                from app.services.repository import update_row
-            except ImportError:
-                from services.repository import update_row  # type: ignore
-            result = update_row("jobs", {"status": "Cancelled"}, {"id": jid})
-            if result.ok:
-                _clear_jobs_detail_modal()
-                st.success("Job cancelled.")
-                st.rerun()
-            st.error(result.error or "Could not cancel job.")
+    def _after_complete_or_delete() -> None:
+        _clear_jobs_detail_modal()
 
-        def _delete_job() -> None:
-            try:
-                from app.services.delete_safety import delete_job_row_if_no_costing
-            except ImportError:
-                from services.delete_safety import delete_job_row_if_no_costing  # type: ignore
-            try:
-                delete_job_row_if_no_costing(jid)
-                _clear_jobs_detail_modal()
-                st.success("Job deleted.")
-                st.rerun()
-            except RuntimeError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error(f"Could not delete job: {exc}")
-
-        render_modal_delete_panel(
-            prefix=f"job_del_{job_key}",
-            delete_label="Delete Job",
-            confirm_message=(
-                "Delete this job permanently? Jobs with labor, materials, equipment, "
-                "or PO expenses cannot be deleted."
-            ),
-            confirm_label="Confirm Delete",
-            can_delete=can_mutate,
-            disabled_reason="Only admin, manager, or supervisor can delete jobs.",
-            on_confirm=_delete_job,
-        )
+    render_job_action_buttons(
+        job,
+        on_complete=_after_complete_or_delete,
+        on_delete=_after_complete_or_delete,
+    )
 
 
 def render_job_detail_dialog(job: dict) -> None:
@@ -1082,7 +1080,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
+        c1, c2, c3 = st.columns([3.2, 2, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -1091,6 +1089,13 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
+            st.selectbox(
+                "View",
+                _JOBS_VIEW_OPTIONS,
+                key=_JOBS_VIEW_KEY,
+                label_visibility="collapsed",
+            )
+        with c3:
             st.button(
                 "Clear",
                 key="jobs_clear_filters",
@@ -1100,21 +1105,29 @@ def render() -> None:
 
     layout_filter_bar(_filters)
 
+    view_filter = str(st.session_state.get(_JOBS_VIEW_KEY) or "Active Jobs")
     filtered = _filter_jobs(
         all_jobs,
         q=str(st.session_state.get("jobs_search") or "").strip(),
+        view=view_filter,
     )
 
     st.caption(f"{len(filtered)} job(s)")
 
-    st.session_state[CACHE_KEY] = {
+    modal_cache = {
         str(job.get("id") or "").strip(): job
         for job in filtered
         if str(job.get("id") or "").strip()
     }
+    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
+    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
+        for job in all_jobs:
+            if str(job.get("id") or "").strip() == selected_job_id:
+                modal_cache[selected_job_id] = job
+                break
+    st.session_state[CACHE_KEY] = modal_cache
 
     _render_custom_jobs_table(filtered, filter_options=filter_options)
 
-    selected_job_id = st.session_state.get(SELECTED_JOB_KEY)
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_jobs_detail_modal()
