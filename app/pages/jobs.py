@@ -883,6 +883,7 @@ def _render_job_actions_panel(job: dict) -> None:
     can_mutate = can_admin_mutate()
     st.markdown("---")
     st.caption("Danger zone")
+    st.markdown('<span class="ips-modal-danger-zone" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     c1, _c2 = st.columns([1, 1], gap="small")
     with c1:

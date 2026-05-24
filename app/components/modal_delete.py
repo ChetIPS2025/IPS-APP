@@ -69,6 +69,7 @@ def render_modal_delete_panel(
     confirm_key = _confirm_key(prefix)
     if not st.session_state.get(confirm_key):
         st.markdown('<div class="ips-modal-delete-actions">', unsafe_allow_html=True)
+        st.markdown('<span class="ips-modal-danger-zone" aria-hidden="true"></span>', unsafe_allow_html=True)
         with danger_outline(f"{prefix}_open"):
             if st.button(
                 delete_label,

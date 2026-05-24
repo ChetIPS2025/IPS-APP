@@ -3122,7 +3122,7 @@ def inject_action_colors_css() -> None:
     """Shared destructive buttons and semantic status pill colors."""
     st.markdown(
         """
-<style id="ips-action-colors-v1">
+<style id="ips-action-colors-v2">
 /* ----- Destructive action buttons (Streamlit container keys + class hooks) ----- */
 .ips-danger-outline button,
 button.ips-danger-outline,
@@ -3238,6 +3238,36 @@ div[data-testid="stButton"] button.ips-danger-solid:hover,
 .ips-modal-delete-actions,
 .ips-modal-delete-confirm {
     margin: 0.35rem 0 0.5rem;
+}
+
+/* st.dialog resets all buttons to gray — need higher specificity for danger actions */
+div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] .stButton > button {
+    background: #ffffff !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] .stButton > button:hover {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    border-color: #b91c1c !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] .stButton > button {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] .stButton > button:hover {
+    background: #b91c1c !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
 }
 </style>
 """,
