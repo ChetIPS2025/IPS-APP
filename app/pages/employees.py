@@ -110,16 +110,16 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.35, 2.2, 3.0, 1.5, 1.4, 1.3, 1.1, 1.4]
+_USER_COLS = [0.35, 2.0, 1.0, 2.4, 1.3, 1.2, 1.0, 1.0]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),
+    ("EMP #", None),
     ("EMAIL", None),
     ("PHONE", None),
     ("ROLE", "role"),
     ("EMPLOYEE", "employee_type"),
     ("STATUS", "status"),
-    ("LAST LOGIN", None),
 ]
 _USER_FILTER_FIELDS = ["role", "employee_type", "status"]
 
@@ -186,6 +186,11 @@ def _format_phone(value: object) -> str:
     if len(digits) == 11 and digits.startswith("1"):
         return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
     return raw
+
+
+def _user_display_employee_number(user: dict) -> str:
+    num = str(user.get("employee_number") or "").strip()
+    return num if num and num != "—" else "—"
 
 
 def _user_display_phone(user: dict) -> str:
@@ -341,11 +346,11 @@ def _render_custom_users_table(
                 continue
 
             name = _user_display_name(user)
+            emp_num = _user_display_employee_number(user)
             email = _user_display_email(user)
             phone = _user_display_phone(user)
             role = _user_display_role(user)
             status = _normalize_user_status(user.get("status"))
-            last_login = _fmt_last_login(user.get("last_login"))
 
             cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
 
@@ -366,33 +371,33 @@ def _render_custom_users_table(
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
+                    f'<div class="ips-users-cell ips-users-emp-num">{html.escape(emp_num)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
+                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
+                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
-                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
-
-            with cols[6]:
-                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
-
-            with cols[7]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-muted">{html.escape(last_login)}</div>',
+                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            with cols[6]:
+                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
+
+            with cols[7]:
+                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -454,6 +459,7 @@ def _seed_employee_edit_form(emp: dict) -> None:
     st.session_state[f"emp_edit_name_{rk}"] = str(emp.get("name") or "")
     st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
     st.session_state[f"emp_edit_phone_{rk}"] = _user_phone_raw(emp)
+    st.session_state[f"emp_edit_empnum_{rk}"] = str(emp.get("employee_number") or "")
     role_opts = lookup_options("user_roles")
     role = str(emp.get("role") or "")
     st.session_state[f"emp_edit_role_{rk}"] = role if role in role_opts else (role_opts[0] if role_opts else role)
@@ -487,8 +493,12 @@ def _render_employee_detail_tabs(emp: dict) -> None:
         overview_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Full Name', name)}"
+            f"{detail_field_html('Employee #', emp.get('employee_number'))}"
             f"{detail_field_html('Email', email)}"
             f"{detail_field_html('Phone', _format_phone(_user_phone_raw(emp)))}"
+            f"{detail_field_html('Position', emp.get('position'))}"
+            f"{detail_field_html('Trade', emp.get('trade'))}"
+            f"{detail_field_html('Hire Date', fmt_date(emp.get('hire_date')))}"
             f"{detail_field_html('Username', emp.get('username'))}"
             f"{detail_field_html('Member Since', fmt_date(emp.get('member_since')))}"
             f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
@@ -588,6 +598,7 @@ def _render_employee_edit_form(emp: dict) -> None:
     ec1, ec2 = st.columns(2, gap="medium")
     with ec1:
         st.text_input("Name", key=f"emp_edit_name_{rk}")
+        st.text_input("Employee #", key=f"emp_edit_empnum_{rk}")
         st.text_input("Email", key=f"emp_edit_email_{rk}")
         st.text_input("Phone", key=f"emp_edit_phone_{rk}", placeholder="(337) 555-0100")
     with ec2:
@@ -607,6 +618,7 @@ def _render_employee_edit_form(emp: dict) -> None:
         ok, msg = persist_employee(
             {
                 "name": st.session_state.get(f"emp_edit_name_{rk}"),
+                "employee_number": st.session_state.get(f"emp_edit_empnum_{rk}"),
                 "email": st.session_state.get(f"emp_edit_email_{rk}"),
                 "phone": st.session_state.get(f"emp_edit_phone_{rk}"),
                 "role": st.session_state.get(f"emp_edit_role_{rk}"),
@@ -653,12 +665,12 @@ def render_employee_detail_dialog(emp: dict) -> None:
         )
         render_compact_modal_meta_grid(
             [
+                ("Employee #", _user_display_employee_number(emp)),
                 ("Role", role),
                 ("Email", email),
                 ("Phone", _user_display_phone(emp)),
                 ("Employee", _employee_type_label(emp)),
                 ("Status", status),
-                ("Last Login", _fmt_last_login(emp.get("last_login"))),
             ]
         )
 
@@ -690,6 +702,13 @@ def render() -> None:
         return
     inject_users_module_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    if not st.session_state.get("_ips_core_employees_seeded"):
+        try:
+            from app.services.employee_seed_service import ensure_core_employee_seed
+        except ImportError:
+            from services.employee_seed_service import ensure_core_employee_seed  # type: ignore
+        ensure_core_employee_seed()
+        st.session_state["_ips_core_employees_seeded"] = True
     all_emp = load_employees()
     filter_options = build_filter_options(all_emp, _USER_COLUMN_FILTER_SPECS)
 
