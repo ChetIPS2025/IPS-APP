@@ -816,6 +816,92 @@ def _render_asset_edit_form(asset: dict) -> None:
             st.error(msg or "Could not save asset.")
 
 
+def _render_asset_pricing_guide_section(asset: dict) -> None:
+    aid = str(asset.get("id") or "")
+    pricing_item_id = str(asset.get("pricing_item_id") or "").strip()
+    st.markdown("#### Pricing Guide")
+    try:
+        from app.services.pricing_guide_service import (
+            cached_pricing_guide_rows,
+            link_asset_to_pricing_item,
+            save_pricing_item,
+        )
+    except ImportError:
+        from services.pricing_guide_service import (  # type: ignore
+            cached_pricing_guide_rows,
+            link_asset_to_pricing_item,
+            save_pricing_item,
+        )
+
+    linked = None
+    if pricing_item_id:
+        linked = next(
+            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id")) == pricing_item_id),
+            None,
+        )
+    if not linked:
+        linked = next(
+            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("asset_id") or "") == aid),
+            None,
+        )
+    if linked:
+        st.success(f"Linked: **{linked.get('description')}** ({linked.get('item_type')})")
+        st.caption(
+            f"Rate {fmt_currency(linked.get('default_cost'))}/hr · "
+            f"Sell {fmt_currency(linked.get('default_sell_price'))}"
+        )
+    else:
+        st.caption("No pricing guide item linked.")
+
+    c1, c2 = st.columns(2, gap="small")
+    with c1:
+        if st.button("Create Pricing Item from Asset", key=f"asset_create_pg_{aid}", use_container_width=True):
+            hourly = float(asset.get("hourly_rate") or 0)
+            daily = float(asset.get("daily_rate") or asset.get("rental_daily_rate") or 0)
+            cost = hourly or (daily / 8.0 if daily else 0.0)
+            ok, msg = save_pricing_item(
+                {
+                    "item_type": "Equipment",
+                    "description": str(asset.get("asset_name") or asset.get("name") or "Equipment"),
+                    "category": str(asset.get("category") or "Equipment"),
+                    "unit": "HR",
+                    "default_cost": cost,
+                    "default_markup_percent": 0.0,
+                    "default_sell_price": cost,
+                    "asset_id": aid,
+                    "equipment_type": str(asset.get("category") or asset.get("asset_type") or ""),
+                    "is_active": asset.get("is_active") is not False,
+                }
+            )
+            if ok:
+                rows = cached_pricing_guide_rows(include_inactive=True)
+                pid = next((str(r.get("id")) for r in rows if str(r.get("asset_id") or "") == aid), "")
+                if pid:
+                    link_asset_to_pricing_item(aid, pid)
+                st.success(msg)
+                st.rerun()
+            st.error(msg)
+    with c2:
+        eq_options = [
+            (f"{r.get('description')} — {r.get('item_type')}", str(r.get("id")))
+            for r in cached_pricing_guide_rows(include_inactive=True)
+            if r.get("item_type") == "Equipment"
+        ]
+        if eq_options and st.button("Link to Pricing Guide Item", key=f"asset_link_pg_{aid}", use_container_width=True):
+            st.session_state[f"asset_show_pg_link_{aid}"] = True
+    if st.session_state.get(f"asset_show_pg_link_{aid}") and eq_options:
+        labels = [label for label, _ in eq_options]
+        pick = st.selectbox("Equipment pricing item", labels, key=f"asset_pg_pick_{aid}")
+        id_map = {label: pid for label, pid in eq_options}
+        if st.button("Confirm Link", key=f"asset_pg_link_confirm_{aid}"):
+            ok, msg = link_asset_to_pricing_item(aid, id_map.get(pick, ""))
+            if ok:
+                st.success(msg)
+                st.session_state.pop(f"asset_show_pg_link_{aid}", None)
+                st.rerun()
+            st.error(msg)
+
+
 def _render_asset_detail_tabs(asset: dict) -> None:
     aid = str(asset.get("id") or "")
     asset_number = safe_value(asset.get("asset_number"))
@@ -894,6 +980,8 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                 unsafe_allow_html=True,
             )
             _render_asset_qr_block(asset, aid)
+
+        _render_asset_pricing_guide_section(asset)
 
     with tab_kit:
         render_kit_contents_tab(asset)

@@ -245,10 +245,124 @@ def _sync_pricing_guide_pick_state(
         st.session_state[k("vendor_id")] = item.get("vendor_id")
         st.session_state[k("uc")] = float(item.get("unit_cost") or 0)
         st.session_state[k("mk")] = float(item.get("markup_pct") or 0)
+        st.session_state[k("type")] = str(item.get("item_type") or "Material")
+        st.session_state[k("pricing_id")] = item.get("pricing_item_id") or item.get("id")
         st.session_state[taxable_key] = bool(item.get("taxable", True))
         st.session_state[last_key] = pick
         return item
     return pg_map.get(pick or "", {})
+
+
+def _save_pricing_item_line(eid: str, est: dict[str, Any], item: dict[str, Any], *, qty: float, markup: float, notes: str, k: Callable[[str], str]) -> tuple[bool, str | None]:
+    item_type = str(item.get("item_type") or st.session_state.get(k("type")) or "Material")
+    description = str(st.session_state.get(k("desc")) or item.get("description") or "")
+    unit = str(st.session_state.get(k("unit")) or item.get("unit") or "EA")
+    unit_cost = float(st.session_state.get(k("uc")) or item.get("unit_cost") or 0)
+    default_labor_markup = float(est.get("default_labor_markup_pct") or 0)
+    default_eq_markup = float(est.get("default_equipment_markup_pct") or 0)
+    default_sub_markup = float(est.get("default_subcontractor_markup_pct") or 0)
+    default_other_markup = float(est.get("default_other_markup_pct") or 0)
+
+    if item_type == "Labor":
+        role = str(item.get("labor_role") or description)
+        return _service_ok(
+            add_estimate_labor(
+                eid,
+                {
+                    "role_name": role,
+                    "description": description,
+                    "st_hours": qty,
+                    "ot_hours": 0.0,
+                    "dt_hours": 0.0,
+                    "st_rate": unit_cost,
+                    "ot_rate": unit_cost * 1.5,
+                    "dt_rate": unit_cost * 2.0,
+                    "markup_percent": markup if markup else default_labor_markup,
+                    "notes": notes,
+                },
+            )
+        )
+    if item_type == "Equipment":
+        return _service_ok(
+            add_estimate_equipment(
+                eid,
+                {
+                    "asset_id": item.get("asset_id"),
+                    "equipment_name": description,
+                    "equipment_type": str(item.get("equipment_type") or item.get("category") or ""),
+                    "quantity": 1.0,
+                    "duration": qty if qty else 1.0,
+                    "duration_unit": "Hours" if unit.upper() in {"HR", "HRS", "HOUR", "HOURS"} else "Days",
+                    "cost_rate": unit_cost,
+                    "markup_percent": markup if markup else default_eq_markup,
+                    "notes": notes,
+                },
+            )
+        )
+    if item_type == "Travel":
+        travel_type = str(item.get("travel_type") or description or "Mileage")
+        return _service_ok(
+            add_estimate_travel(
+                eid,
+                {
+                    "travel_type": travel_type,
+                    "description": description,
+                    "miles": qty,
+                    "mileage_rate": unit_cost,
+                    "markup_percent": markup if markup else default_other_markup,
+                    "notes": notes,
+                },
+            )
+        )
+    if item_type == "Subcontractor":
+        return _service_ok(
+            add_estimate_subcontractor(
+                eid,
+                {
+                    "vendor_id": item.get("vendor_id") or st.session_state.get(k("vendor_id")),
+                    "subcontractor_name": description,
+                    "description": description,
+                    "cost_total": unit_cost * qty,
+                    "markup_percent": markup if markup else default_sub_markup,
+                    "notes": notes,
+                },
+            )
+        )
+    if item_type in {"Service", "Rental", "Assembly"}:
+        return _service_ok(
+            add_estimate_other_cost(
+                eid,
+                {
+                    "description": description,
+                    "category": str(item.get("category") or item_type),
+                    "cost_total": unit_cost * qty,
+                    "markup_percent": markup if markup else default_other_markup,
+                    "taxable": bool(st.session_state.get(k("tax"), True)),
+                    "notes": notes,
+                },
+            )
+        )
+
+    return _service_ok(
+        add_estimate_material(
+            eid,
+            {
+                "pricing_item_id": item.get("pricing_item_id") or item.get("id"),
+                "inventory_item_id": item.get("inventory_item_id"),
+                "sku": st.session_state.get(k("sku")),
+                "description": description,
+                "category": st.session_state.get(k("cat")) or item.get("category"),
+                "unit": unit,
+                "unit_cost": unit_cost,
+                "quantity": qty,
+                "markup_percent": markup,
+                "taxable": bool(st.session_state.get(k("tax"), True)),
+                "vendor": st.session_state.get(k("vendor")),
+                "vendor_id": st.session_state.get(k("vendor_id")),
+                "notes": notes,
+            },
+        )
+    )
 
 
 def render_cost_builder_tab(
@@ -272,7 +386,7 @@ def render_cost_builder_tab(
     st.markdown('<div class="ips-estimate-builder-actions">', unsafe_allow_html=True)
     qa1, qa2, qa3, qa4, qa5, qa6 = st.columns(6, gap="small")
     with qa1:
-        add_mat = st.button("+ Material", key=f"ecb_add_mat_{eid}", use_container_width=True)
+        add_mat = st.button("+ Pricing Item", key=f"ecb_add_mat_{eid}", use_container_width=True)
     with qa2:
         add_lab = st.button("+ Labor", key=f"ecb_add_lab_{eid}", use_container_width=True)
     with qa3:
@@ -363,64 +477,45 @@ def _render_add_material_form(
     key_prefix: str = "ecb_mat",
     form_state_key: str | None = None,
 ) -> None:
+    _ = inventory_options
     fk = form_state_key or f"ecb_form_mat_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     default_markup = float(est.get("default_material_markup_pct") or 0)
     pg_opts = pricing_guide_options or []
-    inv_opts = inventory_options or []
     pg_map = {label: item for label, item in pg_opts}
-    inv_map = {label: item for label, item in inv_opts}
     pg_labels = [label for label, _ in pg_opts]
-    inv_labels = [label for label, _ in inv_opts]
-    source_options = ["Pricing Guide", "Inventory", "Custom Item"]
-    if k("src") not in st.session_state:
-        st.session_state[k("src")] = "Pricing Guide" if pg_opts else ("Inventory" if inv_opts else "Custom Item")
+    use_custom = k("custom") not in st.session_state and not pg_opts
 
-    _compact_form_card("Add Material")
-    source = st.selectbox("Material source", source_options, key=k("src"))
-    custom = source == "Custom Item"
-    pick = None
+    _compact_form_card("Add Pricing Item")
+    custom = st.checkbox("Custom item (not in Pricing Guide)", key=k("custom"), value=use_custom)
     item: dict[str, Any] = {}
 
     c1, c2 = st.columns(2, gap="small")
     with c1:
-        if source == "Pricing Guide":
+        if not custom:
             if pg_opts:
                 pick = st.selectbox("Pricing item", pg_labels, key=k("pg"))
                 item = _sync_pricing_guide_pick_state(k, pick, pg_map, taxable_key=k("tax"))
+                st.caption(f"Type: **{item.get('item_type') or 'Material'}**")
             else:
                 custom = True
-                st.info("No pricing guide items available — add items under Pricing Guide or use Custom Item.")
-        elif source == "Inventory":
-            if inv_opts:
-                pick = st.selectbox("Inventory item", inv_labels, key=k("inv"))
-                item = _sync_pick_state(k, pick, inv_map, taxable_key=k("tax"))
-            else:
-                custom = True
-                st.info("No inventory items available — enter custom material details below.")
+                st.info("No pricing guide items available — add items under Pricing Guide or use a custom item.")
         else:
             item = {}
 
         qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
-        if source == "Pricing Guide" and item.get("markup_pct") is not None:
-            markup = st.number_input(
-                "Markup %",
-                value=float(st.session_state.get(k("mk"), item.get("markup_pct") or default_markup)),
-                key=k("mk"),
-            )
-        else:
-            markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+        markup = st.number_input(
+            "Markup %",
+            value=float(st.session_state.get(k("mk"), item.get("markup_pct") or default_markup)),
+            key=k("mk"),
+        )
         if k("tax") not in st.session_state:
             st.session_state[k("tax")] = bool(item.get("taxable", True))
         taxable = st.checkbox("Taxable", key=k("tax"))
 
     with c2:
-        override = st.checkbox(
-            "Override cost",
-            key=k("ovr"),
-            disabled=custom or (source == "Custom Item"),
-        )
-        if override or custom or (source == "Custom Item") or not item:
+        override = st.checkbox("Override cost", key=k("ovr"), disabled=custom or not item)
+        if override or custom or not item:
             unit_cost = st.number_input(
                 "Unit cost",
                 min_value=0.0,
@@ -434,7 +529,7 @@ def _render_add_material_form(
                 st.warning("No default cost found. Enter a unit cost or enable cost override.")
 
         unit = str(item.get("unit") or st.session_state.get(k("unit")) or "EA")
-        if custom or override or source == "Custom Item":
+        if custom or override or not item:
             unit = st.text_input("Unit", value=unit, key=k("unit"))
         else:
             _display_field("Unit", unit)
@@ -448,10 +543,10 @@ def _render_add_material_form(
             ]
         )
 
-    with st.expander("Advanced material details", expanded=False):
+    with st.expander("Advanced details", expanded=False):
         st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
         st.text_input("Description", key=k("desc"))
-        st.text_input("SKU", key=k("sku"))
+        st.text_input("SKU / Item code", key=k("sku"))
         st.text_input("Category", key=k("cat"))
         st.text_input("Vendor", key=k("vendor"))
         st.markdown("</div>", unsafe_allow_html=True)
@@ -459,43 +554,32 @@ def _render_add_material_form(
     notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
     b1, b2 = st.columns(2, gap="small")
     with b1:
-        if st.button("Save Material", key=k("save"), type="primary", use_container_width=True):
+        if st.button("Save Pricing Item", key=k("save"), type="primary", use_container_width=True):
             item_save: dict[str, Any] = {}
-            inv_id = ""
-            if source == "Pricing Guide":
+            if not custom:
                 pick_save = st.session_state.get(k("pg"))
                 item_save = pg_map.get(pick_save, {}) if pick_save else {}
-            elif source == "Inventory":
-                pick_save = st.session_state.get(k("inv"))
-                item_save = inv_map.get(pick_save, {}) if pick_save else {}
-                inv_id = str(item_save.get("id") or "")
-            if override or custom or source == "Custom Item" or not item_save:
-                unit_cost_save = float(st.session_state.get(k("uc")) or 0)
-            else:
-                unit_cost_save = float(item_save.get("unit_cost") or 0)
-            ok, err = _service_ok(
-                add_estimate_material(
-                    eid,
-                    {
-                        "inventory_item_id": inv_id or None,
-                        "pricing_guide_item_key": item_save.get("item_key") if source == "Pricing Guide" else None,
-                        "sku": st.session_state.get(k("sku")),
-                        "description": st.session_state.get(k("desc")),
-                        "category": st.session_state.get(k("cat")),
-                        "unit": st.session_state.get(k("unit")) or unit,
-                        "unit_cost": unit_cost_save,
-                        "quantity": qty,
-                        "markup_percent": markup,
-                        "taxable": taxable,
-                        "vendor": st.session_state.get(k("vendor")),
-                        "vendor_id": st.session_state.get(k("vendor_id")),
-                        "notes": notes,
-                    },
-                )
+            if custom or not item_save:
+                item_save = {
+                    "item_type": "Material",
+                    "description": st.session_state.get(k("desc")),
+                    "category": st.session_state.get(k("cat")),
+                    "unit": st.session_state.get(k("unit")) or unit,
+                    "unit_cost": float(st.session_state.get(k("uc")) or 0),
+                    "taxable": bool(st.session_state.get(k("tax"), True)),
+                }
+            ok, err = _save_pricing_item_line(
+                eid,
+                est,
+                item_save,
+                qty=qty,
+                markup=markup,
+                notes=notes,
+                k=k,
             )
             if ok:
                 st.session_state.pop(fk, None)
-                st.success("Material added.")
+                st.success("Pricing item added.")
                 st.rerun()
             st.error(err)
     with b2:
@@ -1058,7 +1142,7 @@ def render_materials_tab(
         delete_fn=delete_estimate_material,
         key_prefix="mat_tab",
     )
-    if st.button("+ Add Material", key=f"mat_tab_add_{eid}"):
+    if st.button("+ Add Pricing Item", key=f"mat_tab_add_{eid}"):
         st.session_state[f"mat_tab_form_{eid}"] = True
         st.rerun()
     if st.session_state.get(f"mat_tab_form_{eid}"):

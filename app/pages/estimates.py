@@ -66,7 +66,15 @@ try:
     )
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
-    from app.services.job_from_estimate import approve_estimate_and_create_job
+    from app.services.estimates_service import (
+        approve_estimate_and_job,
+        can_approve_estimates,
+        estimate_status_approvable,
+        estimate_visible_in_active_view,
+        estimate_visible_in_approved_view,
+        estimate_visible_in_rejected_view,
+    )
+    from app.auth import current_role
     from app.styles import inject_estimates_module_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
@@ -128,7 +136,15 @@ except ImportError:
     )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
-    from services.job_from_estimate import approve_estimate_and_create_job  # type: ignore
+    from services.estimates_service import (  # type: ignore
+        approve_estimate_and_job,
+        can_approve_estimates,
+        estimate_status_approvable,
+        estimate_visible_in_active_view,
+        estimate_visible_in_approved_view,
+        estimate_visible_in_rejected_view,
+    )
+    from auth import current_role  # type: ignore
     from styles import inject_estimates_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
@@ -153,20 +169,27 @@ _ESTIMATE_TABS = [
     "Notes",
     "Activity",
 ]
-_ESTIMATE_COLS = [0.35, 1.1, 2.6, 1.8, 1.0, 1.2, 1.1, 1.1, 1.1, 1.1]
+_ESTIMATE_COLS = [0.35, 1.0, 2.5, 1.6, 1.0, 1.0, 1.0, 1.0, 1.15]
 _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("ESTIMATE #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
-    ("JOB", None),
+    ("LINKED JOB", None),
     ("STATUS", "status"),
     ("ESTIMATE DATE", None),
-    ("TOTAL COST", None),
-    ("CUSTOMER PRICE", None),
-    ("CREATED BY", "created_by"),
+    ("TOTAL", None),
+    ("ACTIONS", None),
 ]
-_ESTIMATE_FILTER_FIELDS = ["customer", "status", "created_by"]
+_ESTIMATE_FILTER_FIELDS = ["customer", "status"]
+_ESTIMATE_VIEW_FILTER_KEY = "est_view_filter"
+_PENDING_APPROVE_KEY = "est_pending_approve_id"
+_ESTIMATE_VIEW_OPTIONS = (
+    "Active Estimates",
+    "Approved / Converted",
+    "Rejected",
+    "All Estimates",
+)
 _NEW_ESTIMATE_DIALOG_KEY = "ips_est_new_dialog_open"
 _BUILD_MODE_PREFIX = "est_build_mode_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
@@ -353,7 +376,6 @@ def _estimate_status_pill_html(status: str) -> str:
 _ESTIMATE_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("customer", _estimate_customer),
     ("status", lambda r: _normalize_estimate_status(r.get("status"))),
-    ("created_by", _estimate_created_by),
 ]
 
 
@@ -432,11 +454,9 @@ def _render_custom_estimates_table(
             project = _estimate_project(est)
             customer = _estimate_customer(est)
             status = _normalize_estimate_status(est.get("status"))
-            created_by = _estimate_created_by(est)
             est_date = fmt_date(est.get("estimate_date"))
             job_no = _estimate_job(est)
-            total_cost = _estimate_total_cost(est)
-            customer_price = _estimate_customer_price(est)
+            total = _estimate_customer_price(est)
 
             cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
 
@@ -484,21 +504,25 @@ def _render_custom_estimates_table(
 
             with cols[7]:
                 st.markdown(
-                    f'<div class="ips-estimates-cell">{html.escape(total_cost)}</div>',
+                    f'<div class="ips-estimates-cell ips-estimates-number">{html.escape(total)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[8]:
-                st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-number">{html.escape(customer_price)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[9]:
-                st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(created_by)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if _can_show_approve_job(est):
+                    if st.button(
+                        "Approve Job",
+                        key=f"est_row_approve_{eid}",
+                        type="secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state[_PENDING_APPROVE_KEY] = eid
+                        st.rerun()
+                elif estimate_visible_in_approved_view(est):
+                    st.markdown(
+                        '<span class="ips-est-approve-done">Job Approved</span>',
+                        unsafe_allow_html=True,
+                    )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -604,13 +628,80 @@ def _customer_contact_select(
     return str(ids[int(idx)])
 
 
+def _apply_estimate_view_filter(rows: list[dict], view_filter: str) -> list[dict]:
+    vf = str(view_filter or "Active Estimates").strip()
+    if vf == "All Estimates":
+        return rows
+    if vf == "Approved / Converted":
+        return [r for r in rows if estimate_visible_in_approved_view(r)]
+    if vf == "Rejected":
+        return [r for r in rows if estimate_visible_in_rejected_view(r)]
+    return [r for r in rows if estimate_visible_in_active_view(r)]
+
+
+def _can_show_approve_job(est: dict) -> bool:
+    if not can_approve_estimates(current_role()):
+        return False
+    eid = str(est.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        return False
+    return estimate_status_approvable(est.get("status")) and not estimate_visible_in_approved_view(est)
+
+
+def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
+    eid = str(st.session_state.get(_PENDING_APPROVE_KEY) or "").strip()
+    if not eid:
+        return
+    est = rows_by_id.get(eid)
+    if not est:
+        st.session_state.pop(_PENDING_APPROVE_KEY, None)
+        return
+
+    st.markdown('<div class="ips-est-approve-panel">', unsafe_allow_html=True)
+    st.markdown("**Approve this estimate and activate the linked job?**")
+    c1, c2, c3, c4 = st.columns(4, gap="small")
+    with c1:
+        st.caption("Estimate #")
+        st.write(_estimate_number(est))
+    with c2:
+        st.caption("Project")
+        st.write(_estimate_project(est))
+    with c3:
+        st.caption("Customer")
+        st.write(_estimate_customer(est))
+    with c4:
+        st.caption("Total")
+        st.write(_estimate_customer_price(est))
+    st.caption(f"Linked job: **{_estimate_job(est)}**")
+    b1, b2, _ = st.columns([1, 1, 3], gap="small")
+    with b1:
+        if st.button("Approve Job", key=f"est_confirm_approve_{eid}", type="primary", use_container_width=True):
+            res = approve_estimate_and_job(eid)
+            if res.ok:
+                try:
+                    from app.services.phase2_modules_service import clear_all_data_caches
+                except ImportError:
+                    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                clear_all_data_caches()
+                st.session_state.pop(_PENDING_APPROVE_KEY, None)
+                st.success(res.message or "Estimate approved and linked job activated.")
+                st.rerun()
+            st.error(res.message or "Could not approve estimate.")
+    with b2:
+        if st.button("Cancel", key=f"est_confirm_cancel_{eid}", use_container_width=True):
+            st.session_state.pop(_PENDING_APPROVE_KEY, None)
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _filter_rows(
     rows: list[dict],
     *,
     q: str,
     date_range: tuple[date, date] | None,
+    view_filter: str,
 ) -> list[dict]:
-    out = rows
+    out = _apply_estimate_view_filter(rows, view_filter)
     if q:
         ql = q.lower()
         out = [
@@ -903,6 +994,8 @@ def render_estimate_detail_dialog(est: dict) -> None:
     render_modal_shell()
     render_modal_header(title=en, subtitle=project, status=status)
 
+    show_approve_job = eid and not is_demo_id(eid) and not is_edit_mode(_MOD, rk) and _can_show_approve_job(est)
+
     btn1, btn2, btn3 = st.columns(3, gap="small")
     with btn1:
         if st.button("Edit", key=f"estimates_modal_edit_{rk}", use_container_width=True):
@@ -913,35 +1006,20 @@ def render_estimate_detail_dialog(est: dict) -> None:
             _set_estimate_build_mode(est)
             st.rerun()
     with btn3:
-        show_approve_job = (
-            eid
-            and not is_demo_id(eid)
-            and not linked_job
-            and not is_edit_mode(_MOD, rk)
-        )
         if show_approve_job:
             if st.button(
-                "Approve & Create Job",
+                "Approve Job",
                 key=f"estimates_modal_approve_job_{rk}",
                 type="primary",
                 use_container_width=True,
             ):
-                res = approve_estimate_and_create_job(eid)
-                if res.ok and res.job:
-                    st.success(res.message)
-                    try:
-                        from app.services.phase2_modules_service import clear_all_data_caches
-                    except ImportError:
-                        from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-                    clear_all_data_caches()
-                    st.rerun()
-                elif res.message:
-                    st.error(res.message)
+                st.session_state[_PENDING_APPROVE_KEY] = eid
+                st.rerun()
 
-    if eid and not linked_job and not is_demo_id(eid) and not is_edit_mode(_MOD, rk):
+    if eid and show_approve_job and not is_edit_mode(_MOD, rk):
         st.caption(
-            "One click sets status to **Approved**, creates job **J#####** from quote **Q#####**, "
-            "and links the estimate to the new job."
+            "Approves the estimate and activates the linked job. "
+            "The estimate will move to **Approved / Converted** and leave the active list."
         )
 
     render_modal_meta_grid(
@@ -998,28 +1076,16 @@ def _show_new_estimate_dialog() -> None:
             prev_location_key="est_new_loc_prev",
         )
     with nc2:
-        job_opts = _job_select_options(new_cust)
-        job_labels = [label for label, _ in job_opts]
-        job_ids = [jid for _, jid in job_opts]
-        if "est_new_job" not in st.session_state:
-            st.session_state["est_new_job"] = 0
-        st.selectbox(
-            "Linked job (optional)",
-            range(len(job_labels)),
-            format_func=lambda i: job_labels[i],
-            key="est_new_job",
-        )
         st.date_input("Estimate date", value=date.today(), key="est_new_est_date")
         st.date_input("Expiration date", value=date.today() + timedelta(days=30), key="est_new_exp_date")
         st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
+        st.caption("A linked job in **Estimate Pending** status is created automatically when you save.")
     st.text_area("Description / scope summary", key="est_new_desc", height=80)
     st.text_area("Notes", key="est_new_notes", height=60)
 
     sb1, sb2 = st.columns(2)
     with sb1:
         if st.button("Save Draft", key="est_save_new", type="primary", use_container_width=True):
-            job_idx = int(st.session_state.get("est_new_job") or 0)
-            job_id = job_ids[job_idx] if job_opts else ""
             ok, msg = persist_estimate(
                 {
                     "estimate_number": st.session_state.get("est_new_num"),
@@ -1028,7 +1094,6 @@ def _show_new_estimate_dialog() -> None:
                     "customer_id": customer_id_for_name(new_cust) or None,
                     "customer_location_id": new_location_id or None,
                     "customer_contact_id": new_contact_id or None,
-                    "job_id": job_id or None,
                     "status": st.session_state.get("est_new_status") or "Draft",
                     "estimate_date": str(st.session_state.get("est_new_est_date")),
                     "expiration_date": str(st.session_state.get("est_new_exp_date")),
@@ -1054,7 +1119,7 @@ def _export_estimates_csv(rows: list[dict]) -> str:
     buf = StringIO()
     writer = csv.writer(buf)
     writer.writerow(
-        ["Estimate #", "Project", "Customer", "Job", "Status", "Estimate Date", "Total Cost", "Customer Price", "Created By"]
+        ["Estimate #", "Project", "Customer", "Linked Job", "Status", "Estimate Date", "Total"]
     )
     for row in rows:
         writer.writerow(
@@ -1065,9 +1130,7 @@ def _export_estimates_csv(rows: list[dict]) -> str:
                 _estimate_job(row),
                 _normalize_estimate_status(row.get("status")),
                 fmt_date(row.get("estimate_date")),
-                _estimate_total_cost(row).replace("$", ""),
                 _estimate_customer_price(row).replace("$", ""),
-                _estimate_created_by(row),
             ]
         )
     return buf.getvalue()
@@ -1101,7 +1164,7 @@ def render() -> None:
         _show_new_estimate_dialog()
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([2, 1, 0.6])
+        c1, c2, c3, c4 = st.columns([2, 1.2, 1, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -1110,20 +1173,29 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
+            st.selectbox(
+                "View",
+                list(_ESTIMATE_VIEW_OPTIONS),
+                key=_ESTIMATE_VIEW_FILTER_KEY,
+                label_visibility="collapsed",
+            )
+        with c3:
             st.date_input(
                 "Date range",
                 value=_default_estimate_date_range(),
                 key="est_filter_dates",
                 label_visibility="collapsed",
             )
-        with c3:
+        with c4:
             if st.button("Clear", key="est_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
                     _ESTIMATE_FILTER_FIELDS,
-                    extra_keys=["est_search"],
+                    extra_keys=["est_search", _ESTIMATE_VIEW_FILTER_KEY],
                 )
                 st.session_state["est_filter_dates"] = _default_estimate_date_range()
+                st.session_state[_ESTIMATE_VIEW_FILTER_KEY] = "Active Estimates"
+                st.session_state.pop(_PENDING_APPROVE_KEY, None)
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1132,11 +1204,17 @@ def render() -> None:
     if not isinstance(date_range, tuple) or len(date_range) != 2:
         date_range = _default_estimate_date_range()
 
+    view_filter = str(st.session_state.get(_ESTIMATE_VIEW_FILTER_KEY) or "Active Estimates")
+
     filtered = _filter_rows(
         rows,
         q=str(st.session_state.get("est_search") or "").strip(),
         date_range=date_range,
+        view_filter=view_filter,
     )
+
+    rows_by_id = {str(r.get("id") or ""): r for r in rows if str(r.get("id") or "").strip()}
+    _render_approve_confirmation_panel(rows_by_id)
 
     if st.session_state.pop("est_export_ready", False):
         st.download_button(

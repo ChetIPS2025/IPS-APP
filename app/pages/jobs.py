@@ -687,7 +687,12 @@ def _render_job_detail_tabs(job: dict) -> None:
 
     with tab_estimates:
         jid = str(job.get("id") or "")
-        linked = [e for e in load_estimates() if str(e.get("job_id") or "") == jid]
+        job_est_id = str(job.get("estimate_id") or "").strip()
+        linked = [
+            e
+            for e in load_estimates()
+            if str(e.get("job_id") or "") == jid or (job_est_id and str(e.get("id") or "") == job_est_id)
+        ]
         if not linked:
             _render_dialog_placeholder("No estimates linked to this job yet.")
         else:
@@ -696,6 +701,7 @@ def _render_job_detail_tabs(job: dict) -> None:
                 project = str(est.get("project_name") or "—")
                 status_lbl = str(est.get("status") or "Draft")
                 total = est.get("customer_price") or est.get("total") or 0
+                approved_at = fmt_date(est.get("approved_at")) if est.get("approved_at") else "—"
                 try:
                     from app.utils.formatting import fmt_currency
                 except ImportError:
@@ -705,10 +711,36 @@ def _render_job_detail_tabs(job: dict) -> None:
                     f"{_detail_field('Estimate #', est_no)}"
                     f"{_detail_field('Project', project)}"
                     f"{_detail_field('Status', status_lbl)}"
+                    f"{_detail_field('Estimate Date', fmt_date(est.get('estimate_date')))}"
+                    f"{_detail_field('Approved Date', approved_at)}"
                     f"{_detail_field('Customer Price', fmt_currency(total))}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+                bc1, bc2 = st.columns(2, gap="small")
+                with bc1:
+                    if st.button("View Estimate", key=f"job_est_view_{jid}_{est.get('id')}", use_container_width=True):
+                        st.session_state["selected_estimate_id"] = str(est.get("id") or "")
+                        st.session_state["show_estimate_detail_modal"] = True
+                        st.info("Open the **Estimates** page to view full estimate details.")
+                with bc2:
+                    if st.button("Proposal PDF", key=f"job_est_pdf_{jid}_{est.get('id')}", use_container_width=True):
+                        try:
+                            from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
+                        except ImportError:
+                            from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
+                        pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
+                        if pdf_bytes:
+                            st.download_button(
+                                "Download PDF",
+                                data=pdf_bytes,
+                                file_name=f"{est_no}_proposal.pdf",
+                                mime="application/pdf",
+                                key=f"job_est_pdf_dl_{jid}_{est.get('id')}",
+                                use_container_width=True,
+                            )
+                        else:
+                            st.caption("Proposal PDF is not available for this estimate yet.")
 
     with tab_inventory:
         _render_job_inventory_tab(job)

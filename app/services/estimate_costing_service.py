@@ -382,6 +382,7 @@ def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResu
     calc = calc_material_line(qty, unit_cost, markup_percent)
     payload = {
         "estimate_id": eid,
+        "pricing_item_id": data.get("pricing_item_id") or None,
         "inventory_item_id": data.get("inventory_item_id") or None,
         "item_number": _str(data.get("item_number") or data.get("sku")),
         "sku": _str(data.get("sku") or data.get("item_number")),
@@ -414,6 +415,7 @@ def update_estimate_material(line_id: str, data: dict[str, Any]) -> ServiceResul
     markup_percent = _num(data.get("markup_percent"))
     calc = calc_material_line(qty, unit_cost, markup_percent)
     payload = {
+        "pricing_item_id": data.get("pricing_item_id") or None,
         "inventory_item_id": data.get("inventory_item_id") or None,
         "item_number": _str(data.get("item_number") or data.get("sku")),
         "sku": _str(data.get("sku") or data.get("item_number")),

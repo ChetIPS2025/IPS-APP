@@ -1352,6 +1352,27 @@ def inject_estimates_module_css() -> None:
   font-size: 13px;
   color: #64748b;
 }}
+.ips-est-approve-panel {{
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin: 0.5rem 0 0.75rem;
+}}
+.st-key-estimates_table_wrap button[kind="secondary"] {{
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  min-height: 28px !important;
+  padding: 0.15rem 0.45rem !important;
+}}
+.ips-est-approve-done {{
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #15803d;
+  white-space: nowrap;
+}}
 .ips-estimate-status-pill {{
   display: inline-flex;
   align-items: center;
@@ -1859,6 +1880,55 @@ def inject_pricing_guide_module_css() -> None:
 .ips-pg-status-inactive {{
   background: #f1f5f9;
   color: #475569;
+}}
+.ips-pg-type-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-pg-type-inventory {{ background: #dbeafe; color: #1d4ed8; }}
+.ips-pg-type-material {{ background: #e2e8f0; color: #334155; }}
+.ips-pg-type-labor {{ background: #ede9fe; color: #6d28d9; }}
+.ips-pg-type-equipment {{ background: #ffedd5; color: #c2410c; }}
+.ips-pg-type-travel {{ background: #ccfbf1; color: #0f766e; }}
+.ips-pg-type-subcontractor {{ background: #fef9c3; color: #a16207; }}
+.ips-pg-type-service {{ background: #dcfce7; color: #15803d; }}
+.ips-pg-type-rental {{ background: #e0e7ff; color: #4338ca; }}
+.ips-pg-type-consumable {{ background: #f1f5f9; color: #475569; }}
+.ips-pg-type-assembly {{ background: #1e3a8a; color: #eff6ff; }}
+.ips-pg-summary-grid {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}}
+@media (max-width: 1100px) {{
+  .ips-pg-summary-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
+.ips-pg-summary-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}}
+.ips-pg-summary-card .lbl {{
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}}
+.ips-pg-summary-card .val {{
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 0.15rem;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;

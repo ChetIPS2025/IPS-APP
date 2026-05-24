@@ -108,11 +108,48 @@ def estimate_material_row_to_catalog_shape(row: dict[str, Any]) -> dict[str, Any
     }
 
 
+def _pricing_row_to_catalog_shape(row: dict[str, Any]) -> dict[str, Any]:
+    """Map unified ``pricing_guide_items`` row → legacy catalog shape."""
+    pc = float(row.get("default_cost") or row.get("purchase_price") or 0)
+    sp = float(row.get("default_sell_price") or row.get("sell_price") or row.get("customer_price") or 0)
+    if not sp and pc:
+        sp = round(pc * 1.25, 2)
+    return {
+        "id": row.get("id"),
+        "item_key": str(row.get("item_code") or row.get("item_key") or "").strip(),
+        "description": str(row.get("description") or "").strip(),
+        "category": str(row.get("category") or "Pricing Guide").strip() or "Pricing Guide",
+        "subgroup": str(row.get("subcategory") or row.get("subgroup") or "").strip(),
+        "unit": str(row.get("unit") or "EA").strip() or "EA",
+        "purchase_price": pc,
+        "sell_price": sp,
+        "vendor_item_number": str(row.get("vendor") or row.get("vendor_name") or "").strip(),
+        "inventory_id": "",
+        "is_active": bool(row.get("is_active", True)),
+        "_source": "pricing_guide_items",
+        "inventory_ref_id": row.get("inventory_item_id") or row.get("inventory_ref_id"),
+        "item_type": str(row.get("item_type") or "Material"),
+    }
+
+
 def fetch_estimate_materials_catalog_rows(
     *,
     fetch_table: Callable[..., list[dict[str, Any]]],
     fetch_table_admin: Callable[..., list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
+    try:
+        from app.services.pricing_guide_service import fetch_pricing_guide_rows
+    except ImportError:
+        from services.pricing_guide_service import fetch_pricing_guide_rows  # type: ignore
+
+    unified = fetch_pricing_guide_rows(
+        include_inactive=False,
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+    )
+    if unified and unified[0].get("_source") != "estimate_materials":
+        return [_pricing_row_to_catalog_shape(r) for r in unified]
+
     rows: list[dict[str, Any]] = []
     fetcher = fetch_table_admin or fetch_table
     try:

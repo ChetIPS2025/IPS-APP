@@ -556,6 +556,91 @@ def _render_inventory_transactions_tab(item: dict) -> None:
     st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
 
 
+def _render_inventory_pricing_guide_section(item: dict) -> None:
+    iid = str(item.get("id") or "")
+    pricing_item_id = str(item.get("pricing_item_id") or "").strip()
+    st.markdown("#### Pricing Guide")
+    try:
+        from app.services.pricing_guide_service import (
+            cached_pricing_guide_rows,
+            create_pricing_item_from_inventory,
+            link_inventory_to_pricing_item,
+        )
+    except ImportError:
+        from services.pricing_guide_service import (  # type: ignore
+            cached_pricing_guide_rows,
+            create_pricing_item_from_inventory,
+            link_inventory_to_pricing_item,
+        )
+
+    linked = None
+    if pricing_item_id:
+        linked = next(
+            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id")) == pricing_item_id),
+            None,
+        )
+    if linked:
+        st.success(f"Linked: **{linked.get('description')}** ({linked.get('item_type')})")
+        st.caption(
+            f"Cost {fmt_currency(linked.get('default_cost'))} · "
+            f"Sell {fmt_currency(linked.get('default_sell_price'))}"
+        )
+    else:
+        inv_linked = next(
+            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("inventory_item_id") or "") == iid),
+            None,
+        )
+        if inv_linked:
+            st.info(f"Linked via pricing item: **{inv_linked.get('description')}**")
+        else:
+            st.caption("No pricing guide item linked.")
+
+    sync_cost = bool(item.get("sync_cost_to_pricing"))
+    st.checkbox(
+        "Sync inventory cost to pricing guide",
+        value=sync_cost,
+        key=f"inv_sync_cost_pg_{iid}",
+        disabled=not (linked or pricing_item_id),
+    )
+
+    c1, c2 = st.columns(2, gap="small")
+    with c1:
+        if st.button("Create Pricing Item from Inventory", key=f"inv_create_pg_{iid}", use_container_width=True):
+            ok, msg, pid = create_pricing_item_from_inventory(item)
+            if ok and pid:
+                link_inventory_to_pricing_item(iid, pid, sync_cost=st.session_state.get(f"inv_sync_cost_pg_{iid}", False))
+                st.success(msg)
+                st.rerun()
+            elif ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+    with c2:
+        options = [
+            (f"{r.get('description')} — {r.get('item_type')}", str(r.get("id")))
+            for r in cached_pricing_guide_rows(include_inactive=True)
+            if r.get("item_type") in {"Inventory", "Material", "Consumable"}
+        ]
+        if options and st.button("Link to Pricing Guide Item", key=f"inv_link_pg_{iid}", use_container_width=True):
+            st.session_state[f"inv_show_pg_link_{iid}"] = True
+    if st.session_state.get(f"inv_show_pg_link_{iid}") and options:
+        labels = [label for label, _ in options]
+        pick = st.selectbox("Pricing item", labels, key=f"inv_pg_pick_{iid}")
+        id_map = {label: pid for label, pid in options}
+        if st.button("Confirm Link", key=f"inv_pg_link_confirm_{iid}"):
+            ok, msg = link_inventory_to_pricing_item(
+                iid,
+                id_map.get(pick, ""),
+                sync_cost=st.session_state.get(f"inv_sync_cost_pg_{iid}", False),
+            )
+            if ok:
+                st.success(msg)
+                st.session_state.pop(f"inv_show_pg_link_{iid}", None)
+                st.rerun()
+            st.error(msg)
+
+
 def _render_inventory_detail_tabs(item: dict) -> None:
     status = str(item.get("status") or "")
     (
@@ -601,6 +686,7 @@ def _render_inventory_detail_tabs(item: dict) -> None:
             f"</div>"
         )
         st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
+        _render_inventory_pricing_guide_section(item)
 
     with tab_stock:
         placeholder_html("Stock History will connect to Supabase in a later phase.")

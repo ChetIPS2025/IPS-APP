@@ -134,23 +134,51 @@ def _catalog_row_to_option(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_pricing_guide_options_for_estimate() -> list[dict[str, Any]]:
+    return get_unified_pricing_options_for_estimate()
+
+
+def get_unified_pricing_options_for_estimate() -> list[dict[str, Any]]:
+    """All active pricing guide items for estimate builder (DESCRIPTION — TYPE labels)."""
+    try:
+        from app.services.pricing_guide_service import (
+            cached_pricing_guide_rows,
+            pricing_item_to_estimate_option,
+        )
+    except ImportError:
+        from services.pricing_guide_service import (  # type: ignore
+            cached_pricing_guide_rows,
+            pricing_item_to_estimate_option,
+        )
+    seen: dict[str, int] = {}
+    out: list[dict[str, Any]] = []
+    for row in cached_pricing_guide_rows(include_inactive=False):
+        opt = pricing_item_to_estimate_option(row)
+        base_label = f"{opt['description']} — {opt['item_type']}"
+        opt["label"] = _dedupe_label(base_label, seen, opt["item_type"])
+        out.append(opt)
+    if out:
+        return out
+
     try:
         from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
     except ImportError:
         from services.estimate_materials_catalog import cached_estimate_materials_catalog_rows  # type: ignore
-    seen: dict[str, int] = {}
-    out: list[dict[str, Any]] = []
     for row in cached_estimate_materials_catalog_rows():
         opt = _catalog_row_to_option(row)
         suffix = opt["category"] if opt["category"] and opt["category"] != "—" else "Pricing Guide"
         label = _dedupe_label(opt["description"], seen, suffix)
         opt["label"] = label
+        opt["item_type"] = str(row.get("item_type") or "Material")
         out.append(opt)
     return out
 
 
 def pricing_guide_options_as_select() -> list[tuple[str, dict[str, Any]]]:
-    return [(opt["label"], opt) for opt in get_pricing_guide_options_for_estimate()]
+    return [(opt["label"], opt) for opt in get_unified_pricing_options_for_estimate()]
+
+
+def unified_pricing_options_as_select() -> list[tuple[str, dict[str, Any]]]:
+    return pricing_guide_options_as_select()
 
 
 def _asset_row_to_option(row: dict[str, Any]) -> dict[str, Any]:

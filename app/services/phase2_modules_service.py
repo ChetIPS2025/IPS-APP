@@ -322,6 +322,10 @@ def normalize_estimate(
         "proposal_show_line_items": bool(row.get("proposal_show_line_items")),
         "proposal_show_category_totals": row.get("proposal_show_category_totals", True),
         "proposal_show_final_price_only": bool(row.get("proposal_show_final_price_only")),
+        "approved_at": str(row.get("approved_at") or "")[:19],
+        "approved_by": str(row.get("approved_by") or ""),
+        "archived_from_estimates": bool(row.get("archived_from_estimates")),
+        "converted_to_job_at": str(row.get("converted_to_job_at") or "")[:19],
     }
 
 
@@ -588,6 +592,12 @@ def list_estimates(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
         return (demo if demo else []), True
     cust_names = _customer_name_by_id()
     out = [normalize_estimate(r, customer_names=cust_names) for r in rows]
+    try:
+        from app.services.estimate_job_workflow_service import enrich_estimates_with_job_numbers
+
+        out = enrich_estimates_with_job_numbers(out)
+    except Exception:
+        pass
     out.sort(key=lambda r: str(r.get("estimate_number") or ""))
     return out, False
 
@@ -795,6 +805,31 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         result = update_row("estimates", payload, {"id": row_id})
     else:
         result = insert_row("estimates", payload)
+        if result.ok:
+            eid = str((result.data or {}).get("id") or "").strip()
+            if eid:
+                try:
+                    from app.services.estimate_job_workflow_service import (
+                        auto_create_linked_job_after_estimate_insert,
+                    )
+                except ImportError:
+                    from services.estimate_job_workflow_service import (  # type: ignore
+                        auto_create_linked_job_after_estimate_insert,
+                    )
+                link_result = auto_create_linked_job_after_estimate_insert(eid, estimate_row=result.data)
+                if not link_result.ok and link_result.error_code not in ("duplicate",):
+                    if link_result.error_code == "no_customer":
+                        result = ServiceResult(
+                            ok=True,
+                            data=result.data,
+                            error=None,
+                        )
+                    else:
+                        return ServiceResult(
+                            ok=False,
+                            error=link_result.message or "Estimate saved but linked job could not be created.",
+                            data=result.data,
+                        )
     if result.ok:
         clear_all_data_caches()
     return result

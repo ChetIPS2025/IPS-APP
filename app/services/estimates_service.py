@@ -53,6 +53,14 @@ from app.services.phase2_modules_service import (
     save_estimate,
     save_estimate_line_item,
 )
+from app.services.estimate_job_workflow_service import (
+    approve_estimate_and_job,
+    can_approve_estimates,
+    estimate_status_approvable,
+    estimate_visible_in_active_view,
+    estimate_visible_in_approved_view,
+    estimate_visible_in_rejected_view,
+)
 from app.services.proposal_pdf_service import (
     build_customer_quote_bundle,
     generate_estimate_proposal_pdf,
@@ -69,7 +77,9 @@ __all__ = [
     "add_estimate_other_cost",
     "add_estimate_subcontractor",
     "add_estimate_travel",
+    "approve_estimate_and_job",
     "calculate_estimate_totals",
+    "can_approve_estimates",
     "clear_estimate_cache",
     "delete_estimate",
     "delete_estimate_equipment",
@@ -80,6 +90,10 @@ __all__ = [
     "delete_estimate_subcontractor",
     "delete_estimate_travel",
     "build_customer_quote_bundle",
+    "estimate_status_approvable",
+    "estimate_visible_in_active_view",
+    "estimate_visible_in_approved_view",
+    "estimate_visible_in_rejected_view",
     "generate_estimate_proposal_pdf",
     "generate_estimate_proposal_pdf_by_id",
     "get_default_terms",
