@@ -485,7 +485,15 @@ def _render_edit_form(row: dict[str, Any]) -> None:
     vendor = st.text_input("Vendor / part #", value=str(row.get("vendor") or ""), key=f"pg_edit_vendor_{rk}")
     active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"pg_edit_active_{rk}")
 
-    def _save() -> None:
+    cancelled, saved = render_save_cancel_actions(
+        module=_MODULE,
+        record_key=rk,
+        cancel_key=f"pg_edit_cancel_{rk}",
+        save_key=f"pg_edit_save_{rk}",
+    )
+    if cancelled:
+        st.rerun()
+    if saved:
         ok, msg = _persist_row(
             {
                 "item_key": item_key,
@@ -503,8 +511,7 @@ def _render_edit_form(row: dict[str, Any]) -> None:
         if apply_persist_feedback(ok, msg):
             set_view_mode(_MODULE, rk)
             st.rerun()
-
-    render_save_cancel_actions(_save, lambda: set_view_mode(_MODULE, rk), save_label="Save Pricing Guide Item")
+        st.error(msg or "Could not save pricing guide item.")
 
 
 @st.dialog("Pricing Guide Item", width="large", on_dismiss=_clear_modal)
