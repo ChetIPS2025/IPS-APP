@@ -8,8 +8,7 @@ import html
 import streamlit as st
 
 try:
-    from app.components.action_styles import danger_outline_button
-    from app.components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel
+    from app.components.inventory_actions import render_inventory_action_buttons
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -48,7 +47,6 @@ try:
     )
     from app.services.inventory_service import (
         clear_inventory_cache,
-        delete_inventory_item,
         ensure_inventory_qr_tokens,
         generate_inventory_qr_value,
         get_inventory_image_url,
@@ -60,8 +58,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
-    from components.action_styles import danger_outline_button  # type: ignore
-    from components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel  # type: ignore
+    from components.inventory_actions import render_inventory_action_buttons  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -100,7 +97,6 @@ except ImportError:
     )
     from services.inventory_service import (  # type: ignore
         clear_inventory_cache,
-        delete_inventory_item,
         ensure_inventory_qr_tokens,
         generate_inventory_qr_value,
         get_inventory_image_url,
@@ -787,44 +783,10 @@ def _render_inventory_actions_panel(item: dict) -> None:
     if not iid or is_demo_id(iid):
         return
 
-    can_mutate = can_admin_mutate()
-    with modal_danger_zone():
-        if danger_outline_button(
-            "Deactivate Item",
-            f"inv_deactivate_{record_key}",
-            disabled=not can_mutate,
-            help="Sets status to Discontinued.",
-        ):
-            try:
-                from app.services.repository import update_row
-            except ImportError:
-                from services.repository import update_row  # type: ignore
-            result = update_row("inventory_items", {"status": "Discontinued"}, {"id": iid})
-            if result.ok:
-                clear_inventory_cache()
-                _clear_inventory_modal()
-                st.success("Inventory item deactivated.")
-                st.rerun()
-            st.error(result.error or "Could not deactivate item.")
+    def _after_action() -> None:
+        _clear_inventory_modal()
 
-        def _delete_item() -> None:
-            result = delete_inventory_item(iid)
-            if result.ok:
-                clear_inventory_cache()
-                _clear_inventory_modal()
-                st.success("Inventory item deleted.")
-                st.rerun()
-            st.error(result.error or "Could not delete item.")
-
-        render_modal_delete_panel(
-            prefix=f"inv_del_{record_key}",
-            delete_label="Delete Inventory Item",
-            confirm_message="Delete this inventory item permanently? This cannot be undone.",
-            confirm_label="Confirm Delete",
-            can_delete=can_mutate,
-            disabled_reason="Only admin, manager, or supervisor can delete inventory items.",
-            on_confirm=_delete_item,
-        )
+    render_inventory_action_buttons(item, on_deactivate=_after_action, on_delete=_after_action)
 
 
 def render_inventory_detail_dialog(item: dict) -> None:

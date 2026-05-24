@@ -51,7 +51,9 @@ _DECREASE_ON_HAND = frozenset({"check_out", "issue_to_job", "consume_on_job"})
 
 __all__ = [
     "INVENTORY_TXN_TYPES",
+    "can_manage_inventory_actions",
     "clear_inventory_cache",
+    "deactivate_inventory_item",
     "delete_inventory_item",
     "ensure_inventory_qr_tokens",
     "generate_inventory_qr_value",
@@ -73,6 +75,26 @@ __all__ = [
 def clear_inventory_cache() -> None:
     clear_all_data_caches()
     clear_inventory_image_url_cache()
+
+
+def can_manage_inventory_actions() -> bool:
+    """Admin, manager, or supervisor may deactivate or delete inventory items."""
+    try:
+        from app.components.modal_delete import can_admin_mutate
+    except ImportError:
+        from components.modal_delete import can_admin_mutate  # type: ignore
+    return can_admin_mutate()
+
+
+def deactivate_inventory_item(item_id: str) -> ServiceResult:
+    """Mark an inventory item as Discontinued."""
+    iid = str(item_id or "").strip()
+    if not iid:
+        return ServiceResult(ok=False, error="Missing inventory item id.")
+    result = update_row(_INV_TABLE, {"status": "Discontinued"}, {"id": iid})
+    if result.ok:
+        clear_inventory_cache()
+    return result
 
 
 def get_inventory() -> list[dict[str, Any]]:
