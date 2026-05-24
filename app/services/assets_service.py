@@ -106,6 +106,8 @@ __all__ = [
 
     "get_asset_by_qr",
 
+    "rebuild_asset_qr",
+
     "get_asset_document_view_url",
 
     "get_asset_documents",
@@ -217,97 +219,103 @@ def _ensure_asset_qr_token(row: dict[str, Any]) -> str:
 
 
 def generate_asset_qr_value(asset: dict[str, Any]) -> str:
-
     """Build mobile scan URL using APP_BASE_URL, asset id, and qr_token."""
-
     row = dict(asset or {})
-
     iid = str(row.get("id") or "").strip()
-
     if not row.get("qr_token"):
-
         row["qr_token"] = _ensure_asset_qr_token(row)
-
     token = str(row.get("qr_token") or "").strip()
-
-    cached = str(row.get("qr_value") or "").strip()
-
-    if cached.startswith("http") and "scan=asset" in cached:
-
+    cached = str(row.get("qr_value") or row.get("qr_code_value") or "").strip()
+    if cached.startswith("http") and "scan=asset" in cached and "asset_id=" in cached:
         return cached
-
     if iid and token:
-
         url = _asset_mobile_scan_url(asset_id=iid, qr_token=token)
-
         if url:
-
+            _persist_asset_qr_url(row, url)
             return url
-
     legacy = str(row.get("qr_code_value") or "").strip()
-
-    return legacy
+    if legacy:
+        return legacy
+    num = str(row.get("asset_id") or row.get("asset_number") or row.get("asset_tag") or "").strip()
+    if num:
+        try:
+            from app.services.asset_service import build_qr_value
+        except ImportError:
+            from services.asset_service import build_qr_value  # type: ignore
+        return build_qr_value(num)
+    return ""
 
 
 
 
 
 def ensure_asset_qr_tokens(assets: list[dict[str, Any]] | None = None) -> ServiceResult:
-
-    """Generate and persist missing qr_token values without rotating existing tokens."""
-
+    """Generate missing qr_token values and refresh scan URLs where needed."""
     rows = assets if assets is not None else get_assets()
-
     updated = 0
-
     for row in rows:
-
         iid = str(row.get("id") or "").strip()
-
-        if not iid or str(row.get("qr_token") or "").strip():
-
+        if not iid:
             continue
-
-        token = generate_asset_qr_token()
-
-        norm = normalize_asset({**row, "qr_token": token})
-
-        scan_url = generate_asset_qr_value(norm)
-
-        payload: dict[str, Any] = {"qr_token": token}
-
-        if scan_url:
-
-            payload["qr_value"] = scan_url
-
-            payload["qr_code_value"] = scan_url
-
-        try:
-
-            from app.pages._core._crud import is_demo_id
-
-        except ImportError:
-
-            from pages._core._crud import is_demo_id  # type: ignore
-
-        if is_demo_id(iid):
-
-            continue
-
-        result = update_row(_ASSET_TABLE, payload, {"id": iid})
-
-        if result.ok:
-
-            updated += 1
-
+        has_token = bool(str(row.get("qr_token") or "").strip())
+        if not has_token:
+            token = generate_asset_qr_token()
+            norm = normalize_asset({**row, "qr_token": token})
+            scan_url = generate_asset_qr_value(norm)
+            payload: dict[str, Any] = {"qr_token": token}
+            if scan_url:
+                payload["qr_value"] = scan_url
+                payload["qr_code_value"] = scan_url
+            try:
+                from app.pages._core._crud import is_demo_id
+            except ImportError:
+                from pages._core._crud import is_demo_id  # type: ignore
+            if is_demo_id(iid):
+                continue
+            result = update_row(_ASSET_TABLE, payload, {"id": iid})
+            if result.ok:
+                updated += 1
+        else:
+            norm = normalize_asset(row)
+            scan_url = generate_asset_qr_value(norm)
+            if scan_url.startswith("http") and "scan=asset" in scan_url:
+                cached = str(row.get("qr_value") or row.get("qr_code_value") or "").strip()
+                if cached != scan_url:
+                    _persist_asset_qr_url(norm, scan_url)
+                    updated += 1
     if updated:
-
         clear_assets_cache()
-
     return ServiceResult(ok=True, data={"updated": updated})
 
 
+def rebuild_asset_qr(asset: dict[str, Any]) -> ServiceResult:
+    """Rotate qr_token and persist a fresh mobile scan URL for label reprint."""
+    iid = str((asset or {}).get("id") or "").strip()
+    if not iid:
+        return ServiceResult(ok=False, error="Missing asset id.")
+    try:
+        from app.pages._core._crud import is_demo_id
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+    if is_demo_id(iid):
+        token = generate_asset_qr_token()
+        url = _asset_mobile_scan_url(asset_id=iid, qr_token=token)
+        return ServiceResult(ok=True, data=normalize_asset({**asset, "qr_token": token, "qr_value": url}))
 
+    token = generate_asset_qr_token()
+    url = _asset_mobile_scan_url(asset_id=iid, qr_token=token)
+    if not url:
+        return ServiceResult(ok=False, error="APP_BASE_URL is not configured.")
+    payload: dict[str, Any] = {
+        "qr_token": token,
+        "qr_value": url,
+        "qr_code_value": url,
+    }
+    result = update_row(_ASSET_TABLE, payload, {"id": iid})
+    if not result.ok:
+        return result
+    clear_assets_cache()
+    return ServiceResult(ok=True, data=normalize_asset({**asset, **payload}))
 
 
 def get_assets() -> list[dict[str, Any]]:
@@ -404,119 +412,178 @@ def _db_fetch_by_match(table: str, match: dict[str, Any], *, limit: int = 5) -> 
 
 
 
-def get_asset_by_qr(
+def _normalize_qr_tag(raw: str) -> tuple[str, str]:
+    """Return (raw_tag, bare_id) where bare_id strips an optional IPS- prefix."""
+    s = str(raw or "").strip()
+    if not s:
+        return "", ""
+    bare = s[4:].strip() if s.upper().startswith("IPS-") else s
+    return s, bare
 
+
+def _asset_row_active(row: dict[str, Any]) -> bool:
+    status = str(row.get("status") or "").strip().lower()
+    if status in {"retired", "deleted", "inactive", "disposed", "scrapped"}:
+        return False
+    if row.get("is_active") is False:
+        return False
+    return True
+
+
+def _match_asset_rows_by_identifiers(
     *,
-
-    asset_id: str | None = None,
-
-    asset_number: str | None = None,
-
-    token: str | None = None,
-
-) -> ServiceResult:
-
-    """Resolve asset from QR params; validate qr_token when present."""
-
+    asset_id: str = "",
+    asset_number: str = "",
+    asset_tag: str = "",
+    qr: str = "",
+) -> list[dict[str, Any]]:
+    """Resolve raw DB rows using id, number/tag, or legacy qr values."""
     iid = str(asset_id or "").strip()
-
-    num = str(asset_number or "").strip()
-
-    token_s = str(token or "").strip()
-
-    rows: list[dict[str, Any]] = []
-
-
+    num = str(asset_number or asset_tag or "").strip()
+    qr_raw, qr_bare = _normalize_qr_tag(qr or num)
+    _, num_bare = _normalize_qr_tag(num)
 
     if iid:
+        rows = _db_fetch_by_match(_ASSET_TABLE, {"id": iid}, limit=5)
+        if rows:
+            return rows
+        cached = get_asset(iid)
+        if cached:
+            return [cached]
 
-        rows = _db_fetch_by_match(_ASSET_TABLE, {"id": iid}, limit=3)
+    candidates = {x.upper() for x in (num, num_bare, qr_raw, qr_bare) if x}
+    if not candidates:
+        return []
 
-        if not rows:
+    all_rows, _ = fetch_rows(_ASSET_TABLE, limit=8000, alt_tables=("asset_database",))
+    matches: list[dict[str, Any]] = []
+    for row in all_rows:
+        fields = {
+            str(row.get("asset_id") or "").strip().upper(),
+            str(row.get("asset_number") or "").strip().upper(),
+            str(row.get("asset_tag") or "").strip().upper(),
+            str(row.get("qr_code_value") or "").strip().upper(),
+            str(row.get("qr_value") or "").strip().upper(),
+        }
+        fields.discard("")
+        if candidates & fields:
+            matches.append(row)
+            continue
+        qv = str(row.get("qr_value") or row.get("qr_code_value") or "").strip()
+        if qv and any(c in qv.upper() for c in candidates):
+            matches.append(row)
 
-            cached = get_asset(iid)
-
-            if cached:
-
-                rows = [cached]
-
-    elif num:
-
-        rows = _db_fetch_by_match(_ASSET_TABLE, {"asset_id": num}, limit=5)
-
-        if len(rows) != 1:
-
-            all_rows, _ = fetch_rows(_ASSET_TABLE, limit=8000, alt_tables=("asset_database",))
-
-            matches = [
-
-                r for r in all_rows
-
-                if str(r.get("asset_id") or r.get("asset_number") or "").strip().upper() == num.upper()
-
-            ]
-
-            if len(matches) == 1:
-
-                rows = matches
-
-            elif len(matches) > 1:
-
-                return ServiceResult(ok=False, error="Ambiguous asset number.")
-
-    else:
-
-        return ServiceResult(ok=False, error="Missing asset identifier.")
+    if len(matches) == 1:
+        return matches
+    if len(matches) > 1:
+        return matches
+    return []
 
 
+def _persist_asset_qr_url(row: dict[str, Any], scan_url: str) -> None:
+    iid = str(row.get("id") or "").strip()
+    if not iid or not scan_url:
+        return
+    try:
+        from app.pages._core._crud import is_demo_id
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+    if is_demo_id(iid):
+        return
+    payload: dict[str, Any] = {"qr_value": scan_url, "qr_code_value": scan_url}
+    update_row(_ASSET_TABLE, payload, {"id": iid})
+    clear_assets_cache()
+
+
+def get_asset_by_qr(
+    *,
+    asset_id: str | None = None,
+    asset_number: str | None = None,
+    asset_tag: str | None = None,
+    qr: str | None = None,
+    token: str | None = None,
+    allow_legacy: bool = True,
+) -> ServiceResult:
+    """
+    Resolve asset from QR params; validate qr_token when supplied.
+
+    Returns asset dict in ``data`` with optional ``_qr_scan_warning`` / ``_qr_scan_legacy``.
+    """
+    token_s = str(token or "").strip()
+    tag = str(asset_tag or "").strip()
+    num = str(asset_number or tag or "").strip()
+    qr_s = str(qr or tag or num or "").strip()
+
+    rows = _match_asset_rows_by_identifiers(
+        asset_id=str(asset_id or "").strip(),
+        asset_number=num,
+        asset_tag=tag,
+        qr=qr_s,
+    )
 
     if not rows:
-
-        return ServiceResult(ok=False, error="Asset not found.")
-
+        scanned = qr_s or num or str(asset_id or "").strip()
+        msg = "Asset not found for this QR code."
+        if scanned:
+            msg = f"{msg} Scanned value: {scanned}"
+        return ServiceResult(ok=False, error=msg)
     if len(rows) > 1:
+        return ServiceResult(ok=False, error="Ambiguous asset match for this QR code.")
 
-        return ServiceResult(ok=False, error="Ambiguous asset match.")
-
-
+    if not _asset_row_active(rows[0]):
+        return ServiceResult(ok=False, error="This asset is inactive or unavailable.")
 
     item = normalize_asset(rows[0])
-
-    stored_token = str(item.get("qr_token") or "").strip()
-
     try:
-
         from app.pages._core._crud import is_demo_id
-
     except ImportError:
-
         from pages._core._crud import is_demo_id  # type: ignore
-
     is_demo = is_demo_id(str(item.get("id") or ""))
 
-
+    stored_token = str(item.get("qr_token") or "").strip()
+    legacy_mode = False
+    warning: str | None = None
+    token_created = False
 
     if stored_token and token_s and token_s != stored_token:
-
-        return ServiceResult(ok=False, error="Invalid asset QR code.")
+        return ServiceResult(ok=False, error="Invalid or expired asset QR token.")
 
     if stored_token and not token_s:
-
-        return ServiceResult(ok=False, error="Invalid asset QR code.")
+        if allow_legacy:
+            legacy_mode = True
+            warning = (
+                "This QR label uses an older format. Reprint the QR label for full secure access."
+            )
+        else:
+            return ServiceResult(ok=False, error="Invalid or expired asset QR token.")
 
     if not stored_token and not is_demo:
-
-        item["qr_token"] = _ensure_asset_qr_token(item)
-
-        if token_s and token_s != item.get("qr_token"):
-
-            return ServiceResult(ok=False, error="Invalid asset QR code.")
-
+        new_token = _ensure_asset_qr_token(item)
+        item["qr_token"] = new_token
+        token_created = True
+        if token_s and token_s != new_token:
+            return ServiceResult(ok=False, error="Invalid or expired asset QR token.")
+        if not token_s:
+            legacy_mode = True
+            warning = "QR token was missing and has been created. Reprint this asset label."
     elif not stored_token and is_demo and token_s:
-
         item["qr_token"] = token_s
 
+    scan_url = generate_asset_qr_value(item)
+    if scan_url.startswith("http"):
+        item["qr_value"] = scan_url
+        cached = str(rows[0].get("qr_value") or rows[0].get("qr_code_value") or "").strip()
+        if not cached.startswith("http") or "scan=asset" not in cached:
+            _persist_asset_qr_url(item, scan_url)
 
+    if token_created and not warning:
+        warning = "QR token was missing and has been created. Reprint this asset label."
+        legacy_mode = True
+
+    if legacy_mode:
+        item["_qr_scan_legacy"] = True
+    if warning:
+        item["_qr_scan_warning"] = warning
 
     return ServiceResult(ok=True, data=item)
 

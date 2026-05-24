@@ -381,6 +381,7 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": aid or num,
         "asset_number": num,
+        "asset_tag": str(row.get("asset_tag") or row.get("asset_id") or row.get("tag") or num),
         "asset_name": str(row.get("asset_name") or row.get("name") or "—"),
         "category": str(row.get("category") or row.get("asset_type") or "—"),
         "location": str(row.get("location") or "—"),

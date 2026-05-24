@@ -254,6 +254,7 @@ class Settings:
     debug_performance: bool = field(
         default_factory=lambda: _bool_env("IPS_DEBUG_PERFORMANCE") or _bool_env("DEBUG_PERFORMANCE")
     )
+    debug_qr: bool = field(default_factory=lambda: _bool_env("DEBUG_QR"))
     reference_cache_ttl_seconds: int = field(
         default_factory=lambda: _int_env("REFERENCE_CACHE_TTL_SECONDS", 120)
     )

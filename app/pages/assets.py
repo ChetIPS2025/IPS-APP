@@ -48,6 +48,7 @@ try:
         generate_asset_qr_value,
         get_asset_document_view_url,
         get_asset_documents,
+        rebuild_asset_qr,
         get_asset_image_url,
         get_asset_inspections,
         get_asset_issues,
@@ -549,6 +550,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
         return
     subject = qr_embed_subject(qr_asset)
     scan_url = generate_asset_qr_value(asset)
+    is_secure_url = scan_url.startswith("http") and "scan=asset" in scan_url and "token=" in scan_url
 
     with st.container(border=True):
         st.markdown(
@@ -556,6 +558,10 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             '<p style="margin:0 0 0.35rem;font-weight:700;font-size:0.9rem;">Equipment QR</p>',
             unsafe_allow_html=True,
         )
+        if not is_secure_url:
+            st.warning(
+                "This label uses an older QR format. Reprint it to use secure scan links."
+            )
         try:
             qr_png = qr_png_bytes(subject)
             if qr_png and scan_url:
@@ -578,12 +584,25 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             st.link_button("Open Asset QR Page", scan_url, use_container_width=True)
         else:
             st.caption("Set APP_BASE_URL so printed labels open the asset card when scanned.")
-        dl1, dl2 = st.columns(2)
-        with dl1:
+        if scan_url:
+            st.caption("Scan URL")
+            st.code(scan_url, language=None)
+        act1, act2, act3 = st.columns(3)
+        with act1:
+            if st.button("Rebuild QR", key=f"ast_qr_rebuild_{aid}", use_container_width=True):
+                result = rebuild_asset_qr(asset)
+                if result.ok and isinstance(result.data, dict):
+                    clear_assets_cache()
+                    st.session_state["ips_sel_assets"] = aid
+                    st.success("QR label rebuilt. Reprint the sticker when ready.")
+                    st.rerun()
+                else:
+                    st.error(str(getattr(result, "error", None) or "Could not rebuild QR."))
+        with act2:
             try:
                 dl_bytes, dl_mime, dl_name = qr_label_for_download(qr_asset, subject)
                 st.download_button(
-                    "Print QR Label",
+                    "Print Label",
                     data=dl_bytes,
                     file_name=dl_name,
                     mime=dl_mime,
@@ -599,7 +618,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
                     key=f"ast_qr_png_{aid}",
                     use_container_width=True,
                 )
-        with dl2:
+        with act3:
             try:
                 st.download_button(
                     "2×1 sticker",
@@ -611,8 +630,6 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
                 )
             except Exception:
                 pass
-        if scan_url.startswith("http"):
-            st.code(scan_url, language=None)
 
 
 def _render_asset_documents_tab(asset: dict) -> None:

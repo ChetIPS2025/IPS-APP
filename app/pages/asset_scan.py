@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
@@ -66,27 +67,172 @@ def _first_query_param(name: str) -> str:
     return str(v or "").strip()
 
 
+def _qp(name: str) -> str | None:
+    """Read one query param (Streamlit may return str or list)."""
+    value = _first_query_param(name)
+    return value if value else None
+
+
+def _debug_qr_enabled() -> bool:
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    flag = str(getattr(settings, "debug_qr", "") or "").strip().lower()
+    if flag in {"1", "true", "yes", "on"}:
+        return True
+    import os
+    return str(os.environ.get("DEBUG_QR") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_scan_url_params(raw: str) -> dict[str, str]:
+    """Extract scan=asset params from a full URL or query string fragment."""
+    out: dict[str, str] = {}
+    s = str(raw or "").strip()
+    if not s:
+        return out
+    try:
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(s if "://" in s else f"https://local.invalid/?{s.lstrip('?')}")
+        qs = parse_qs(parsed.query)
+        for key in (
+            "scan",
+            "asset_id",
+            "asset_number",
+            "asset_tag",
+            "tag",
+            "qr",
+            "token",
+            "page",
+            "asset",
+        ):
+            vals = qs.get(key) or []
+            if vals and str(vals[0]).strip():
+                out[key] = str(vals[0]).strip()
+    except Exception:
+        pass
+    return out
+
+
+def _collect_asset_scan_params() -> dict[str, str]:
+    """Merge session, query params, and embedded URL fragments for asset scan."""
+    params: dict[str, str] = {}
+    for key in (
+        "scan",
+        "asset_id",
+        "asset_number",
+        "asset_tag",
+        "tag",
+        "qr",
+        "code",
+        "token",
+        "page",
+        "asset",
+    ):
+        val = _qp(key)
+        if val:
+            params[key] = val
+
+    if params.get("code") and not params.get("qr"):
+        params["qr"] = params["code"]
+
+    for sess_key, out_key in (
+        ("_ips_scan_ast_id", "asset_id"),
+        ("_ips_scan_ast_num", "asset_number"),
+        ("_ips_scan_ast_tag", "asset_tag"),
+        ("_ips_scan_ast_token", "token"),
+        ("_ips_scan_ast_qr", "qr"),
+    ):
+        val = str(st.session_state.get(sess_key) or "").strip()
+        if val and not params.get(out_key):
+            params[out_key] = val
+
+    embedded = _parse_scan_url_params(params.get("qr") or "")
+    for key, val in embedded.items():
+        if val and not params.get(key):
+            params[key] = val
+
+    if not params.get("scan"):
+        page = (params.get("page") or "").lower()
+        if params.get("asset") or params.get("asset_tag") or params.get("tag"):
+            params["scan"] = "asset"
+        elif "asset_card" in page:
+            params["scan"] = "asset"
+
+    if params.get("asset") and not params.get("asset_tag"):
+        params["asset_tag"] = params["asset"]
+    if params.get("tag") and not params.get("asset_tag"):
+        params["asset_tag"] = params["tag"]
+
+    if not params.get("scan") and _looks_like_asset_identifier(
+        params.get("qr") or params.get("code") or ""
+    ):
+        params["scan"] = "asset"
+        if params.get("code") and not params.get("qr"):
+            params["qr"] = params["code"]
+
+    return params
+
+
+def _looks_like_asset_identifier(raw: str) -> bool:
+    """True when a bare scanned value is likely an asset tag (not inventory)."""
+    s = str(raw or "").strip()
+    if not s or s.lower() == "inventory":
+        return False
+    if "://" in s or "scan=" in s.lower() or "asset_id=" in s.lower():
+        embedded = _parse_scan_url_params(s)
+        return bool(
+            embedded.get("scan") == "asset"
+            or embedded.get("asset_id")
+            or embedded.get("asset_tag")
+            or embedded.get("asset")
+            or embedded.get("qr")
+        )
+    low = s.lower()
+    if low.startswith("ips-"):
+        return True
+    if re.match(r"^[a-z]{2,12}-[a-f0-9]{6,}$", low):
+        return True
+    return len(s) >= 8 and "-" in s
+
+
 def capture_asset_scan_from_query() -> None:
     """Persist asset scan params before auth / legacy asset routing."""
-    scan = _first_query_param("scan")
-    if scan != "asset":
-        return
+    params = _collect_asset_scan_params()
+    scan = params.get("scan") or _qp("scan")
+    if scan != "asset" and not (params.get("asset") or params.get("asset_tag") or params.get("tag")):
+        page = (params.get("page") or _qp("page") or "").lower()
+        if "asset_card" not in page and not _looks_like_asset_identifier(
+            params.get("qr") or params.get("code") or _qp("qr") or _qp("code") or ""
+        ):
+            return
     st.session_state[_SCAN_SESSION_KEY] = True
-    asset_id = _first_query_param("asset_id")
-    asset_number = _first_query_param("asset_number")
-    token = _first_query_param("token")
-    if asset_id:
-        st.session_state["_ips_scan_ast_id"] = asset_id
-    if asset_number:
-        st.session_state["_ips_scan_ast_num"] = asset_number
-    if token:
-        st.session_state["_ips_scan_ast_token"] = token
+    for key, sess_key in (
+        ("asset_id", "_ips_scan_ast_id"),
+        ("asset_number", "_ips_scan_ast_num"),
+        ("asset_tag", "_ips_scan_ast_tag"),
+        ("token", "_ips_scan_ast_token"),
+        ("qr", "_ips_scan_ast_qr"),
+    ):
+        if params.get(key):
+            st.session_state[sess_key] = params[key]
+    if params.get("code") and not st.session_state.get("_ips_scan_ast_qr"):
+        st.session_state["_ips_scan_ast_qr"] = params["code"]
 
 
 def asset_scan_route_active() -> bool:
     if st.session_state.get(_SCAN_SESSION_KEY):
         return True
-    return _first_query_param("scan") == "asset"
+    if _qp("scan") == "asset":
+        return True
+    if _qp("asset") or _qp("asset_tag") or _qp("tag"):
+        return True
+    page = (_qp("page") or "").lower()
+    if "asset_card" in page:
+        return True
+    if _looks_like_asset_identifier(_qp("qr") or _qp("code") or ""):
+        return True
+    return False
 
 
 def _profile_name() -> str:
@@ -119,18 +265,19 @@ def _can_view_restricted_docs() -> bool:
     return str(current_role() or "").lower() in {"admin", "supervisor", "manager"}
 
 
-def _load_scan_asset() -> tuple[dict[str, Any] | None, str]:
-    asset_id = _first_query_param("asset_id") or str(st.session_state.get("_ips_scan_ast_id") or "")
-    asset_number = _first_query_param("asset_number") or str(st.session_state.get("_ips_scan_ast_num") or "")
-    token = _first_query_param("token") or str(st.session_state.get("_ips_scan_ast_token") or "")
+def _load_scan_asset() -> tuple[dict[str, Any] | None, str, dict[str, str]]:
+    params = _collect_asset_scan_params()
     result = get_asset_by_qr(
-        asset_id=asset_id or None,
-        asset_number=asset_number or None,
-        token=token or None,
+        asset_id=params.get("asset_id"),
+        asset_number=params.get("asset_number"),
+        asset_tag=params.get("asset_tag"),
+        qr=params.get("qr"),
+        token=params.get("token"),
+        allow_legacy=True,
     )
     if not result.ok:
-        return None, str(result.error or "Invalid asset QR code.")
-    return result.data, ""
+        return None, str(result.error or "Asset not found for this QR code."), params
+    return result.data, "", params
 
 
 def _asset_status_pill_html(status: str) -> str:
@@ -471,6 +618,22 @@ def _render_asset_card(asset: dict[str, Any]) -> None:
     _render_asset_summary(asset)
 
 
+def _render_qr_debug(params: dict[str, str]) -> None:
+    if not _debug_qr_enabled():
+        return
+    token_present = bool(params.get("token"))
+    with st.expander("QR debug (DEBUG_QR)", expanded=False):
+        st.write(
+            {
+                "asset_id": params.get("asset_id"),
+                "asset_number": params.get("asset_number"),
+                "asset_tag": params.get("asset_tag"),
+                "qr": params.get("qr"),
+                "token_present": token_present,
+            }
+        )
+
+
 def render_asset_scan_page() -> None:
     """Dedicated mobile asset card — no sidebar, no dashboard routing."""
     try:
@@ -488,15 +651,33 @@ def render_asset_scan_page() -> None:
 
     st.markdown("## IPS Asset Card")
 
+    params = _collect_asset_scan_params()
+    _render_qr_debug(params)
+
     view = str(st.session_state.get(_VIEW_KEY) or "card")
     if view == "success" and st.session_state.get(_SUCCESS_KEY):
         _render_success()
         return
 
-    asset, err = _load_scan_asset()
+    asset, err, _params = _load_scan_asset()
     if err or not asset:
-        st.error(err or "Invalid asset QR code.")
+        st.error(err or "Asset not found for this QR code.")
+        scanned = (
+            _params.get("qr")
+            or _params.get("asset_tag")
+            or _params.get("asset_number")
+            or _params.get("asset_id")
+            or ""
+        )
+        if scanned:
+            st.caption(f"Scanned value: {html.escape(scanned)}")
         st.stop()
+
+    warning = str(asset.pop("_qr_scan_warning", "") or "").strip()
+    if asset.pop("_qr_scan_legacy", False) and not warning:
+        warning = "Legacy QR label detected. Reprint this label when convenient."
+    if warning:
+        st.warning(warning)
 
     if view == "inspection":
         _render_inspection_form(asset)
