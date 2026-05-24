@@ -693,3 +693,23 @@ def search_pricing_rows(rows: list[dict[str, Any]], query: str) -> list[dict[str
         if q in haystack:
             out.append(r)
     return out
+
+
+def delete_pricing_item(row_id: str) -> tuple[bool, str]:
+    """Permanently remove a pricing guide item."""
+    rid = str(row_id or "").strip()
+    if not rid:
+        return False, "Missing item id."
+    try:
+        from app.pages._core._crud import is_demo_id
+        from app.services.repository import delete_row
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+        from services.repository import delete_row  # type: ignore
+    if is_demo_id(rid):
+        return False, "Demo records cannot be deleted."
+    result = delete_row("pricing_guide_items", {"id": rid})
+    if result.ok:
+        clear_pricing_guide_cache()
+        return True, "Pricing item deleted."
+    return False, result.error or "Could not delete pricing item."

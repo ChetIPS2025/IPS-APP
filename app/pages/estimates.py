@@ -56,6 +56,8 @@ try:
         lookup_options,
         persist_estimate,
     )
+    from app.components.action_styles import danger_outline
+    from app.components.modal_delete import can_admin_mutate, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -126,6 +128,8 @@ except ImportError:
         lookup_options,
         persist_estimate,
     )
+    from components.action_styles import danger_outline  # type: ignore
+    from components.modal_delete import can_admin_mutate, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -981,6 +985,72 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         placeholder_html("Estimate activity history will appear here when connected to Supabase.")
 
 
+def _render_estimate_actions_panel(est: dict) -> None:
+    rk = record_session_key(est, "id", "estimate_number")
+    if is_edit_mode(_MOD, rk):
+        return
+    eid = str(est.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        return
+
+    can_mutate = can_admin_mutate()
+    st.markdown("---")
+    st.caption("Danger zone")
+
+    with danger_outline(f"est_reject_{rk}"):
+        if st.button(
+            "Reject Estimate",
+            key=f"est_reject_{rk}",
+            type="secondary",
+            use_container_width=True,
+            disabled=not can_mutate,
+            help="Marks this estimate as Rejected.",
+        ):
+            try:
+                from app.services.repository import update_row
+            except ImportError:
+                from services.repository import update_row  # type: ignore
+            result = update_row("estimates", {"status": "Rejected"}, {"id": eid})
+            if result.ok:
+                try:
+                    from app.services.phase2_modules_service import clear_all_data_caches
+                except ImportError:
+                    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                clear_all_data_caches()
+                _clear_estimates_detail_modal()
+                st.success("Estimate rejected.")
+                st.rerun()
+            st.error(result.error or "Could not reject estimate.")
+
+    def _delete_estimate() -> None:
+        try:
+            from app.services.delete_safety import delete_estimate_unlink_first
+        except ImportError:
+            from services.delete_safety import delete_estimate_unlink_first  # type: ignore
+        try:
+            delete_estimate_unlink_first(eid)
+            try:
+                from app.services.phase2_modules_service import clear_all_data_caches
+            except ImportError:
+                from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+            clear_all_data_caches()
+            _clear_estimates_detail_modal()
+            st.success("Estimate deleted.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Could not delete estimate: {exc}")
+
+    render_modal_delete_panel(
+        prefix=f"est_del_{rk}",
+        delete_label="Delete Estimate",
+        confirm_message="Delete this estimate permanently? Linked jobs will be unlinked first.",
+        confirm_label="Confirm Delete",
+        can_delete=can_mutate,
+        disabled_reason="Only admin, manager, or supervisor can delete estimates.",
+        on_confirm=_delete_estimate,
+    )
+
+
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
@@ -1034,6 +1104,7 @@ def render_estimate_detail_dialog(est: dict) -> None:
     if is_edit_mode(_MOD, rk):
         _render_estimate_edit_form(est)
     else:
+        _render_estimate_actions_panel(est)
         _render_estimate_detail_tabs(est)
 
 

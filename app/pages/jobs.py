@@ -8,6 +8,8 @@ from datetime import date
 import streamlit as st
 
 try:
+    from app.components.action_styles import danger_outline
+    from app.components.modal_delete import can_admin_mutate, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -27,7 +29,7 @@ try:
         lookup_options,
         persist_job,
     )
-    from app.pages._core._crud import apply_persist_feedback
+    from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.pages.tasks import render_job_linked_tasks_tab
     from app.styles import inject_jobs_module_css, inject_tasks_module_css
@@ -35,6 +37,8 @@ try:
     from app.services.inventory_service import get_inventory_transactions
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
+    from components.action_styles import danger_outline  # type: ignore
+    from components.modal_delete import can_admin_mutate, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -51,7 +55,7 @@ except ImportError:
         lookup_options,
         persist_job,
     )
-    from pages._core._crud import apply_persist_feedback  # type: ignore
+    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from pages.tasks import render_job_linked_tasks_tab  # type: ignore
     from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
@@ -867,6 +871,70 @@ def _render_job_edit_form(job: dict) -> None:
                 st.error(msg or "Could not save job.")
 
 
+def _render_job_actions_panel(job: dict) -> None:
+    """Cancel or permanently delete a job from the detail modal."""
+    job_key = _job_session_key(job)
+    if bool(st.session_state.get(_job_edit_mode_key(job))):
+        return
+    jid = str(job.get("id") or "").strip()
+    if not jid or is_demo_id(jid):
+        return
+
+    can_mutate = can_admin_mutate()
+    st.markdown("---")
+    st.caption("Danger zone")
+
+    c1, _c2 = st.columns([1, 1], gap="small")
+    with c1:
+        with danger_outline(f"job_cancel_{job_key}"):
+            if st.button(
+                "Cancel Job",
+                key=f"job_cancel_{job_key}",
+                type="secondary",
+                use_container_width=True,
+                disabled=not can_mutate,
+                help="Sets job status to Cancelled.",
+            ):
+                try:
+                    from app.services.repository import update_row
+                except ImportError:
+                    from services.repository import update_row  # type: ignore
+                result = update_row("jobs", {"status": "Cancelled"}, {"id": jid})
+                if result.ok:
+                    _clear_jobs_detail_modal()
+                    st.success("Job cancelled.")
+                    st.rerun()
+                st.error(result.error or "Could not cancel job.")
+
+    def _delete_job() -> None:
+        try:
+            from app.services.delete_safety import delete_job_row_if_no_costing
+        except ImportError:
+            from services.delete_safety import delete_job_row_if_no_costing  # type: ignore
+        try:
+            delete_job_row_if_no_costing(jid)
+            _clear_jobs_detail_modal()
+            st.success("Job deleted.")
+            st.rerun()
+        except RuntimeError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Could not delete job: {exc}")
+
+    render_modal_delete_panel(
+        prefix=f"job_del_{job_key}",
+        delete_label="Delete Job",
+        confirm_message=(
+            "Delete this job permanently? Jobs with labor, materials, equipment, "
+            "or PO expenses cannot be deleted."
+        ),
+        confirm_label="Confirm Delete",
+        can_delete=can_mutate,
+        disabled_reason="Only admin, manager, or supervisor can delete jobs.",
+        on_confirm=_delete_job,
+    )
+
+
 def render_job_detail_dialog(job: dict) -> None:
     """Professional Job Details modal body (opened via row selection)."""
     job_key = _job_session_key(job)
@@ -924,6 +992,7 @@ def render_job_detail_dialog(job: dict) -> None:
     if edit_mode:
         _render_job_edit_form(job)
     else:
+        _render_job_actions_panel(job)
         _render_job_detail_tabs(job)
 
 

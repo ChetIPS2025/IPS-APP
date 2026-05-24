@@ -3234,6 +3234,11 @@ div[data-testid="stButton"] button.ips-danger-solid:hover,
     color: #9a3412;
     border: 1px solid #fdba74;
 }
+
+.ips-modal-delete-actions,
+.ips-modal-delete-confirm {
+    margin: 0.35rem 0 0.5rem;
+}
 </style>
 """,
         unsafe_allow_html=True,
