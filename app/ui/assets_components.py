@@ -17,6 +17,7 @@ _STATUS_PILL: dict[str, tuple[str, str, str]] = {
 
 _TAB_ICONS: dict[str, str] = {
     "Overview": "▦",
+    "Kit / Contents": "🧰",
     "Maintenance": "🔧",
     "Documents": "📄",
     "Assignments": "👤",

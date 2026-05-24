@@ -61,6 +61,8 @@ try:
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.services.asset_kits_service import asset_is_kit, kit_item_names_by_parent
+    from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -114,6 +116,8 @@ except ImportError:
         summary_card_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from services.asset_kits_service import asset_is_kit, kit_item_names_by_parent  # type: ignore
+    from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
 
 _SEL = select_key("assets")
 _MOD = "assets"
@@ -142,7 +146,16 @@ _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("department", lambda r: _asset_department(r)),
     ("status", lambda r: _normalize_asset_status(r.get("status"))),
 ]
-_ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
+_ASSET_TABS = [
+    "Overview",
+    "Kit / Contents",
+    "Maintenance",
+    "Documents",
+    "Assignments",
+    "Depreciation",
+    "Notes",
+    "Activity",
+]
 
 
 def _normalize_asset_status(raw: object) -> str:
@@ -419,6 +432,10 @@ def _render_custom_assets_table(
     return all_asset_ids
 
 
+def _kit_search_index() -> dict[str, list[str]]:
+    return kit_item_names_by_parent()
+
+
 def _filter_rows(
     rows: list[dict],
     *,
@@ -427,18 +444,36 @@ def _filter_rows(
     out = rows
     if q:
         ql = q.lower()
-        out = [
-            r
-            for r in out
-            if ql in _asset_number(r).lower()
-            or ql in _asset_name(r).lower()
-            or ql in _asset_category(r).lower()
-            or ql in _asset_location(r).lower()
-            or ql in _asset_department(r).lower()
-            or ql in _asset_assigned_to(r).lower()
-            or ql in _normalize_asset_status(r.get("status")).lower()
-            or ql in _asset_serial(r).lower()
-        ]
+        kit_index = _kit_search_index()
+
+        def _matches(r: dict) -> bool:
+            aid = str(r.get("id") or "")
+            if ql in _asset_number(r).lower():
+                return True
+            if ql in _asset_name(r).lower():
+                return True
+            if ql in _asset_category(r).lower():
+                return True
+            if ql in _asset_location(r).lower():
+                return True
+            if ql in _asset_department(r).lower():
+                return True
+            if ql in _asset_assigned_to(r).lower():
+                return True
+            if ql in _normalize_asset_status(r.get("status")).lower():
+                return True
+            if ql in _asset_serial(r).lower():
+                return True
+            if ql in str(r.get("assigned_to_name") or "").lower():
+                return True
+            if ql in str(r.get("kit_type") or "").lower():
+                return True
+            for item_name in kit_index.get(aid, []):
+                if ql in item_name:
+                    return True
+            return False
+
+        out = [r for r in out if _matches(r)]
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
@@ -789,6 +824,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
 
     (
         tab_overview,
+        tab_kit,
         tab_maintenance,
         tab_documents,
         tab_assignments,
@@ -858,6 +894,9 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                 unsafe_allow_html=True,
             )
             _render_asset_qr_block(asset, aid)
+
+    with tab_kit:
+        render_kit_contents_tab(asset)
 
     with tab_maintenance:
         _render_asset_maintenance_tab(asset)
@@ -987,6 +1026,8 @@ def render() -> None:
         with add_col:
             if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
                 st.session_state["ips_ast_form"] = True
+
+    render_kit_accountability_summary()
 
     if st.session_state.get("ips_ast_form"):
         with st.expander("New Asset", expanded=True):

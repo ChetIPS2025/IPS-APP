@@ -25,6 +25,8 @@ try:
         upload_asset_image,
     )
     from app.utils.formatting import fmt_date
+    from app.services.asset_kits_service import asset_is_kit
+    from app.pages.asset_kits_ui import render_mobile_kit_scan
 except ImportError:
     from auth import current_profile, current_role, is_authenticated  # type: ignore
     from services.assets_service import (  # type: ignore
@@ -40,6 +42,8 @@ except ImportError:
         upload_asset_image,
     )
     from utils.formatting import fmt_date  # type: ignore
+    from services.asset_kits_service import asset_is_kit  # type: ignore
+    from pages.asset_kits_ui import render_mobile_kit_scan  # type: ignore
 
 _SCAN_SESSION_KEY = "_ips_asset_scan_page"
 _SUCCESS_KEY = "asset_scan_success_payload"
@@ -601,6 +605,24 @@ def _render_success() -> None:
 
 
 def _render_asset_card(asset: dict[str, Any]) -> None:
+    if asset_is_kit(asset):
+        image_url = get_asset_image_url(asset)
+        if image_url:
+            st.markdown(
+                f'<img class="ips-asset-scan-hero-img" src="{html.escape(image_url, quote=True)}" alt="Asset photo" />',
+                unsafe_allow_html=True,
+            )
+        render_mobile_kit_scan(asset)
+        st.markdown("---")
+        if st.button("Start Inspection", use_container_width=True, key="ast_scan_kit_insp"):
+            st.session_state[_VIEW_KEY] = "inspection"
+            st.rerun()
+        if st.button("Report Issue", use_container_width=True, key="ast_scan_kit_issue"):
+            st.session_state[_VIEW_KEY] = "issue"
+            st.rerun()
+        _render_document_buttons(asset)
+        return
+
     _render_asset_hero(asset)
     st.markdown("---")
     if st.button("Start Inspection", type="primary", use_container_width=True, key="ast_scan_start_insp"):
@@ -685,5 +707,7 @@ def render_asset_scan_page() -> None:
         _render_issue_form(asset)
     elif view == "maintenance":
         _render_maintenance_history(asset)
+    elif asset_is_kit(asset) and str(st.session_state.get("_kit_scan_view") or "card") != "card":
+        render_mobile_kit_scan(asset)
     else:
         _render_asset_card(asset)

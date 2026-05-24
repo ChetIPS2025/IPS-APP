@@ -414,6 +414,15 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
         "photo_path": str(row.get("photo_path") or ""),
         "photo_url": str(row.get("photo_url") or ""),
+        "is_kit": bool(row.get("is_kit")),
+        "kit_type": str(row.get("kit_type") or ""),
+        "kit_status": str(row.get("kit_status") or "Active"),
+        "total_kit_value": float(row.get("total_kit_value") or 0),
+        "last_kit_audit_at": str(row.get("last_kit_audit_at") or "")[:19],
+        "assigned_to_employee_id": str(row.get("assigned_to_employee_id") or "").strip() or None,
+        "assigned_to_name": str(row.get("assigned_to_name") or ""),
+        "assigned_to_phone": str(row.get("assigned_to_phone") or ""),
+        "assigned_job_id": str(row.get("assigned_job_id") or "").strip() or None,
     }
 
 
