@@ -675,14 +675,15 @@ def _render_user_delete_panel(emp: dict, rk: str) -> None:
 
     if not st.session_state.get(confirm_key):
         st.markdown('<div class="ips-user-delete-actions">', unsafe_allow_html=True)
-        if st.button(
-            "Delete User",
-            key=f"emp_delete_open_{rk}",
-            disabled=not check.allowed,
-            help=check.reason or "Remove this user's system access",
-        ):
-            st.session_state[confirm_key] = True
-            st.rerun()
+        with st.container(key=f"emp_delete_danger_wrap_{rk}"):
+            if st.button(
+                "Delete User",
+                key=f"emp_delete_open_{rk}",
+                disabled=not check.allowed,
+                help=check.reason or "Remove this user's system access",
+            ):
+                st.session_state[confirm_key] = True
+                st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         if not check.allowed and check.reason:
             st.caption(check.reason)
@@ -740,54 +741,58 @@ def _render_user_delete_panel(emp: dict, rk: str) -> None:
             st.session_state.pop(confirm_key, None)
             st.rerun()
     with btn_deactivate:
-        if st.button(
-            "Deactivate User",
-            key=f"emp_delete_deactivate_{rk}",
-            type="primary",
-            use_container_width=True,
-            disabled=not check.allowed,
-        ):
-            result = deactivate_user(
-                eid,
-                deleted_by=actor_id,
-                actor=actor,
-            )
-            if result.ok:
-                st.session_state.pop(confirm_key, None)
-                _clear_employee_modal()
-                if isinstance(result.data, dict) and result.data.get("warning"):
-                    st.session_state["users_action_flash"] = (
-                        "warning",
-                        f"User deactivated. {result.data['warning']}",
-                    )
-                else:
-                    st.session_state["users_action_flash"] = ("success", "User deactivated.")
-                st.rerun()
-            st.error(result.error or "Could not deactivate user.")
+        with st.container(key=f"emp_delete_confirm_danger_{rk}"):
+            if st.button(
+                "Deactivate User",
+                key=f"emp_delete_deactivate_{rk}",
+                type="secondary",
+                use_container_width=True,
+                disabled=not check.allowed,
+            ):
+                result = deactivate_user(
+                    eid,
+                    deleted_by=actor_id,
+                    actor=actor,
+                )
+                if result.ok:
+                    st.session_state.pop(confirm_key, None)
+                    _clear_employee_modal()
+                    if isinstance(result.data, dict) and result.data.get("warning"):
+                        st.session_state["users_action_flash"] = (
+                            "warning",
+                            f"User deactivated. {result.data['warning']}",
+                        )
+                    else:
+                        st.session_state["users_action_flash"] = ("success", "User deactivated.")
+                    st.rerun()
+                st.error(result.error or "Could not deactivate user.")
     with btn_hard:
-        if is_admin and st.button(
-            "Permanently Delete",
-            key=f"emp_delete_hard_{rk}",
-            use_container_width=True,
-            disabled=not check.allowed,
-        ):
-            result = hard_delete_user(
-                eid,
-                delete_employee=not keep_employee,
-                deleted_by=actor_id,
-                actor=actor,
-            )
-            if result.ok:
-                st.session_state.pop(confirm_key, None)
-                _clear_employee_modal()
-                flash_msg = "User permanently deleted."
-                if isinstance(result.data, dict):
-                    warns = result.data.get("warnings") or []
-                    if warns:
-                        flash_msg = f"{flash_msg} {' '.join(str(w) for w in warns)}"
-                st.session_state["users_action_flash"] = ("success", flash_msg)
-                st.rerun()
-            st.error(result.error or "Could not permanently delete user.")
+        if is_admin:
+            with st.container(key=f"emp_delete_confirm_danger_hard_{rk}"):
+                if st.button(
+                    "Permanently Delete",
+                    key=f"emp_delete_hard_{rk}",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not check.allowed,
+                ):
+                    result = hard_delete_user(
+                        eid,
+                        delete_employee=not keep_employee,
+                        deleted_by=actor_id,
+                        actor=actor,
+                    )
+                    if result.ok:
+                        st.session_state.pop(confirm_key, None)
+                        _clear_employee_modal()
+                        flash_msg = "User permanently deleted."
+                        if isinstance(result.data, dict):
+                            warns = result.data.get("warnings") or []
+                            if warns:
+                                flash_msg = f"{flash_msg} {' '.join(str(w) for w in warns)}"
+                        st.session_state["users_action_flash"] = ("success", flash_msg)
+                        st.rerun()
+                    st.error(result.error or "Could not permanently delete user.")
 
 
 def _employee_type_label(emp: dict) -> str:

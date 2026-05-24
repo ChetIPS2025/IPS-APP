@@ -162,6 +162,51 @@ def inject_users_module_css() -> None:
   display: flex;
   justify-content: flex-end;
 }}
+/* Outlined danger — initial Delete User */
+[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button {{
+  background: #ffffff !important;
+  color: #dc2626 !important;
+  border: 1px solid #dc2626 !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}}
+[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button:hover {{
+  background: #fee2e2 !important;
+  border-color: #b91c1c !important;
+  color: #b91c1c !important;
+}}
+[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button:disabled {{
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+}}
+/* Filled danger — confirmation Deactivate / Permanently Delete */
+[class*="st-key-emp_delete_confirm_danger"] [data-testid="stButton"] > button {{
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: 1px solid #dc2626 !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  min-height: 36px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}}
+[class*="st-key-emp_delete_confirm_danger"] [data-testid="stButton"] > button:hover {{
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}}
+[class*="st-key-emp_delete_confirm_danger_hard"] [data-testid="stButton"] > button {{
+  background: #991b1b !important;
+  border-color: #991b1b !important;
+}}
+[class*="st-key-emp_delete_confirm_danger_hard"] [data-testid="stButton"] > button:hover {{
+  background: #7f1d1d !important;
+  border-color: #7f1d1d !important;
+}}
 div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button {{
   border: 1px solid #dc2626 !important;
   background: #ffffff !important;
@@ -169,7 +214,7 @@ div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="s
   font-weight: 700 !important;
 }}
 div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button:hover {{
-  background: #fef2f2 !important;
+  background: #fee2e2 !important;
   border-color: #b91c1c !important;
   color: #b91c1c !important;
 }}
@@ -224,7 +269,7 @@ div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="s
   color: #dc2626 !important;
 }}
 div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="stButton"]:last-of-type > button:hover {{
-  background: #fef2f2 !important;
+  background: #fee2e2 !important;
 }}
 </style>
 """,
