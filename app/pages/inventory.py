@@ -238,18 +238,18 @@ def _render_inventory_thumbnail(item: dict) -> None:
     if image_url:
         st.markdown(
             (
-                f'<div class="ips-inventory-thumb-cell">'
+                f'<span class="ips-inventory-thumb-cell">'
                 f'<img class="ips-inventory-thumb-img" src="{html.escape(image_url, quote=True)}" '
                 f'alt="Inventory item image" />'
-                f"</div>"
+                f"</span>"
             ),
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div class="ips-inventory-thumb-cell">'
-            '<div class="ips-inventory-thumb-placeholder">—</div>'
-            "</div>",
+            '<span class="ips-inventory-thumb-cell">'
+            '<span class="ips-inventory-thumb-placeholder">—</span>'
+            "</span>",
             unsafe_allow_html=True,
         )
 

@@ -1540,7 +1540,7 @@ def inject_inventory_module_css() -> None:
     """Inventory list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-inventory-module-v1">
+<style id="ips-inventory-module-v2">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -1644,6 +1644,24 @@ def inject_inventory_module_css() -> None:
 .st-key-inventory_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100%;
+  justify-content: center !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stMarkdownContainer"],
+.st-key-inventory_table_wrap .stMarkdown,
+.st-key-inventory_table_wrap .stMarkdown p {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-inventory_table_wrap .stMarkdown p:has(.ips-inventory-thumb-cell) {{
+  line-height: 0 !important;
+}}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] {{
   gap: 0.35rem !important;
   align-items: center !important;
@@ -1664,7 +1682,9 @@ def inject_inventory_module_css() -> None:
   background: #eaf2ff !important;
 }}
 .st-key-inventory_table_wrap [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
   margin-bottom: 0 !important;
+  padding-top: 0 !important;
   padding-bottom: 0 !important;
 }}
 .st-key-inventory_table_wrap [data-testid="stCheckbox"] {{
@@ -1695,12 +1715,16 @@ def inject_inventory_module_css() -> None:
   height: 40px;
 }}
 .ips-inventory-thumb-cell {{
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 46px;
+  width: 42px;
+  height: 42px;
+  vertical-align: middle;
+  flex-shrink: 0;
 }}
 .ips-inventory-thumb-img {{
+  display: block;
   width: 42px !important;
   height: 42px !important;
   object-fit: cover;
@@ -1709,17 +1733,18 @@ def inject_inventory_module_css() -> None:
   background: #ffffff;
 }}
 .ips-inventory-thumb-placeholder {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 42px;
   height: 42px;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
   color: #94a3b8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
 }}
 .ips-inventory-detail-image {{
   max-width: 260px;
