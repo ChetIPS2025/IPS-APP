@@ -44,7 +44,7 @@ except ImportError:
     )
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, is_authenticated
     from app.ui.page_shell import render_page_header
     from app.ui import role_can_open_page
     from app.db import (
@@ -56,9 +56,13 @@ try:
         insert_row_admin,
         update_rows_admin,
     )
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from app.services.job_service import (
+        build_job_dropdown_label_maps,
+        job_row_select_label,
+        sort_jobs_by_number_then_name,
+    )
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, is_authenticated  # type: ignore
     from branding import render_header  # type: ignore
     from ui import role_can_open_page  # type: ignore
     from db import (  # type: ignore
@@ -70,7 +74,11 @@ except ImportError:
         insert_row_admin,
         update_rows_admin,
     )
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from services.job_service import (  # type: ignore
+        build_job_dropdown_label_maps,
+        job_row_select_label,
+        sort_jobs_by_number_then_name,
+    )
 
 _INV = "inventory_items"
 _TXN = "inventory_transactions"
@@ -1130,3 +1138,351 @@ def _fmt_money(v: float) -> str:
     if v is None or v == 0:
         return "—"
     return f"${float(v):,.2f}"
+
+
+# ---------------------------------------------------------------------------
+# Mobile inventory QR scan page (?scan=inventory&sku=…&token=…)
+# ---------------------------------------------------------------------------
+
+_REMEMBERED_PHONE_KEY = "_ips_remembered_scanner_phone"
+_SCAN_SESSION_KEY = "_ips_inventory_scan_page"
+
+_ACTION_DB_VALUES = (
+    "check_out",
+    "check_in",
+    "issue_to_job",
+    "return_from_job",
+    "consume_on_job",
+)
+_ACTION_LABELS: dict[str, str] = {
+    "check_out": "Take / Check Out",
+    "check_in": "Return / Check In",
+    "issue_to_job": "Issue to Job",
+    "return_from_job": "Return From Job",
+    "consume_on_job": "Consume On Job",
+}
+_JOB_REQUIRED_ACTIONS = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
+
+
+def capture_inventory_scan_from_query() -> None:
+    """Persist inventory scan params before auth / asset routing."""
+    scan = _first_query_param("scan")
+    legacy_qr = _first_query_param("qr")
+    pg = urllib.parse.unquote_plus(_first_query_param("page")).strip().lower()
+    legacy_page = pg in {"scan inventory", "inventory scan"}
+    if scan != "inventory" and legacy_qr != "inventory" and not legacy_page:
+        return
+    st.session_state[_SCAN_SESSION_KEY] = True
+    sku = _first_query_param("sku")
+    token = _first_query_param("token")
+    item_id = _first_query_param("item_id")
+    legacy_code = _first_query_param("code")
+    if sku:
+        st.session_state["_ips_scan_inv_sku"] = sku
+    if token:
+        st.session_state["_ips_scan_inv_token"] = token
+    if item_id:
+        st.session_state["_ips_scan_inv_item_id"] = item_id
+    if legacy_code:
+        st.session_state["_ips_scan_legacy_code"] = _normalize_scan_input(legacy_code)
+
+
+def inventory_scan_route_active() -> bool:
+    if st.session_state.get(_SCAN_SESSION_KEY):
+        return True
+    if _first_query_param("scan") == "inventory":
+        return True
+    if _first_query_param("qr") == "inventory":
+        return True
+    pg = urllib.parse.unquote_plus(_first_query_param("page")).strip().lower()
+    if pg in {"scan inventory", "inventory scan"}:
+        return True
+    return False
+
+
+def _load_scan_item_legacy(code: str) -> tuple[dict[str, Any] | None, str]:
+    rows, reason = _lookup_inventory(code)
+    if reason == "" and rows:
+        return rows[0], ""
+    if reason == "ambiguous":
+        return None, "Multiple inventory items matched this code."
+    return None, "Invalid inventory QR code."
+
+
+def _scan_profile_name() -> str:
+    prof = current_profile() or {}
+    return str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
+
+
+def _scan_profile_phone() -> str:
+    prof = current_profile() or {}
+    for key in ("phone_number", "phone", "mobile"):
+        val = str(prof.get(key) or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def _scan_profile_user_id() -> str | None:
+    prof = current_profile() or {}
+    uid = str(prof.get("id") or "").strip()
+    return uid or None
+
+
+def _scan_default_phone() -> str:
+    prof_phone = _scan_profile_phone()
+    if prof_phone:
+        return prof_phone
+    remembered = str(st.session_state.get(_REMEMBERED_PHONE_KEY) or "").strip()
+    return remembered
+
+
+def _load_scan_item() -> tuple[dict[str, Any] | None, str]:
+    try:
+        from app.services.inventory_service import get_inventory_item_by_qr
+    except ImportError:
+        from services.inventory_service import get_inventory_item_by_qr  # type: ignore
+    sku = _first_query_param("sku") or str(st.session_state.get("_ips_scan_inv_sku") or "")
+    token = _first_query_param("token") or str(st.session_state.get("_ips_scan_inv_token") or "")
+    item_id = _first_query_param("item_id") or str(st.session_state.get("_ips_scan_inv_item_id") or "")
+    if not sku and not item_id and not token:
+        legacy = str(st.session_state.get("_ips_scan_legacy_code") or _first_query_param("code") or "").strip()
+        if legacy:
+            return _load_scan_item_legacy(legacy)
+    result = get_inventory_item_by_qr(sku=sku or None, item_id=item_id or None, token=token or None)
+    if not result.ok:
+        return None, str(result.error or "Invalid inventory QR code.")
+    return result.data, ""
+
+
+def _scan_active_jobs() -> tuple[list[str], dict[str, str]]:
+    try:
+        jobs = sort_jobs_by_number_then_name(fetch_table_admin("jobs", limit=5000))
+    except Exception:
+        jobs = []
+    inactive = frozenset({"completed", "closed", "cancelled", "inactive"})
+    active = [j for j in jobs if str(j.get("status") or "").strip().lower() not in inactive]
+    active = sort_jobs_by_number_then_name(active)
+    _, label_to_id, labels = build_job_dropdown_label_maps(active)
+    return ["— Select job —"] + labels, label_to_id
+
+
+def _scan_can_submit() -> bool:
+    if not is_authenticated():
+        return True
+    return str(current_role() or "viewer").lower() != "viewer"
+
+
+def _render_scan_success(item: dict[str, Any], payload: dict[str, Any]) -> None:
+    st.success("Inventory action recorded.")
+    st.markdown(
+        f"**Item:** {html.escape(str(item.get('name') or item.get('item_name') or '—'))}  \n"
+        f"**Action:** {html.escape(_ACTION_LABELS.get(str(payload.get('action') or ''), payload.get('action', '')))}  \n"
+        f"**Quantity:** {float(payload.get('quantity') or 0):g} {html.escape(str(payload.get('unit') or 'EA'))}  \n"
+        f"**Job:** {html.escape(str(payload.get('job_label') or '—'))}  \n"
+        f"**Name:** {html.escape(str(payload.get('name') or '—'))}  \n"
+        f"**Phone:** {html.escape(str(payload.get('phone_display') or '—'))}  \n"
+        f"**Time:** {html.escape(str(payload.get('timestamp') or '—'))}"
+    )
+    b1, b2 = st.columns(2, gap="small")
+    with b1:
+        if st.button("Submit another action for this item", key="inv_scan_success_again", use_container_width=True):
+            st.session_state.pop("inv_scan_success_payload", None)
+            st.rerun()
+    with b2:
+        if st.button("Back to Inventory", key="inv_scan_success_inventory", use_container_width=True):
+            st.session_state.pop("inv_scan_success_payload", None)
+            st.session_state.pop(_SCAN_SESSION_KEY, None)
+            for key in ("_ips_scan_inv_sku", "_ips_scan_inv_token", "_ips_scan_inv_item_id", "_ips_scan_legacy_code"):
+                st.session_state.pop(key, None)
+            try:
+                for qp in ("scan", "sku", "token", "item_id", "qr", "code", "page"):
+                    if qp in st.query_params:
+                        del st.query_params[qp]
+                st.query_params["page"] = "Inventory"
+            except Exception:
+                pass
+            st.rerun()
+
+
+def render_inventory_scan_page() -> None:
+    """Dedicated mobile inventory scan form — no sidebar, no asset routing."""
+    ensure_narrow_viewport_detected()
+    try:
+        from app.styles import inject_inventory_qr_scan_css
+    except ImportError:
+        from styles import inject_inventory_qr_scan_css  # type: ignore
+    inject_inventory_qr_scan_css()
+    _inject_inv_scan_mobile_css()
+    st.markdown('<span class="ips-inv-qr-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+    st.markdown("## IPS Inventory Scan")
+    st.caption("Record check-out, check-in, or job issue for this item.")
+
+    success = st.session_state.get("inv_scan_success_payload")
+    if success and isinstance(success, dict):
+        item_ok = success.get("item") or {}
+        _render_scan_success(item_ok, success)
+        return
+
+    item, err = _load_scan_item()
+    if err or not item:
+        st.error(err or "Invalid inventory QR code.")
+        st.stop()
+
+    if not _scan_can_submit():
+        st.error("Your role cannot submit inventory actions.")
+        st.stop()
+
+    iid = str(item.get("id") or "")
+    name = str(item.get("name") or item.get("item_name") or "—")
+    sku = str(item.get("sku") or "—")
+    unit = str(item.get("unit") or "EA")
+    location = str(item.get("location") or item.get("storage_location") or "—")
+    qoh = _qty_on_hand(item)
+    status = str(item.get("status") or "—")
+
+    col_img, col_info = st.columns([1, 2], gap="small")
+    with col_img:
+        _inv_item_thumb_display(item)
+    with col_info:
+        st.markdown(
+            f'<div class="ips-inv-qr-item-card">'
+            f'<div class="ips-inv-qr-item-title">{html.escape(name)}</div>'
+            f'<div class="ips-inv-qr-item-meta">SKU: {html.escape(sku)} · Unit: {html.escape(unit)}</div>'
+            f'<div class="ips-inv-qr-item-meta">Location: {html.escape(location)} · Status: {html.escape(status)}</div>'
+            f'<div class="ips-inv-qr-item-meta"><strong>On hand: {qoh:g}</strong></div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    prof_name = _scan_profile_name()
+    prof_phone = _scan_profile_phone()
+    default_phone = _scan_default_phone()
+    job_labels, job_map = _scan_active_jobs()
+    action_labels = [_ACTION_LABELS[k] for k in _ACTION_DB_VALUES]
+
+    with st.form("inv_mobile_scan_form", clear_on_submit=False):
+        action_label = st.selectbox("Action", action_labels, key="inv_scan_action_label")
+        action = _ACTION_DB_VALUES[action_labels.index(action_label)]
+
+        qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key="inv_scan_qty")
+
+        for_job = st.checkbox(
+            "This is for a job",
+            value=action in _JOB_REQUIRED_ACTIONS,
+            key="inv_scan_for_job",
+        )
+        job_pick = ""
+        if for_job or action in _JOB_REQUIRED_ACTIONS:
+            job_pick = st.selectbox("Job", job_labels, key="inv_scan_job_pick")
+
+        st.markdown("**Person who scanned / signed out**")
+        name_val = st.text_input(
+            "Name",
+            value=prof_name,
+            key="inv_scan_person_name",
+            disabled=bool(prof_name and is_authenticated()),
+        )
+        phone_val = st.text_input(
+            "Phone number",
+            value=default_phone,
+            key="inv_scan_person_phone",
+            placeholder="(337) 555-0100",
+        )
+        st.caption(
+            "Phone comes from your profile, a remembered value on this device, or manual entry — "
+            "browsers cannot read the device phone number automatically."
+        )
+        remember_phone = st.checkbox("Remember this phone number on this device", key="inv_scan_remember_phone")
+
+        notes = st.text_area("Notes", key="inv_scan_notes", height=72, placeholder="Optional")
+        allow_over = False
+        if str(current_role() or "").lower() == "admin":
+            allow_over = st.checkbox("Allow quantity over on-hand (admin)", key="inv_scan_allow_over")
+
+        submit = st.form_submit_button("Enter", type="primary", use_container_width=True)
+
+    if not submit:
+        return
+
+    try:
+        from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
+        from app.services.inventory_service import record_inventory_transaction
+    except ImportError:
+        from utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone  # type: ignore
+        from services.inventory_service import record_inventory_transaction  # type: ignore
+
+    qv = float(qty or 0)
+    if qv <= 0:
+        st.error("Quantity must be greater than zero.")
+        st.stop()
+
+    need_job = action in _JOB_REQUIRED_ACTIONS or for_job
+    job_id = None
+    job_label = "—"
+    if need_job:
+        job_label = str(job_pick or "").strip()
+        if not job_label or job_label.startswith("—"):
+            st.error("Select a job for this action.")
+            st.stop()
+        job_id = job_map.get(job_label)
+        if not job_id:
+            st.error("Invalid job selection.")
+            st.stop()
+    elif job_pick and not str(job_pick).startswith("—"):
+        job_label = str(job_pick).strip()
+        job_id = job_map.get(job_label)
+
+    actor_name = prof_name if (prof_name and is_authenticated()) else str(name_val or "").strip()
+    if not actor_name:
+        st.error("Name is required.")
+        st.stop()
+
+    phone_norm = normalize_phone(phone_val or default_phone)
+    if not is_valid_phone(phone_norm):
+        st.error("Enter a valid phone number.")
+        st.stop()
+
+    if remember_phone:
+        st.session_state[_REMEMBERED_PHONE_KEY] = phone_norm
+
+    phone_verified = bool(prof_phone and normalize_phone(prof_phone) == phone_norm and is_authenticated())
+
+    if action in {"check_out", "issue_to_job", "consume_on_job"} and qv > qoh and not allow_over:
+        st.error("Quantity exceeds quantity on hand.")
+        st.stop()
+
+    result = record_inventory_transaction({
+        "inventory_id": iid,
+        "transaction_type": action,
+        "quantity": qv,
+        "job_id": job_id,
+        "unit": unit,
+        "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
+        "scanned_by_employee_id": _profile_employee_id(),
+        "scanned_by_name": actor_name,
+        "scanned_by_phone": phone_norm,
+        "phone_verified": phone_verified,
+        "source": "qr_scan",
+        "notes": notes,
+        "allow_overdraw": allow_over,
+    })
+
+    if not result.ok:
+        st.error(result.error or "Could not record transaction.")
+        st.stop()
+
+    from datetime import datetime, timezone
+
+    st.session_state["inv_scan_success_payload"] = {
+        "item": item,
+        "action": action,
+        "quantity": qv,
+        "unit": unit,
+        "job_label": job_label,
+        "name": actor_name,
+        "phone_display": format_phone_display(phone_norm),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+    }
+    st.rerun()

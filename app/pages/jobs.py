@@ -10,6 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.pages._core._data import (
         customer_contact_select_options,
         customer_filter_options,
@@ -31,6 +37,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from pages._core._data import (  # type: ignore
         customer_filter_options,
         employee_options,
@@ -46,6 +58,7 @@ except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("jobs")
+_TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
 _JOB_TABS = [
     "Overview",
@@ -66,19 +79,17 @@ SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
 CACHE_KEY = "_ips_jobs_modal_by_id"
 _JOB_COLS = [0.35, 1.1, 3.2, 2.2, 1.8, 1.3, 1.2, 1.2]
-_JOB_HEADERS = ["", "JOB #", "PROJECT / DESCRIPTION", "CUSTOMER", "SUPERVISOR", "STATUS", "START DATE", "END DATE"]
-_STATUS_FILTER_OPTS = [
-    "All Statuses",
-    "Draft",
-    "Planning",
-    "Scheduled",
-    "Active",
-    "Awarded",
-    "On Hold",
-    "Completed",
-    "Closed",
-    "Cancelled",
+_JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("JOB #", None),
+    ("PROJECT / DESCRIPTION", None),
+    ("CUSTOMER", "customer"),
+    ("SUPERVISOR", "supervisor"),
+    ("STATUS", "status"),
+    ("START DATE", None),
+    ("END DATE", None),
 ]
+_JOB_FILTER_FIELDS = ["customer", "supervisor", "status"]
 
 
 def _normalize_job_status(raw: object) -> str:
@@ -142,6 +153,13 @@ def _job_location(job: dict) -> str:
     return "—"
 
 
+_JOB_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("customer", _job_customer),
+    ("supervisor", _job_supervisor),
+    ("status", lambda r: _normalize_job_status(r.get("status"))),
+]
+
+
 def _job_status_pill_html(status: str) -> str:
     cls_map = {
         "Draft": "ips-job-status-draft",
@@ -160,22 +178,10 @@ def _job_status_pill_html(status: str) -> str:
 
 def _clear_jobs_filters() -> None:
     """Reset filter widgets (must run via button ``on_click``, not after widgets render)."""
-    st.session_state["jobs_search"] = ""
-    st.session_state["jobs_filter_status"] = "All Statuses"
-    st.session_state["jobs_filter_customer"] = "All Customers"
-    st.session_state["jobs_filter_supervisor"] = "All Supervisors"
-    st.session_state["jobs_filter_location"] = "All Locations"
+    clear_table_filters(_TABLE_KEY, _JOB_FILTER_FIELDS, extra_keys=["jobs_search"])
 
 
-def _filter_jobs(
-    rows: list[dict],
-    *,
-    q: str,
-    status: str,
-    customer: str,
-    supervisor: str,
-    location: str,
-) -> list[dict]:
+def _filter_jobs(rows: list[dict], *, q: str) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
@@ -188,15 +194,7 @@ def _filter_jobs(
             or ql in _job_supervisor(r).lower()
             or ql in _normalize_job_status(r.get("status")).lower()
         ]
-    if status and status != "All Statuses":
-        out = [r for r in out if _normalize_job_status(r.get("status")) == status]
-    if customer and customer != "All Customers":
-        out = [r for r in out if _job_customer(r) == customer]
-    if supervisor and supervisor != "All Supervisors":
-        out = [r for r in out if _job_supervisor(r) == supervisor]
-    if location and location != "All Locations":
-        out = [r for r in out if _job_location(r) == location]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _JOB_COLUMN_FILTER_SPECS)
 
 
 def _job_select_key(job_id: str) -> str:
@@ -240,7 +238,11 @@ def _clear_jobs_detail_modal() -> None:
             st.session_state.pop(key, None)
 
 
-def _render_custom_jobs_table(filtered: list[dict]) -> list[str]:
+def _render_custom_jobs_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No jobs match your filters.")
         st.session_state[_ALL_JOB_IDS_KEY] = []
@@ -253,12 +255,21 @@ def _render_custom_jobs_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-jobs-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _JOB_HEADERS):
+        for col, (label, field) in zip(header_cols, _JOB_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-jobs-header-row ips-jobs-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-jobs-header-row ips-jobs-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-jobs-header-row ips-jobs-cell",
+                    )
 
         for job in filtered:
             jid = str(job.get("id") or "").strip()
@@ -903,13 +914,7 @@ def render() -> None:
     )
     inject_jobs_module_css()
     all_jobs = load_jobs()
-    customers = customer_filter_options()
-    supervisors = sorted(
-        {_job_supervisor(j) for j in all_jobs if _job_supervisor(j) != "—"}
-    )
-    locations = sorted(
-        {_job_location(j) for j in all_jobs if _job_location(j) != "—"}
-    )
+    filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -977,7 +982,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -986,34 +991,6 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="jobs_filter_status",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Customer",
-                ["All Customers", *customers],
-                key="jobs_filter_customer",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Supervisor",
-                ["All Supervisors", *supervisors],
-                key="jobs_filter_supervisor",
-                label_visibility="collapsed",
-            )
-        with c5:
-            st.selectbox(
-                "Location",
-                ["All Locations", *locations],
-                key="jobs_filter_location",
-                label_visibility="collapsed",
-            )
-        with c6:
             st.button(
                 "Clear",
                 key="jobs_clear_filters",
@@ -1026,10 +1003,6 @@ def render() -> None:
     filtered = _filter_jobs(
         all_jobs,
         q=str(st.session_state.get("jobs_search") or "").strip(),
-        status=str(st.session_state.get("jobs_filter_status") or "All Statuses"),
-        customer=str(st.session_state.get("jobs_filter_customer") or "All Customers"),
-        supervisor=str(st.session_state.get("jobs_filter_supervisor") or "All Supervisors"),
-        location=str(st.session_state.get("jobs_filter_location") or "All Locations"),
     )
 
     st.caption(f"{len(filtered)} job(s)")
@@ -1040,7 +1013,7 @@ def render() -> None:
         if str(job.get("id") or "").strip()
     }
 
-    _render_custom_jobs_table(filtered)
+    _render_custom_jobs_table(filtered, filter_options=filter_options)
 
     selected_job_id = st.session_state.get(SELECTED_JOB_KEY)
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):

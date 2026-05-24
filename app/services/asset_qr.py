@@ -24,12 +24,40 @@ def _app_base_url() -> str:
     return str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
 
 
-def asset_scan_link_url(*, qr_code_value: str, app_base_url: str | None = None) -> str:
+def asset_mobile_scan_link_url(*, asset_id: str, qr_token: str, app_base_url: str | None = None) -> str:
+    """
+    Mobile asset scan URL.
+
+    Format: ``{APP_BASE_URL}/?scan=asset&asset_id={uuid}&token={qr_token}``
+    """
+    b = str(app_base_url or _app_base_url() or "").strip().rstrip("/")
+    aid = quote(str(asset_id or "").strip(), safe="")
+    token = quote(str(qr_token or "").strip(), safe="")
+    if not b or not aid or not token:
+        return ""
+    return f"{b}/?scan=asset&asset_id={aid}&token={token}"
+
+
+def asset_scan_link_url(
+    *,
+    qr_code_value: str = "",
+    asset_id: str = "",
+    qr_token: str = "",
+    app_base_url: str | None = None,
+) -> str:
     """
     Full URL encoded in asset QR labels for phone scans.
 
-    Format: ``{APP_BASE_URL}/?page=Assets&code=<token>``
+    Prefers ``?scan=asset&asset_id=&token=`` when id/token provided; legacy ``?page=Assets&code=`` fallback.
     """
+    if asset_id and qr_token:
+        link = asset_mobile_scan_link_url(
+            asset_id=asset_id,
+            qr_token=qr_token,
+            app_base_url=app_base_url,
+        )
+        if link:
+            return link
     b = str(app_base_url or _app_base_url() or "").strip().rstrip("/")
     v = str(qr_code_value or "").strip()
     if not b or not v:
@@ -49,7 +77,14 @@ def qr_payload(asset: dict[str, Any]) -> str:
 
 
 def qr_embed_subject(asset: dict[str, Any], *, app_base_url: str | None = None) -> str:
-    """Value encoded inside the QR image — full app URL when ``APP_BASE_URL`` is configured."""
+    """Value encoded inside the QR image — mobile scan URL when ``APP_BASE_URL`` is configured."""
+    try:
+        from app.services.assets_service import generate_asset_qr_value
+    except ImportError:
+        from services.assets_service import generate_asset_qr_value  # type: ignore
+    url = generate_asset_qr_value(asset)
+    if url and str(url).startswith("http"):
+        return url
     token = qr_payload(asset)
     if not token:
         return ""
@@ -123,8 +158,18 @@ def capture_asset_deeplink_from_query() -> None:
     """Read ``?page=Assets&code=…`` (or ``?qr=``) from the URL and stash for post-nav apply."""
     import streamlit as st
 
+    if _first_query_param("scan") in {"inventory", "asset"}:
+        return
+
     pg = _first_query_param("page")
+    if pg:
+        decoded = unquote_plus(pg).strip().lower()
+        if decoded in {"scan inventory", "inventory scan", "asset scan", "scan asset"}:
+            return
+
     raw_code = _first_query_param("code") or _first_query_param("qr")
+    if str(raw_code or "").strip().lower() == "inventory":
+        raw_code = ""
     wants_assets = False
     if pg:
         decoded = unquote_plus(pg).strip().lower()

@@ -145,7 +145,7 @@ def generate_inventory_qr_value(item: dict[str, Any]) -> str:
     token = str(row.get("qr_token") or "").strip()
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
     if base and sku and token:
-        return inventory_qr_link_url(sku=sku, qr_token=token, app_base_url=base)
+        return inventory_qr_link_url(sku=sku, qr_token=token, app_base_url=base, item_id=str(row.get("id") or ""))
     qrv = resolve_inventory_qr_value(row)
     if base and qrv:
         try:
@@ -165,7 +165,12 @@ def ensure_inventory_qr_tokens(items: list[dict[str, Any]] | None = None) -> Ser
         if not iid or str(row.get("qr_token") or "").strip():
             continue
         token = generate_inventory_qr_token()
-        result = update_row(_INV_TABLE, {"qr_token": token}, {"id": iid})
+        norm = normalize_inventory({**row, "qr_token": token})
+        scan_url = generate_inventory_qr_value(norm)
+        payload: dict[str, Any] = {"qr_token": token}
+        if scan_url:
+            payload["qr_code_value"] = scan_url
+        result = update_row(_INV_TABLE, payload, {"id": iid})
         if result.ok:
             updated += 1
     if updated:
@@ -207,9 +212,9 @@ def get_inventory_item_by_qr(
     item = _row_to_item(rows[0])
     stored_token = str(item.get("qr_token") or "").strip()
     if stored_token and token_s and token_s != stored_token:
-        return ServiceResult(ok=False, error="Invalid or expired inventory QR code.")
+        return ServiceResult(ok=False, error="Invalid inventory QR code.")
     if stored_token and not token_s:
-        return ServiceResult(ok=False, error="Invalid or expired inventory QR code.")
+        return ServiceResult(ok=False, error="Invalid inventory QR code.")
     if not stored_token:
         item["qr_token"] = _ensure_item_qr_token(item)
     return ServiceResult(ok=True, data=item)

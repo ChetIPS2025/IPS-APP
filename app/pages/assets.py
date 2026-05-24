@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import html
 
 import streamlit as st
@@ -9,6 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -37,7 +44,13 @@ try:
     from app.styles import inject_assets_module_css
     from app.services.assets_service import (
         clear_assets_cache,
+        ensure_asset_qr_tokens,
+        generate_asset_qr_value,
+        get_asset_document_view_url,
+        get_asset_documents,
         get_asset_image_url,
+        get_asset_inspections,
+        get_asset_issues,
         upload_asset_image,
     )
     from app.ui.assets_components import (
@@ -50,6 +63,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -78,7 +97,13 @@ except ImportError:
     from styles import inject_assets_module_css  # type: ignore
     from services.assets_service import (  # type: ignore
         clear_assets_cache,
+        ensure_asset_qr_tokens,
+        generate_asset_qr_value,
+        get_asset_document_view_url,
+        get_asset_documents,
         get_asset_image_url,
+        get_asset_inspections,
+        get_asset_issues,
         upload_asset_image,
     )
     from ui.assets_components import (  # type: ignore
@@ -96,28 +121,25 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
+_TABLE_KEY = "assets_list"
 _ASSET_COLS = [0.35, 0.9, 3.2, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
-_ASSET_HEADERS = [
-    "",
-    "IMAGE",
-    "ASSET NAME",
-    "CATEGORY",
-    "LOCATION",
-    "DEPARTMENT",
-    "STATUS",
-    "ASSIGNED TO",
-    "NEXT SERVICE DUE",
+_ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("IMAGE", None),
+    ("ASSET NAME", None),
+    ("CATEGORY", "category"),
+    ("LOCATION", "location"),
+    ("DEPARTMENT", "department"),
+    ("STATUS", "status"),
+    ("ASSIGNED TO", None),
+    ("NEXT SERVICE DUE", None),
 ]
-_STATUS_FILTER_OPTS = [
-    "All Statuses",
-    "Available",
-    "In Service",
-    "Assigned",
-    "Out for Repair",
-    "Maintenance Due",
-    "Retired",
-    "Sold",
-    "Lost",
+_FILTER_FIELDS = ["category", "location", "department", "status"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("category", lambda r: _asset_category(r)),
+    ("location", lambda r: _asset_location(r)),
+    ("department", lambda r: _asset_department(r)),
+    ("status", lambda r: _normalize_asset_status(r.get("status"))),
 ]
 _ASSET_TABS = ["Overview", "Maintenance", "Documents", "Assignments", "Depreciation", "Notes", "Activity"]
 
@@ -292,7 +314,11 @@ def _on_asset_checkbox_change(asset_id: str, all_asset_ids: list[str]) -> None:
         st.session_state[SHOW_ASSET_MODAL_KEY] = False
 
 
-def _render_custom_assets_table(filtered: list[dict]) -> list[str]:
+def _render_custom_assets_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No assets match your filters.")
         st.session_state[_ALL_ASSET_IDS_KEY] = []
@@ -305,12 +331,21 @@ def _render_custom_assets_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _ASSET_HEADERS):
+        for col, (label, field) in zip(header_cols, _ASSET_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-assets-header-row ips-assets-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-assets-header-row ips-assets-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-assets-header-row ips-assets-cell",
+                    )
 
         for asset in filtered:
             aid = str(asset.get("id") or "").strip()
@@ -387,10 +422,6 @@ def _filter_rows(
     rows: list[dict],
     *,
     q: str,
-    category: str,
-    location: str,
-    status: str,
-    department: str,
 ) -> list[dict]:
     out = rows
     if q:
@@ -407,23 +438,12 @@ def _filter_rows(
             or ql in _normalize_asset_status(r.get("status")).lower()
             or ql in _asset_serial(r).lower()
         ]
-    if category and category != "All Categories":
-        out = [r for r in out if _asset_category(r) == category]
-    if location and location != "All Locations":
-        out = [r for r in out if _asset_location(r) == location]
-    if status and status != "All Statuses":
-        out = [r for r in out if _normalize_asset_status(r.get("status")) == status]
-    if department and department != "All Departments":
-        out = [r for r in out if _asset_department(r) == department]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
 def _clear_asset_filters() -> None:
-    st.session_state["ast_search"] = ""
-    st.session_state["ast_cat"] = "All Categories"
-    st.session_state["ast_loc"] = "All Locations"
-    st.session_state["ast_status"] = "All Statuses"
-    st.session_state["ast_dept"] = "All Departments"
+    clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=["ast_search"])
+    _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
 
 
 def _clear_assets_detail_modal() -> None:
@@ -506,7 +526,6 @@ def _asset_for_qr(asset: dict) -> dict:
 def _render_asset_qr_block(asset: dict, aid: str) -> None:
     try:
         from app.services.asset_qr import (
-            asset_scan_link_url,
             qr_embed_subject,
             qr_label_2x1_sticker_download_filename,
             qr_label_2x1_sticker_pdf_bytes,
@@ -516,7 +535,6 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
         )
     except ImportError:
         from services.asset_qr import (  # type: ignore
-            asset_scan_link_url,
             qr_embed_subject,
             qr_label_2x1_sticker_download_filename,
             qr_label_2x1_sticker_pdf_bytes,
@@ -530,7 +548,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
     if not token:
         return
     subject = qr_embed_subject(qr_asset)
-    scan_url = asset_scan_link_url(qr_code_value=token)
+    scan_url = generate_asset_qr_value(asset)
 
     with st.container(border=True):
         st.markdown(
@@ -539,12 +557,25 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             unsafe_allow_html=True,
         )
         try:
-            st.image(qr_png_bytes(subject), width=132)
+            qr_png = qr_png_bytes(subject)
+            if qr_png and scan_url:
+                b64 = base64.b64encode(qr_png).decode("ascii")
+                safe_url = html.escape(scan_url, quote=True)
+                st.markdown(
+                    f'<a href="{safe_url}" target="_self" title="Open asset QR page">'
+                    f'<img src="data:image/png;base64,{b64}" width="132" alt="Asset QR code" '
+                    f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
+                    f"</a>",
+                    unsafe_allow_html=True,
+                )
+            elif qr_png:
+                st.image(qr_png, width=132)
         except Exception:
             st.caption(f"Scan code: {token}")
-        st.caption(f"Asset tag: **{html.escape(token)}**", unsafe_allow_html=True)
+        st.caption(f"Asset tag: **{html.escape(str(asset.get('asset_number') or token))}**", unsafe_allow_html=True)
         if scan_url.startswith("http"):
-            st.caption("Scan with a phone camera to open this asset card.")
+            st.caption("Scan with a phone camera to open the mobile asset card.")
+            st.link_button("Open Asset QR Page", scan_url, use_container_width=True)
         else:
             st.caption("Set APP_BASE_URL so printed labels open the asset card when scanned.")
         dl1, dl2 = st.columns(2)
@@ -552,7 +583,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             try:
                 dl_bytes, dl_mime, dl_name = qr_label_for_download(qr_asset, subject)
                 st.download_button(
-                    "Print label",
+                    "Print QR Label",
                     data=dl_bytes,
                     file_name=dl_name,
                     mime=dl_mime,
@@ -580,6 +611,69 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
                 )
             except Exception:
                 pass
+        if scan_url.startswith("http"):
+            st.code(scan_url, language=None)
+
+
+def _render_asset_documents_tab(asset: dict) -> None:
+    aid = str(asset.get("id") or "")
+    try:
+        from app.auth import current_role, is_authenticated
+    except ImportError:
+        from auth import current_role, is_authenticated  # type: ignore
+    include_restricted = is_authenticated() and str(current_role() or "").lower() in {
+        "admin",
+        "supervisor",
+        "manager",
+    }
+    docs = get_asset_documents(aid, include_restricted=include_restricted)
+    if not docs:
+        placeholder_html("No documents attached to this asset.")
+        return
+    for doc in docs:
+        fname = str(doc.get("file_name") or "Document")
+        dtype = str(doc.get("doc_type") or "Document")
+        view_url = doc.get("view_url") or get_asset_document_view_url(doc)
+        label = f"{dtype} — {fname}" if dtype else fname
+        key = f"ast_doc_tab_{doc.get('id') or fname}"
+        if doc.get("is_restricted") and not include_restricted:
+            st.caption(f"Restricted: {html.escape(fname)}")
+            continue
+        if view_url:
+            st.link_button(f"View {label}", view_url, use_container_width=True, key=key)
+        else:
+            st.caption(f"{label} (no preview URL)")
+
+
+def _render_asset_maintenance_tab(asset: dict) -> None:
+    aid = str(asset.get("id") or "")
+    inspections = get_asset_inspections(aid)
+    issues = get_asset_issues(aid)
+    if inspections or issues:
+        if inspections:
+            st.markdown("**Inspections**")
+            for row in inspections[:25]:
+                st.markdown(
+                    f"- **{html.escape(fmt_date(row.get('inspection_date')))}** — "
+                    f"{html.escape(str(row.get('condition') or '—'))} · "
+                    f"{html.escape(str(row.get('inspector_name') or '—'))}"
+                )
+        if issues:
+            st.markdown("**Reported Issues**")
+            for row in issues[:25]:
+                st.markdown(
+                    f"- **{html.escape(str(row.get('severity') or '—'))}** "
+                    f"({html.escape(str(row.get('status') or 'Open'))}) — "
+                    f"{html.escape(str(row.get('description') or '')[:160])}"
+                )
+        return
+    st.markdown(
+        '<div class="ips-assets-maint-section">'
+        '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
+        f"{maintenance_table_html(_maintenance_rows(asset))}"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _seed_asset_edit_form(asset: dict) -> None:
@@ -749,16 +843,10 @@ def _render_asset_detail_tabs(asset: dict) -> None:
             _render_asset_qr_block(asset, aid)
 
     with tab_maintenance:
-        st.markdown(
-            '<div class="ips-assets-maint-section">'
-            '<div class="ips-assets-maint-head"><h4>Maintenance History</h4></div>'
-            f"{maintenance_table_html(_maintenance_rows(asset))}"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        _render_asset_maintenance_tab(asset)
 
     with tab_documents:
-        placeholder_html("Asset documents will appear here when connected to Supabase.")
+        _render_asset_documents_tab(asset)
 
     with tab_assignments:
         assign_html = (
@@ -866,9 +954,11 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     rows = load_assets()
-    categories = sorted({_asset_category(r) for r in rows if _asset_category(r) != "—"})
-    locations = sorted({_asset_location(r) for r in rows if _asset_location(r) != "—"})
-    departments = sorted({_asset_department(r) for r in rows if _asset_department(r) != "—"})
+    if not st.session_state.get("_ast_qr_tokens_seeded"):
+        ensure_asset_qr_tokens(rows)
+        st.session_state["_ast_qr_tokens_seeded"] = True
+        rows = load_assets()
+    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -926,7 +1016,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -935,34 +1025,6 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Category",
-                ["All Categories", *categories],
-                key="ast_cat",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Location",
-                ["All Locations", *locations],
-                key="ast_loc",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="ast_status",
-                label_visibility="collapsed",
-            )
-        with c5:
-            st.selectbox(
-                "Department",
-                ["All Departments", *departments],
-                key="ast_dept",
-                label_visibility="collapsed",
-            )
-        with c6:
             st.button("Clear", key="ast_clear", use_container_width=True, on_click=_clear_asset_filters)
 
     layout_filter_bar(_filters)
@@ -970,10 +1032,6 @@ def render() -> None:
     filtered = _filter_rows(
         rows,
         q=str(st.session_state.get("ast_search") or "").strip(),
-        category=str(st.session_state.get("ast_cat") or "All Categories"),
-        location=str(st.session_state.get("ast_loc") or "All Locations"),
-        status=str(st.session_state.get("ast_status") or "All Statuses"),
-        department=str(st.session_state.get("ast_dept") or "All Departments"),
     )
 
     st.caption(f"{len(filtered)} asset(s)")
@@ -986,7 +1044,7 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    _render_custom_assets_table(filtered)
+    _render_custom_assets_table(filtered, filter_options=filter_options)
 
     selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
     if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):

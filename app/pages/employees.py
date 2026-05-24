@@ -11,6 +11,12 @@ try:
     from app.auth import current_role
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -52,6 +58,12 @@ except ImportError:
     from auth import current_role  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -99,9 +111,17 @@ SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
 _USER_COLS = [0.35, 2.2, 3.0, 1.5, 1.4, 1.3, 1.1, 1.4]
-_USER_HEADERS = ["", "NAME", "EMAIL", "PHONE", "ROLE", "EMPLOYEE", "STATUS", "LAST LOGIN"]
-_STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Locked", "Pending"]
-_EMPLOYEE_TYPE_FILTER_OPTS = ["All Employee Types", "Employees Only", "System Users Only"]
+_USER_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("NAME", None),
+    ("EMAIL", None),
+    ("PHONE", None),
+    ("ROLE", "role"),
+    ("EMPLOYEE", "employee_type"),
+    ("STATUS", "status"),
+    ("LAST LOGIN", None),
+]
+_USER_FILTER_FIELDS = ["role", "employee_type", "status"]
 
 _EMPLOYEE_TABS = [
     "Overview",
@@ -211,14 +231,7 @@ def _user_status_pill_html(status: str) -> str:
     return f'<span class="ips-user-pill {cls}">{html.escape(status)}</span>'
 
 
-def _filter_employees(
-    rows: list[dict],
-    *,
-    q: str,
-    status: str,
-    role: str,
-    employee_type: str,
-) -> list[dict]:
+def _filter_employees(rows: list[dict], *, q: str) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
@@ -232,15 +245,7 @@ def _filter_employees(
             or ql in _user_phone_raw(e).lower()
             or ql in re.sub(r"\D", "", _user_phone_raw(e))
         ]
-    if status and status != "All Statuses":
-        out = [e for e in out if _normalize_user_status(e.get("status")) == status]
-    if role and role != "All Roles":
-        out = [e for e in out if _user_display_role(e) == role]
-    if employee_type == "Employees Only":
-        out = [e for e in out if e.get("is_employee") is not False]
-    elif employee_type == "System Users Only":
-        out = [e for e in out if e.get("is_employee") is False]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
 
 
 def _user_select_key(user_id: str) -> str:
@@ -295,7 +300,11 @@ def _clear_employee_modal() -> None:
     )
 
 
-def _render_custom_users_table(filtered: list[dict]) -> list[str]:
+def _render_custom_users_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No users match your filters.")
         st.session_state[_ALL_USER_IDS_KEY] = []
@@ -310,12 +319,21 @@ def _render_custom_users_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-users-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _USER_HEADERS):
+        for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-users-header-row ips-users-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-users-header-row ips-users-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-users-header-row ips-users-cell",
+                    )
 
         for user in filtered:
             uid = str(user.get("id") or "").strip()
@@ -608,6 +626,13 @@ def _employee_type_label(emp: dict) -> str:
     return "Employee" if emp.get("is_employee") is not False else "System User"
 
 
+_USER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("role", _user_display_role),
+    ("employee_type", _employee_type_label),
+    ("status", lambda u: _normalize_user_status(u.get("status"))),
+]
+
+
 def render_employee_detail_dialog(emp: dict) -> None:
     rk = record_session_key(emp, "id", "email")
     name = safe_value(emp.get("name"))
@@ -666,9 +691,7 @@ def render() -> None:
     inject_users_module_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     all_emp = load_employees()
-    roles = sorted(
-        {_user_display_role(e) for e in all_emp if _user_display_role(e) != "—"}
-    )
+    filter_options = build_filter_options(all_emp, _USER_COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -709,7 +732,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -718,32 +741,8 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="emp_status",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Role",
-                ["All Roles", *roles],
-                key="emp_role_filter",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Employee Type",
-                _EMPLOYEE_TYPE_FILTER_OPTS,
-                key="emp_type_filter",
-                label_visibility="collapsed",
-            )
-        with c5:
             if st.button("Clear", key="emp_clear", use_container_width=True):
-                st.session_state["emp_search"] = ""
-                st.session_state["emp_status"] = "All Statuses"
-                st.session_state["emp_role_filter"] = "All Roles"
-                st.session_state["emp_type_filter"] = "All Employee Types"
+                clear_table_filters(_TABLE_KEY, _USER_FILTER_FIELDS, extra_keys=["emp_search"])
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -751,15 +750,12 @@ def render() -> None:
     filtered = _filter_employees(
         all_emp,
         q=str(st.session_state.get("emp_search") or "").strip(),
-        status=str(st.session_state.get("emp_status") or "All Statuses"),
-        role=str(st.session_state.get("emp_role_filter") or "All Roles"),
-        employee_type=str(st.session_state.get("emp_type_filter") or "All Employee Types"),
     )
 
     st.caption(f"{len(filtered)} user(s)")
 
     build_modal_cache(filtered, cache_key=CACHE_KEY)
-    _render_custom_users_table(filtered)
+    _render_custom_users_table(filtered, filter_options=filter_options)
 
     selected_user_id = st.session_state.get(SELECTED_USER_KEY)
     if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):

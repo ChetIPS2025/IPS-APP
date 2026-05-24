@@ -58,6 +58,12 @@ try:
     )
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_estimates_module_css
@@ -113,6 +119,12 @@ except ImportError:
     )
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_estimates_module_css  # type: ignore
@@ -120,6 +132,7 @@ except ImportError:
 
 _SEL = select_key("estimates")
 _MOD = "estimates"
+_TABLE_KEY = "estimates_list"
 _ESTIMATES_MODAL_KEY = "ips_estimates_detail_modal_id"
 _ESTIMATES_CACHE_KEY = "_ips_estimates_modal_by_id"
 _NEW_CUST_PREV = "est_new_cust_prev"
@@ -139,34 +152,24 @@ _ESTIMATE_TABS = [
     "Activity",
 ]
 _ESTIMATE_COLS = [0.35, 1.1, 2.6, 1.8, 1.0, 1.2, 1.1, 1.1, 1.1, 1.1]
-_ESTIMATE_HEADERS = [
-    "",
-    "ESTIMATE #",
-    "PROJECT / DESCRIPTION",
-    "CUSTOMER",
-    "JOB",
-    "STATUS",
-    "ESTIMATE DATE",
-    "TOTAL COST",
-    "CUSTOMER PRICE",
-    "CREATED BY",
+_ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("ESTIMATE #", None),
+    ("PROJECT / DESCRIPTION", None),
+    ("CUSTOMER", "customer"),
+    ("JOB", None),
+    ("STATUS", "status"),
+    ("ESTIMATE DATE", None),
+    ("TOTAL COST", None),
+    ("CUSTOMER PRICE", None),
+    ("CREATED BY", "created_by"),
 ]
+_ESTIMATE_FILTER_FIELDS = ["customer", "status", "created_by"]
 _NEW_ESTIMATE_DIALOG_KEY = "ips_est_new_dialog_open"
 _BUILD_MODE_PREFIX = "est_build_mode_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
-_STATUS_FILTER_OPTS = [
-    "All Statuses",
-    "Draft",
-    "Pending",
-    "Sent",
-    "Approved",
-    "Awarded",
-    "Rejected",
-    "Expired",
-    "Cancelled",
-]
 
 
 def _default_estimate_date_range() -> tuple[date, date]:
@@ -332,6 +335,13 @@ def _estimate_status_pill_html(status: str) -> str:
     return f'<span class="ips-estimate-status-pill {cls}">{html.escape(status)}</span>'
 
 
+_ESTIMATE_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("customer", _estimate_customer),
+    ("status", lambda r: _normalize_estimate_status(r.get("status"))),
+    ("created_by", _estimate_created_by),
+]
+
+
 def _estimate_select_key(estimate_id: str) -> str:
     return f"estimate_select_{estimate_id}"
 
@@ -363,7 +373,11 @@ def _on_estimate_checkbox_change(estimate_id: str, all_estimate_ids: list[str]) 
         st.session_state[SHOW_ESTIMATE_MODAL_KEY] = False
 
 
-def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
+def _render_custom_estimates_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No estimates match your filters.")
         st.session_state[_ALL_ESTIMATE_IDS_KEY] = []
@@ -378,12 +392,21 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-estimates-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _ESTIMATE_HEADERS):
+        for col, (label, field) in zip(header_cols, _ESTIMATE_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-estimates-header-row ips-estimates-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-estimates-header-row ips-estimates-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-estimates-header-row ips-estimates-cell",
+                    )
 
         for est in filtered:
             eid = str(est.get("id") or "").strip()
@@ -570,9 +593,6 @@ def _filter_rows(
     rows: list[dict],
     *,
     q: str,
-    status: str,
-    customer: str,
-    created_by: str,
     date_range: tuple[date, date] | None,
 ) -> list[dict]:
     out = rows
@@ -587,12 +607,6 @@ def _filter_rows(
             or ql in _estimate_created_by(r).lower()
             or ql in _normalize_estimate_status(r.get("status")).lower()
         ]
-    if status and status != "All Statuses":
-        out = [r for r in out if _normalize_estimate_status(r.get("status")) == status]
-    if customer and customer != "All Customers":
-        out = [r for r in out if _estimate_customer(r) == customer]
-    if created_by and created_by != "All Created By":
-        out = [r for r in out if _estimate_created_by(r) == created_by]
     if date_range and len(date_range) == 2:
         start, end = date_range
         filtered_range: list[dict] = []
@@ -601,7 +615,7 @@ def _filter_rows(
             if est_date is None or (start <= est_date <= end):
                 filtered_range.append(row)
         out = filtered_range
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _ESTIMATE_COLUMN_FILTER_SPECS)
 
 
 def _clear_estimates_detail_modal() -> None:
@@ -609,7 +623,7 @@ def _clear_estimates_detail_modal() -> None:
     _clear_estimate_selection([str(eid) for eid in estimate_ids])
     clear_edit_modes(_MOD)
     clear_record_modal(
-        table_key="estimates_list",
+        table_key=_TABLE_KEY,
         session_select_key=_SEL,
         modal_key=_ESTIMATES_MODAL_KEY,
         module=_MOD,
@@ -1019,7 +1033,7 @@ def render() -> None:
     inject_estimates_module_css()
     st.markdown('<div class="ips-estimates-page"></div>', unsafe_allow_html=True)
     rows = load_estimates()
-    customers = customer_filter_options()
+    filter_options = build_filter_options(rows, _ESTIMATE_COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -1036,12 +1050,8 @@ def render() -> None:
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()
 
-    created_by_opts = sorted(
-        {_estimate_created_by(e) for e in rows if _estimate_created_by(e) != "—"}
-    )
-
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
+        c1, c2, c3 = st.columns([2, 1, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -1050,39 +1060,19 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="est_filter_status",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Customer",
-                ["All Customers", *customers],
-                key="est_filter_customer",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Created By",
-                ["All Created By", *created_by_opts],
-                key="est_filter_created_by",
-                label_visibility="collapsed",
-            )
-        with c5:
             st.date_input(
                 "Date range",
                 value=_default_estimate_date_range(),
                 key="est_filter_dates",
                 label_visibility="collapsed",
             )
-        with c6:
+        with c3:
             if st.button("Clear", key="est_clear", use_container_width=True):
-                st.session_state["est_search"] = ""
-                st.session_state["est_filter_status"] = "All Statuses"
-                st.session_state["est_filter_customer"] = "All Customers"
-                st.session_state["est_filter_created_by"] = "All Created By"
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _ESTIMATE_FILTER_FIELDS,
+                    extra_keys=["est_search"],
+                )
                 st.session_state["est_filter_dates"] = _default_estimate_date_range()
                 st.rerun()
 
@@ -1095,9 +1085,6 @@ def render() -> None:
     filtered = _filter_rows(
         rows,
         q=str(st.session_state.get("est_search") or "").strip(),
-        status=str(st.session_state.get("est_filter_status") or "All Statuses"),
-        customer=str(st.session_state.get("est_filter_customer") or "All Customers"),
-        created_by=str(st.session_state.get("est_filter_created_by") or "All Created By"),
         date_range=date_range,
     )
 
@@ -1113,7 +1100,7 @@ def render() -> None:
     st.caption(f"{len(filtered)} estimate(s)")
 
     build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
-    _render_custom_estimates_table(filtered)
+    _render_custom_estimates_table(filtered, filter_options=filter_options)
 
     selected_estimate_id = st.session_state.get(SELECTED_ESTIMATE_KEY)
     if selected_estimate_id and st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):

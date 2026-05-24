@@ -1743,6 +1743,171 @@ div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) button[kind="
     )
 
 
+def inject_table_header_filter_css() -> None:
+    """Compact popover filters inside custom table headers."""
+    st.markdown(
+        """
+<style id="ips-table-header-filter-v1">
+.ips-table-header-filter-wrap [data-testid="stPopover"] > button {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 32px !important;
+  height: auto !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  color: #475569 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  justify-content: flex-start !important;
+}
+.ips-table-header-filter-active-wrap [data-testid="stPopover"] > button {
+  color: #2563eb !important;
+}
+.ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover {
+  color: #1d4ed8 !important;
+}
+.ips-table-header-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ips-table-header-filter-active {
+  color: #2563eb;
+}
+.ips-filter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #2563eb;
+  display: inline-block;
+}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-tasks_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-company_updates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-certifications_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"] {
+  margin: 0 !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def inject_asset_qr_scan_css() -> None:
+    """Mobile asset QR scan page."""
+    st.markdown(
+        """
+<style id="ips-asset-qr-scan-v1">
+.ips-asset-scan-hero-img {
+  width: 100%;
+  max-width: 360px;
+  max-height: 260px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  display: block;
+  margin: 0 auto 12px;
+}
+.ips-asset-scan-hero-placeholder {
+  width: 100%;
+  max-width: 360px;
+  height: 200px;
+  margin: 0 auto 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.ips-asset-scan-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.ips-asset-scan-tag {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.ips-asset-scan-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+  margin: 0 auto 12px;
+}
+.ips-asset-scan-info {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.ips-asset-scan-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 0.875rem;
+}
+.ips-asset-scan-info-row:last-child {
+  border-bottom: none;
+}
+.ips-asset-scan-info-label {
+  color: #64748b;
+  font-weight: 600;
+}
+.ips-asset-scan-info-value {
+  color: #0f172a;
+  font-weight: 700;
+  text-align: right;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) label {
+  font-size: 1rem !important;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) input,
+div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) textarea {
+  min-height: 44px !important;
+  font-size: 1rem !important;
+  background: #ffffff !important;
+  border-radius: 10px !important;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) button[kind="primary"] {
+  min-height: 48px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
     st.markdown(

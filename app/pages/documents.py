@@ -11,6 +11,12 @@ try:
     from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_record_modal,
@@ -49,6 +55,12 @@ except ImportError:
     from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_record_modal,
@@ -99,9 +111,30 @@ _DOCUMENT_TABS = [
     "Notes",
     "Activity",
 ]
+_FILTER_FIELDS = ["doc_type", "linked_module", "access"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("doc_type", None),
+    ("linked_module", None),
+    ("access", lambda r: _doc_access_value(r)),
+]
+_DOC_FILTER_COLS = [2.5, 1, 1, 1.5, 1.3, 0.9, 0.9, 1]
+_DOC_FILTER_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("FILE", None),
+    ("TYPE", "doc_type"),
+    ("MODULE", "linked_module"),
+    ("LINKED TO", None),
+    ("UPLOADED BY", None),
+    ("DATE", None),
+    ("EXPIRES", None),
+    ("ACCESS", "access"),
+]
 
 
-def _filter_docs(rows: list[dict], *, q: str, module: str, doc_type: str) -> list[dict]:
+def _doc_access_value(row: dict) -> str:
+    return "RESTRICTED" if row.get("is_restricted") else "Standard"
+
+
+def _filter_docs(rows: list[dict], *, q: str) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
@@ -112,11 +145,26 @@ def _filter_docs(rows: list[dict], *, q: str, module: str, doc_type: str) -> lis
             or ql in str(d.get("linked_ref", "")).lower()
             or ql in str(d.get("doc_type", "")).lower()
         ]
-    if module and module != "All Modules":
-        out = [d for d in out if str(d.get("linked_module", "")) == module]
-    if doc_type and doc_type != "All Types":
-        out = [d for d in out if str(d.get("doc_type", "")) == doc_type]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
+
+
+def _render_documents_column_filters(*, filter_options: dict[str, list[str]]) -> None:
+    header_cols = st.columns(_DOC_FILTER_COLS, gap="small", vertical_alignment="center")
+    for col, (label, field) in zip(header_cols, _DOC_FILTER_HEADER_SPECS):
+        with col:
+            if field:
+                render_table_header_cell(
+                    label,
+                    table_key=_TABLE_KEY,
+                    filter_field=field,
+                    filter_options=filter_options.get(field, []),
+                    base_class="ips-documents-header-row ips-documents-cell",
+                )
+            else:
+                render_table_header_cell(
+                    label,
+                    base_class="ips-documents-header-row ips-documents-cell",
+                )
 
 
 def _upload_file_name() -> str:
@@ -179,7 +227,7 @@ def _open_document_modal(document_id: str, document: dict | None = None) -> None
 
 def _documents_display_cell(field: str, row: dict) -> str:
     if field == "access":
-        return "RESTRICTED" if row.get("is_restricted") else "Standard"
+        return _doc_access_value(row)
     if field in ("upload_date", "expiration_date"):
         return fmt_date(row.get(field)) if row.get(field) else "—"
     val = row.get(field)
@@ -187,7 +235,7 @@ def _documents_display_cell(field: str, row: dict) -> str:
 
 
 def _access_label(doc: dict) -> str:
-    return "RESTRICTED" if doc.get("is_restricted") else "Standard access"
+    return _doc_access_value(doc) if doc.get("is_restricted") else "Standard access"
 
 
 def _seed_document_edit_form(doc: dict, *, hr_ok: bool) -> None:
@@ -415,36 +463,21 @@ def render() -> None:
         )
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([1.3, 1, 1, 0.9, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input("Search", placeholder="Search file or linked record…", key="doc_hub_search", label_visibility="collapsed")
         with c2:
-            st.selectbox("Module", DOCUMENT_LINK_MODULES, key="doc_hub_module", label_visibility="collapsed")
-        with c3:
-            st.selectbox("Type", ["All Types", *lookup_options("document_types")], key="doc_hub_type", label_visibility="collapsed")
-        with c4:
-            st.selectbox("Access", ["All", "Standard", "Restricted"], key="doc_hub_access", label_visibility="collapsed")
-        with c5:
             if st.button("Clear", key="doc_hub_clear", use_container_width=True):
-                st.session_state["doc_hub_search"] = ""
-                st.session_state["doc_hub_module"] = "All Modules"
-                st.session_state["doc_hub_type"] = "All Types"
-                st.session_state["doc_hub_access"] = "All"
+                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=["doc_hub_search"])
                 st.rerun()
 
     layout_filter_bar(_filters)
 
+    filter_options = build_filter_options(all_docs, _COLUMN_FILTER_SPECS)
     filtered = _filter_docs(
         all_docs,
         q=str(st.session_state.get("doc_hub_search") or "").strip(),
-        module=str(st.session_state.get("doc_hub_module") or "All Modules"),
-        doc_type=str(st.session_state.get("doc_hub_type") or "All Types"),
     )
-    access = str(st.session_state.get("doc_hub_access") or "All")
-    if access == "Standard":
-        filtered = [d for d in filtered if not d.get("is_restricted")]
-    elif access == "Restricted":
-        filtered = [d for d in filtered if d.get("is_restricted")]
 
     st.caption(f"{len(filtered)} document(s)")
 
@@ -452,6 +485,8 @@ def render() -> None:
         _render_upload_form(hr_ok=hr_ok)
 
     build_modal_cache(filtered, cache_key=CACHE_KEY)
+
+    _render_documents_column_filters(filter_options=filter_options)
 
     render_clickable_table(
         filtered,

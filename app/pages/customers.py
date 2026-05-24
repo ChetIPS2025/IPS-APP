@@ -11,6 +11,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -59,6 +65,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -162,17 +174,17 @@ SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
 _CUSTOMER_COLS = [0.35, 4.5, 1.2, 1.2, 1.4, 1.3]
-_CUSTOMER_HEADERS = [
-    "",
-    "CUSTOMER",
-    "CONTACTS",
-    "OPEN JOBS",
-    "OPEN ESTIMATES",
-    "STATUS",
+_CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("CUSTOMER", None),
+    ("CONTACTS", None),
+    ("OPEN JOBS", None),
+    ("OPEN ESTIMATES", None),
+    ("STATUS", "status"),
 ]
+_CUSTOMER_FILTER_FIELDS = ["status"]
 _STATE_FILTER_ALL = "Filter by Location State"
 _LOCATION_FILTER_ALL = "Filter by Customer Location"
-_STATUS_FILTER_OPTS = ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"]
 SELECTED_CONTACT_KEY = "selected_contact_id"
 SHOW_CONTACT_MODAL_KEY = "show_contact_detail_modal"
 _ALL_CONTACT_IDS_KEY = "_ips_contacts_visible_ids"
@@ -241,6 +253,11 @@ def _customer_status_pill_html(status: str) -> str:
     return f'<span class="ips-customer-status-pill {cls}">{html.escape(status)}</span>'
 
 
+_CUSTOMER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("status", lambda c: _normalize_customer_status(c.get("status"))),
+]
+
+
 def _customer_select_key(customer_id: str) -> str:
     return f"customer_select_{customer_id}"
 
@@ -272,7 +289,11 @@ def _on_customer_checkbox_change(customer_id: str, all_customer_ids: list[str]) 
         st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
 
 
-def _render_custom_customers_table(filtered: list[dict]) -> list[str]:
+def _render_custom_customers_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No customers match your filters.")
         st.session_state[_ALL_CUSTOMER_IDS_KEY] = []
@@ -287,12 +308,21 @@ def _render_custom_customers_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-customers-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _CUSTOMER_HEADERS):
+        for col, (label, field) in zip(header_cols, _CUSTOMER_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-customers-header-row ips-customers-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_CUSTOMERS_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-customers-header-row ips-customers-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-customers-header-row ips-customers-cell",
+                    )
 
         for customer in filtered:
             cid = str(customer.get("id") or "").strip()
@@ -384,7 +414,6 @@ def _filter_customers(
     rows: list[dict],
     *,
     q: str,
-    status: str,
     state: str,
     location: str,
 ) -> list[dict]:
@@ -399,13 +428,11 @@ def _filter_customers(
             or ql in _customer_state(c).lower()
             or ql in _customer_primary_location(c).lower()
         ]
-    if status and status != "All Statuses":
-        out = [c for c in out if _normalize_customer_status(c.get("status")) == status]
     if state and state not in ("All States", _STATE_FILTER_ALL):
         out = [c for c in out if _customer_state(c) == state]
     if location and location not in ("All Locations", _LOCATION_FILTER_ALL):
         out = [c for c in out if _customer_primary_location(c) == location]
-    return out
+    return apply_column_filters(out, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
 
 
 def _location_name_map(locations: list[dict]) -> dict[str, dict]:
@@ -2374,6 +2401,7 @@ def render() -> None:
     )
 
     all_rows = _enrich_list_rows(get_customers())
+    filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
     states = sorted(
         {_customer_state(c) for c in all_rows if _customer_state(c) != "—"}
     )
@@ -2440,7 +2468,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 0.6])
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -2450,29 +2478,29 @@ def render() -> None:
             )
         with c2:
             st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="cust_filter_status",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
                 "State",
                 [_STATE_FILTER_ALL, *states],
                 key="cust_filter_state",
                 label_visibility="collapsed",
             )
-        with c4:
+        with c3:
             st.selectbox(
                 "Location",
                 [_LOCATION_FILTER_ALL, *locations],
                 key="cust_filter_location",
                 label_visibility="collapsed",
             )
-        with c5:
+        with c4:
             if st.button("Clear", key="cust_clear", use_container_width=True):
-                st.session_state["cust_search"] = ""
-                st.session_state["cust_filter_status"] = "All Statuses"
+                clear_table_filters(
+                    _CUSTOMERS_TABLE_KEY,
+                    _CUSTOMER_FILTER_FIELDS,
+                    extra_keys=[
+                        "cust_search",
+                        "cust_filter_state",
+                        "cust_filter_location",
+                    ],
+                )
                 st.session_state["cust_filter_state"] = _STATE_FILTER_ALL
                 st.session_state["cust_filter_location"] = _LOCATION_FILTER_ALL
                 st.rerun()
@@ -2482,7 +2510,6 @@ def render() -> None:
     filtered = _filter_customers(
         all_rows,
         q=str(st.session_state.get("cust_search") or "").strip(),
-        status=str(st.session_state.get("cust_filter_status") or "All Statuses"),
         state=str(st.session_state.get("cust_filter_state") or _STATE_FILTER_ALL),
         location=str(st.session_state.get("cust_filter_location") or _LOCATION_FILTER_ALL),
     )
@@ -2490,7 +2517,7 @@ def render() -> None:
     st.caption(f"{len(filtered)} customer(s)")
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_custom_customers_table(filtered)
+    _render_custom_customers_table(filtered, filter_options=filter_options)
 
     selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
     if selected_customer_id and st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):

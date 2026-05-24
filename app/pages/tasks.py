@@ -10,6 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_record_modal,
@@ -61,6 +67,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_record_modal,
@@ -124,7 +136,21 @@ _UUID_RE = re.compile(
 )
 _ALL_TASK_IDS_KEY = "_ips_tasks_visible_ids"
 _TASK_COLS = [0.35, 4.8, 1.2, 1.2, 2.0, 2.8, 1.2]
-_TASK_HEADERS = ["", "TASK", "STATUS", "PRIORITY", "ASSIGNED TO", "JOB", "DUE"]
+_TASK_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("TASK", None),
+    ("STATUS", None),
+    ("PRIORITY", "priority_display"),
+    ("ASSIGNED TO", "assigned_to_display"),
+    ("JOB", "job_display"),
+    ("DUE", None),
+]
+_FILTER_FIELDS = ["priority_display", "assigned_to_display", "job_display"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("priority_display", None),
+    ("assigned_to_display", None),
+    ("job_display", None),
+]
 
 _TASK_TABS = [
     "Overview",
@@ -282,15 +308,25 @@ def _render_task_view_selector() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _enrich_task_row(
+    task: dict,
+    *,
+    assignee_lookup: dict[str, str],
+    jobs_by_id: dict[str, dict],
+    job_options: list[dict],
+) -> dict:
+    return {
+        **task,
+        "priority_display": normalize_task_priority(task.get("priority")),
+        "assigned_to_display": _resolve_assignee_name(task.get("assigned_to"), assignee_lookup),
+        "job_display": _format_job_label(task, jobs_by_id, job_options),
+    }
+
+
 def _filter_tasks(
     rows: list[dict],
     *,
     q: str,
-    priority: str,
-    assignee: str,
-    assignee_lookup: dict[str, str],
-    jobs_by_id: dict[str, dict],
-    job_options: list[dict],
 ) -> list[dict]:
     out = rows
     if q:
@@ -300,17 +336,9 @@ def _filter_tasks(
             for t in out
             if ql in str(t.get("title", "")).lower()
             or ql in str(t.get("description", "")).lower()
-            or ql in _format_job_label(t, jobs_by_id, job_options).lower()
+            or ql in str(t.get("job_display") or "").lower()
         ]
-    if priority and priority != "All Priorities":
-        out = [t for t in out if normalize_task_priority(t.get("priority")) == priority]
-    if assignee and assignee != "All Assignees":
-        out = [
-            t
-            for t in out
-            if _resolve_assignee_name(t.get("assigned_to"), assignee_lookup) == assignee
-        ]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
 def _apply_local_task_update(task_id: str, updates: dict) -> None:
@@ -705,6 +733,7 @@ def _show_task_modal(
 def _render_custom_task_table(
     filtered: list[dict],
     *,
+    filter_options: dict[str, list[str]],
     assignee_lookup: dict[str, str],
     jobs_by_id: dict[str, dict],
     job_options: list[dict],
@@ -721,12 +750,21 @@ def _render_custom_task_table(
         st.markdown('<div class="ips-task-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_TASK_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _TASK_HEADERS):
+        for col, (label, field) in zip(header_cols, _TASK_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-task-header-row ips-task-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-task-header-row ips-task-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-task-header-row ips-task-cell",
+                    )
 
         for task in filtered:
             tid = str(task.get("id") or "").strip()
@@ -1022,13 +1060,16 @@ def render() -> None:
     jobs_by_id = _build_jobs_lookup()
     job_options = get_job_options(include_all=True)
     all_tasks = _merge_task_overrides(get_tasks())
-    assignees = sorted(
-        {
-            name
-            for t in all_tasks
-            if (name := _resolve_assignee_name(t.get("assigned_to"), assignee_lookup)) != "—"
-        }
-    )
+    enriched_tasks = [
+        _enrich_task_row(
+            t,
+            assignee_lookup=assignee_lookup,
+            jobs_by_id=jobs_by_id,
+            job_options=job_options,
+        )
+        for t in all_tasks
+    ]
+    filter_options = build_filter_options(enriched_tasks, _COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -1039,29 +1080,18 @@ def render() -> None:
 
     def _filters() -> None:
         _render_task_view_selector()
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input("Search", placeholder="Search tasks…", key="task_search", label_visibility="collapsed")
         with c2:
-            st.selectbox(
-                "Priority",
-                _PRIORITY_FILTER_OPTS,
-                key="task_filter_priority",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Assigned to",
-                ["All Assignees", *assignees],
-                key="task_filter_assignee",
-                label_visibility="collapsed",
-            )
-        with c4:
             if st.button("Clear", key="task_clear", use_container_width=True):
-                st.session_state["task_search"] = ""
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["task_search", TASK_VIEW_KEY],
+                )
+                _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
                 st.session_state[TASK_VIEW_KEY] = "Open Tasks"
-                st.session_state["task_filter_priority"] = "All Priorities"
-                st.session_state["task_filter_assignee"] = "All Assignees"
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1124,15 +1154,10 @@ def render() -> None:
         view = "Open Tasks"
         st.session_state[TASK_VIEW_KEY] = view
 
-    viewed = _apply_task_view_filter(all_tasks, view)
+    viewed = _apply_task_view_filter(enriched_tasks, view)
     filtered = _filter_tasks(
         viewed,
         q=str(st.session_state.get("task_search") or "").strip(),
-        priority=str(st.session_state.get("task_filter_priority") or "All Priorities"),
-        assignee=str(st.session_state.get("task_filter_assignee") or "All Assignees"),
-        assignee_lookup=assignee_lookup,
-        jobs_by_id=jobs_by_id,
-        job_options=job_options,
     )
 
     st.caption(_task_count_caption(len(filtered), view))
@@ -1140,6 +1165,7 @@ def render() -> None:
     build_modal_cache(filtered, cache_key=CACHE_KEY)
     _render_custom_task_table(
         filtered,
+        filter_options=filter_options,
         assignee_lookup=assignee_lookup,
         jobs_by_id=jobs_by_id,
         job_options=job_options,

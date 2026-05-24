@@ -199,19 +199,16 @@ def _storage_backend() -> str:
     return v if v else "supabase"
 
 
-# Canonical public app origin (QR scan links, cookie Secure hint, etc.). Override with ``APP_BASE_URL``.
-_CANONICAL_APP_BASE_URL = "https://ips-app-ajy0.onrender.com"
+_LOCAL_DEV_APP_BASE_URL = "http://localhost:8501"
 
 
 def _resolve_app_base_url() -> str:
     """
-    Public origin, no trailing slash — from ``APP_BASE_URL`` or ``_CANONICAL_APP_BASE_URL``.
-
-    Scan links: ``{app_base_url}/?page=Scan%20Inventory&code=…`` (see ``app.services.qr_codes``).
-    Set ``APP_BASE_URL`` in the environment for local dev (e.g. ``http://127.0.0.1:8501``).
+    Public origin, no trailing slash — from ``st.secrets["APP_BASE_URL"]``, env ``APP_BASE_URL``,
+    or ``http://localhost:8501`` for local development.
     """
     raw = _strip_env("APP_BASE_URL")
-    return raw.strip().rstrip("/") if raw else _CANONICAL_APP_BASE_URL
+    return raw.strip().rstrip("/") if raw else _LOCAL_DEV_APP_BASE_URL
 
 
 @dataclass(frozen=True)

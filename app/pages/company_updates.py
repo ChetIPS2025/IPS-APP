@@ -10,6 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -40,6 +46,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -77,35 +89,21 @@ SELECTED_UPDATE_KEY = "selected_update_id"
 SHOW_UPDATE_MODAL_KEY = "show_update_detail_modal"
 _ALL_UPDATE_IDS_KEY = "_ips_updates_visible_ids"
 _UPD_COLS = [0.35, 3.2, 1.5, 1.6, 1.2, 1.4, 1.7, 1.3]
-_UPD_HEADERS = [
-    "",
-    "TITLE",
-    "CATEGORY",
-    "AUDIENCE",
-    "STATUS",
-    "EVENT DATE",
-    "CREATED BY",
-    "CREATED",
+_UPD_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("TITLE", None),
+    ("CATEGORY", "category"),
+    ("AUDIENCE", "audience"),
+    ("STATUS", "status"),
+    ("EVENT DATE", None),
+    ("CREATED BY", None),
+    ("CREATED", None),
 ]
-_CATEGORY_FILTER_OPTS = [
-    "All Categories",
-    "Announcement",
-    "Safety Alert",
-    "Event",
-    "HR Update",
-    "Project Update",
-    "General",
-]
-_STATUS_FILTER_OPTS = ["All Statuses", "Draft", "Published", "Scheduled", "Archived"]
-_AUDIENCE_FILTER_OPTS = [
-    "All Audiences",
-    "All",
-    "Admin",
-    "Supervisors",
-    "Employees",
-    "Field Crew",
-    "Office",
-    "Management",
+_FILTER_FIELDS = ["category", "audience", "status"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("category", lambda r: _normalize_update_category(r.get("category"))),
+    ("audience", lambda r: _normalize_audience(r.get("audience") or r.get("visibility"))),
+    ("status", lambda r: _normalize_update_status(r.get("status"), is_active=r.get("is_active"))),
 ]
 _CATEGORY_EDIT_OPTS = [
     "Announcement",
@@ -116,6 +114,15 @@ _CATEGORY_EDIT_OPTS = [
     "General",
 ]
 _STATUS_EDIT_OPTS = ["Draft", "Published", "Scheduled", "Archived"]
+_AUDIENCE_EDIT_OPTS = [
+    "All",
+    "Admin",
+    "Supervisors",
+    "Employees",
+    "Field Crew",
+    "Office",
+    "Management",
+]
 _SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
 
 
@@ -448,7 +455,7 @@ def _render_cu_edit_form(update: dict) -> None:
         st.selectbox("Category", _CATEGORY_EDIT_OPTS, key=f"cu_edit_cat_{rk}")
         st.selectbox("Status", _STATUS_EDIT_OPTS, key=f"cu_edit_status_{rk}")
     with ec2:
-        st.selectbox("Audience", _AUDIENCE_FILTER_OPTS[1:], key=f"cu_edit_audience_{rk}")
+        st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key=f"cu_edit_audience_{rk}")
         st.text_input("Event date", key=f"cu_edit_event_date_{rk}", placeholder="YYYY-MM-DD")
     st.text_area("Body / content", key=f"cu_edit_body_{rk}", height=120)
     st.text_area("Notes", key=f"cu_edit_notes_{rk}", height=80)
@@ -536,13 +543,9 @@ def _filter_updates(
     updates: list[dict],
     *,
     q: str,
-    category: str,
-    status: str,
-    audience: str,
     sort: str,
-    lookup: dict[str, str],
 ) -> list[dict]:
-    rows = [_build_update_row(u, lookup) for u in updates]
+    rows = updates
     if q:
         ql = q.lower()
         rows = [
@@ -555,16 +558,15 @@ def _filter_updates(
             or ql in str(r.get("created_by_display") or "").lower()
             or ql in str(r.get("status") or "").lower()
         ]
-    if category != "All Categories":
-        rows = [r for r in rows if r.get("category") == category]
-    if status != "All Statuses":
-        rows = [r for r in rows if r.get("status") == status]
-    if audience != "All Audiences":
-        rows = [r for r in rows if r.get("audience") == audience]
+    rows = apply_column_filters(rows, _TABLE_KEY, _COLUMN_FILTER_SPECS)
     return _sort_updates(rows, sort)
 
 
-def _render_custom_updates_table(filtered: list[dict]) -> list[str]:
+def _render_custom_updates_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No updates match your filters.")
         st.session_state[_ALL_UPDATE_IDS_KEY] = []
@@ -579,13 +581,21 @@ def _render_custom_updates_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-updates-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_UPD_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _UPD_HEADERS):
+        for col, (label, field) in zip(header_cols, _UPD_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-updates-header-row ips-updates-cell">'
-                    f"{html.escape(label)}</div>",
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-updates-header-row ips-updates-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-updates-header-row ips-updates-cell",
+                    )
 
         for update in filtered:
             uid = str(update.get("id") or "").strip()
@@ -682,7 +692,7 @@ def render() -> None:
                 st.selectbox("Category", _CATEGORY_EDIT_OPTS, key="cu_new_cat")
                 st.selectbox("Status", _STATUS_EDIT_OPTS, key="cu_new_status")
             with nc2:
-                st.selectbox("Audience", _AUDIENCE_FILTER_OPTS[1:], key="cu_new_audience")
+                st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key="cu_new_audience")
                 st.text_input("Event date", key="cu_new_event_date", placeholder="YYYY-MM-DD")
             st.text_area("Body / content", key="cu_new_body", height=100)
             st.text_area("Notes", key="cu_new_notes", height=60)
@@ -706,7 +716,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 0.6, 1])
+        c1, c2, c3 = st.columns([5, 0.6, 1])
         with c1:
             st.text_input(
                 "Search",
@@ -715,35 +725,16 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Category",
-                _CATEGORY_FILTER_OPTS,
-                key="cu_cat_filter",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="cu_status_filter",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Audience",
-                _AUDIENCE_FILTER_OPTS,
-                key="cu_audience_filter",
-                label_visibility="collapsed",
-            )
-        with c5:
             if st.button("Clear", key="cu_clear", use_container_width=True):
-                st.session_state["cu_search"] = ""
-                st.session_state["cu_cat_filter"] = "All Categories"
-                st.session_state["cu_status_filter"] = "All Statuses"
-                st.session_state["cu_audience_filter"] = "All Audiences"
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["cu_search", "cu_sort"],
+                )
+                _clear_update_selection(st.session_state.get(_ALL_UPDATE_IDS_KEY))
                 st.session_state["cu_sort"] = "Newest First"
                 st.rerun()
-        with c6:
+        with c3:
             st.selectbox(
                 "Sort",
                 _SORT_OPTS,
@@ -754,20 +745,18 @@ def render() -> None:
     layout_filter_bar(_filters)
 
     updates = load_company_updates(category="All Updates")
+    all_rows = [_build_update_row(u, lookup) for u in updates]
+    filter_options = build_filter_options(all_rows, _COLUMN_FILTER_SPECS)
     filtered = _filter_updates(
-        updates,
+        all_rows,
         q=str(st.session_state.get("cu_search") or "").strip(),
-        category=str(st.session_state.get("cu_cat_filter") or "All Categories"),
-        status=str(st.session_state.get("cu_status_filter") or "All Statuses"),
-        audience=str(st.session_state.get("cu_audience_filter") or "All Audiences"),
         sort=str(st.session_state.get("cu_sort") or "Newest First"),
-        lookup=lookup,
     )
 
     st.caption(f"{len(filtered)} update(s)")
 
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_updates_table(filtered)
+    _render_custom_updates_table(filtered, filter_options=filter_options)
 
     if st.session_state.get(SELECTED_UPDATE_KEY) and st.session_state.get(SHOW_UPDATE_MODAL_KEY):
         _show_update_detail_modal()

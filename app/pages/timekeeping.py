@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import html
 from datetime import date, timedelta
+from typing import Any
 
 import streamlit as st
 
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -40,6 +47,12 @@ try:
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_header  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -80,18 +93,25 @@ SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
 _TK_COLS = [0.35, 2.4, 1.8, 1.4, 1.0, 1.0, 1.0, 1.2, 1.3]
-_TK_HEADERS = [
-    "",
-    "EMPLOYEE",
-    "DEPARTMENT",
-    "WEEK START",
-    "ST TOTAL",
-    "OT TOTAL",
-    "DT TOTAL",
-    "TOTAL HOURS",
-    "STATUS",
+_TK_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("EMPLOYEE", "employee_name"),
+    ("DEPARTMENT", "department"),
+    ("WEEK START", "week_start"),
+    ("ST TOTAL", None),
+    ("OT TOTAL", None),
+    ("DT TOTAL", None),
+    ("TOTAL HOURS", None),
+    ("STATUS", "status"),
 ]
-_STATUS_FILTER_OPTS = ["All Statuses", "Draft", "Pending", "Approved", "Rejected"]
+_STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
+_TK_FILTER_FIELDS = ["employee_name", "department", "week_start", "status"]
+_TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
+    ("employee_name", None),
+    ("department", None),
+    ("week_start", lambda r: fmt_date(r.get("week_start"))),
+    ("status", lambda r: _normalize_timecard_status(r.get("status"))),
+]
 _DAY_GRID_COLS = [0.55, 0.7, 2.0, 0.75, 0.75, 0.75, 0.75, 1.3]
 _DAY_GRID_LABELS = [
     "Day",
@@ -556,8 +576,6 @@ def _filter_timecards(
     ws: date,
     *,
     q: str,
-    dept: str,
-    status: str,
 ) -> list[dict]:
     rows = [_build_timecard_row(row, ws) for row in summaries]
     if q:
@@ -569,14 +587,14 @@ def _filter_timecards(
             or ql in str(r.get("department") or "").lower()
             or ql in str(r.get("status") or "").lower()
         ]
-    if dept != "All Departments":
-        rows = [r for r in rows if str(r.get("department") or "") == dept]
-    if status != "All Statuses":
-        rows = [r for r in rows if _normalize_timecard_status(r.get("status")) == status]
-    return rows
+    return apply_column_filters(rows, _TABLE_KEY, _TK_COLUMN_FILTER_SPECS)
 
 
-def _render_custom_timekeeping_table(filtered: list[dict]) -> list[str]:
+def _render_custom_timekeeping_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No timecards match your filters.")
         st.session_state[_ALL_TIMECARD_IDS_KEY] = []
@@ -593,13 +611,21 @@ def _render_custom_timekeeping_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-timekeeping-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_TK_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _TK_HEADERS):
+        for col, (label, field) in zip(header_cols, _TK_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-timekeeping-header-row ips-timekeeping-cell">'
-                    f"{html.escape(label)}</div>",
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-timekeeping-header-row ips-timekeeping-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-timekeeping-header-row ips-timekeeping-cell",
+                    )
 
         for row in filtered:
             timecard_id = str(row.get("timecard_id") or "").strip()
@@ -694,7 +720,8 @@ def render() -> None:
     ws = _current_week_start()
     we = week_end(ws)
     summaries = load_timekeeping_summaries(ws)
-    departments = sorted({str(s.get("department") or "") for s in summaries if s.get("department")})
+    all_rows = [_build_timecard_row(row, ws) for row in summaries]
+    filter_options = build_filter_options(all_rows, _TK_COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -723,7 +750,7 @@ def render() -> None:
         )
 
     def _filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -732,24 +759,9 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Department",
-                ["All Departments", *departments],
-                key="tk_dept",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="tk_status",
-                label_visibility="collapsed",
-            )
-        with c4:
             if st.button("Clear", key="tk_clear", use_container_width=True):
-                st.session_state["tk_search"] = ""
-                st.session_state["tk_dept"] = "All Departments"
-                st.session_state["tk_status"] = "All Statuses"
+                clear_table_filters(_TABLE_KEY, _TK_FILTER_FIELDS, extra_keys=["tk_search"])
+                _clear_timecard_selection(st.session_state.get(_ALL_TIMECARD_IDS_KEY))
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -758,14 +770,12 @@ def render() -> None:
         summaries,
         ws,
         q=str(st.session_state.get("tk_search") or "").strip(),
-        dept=str(st.session_state.get("tk_dept") or "All Departments"),
-        status=str(st.session_state.get("tk_status") or "All Statuses"),
     )
 
     st.caption(f"{len(filtered)} timecard(s)")
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
-    _render_custom_timekeeping_table(filtered)
+    _render_custom_timekeeping_table(filtered, filter_options=filter_options)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()

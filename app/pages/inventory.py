@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import html
 
 import streamlit as st
@@ -9,6 +10,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -52,6 +59,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -96,21 +109,28 @@ _MODULE = "inventory"
 SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
+_TABLE_KEY = "inventory_list"
 _INV_COLS = [0.35, 0.75, 0.9, 3.6, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
-_INV_HEADERS = [
-    "",
-    "",
-    "IMAGE",
-    "DESCRIPTION",
-    "CATEGORY",
-    "LOCATION",
-    "QTY ON HAND",
-    "UNIT",
-    "UNIT COST",
-    "STATUS",
-    "VENDOR",
+_INV_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("", None),
+    ("IMAGE", None),
+    ("DESCRIPTION", None),
+    ("CATEGORY", "category"),
+    ("LOCATION", "location"),
+    ("QTY ON HAND", None),
+    ("UNIT", None),
+    ("UNIT COST", None),
+    ("STATUS", "status"),
+    ("VENDOR", "vendor"),
 ]
-_STATUS_FILTER_OPTS = ["All Statuses", "In Stock", "Low Stock", "Out of Stock", "On Order", "Discontinued"]
+_FILTER_FIELDS = ["category", "location", "status", "vendor"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("category", lambda r: _inventory_category(r)),
+    ("location", lambda r: _inventory_location(r)),
+    ("status", lambda r: _normalize_inventory_status(r.get("status"))),
+    ("vendor", lambda r: _inventory_vendor(r)),
+]
 
 _INV_TABS = [
     "Overview",
@@ -278,7 +298,11 @@ def _on_inventory_checkbox_change(item_id: str, all_item_ids: list[str]) -> None
         st.session_state[SHOW_INVENTORY_MODAL_KEY] = False
 
 
-def _render_custom_inventory_table(filtered: list[dict]) -> list[str]:
+def _render_custom_inventory_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
     if not filtered:
         st.info("No inventory items match your filters.")
         st.session_state[_ALL_INVENTORY_IDS_KEY] = []
@@ -291,12 +315,21 @@ def _render_custom_inventory_table(filtered: list[dict]) -> list[str]:
         st.markdown('<div class="ips-inventory-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_INV_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _INV_HEADERS):
+        for col, (label, field) in zip(header_cols, _INV_HEADER_SPECS):
             with col:
-                st.markdown(
-                    f'<div class="ips-inventory-header-row ips-inventory-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-inventory-header-row ips-inventory-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-inventory-header-row ips-inventory-cell",
+                    )
 
         for item in filtered:
             iid = str(item.get("id") or "").strip()
@@ -387,10 +420,6 @@ def _filter_rows(
     rows: list[dict],
     *,
     q: str,
-    category: str,
-    location: str,
-    status: str,
-    vendor: str,
 ) -> list[dict]:
     out = rows
     if q:
@@ -406,15 +435,7 @@ def _filter_rows(
             or ql in _inventory_vendor(r).lower()
             or ql in _normalize_inventory_status(r.get("status")).lower()
         ]
-    if category and category != "All Categories":
-        out = [r for r in out if _inventory_category(r) == category]
-    if location and location != "All Locations":
-        out = [r for r in out if _inventory_location(r) == location]
-    if status and status != "All Statuses":
-        out = [r for r in out if _normalize_inventory_status(r.get("status")) == status]
-    if vendor and vendor != "All Vendors":
-        out = [r for r in out if _inventory_vendor(r) == vendor]
-    return out
+    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
 def _clear_inventory_modal() -> None:
@@ -455,10 +476,33 @@ def _seed_inventory_edit_form(item: dict) -> None:
     st.session_state[f"inv_edit_cost_{iid}"] = float(item.get("unit_cost") or 0)
 
 
+def _render_inventory_qr_block(item: dict) -> None:
+    """Clickable QR + checkout link for inventory scan form."""
+    scan_url = generate_inventory_qr_value(item)
+    qr_png = inventory_qr_png_bytes(item)
+    if qr_png and scan_url:
+        b64 = base64.b64encode(qr_png).decode("ascii")
+        safe_url = html.escape(scan_url, quote=True)
+        st.markdown(
+            f'<a href="{safe_url}" target="_self" title="Open checkout form">'
+            f'<img src="data:image/png;base64,{b64}" width="140" alt="Inventory QR code" '
+            f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
+            f"</a>",
+            unsafe_allow_html=True,
+        )
+    elif qr_png:
+        st.image(qr_png, width=140)
+    else:
+        st.caption(str(item.get("qr_code_value") or "—"))
+    if scan_url:
+        st.link_button("Open Checkout Form", scan_url, use_container_width=True)
+        st.caption("Scan with a phone or tap to open the checkout form.")
+
+
 def _txn_action_label(txn_type: str) -> str:
     labels = {
-        "check_out": "Check Out",
-        "check_in": "Check In",
+        "check_out": "Take / Check Out",
+        "check_in": "Return / Check In",
         "issue_to_job": "Issue to Job",
         "return_from_job": "Return From Job",
         "consume_on_job": "Consume On Job",
@@ -491,7 +535,8 @@ def _render_inventory_transactions_tab(item: dict) -> None:
 
     scan_url = generate_inventory_qr_value(item)
     if scan_url:
-        st.link_button("Open Scan Link", scan_url, use_container_width=False)
+        st.link_button("Open Checkout Form", scan_url, use_container_width=True)
+        st.code(scan_url, language=None)
 
     if not txns:
         st.caption("No scan transactions yet.")
@@ -538,11 +583,7 @@ def _render_inventory_detail_tabs(item: dict) -> None:
             _render_inventory_detail_image(item)
         with media2:
             st.markdown("**QR Code**")
-            qr_png = inventory_qr_png_bytes(item)
-            if qr_png:
-                st.image(qr_png, width=140)
-            else:
-                st.caption(str(item.get("qr_code_value") or "—"))
+            _render_inventory_qr_block(item)
         with details:
             details_html = (
                 f'<div class="ips-detail-grid">'
@@ -709,9 +750,7 @@ def render() -> None:
         ensure_inventory_qr_tokens(rows)
         st.session_state["_inv_qr_tokens_seeded"] = True
         rows = load_inventory()
-    categories = sorted({_inventory_category(r) for r in rows if _inventory_category(r) != "—"})
-    locations = sorted({_inventory_location(r) for r in rows if _inventory_location(r) != "—"})
-    vendors = sorted({_inventory_vendor(r) for r in rows if _inventory_vendor(r) != "—"})
+    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     act_l, act_r = st.columns([3, 1])
     with act_l:
@@ -769,7 +808,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2, 1, 1, 1, 1, 0.6])
+        c1, c2 = st.columns([5, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -778,40 +817,13 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Category",
-                ["All Categories", *categories],
-                key="inv_cat",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Location",
-                ["All Locations", *locations],
-                key="inv_loc",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTER_OPTS,
-                key="inv_status",
-                label_visibility="collapsed",
-            )
-        with c5:
-            st.selectbox(
-                "Vendor",
-                ["All Vendors", *vendors],
-                key="inv_vendor",
-                label_visibility="collapsed",
-            )
-        with c6:
             if st.button("Clear", key="inv_clear", use_container_width=True):
-                st.session_state["inv_search"] = ""
-                st.session_state["inv_cat"] = "All Categories"
-                st.session_state["inv_loc"] = "All Locations"
-                st.session_state["inv_status"] = "All Statuses"
-                st.session_state["inv_vendor"] = "All Vendors"
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["inv_search"],
+                )
+                _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -819,16 +831,12 @@ def render() -> None:
     filtered = _filter_rows(
         rows,
         q=str(st.session_state.get("inv_search") or "").strip(),
-        category=str(st.session_state.get("inv_cat") or "All Categories"),
-        location=str(st.session_state.get("inv_loc") or "All Locations"),
-        status=str(st.session_state.get("inv_status") or "All Statuses"),
-        vendor=str(st.session_state.get("inv_vendor") or "All Vendors"),
     )
 
     st.caption(f"{len(filtered)} item(s)")
 
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_inventory_table(filtered)
+    _render_custom_inventory_table(filtered, filter_options=filter_options)
 
     selected_inventory_id = st.session_state.get(SELECTED_INVENTORY_KEY)
     if selected_inventory_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):

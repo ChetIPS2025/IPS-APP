@@ -174,16 +174,48 @@ def main() -> None:
     inject_global_css()
 
     try:
+        from app.pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active
+    except ImportError:
+        from pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active  # type: ignore
+    capture_inventory_scan_from_query()
+
+    try:
+        from app.pages.asset_scan import capture_asset_scan_from_query, asset_scan_route_active
+    except ImportError:
+        from pages.asset_scan import capture_asset_scan_from_query, asset_scan_route_active  # type: ignore
+    capture_asset_scan_from_query()
+
+    try:
         from app.services.asset_qr import capture_asset_deeplink_from_query
     except ImportError:
         from services.asset_qr import capture_asset_deeplink_from_query  # type: ignore
     capture_asset_deeplink_from_query()
 
-    try:
-        from app.pages.inventory_qr_action import capture_inventory_qr_from_query
-    except ImportError:
-        from pages.inventory_qr_action import capture_inventory_qr_from_query  # type: ignore
-    capture_inventory_qr_from_query()
+    if inventory_scan_route_active():
+        try:
+            from app.pages.inventory_scan import render_inventory_scan_page
+        except ImportError:
+            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
+        if is_authenticated():
+            persist_auth_cookies_if_pending()
+            inject_authenticated_shell_css()
+        else:
+            inject_unauthenticated_shell_css()
+        render_inventory_scan_page()
+        st.stop()
+
+    if asset_scan_route_active():
+        try:
+            from app.pages.asset_scan import render_asset_scan_page
+        except ImportError:
+            from pages.asset_scan import render_asset_scan_page  # type: ignore
+        if is_authenticated():
+            persist_auth_cookies_if_pending()
+            inject_authenticated_shell_css()
+        else:
+            inject_unauthenticated_shell_css()
+        render_asset_scan_page()
+        st.stop()
 
     if not is_authenticated():
         _render_login()
@@ -199,19 +231,6 @@ def main() -> None:
         _render_password_reset()
         if must_reset_password():
             st.stop()
-
-    try:
-        qr_kind = str(st.query_params.get("qr") or "").strip().lower()
-    except Exception:
-        qr_kind = ""
-    if qr_kind == "inventory" or st.session_state.get("_ips_qr_inventory_page"):
-        try:
-            from app.pages.inventory_qr_action import render_inventory_qr_action_page
-        except ImportError:
-            from pages.inventory_qr_action import render_inventory_qr_action_page  # type: ignore
-        inject_authenticated_shell_css()
-        render_inventory_qr_action_page()
-        st.stop()
 
     ensure_nav_defaults()
     prev_slug = st.session_state.get("_ips_last_slug")

@@ -11,6 +11,12 @@ import streamlit as st
 try:
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         detail_field_html,
         dialog_card_html,
@@ -57,6 +63,12 @@ try:
 except ImportError:
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         detail_field_html,
         dialog_card_html,
@@ -102,13 +114,43 @@ except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
 _MODULE = "employee_certifications"
+_TABLE_KEY = "certifications_list"
 _ALL_CERT_IDS_KEY = "_cert_page_all_ids"
-_STATUS_FILTERS = ["All Statuses", *CERT_STATUS_VALUES]
+_FILTER_FIELDS_ALL = ["employee_name", "cert_type", "status"]
+_FILTER_FIELDS_EMP = ["cert_type", "status"]
+_COLUMN_FILTER_SPECS_ALL: list[tuple[str, object]] = [
+    ("employee_name", lambda r: str(r.get("employee_name") or "").strip() or "—"),
+    ("cert_type", None),
+    ("status", None),
+]
+_COLUMN_FILTER_SPECS_EMP: list[tuple[str, object]] = [
+    ("cert_type", None),
+    ("status", None),
+]
 
 _CERT_COLS_ALL = [0.35, 2.0, 1.4, 1.5, 1.6, 1.1, 1.1, 1.2, 0.9]
-_CERT_HEADERS_ALL = ["", "EMPLOYEE", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS", "DOCUMENT"]
+_CERT_HEADER_SPECS_ALL: list[tuple[str, str | None]] = [
+    ("", None),
+    ("EMPLOYEE", "employee_name"),
+    ("TYPE", "cert_type"),
+    ("NUMBER", None),
+    ("ISSUING ORG", None),
+    ("ISSUED", None),
+    ("EXPIRES", None),
+    ("STATUS", "status"),
+    ("DOCUMENT", None),
+]
 _CERT_COLS_EMP = [0.35, 1.8, 1.6, 1.8, 1.2, 1.2, 1.2, 0.9]
-_CERT_HEADERS_EMP = ["", "TYPE", "NUMBER", "ISSUING ORG", "ISSUED", "EXPIRES", "STATUS", "DOCUMENT"]
+_CERT_HEADER_SPECS_EMP: list[tuple[str, str | None]] = [
+    ("", None),
+    ("TYPE", "cert_type"),
+    ("NUMBER", None),
+    ("ISSUING ORG", None),
+    ("ISSUED", None),
+    ("EXPIRES", None),
+    ("STATUS", "status"),
+    ("DOCUMENT", None),
+]
 
 
 def _cert_select_key(cert_id: str, *, prefix: str = "") -> str:
@@ -144,7 +186,7 @@ def _on_certification_checkbox_change(cert_id: str, all_cert_ids: list[str], *, 
         st.session_state[_show_detail_key(prefix=prefix)] = False
 
 
-def _filter_certs(rows: list[dict], *, q: str, status: str, cert_type: str) -> list[dict]:
+def _filter_certs(rows: list[dict], *, q: str, hide_employee: bool) -> list[dict]:
     out = rows
     if q:
         ql = q.lower()
@@ -156,11 +198,8 @@ def _filter_certs(rows: list[dict], *, q: str, status: str, cert_type: str) -> l
             or ql in str(c.get("employee_name", "")).lower()
             or ql in str(c.get("issuer", "")).lower()
         ]
-    if status and status != "All Statuses":
-        out = [c for c in out if str(c.get("status", "")) == status]
-    if cert_type and cert_type != "All Types":
-        out = [c for c in out if str(c.get("cert_type", "")) == cert_type]
-    return out
+    specs = _COLUMN_FILTER_SPECS_EMP if hide_employee else _COLUMN_FILTER_SPECS_ALL
+    return apply_column_filters(out, _TABLE_KEY, specs)
 
 
 def _current_profile() -> dict:
@@ -311,6 +350,7 @@ def _render_certifications_table(
     hide_employee: bool,
     table_wrap_key: str,
     session_prefix: str = "",
+    filter_options: dict[str, list[str]],
 ) -> list[str]:
     if not certifications:
         st.info("No certifications match your filters.")
@@ -323,18 +363,27 @@ def _render_certifications_table(
     st.session_state[_ALL_CERT_IDS_KEY] = all_cert_ids
 
     col_ratios = _CERT_COLS_EMP if hide_employee else _CERT_COLS_ALL
-    headers = _CERT_HEADERS_EMP if hide_employee else _CERT_HEADERS_ALL
+    header_specs = _CERT_HEADER_SPECS_EMP if hide_employee else _CERT_HEADER_SPECS_ALL
 
     with st.container(key=table_wrap_key):
         st.markdown('<div class="ips-certifications-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(col_ratios, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, headers):
+        for col, (label, field) in zip(header_cols, header_specs):
             with col:
-                st.markdown(
-                    f'<div class="ips-certifications-header-row ips-certifications-cell">{html.escape(label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-certifications-header-row ips-certifications-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-certifications-header-row ips-certifications-cell",
+                    )
 
         for cert in certifications:
             cid = str(cert.get("id") or "").strip()
@@ -625,12 +674,14 @@ def render_certifications_table_block(
     table_wrap_key: str = "certifications_table_wrap",
     session_prefix: str = "",
     inline_detail: bool = False,
+    filter_options: dict[str, list[str]] | None = None,
 ) -> list[str]:
     all_cert_ids = _render_certifications_table(
         certifications,
         hide_employee=hide_employee,
         table_wrap_key=table_wrap_key,
         session_prefix=session_prefix,
+        filter_options=filter_options or {},
     )
     if inline_detail:
         selected_certification_id = st.session_state.get(_selected_id_key(prefix=session_prefix))
@@ -760,7 +811,7 @@ def render() -> None:
         )
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 1, 1, 0.6])
+        c1, c2, c3 = st.columns([1.2, 5, 0.6])
         with c1:
             idx = filter_names.index(default_filter) if default_filter in filter_names else 0
             picked = st.selectbox(
@@ -782,24 +833,14 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c3:
-            st.selectbox(
-                "Status",
-                _STATUS_FILTERS,
-                key="cert_status_filter",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Type",
-                ["All Types", *CERTIFICATION_TYPES],
-                key="cert_type_filter",
-                label_visibility="collapsed",
-            )
-        with c5:
             if st.button("Clear", key="cert_clear", use_container_width=True):
-                st.session_state["cert_search"] = ""
-                st.session_state["cert_status_filter"] = "All Statuses"
-                st.session_state["cert_type_filter"] = "All Types"
+                eid_now = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
+                filter_fields = _FILTER_FIELDS_EMP if eid_now else _FILTER_FIELDS_ALL
+                clear_table_filters(
+                    _TABLE_KEY,
+                    filter_fields,
+                    extra_keys=["cert_search", "cert_emp_filter", ACTIVE_EMPLOYEE_KEY],
+                )
                 st.session_state["cert_emp_filter"] = "All Employees"
                 st.session_state[ACTIVE_EMPLOYEE_KEY] = ""
                 _clear_certification_selection(st.session_state.get(_ALL_CERT_IDS_KEY))
@@ -808,12 +849,14 @@ def render() -> None:
     layout_filter_bar(_filters)
 
     eid = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
+    hide_employee = bool(eid)
     scope = load_certifications(eid) if eid else all_certs
+    filter_specs = _COLUMN_FILTER_SPECS_EMP if hide_employee else _COLUMN_FILTER_SPECS_ALL
+    filter_options = build_filter_options(scope, filter_specs)
     filtered = _filter_certs(
         scope,
         q=str(st.session_state.get("cert_search") or "").strip(),
-        status=str(st.session_state.get("cert_status_filter") or "All Statuses"),
-        cert_type=str(st.session_state.get("cert_type_filter") or "All Types"),
+        hide_employee=hide_employee,
     )
 
     st.caption(f"{len(filtered)} certification(s)")
@@ -823,9 +866,10 @@ def render() -> None:
 
     all_cert_ids = render_certifications_table_block(
         filtered,
-        hide_employee=bool(eid),
+        hide_employee=hide_employee,
         table_wrap_key="certifications_table_wrap",
         inline_detail=False,
+        filter_options=filter_options,
     )
 
     selected_certification_id = st.session_state.get("selected_certification_id")

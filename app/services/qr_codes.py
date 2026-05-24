@@ -16,18 +16,23 @@ def generate_inventory_qr_token() -> str:
     return secrets.token_urlsafe(24)
 
 
-def inventory_qr_link_url(*, sku: str, qr_token: str, app_base_url: str) -> str:
+def inventory_qr_link_url(*, sku: str, qr_token: str, app_base_url: str, item_id: str = "") -> str:
     """
     Mobile inventory scan URL.
 
-    Format: ``{APP_BASE_URL}/?qr=inventory&sku={sku}&token={qr_token}``
+    Format: ``{APP_BASE_URL}/?scan=inventory&sku={sku}&token={qr_token}``
     """
     base = str(app_base_url or "").strip().rstrip("/")
     sku_q = quote(str(sku or "").strip(), safe="")
     token_q = quote(str(qr_token or "").strip(), safe="")
-    if not base or not sku_q or not token_q:
+    if not base or not token_q:
         return ""
-    return f"{base}/?qr=inventory&sku={sku_q}&token={token_q}"
+    if sku_q:
+        return f"{base}/?scan=inventory&sku={sku_q}&token={token_q}"
+    iid_q = quote(str(item_id or "").strip(), safe="")
+    if iid_q:
+        return f"{base}/?scan=inventory&item_id={iid_q}&token={token_q}"
+    return ""
 
 
 def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str, sku: str = "", qr_token: str = "") -> str:
