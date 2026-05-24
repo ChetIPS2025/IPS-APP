@@ -2766,8 +2766,8 @@ div[data-testid="stDialog"] [data-testid="stModalHeader"] h1 {{
   padding: 0 !important;
   border: none !important;
 }}
-div[data-testid="stDialog"] .stButton > button,
-div[data-testid="stDialog"] [data-testid="stButton"] > button {{
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) .stButton > button {{
   width: auto !important;
   min-width: 4.75rem !important;
   max-width: none !important;
@@ -2824,8 +2824,8 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) div[data-testid="stTa
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stTabContent"] {{
   padding-top: 0.55rem !important;
 }}
-div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .stButton > button,
-div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stButton"] > button {{
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) [data-testid="stButton"] > button,
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]) .stButton > button {{
   height: 36px !important;
   min-height: 36px !important;
   padding: 0 16px !important;
@@ -3122,51 +3122,167 @@ def inject_action_colors_css() -> None:
     """Shared destructive buttons and semantic status pill colors."""
     st.markdown(
         """
-<style id="ips-action-colors-v2">
-/* ----- Destructive action buttons (Streamlit container keys + class hooks) ----- */
-.ips-danger-outline button,
-button.ips-danger-outline,
-div[data-testid="stButton"] button.ips-danger-outline,
-[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button {
+<style id="ips-action-colors-v4">
+/* ----- Destructive buttons (st-key on widget wrapper) ----- */
+[class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
+[class*="st-key-ips_dng_o_"] .stButton > button,
+[class*="st-key-ips_dng_o_"][data-testid="stButton"] > button,
+.stButton[class*="st-key-ips_dng_o_"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"] > .stButton > button {
     background: #ffffff !important;
     color: #dc2626 !important;
     border: 1px solid #dc2626 !important;
     border-radius: 10px !important;
     font-weight: 700 !important;
     transition: all 0.15s ease;
+    width: 100% !important;
+    max-width: none !important;
 }
-.ips-danger-outline button:hover,
-button.ips-danger-outline:hover,
-div[data-testid="stButton"] button.ips-danger-outline:hover,
-[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:hover {
+[class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-ips_dng_o_"] .stButton > button:hover,
+[class*="st-key-ips_dng_o_"][data-testid="stButton"] > button:hover,
+.stButton[class*="st-key-ips_dng_o_"] > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button:hover {
     background: #fee2e2 !important;
     color: #b91c1c !important;
     border-color: #b91c1c !important;
 }
-.ips-danger-outline button:disabled,
-[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:disabled {
+[class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button:disabled,
+[class*="st-key-ips_dng_o_"] .stButton > button:disabled,
+[class*="st-key-ips_dng_o_"][data-testid="stButton"] > button:disabled {
     opacity: 0.55 !important;
     cursor: not-allowed !important;
 }
 
-.ips-danger-solid button,
-button.ips-danger-solid,
-div[data-testid="stButton"] button.ips-danger-solid,
-[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button {
+[class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+[class*="st-key-ips_dng_s_"] .stButton > button,
+[class*="st-key-ips_dng_s_"][data-testid="stButton"] > button,
+.stButton[class*="st-key-ips_dng_s_"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] > .stButton > button {
     background: #dc2626 !important;
     color: #ffffff !important;
     border: 1px solid #dc2626 !important;
     border-radius: 10px !important;
     font-weight: 800 !important;
     transition: all 0.15s ease;
+    width: 100% !important;
+    max-width: none !important;
 }
-.ips-danger-solid button:hover,
-button.ips-danger-solid:hover,
-div[data-testid="stButton"] button.ips-danger-solid:hover,
-[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button:hover {
+[class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-ips_dng_s_"] .stButton > button:hover,
+[class*="st-key-ips_dng_s_"][data-testid="stButton"] > button:hover,
+.stButton[class*="st-key-ips_dng_s_"] > button:hover,
+div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button:hover {
     background: #b91c1c !important;
     border-color: #b91c1c !important;
     color: #ffffff !important;
+}
+
+/* Legacy container-key wrappers */
+[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button,
+[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button {
+    background: #ffffff !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+}
+[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+}
+
+/* st.dialog — full-width red destructive buttons */
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"][data-testid="stButton"] > button,
+div[data-testid="stDialog"] .stButton[class*="st-key-ips_dng_o_"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"] > .stButton > button {
+    background: #ffffff !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"] .stButton > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_o_"][data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] .stButton[class*="st-key-ips_dng_o_"] > button:hover {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    border-color: #b91c1c !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"][data-testid="stButton"] > button,
+div[data-testid="stDialog"] .stButton[class*="st-key-ips_dng_s_"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] > .stButton > button {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+}
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"] .stButton > button:hover,
+div[data-testid="stDialog"] [class*="st-key-ips_dng_s_"][data-testid="stButton"] > button:hover,
+div[data-testid="stDialog"] .stButton[class*="st-key-ips_dng_s_"] > button:hover {
+    background: #b91c1c !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
+}
+
+/* Danger zone card in modals */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) {
+    border-color: #fecaca !important;
+    background: #fffbfb !important;
+    border-radius: 12px !important;
+    padding: 0.65rem 0.75rem 0.75rem !important;
+    margin: 0.65rem 0 0.75rem !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) [data-testid="stVerticalBlock"] {
+    gap: 0.45rem !important;
+}
+.ips-modal-danger-zone-marker {
+    display: none !important;
+}
+.ips-modal-danger-zone-title {
+    margin: 0 0 0.55rem 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #991b1b;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) [class*="st-key-ips_dng_o_"] [data-testid="stElementContainer"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) [class*="st-key-ips_dng_o_"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) div[data-testid="stElementContainer"][class*="st-key-ips_dng_o_"],
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) div[data-testid="stElementContainer"][class*="st-key-ips_dng_s_"] {
+    margin-bottom: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+div[data-testid="stDialog"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) [data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] {
+    width: 100% !important;
+    max-width: none !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marker) hr {
+    display: none !important;
 }
 
 /* ----- Semantic status pills ----- */
@@ -3233,41 +3349,6 @@ div[data-testid="stButton"] button.ips-danger-solid:hover,
     background: #fed7aa;
     color: #9a3412;
     border: 1px solid #fdba74;
-}
-
-.ips-modal-delete-actions,
-.ips-modal-delete-confirm {
-    margin: 0.35rem 0 0.5rem;
-}
-
-/* st.dialog resets all buttons to gray — need higher specificity for danger actions */
-div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button,
-div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] .stButton > button {
-    background: #ffffff !important;
-    color: #dc2626 !important;
-    border: 1px solid #dc2626 !important;
-    border-radius: 10px !important;
-    font-weight: 700 !important;
-}
-div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:hover,
-div[data-testid="stDialog"] [class*="st-key-ips_danger_outline_"] .stButton > button:hover {
-    background: #fee2e2 !important;
-    color: #b91c1c !important;
-    border-color: #b91c1c !important;
-}
-div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button,
-div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] .stButton > button {
-    background: #dc2626 !important;
-    color: #ffffff !important;
-    border: 1px solid #dc2626 !important;
-    border-radius: 10px !important;
-    font-weight: 800 !important;
-}
-div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button:hover,
-div[data-testid="stDialog"] [class*="st-key-ips_danger_solid_"] .stButton > button:hover {
-    background: #b91c1c !important;
-    border-color: #b91c1c !important;
-    color: #ffffff !important;
 }
 </style>
 """,

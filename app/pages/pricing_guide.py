@@ -9,8 +9,8 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.components.action_styles import danger_outline
-    from app.components.modal_delete import render_modal_delete_panel
+    from app.components.action_styles import danger_outline_button
+    from app.components.modal_delete import modal_danger_zone, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -63,8 +63,8 @@ try:
     from app.utils.formatting import fmt_currency
 except ImportError:
     from auth import current_role  # type: ignore
-    from components.action_styles import danger_outline  # type: ignore
-    from components.modal_delete import render_modal_delete_panel  # type: ignore
+    from components.action_styles import danger_outline_button  # type: ignore
+    from components.modal_delete import modal_danger_zone, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -645,15 +645,10 @@ def _render_pricing_actions_panel(row: dict) -> None:
         return
 
     can_mutate = _can_manage_pricing()
-    st.markdown("---")
-    st.caption("Danger zone")
-
-    with danger_outline(f"pg_deactivate_{rk}"):
-        if st.button(
+    with modal_danger_zone():
+        if danger_outline_button(
             "Deactivate Item",
-            key=f"pg_deactivate_{rk}",
-            type="secondary",
-            use_container_width=True,
+            f"pg_deactivate_{rk}",
             disabled=not can_mutate,
             help="Marks this pricing item inactive.",
         ):
@@ -673,23 +668,23 @@ def _render_pricing_actions_panel(row: dict) -> None:
                 st.rerun()
             st.error(result.error or "Could not deactivate pricing item.")
 
-    def _delete_item() -> None:
-        ok, msg = delete_pricing_item(rid)
-        if ok:
-            _clear_modal()
-            st.success(msg or "Pricing item deleted.")
-            st.rerun()
-        st.error(msg or "Could not delete pricing item.")
+        def _delete_item() -> None:
+            ok, msg = delete_pricing_item(rid)
+            if ok:
+                _clear_modal()
+                st.success(msg or "Pricing item deleted.")
+                st.rerun()
+            st.error(msg or "Could not delete pricing item.")
 
-    render_modal_delete_panel(
-        prefix=f"pg_del_{rk}",
-        delete_label="Delete Item",
-        confirm_message="Delete this pricing guide item permanently? This cannot be undone.",
-        confirm_label="Confirm Delete",
-        can_delete=can_mutate,
-        disabled_reason="Only admin, manager, or supervisor can delete pricing items.",
-        on_confirm=_delete_item,
-    )
+        render_modal_delete_panel(
+            prefix=f"pg_del_{rk}",
+            delete_label="Delete Item",
+            confirm_message="Delete this pricing guide item permanently? This cannot be undone.",
+            confirm_label="Confirm Delete",
+            can_delete=can_mutate,
+            disabled_reason="Only admin, manager, or supervisor can delete pricing items.",
+            on_confirm=_delete_item,
+        )
 
 
 @st.dialog("Pricing Guide Item", width="large", on_dismiss=_clear_modal)

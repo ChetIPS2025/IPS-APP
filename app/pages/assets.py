@@ -8,8 +8,8 @@ import html
 import streamlit as st
 
 try:
-    from app.components.action_styles import danger_outline
-    from app.components.modal_delete import can_admin_mutate, render_modal_delete_panel
+    from app.components.action_styles import danger_outline_button
+    from app.components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -66,8 +66,8 @@ try:
     from app.services.asset_kits_service import asset_is_kit, kit_item_names_by_parent
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
 except ImportError:
-    from components.action_styles import danger_outline  # type: ignore
-    from components.modal_delete import can_admin_mutate, render_modal_delete_panel  # type: ignore
+    from components.action_styles import danger_outline_button  # type: ignore
+    from components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -1043,15 +1043,10 @@ def _render_asset_actions_panel(asset: dict) -> None:
         return
 
     can_mutate = can_admin_mutate()
-    st.markdown("---")
-    st.caption("Danger zone")
-
-    with danger_outline(f"asset_retire_{rk}"):
-        if st.button(
+    with modal_danger_zone():
+        if danger_outline_button(
             "Retire Asset",
-            key=f"asset_retire_{rk}",
-            type="secondary",
-            use_container_width=True,
+            f"asset_retire_{rk}",
             disabled=not can_mutate,
             help="Sets asset status to Retired.",
         ):
@@ -1067,32 +1062,32 @@ def _render_asset_actions_panel(asset: dict) -> None:
                 st.rerun()
             st.error(result.error or "Could not retire asset.")
 
-    def _delete_asset() -> None:
-        try:
-            from app.services.asset_service import delete_asset_and_related
-        except ImportError:
-            from services.asset_service import delete_asset_and_related  # type: ignore
-        try:
-            delete_asset_and_related(aid)
-            clear_assets_cache()
-            _clear_assets_detail_modal()
-            st.success("Asset deleted.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Could not delete asset: {exc}")
+        def _delete_asset() -> None:
+            try:
+                from app.services.asset_service import delete_asset_and_related
+            except ImportError:
+                from services.asset_service import delete_asset_and_related  # type: ignore
+            try:
+                delete_asset_and_related(aid)
+                clear_assets_cache()
+                _clear_assets_detail_modal()
+                st.success("Asset deleted.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not delete asset: {exc}")
 
-    render_modal_delete_panel(
-        prefix=f"asset_del_{rk}",
-        delete_label="Delete Asset",
-        confirm_message=(
-            "Delete this asset permanently? Related documents, photos, maintenance, "
-            "and inspection records will also be removed."
-        ),
-        confirm_label="Confirm Delete",
-        can_delete=can_mutate,
-        disabled_reason="Only admin, manager, or supervisor can delete assets.",
-        on_confirm=_delete_asset,
-    )
+        render_modal_delete_panel(
+            prefix=f"asset_del_{rk}",
+            delete_label="Delete Asset",
+            confirm_message=(
+                "Delete this asset permanently? Related documents, photos, maintenance, "
+                "and inspection records will also be removed."
+            ),
+            confirm_label="Confirm Delete",
+            can_delete=can_mutate,
+            disabled_reason="Only admin, manager, or supervisor can delete assets.",
+            on_confirm=_delete_asset,
+        )
 
 
 def render_asset_detail_dialog(asset: dict) -> None:

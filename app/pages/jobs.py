@@ -8,8 +8,8 @@ from datetime import date
 import streamlit as st
 
 try:
-    from app.components.action_styles import danger_outline
-    from app.components.modal_delete import can_admin_mutate, render_modal_delete_panel
+    from app.components.action_styles import danger_outline_button
+    from app.components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -37,8 +37,8 @@ try:
     from app.services.inventory_service import get_inventory_transactions
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
-    from components.action_styles import danger_outline  # type: ignore
-    from components.modal_delete import can_admin_mutate, render_modal_delete_panel  # type: ignore
+    from components.action_styles import danger_outline_button  # type: ignore
+    from components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -881,59 +881,51 @@ def _render_job_actions_panel(job: dict) -> None:
         return
 
     can_mutate = can_admin_mutate()
-    st.markdown("---")
-    st.caption("Danger zone")
-    st.markdown('<span class="ips-modal-danger-zone" aria-hidden="true"></span>', unsafe_allow_html=True)
+    with modal_danger_zone():
+        if danger_outline_button(
+            "Cancel Job",
+            f"job_cancel_{job_key}",
+            disabled=not can_mutate,
+            help="Sets job status to Cancelled.",
+        ):
+            try:
+                from app.services.repository import update_row
+            except ImportError:
+                from services.repository import update_row  # type: ignore
+            result = update_row("jobs", {"status": "Cancelled"}, {"id": jid})
+            if result.ok:
+                _clear_jobs_detail_modal()
+                st.success("Job cancelled.")
+                st.rerun()
+            st.error(result.error or "Could not cancel job.")
 
-    c1, _c2 = st.columns([1, 1], gap="small")
-    with c1:
-        with danger_outline(f"job_cancel_{job_key}"):
-            if st.button(
-                "Cancel Job",
-                key=f"job_cancel_{job_key}",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_mutate,
-                help="Sets job status to Cancelled.",
-            ):
-                try:
-                    from app.services.repository import update_row
-                except ImportError:
-                    from services.repository import update_row  # type: ignore
-                result = update_row("jobs", {"status": "Cancelled"}, {"id": jid})
-                if result.ok:
-                    _clear_jobs_detail_modal()
-                    st.success("Job cancelled.")
-                    st.rerun()
-                st.error(result.error or "Could not cancel job.")
+        def _delete_job() -> None:
+            try:
+                from app.services.delete_safety import delete_job_row_if_no_costing
+            except ImportError:
+                from services.delete_safety import delete_job_row_if_no_costing  # type: ignore
+            try:
+                delete_job_row_if_no_costing(jid)
+                _clear_jobs_detail_modal()
+                st.success("Job deleted.")
+                st.rerun()
+            except RuntimeError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error(f"Could not delete job: {exc}")
 
-    def _delete_job() -> None:
-        try:
-            from app.services.delete_safety import delete_job_row_if_no_costing
-        except ImportError:
-            from services.delete_safety import delete_job_row_if_no_costing  # type: ignore
-        try:
-            delete_job_row_if_no_costing(jid)
-            _clear_jobs_detail_modal()
-            st.success("Job deleted.")
-            st.rerun()
-        except RuntimeError as exc:
-            st.error(str(exc))
-        except Exception as exc:
-            st.error(f"Could not delete job: {exc}")
-
-    render_modal_delete_panel(
-        prefix=f"job_del_{job_key}",
-        delete_label="Delete Job",
-        confirm_message=(
-            "Delete this job permanently? Jobs with labor, materials, equipment, "
-            "or PO expenses cannot be deleted."
-        ),
-        confirm_label="Confirm Delete",
-        can_delete=can_mutate,
-        disabled_reason="Only admin, manager, or supervisor can delete jobs.",
-        on_confirm=_delete_job,
-    )
+        render_modal_delete_panel(
+            prefix=f"job_del_{job_key}",
+            delete_label="Delete Job",
+            confirm_message=(
+                "Delete this job permanently? Jobs with labor, materials, equipment, "
+                "or PO expenses cannot be deleted."
+            ),
+            confirm_label="Confirm Delete",
+            can_delete=can_mutate,
+            disabled_reason="Only admin, manager, or supervisor can delete jobs.",
+            on_confirm=_delete_job,
+        )
 
 
 def render_job_detail_dialog(job: dict) -> None:

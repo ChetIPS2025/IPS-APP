@@ -8,8 +8,8 @@ import html
 import streamlit as st
 
 try:
-    from app.components.action_styles import danger_outline
-    from app.components.modal_delete import can_admin_mutate, render_modal_delete_panel
+    from app.components.action_styles import danger_outline_button
+    from app.components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -60,8 +60,8 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
-    from components.action_styles import danger_outline  # type: ignore
-    from components.modal_delete import can_admin_mutate, render_modal_delete_panel  # type: ignore
+    from components.action_styles import danger_outline_button  # type: ignore
+    from components.modal_delete import can_admin_mutate, modal_danger_zone, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -788,15 +788,10 @@ def _render_inventory_actions_panel(item: dict) -> None:
         return
 
     can_mutate = can_admin_mutate()
-    st.markdown("---")
-    st.caption("Danger zone")
-
-    with danger_outline(f"inv_deactivate_{record_key}"):
-        if st.button(
+    with modal_danger_zone():
+        if danger_outline_button(
             "Deactivate Item",
-            key=f"inv_deactivate_{record_key}",
-            type="secondary",
-            use_container_width=True,
+            f"inv_deactivate_{record_key}",
             disabled=not can_mutate,
             help="Sets status to Discontinued.",
         ):
@@ -812,24 +807,24 @@ def _render_inventory_actions_panel(item: dict) -> None:
                 st.rerun()
             st.error(result.error or "Could not deactivate item.")
 
-    def _delete_item() -> None:
-        result = delete_inventory_item(iid)
-        if result.ok:
-            clear_inventory_cache()
-            _clear_inventory_modal()
-            st.success("Inventory item deleted.")
-            st.rerun()
-        st.error(result.error or "Could not delete item.")
+        def _delete_item() -> None:
+            result = delete_inventory_item(iid)
+            if result.ok:
+                clear_inventory_cache()
+                _clear_inventory_modal()
+                st.success("Inventory item deleted.")
+                st.rerun()
+            st.error(result.error or "Could not delete item.")
 
-    render_modal_delete_panel(
-        prefix=f"inv_del_{record_key}",
-        delete_label="Delete Inventory Item",
-        confirm_message="Delete this inventory item permanently? This cannot be undone.",
-        confirm_label="Confirm Delete",
-        can_delete=can_mutate,
-        disabled_reason="Only admin, manager, or supervisor can delete inventory items.",
-        on_confirm=_delete_item,
-    )
+        render_modal_delete_panel(
+            prefix=f"inv_del_{record_key}",
+            delete_label="Delete Inventory Item",
+            confirm_message="Delete this inventory item permanently? This cannot be undone.",
+            confirm_label="Confirm Delete",
+            can_delete=can_mutate,
+            disabled_reason="Only admin, manager, or supervisor can delete inventory items.",
+            on_confirm=_delete_item,
+        )
 
 
 def render_inventory_detail_dialog(item: dict) -> None:
