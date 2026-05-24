@@ -10,9 +10,14 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_filters import (
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -34,21 +39,25 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
-    from app.components.status import status_pill_html
     from app.components.tabs import render_tabs
     from app.db import fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimate_materials_catalog import clear_estimate_materials_catalog_cache
+    from app.styles import inject_pricing_guide_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
     from auth import current_role  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_filters import (  # type: ignore
+        apply_column_filters,
+        build_filter_options,
+        clear_table_filters,
+        render_table_header_cell,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -70,15 +79,14 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
-        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
-    from components.status import status_pill_html  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from db import fetch_table, fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.estimate_materials_catalog import clear_estimate_materials_catalog_cache  # type: ignore
+    from styles import inject_pricing_guide_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
 _SEL = select_key("pricing_guide")
@@ -86,6 +94,27 @@ _MODULE = "pricing_guide"
 _TABLE_KEY = "pg_list"
 _MODAL_KEY = "ips_pg_detail_modal_id"
 _CACHE_KEY = "_ips_pg_modal_by_id"
+SELECTED_PG_KEY = "selected_pricing_guide_id"
+SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
+_ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
+_PG_COLS = [0.35, 4.35, 1.8, 0.9, 1.2, 1.0, 1.3, 1.8, 1.0]
+_PG_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("ITEM", None),
+    ("CATEGORY", "category"),
+    ("UNIT", None),
+    ("DEFAULT COST", None),
+    ("MARKUP %", None),
+    ("CUSTOMER PRICE", None),
+    ("VENDOR", "vendor"),
+    ("STATUS", "status"),
+]
+_FILTER_FIELDS = ["category", "vendor", "status"]
+_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
+    ("category", lambda r: str(r.get("category") or "—")),
+    ("vendor", lambda r: str(r.get("vendor") or "—")),
+    ("status", lambda r: str(r.get("status") or "Active")),
+]
 _DETAIL_TABS = (
     "Overview",
     "Pricing",
@@ -145,6 +174,9 @@ def _load_rows() -> list[dict[str, Any]]:
 
 
 def _clear_modal() -> None:
+    row_ids = st.session_state.get(_ALL_PG_IDS_KEY) or []
+    _clear_pg_selection([str(rid) for rid in row_ids])
+    clear_edit_modes(_MODULE)
     clear_record_modal(
         table_key=_TABLE_KEY,
         session_select_key=_SEL,
@@ -154,14 +186,184 @@ def _clear_modal() -> None:
 
 
 def _open_modal(row_id: str, row: dict | None = None) -> None:
+    rid = str(row_id or "").strip()
+    if not rid:
+        return
+    st.session_state[SELECTED_PG_KEY] = rid
+    st.session_state[SHOW_PG_MODAL_KEY] = True
     open_record_modal(
-        row_id,
+        rid,
         row,
         session_select_key=_SEL,
         modal_key=_MODAL_KEY,
         module=_MODULE,
         id_fields=("id",),
     )
+
+
+def _pg_select_key(row_id: str) -> str:
+    return f"pg_select_{row_id}"
+
+
+def _clear_pg_selection(row_ids: list[str] | None = None) -> None:
+    st.session_state[SELECTED_PG_KEY] = None
+    st.session_state[SHOW_PG_MODAL_KEY] = False
+    ids = list(row_ids or [])
+    for rid in ids:
+        st.session_state[_pg_select_key(rid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("pg_select_"):
+            st.session_state[key] = False
+
+
+def _on_pg_checkbox_change(row_id: str, all_row_ids: list[str]) -> None:
+    key = _pg_select_key(row_id)
+    if st.session_state.get(key):
+        for rid in all_row_ids:
+            if rid != row_id:
+                st.session_state[_pg_select_key(rid)] = False
+        st.session_state[SELECTED_PG_KEY] = row_id
+        st.session_state[SHOW_PG_MODAL_KEY] = True
+        cache = st.session_state.get(_CACHE_KEY) or {}
+        row = cache.get(row_id) if isinstance(cache, dict) else None
+        _open_modal(row_id, row)
+    elif st.session_state.get(SELECTED_PG_KEY) == row_id:
+        st.session_state[SELECTED_PG_KEY] = None
+        st.session_state[SHOW_PG_MODAL_KEY] = False
+
+
+def _pg_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Active": "ips-pg-status-active",
+        "Inactive": "ips-pg-status-inactive",
+    }
+    cls = cls_map.get(status, "ips-pg-status-active")
+    return f'<span class="ips-pg-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _render_custom_pricing_guide_table(
+    filtered: list[dict[str, Any]],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
+    if not filtered:
+        st.info("No pricing guide items match your filters.")
+        st.session_state[_ALL_PG_IDS_KEY] = []
+        return []
+
+    all_row_ids = [str(r.get("id") or "").strip() for r in filtered if str(r.get("id") or "").strip()]
+    st.session_state[_ALL_PG_IDS_KEY] = all_row_ids
+
+    with st.container(key="pricing_guide_table_wrap"):
+        st.markdown('<div class="ips-pg-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_PG_COLS, gap="small", vertical_alignment="center")
+        for col, (label, field) in zip(header_cols, _PG_HEADER_SPECS):
+            with col:
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-pg-header-row ips-pg-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-pg-header-row ips-pg-cell",
+                    )
+
+        for row in filtered:
+            rid = str(row.get("id") or "").strip()
+            if not rid:
+                continue
+
+            item = str(row.get("item") or "—")
+            category = str(row.get("category") or "—")
+            unit = str(row.get("unit") or "—")
+            default_cost = fmt_currency(row.get("default_cost"))
+            markup = f"{float(row.get('markup_pct') or 0):.1f}%"
+            customer_price = fmt_currency(row.get("customer_price"))
+            vendor = str(row.get("vendor") or "—")
+            status = str(row.get("status") or "Active")
+
+            cols = st.columns(_PG_COLS, gap="small", vertical_alignment="center")
+
+            with cols[0]:
+                st.checkbox(
+                    "",
+                    key=_pg_select_key(rid),
+                    label_visibility="collapsed",
+                    on_change=_on_pg_checkbox_change,
+                    args=(rid, all_row_ids),
+                )
+
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-pg-title">{html.escape(item)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-pg-cell">{html.escape(category)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-pg-muted ips-pg-cell">{html.escape(unit)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(default_cost)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[5]:
+                st.markdown(
+                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(markup)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(customer_price)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[7]:
+                st.markdown(
+                    f'<div class="ips-pg-muted ips-pg-cell">{html.escape(vendor)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[8]:
+                st.markdown(_pg_status_pill_html(status), unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    return all_row_ids
+
+
+def _filter_rows(rows: list[dict[str, Any]], *, q: str) -> list[dict[str, Any]]:
+    out = rows
+    if q:
+        ql = q.lower()
+        out = [
+            r
+            for r in out
+            if ql in str(r.get("item") or "").lower()
+            or ql in str(r.get("item_key") or "").lower()
+            or ql in str(r.get("category") or "").lower()
+            or ql in str(r.get("vendor") or "").lower()
+            or ql in str(r.get("unit") or "").lower()
+            or ql in str(r.get("status") or "").lower()
+        ]
+    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
 def _persist_row(data: dict[str, Any], row_id: str | None = None) -> tuple[bool, str]:
@@ -195,17 +397,6 @@ def _persist_row(data: dict[str, Any], row_id: str | None = None) -> tuple[bool,
         return True, "Saved."
     except Exception as exc:
         return False, str(exc)
-
-
-def _cell(field: str, row: dict[str, Any]) -> str:
-    if field in ("default_cost", "customer_price"):
-        return html.escape(fmt_currency(row.get(field)))
-    if field == "markup_pct":
-        return html.escape(f"{float(row.get(field) or 0):.1f}%")
-    if field == "status":
-        return status_pill_html(str(row.get("status") or ""))
-    val = row.get(field)
-    return html.escape(str(val).strip() if val is not None and str(val).strip() else "—")
 
 
 def _render_item_tabs(row: dict[str, Any]) -> None:
@@ -355,23 +546,24 @@ def render() -> None:
     if not begin_module("pricing_guide"):
         return
 
-    render_page_header(
-        "Pricing Guide",
-        "Manage default material costs, vendors, units, and markup rates for estimating.",
+    inject_pricing_guide_module_css()
+    st.markdown(
+        '<span class="ips-pricing-guide-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
     )
 
     rows = _load_rows()
-    build_modal_cache(rows, cache_key=_CACHE_KEY)
+    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
-    def _filters() -> None:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.text_input("Search", placeholder="Search pricing items…", key="pg_search", label_visibility="collapsed")
-        with c2:
-            if st.button("+ New Pricing Item", key="pg_add", type="primary", use_container_width=True):
-                st.session_state["pg_add_form"] = True
-
-    layout_filter_bar(_filters)
+    act_l, act_r = st.columns([3, 1])
+    with act_l:
+        render_page_header(
+            "Pricing Guide",
+            "Manage default material costs, vendors, units, and markup rates for estimating.",
+        )
+    with act_r:
+        if st.button("+ New Pricing Item", key="pg_add", type="primary", use_container_width=True):
+            st.session_state["pg_add_form"] = True
 
     if st.session_state.get("pg_add_form"):
         with st.expander("Add Pricing Guide Item", expanded=True):
@@ -398,38 +590,37 @@ def render() -> None:
                 if apply_persist_feedback(ok, msg, clear_keys=("pg_add_form",)):
                     st.rerun()
 
-    q = str(st.session_state.get("pg_search") or "").strip().lower()
-    filtered = rows
-    if q:
-        filtered = [
-            r
-            for r in rows
-            if q in str(r.get("item") or "").lower()
-            or q in str(r.get("item_key") or "").lower()
-            or q in str(r.get("category") or "").lower()
-            or q in str(r.get("vendor") or "").lower()
-        ]
+    def _filters() -> None:
+        c1, c2 = st.columns([5, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search pricing items…",
+                key="pg_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="pg_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["pg_search"],
+                )
+                _clear_pg_selection(st.session_state.get(_ALL_PG_IDS_KEY))
+                st.rerun()
 
-    columns = [
-        ("item", "Item"),
-        ("category", "Category"),
-        ("unit", "Unit"),
-        ("default_cost", "Default Cost"),
-        ("markup_pct", "Markup %"),
-        ("customer_price", "Customer Price"),
-        ("vendor", "Vendor"),
-        ("status", "Status"),
-    ]
+    layout_filter_bar(_filters)
 
-    render_clickable_table(
-        filtered,
-        columns,
-        _TABLE_KEY,
-        row_id_key="id",
-        session_select_key=_SEL,
-        format_cell=_cell,
-        click_caption="Click a row to open pricing guide item details.",
-        on_row_selected=_open_modal,
+    filtered = _filter_rows(
+        rows,
+        q=str(st.session_state.get("pg_search") or "").strip(),
     )
 
-    show_modal_if_pending(_MODAL_KEY, _show_detail_modal)
+    st.caption(f"{len(filtered)} item(s)")
+
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+    _render_custom_pricing_guide_table(filtered, filter_options=filter_options)
+
+    selected_id = st.session_state.get(SELECTED_PG_KEY)
+    if selected_id and st.session_state.get(SHOW_PG_MODAL_KEY):
+        _show_detail_modal()

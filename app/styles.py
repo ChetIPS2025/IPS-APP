@@ -1700,6 +1700,119 @@ def inject_inventory_module_css() -> None:
     )
 
 
+def inject_pricing_guide_module_css() -> None:
+    """Pricing Guide list custom table styling (matches Inventory table)."""
+    st.markdown(
+        f"""
+<style id="ips-pricing-guide-module-v1">
+.ips-pg-table-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}}
+.ips-pg-header-row {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}}
+.ips-pg-cell {{
+  color: {TEXT};
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  min-width: 0;
+}}
+.ips-pg-title {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.ips-pg-muted {{
+  font-size: 13px;
+  color: #64748b;
+  word-break: break-word;
+}}
+.ips-pg-money {{
+  text-align: right;
+  white-space: nowrap;
+}}
+.ips-pg-status-pill {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}}
+.ips-pg-status-active {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-pg-status-inactive {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 62px;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stMarkdownContainer"],
+.st-key-pricing_guide_table_wrap .stMarkdown,
+.st-key-pricing_guide_table_wrap .stMarkdown p {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stCheckbox"] label {{
+  min-height: 24px !important;
+  margin: 0 !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_inventory_qr_scan_css() -> None:
     """Mobile inventory QR scan page."""
     st.markdown(
@@ -1794,6 +1907,7 @@ def inject_table_header_filter_css() -> None:
 .st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-tasks_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-company_updates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
@@ -1912,7 +2026,7 @@ def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-assets-module-v1">
+<style id="ips-assets-module-v2">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2013,13 +2127,35 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+}}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100%;
+  justify-content: center !important;
+}}
+.st-key-assets_table_wrap [data-testid="stMarkdownContainer"],
+.st-key-assets_table_wrap .stMarkdown,
+.st-key-assets_table_wrap .stMarkdown p {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-assets_table_wrap .stMarkdown p:has(.ips-asset-thumb-cell) {{
+  line-height: 0 !important;
+}}
 .ips-asset-thumb-cell {{
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 46px;
+  width: 42px;
+  height: 42px;
+  vertical-align: middle;
+  flex-shrink: 0;
 }}
 .ips-asset-thumb-img {{
+  display: block;
   width: 42px !important;
   height: 42px !important;
   object-fit: cover;
@@ -2028,17 +2164,18 @@ def inject_assets_module_css() -> None:
   background: #ffffff;
 }}
 .ips-asset-thumb-placeholder {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 42px;
   height: 42px;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
   color: #94a3b8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
 }}
 .ips-asset-detail-image {{
   max-width: 300px;
@@ -2069,7 +2206,9 @@ def inject_assets_module_css() -> None:
   background: #eaf2ff !important;
 }}
 .st-key-assets_table_wrap [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
   margin-bottom: 0 !important;
+  padding-top: 0 !important;
   padding-bottom: 0 !important;
 }}
 .st-key-assets_table_wrap [data-testid="stCheckbox"] {{

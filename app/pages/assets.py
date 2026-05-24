@@ -260,18 +260,18 @@ def _render_asset_thumbnail(asset: dict) -> None:
     if image_url:
         st.markdown(
             (
-                f'<div class="ips-asset-thumb-cell">'
+                f'<span class="ips-asset-thumb-cell">'
                 f'<img class="ips-asset-thumb-img" src="{html.escape(image_url, quote=True)}" '
                 f'alt="Asset image" />'
-                f"</div>"
+                f"</span>"
             ),
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div class="ips-asset-thumb-cell">'
-            '<div class="ips-asset-thumb-placeholder">—</div>'
-            "</div>",
+            '<span class="ips-asset-thumb-cell">'
+            '<span class="ips-asset-thumb-placeholder">—</span>'
+            "</span>",
             unsafe_allow_html=True,
         )
 
