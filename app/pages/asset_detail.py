@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from app.components.action_styles import danger_outline, danger_solid
     from app.asset_responsive import inject_asset_workflow_mobile_css
     from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected
     from app.auth import current_profile, current_role
@@ -41,6 +42,7 @@ try:
     from app.services.job_service import job_row_select_label
     from app.ui import IPS_NAV_PENDING_KEY
 except ImportError:
+    from components.action_styles import danger_outline, danger_solid  # type: ignore
     from asset_responsive import inject_asset_workflow_mobile_css  # type: ignore
     from mobile_ui import IPS_VIEWPORT_NARROW_KEY, ensure_narrow_viewport_detected  # type: ignore
     from auth import current_profile, current_role  # type: ignore
@@ -1302,13 +1304,14 @@ def _render_tool_trailer_kit(
                         st.success("Saved.")
                         st.rerun()
                 with b2:
-                    if st.button("Delete item", type="secondary", use_container_width=True, key=f"kit_e_del_{kid}"):
-                        delete_asset_and_related  # keep linter quiet about imported symbol in file scope
-                        try:
-                            from app.db import delete_rows_admin as _del_admin
-                        except ImportError:
-                            from db import delete_rows_admin as _del_admin  # type: ignore
-                        _del_admin("asset_kit_items", {"id": kid})
+                    with danger_outline(f"kit_e_del_{kid}"):
+                        if st.button("Delete item", type="secondary", use_container_width=True, key=f"kit_e_del_{kid}"):
+                            delete_asset_and_related  # keep linter quiet about imported symbol in file scope
+                            try:
+                                from app.db import delete_rows_admin as _del_admin
+                            except ImportError:
+                                from db import delete_rows_admin as _del_admin  # type: ignore
+                            _del_admin("asset_kit_items", {"id": kid})
                         st.success("Deleted.")
                         st.rerun()
 
@@ -1562,8 +1565,9 @@ def render() -> None:
                     if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
                         st.session_state["asset_detail_action"] = "doc"
                 with ed2:
-                    if st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True):
-                        st.session_state["asset_detail_action"] = "delete"
+                    with danger_outline(f"ad_del_{aid}"):
+                        if st.button("Delete asset", key=f"ad_del_{aid}", use_container_width=True):
+                            st.session_state["asset_detail_action"] = "delete"
             else:
                 if st.button("Upload document", key=f"ad_doc_{aid}", use_container_width=True):
                     st.session_state["asset_detail_action"] = "doc"
@@ -1908,18 +1912,19 @@ def render() -> None:
                     key=f"del_confirm_{aid}",
                 )
                 aid_str = str(asset.get("asset_id") or "")
-                if st.button(
-                    "Permanently delete",
-                    key=f"del_go_{aid}",
-                    disabled=del_confirm.strip() != aid_str,
-                    use_container_width=True,
-                ):
-                    delete_asset_and_related(str(asset["id"]))
-                    st.session_state.pop("asset_detail_id", None)
-                    st.session_state.pop("asset_detail_action", None)
-                    st.session_state["asset_detail_flash"] = f"Deleted asset {aid_str}."
-                    st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
-                    st.session_state["_asset_detail_do_nav_rerun"] = True
+                with danger_solid(f"ad_del_confirm_{aid}"):
+                    if st.button(
+                        "Permanently delete",
+                        key=f"del_go_{aid}",
+                        disabled=del_confirm.strip() != aid_str,
+                        use_container_width=True,
+                    ):
+                        delete_asset_and_related(str(asset["id"]))
+                        st.session_state.pop("asset_detail_id", None)
+                        st.session_state.pop("asset_detail_action", None)
+                        st.session_state["asset_detail_flash"] = f"Deleted asset {aid_str}."
+                        st.session_state[IPS_NAV_PENDING_KEY] = "Asset Database"
+                        st.session_state["_asset_detail_do_nav_rerun"] = True
 
         elif act == "doc":
             st.markdown("**Upload document**")

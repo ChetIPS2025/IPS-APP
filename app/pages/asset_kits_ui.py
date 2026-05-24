@@ -10,6 +10,7 @@ from typing import Any
 import streamlit as st
 
 try:
+    from app.components.action_styles import danger_outline
     from app.components.status import status_pill_html
     from app.pages._core._data import load_assets, load_inventory, load_jobs
     from app.services.asset_kits_service import (
@@ -34,6 +35,7 @@ try:
     )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
+    from components.action_styles import danger_outline  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from pages._core._data import load_assets, load_inventory, load_jobs  # type: ignore
     from services.asset_kits_service import (  # type: ignore
@@ -58,14 +60,17 @@ except ImportError:
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
-_KIT_STATUS_COLORS = {
-    "present": ("#15803d", "#dcfce7"),
-    "missing": ("#b91c1c", "#fee2e2"),
-    "damaged": ("#c2410c", "#ffedd5"),
-    "checked out": ("#1d4ed8", "#dbeafe"),
-    "needs repair": ("#b45309", "#fef3c7"),
-    "needs replacement": ("#c2410c", "#ffedd5"),
-    "retired": ("#64748b", "#f1f5f9"),
+_KIT_STATUS_CLASS = {
+    "present": "ips-kit-status-present",
+    "missing": "ips-kit-status-missing",
+    "damaged": "ips-kit-status-damaged",
+    "checked out": "ips-kit-status-checked-out",
+    "needs repair": "ips-kit-status-needs-repair",
+    "needs replacement": "ips-kit-status-needs-replacement",
+    "retired": "ips-kit-status-retired",
+    "good": "ips-kit-status-present",
+    "new": "ips-kit-status-present",
+    "fair": "ips-kit-status-needs-repair",
 }
 
 
@@ -75,13 +80,9 @@ def _sk(aid: str, suffix: str) -> str:
 
 def kit_item_status_pill_html(status: str) -> str:
     key = str(status or "").strip().lower()
-    fg, bg = _KIT_STATUS_COLORS.get(key, ("#475569", "#f1f5f9"))
+    cls = _KIT_STATUS_CLASS.get(key, "ips-kit-status-neutral")
     label = html.escape(str(status or "—"))
-    return (
-        f'<span class="ips-kit-status-pill" style="color:{fg};background:{bg};'
-        f'border:1px solid {fg}22;padding:0.12rem 0.45rem;border-radius:999px;'
-        f'font-size:0.72rem;font-weight:600;">{label}</span>'
-    )
+    return f'<span class="ips-kit-status-pill {cls}">{label}</span>'
 
 
 def inject_kit_ui_styles() -> None:
@@ -454,14 +455,15 @@ def _render_kit_item_detail_inline(asset: dict, aid: str, item: dict) -> None:
             st.caption(f"Linked asset ID: {item.get('child_asset_id')}")
         if item.get("inventory_item_id"):
             st.caption(f"Linked inventory ID: {item.get('inventory_item_id')}")
-        if st.button("Delete item", key=f"kit_del_{aid}_{iid}"):
-            result = delete_asset_kit_item(iid)
-            if result.ok:
-                st.session_state[_sk(aid, "sel")] = ""
-                st.success("Item removed.")
-                st.rerun()
-            else:
-                st.error(result.error or "Could not delete.")
+        with danger_outline(f"kit_del_{aid}_{iid}"):
+            if st.button("Delete item", key=f"kit_del_{aid}_{iid}"):
+                result = delete_asset_kit_item(iid)
+                if result.ok:
+                    st.session_state[_sk(aid, "sel")] = ""
+                    st.success("Item removed.")
+                    st.rerun()
+                else:
+                    st.error(result.error or "Could not delete.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -865,15 +867,16 @@ def render_mobile_kit_scan(asset: dict) -> None:
             labels = [str(i.get("item_name") or "") for i in items]
             pick = st.selectbox("Tool", labels)
             note = st.text_area("Notes")
-            if st.button("Mark Missing", type="primary", key="kit_scan_mark_missing"):
-                item = next(i for i in items if i.get("item_name") == pick)
-                update_asset_kit_item(
-                    str(item.get("id")),
-                    {"status": "Missing", "condition": "Missing", "performed_by_name": st.session_state.get("_kit_scan_name")},
-                )
-                st.success("Marked missing.")
-                st.session_state["_kit_scan_view"] = "card"
-                st.rerun()
+            with danger_outline("kit_scan_mark_missing"):
+                if st.button("Mark Missing", type="secondary", key="kit_scan_mark_missing"):
+                    item = next(i for i in items if i.get("item_name") == pick)
+                    update_asset_kit_item(
+                        str(item.get("id")),
+                        {"status": "Missing", "condition": "Missing", "performed_by_name": st.session_state.get("_kit_scan_name")},
+                    )
+                    st.success("Marked missing.")
+                    st.session_state["_kit_scan_view"] = "card"
+                    st.rerun()
         if st.button("← Back", key="kit_scan_back_missing"):
             st.session_state["_kit_scan_view"] = "card"
             st.rerun()
@@ -885,9 +888,10 @@ def render_mobile_kit_scan(asset: dict) -> None:
     if st.button("View Tool List", use_container_width=True, key="kit_scan_tools"):
         st.session_state["_kit_scan_view"] = "tools"
         st.rerun()
-    if st.button("Report Missing Tool", use_container_width=True, key="kit_scan_missing"):
-        st.session_state["_kit_scan_view"] = "missing"
-        st.rerun()
+    with danger_outline("kit_scan_report_missing"):
+        if st.button("Report Missing Tool", use_container_width=True, key="kit_scan_missing"):
+            st.session_state["_kit_scan_view"] = "missing"
+            st.rerun()
 
     st.markdown("---")
     st.markdown("#### Tools in Kit")

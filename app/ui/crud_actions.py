@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
+from app.components.action_styles import danger_outline
 from app.ips_crud_list_styles import inject_ips_crud_list_styles
 from app.table_actions import inject_table_action_styles
 
@@ -46,10 +47,12 @@ def render_standard_toolbar(
                 if on_edit and one:
                     on_edit(str(selected_ids[0]))
         with b2:
-            if st.button(deactivate_label, type="secondary", use_container_width=True, disabled=not can_add or none, key=f"{key_prefix}_deactivate"):
-                if on_deactivate and selected_ids:
-                    on_deactivate(selected_ids)
+            with danger_outline(f"{key_prefix}_deactivate"):
+                if st.button(deactivate_label, type="secondary", use_container_width=True, disabled=not can_add or none, key=f"{key_prefix}_deactivate"):
+                    if on_deactivate and selected_ids:
+                        on_deactivate(selected_ids)
         with b3:
-            if st.button(delete_label, type="secondary", use_container_width=True, disabled=not can_add or none, key=f"{key_prefix}_delete"):
-                if on_delete and selected_ids:
-                    on_delete(selected_ids)
+            with danger_outline(f"{key_prefix}_delete"):
+                if st.button(delete_label, type="secondary", use_container_width=True, disabled=not can_add or none, key=f"{key_prefix}_delete"):
+                    if on_delete and selected_ids:
+                        on_delete(selected_ids)

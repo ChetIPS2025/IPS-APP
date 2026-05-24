@@ -11,6 +11,11 @@ import streamlit.components.v1 as components
 from auth import current_role
 
 try:
+    from app.components.action_styles import danger_outline, danger_solid
+except ImportError:
+    from components.action_styles import danger_outline, danger_solid  # type: ignore
+
+try:
     from app.db import create_signed_url
 except ImportError:
     from db import create_signed_url  # type: ignore
@@ -301,27 +306,29 @@ def render_job_database_detail_view_page(
             st.rerun()
     with top3:
         del_help = "Only admin or manager can delete jobs." if not can_edit else "Delete this job (blocked if costing exists)."
-        if st.button("Delete Job", type="secondary", key="job_detail_del", disabled=not can_edit, help=del_help):
-            st.session_state["job_db_detail_delete_confirm"] = jid
-            st.rerun()
+        with danger_outline("job_detail_del"):
+            if st.button("Delete Job", type="secondary", key="job_detail_del", disabled=not can_edit, help=del_help):
+                st.session_state["job_db_detail_delete_confirm"] = jid
+                st.rerun()
 
     conf = str(st.session_state.get("job_db_detail_delete_confirm") or "").strip()
     if conf == jid:
         st.warning("Delete this job permanently? Jobs with labor, materials, equipment, or PO expenses cannot be deleted.")
         d1, d2 = st.columns(2, gap="small")
         with d1:
-            if st.button("Confirm delete", type="primary", key="job_detail_del_y", use_container_width=True):
-                try:
-                    delete_job_row_if_no_costing(jid, admin_read=admin_read)
-                    st.session_state.pop("job_db_detail_delete_confirm", None)
-                    _on_clear_view()
-                    clear_selected_ids(TABLE_KEY_JOBS)
-                    st.success("Job deleted.")
-                    st.rerun()
-                except RuntimeError as re:
-                    st.error(str(re))
-                except Exception as exc:
-                    st.error(f"Could not delete: {exc}")
+            with danger_solid("job_detail_del_confirm"):
+                if st.button("Confirm delete", type="secondary", key="job_detail_del_y", use_container_width=True):
+                    try:
+                        delete_job_row_if_no_costing(jid, admin_read=admin_read)
+                        st.session_state.pop("job_db_detail_delete_confirm", None)
+                        _on_clear_view()
+                        clear_selected_ids(TABLE_KEY_JOBS)
+                        st.success("Job deleted.")
+                        st.rerun()
+                    except RuntimeError as re:
+                        st.error(str(re))
+                    except Exception as exc:
+                        st.error(f"Could not delete: {exc}")
         with d2:
             if st.button("Cancel", key="job_detail_del_n", use_container_width=True):
                 st.session_state.pop("job_db_detail_delete_confirm", None)

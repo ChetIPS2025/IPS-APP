@@ -106,6 +106,8 @@ def _normalize_job_status(raw: object) -> str:
         "closed": "Closed",
         "cancelled": "Cancelled",
         "canceled": "Cancelled",
+        "archived": "Archived",
+        "estimate pending": "Estimate Pending",
     }
     if s in mapping:
         return mapping[s]
@@ -171,6 +173,8 @@ def _job_status_pill_html(status: str) -> str:
         "Completed": "ips-job-status-completed",
         "Closed": "ips-job-status-closed",
         "Cancelled": "ips-job-status-cancelled",
+        "Archived": "ips-job-status-archived",
+        "Estimate Pending": "ips-job-status-estimate-pending",
     }
     cls = cls_map.get(status, "ips-job-status-draft")
     return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
@@ -514,6 +518,8 @@ def _status_class(status: object) -> str:
         "on hold": "pending",
         "cancelled": "danger",
         "canceled": "danger",
+        "archived": "draft",
+        "estimate pending": "pending",
         "closed": "completed",
     }
     slug = aliases.get(raw, "draft")

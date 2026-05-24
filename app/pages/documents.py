@@ -265,6 +265,12 @@ def _seed_document_edit_form(doc: dict, *, hr_ok: bool) -> None:
     st.session_state[f"doc_edit_rest_{rk}"] = bool(doc.get("is_restricted")) and hr_ok
 
 
+def _restricted_pill_html(restricted: bool) -> str:
+    if restricted:
+        return '<span class="ips-doc-restricted-pill">Restricted</span>'
+    return html.escape("No")
+
+
 def _render_document_detail_tabs(doc: dict) -> None:
     restricted = bool(doc.get("is_restricted"))
     access = _access_label(doc)
@@ -308,7 +314,7 @@ def _render_document_detail_tabs(doc: dict) -> None:
         access_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Access Level', access)}"
-            f"{detail_field_html('Restricted', 'Yes' if restricted else 'No')}"
+            f"{detail_field_html('Restricted', 'Yes' if restricted else 'No', html_value=_restricted_pill_html(restricted))}"
             f"</div>"
         )
         st.markdown(dialog_card_html("Access", access_html), unsafe_allow_html=True)

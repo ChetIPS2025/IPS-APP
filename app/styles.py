@@ -162,62 +162,6 @@ def inject_users_module_css() -> None:
   display: flex;
   justify-content: flex-end;
 }}
-/* Outlined danger — initial Delete User */
-[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button {{
-  background: #ffffff !important;
-  color: #dc2626 !important;
-  border: 1px solid #dc2626 !important;
-  border-radius: 10px !important;
-  font-weight: 700 !important;
-  min-height: 36px !important;
-  padding: 0 14px !important;
-  cursor: pointer !important;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
-}}
-[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button:hover {{
-  background: #fee2e2 !important;
-  border-color: #b91c1c !important;
-  color: #b91c1c !important;
-}}
-[class*="st-key-emp_delete_danger_wrap"] [data-testid="stButton"] > button:disabled {{
-  opacity: 0.55 !important;
-  cursor: not-allowed !important;
-}}
-/* Filled danger — confirmation Deactivate / Permanently Delete */
-[class*="st-key-emp_delete_confirm_danger"] [data-testid="stButton"] > button {{
-  background: #dc2626 !important;
-  color: #ffffff !important;
-  border: 1px solid #dc2626 !important;
-  border-radius: 10px !important;
-  font-weight: 700 !important;
-  min-height: 36px !important;
-  cursor: pointer !important;
-  transition: background 0.15s ease, border-color 0.15s ease !important;
-}}
-[class*="st-key-emp_delete_confirm_danger"] [data-testid="stButton"] > button:hover {{
-  background: #b91c1c !important;
-  border-color: #b91c1c !important;
-  color: #ffffff !important;
-}}
-[class*="st-key-emp_delete_confirm_danger_hard"] [data-testid="stButton"] > button {{
-  background: #991b1b !important;
-  border-color: #991b1b !important;
-}}
-[class*="st-key-emp_delete_confirm_danger_hard"] [data-testid="stButton"] > button:hover {{
-  background: #7f1d1d !important;
-  border-color: #7f1d1d !important;
-}}
-div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button {{
-  border: 1px solid #dc2626 !important;
-  background: #ffffff !important;
-  color: #dc2626 !important;
-  font-weight: 700 !important;
-}}
-div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="stButton"] > button:hover {{
-  background: #fee2e2 !important;
-  border-color: #b91c1c !important;
-  color: #b91c1c !important;
-}}
 .ips-user-delete-warning {{
   background: #fff7ed;
   border: 1px solid #fed7aa;
@@ -262,14 +206,6 @@ div[data-testid="stVerticalBlock"]:has(.ips-user-delete-actions) [data-testid="s
   border: none !important;
   padding: 2px 0 !important;
   color: #9a3412;
-}}
-div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="stButton"]:last-of-type > button {{
-  border-color: #dc2626 !important;
-  background: #ffffff !important;
-  color: #dc2626 !important;
-}}
-div[data-testid="stVerticalBlock"]:has(.ips-user-delete-warning) [data-testid="stButton"]:last-of-type > button:hover {{
-  background: #fee2e2 !important;
 }}
 </style>
 """,
@@ -847,6 +783,14 @@ def inject_jobs_module_css() -> None:
   background: #fee2e2;
   color: #991b1b;
 }}
+.ips-job-status-archived {{
+  background: #f1f5f9;
+  color: #475569;
+}}
+.ips-job-status-estimate-pending {{
+  background: #fef3c7;
+  color: #92400e;
+}}
 .st-key-jobs_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
@@ -965,8 +909,8 @@ def inject_tasks_module_css() -> None:
   color: #c2410c;
 }}
 .ips-priority-low {{
-  background: #dcfce7;
-  color: #166534;
+  background: #f1f5f9;
+  color: #475569;
 }}
 .st-key-tasks_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
@@ -1003,14 +947,14 @@ def inject_tasks_module_css() -> None:
   width: auto !important;
 }}
 .st-key-tasks_table_wrap [class*="st-key-task_status_open_"] .stButton > button {{
-  background: #dcfce7 !important;
-  color: #166534 !important;
-  border: 1px solid #86efac !important;
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
 }}
 .st-key-tasks_table_wrap [class*="st-key-task_status_closed_"] .stButton > button {{
-  background: #fee2e2 !important;
-  color: #991b1b !important;
-  border: 1px solid #fca5a5 !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
 }}
 .st-key-tasks_table_wrap [data-testid="stSelectbox"] {{
   margin: 0 !important;
@@ -1696,8 +1640,8 @@ def inject_inventory_module_css() -> None:
   color: #92400e;
 }}
 .ips-inventory-status-out-of-stock {{
-  background: #fee2e2;
-  color: #991b1b;
+  background: #ffedd5;
+  color: #c2410c;
 }}
 .ips-inventory-status-on-order {{
   background: #dbeafe;
@@ -3174,6 +3118,128 @@ div[data-testid="stDialog"] [data-testid="stSlider"] {{
     )
 
 
+def inject_action_colors_css() -> None:
+    """Shared destructive buttons and semantic status pill colors."""
+    st.markdown(
+        """
+<style id="ips-action-colors-v1">
+/* ----- Destructive action buttons (Streamlit container keys + class hooks) ----- */
+.ips-danger-outline button,
+button.ips-danger-outline,
+div[data-testid="stButton"] button.ips-danger-outline,
+[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button {
+    background: #ffffff !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    transition: all 0.15s ease;
+}
+.ips-danger-outline button:hover,
+button.ips-danger-outline:hover,
+div[data-testid="stButton"] button.ips-danger-outline:hover,
+[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:hover {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    border-color: #b91c1c !important;
+}
+.ips-danger-outline button:disabled,
+[class*="st-key-ips_danger_outline_"] [data-testid="stButton"] > button:disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+}
+
+.ips-danger-solid button,
+button.ips-danger-solid,
+div[data-testid="stButton"] button.ips-danger-solid,
+[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border: 1px solid #dc2626 !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    transition: all 0.15s ease;
+}
+.ips-danger-solid button:hover,
+button.ips-danger-solid:hover,
+div[data-testid="stButton"] button.ips-danger-solid:hover,
+[class*="st-key-ips_danger_solid_"] [data-testid="stButton"] > button:hover {
+    background: #b91c1c !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
+}
+
+/* ----- Semantic status pills ----- */
+.ips-status-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+.ips-status-attention {
+    background: #fed7aa;
+    color: #9a3412;
+    border-color: #fdba74;
+}
+.ips-status-success {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+.ips-status-neutral {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+.ips-status-primary {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+.ips-status-danger {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+/* Kit / tool trailer item statuses */
+.ips-kit-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+.ips-kit-status-present { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.ips-kit-status-missing { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+.ips-kit-status-damaged { background: #ffedd5; color: #c2410c; border-color: #fed7aa; }
+.ips-kit-status-checked-out { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+.ips-kit-status-needs-repair,
+.ips-kit-status-needs-replacement { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.ips-kit-status-retired { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.ips-kit-status-neutral { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+
+/* Documents restricted access */
+.ips-doc-restricted-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #fed7aa;
+    color: #9a3412;
+    border: 1px solid #fdba74;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
@@ -3332,6 +3398,11 @@ section[data-testid="stSidebar"] .block-container {{
 .ips-status-draft {{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }}
 .ips-status-sent {{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }}
 .ips-status-danger {{ background:#fee2e2; color:#dc2626; border-color:#fecaca; }}
+.ips-status-warning {{ background:#fef3c7; color:#92400e; border-color:#fde68a; }}
+.ips-status-attention {{ background:#fed7aa; color:#9a3412; border-color:#fdba74; }}
+.ips-status-success {{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }}
+.ips-status-neutral {{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }}
+.ips-status-primary {{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }}
 
 /* Data table — stable grid (survives Streamlit reruns) */
 .ips-data-table-wrap {{
@@ -4404,3 +4475,4 @@ section[data-testid="stSidebar"] hr {{
         from ui.clean_table import inject_clean_table_css  # type: ignore
     inject_clean_table_css()
     inject_ips_dialog_styles()
+    inject_action_colors_css()

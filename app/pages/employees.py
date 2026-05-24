@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
+    from app.components.action_styles import danger_outline, danger_solid
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -62,6 +63,7 @@ try:
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
+    from components.action_styles import danger_outline, danger_solid  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -675,7 +677,7 @@ def _render_user_delete_panel(emp: dict, rk: str) -> None:
 
     if not st.session_state.get(confirm_key):
         st.markdown('<div class="ips-user-delete-actions">', unsafe_allow_html=True)
-        with st.container(key=f"emp_delete_danger_wrap_{rk}"):
+        with danger_outline(f"emp_delete_{rk}"):
             if st.button(
                 "Delete User",
                 key=f"emp_delete_open_{rk}",
@@ -741,7 +743,7 @@ def _render_user_delete_panel(emp: dict, rk: str) -> None:
             st.session_state.pop(confirm_key, None)
             st.rerun()
     with btn_deactivate:
-        with st.container(key=f"emp_delete_confirm_danger_{rk}"):
+        with danger_outline(f"emp_deactivate_{rk}"):
             if st.button(
                 "Deactivate User",
                 key=f"emp_delete_deactivate_{rk}",
@@ -768,7 +770,7 @@ def _render_user_delete_panel(emp: dict, rk: str) -> None:
                 st.error(result.error or "Could not deactivate user.")
     with btn_hard:
         if is_admin:
-            with st.container(key=f"emp_delete_confirm_danger_hard_{rk}"):
+            with danger_solid(f"emp_hard_{rk}"):
                 if st.button(
                     "Permanently Delete",
                     key=f"emp_delete_hard_{rk}",

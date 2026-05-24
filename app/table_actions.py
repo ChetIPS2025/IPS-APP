@@ -27,6 +27,11 @@ from collections.abc import Callable
 import pandas as pd
 import streamlit as st
 
+try:
+    from app.components.action_styles import danger_outline, danger_solid
+except ImportError:
+    from components.action_styles import danger_outline, danger_solid  # type: ignore
+
 # Legacy: dict-based storage (migrated on read into selected_<table_key>_ids)
 IPS_ROW_SELECTIONS = "ips_row_selections"
 
@@ -464,15 +469,16 @@ def render_table_action_bar(
                 b1, b2, b3, b4 = st.columns([1.2, 1.2, 1.2, 1.2], gap="small")
                 with b1:
                     del_multi_dis = not (n >= 1 and can_delete)
-                    if st.button(
-                        delete_selected_label,
-                        disabled=del_multi_dis,
-                        type="secondary",
-                        use_container_width=False,
-                        key=f"ips_ta_del_multi_{table_key}",
-                    ):
-                        pending[table_key] = list(selected_ids)
-                        st.rerun()
+                    with danger_outline(f"ta_del_multi_{table_key}"):
+                        if st.button(
+                            delete_selected_label,
+                            disabled=del_multi_dis,
+                            type="secondary",
+                            use_container_width=False,
+                            key=f"ips_ta_del_multi_{table_key}",
+                        ):
+                            pending[table_key] = list(selected_ids)
+                            st.rerun()
                 with b2:
                     st.download_button(
                         label="Export Selected",
@@ -529,15 +535,16 @@ def render_table_action_bar(
                     if st.button(edit_label, disabled=edit_dis, use_container_width=False, key=f"ips_ta_edit_{table_key}"):
                         out["edit"] = True
                 with b3:
-                    if st.button(
-                        delete_label,
-                        disabled=del_dis,
-                        type="secondary",
-                        use_container_width=False,
-                        key=f"ips_ta_del_{table_key}",
-                    ):
-                        pending[table_key] = list(selected_ids)
-                        st.rerun()
+                    with danger_outline(f"ta_del_{table_key}"):
+                        if st.button(
+                            delete_label,
+                            disabled=del_dis,
+                            type="secondary",
+                            use_container_width=False,
+                            key=f"ips_ta_del_{table_key}",
+                        ):
+                            pending[table_key] = list(selected_ids)
+                            st.rerun()
                 with b4:
                     st.download_button(
                         label="Export Selected",
@@ -593,13 +600,14 @@ def render_table_action_bar(
         st.warning(f"Delete **{len(pend_ids)}** row(s)? This cannot be undone.")
         dc1, dc2 = st.columns(2, gap="small")
         with dc1:
-            if st.button(
-                "Confirm delete",
-                type="primary",
-                use_container_width=False,
-                key=f"ips_ta_del_y_{table_key}",
-            ):
-                out["confirm_delete"] = True
+            with danger_solid(f"ta_del_confirm_{table_key}"):
+                if st.button(
+                    "Confirm delete",
+                    type="secondary",
+                    use_container_width=False,
+                    key=f"ips_ta_del_y_{table_key}",
+                ):
+                    out["confirm_delete"] = True
         with dc2:
             if st.button("Cancel", use_container_width=False, key=f"ips_ta_del_n_{table_key}"):
                 pending.pop(table_key, None)

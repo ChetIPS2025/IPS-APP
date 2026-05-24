@@ -52,6 +52,7 @@ except ImportError:
     )
 
 try:
+    from app.components.action_styles import danger_outline
     from app.confirm_delete import (
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -59,6 +60,7 @@ try:
         render_destructive_confirmation,
     )
 except ImportError:
+    from components.action_styles import danger_outline  # type: ignore
     from confirm_delete import (  # type: ignore
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -298,26 +300,28 @@ def _render_action_buttons(*, sel: list[str], can_edit: bool) -> None:
                 st.session_state["inv_panel_id"] = str(sel[0])
                 st.rerun()
         with b2:
-            if st.button(
-                "Deactivate",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_edit or none,
-                key="inv_btn_deactivate",
-            ):
-                st.session_state["_inv_do_deactivate"] = True
-                st.rerun()
+            with danger_outline("inv_btn_deactivate"):
+                if st.button(
+                    "Deactivate",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not can_edit or none,
+                    key="inv_btn_deactivate",
+                ):
+                    st.session_state["_inv_do_deactivate"] = True
+                    st.rerun()
         with b3:
-            if st.button(
-                "Delete",
-                type="secondary",
-                use_container_width=True,
-                disabled=not can_edit or none,
-                key="inv_btn_delete",
-            ):
-                open_destructive_confirmation(_INV_DELETE_PREFIX)
-                st.session_state["inv_pending_delete_ids"] = [str(x) for x in sel]
-                st.rerun()
+            with danger_outline("inv_btn_delete"):
+                if st.button(
+                    "Delete",
+                    type="secondary",
+                    use_container_width=True,
+                    disabled=not can_edit or none,
+                    key="inv_btn_delete",
+                ):
+                    open_destructive_confirmation(_INV_DELETE_PREFIX)
+                    st.session_state["inv_pending_delete_ids"] = [str(x) for x in sel]
+                    st.rerun()
 
 
 def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:

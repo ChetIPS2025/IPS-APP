@@ -18,6 +18,11 @@ from collections.abc import Callable
 
 import streamlit as st
 
+try:
+    from app.components.action_styles import danger_solid
+except ImportError:
+    from components.action_styles import danger_solid  # type: ignore
+
 IPS_DELETE_CONFIRM_STYLE_KEY = "ips_delete_confirm_styles_injected"
 
 
@@ -111,12 +116,13 @@ def _render_destructive_panel_ui(
             )
         bc1, bc2 = st.columns(2, gap="small")
         with bc1:
-            confirm = st.button(
-                confirm_label,
-                type="primary",
-                use_container_width=True,
-                key=confirm_key,
-            )
+            with danger_solid(f"dc_{key_prefix}"):
+                confirm = st.button(
+                    confirm_label,
+                    type="secondary",
+                    use_container_width=True,
+                    key=confirm_key,
+                )
         with bc2:
             cancel = st.button(
                 cancel_label,
