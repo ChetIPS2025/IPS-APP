@@ -30,7 +30,7 @@ try:
         recalculate_and_save_estimate_totals,
     )
     from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
-    from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
+    from app.services.proposal_pdf_service import build_customer_quote_bundle
     from app.services.estimate_builder_helpers import (
         equipment_line_totals,
         labor_line_totals,
@@ -73,6 +73,7 @@ except ImportError:
         travel_defaults,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from services.proposal_pdf_service import build_customer_quote_bundle  # type: ignore
 
 
 def _service_ok(result) -> tuple[bool, str]:
@@ -1213,59 +1214,74 @@ def render_summary_tab(est: dict[str, Any]) -> None:
 
 def render_proposal_preview_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        show_lines = st.checkbox("Show detailed line items", value=bool(est.get("proposal_show_line_items")), key=f"pp_lines_{eid}")
-    with c2:
-        show_cats = st.checkbox("Show category totals", value=est.get("proposal_show_category_totals", True), key=f"pp_cats_{eid}")
-    with c3:
-        final_only = st.checkbox("Show final price only", value=bool(est.get("proposal_show_final_price_only")), key=f"pp_final_{eid}")
+    totals = calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
 
-    preview_est = {
-        **est,
-        "proposal_show_line_items": show_lines,
-        "proposal_show_category_totals": show_cats,
-        "proposal_show_final_price_only": final_only,
-    }
-    totals = calculate_estimate_totals(eid)
-    travel_price = float(totals.get("travel_price") or 0)
     preview_fields = [
         detail_field_html("Estimate #", est.get("estimate_number")),
         detail_field_html("Customer", est.get("customer")),
         detail_field_html("Project", est.get("project_name")),
         detail_field_html("Valid through", fmt_date(est.get("expiration_date"))),
     ]
+    travel_price = float(totals.get("travel_price") or 0)
     if travel_price > 0:
         preview_fields.append(detail_field_html("Travel (customer)", fmt_currency(travel_price)))
     preview_fields.append(detail_field_html("Proposal total", fmt_currency(totals.get("customer_price"))))
     st.markdown(
         dialog_card_html(
-            "Proposal Preview",
+            "Customer Quote",
             f'<div class="ips-detail-grid">{"".join(preview_fields)}</div>',
         ),
         unsafe_allow_html=True,
     )
-    scope = safe_value(est.get("description") or est.get("scope_of_work"), "No scope entered.")
-    st.markdown(f"**Scope:** {html.escape(scope)}")
 
     if is_demo_id(eid):
-        st.info("Save estimate to Supabase to download PDF.")
+        st.info("Save estimate to Supabase to preview and download the customer quote.")
         return
 
     try:
-        pdf_bytes = generate_estimate_proposal_pdf_by_id(eid, preview_est)
+        docx_bytes, pdf_bytes, page_html, word_err, pdf_note = build_customer_quote_bundle(eid, est, totals=totals)
     except Exception as exc:
-        st.error(f"Could not generate PDF preview: {exc}")
+        st.error(f"Could not build customer quote: {exc}")
         return
 
-    st.download_button(
-        "Download Proposal PDF",
-        data=pdf_bytes,
-        file_name=f"{est.get('estimate_number', 'estimate')}_proposal.pdf",
-        mime="application/pdf",
-        key=f"pp_download_{eid}",
-        type="primary",
-    )
+    if word_err:
+        st.error(word_err)
+        return
+
+    try:
+        from app.estimate.proposal_exports import _inject_proposal_preview_styles
+    except ImportError:
+        from estimate.proposal_exports import _inject_proposal_preview_styles  # type: ignore
+
+    _inject_proposal_preview_styles()
+    st.markdown(page_html, unsafe_allow_html=True)
+
+    slug = str(est.get("estimate_number") or est.get("quote_number") or "quote").strip() or "quote"
+    d1, d2 = st.columns(2)
+    with d1:
+        st.download_button(
+            "Download Quote (Word)",
+            data=docx_bytes or b"",
+            file_name=f"{slug}_quote.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key=f"pp_word_{eid}",
+            disabled=not docx_bytes,
+            use_container_width=True,
+        )
+    with d2:
+        st.download_button(
+            "Download Quote (PDF)",
+            data=pdf_bytes or b"",
+            file_name=f"{slug}_quote.pdf",
+            mime="application/pdf",
+            key=f"pp_download_{eid}",
+            type="primary",
+            disabled=not pdf_bytes,
+            use_container_width=True,
+        )
+    if not pdf_bytes and pdf_note:
+        st.caption(pdf_note)
+
     if st.button("Mark as Sent", key=f"pp_sent_{eid}"):
         try:
             from app.pages._core._data import persist_estimate, get_estimate as _get_est
@@ -1278,9 +1294,6 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
                 "project_name": cur.get("project_name"),
                 "customer": cur.get("customer"),
                 "status": "Sent",
-                "proposal_show_line_items": show_lines,
-                "proposal_show_category_totals": show_cats,
-                "proposal_show_final_price_only": final_only,
             },
             row_id=eid,
         )

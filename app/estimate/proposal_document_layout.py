@@ -183,12 +183,10 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
 
     title_line = f"{html.escape(vm.job_title_token)} \u2013 Quote"
     qn = html.escape(vm.quote_number)
-    cust = html.escape(vm.customer_name)
     attn = html.escape(vm.contact_name) if vm.contact_name else "\u2014"
     amt = html.escape(vm.proposal_amount)
     scope_html = _esc_body(vm.scope_of_work) or "\u2014"
-    resp_intro = html.escape(f"{vm.customer_name} Responsibilities".strip() or "Responsibilities")
-    resp_body = _esc_body(vm.customer_responsibilities) or "\u2014"
+    resp_body = _esc_body(vm.customer_responsibilities)
     prep = html.escape(vm.prepared_by)
     dt = html.escape(vm.date_display)
     phone = html.escape(vm.prepared_by_phone)
@@ -202,6 +200,13 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
         else '<div class="ips-ph-logo-missing"></div>'
     )
 
+    resp_section = ""
+    if resp_body:
+        resp_section = (
+            '<div class="ips-ph-section-spacer" aria-hidden="true"></div>'
+            f'<div class="ips-ph-resp-body">{resp_body}</div>'
+        )
+
     inner = f"""
 <div class="ips-proposal-page-inner ips-quote-doc">
 {logo_block}
@@ -210,18 +215,14 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
 <div class="proposal-header-subtitle"><span class="ips-ph-quote-lbl">Quote #:</span> {qn}</div>
 </div>
 <div class="ips-ph-customer-block">
-<div class="ips-ph-customer-line"><span class="ips-ph-meta-k">Customer:</span> {cust}</div>
 <div class="ips-ph-attn-line">
-  <span><span class="ips-ph-meta-k">Contact:</span> {attn}</span>
+  <span><span class="ips-ph-meta-k">Attn:</span> {attn}</span>
   <span class="ips-ph-quote-amt"><span class="ips-ph-meta-k">Quote Amt:</span> {amt}</span>
 </div>
 </div>
-<p class="ips-ph-intro">Industrial Plant <span class="ips-ph-ul">Solutions</span>, LLC (IPS) proposes to perform the following scope of work:</p>
 <div class="ips-ph-grow-block">
 <div class="ips-ph-scope">{scope_html}</div>
-<div class="ips-ph-section-spacer" aria-hidden="true"></div>
-<div class="ips-ph-resp-heading">{resp_intro}</div>
-<div class="ips-ph-resp-body">{resp_body}</div>
+{resp_section}
 </div>
 <div class="ips-ph-close-block">
 <div class="ips-ph-prep-line"><span class="ips-ph-meta-k">Prepared By:</span> {prep}</div>
