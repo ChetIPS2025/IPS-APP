@@ -866,18 +866,26 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
     except ImportError:
         from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
     sku = str(ui.get("sku") or ui.get("item_number") or "").strip()
-    payload = {
+    payload: dict[str, Any] = {
         "item_name": ui.get("name") or ui.get("item_name"),
         "sku": sku or None,
         "category": ui.get("category"),
         "storage_location": ui.get("location"),
         "department": ui.get("department") or "",
-        "quantity_on_hand": ui.get("qty_on_hand"),
-        "reorder_point": ui.get("reorder_point"),
         "unit_cost": ui.get("unit_cost"),
         "vendor": ui.get("vendor"),
         "status": ui.get("status") or "In Stock",
     }
+    qty = ui.get("qty_on_hand")
+    if qty is not None:
+        payload["quantity_on_hand"] = float(qty or 0)
+    elif not row_id:
+        payload["quantity_on_hand"] = 0.0
+    reorder = ui.get("reorder_point")
+    if reorder is not None:
+        payload["reorder_point"] = int(float(reorder or 0))
+    elif not row_id:
+        payload["reorder_point"] = 0
     for key in (
         "image_path",
         "image_url",

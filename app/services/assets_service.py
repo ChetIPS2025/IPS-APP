@@ -90,6 +90,8 @@ _DOCUMENT_TYPE_GROUPS: dict[str, tuple[str, ...]] = {
 
 __all__ = [
 
+    "can_manage_asset_actions",
+
     "clear_assets_cache",
 
     "create_asset_inspection",
@@ -107,6 +109,8 @@ __all__ = [
     "get_asset_by_qr",
 
     "rebuild_asset_qr",
+
+    "retire_asset",
 
     "get_asset_document_view_url",
 
@@ -141,6 +145,55 @@ def clear_assets_cache() -> None:
     clear_all_data_caches()
 
     clear_asset_image_url_cache()
+
+
+def can_manage_asset_actions() -> bool:
+    """Admin, manager, or supervisor may retire or delete assets."""
+    try:
+        from app.components.modal_delete import can_admin_mutate
+    except ImportError:
+        from components.modal_delete import can_admin_mutate  # type: ignore
+    return can_admin_mutate()
+
+
+def retire_asset(asset_id: str) -> ServiceResult:
+    """Mark an asset as Retired."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return ServiceResult(ok=False, error="Missing asset id.")
+    try:
+        from app.pages._core._crud import is_demo_id
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+    if is_demo_id(aid):
+        return ServiceResult(ok=True, data={"id": aid, "status": "Retired"})
+    result = update_row(_ASSET_TABLE, {"status": "Retired"}, {"id": aid})
+    if result.ok:
+        clear_assets_cache()
+    return result
+
+
+def delete_asset_record(asset_id: str) -> ServiceResult:
+    """Remove an asset and related child records."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return ServiceResult(ok=False, error="Missing asset id.")
+    try:
+        from app.pages._core._crud import is_demo_id
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+    if is_demo_id(aid):
+        return ServiceResult(ok=True, data={"id": aid})
+    try:
+        from app.services.asset_service import delete_asset_and_related
+    except ImportError:
+        from services.asset_service import delete_asset_and_related  # type: ignore
+    try:
+        delete_asset_and_related(aid)
+    except Exception as exc:
+        return ServiceResult(ok=False, error=str(exc))
+    clear_assets_cache()
+    return ServiceResult(ok=True, data={"id": aid})
 
 
 

@@ -757,6 +757,7 @@ def _render_inventory_edit_form(item: dict) -> None:
                 "location": st.session_state.get(f"inv_edit_loc_{iid}"),
                 "qty_on_hand": st.session_state.get(f"inv_edit_qty_{iid}"),
                 "unit_cost": st.session_state.get(f"inv_edit_cost_{iid}"),
+                "reorder_point": item.get("reorder_point", 0),
             },
         )
         if not result.ok:
@@ -883,6 +884,8 @@ def render() -> None:
                         "name": st.session_state.get("inv_new_name"),
                         "category": st.session_state.get("inv_new_cat"),
                         "status": st.session_state.get("inv_new_status"),
+                        "reorder_point": 0,
+                        "qty_on_hand": 0,
                     }
                 )
                 if not result.ok:

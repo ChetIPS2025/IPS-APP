@@ -6,41 +6,52 @@ import html
 
 import streamlit as st
 
+try:
+    from app.branding import header_logo_html
+except ImportError:
+    from branding import header_logo_html  # type: ignore
+
 
 def render_page_header(
     title: str,
     subtitle: str = "",
     *,
     actions_cols: list | None = None,
+    show_logo: bool = True,
 ) -> None:
+    """Compact page header row with optional logo, title, subtitle, and actions."""
     ot, ct = "d" + "iv", "/" + "d" + "iv"
     st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
-    left, right = st.columns([3, 1])
-    with left:
-        sub = (
-            f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
-            if subtitle
-            else ""
-        )
-        st.markdown(
-            f"""
-<{ot} class="ips-page-header">
-  <{ot}>
-    <h1 class="ips-page-title">{html.escape(title)}</h1>
-    {sub}
-  </{ct}>
-</{ct}>
-""",
-            unsafe_allow_html=True,
-        )
-    with right:
-        if actions_cols:
+
+    logo = header_logo_html(height=40) if show_logo else ""
+    sub = (
+        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
+        if subtitle
+        else ""
+    )
+    header_html = (
+        f'<{ot} class="ips-page-header-bar">'
+        f"{logo}"
+        f'<{ot} class="ips-page-header-text">'
+        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
+        f"{sub}"
+        f"</{ct}>"
+        f"</{ct}>"
+    )
+
+    if actions_cols:
+        main_col, act_col = st.columns([4, 1], gap="small", vertical_alignment="center")
+        with main_col:
+            st.markdown(header_html, unsafe_allow_html=True)
+        with act_col:
             st.markdown(f'<{ot} class="ips-header-actions">', unsafe_allow_html=True)
-            ac1, ac2 = st.columns(2)
+            ac1, ac2 = st.columns(2, gap="small")
             for i, widget in enumerate(actions_cols):
-                with (ac1 if i % 2 == 0 else ac2):
+                with ac1 if i % 2 == 0 else ac2:
                     widget()
             st.markdown(f"</{ct}>", unsafe_allow_html=True)
+    else:
+        st.markdown(header_html, unsafe_allow_html=True)
 
 
 def _initials(name: str) -> str:

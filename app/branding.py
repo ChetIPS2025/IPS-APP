@@ -1,20 +1,64 @@
 from __future__ import annotations
 
+import base64
 import html
+from functools import lru_cache
 from pathlib import Path
 
 import streamlit as st
 
+_ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+
 
 def _find_wide_logo() -> Path | None:
     search_paths = [
-        Path(__file__).resolve().parents[1] / "assets" / "ips_logo_wide.png",
-        Path(__file__).resolve().parents[1] / "assets" / "IPS LOGO WIDE.png",
+        _ASSETS_DIR / "ips_logo_wide.png",
+        _ASSETS_DIR / "IPS LOGO WIDE.png",
     ]
     for path in search_paths:
         if path.exists():
             return path
     return None
+
+
+def get_header_logo_path() -> Path | None:
+    """Compact logo for page header bars (square / icon variants)."""
+    for name in (
+        "ips_logo_header.png",
+        "IPS Icon.png",
+        "company_logo.png",
+        "ips_logo_round.png",
+    ):
+        path = _ASSETS_DIR / name
+        if path.is_file():
+            return path
+    return None
+
+
+@lru_cache(maxsize=4)
+def _logo_data_uri(path_str: str) -> str:
+    path = Path(path_str)
+    mime = "image/png"
+    if path.suffix.lower() in {".jpg", ".jpeg"}:
+        mime = "image/jpeg"
+    elif path.suffix.lower() == ".webp":
+        mime = "image/webp"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def header_logo_html(*, height: int = 40, alt: str = "IPS") -> str:
+    """Inline logo markup for compact page headers."""
+    path = get_header_logo_path()
+    if not path:
+        return ""
+    src = _logo_data_uri(str(path))
+    return (
+        f'<span class="ips-page-header-logo-wrap">'
+        f'<img class="ips-page-header-logo" src="{src}" alt="{html.escape(alt)}" '
+        f'height="{int(height)}" />'
+        f"</span>"
+    )
 
 
 def apply_branding() -> None:

@@ -22,7 +22,7 @@ _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
 
 def _logo_path() -> Path | None:
-    for name in ("company_logo.png", "IPS Icon.png", "ips_logo_round.png"):
+    for name in ("ips_logo_header.png", "IPS Icon.png", "company_logo.png", "ips_logo_round.png"):
         p = ROOT_DIR / "assets" / name
         if p.is_file():
             return p

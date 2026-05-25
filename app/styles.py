@@ -3385,14 +3385,16 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marke
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker),
-div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) {
+div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker),
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) {
     margin-top: 0.65rem !important;
     margin-bottom: 0.35rem !important;
 }
 .ips-job-actions-title,
 .ips-user-actions-title,
 .ips-estimate-actions-title,
-.ips-inventory-actions-title {
+.ips-inventory-actions-title,
+.ips-asset-actions-title {
     margin: 0 0 0.45rem 0;
     font-size: 0.72rem;
     font-weight: 800;
@@ -3403,7 +3405,8 @@ div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) {
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="stHorizontalBlock"],
-div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="stHorizontalBlock"] {
+div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="stHorizontalBlock"],
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [data-testid="stHorizontalBlock"] {
     gap: 12px !important;
     flex-wrap: wrap !important;
     align-items: center !important;
@@ -3411,7 +3414,8 @@ div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-t
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="column"],
-div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="column"] {
+div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="column"],
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [data-testid="column"] {
     flex: 0 0 auto !important;
     width: auto !important;
     min-width: 0 !important;
@@ -3427,7 +3431,10 @@ div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*=
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
-div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -3443,7 +3450,10 @@ div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-estim
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
-div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -3548,8 +3558,49 @@ section[data-testid="stMain"] > div,
 }}
 section[data-testid="stMain"] .block-container {{
   max-width: 1680px !important;
-  padding-top: 0.5rem !important;
-  padding-bottom: 1rem !important;
+  padding-top: 0.15rem !important;
+  padding-bottom: 0.85rem !important;
+}}
+
+/* Reclaim Streamlit default top chrome (Deploy bar, menu, decoration) */
+header[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+#MainMenu,
+footer {{
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}}
+[data-testid="stAppViewContainer"] > section.main > div {{
+  padding-top: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {{
+  padding-top: 0.1rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child {{
+  align-items: center !important;
+  gap: 0.65rem !important;
+  margin-bottom: 0.35rem !important;
+  padding-bottom: 0.45rem !important;
+  border-bottom: 1px solid {BORDER} !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child [data-testid="column"]:last-child {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+  width: 100% !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-header-bar) {{
+  margin-bottom: 0 !important;
 }}
 
 /* Sidebar */
@@ -3635,24 +3686,51 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 
 /* Page header */
-.ips-page-header {{
+.ips-page-header,
+.ips-page-header-bar {{
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}}
+.ips-page-header-logo-wrap {{
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  border-radius: 10px;
+  padding: 3px 5px;
+  border: 1px solid #1e293b;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}}
+.ips-page-header-logo {{
+  display: block;
+  height: 40px;
+  width: auto;
+  max-width: 52px;
+  object-fit: contain;
+}}
+.ips-page-header-text {{
+  flex: 1 1 auto;
+  min-width: 0;
 }}
 .ips-page-title {{
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: {TEXT};
   margin: 0;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }}
 .ips-page-subtitle {{
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   color: {TEXT_MUTED};
-  margin: 0.2rem 0 0;
+  margin: 0.12rem 0 0;
+  line-height: 1.35;
 }}
 
 /* Filter bar */
@@ -3946,8 +4024,9 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
 .ips-module-page {{
   width: 100%;
 }}
-.ips-module-page .ips-page-header {{
-  margin-bottom: 0.85rem;
+.ips-module-page .ips-page-header,
+.ips-module-page .ips-page-header-bar {{
+  margin-bottom: 0.35rem;
 }}
 .ips-form-card {{
   margin-bottom: 0.75rem;
@@ -4578,12 +4657,12 @@ section[data-testid="stSidebar"] > div {{
   min-height: 100vh;
 }}
 .ips-sidebar-logo-wrap {{
-  padding: 0.65rem 0.75rem 0.85rem;
+  padding: 0.45rem 0.65rem 0.55rem;
   border-bottom: 1px solid {BORDER};
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }}
 .ips-sidebar-logo-wrap img {{
-  max-height: 44px;
+  max-height: 38px;
   width: auto;
   display: block;
 }}
