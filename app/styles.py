@@ -3701,11 +3701,11 @@ section[data-testid="stSidebar"] .block-container {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #050505;
-  border-radius: 10px;
-  padding: 3px 5px;
-  border: 1px solid #1e293b;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
 }}
 .ips-page-header-logo {{
   display: block;
@@ -3713,6 +3713,7 @@ section[data-testid="stSidebar"] .block-container {{
   width: auto;
   max-width: 52px;
   object-fit: contain;
+  background: transparent;
 }}
 .ips-page-header-text {{
   flex: 1 1 auto;
@@ -4660,11 +4661,26 @@ section[data-testid="stSidebar"] > div {{
   padding: 0.45rem 0.65rem 0.55rem;
   border-bottom: 1px solid {BORDER};
   margin-bottom: 0.25rem;
+  background: transparent !important;
 }}
-.ips-sidebar-logo-wrap img {{
+.ips-sidebar-logo-wrap img,
+.ips-sidebar-logo-wrap [data-testid="stImage"],
+.ips-sidebar-logo-wrap [data-testid="stImage"] img {{
   max-height: 38px;
   width: auto;
   display: block;
+  background: transparent !important;
+}}
+section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] {{
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}}
+section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] > div {{
+  background: transparent !important;
+}}
+section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] img {{
+  background: transparent !important;
 }}
 .ips-sidebar-brand {{
   font-size: 0.95rem;
