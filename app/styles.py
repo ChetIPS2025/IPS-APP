@@ -683,7 +683,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v11">
+<style id="ips-jobs-module-v12">
 .ips-jobs-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -703,6 +703,10 @@ def inject_jobs_module_css() -> None:
   min-height: 38px;
   display: flex;
   align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }}
 .ips-jobs-row {{
   background: #ffffff;
@@ -814,6 +818,7 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 40px;
+  height: auto !important;
   padding: 8px 10px !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
@@ -1313,11 +1318,10 @@ def inject_estimates_module_css() -> None:
   min-height: 38px;
   display: flex;
   align-items: center;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: 1.15;
-  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }}
 .ips-estimates-row {{
   background: #ffffff;
@@ -2028,9 +2032,16 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v5">
+<style id="ips-table-header-filter-v6">
 .ips-table-header-filter-marker {
   display: none !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type {
+  flex-wrap: nowrap !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
+  min-width: 0 !important;
+  overflow: hidden !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text,
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [class*="-header-row"] {
@@ -2038,13 +2049,14 @@ def inject_table_header_filter_css() -> None:
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
+  letter-spacing: 0.03em;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
-  line-height: 1.15;
-  word-break: keep-all;
+  line-height: 1.2;
+  word-break: normal !important;
+  writing-mode: horizontal-tb !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {
   display: block;
@@ -2058,6 +2070,7 @@ def inject_table_header_filter_css() -> None:
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {
   align-items: center !important;
+  flex-wrap: nowrap !important;
   gap: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -2121,15 +2134,21 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
 }
-/* Icon-only filter popover trigger beside header label */
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button svg {
-  display: inline-block !important;
-  width: 16px !important;
-  height: 16px !important;
-  margin: 0 !important;
+/* Single chevron trigger: text only, hide Streamlit/material duplicate icons */
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button svg,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button img {
+  display: none !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p {
+  display: block !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  font-size: 12px !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span:not([data-testid]) {
   display: none !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopoverBody"] [data-testid="stMultiSelect"] label,
@@ -2140,7 +2159,7 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
-  min-height: 44px !important;
+  min-height: 40px !important;
   height: auto !important;
   align-items: center !important;
 }
