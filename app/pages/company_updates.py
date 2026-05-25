@@ -8,7 +8,7 @@ from datetime import datetime
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -44,7 +44,7 @@ try:
     from app.styles import inject_updates_module_css
     from app.utils.formatting import fmt_date
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -674,15 +674,15 @@ def render() -> None:
 
     lookup = _user_name_lookup()
 
-    hdr_l, hdr_r = st.columns([3, 1])
-    with hdr_l:
-        render_page_header(
-            "Company Updates",
-            "Share announcements, safety alerts, events, and company news.",
-        )
-    with hdr_r:
+    def _cu_new() -> None:
         if st.button("+ New Update", key="cu_new", type="primary", use_container_width=True):
             st.session_state["ips_cu_form"] = True
+
+    render_page_brand_header(
+        "Company Updates",
+        "Share announcements, safety alerts, events, and company news.",
+        actions=[_cu_new],
+    )
 
     if st.session_state.get("ips_cu_form"):
         with st.expander("New company update", expanded=True):

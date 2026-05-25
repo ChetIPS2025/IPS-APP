@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -46,7 +46,7 @@ try:
     from app.utils.dates import week_end, week_start
     from app.utils.formatting import fmt_date
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
@@ -723,11 +723,14 @@ def render() -> None:
     all_rows = [_build_timecard_row(row, ws) for row in summaries]
     filter_options = build_filter_options(all_rows, _TK_COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Timekeeping", "View and edit employee weekly time entries.")
-    with act_r:
+    def _tk_export() -> None:
         st.button("Export", key="tk_export", use_container_width=True)
+
+    render_page_brand_header(
+        "Timekeeping",
+        "View and edit employee weekly time entries.",
+        actions=[_tk_export],
+    )
 
     nav1, nav2, nav3, week_col = st.columns([1, 1, 1, 2.2], gap="small")
     with nav1:

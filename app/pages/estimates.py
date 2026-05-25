@@ -57,7 +57,7 @@ try:
         persist_estimate,
     )
     from app.components.estimate_actions import render_estimate_action_buttons
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -128,7 +128,7 @@ except ImportError:
         persist_estimate,
     )
     from components.estimate_actions import render_estimate_action_buttons  # type: ignore
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -1147,17 +1147,19 @@ def render() -> None:
     rows = load_estimates()
     filter_options = build_filter_options(rows, _ESTIMATE_COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Estimates", "Create, review, price, and send customer proposals.")
-    with act_r:
-        exp_col, add_col = st.columns(2, gap="small")
-        with exp_col:
-            if st.button("Export", key="est_export", use_container_width=True):
-                st.session_state["est_export_ready"] = True
-        with add_col:
-            if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
-                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
+    def _est_export() -> None:
+        if st.button("Export", key="est_export", use_container_width=True):
+            st.session_state["est_export_ready"] = True
+
+    def _est_new() -> None:
+        if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
+            st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
+
+    render_page_brand_header(
+        "Estimates",
+        "Create, review, price, and send customer proposals.",
+        actions=[_est_export, _est_new],
+    )
 
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()

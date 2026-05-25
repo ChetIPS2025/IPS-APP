@@ -10,12 +10,10 @@ import streamlit as st
 try:
     from app.components.job_actions import render_job_action_buttons
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
-    from app.components.headers import render_page_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.headers import render_page_brand_header
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.pages._core._data import (
@@ -39,12 +37,10 @@ try:
 except ImportError:
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from pages._core._data import (  # type: ignore
@@ -94,15 +90,7 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("START DATE", None),
     ("END DATE", None),
 ]
-_JOB_FILTER_FIELDS = ["customer", "supervisor", "status"]
-_JOBS_VIEW_OPTIONS = (
-    "Active Jobs",
-    "Completed Jobs",
-    "Cancelled Jobs",
-    "Deleted/Archived Jobs",
-    "All Jobs",
-)
-_JOBS_VIEW_KEY = "jobs_view_filter"
+_JOBS_DEFAULT_VIEW = "Active Jobs"
 
 
 def _normalize_job_status(raw: object) -> str:
@@ -195,12 +183,6 @@ def _job_status_pill_html(status: str) -> str:
     return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
 
 
-def _clear_jobs_filters() -> None:
-    """Reset filter widgets (must run via button ``on_click``, not after widgets render)."""
-    clear_table_filters(_TABLE_KEY, _JOB_FILTER_FIELDS, extra_keys=["jobs_search"])
-    st.session_state[_JOBS_VIEW_KEY] = "Active Jobs"
-
-
 def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
     view_norm = str(view or "Active Jobs").strip()
     if view_norm == "All Jobs":
@@ -229,19 +211,8 @@ def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
     ]
 
 
-def _filter_jobs(rows: list[dict], *, q: str, view: str) -> list[dict]:
+def _filter_jobs(rows: list[dict], *, view: str = _JOBS_DEFAULT_VIEW) -> list[dict]:
     out = _apply_jobs_view_filter(rows, view)
-    if q:
-        ql = q.lower()
-        out = [
-            r
-            for r in out
-            if ql in _job_number(r).lower()
-            or ql in _job_project(r).lower()
-            or ql in _job_customer(r).lower()
-            or ql in _job_supervisor(r).lower()
-            or ql in _normalize_job_status(r.get("status")).lower()
-        ]
     return apply_column_filters(out, _TABLE_KEY, _JOB_COLUMN_FILTER_SPECS)
 
 
@@ -1095,19 +1066,18 @@ def render() -> None:
     all_jobs = load_jobs()
     filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header(
-            "Jobs",
-            "Track and manage all company jobs, assignments, and costing.",
-        )
-    with act_r:
-        exp_col, add_col = st.columns(2, gap="small")
-        with exp_col:
-            st.button("Export", key="jobs_export", use_container_width=True)
-        with add_col:
-            if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
-                st.session_state["ips_job_form"] = True
+    def _jobs_export() -> None:
+        st.button("Export", key="jobs_export", use_container_width=True)
+
+    def _jobs_new() -> None:
+        if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+            st.session_state["ips_job_form"] = True
+
+    render_page_brand_header(
+        "Jobs",
+        "Track and manage all company jobs, assignments, and costing.",
+        actions=[_jobs_export, _jobs_new],
+    )
 
     if st.session_state.get("ips_job_form"):
         with st.expander("New Job", expanded=True):
@@ -1160,38 +1130,7 @@ def render() -> None:
                     st.session_state.pop("ips_job_form", None)
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2, c3 = st.columns([3.2, 2, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search jobs...",
-                key="jobs_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "View",
-                _JOBS_VIEW_OPTIONS,
-                key=_JOBS_VIEW_KEY,
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.button(
-                "Clear",
-                key="jobs_clear_filters",
-                use_container_width=True,
-                on_click=_clear_jobs_filters,
-            )
-
-    layout_filter_bar(_filters)
-
-    view_filter = str(st.session_state.get(_JOBS_VIEW_KEY) or "Active Jobs")
-    filtered = _filter_jobs(
-        all_jobs,
-        q=str(st.session_state.get("jobs_search") or "").strip(),
-        view=view_filter,
-    )
+    filtered = _filter_jobs(all_jobs)
 
     st.caption(f"{len(filtered)} job(s)")
 

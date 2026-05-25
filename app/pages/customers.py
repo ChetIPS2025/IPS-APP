@@ -9,12 +9,10 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.headers import render_page_brand_header
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.components.record_modal import (
@@ -63,12 +61,10 @@ try:
     )
     from app.styles import inject_customers_module_css
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from components.record_modal import (  # type: ignore
@@ -182,9 +178,6 @@ _CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("OPEN ESTIMATES", None),
     ("STATUS", "status"),
 ]
-_CUSTOMER_FILTER_FIELDS = ["status"]
-_STATE_FILTER_ALL = "Filter by Location State"
-_LOCATION_FILTER_ALL = "Filter by Customer Location"
 SELECTED_CONTACT_KEY = "selected_contact_id"
 SHOW_CONTACT_MODAL_KEY = "show_contact_detail_modal"
 _ALL_CONTACT_IDS_KEY = "_ips_contacts_visible_ids"
@@ -410,29 +403,8 @@ def _enrich_list_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _filter_customers(
-    rows: list[dict],
-    *,
-    q: str,
-    state: str,
-    location: str,
-) -> list[dict]:
-    out = rows
-    if q:
-        ql = q.lower()
-        out = [
-            c
-            for c in out
-            if ql in _customer_name(c).lower()
-            or ql in _customer_city(c).lower()
-            or ql in _customer_state(c).lower()
-            or ql in _customer_primary_location(c).lower()
-        ]
-    if state and state not in ("All States", _STATE_FILTER_ALL):
-        out = [c for c in out if _customer_state(c) == state]
-    if location and location not in ("All Locations", _LOCATION_FILTER_ALL):
-        out = [c for c in out if _customer_primary_location(c) == location]
-    return apply_column_filters(out, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
+def _filter_customers(rows: list[dict]) -> list[dict]:
+    return apply_column_filters(rows, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
 
 
 def _location_name_map(locations: list[dict]) -> dict[str, dict]:
@@ -2402,19 +2374,16 @@ def render() -> None:
 
     all_rows = _enrich_list_rows(get_customers())
     filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
-    states = sorted(
-        {_customer_state(c) for c in all_rows if _customer_state(c) != "—"}
-    )
-    locations = sorted(
-        {_customer_primary_location(c) for c in all_rows if _customer_primary_location(c) != "—"}
-    )
 
-    hdr_l, hdr_r = st.columns([3, 1])
-    with hdr_l:
-        render_page_header("Customers", "Manage customer companies, locations, and contacts.")
-    with hdr_r:
+    def _customers_new() -> None:
         if st.button("+ New Customer", key="cust_new", type="primary", use_container_width=True):
             st.session_state["ips_cust_form"] = True
+
+    render_page_brand_header(
+        "Customers",
+        "Manage customer companies, locations, and contacts.",
+        actions=[_customers_new],
+    )
 
     if st.session_state.get("ips_cust_form"):
         with st.container(border=True):
@@ -2467,52 +2436,7 @@ def render() -> None:
                     st.session_state.pop("ips_cust_form", None)
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search customers...",
-                key="cust_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "State",
-                [_STATE_FILTER_ALL, *states],
-                key="cust_filter_state",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Location",
-                [_LOCATION_FILTER_ALL, *locations],
-                key="cust_filter_location",
-                label_visibility="collapsed",
-            )
-        with c4:
-            if st.button("Clear", key="cust_clear", use_container_width=True):
-                clear_table_filters(
-                    _CUSTOMERS_TABLE_KEY,
-                    _CUSTOMER_FILTER_FIELDS,
-                    extra_keys=[
-                        "cust_search",
-                        "cust_filter_state",
-                        "cust_filter_location",
-                    ],
-                )
-                st.session_state["cust_filter_state"] = _STATE_FILTER_ALL
-                st.session_state["cust_filter_location"] = _LOCATION_FILTER_ALL
-                st.rerun()
-
-    layout_filter_bar(_filters)
-
-    filtered = _filter_customers(
-        all_rows,
-        q=str(st.session_state.get("cust_search") or "").strip(),
-        state=str(st.session_state.get("cust_filter_state") or _STATE_FILTER_ALL),
-        location=str(st.session_state.get("cust_filter_location") or _LOCATION_FILTER_ALL),
-    )
+    filtered = _filter_customers(all_rows)
 
     st.caption(f"{len(filtered)} customer(s)")
 

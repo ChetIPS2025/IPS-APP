@@ -9,7 +9,7 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.components.clickable_table import render_clickable_table
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
@@ -40,7 +40,7 @@ try:
 except ImportError:
     from auth import current_role  # type: ignore
     from components.clickable_table import render_clickable_table  # type: ignore
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -235,12 +235,15 @@ def render() -> None:
     active_id = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
     default_name = next((n for n, eid in emp_opts.items() if eid == active_id), names[0] if names else "")
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Employee Documents", "Store licenses, training records, and HR files.")
-    with act_r:
+    def _doc_upload() -> None:
         if st.button("+ Upload Document", key="doc_upload", type="primary", use_container_width=True):
             st.session_state["ips_doc_form_open"] = True
+
+    render_page_brand_header(
+        "Employee Documents",
+        "Store licenses, training records, and HR files.",
+        actions=[_doc_upload],
+    )
 
     if not hr_ok:
         st.markdown(

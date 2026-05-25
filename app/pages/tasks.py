@@ -8,7 +8,7 @@ import re
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -65,7 +65,7 @@ try:
     from app.styles import inject_tasks_module_css
     from app.utils.formatting import fmt_date
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -1071,12 +1071,15 @@ def render() -> None:
     ]
     filter_options = build_filter_options(enriched_tasks, _COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Tasks", "Track to-dos, assignments, and linked jobs or estimates.")
-    with act_r:
+    def _task_new() -> None:
         if st.button("+ New Task", key="task_new", type="primary", use_container_width=True):
             st.session_state["ips_task_form"] = True
+
+    render_page_brand_header(
+        "Tasks",
+        "Track to-dos, assignments, and linked jobs or estimates.",
+        actions=[_task_new],
+    )
 
     def _filters() -> None:
         _render_task_view_selector()

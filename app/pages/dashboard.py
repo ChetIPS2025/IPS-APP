@@ -11,7 +11,7 @@ try:
     from app.auth import current_profile
     from app.components.cards import render_kpi_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
-    from app.components.headers import render_dashboard_quick_actions, render_page_header
+    from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.pages._core._data import (
@@ -29,7 +29,7 @@ except ImportError:
     from auth import current_profile  # type: ignore
     from components.cards import render_kpi_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
-    from components.headers import render_dashboard_quick_actions, render_page_header  # type: ignore
+    from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from pages._core._data import (  # type: ignore
@@ -73,10 +73,7 @@ def render() -> None:
         return
     start, end = _date_range_state()
 
-    hdr_l, hdr_r = st.columns([3, 1])
-    with hdr_l:
-        render_page_header("Dashboard", f"Welcome back, {_welcome_name()}!")
-    with hdr_r:
+    def _dash_period() -> None:
         dr = st.date_input(
             "Period",
             value=(start, end),
@@ -86,7 +83,15 @@ def render() -> None:
         if isinstance(dr, tuple) and len(dr) == 2:
             st.session_state["ips_dash_date_start"] = dr[0]
             st.session_state["ips_dash_date_end"] = dr[1]
+
+    def _dash_customize() -> None:
         st.button("Customize", key="ips_dash_customize", use_container_width=True)
+
+    render_page_brand_header(
+        "Dashboard",
+        f"Welcome back, {_welcome_name()}!",
+        actions=[_dash_period, _dash_customize],
+    )
 
     kpis = load_dashboard_kpis()
     ot = "d" + "iv"

@@ -7,7 +7,7 @@ try:
     from app.components.cards import render_card, render_metric_card
     from app.components.empty_states import render_empty_state
     from app.components.forms import render_dropdown
-    from app.components.headers import render_page_header
+    from app.components.headers import render_main_brand_bar, render_page_brand_header, render_page_header
     from app.components.layout import (
         render_filter_bar,
         render_page_shell,
@@ -25,7 +25,7 @@ except ImportError:
     from components.cards import render_card, render_metric_card  # type: ignore
     from components.empty_states import render_empty_state  # type: ignore
     from components.forms import render_dropdown  # type: ignore
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_main_brand_bar, render_page_brand_header, render_page_header  # type: ignore
     from components.layout import (  # type: ignore
         render_filter_bar,
         render_page_shell,
@@ -52,6 +52,8 @@ __all__ = [
     "render_filter_bar",
     "render_tab_placeholder",
     "render_metric_card",
+    "render_main_brand_bar",
+    "render_page_brand_header",
     "render_page_header",
     "render_page_shell",
     "render_selected_detail_panel",

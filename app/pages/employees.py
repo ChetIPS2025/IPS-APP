@@ -10,7 +10,7 @@ import streamlit as st
 try:
     from app.auth import current_profile, current_role
     from app.components.user_actions import render_user_action_buttons
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -58,7 +58,7 @@ try:
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from components.user_actions import render_user_action_buttons  # type: ignore
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -750,16 +750,18 @@ def render() -> None:
     all_emp = load_employees()
     filter_options = build_filter_options(all_emp, _USER_COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Users", "Manage system users, roles, and permissions.")
-    with act_r:
-        exp_col, add_col = st.columns(2, gap="small")
-        with exp_col:
-            st.button("Export", key="users_export", use_container_width=True)
-        with add_col:
-            if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
-                st.session_state["ips_emp_form"] = True
+    def _users_export() -> None:
+        st.button("Export", key="users_export", use_container_width=True)
+
+    def _users_new() -> None:
+        if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
+            st.session_state["ips_emp_form"] = True
+
+    render_page_brand_header(
+        "Users",
+        "Manage system users, roles, and permissions.",
+        actions=[_users_export, _users_new],
+    )
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New User", expanded=True):

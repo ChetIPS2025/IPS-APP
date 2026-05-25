@@ -35,6 +35,35 @@ def get_header_logo_path() -> Path | None:
     return None
 
 
+def get_wording_logo_path() -> Path | None:
+    """Horizontal Industrial Plant Solutions wording logo for the main content header bar."""
+    for name in (
+        "ips_wording_logo.png",
+        "IPS Wording Logo.png",
+        "ips_logo_wide.png",
+        "IPS LOGO WIDE.png",
+    ):
+        path = _ASSETS_DIR / name
+        if path.is_file():
+            return path
+    pdf = _ASSETS_DIR / "IPS Wording Logo.pdf"
+    if pdf.is_file():
+        try:
+            import fitz  # PyMuPDF
+
+            doc = fitz.open(pdf)
+            page = doc.load_page(0)
+            pix = page.get_pixmap(alpha=True, dpi=200)
+            out = _ASSETS_DIR / "ips_wording_logo.png"
+            pix.save(str(out))
+            doc.close()
+            if out.is_file():
+                return out
+        except Exception:
+            pass
+    return _find_wide_logo()
+
+
 @lru_cache(maxsize=4)
 def _logo_data_uri(path_str: str) -> str:
     path = Path(path_str)
@@ -45,6 +74,20 @@ def _logo_data_uri(path_str: str) -> str:
         mime = "image/webp"
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+def wording_logo_html(*, height: int = 46, alt: str = "Industrial Plant Solutions") -> str:
+    """Inline wording logo for the light-gray main content header bar."""
+    path = get_wording_logo_path()
+    if not path:
+        return (
+            f'<span class="ips-main-header-logo-fallback">{html.escape(alt)}</span>'
+        )
+    src = _logo_data_uri(str(path))
+    return (
+        f'<img class="ips-main-header-logo" src="{src}" alt="{html.escape(alt)}" '
+        f'height="{int(height)}" />'
+    )
 
 
 def header_logo_html(*, height: int = 40, alt: str = "IPS") -> str:
@@ -87,20 +130,11 @@ def apply_branding() -> None:
         }
 
         .ips-page-title {
-            color: #111827;
-            font-size: 1.45rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin: 0 0 0.12rem 0;
-            line-height: 1.15;
+            /* Title sizing lives in app/styles.py inject_global_css */
         }
 
         .ips-page-subtitle {
-            color: #1f2937;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.28rem;
-            line-height: 1.35;
+            /* Subtitle sizing lives in app/styles.py inject_global_css */
         }
 
         .ips-page-help {

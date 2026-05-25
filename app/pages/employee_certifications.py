@@ -9,7 +9,7 @@ from functools import partial
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -61,7 +61,7 @@ try:
     from app.utils.constants import CERTIFICATION_TYPES
     from app.utils.formatting import fmt_date
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -790,12 +790,15 @@ def render() -> None:
     if default_filter not in filter_names:
         default_filter = "All Employees"
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Employee Certifications", "Track credentials, expirations, and compliance.")
-    with act_r:
+    def _cert_add() -> None:
         if st.button("+ Add Certification", key="cert_add", type="primary", use_container_width=True):
             st.session_state["ips_cert_form_open"] = True
+
+    render_page_brand_header(
+        "Employee Certifications",
+        "Track credentials, expirations, and compliance.",
+        actions=[_cert_add],
+    )
 
     all_certs = load_all_certifications()
     expired_n, expiring_n = certification_alerts(all_certs)

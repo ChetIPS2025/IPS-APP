@@ -11,7 +11,7 @@ try:
     from app.auth import current_role
     from app.components.action_styles import danger_outline_button
     from app.components.modal_delete import modal_danger_zone, render_modal_delete_panel
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -65,7 +65,7 @@ except ImportError:
     from auth import current_role  # type: ignore
     from components.action_styles import danger_outline_button  # type: ignore
     from components.modal_delete import modal_danger_zone, render_modal_delete_panel  # type: ignore
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -737,15 +737,15 @@ def render() -> None:
     rows = _load_rows()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header(
-            "Pricing Guide",
-            "Master estimating database: inventory-linked items, labor, equipment, travel, subcontractors, and more.",
-        )
-    with act_r:
+    def _pg_new() -> None:
         if st.button("+ New Pricing Item", key="pg_add", type="primary", use_container_width=True):
             st.session_state["pg_add_form"] = True
+
+    render_page_brand_header(
+        "Pricing Guide",
+        "Master estimating database: inventory-linked items, labor, equipment, travel, subcontractors, and more.",
+        actions=[_pg_new],
+    )
 
     _render_summary_cards(rows)
 

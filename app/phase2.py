@@ -116,6 +116,14 @@ def render_module(slug: str | None = None) -> None:
     fn = BUILT_MODULES.get(active)
     if fn:
         try:
+            try:
+                from app.components.headers import render_main_brand_bar
+                from app.styles import inject_global_css
+            except ImportError:
+                from components.headers import render_main_brand_bar  # type: ignore
+                from styles import inject_global_css  # type: ignore
+            inject_global_css()
+            render_main_brand_bar()
             fn()  # type: ignore[operator]
         except Exception as exc:
             st.error(f"This page encountered an error: {exc}")
@@ -133,6 +141,4 @@ def render_module(slug: str | None = None) -> None:
         from styles import inject_global_css  # type: ignore
 
     inject_global_css()
-    label = active.replace("_", " ").title()
-    render_page_header(label, "This module is not available yet.")
     st.markdown('<p class="ips-module-placeholder">Module not found.</p>', unsafe_allow_html=True)

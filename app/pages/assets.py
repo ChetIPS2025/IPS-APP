@@ -9,12 +9,10 @@ import streamlit as st
 
 try:
     from app.components.asset_actions import render_asset_action_buttons
-    from app.components.headers import render_page_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.headers import render_page_brand_header
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.components.record_modal import (
@@ -62,16 +60,14 @@ try:
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
-    from app.services.asset_kits_service import asset_is_kit, kit_item_names_by_parent
+    from app.services.asset_kits_service import asset_is_kit
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
 except ImportError:
     from components.asset_actions import render_asset_action_buttons  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from components.record_modal import (  # type: ignore
@@ -118,7 +114,7 @@ except ImportError:
         summary_card_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from services.asset_kits_service import asset_is_kit, kit_item_names_by_parent  # type: ignore
+    from services.asset_kits_service import asset_is_kit  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
 
 _SEL = select_key("assets")
@@ -141,7 +137,6 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("ASSIGNED TO", None),
     ("NEXT SERVICE DUE", None),
 ]
-_FILTER_FIELDS = ["category", "location", "department", "status"]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
     ("location", lambda r: _asset_location(r)),
@@ -434,54 +429,8 @@ def _render_custom_assets_table(
     return all_asset_ids
 
 
-def _kit_search_index() -> dict[str, list[str]]:
-    return kit_item_names_by_parent()
-
-
-def _filter_rows(
-    rows: list[dict],
-    *,
-    q: str,
-) -> list[dict]:
-    out = rows
-    if q:
-        ql = q.lower()
-        kit_index = _kit_search_index()
-
-        def _matches(r: dict) -> bool:
-            aid = str(r.get("id") or "")
-            if ql in _asset_number(r).lower():
-                return True
-            if ql in _asset_name(r).lower():
-                return True
-            if ql in _asset_category(r).lower():
-                return True
-            if ql in _asset_location(r).lower():
-                return True
-            if ql in _asset_department(r).lower():
-                return True
-            if ql in _asset_assigned_to(r).lower():
-                return True
-            if ql in _normalize_asset_status(r.get("status")).lower():
-                return True
-            if ql in _asset_serial(r).lower():
-                return True
-            if ql in str(r.get("assigned_to_name") or "").lower():
-                return True
-            if ql in str(r.get("kit_type") or "").lower():
-                return True
-            for item_name in kit_index.get(aid, []):
-                if ql in item_name:
-                    return True
-            return False
-
-        out = [r for r in out if _matches(r)]
-    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
-
-
-def _clear_asset_filters() -> None:
-    clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=["ast_search"])
-    _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
+def _filter_rows(rows: list[dict]) -> list[dict]:
+    return apply_column_filters(rows, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
 def _clear_assets_detail_modal() -> None:
@@ -1121,16 +1070,18 @@ def render() -> None:
         rows = load_assets()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
-    act_l, act_r = st.columns([3, 1])
-    with act_l:
-        render_page_header("Assets", "Track and manage all company assets and equipment.")
-    with act_r:
-        exp_col, add_col = st.columns(2, gap="small")
-        with exp_col:
-            st.button("Export", key="ast_export", use_container_width=True)
-        with add_col:
-            if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
-                st.session_state["ips_ast_form"] = True
+    def _assets_export() -> None:
+        st.button("Export", key="ast_export", use_container_width=True)
+
+    def _assets_new() -> None:
+        if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
+            st.session_state["ips_ast_form"] = True
+
+    render_page_brand_header(
+        "Assets",
+        "Track and manage all company assets and equipment.",
+        actions=[_assets_export, _assets_new],
+    )
 
     render_kit_accountability_summary()
 
@@ -1178,24 +1129,7 @@ def render() -> None:
                     st.success("Asset saved.")
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search assets...",
-                key="ast_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.button("Clear", key="ast_clear", use_container_width=True, on_click=_clear_asset_filters)
-
-    layout_filter_bar(_filters)
-
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("ast_search") or "").strip(),
-    )
+    filtered = _filter_rows(rows)
 
     st.caption(f"{len(filtered)} asset(s)")
 

@@ -3,55 +3,107 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 
 import streamlit as st
 
 try:
-    from app.branding import header_logo_html
+    from app.branding import wording_logo_html
 except ImportError:
-    from branding import header_logo_html  # type: ignore
+    from branding import wording_logo_html  # type: ignore
+
+_ActionFn = Callable[[], None]
+
+
+def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None) -> None:
+    """Light-gray IPS wording logo bar — call once per page (via phase2 shell)."""
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    logo = wording_logo_html(height=46)
+    st.markdown(
+        f'<{ot} class="ips-main-header">'
+        f'<{ot} class="ips-main-header-brand">{logo}</{ct}>'
+        f'<{ot} class="ips-main-header-actions-slot"></{ct}>'
+        f"</{ct}>",
+        unsafe_allow_html=True,
+    )
+    if brand_actions:
+        ba_cols = st.columns([5, 1], gap="small")
+        with ba_cols[1]:
+            st.markdown(f'<{ot} class="ips-main-header-actions">', unsafe_allow_html=True)
+            for fn in brand_actions:
+                fn()
+            st.markdown(f"</{ct}>", unsafe_allow_html=True)
+
+
+def render_page_brand_header(
+    title: str,
+    subtitle: str | None = None,
+    *,
+    actions: list[_ActionFn] | None = None,
+    brand_actions: list[_ActionFn] | None = None,
+    include_brand_bar: bool = False,
+) -> None:
+    """
+    Compact page title row below the global brand bar.
+
+    Set ``include_brand_bar=True`` only for standalone pages outside ``render_module``.
+    """
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
+
+    if include_brand_bar:
+        render_main_brand_bar(brand_actions=brand_actions)
+
+    sub_html = (
+        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
+        if subtitle
+        else ""
+    )
+    title_block = (
+        f'<{ot} class="ips-page-title-block">'
+        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
+        f"{sub_html}"
+        f"</{ct}>"
+    )
+
+    if actions:
+        main_col, act_col = st.columns([3.2, 1], gap="small", vertical_alignment="top")
+        with main_col:
+            st.markdown(
+                f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+                unsafe_allow_html=True,
+            )
+        with act_col:
+            st.markdown(f'<{ot} class="ips-page-actions">', unsafe_allow_html=True)
+            n = len(actions)
+            if n <= 2:
+                ac1, ac2 = st.columns(2, gap="small")
+                cols = [ac1, ac2]
+            else:
+                cols = st.columns(min(n, 3), gap="small")
+            for i, widget in enumerate(actions):
+                with cols[i % len(cols)]:
+                    widget()
+            st.markdown(f"</{ct}>", unsafe_allow_html=True)
+    else:
+        st.markdown(
+            f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_page_header(
     title: str,
     subtitle: str = "",
     *,
-    actions_cols: list | None = None,
+    actions_cols: list[_ActionFn] | None = None,
+    actions: list[_ActionFn] | None = None,
     show_logo: bool = False,
 ) -> None:
-    """Compact page header row with optional logo, title, subtitle, and actions."""
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
-
-    logo = header_logo_html(height=40) if show_logo else ""
-    sub = (
-        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
-        if subtitle
-        else ""
-    )
-    header_html = (
-        f'<{ot} class="ips-page-header-bar">'
-        f"{logo}"
-        f'<{ot} class="ips-page-header-text">'
-        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
-        f"{sub}"
-        f"</{ct}>"
-        f"</{ct}>"
-    )
-
-    if actions_cols:
-        main_col, act_col = st.columns([4, 1], gap="small", vertical_alignment="center")
-        with main_col:
-            st.markdown(header_html, unsafe_allow_html=True)
-        with act_col:
-            st.markdown(f'<{ot} class="ips-header-actions">', unsafe_allow_html=True)
-            ac1, ac2 = st.columns(2, gap="small")
-            for i, widget in enumerate(actions_cols):
-                with ac1 if i % 2 == 0 else ac2:
-                    widget()
-            st.markdown(f"</{ct}>", unsafe_allow_html=True)
-    else:
-        st.markdown(header_html, unsafe_allow_html=True)
+    """Backward-compatible wrapper around ``render_page_brand_header``."""
+    _ = show_logo  # sidebar logo only; never render page title icon
+    merged = actions or actions_cols
+    render_page_brand_header(title, subtitle or None, actions=merged)
 
 
 def _initials(name: str) -> str:

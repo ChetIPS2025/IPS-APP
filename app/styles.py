@@ -3557,9 +3557,38 @@ section[data-testid="stMain"] > div,
   background: {APP_BG} !important;
 }}
 section[data-testid="stMain"] .block-container {{
-  max-width: 1680px !important;
-  padding-top: 0.15rem !important;
-  padding-bottom: 0.85rem !important;
+  max-width: 100% !important;
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 2rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
+  padding-left: 28px;
+  padding-right: 28px;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker),
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-main-header) {{
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions) {{
+  margin-top: -0.15rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-actions),
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions) {{
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) .ips-page-actions [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+  width: 100% !important;
+  gap: 0.45rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) .ips-page-actions .stButton > button {{
+  min-height: 2.05rem !important;
+  white-space: nowrap !important;
 }}
 
 /* Reclaim Streamlit default top chrome (Deploy bar, menu, decoration) */
@@ -3579,28 +3608,6 @@ footer {{
 }}
 [data-testid="stAppViewContainer"] > section.main > div {{
   padding-top: 0 !important;
-}}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {{
-  padding-top: 0.1rem !important;
-}}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child {{
-  align-items: center !important;
-  gap: 0.65rem !important;
-  margin-bottom: 0.35rem !important;
-  padding-bottom: 0.45rem !important;
-  border-bottom: 1px solid {BORDER} !important;
-}}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child [data-testid="column"]:last-child {{
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-}}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) > div > [data-testid="stVerticalBlock"] > div > [data-testid="stHorizontalBlock"]:first-child [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
-  justify-content: flex-end !important;
-  width: 100% !important;
-}}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-header-bar) {{
-  margin-bottom: 0 !important;
 }}
 
 /* Sidebar */
@@ -3685,53 +3692,127 @@ section[data-testid="stSidebar"] .block-container {{
   line-height: 1.2;
 }}
 
-/* Page header */
-.ips-page-header,
-.ips-page-header-bar {{
+/* Page header — light-gray brand bar + title row */
+.ips-page-shell-marker {{
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.ips-main-header {{
+  background: #f3f6fa;
+  border-bottom: 1px solid #dbe3ee;
+  padding: 12px 28px;
+  min-height: 68px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}}
+.ips-main-header-brand {{
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+}}
+.ips-main-header-logo {{
+  height: 46px;
+  width: auto;
+  max-width: 430px;
+  object-fit: contain;
+  display: block;
+  background: transparent;
+}}
+.ips-main-header-logo-fallback {{
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}}
+.ips-main-header-actions,
+.ips-main-header-actions-slot {{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}}
+.ips-page-content {{
+  padding: 22px 28px 32px 28px;
+}}
+.ips-page-header {{
+  margin: 0 0 18px 0;
+}}
+.ips-page-header-bar {{
+  display: none !important;
+}}
+.ips-page-title-row {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}}
+.ips-page-title-block {{
   min-width: 0;
 }}
 .ips-page-header-logo-wrap {{
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border-radius: 0;
-  padding: 0;
-  border: none;
-  box-shadow: none;
-}}
-.ips-page-header-logo {{
-  display: block;
-  height: 40px;
-  width: auto;
-  max-width: 52px;
-  object-fit: contain;
-  background: transparent;
+  display: none !important;
 }}
 .ips-page-header-text {{
   flex: 1 1 auto;
   min-width: 0;
 }}
 .ips-page-title {{
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: {TEXT};
   margin: 0;
+  font-size: 36px;
+  line-height: 1.1;
+  font-weight: 850;
+  color: #0f172a;
   letter-spacing: -0.02em;
-  line-height: 1.2;
 }}
 .ips-page-subtitle {{
-  font-size: 0.78rem;
-  color: {TEXT_MUTED};
-  margin: 0.12rem 0 0;
+  margin-top: 8px;
+  font-size: 15px;
+  color: #64748b;
   line-height: 1.35;
+}}
+.ips-page-actions {{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}}
+@media (max-width: 900px) {{
+  .ips-main-header {{
+    padding: 10px 18px;
+    min-height: 58px;
+  }}
+  .ips-main-header-logo {{
+    height: 36px;
+    max-width: 85%;
+  }}
+  .ips-page-content {{
+    padding: 18px 16px 28px 16px;
+  }}
+  section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
+    padding-left: 16px;
+    padding-right: 16px;
+  }}
+  .ips-page-title-row {{
+    flex-direction: column;
+    gap: 12px;
+  }}
+  .ips-page-title {{
+    font-size: 30px;
+  }}
+  .ips-page-actions {{
+    width: 100%;
+    justify-content: flex-start;
+  }}
 }}
 
 /* Filter bar */
@@ -4064,7 +4145,12 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.65rem;
+  margin-top: 18px;
   margin-bottom: 0.75rem;
+}}
+.ips-dashboard-metrics,
+.ips-metric-grid {{
+  margin-top: 18px;
 }}
 @media (max-width: 1200px) {{
   .ips-kpi-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
@@ -4609,8 +4695,8 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   border-bottom: 1px solid #f1f5f9;
 }}
 
-/* Page shell — marker class; Streamlit main area scoped via :has() */
-.ips-page-content {{
+/* Page shell marker — hidden; used for :has() layout scoping only */
+.ips-page-content-marker {{
   display: none !important;
   height: 0 !important;
   width: 0 !important;
@@ -4618,12 +4704,12 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   margin: 0 !important;
   padding: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-content) [data-testid="stMainBlockContainer"],
-section[data-testid="stMain"]:has(.ips-page-content) .block-container {{
-  max-width: 1680px !important;
+section[data-testid="stMain"]:has(.ips-page-content-marker) [data-testid="stMainBlockContainer"],
+section[data-testid="stMain"]:has(.ips-page-content-marker) .block-container {{
+  max-width: 100% !important;
   width: 100% !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-content) [data-testid="stElementContainer"] {{
+section[data-testid="stMain"]:has(.ips-page-content-marker) [data-testid="stElementContainer"] {{
   margin-bottom: 0.1rem !important;
 }}
 
