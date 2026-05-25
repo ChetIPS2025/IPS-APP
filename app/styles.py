@@ -3572,23 +3572,33 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElemen
   padding-left: 0 !important;
   padding-right: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions) {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker) {{
   margin-top: -0.15rem !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-actions),
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions) {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) {{
   display: flex !important;
-  align-items: flex-start !important;
-  justify-content: flex-end !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) .ips-page-actions [data-testid="stHorizontalBlock"] {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stHorizontalBlock"] {{
   justify-content: flex-end !important;
   width: 100% !important;
   gap: 0.45rem !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) .ips-page-actions .stButton > button {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button {{
   min-height: 2.05rem !important;
   white-space: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-main-header-actions-marker) {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-main-header-actions-marker) [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+  gap: 12px !important;
 }}
 
 /* Reclaim Streamlit default top chrome (Deploy bar, menu, decoration) */

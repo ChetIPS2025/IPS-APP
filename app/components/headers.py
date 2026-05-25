@@ -29,10 +29,12 @@ def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None) -> No
     if brand_actions:
         ba_cols = st.columns([5, 1], gap="small")
         with ba_cols[1]:
-            st.markdown(f'<{ot} class="ips-main-header-actions">', unsafe_allow_html=True)
+            st.markdown(
+                f'<span class="ips-main-header-actions-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             for fn in brand_actions:
                 fn()
-            st.markdown(f"</{ct}>", unsafe_allow_html=True)
 
 
 def render_page_brand_header(
@@ -74,7 +76,10 @@ def render_page_brand_header(
                 unsafe_allow_html=True,
             )
         with act_col:
-            st.markdown(f'<{ot} class="ips-page-actions">', unsafe_allow_html=True)
+            st.markdown(
+                '<span class="ips-page-actions-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             n = len(actions)
             if n <= 2:
                 ac1, ac2 = st.columns(2, gap="small")
@@ -84,7 +89,6 @@ def render_page_brand_header(
             for i, widget in enumerate(actions):
                 with cols[i % len(cols)]:
                     widget()
-            st.markdown(f"</{ct}>", unsafe_allow_html=True)
     else:
         st.markdown(
             f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
