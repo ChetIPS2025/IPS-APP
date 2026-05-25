@@ -2022,80 +2022,89 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v2">
-.ips-table-header-filter-wrap {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
+<style id="ips-table-header-filter-v3">
+.ips-table-header-filter-marker {
+  display: none !important;
 }
-.ips-table-header-filter-text {
-  flex: 1 1 auto;
-  min-width: 0;
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  display: inline-block;
+  vertical-align: middle;
 }
-.ips-table-header-filter-wrap [data-testid="stPopover"] {
-  flex: 0 0 auto;
+.ips-table-header-filter-text.ips-table-header-filter-active {
+  color: #2563eb !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stVerticalBlock"] {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  width: 100% !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stElementContainer"] {
   margin: 0 !important;
   padding: 0 !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
 }
-section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button,
-.ips-table-header-filter-wrap [data-testid="stPopover"] > button {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stElementContainer"]:first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+}
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0 2px !important;
+  padding: 0 !important;
   margin: 0 !important;
-  min-height: 20px !important;
-  max-height: 24px !important;
-  height: auto !important;
+  min-height: 18px !important;
+  max-height: 20px !important;
+  height: 18px !important;
   min-width: 18px !important;
-  width: auto !important;
-  max-width: none !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
+  width: 18px !important;
+  max-width: 18px !important;
   color: #64748b !important;
-  text-transform: none !important;
-  letter-spacing: 0 !important;
-  white-space: nowrap !important;
   justify-content: center !important;
-  line-height: 1 !important;
+  align-items: center !important;
 }
-section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover,
-.ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover {
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   color: #2563eb !important;
 }
-section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button p,
-.ips-table-header-filter-wrap [data-testid="stPopover"] > button p {
-  white-space: nowrap !important;
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button p {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
   margin: 0 !important;
-  line-height: 1 !important;
-  font-size: 11px !important;
+  padding: 0 !important;
 }
-.ips-table-header-filter-active-wrap .ips-table-header-filter-text {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
-}
-.ips-table-header-filter-active-wrap [data-testid="stPopover"] > button {
-  color: #2563eb !important;
-}
-.ips-table-header-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #0f172a;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.ips-table-header-filter-active {
-  color: #2563eb;
 }
 .ips-filter-dot {
   width: 6px;
@@ -5202,5 +5211,6 @@ section[data-testid="stMain"]:has(.ips-weekly-timesheets-page) [data-testid="stS
     except ImportError:
         from ui.clean_table import inject_clean_table_css  # type: ignore
     inject_clean_table_css()
+    inject_table_header_filter_css()
     inject_ips_dialog_styles()
     inject_action_colors_css()

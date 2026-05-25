@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v2"
+_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v3"
 
 
 def inject_table_header_filter_css_once() -> None:
@@ -116,22 +116,23 @@ def render_header_filter(
         option_set.add(val)
     merged = sorted(option_set, key=lambda s: (s == "—", s.lower()))
 
-    wrap_classes = wrap_class
-    if header_class:
-        wrap_classes += f" {header_class}"
-    if active:
-        wrap_classes += " ips-table-header-filter-active-wrap"
+    active_class = " ips-table-header-filter-active" if active else ""
 
     label_html = html.escape(label)
     if active:
         label_html += ' <span class="ips-filter-dot" aria-hidden="true"></span>'
 
     st.markdown(
-        f'<div class="{wrap_classes}">'
-        f'<span class="ips-table-header-filter-text">{label_html}</span>',
+        f'<span class="ips-table-header-filter-marker{active_class}" aria-hidden="true"></span>'
+        f'<span class="ips-table-header-filter-text{active_class}">{label_html}</span>',
         unsafe_allow_html=True,
     )
-    with st.popover("▾", help=f"Filter {label}"):
+    with st.popover(
+        " ",
+        help=f"Filter {label}",
+        icon=":material/keyboard_arrow_down:",
+        type="tertiary",
+    ):
         st.multiselect(
             f"Filter {label}",
             options=merged,
@@ -140,7 +141,6 @@ def render_header_filter(
         if st.button("Clear filter", key=f"clear_{table_key}_{field}_filter"):
             st.session_state[session_key] = []
             st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_table_header_cell(
