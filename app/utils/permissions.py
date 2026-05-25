@@ -19,6 +19,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             ("inventory",),
             ("assets",),
             ("timekeeping",),
+            ("weekly_timesheets",),
             ("employees",),
             ("employee_certifications",),
             ("employee_documents",),
@@ -42,6 +43,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "inventory",
             "assets",
             "timekeeping",
+            "weekly_timesheets",
             "employees",
             "employee_certifications",
             "employee_documents",
@@ -64,6 +66,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "inventory",
             "assets",
             "timekeeping",
+            "weekly_timesheets",
             "employees",
             "employee_certifications",
             "employee_documents",
@@ -122,6 +125,11 @@ def can_view_field_certifications(role: str) -> bool:
 
 def can_view_own_documents_only(role: str) -> bool:
     return normalize_role(role) == "employee"
+
+
+def can_manage_weekly_timesheets(role: str) -> bool:
+    """Generate, edit, approve, and void weekly job timesheets."""
+    return normalize_role(role) in {"admin", "supervisor", "project manager"}
 
 
 def filter_nav_for_role(

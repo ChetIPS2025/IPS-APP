@@ -28,6 +28,7 @@ try:
         settings,
         tasks,
         timekeeping,
+        weekly_timesheets,
     )
     from app.pages._core._session import clear_all_module_selections, nav_slug
     from app.utils.constants import SESSION_NAV_KEY
@@ -54,6 +55,7 @@ except ImportError:
         settings,
         tasks,
         timekeeping,
+        weekly_timesheets,
     )
     from pages._core._session import clear_all_module_selections, nav_slug  # type: ignore
     from utils.constants import SESSION_NAV_KEY  # type: ignore
@@ -70,6 +72,7 @@ BUILT_MODULES: dict[str, object] = {
     "inventory": inventory.render,
     "assets": assets.render,
     "timekeeping": timekeeping.render,
+    "weekly_timesheets": weekly_timesheets.render,
     "employees": employees.render,
     "users": employees.render,
     "employee_certifications": employee_certifications.render,

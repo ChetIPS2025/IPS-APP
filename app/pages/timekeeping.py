@@ -779,3 +779,17 @@ def render() -> None:
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()
+
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import role_can_access_page
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import role_can_access_page  # type: ignore
+    if role_can_access_page(current_role(), "weekly_timesheets"):
+        st.divider()
+        st.markdown("**Weekly job timesheets**")
+        st.caption("Build customer-facing weekly timesheets from timekeeping hours and job expenses.")
+        if st.button("Open Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
+            st.session_state["ips_nav_page"] = "weekly_timesheets"
+            st.rerun()

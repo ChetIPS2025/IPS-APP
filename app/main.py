@@ -217,6 +217,16 @@ def main() -> None:
         render_asset_scan_page()
         st.stop()
 
+    _tsign = str(st.query_params.get("tsign") or "").strip()
+    if _tsign:
+        try:
+            from app.pages.sign_timesheet import render_public as render_sign_timesheet_public
+        except ImportError:
+            from pages.sign_timesheet import render_public as render_sign_timesheet_public  # type: ignore
+        inject_unauthenticated_shell_css()
+        render_sign_timesheet_public(_tsign)
+        st.stop()
+
     if not is_authenticated():
         _render_login()
         if not is_authenticated():

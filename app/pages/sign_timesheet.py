@@ -59,7 +59,11 @@ def render_public(sign_token: str) -> None:
         st.error("Missing token.")
         return
 
-    rows = fetch_by_match_admin("job_weekly_timesheets", {"sign_token": tok}, limit=1)
+    rows = fetch_by_match_admin("weekly_job_timesheets", {"sign_token": tok}, limit=1)
+    ts_table = "weekly_job_timesheets"
+    if not rows:
+        rows = fetch_by_match_admin("job_weekly_timesheets", {"sign_token": tok}, limit=1)
+        ts_table = "job_weekly_timesheets"
     if not rows:
         render_header("Sign timesheet")
         st.error("Timesheet not found or link is invalid.")
@@ -86,8 +90,8 @@ def render_public(sign_token: str) -> None:
         except ValueError:
             pass
 
-    unsigned_path = str(ts.get("unsigned_pdf_url") or "").strip()
-    signed_path = str(ts.get("signed_pdf_url") or "").strip()
+    unsigned_path = str(ts.get("unsigned_pdf_url") or ts.get("pdf_file_url") or "").strip()
+    signed_path = str(ts.get("signed_pdf_url") or ts.get("pdf_file_url") or "").strip()
     show_path = signed_path if signed_path and status == "Signed" else unsigned_path
     if show_path:
         try:
@@ -187,7 +191,7 @@ def render_public(sign_token: str) -> None:
     else:
         st.caption("No time entries found for this week.")
     st.markdown(f"**Total hours:** {total_hours:,.2f}")
-    note = str(ts.get("notes") or "").strip()
+    note = str(ts.get("work_performed") or ts.get("notes") or "").strip()
     if note:
         st.subheader("Work summary / notes")
         st.write(note)
@@ -226,8 +230,8 @@ def render_public(sign_token: str) -> None:
 
     if reject:
         update_rows_admin(
-            "job_weekly_timesheets",
-            {"status": "Rejected", "notes": "Rejected by customer", "signed_at": datetime.now(timezone.utc).isoformat()},
+            ts_table,
+            {"status": "Rejected", "signed_at": datetime.now(timezone.utc).isoformat()},
             {"id": ts["id"]},
         )
         st.success("Rejected.")
@@ -253,23 +257,47 @@ def render_public(sign_token: str) -> None:
         st.stop()
 
     # Build signed PDF by regenerating with signature.
-    ws = ws_s
-    we = we_s
-    signed_pdf = build_timesheet_pdf_bytes(
-        job=job,
-        customer=cust,
-        location=loc,
-        week_start=date.fromisoformat(ws) if ws else datetime.now().date(),
-        time_entries=time_rows,
-        signer_name=signer_name.strip(),
-        signer_email=signer_email.strip(),
-        signer_title=signer_title.strip(),
-        signature_data=sig_b64,
-        work_summary=note,
-        signed_at_utc=datetime.now(timezone.utc),
-    )
-    job_num = str(job.get("job_number") or job.get("job_id") or "").strip() or str(ts.get("job_id"))[:8]
-    storage_path = f"job_timesheets/{job_num}/{ws}/signed.pdf"
+    if ts_table == "weekly_job_timesheets":
+        try:
+            from app.services.weekly_job_timesheet_service import (
+                build_timesheet_pdf_bytes as build_wjt_pdf,
+                load_timesheet_data,
+            )
+        except ImportError:
+            from services.weekly_job_timesheet_service import (  # type: ignore
+                build_timesheet_pdf_bytes as build_wjt_pdf,
+                load_timesheet_data,
+            )
+        data = load_timesheet_data(str(ts["id"]))
+        if not data:
+            st.error("Could not load timesheet data.")
+            st.stop()
+        data.approved_by = signer_name.strip()
+        sig_val = sig_b64 or ""
+        if sig_val and not str(sig_val).startswith("data:"):
+            sig_val = f"data:image/png;base64,{sig_val}"
+        data.signature_data = sig_val
+        data.signed_at = datetime.now(timezone.utc).isoformat()[:19]
+        data.status = "Signed"
+        signed_pdf = build_wjt_pdf(data)
+        job_num = str(data.job_number or job.get("job_number") or "")[:32] or str(ts.get("job_id"))[:8]
+        storage_path = f"weekly_job_timesheets/{job_num}/{ws_s}/signed.pdf"
+    else:
+        signed_pdf = build_timesheet_pdf_bytes(
+            job=job,
+            customer=cust,
+            location=loc,
+            week_start=date.fromisoformat(ws_s) if ws_s else datetime.now().date(),
+            time_entries=time_rows,
+            signer_name=signer_name.strip(),
+            signer_email=signer_email.strip(),
+            signer_title=signer_title.strip(),
+            signature_data=sig_b64,
+            work_summary=note,
+            signed_at_utc=datetime.now(timezone.utc),
+        )
+        job_num = str(job.get("job_number") or job.get("job_id") or "").strip() or str(ts.get("job_id"))[:8]
+        storage_path = f"job_timesheets/{job_num}/{ws_s}/signed.pdf"
     upload_bytes_admin(storage_path, signed_pdf, content_type="application/pdf")
 
     ua = request_user_agent()
@@ -281,21 +309,22 @@ def render_public(sign_token: str) -> None:
             ip = str(hdrs.get("x-forwarded-for") or hdrs.get("X-Forwarded-For") or "")[:120]
     except Exception:
         ip = ""
-    update_rows_admin(
-        "job_weekly_timesheets",
-        {
-            "status": "Signed",
-            "signed_at": datetime.now(timezone.utc).isoformat(),
-            "signed_by_name": signer_name.strip()[:250],
-            "signed_by_email": signer_email.strip()[:250],
-            "signed_by_title": signer_title.strip()[:250],
-            "signature_data": sig_b64,
-            "signed_pdf_url": storage_path,
-            "signed_by_user_agent": str(ua or "")[:500],
-            "signed_by_ip": ip,
-        },
-        {"id": ts["id"]},
-    )
+    sign_payload: dict[str, Any] = {
+        "status": "Signed",
+        "signed_at": datetime.now(timezone.utc).isoformat(),
+        "signed_by_name": signer_name.strip()[:250],
+        "signed_by_email": signer_email.strip()[:250],
+        "signature_data": sig_b64,
+        "pdf_file_url": storage_path,
+        "signed_by_user_agent": str(ua or "")[:500],
+        "signed_by_ip": ip,
+    }
+    if ts_table == "job_weekly_timesheets":
+        sign_payload["signed_by_title"] = signer_title.strip()[:250]
+        sign_payload["signed_pdf_url"] = storage_path
+    else:
+        sign_payload["approved_by"] = signer_name.strip()[:250]
+    update_rows_admin(ts_table, sign_payload, {"id": ts["id"]})
     st.success("Signed. Thank you.")
     st.stop()
 

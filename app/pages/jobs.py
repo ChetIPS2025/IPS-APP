@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
+    from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
     from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -37,6 +38,7 @@ try:
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
     from components.job_actions import render_job_action_buttons  # type: ignore
+    from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -70,6 +72,7 @@ _JOB_TABS = [
     "Inventory",
     "Schedule",
     "Tasks",
+    "Weekly Timesheets",
     "Documents",
     "Photos",
     "Daily Updates",
@@ -621,6 +624,72 @@ def _currency_value(value: object) -> str:
         return _safe_value(value)
 
 
+def _render_job_documents_tab(job: dict) -> None:
+    """Job-linked documents from documents_hub and approved weekly timesheets."""
+    jid = str(job.get("id") or "")
+    if not jid:
+        _render_dialog_placeholder("Save this job before attaching documents.")
+        return
+    try:
+        from app.db import fetch_by_match_admin, fetch_table_admin
+        from app.services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet
+    except ImportError:
+        from db import fetch_by_match_admin, fetch_table_admin  # type: ignore
+        from services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet  # type: ignore
+
+    docs: list[dict] = []
+    try:
+        hub = fetch_table_admin("documents_hub", limit=500, order_by="upload_date")
+        docs = [d for d in hub if str(d.get("linked_record_id") or "") == jid]
+    except Exception:
+        docs = []
+
+    ts_rows = [
+        r
+        for r in list_timesheets_for_job(jid)
+        if str(r.get("status") or "") in {"Approved", "Signed", "Sent", "Generated"}
+    ]
+
+    if not docs and not ts_rows:
+        _render_dialog_placeholder("No job documents yet. Approved weekly timesheets will appear here.")
+        return
+
+    if docs:
+        st.markdown("**Documents hub**")
+        for doc in sorted(docs, key=lambda d: str(d.get("upload_date") or ""), reverse=True):
+            name = str(doc.get("file_name") or doc.get("name") or "Document")
+            dtype = str(doc.get("doc_type") or "")
+            path = str(doc.get("storage_path") or "")
+            url = signed_url_for_timesheet(path) if path else ""
+            when = str(doc.get("upload_date") or "")[:10]
+            line = f"- **{html.escape(name)}** · {html.escape(dtype)} · {when}"
+            if url:
+                line += f' · <a href="{html.escape(url)}" target="_blank">Open</a>'
+            st.markdown(line, unsafe_allow_html=True)
+
+    if ts_rows:
+        st.markdown("**Weekly timesheets**")
+        for row in sorted(ts_rows, key=lambda r: str(r.get("week_start") or ""), reverse=True):
+            ws = str(row.get("week_start") or "")[:10]
+            status = str(row.get("status") or "")
+            pdf = str(row.get("pdf_path") or row.get("pdf_file_url") or "")
+            xls = str(row.get("excel_path") or row.get("excel_url") or "")
+            links: list[str] = []
+            if pdf:
+                u = signed_url_for_timesheet(pdf)
+                if u:
+                    links.append(f'<a href="{html.escape(u)}" target="_blank">PDF</a>')
+            if xls:
+                u = signed_url_for_timesheet(xls)
+                if u:
+                    links.append(f'<a href="{html.escape(u)}" target="_blank">Excel</a>')
+            link_html = " · ".join(links) if links else ""
+            st.markdown(
+                f"- Week **{ws}** · **{html.escape(status)}**" + (f" · {link_html}" if link_html else ""),
+                unsafe_allow_html=True,
+            )
+
+
 def _render_dialog_placeholder(message: str) -> None:
     st.markdown(
         f'<div class="ips-dialog-placeholder">{html.escape(message)}</div>',
@@ -690,6 +759,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_inventory,
         tab_schedule,
         tab_tasks,
+        tab_weekly_ts,
         tab_documents,
         tab_photos,
         tab_daily,
@@ -806,8 +876,19 @@ def _render_job_detail_tabs(job: dict) -> None:
         inject_tasks_module_css()
         render_job_linked_tasks_tab(job)
 
+    with tab_weekly_ts:
+        jid = str(job.get("id") or "").strip()
+        if jid:
+            render_weekly_timesheet_builder(
+                fixed_job_id=jid,
+                embedded=True,
+                key_prefix=f"job_wjt_{_job_session_key(job)}",
+            )
+        else:
+            _render_dialog_placeholder("Save this job before generating weekly timesheets.")
+
     with tab_documents:
-        _render_dialog_placeholder("Job documents will appear here when connected to Supabase.")
+        _render_job_documents_tab(job)
 
     with tab_photos:
         _render_dialog_placeholder("Job photos will appear here when connected to Supabase.")
