@@ -2022,7 +2022,7 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v3">
+<style id="ips-table-header-filter-v4">
 .ips-table-header-filter-marker {
   display: none !important;
 }
@@ -2036,75 +2036,84 @@ def inject_table_header_filter_css() -> None:
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  display: inline-block;
-  vertical-align: middle;
+  display: block;
 }
 .ips-table-header-filter-text.ips-table-header-filter-active {
   color: #2563eb !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stVerticalBlock"] {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
-  gap: 2px !important;
-  width: 100% !important;
-}
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stElementContainer"] {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stElementContainer"] {
   margin: 0 !important;
   padding: 0 !important;
-  width: auto !important;
-  flex: 0 0 auto !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stElementContainer"]:first-child {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
   flex: 1 1 auto !important;
   min-width: 0 !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] {
-  margin: 0 !important;
-  padding: 0 !important;
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
   flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 22px !important;
+  max-width: 28px !important;
 }
-section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
-section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child [data-testid="stElementContainer"] {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+}
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 18px !important;
-  max-height: 20px !important;
-  height: 18px !important;
-  min-width: 18px !important;
-  width: 18px !important;
-  max-width: 18px !important;
+  min-height: 16px !important;
+  max-height: 18px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  width: auto !important;
+  max-width: none !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
   color: #64748b !important;
   justify-content: center !important;
   align-items: center !important;
 }
-section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
-section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover {
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
+section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:hover,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button:hover {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   color: #2563eb !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button p {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button p {
+  white-space: nowrap !important;
   margin: 0 !important;
   padding: 0 !important;
+  line-height: 1 !important;
+  font-size: 12px !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
+}
+/* Hide Streamlit's built-in popover icon; label uses a single chevron character */
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button svg {
+  display: none !important;
 }
 .ips-filter-dot {
   width: 6px;
