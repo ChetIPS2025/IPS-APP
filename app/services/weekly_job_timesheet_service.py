@@ -328,6 +328,15 @@ def build_timesheet_pdf_bytes(data: WeeklyJobTimesheetData) -> bytes:
     return export_data_to_pdf(data)
 
 
+def _safe_admin_fetch(table: str, match: dict[str, Any], *, limit: int = 500) -> list[dict[str, Any]]:
+    try:
+        return fetch_by_match_admin(table, match, limit=limit) or []
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            return []
+        raise
+
+
 def _fetch_job(job_id: str) -> dict[str, Any]:
     rows = fetch_by_match_admin("jobs", {"id": job_id}, limit=1)
     return rows[0] if rows else {}
@@ -423,7 +432,7 @@ def _build_labor_from_time_entries(job_id: str, ws: date, we: date, emp_map: dic
 
 
 def _build_equipment_lines(job_id: str, ws: date, we: date) -> list[TimesheetLine]:
-    rows = fetch_by_match_admin("job_equipment", {"job_id": job_id}, limit=500)
+    rows = _safe_admin_fetch("job_equipment", {"job_id": job_id}, limit=500)
     lines: list[TimesheetLine] = []
     for row in rows:
         created = _parse_date(row.get("created_at"))
@@ -449,7 +458,7 @@ def _build_equipment_lines(job_id: str, ws: date, we: date) -> list[TimesheetLin
 
 def _build_material_lines(job_id: str, ws: date, we: date) -> list[TimesheetLine]:
     lines: list[TimesheetLine] = []
-    for row in fetch_by_match_admin("job_materials", {"job_id": job_id}, limit=500):
+    for row in _safe_admin_fetch("job_materials", {"job_id": job_id}, limit=500):
         created = _parse_date(row.get("created_at"))
         if created and (created < ws or created > we):
             continue
@@ -485,28 +494,65 @@ def _build_material_lines(job_id: str, ws: date, we: date) -> list[TimesheetLine
     return lines
 
 
+def get_job_timesheet_header(job_id: str, week_start: date) -> dict[str, str]:
+    """Header fields for weekly timesheet UI (job #, client, name, PO, week ending date)."""
+    job = _fetch_job(job_id)
+    if not job:
+        return {}
+    ws, we = week_bounds(monday_of_week(week_start))
+    client = _fetch_customer_name(str(job.get("customer_id") or "").strip() or None)
+    if not client:
+        client = str(job.get("customer") or job.get("customer_name") or "").strip()
+    job_name = str(
+        job.get("job_name")
+        or job.get("project_name")
+        or job.get("description")
+        or job.get("scope_of_work")
+        or ""
+    ).strip()
+    return {
+        "job_number": str(job.get("job_number") or job.get("job_id") or "").strip(),
+        "client_name": client,
+        "job_name": job_name,
+        "po_number": _fetch_po_for_job(job),
+        "sheet_date": we.isoformat(),
+        "week_start": ws.isoformat(),
+        "week_end": we.isoformat(),
+    }
+
+
 def _build_work_performed(job_id: str, ws: date, we: date) -> str:
     parts: list[str] = []
-    for row in fetch_by_match_admin("job_daily_updates", {"job_id": job_id}, limit=200):
-        ud = _parse_date(row.get("update_date"))
-        if ud and ws <= ud <= we:
-            txt = str(row.get("summary") or row.get("notes") or "").strip()
-            if txt:
-                parts.append(f"{ud.isoformat()}: {txt}")
-    for row in fetch_by_match_admin("job_daily_work_plans", {"job_id": job_id}, limit=200):
-        wd = _parse_date(row.get("work_date"))
-        if wd and ws <= wd <= we:
-            for fld in ("eod_summary", "tomorrow_plan", "plan_text"):
-                txt = str(row.get(fld) or "").strip()
+    try:
+        from app.services.job_updates_service import get_job_daily_updates_for_week, format_work_performed_from_updates
+    except ImportError:
+        from services.job_updates_service import get_job_daily_updates_for_week, format_work_performed_from_updates  # type: ignore
+    try:
+        daily = format_work_performed_from_updates(get_job_daily_updates_for_week(job_id, ws))
+        if daily:
+            parts.append(daily)
+    except Exception:
+        pass
+    try:
+        for row in _safe_admin_fetch("job_daily_work_plans", {"job_id": job_id}, limit=200):
+            wd = _parse_date(row.get("work_date"))
+            if wd and ws <= wd <= we:
+                for fld in ("eod_summary", "tomorrow_plan", "plan_text"):
+                    txt = str(row.get(fld) or "").strip()
+                    if txt:
+                        parts.append(f"{wd.isoformat()}: {txt}")
+                        break
+    except Exception:
+        pass
+    try:
+        for row in _safe_admin_fetch("job_notes", {"job_id": job_id}, limit=100):
+            created = _parse_date(row.get("created_at"))
+            if created and ws <= created <= we:
+                txt = str(row.get("note_text") or row.get("notes") or "").strip()
                 if txt:
-                    parts.append(f"{wd.isoformat()}: {txt}")
-                    break
-    for row in fetch_by_match_admin("job_notes", {"job_id": job_id}, limit=100):
-        created = _parse_date(row.get("created_at"))
-        if created and ws <= created <= we:
-            txt = str(row.get("note_text") or row.get("notes") or "").strip()
-            if txt:
-                parts.append(txt)
+                    parts.append(txt)
+    except Exception:
+        pass
     return "\n".join(parts[:20])
 
 
@@ -523,24 +569,32 @@ def build_timesheet_data(
     if not job:
         raise ValueError("Job not found.")
     ws, we = week_bounds(monday_of_week(week_start))
-    emp_map = _employees_map()
-    labor = _build_labor_from_timekeeping_days(job_id, ws, we, emp_map)
-    if not labor:
-        labor = _build_labor_from_time_entries(job_id, ws, we, emp_map)
-    labor.extend(_build_equipment_lines(job_id, ws, we))
-    materials = _build_material_lines(job_id, ws, we)
-    client = _fetch_customer_name(str(job.get("customer_id") or "").strip() or None)
-    if not client:
-        client = str(job.get("customer") or job.get("customer_name") or "").strip()
-    po = po_number.strip() or _fetch_po_for_job(job)
+    header = get_job_timesheet_header(job_id, week_start)
+    try:
+        emp_map = _employees_map()
+    except Exception:
+        emp_map = {}
+    labor: list[TimesheetLine] = []
+    try:
+        labor = _build_labor_from_timekeeping_days(job_id, ws, we, emp_map)
+        if not labor:
+            labor = _build_labor_from_time_entries(job_id, ws, we, emp_map)
+        labor.extend(_build_equipment_lines(job_id, ws, we))
+    except Exception:
+        labor = []
+    try:
+        materials = _build_material_lines(job_id, ws, we)
+    except Exception:
+        materials = []
+    po = po_number.strip() or str(header.get("po_number") or "").strip() or _fetch_po_for_job(job)
     wp = work_performed.strip() or _build_work_performed(job_id, ws, we)
     return WeeklyJobTimesheetData(
         job_id=job_id,
-        job_number=str(job.get("job_number") or job.get("job_id") or "").strip(),
-        client_name=client,
-        job_name=str(job.get("job_name") or "").strip(),
+        job_number=str(header.get("job_number") or "").strip(),
+        client_name=str(header.get("client_name") or "").strip(),
+        job_name=str(header.get("job_name") or "").strip(),
         po_number=po,
-        sheet_date=we.isoformat(),
+        sheet_date=str(header.get("sheet_date") or we.isoformat()),
         week_start=ws.isoformat(),
         week_end=we.isoformat(),
         approved_by=approved_by.strip(),

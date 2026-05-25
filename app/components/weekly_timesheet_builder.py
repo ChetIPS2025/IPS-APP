@@ -23,12 +23,17 @@ try:
         build_timesheet_data,
         build_timesheet_pdf_bytes,
         fetch_timesheet_by_job_week,
+        get_job_timesheet_header,
         list_timesheets_for_job,
         load_timesheet_data,
         render_timesheet_html,
         save_timesheet,
         signed_url_for_timesheet,
         timesheet_table_available,
+    )
+    from app.services.job_updates_service import (
+        DAILY_UPDATES_MISSING_MSG,
+        daily_updates_table_available,
     )
     from app.services.weekly_timesheet_export_service import export_data_to_excel_bytes
     from app.services.weekly_timesheet_service import (
@@ -48,12 +53,17 @@ except ImportError:
         build_timesheet_data,
         build_timesheet_pdf_bytes,
         fetch_timesheet_by_job_week,
+        get_job_timesheet_header,
         list_timesheets_for_job,
         load_timesheet_data,
         render_timesheet_html,
         save_timesheet,
         signed_url_for_timesheet,
         timesheet_table_available,
+    )
+    from services.job_updates_service import (  # type: ignore
+        DAILY_UPDATES_MISSING_MSG,
+        daily_updates_table_available,
     )
     from services.weekly_timesheet_export_service import export_data_to_excel_bytes  # type: ignore
     from services.weekly_timesheet_service import (  # type: ignore
@@ -273,6 +283,25 @@ def _store_session_data(data: WeeklyJobTimesheetData) -> None:
     st.session_state[f"{key}_material"] = _lines_to_material_df(data.material_lines)
 
 
+def _store_header_only_draft(job_id: str, week_start: date) -> None:
+    ws = monday_of_week(week_start)
+    _, we = week_bounds(ws)
+    header = get_job_timesheet_header(job_id, ws)
+    data = WeeklyJobTimesheetData(
+        job_id=job_id,
+        job_number=str(header.get("job_number") or ""),
+        client_name=str(header.get("client_name") or ""),
+        job_name=str(header.get("job_name") or ""),
+        po_number=str(header.get("po_number") or ""),
+        sheet_date=str(header.get("sheet_date") or we.isoformat()),
+        week_start=str(header.get("week_start") or ws.isoformat()),
+        week_end=str(header.get("week_end") or we.isoformat()),
+        labor_lines=[TimesheetLine(line_type="labor")],
+        material_lines=[TimesheetLine(line_type="material")],
+    )
+    _store_session_data(data)
+
+
 def _parse_date(v: Any) -> date | None:
     if isinstance(v, date):
         return v
@@ -386,7 +415,7 @@ def render_weekly_timesheet_builder(
     _, we = week_bounds(week_start)
 
     st.markdown('<span class="ips-wjt-toolbar-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-    wc1, wc2, wc3, wc4, wc5 = st.columns([0.9, 0.95, 0.9, 1.15, 1.35], gap="small")
+    wc1, wc2, wc3, wc4, wc5 = st.columns([0.85, 0.9, 0.85, 1.1, 1.35], gap="small")
     wc1.button(
         "◀ Previous Week",
         key=f"{kp}_prev",
@@ -433,7 +462,6 @@ def render_weekly_timesheet_builder(
             labels,
             index=labels.index(default_label) if default_label in labels else 0,
             key=f"{kp}_job",
-            label_visibility="visible",
         )
         job_id = str(jobs.get(pick) or "").strip()
 
@@ -441,51 +469,29 @@ def render_weekly_timesheet_builder(
         st.info("Select a job to build a weekly timesheet.")
         return
 
+    if not daily_updates_table_available(force=True):
+        st.caption(DAILY_UPDATES_MISSING_MSG)
+
     if embedded or fixed_job_id:
         _render_saved_timesheets_table(job_id, key_prefix=kp, week_start=week_start)
 
     existing_row = fetch_timesheet_by_job_week(job_id, week_start)
     locked = timesheet_is_locked(existing_row)
 
-    gen_col, _ = st.columns([1, 3])
-    if gen_col.button("Generate Weekly Timesheet", type="primary", key=f"{kp}_generate", disabled=locked):
+    act1, act2, act3, act4 = st.columns(4, gap="small")
+    if act1.button("Generate Weekly Timesheet", type="primary", use_container_width=True, key=f"{kp}_generate", disabled=locked):
         try:
             data = build_timesheet_data(job_id, week_start)
             _store_session_data(data)
             st.success("Timesheet draft generated from job, timekeeping, materials, and notes.")
             st.rerun()
         except Exception as exc:
-            st.error(str(exc))
-
-    if locked:
-        st.warning("This timesheet is approved/signed and locked. Void it to regenerate, or contact an admin.")
-
-    sk = _session_data_key(job_id, week_start)
-    if sk not in st.session_state and not locked:
-        try:
-            data = build_timesheet_data(job_id, week_start)
-            _store_session_data(data)
-        except Exception as exc:
-            st.warning(f"Could not auto-load data: {exc}")
-            _store_session_data(
-                WeeklyJobTimesheetData(job_id=job_id, week_start=week_start.isoformat(), week_end=we.isoformat())
-            )
-    elif locked and existing_row:
-        loaded = load_timesheet_data(str(existing_row["id"]))
-        if loaded:
-            _store_session_data(loaded)
-
-    hdr = st.session_state.get(sk, {})
-    h1, h2, h3, h4, h5 = st.columns(5, gap="small")
-    hdr["job_number"] = h1.text_input("JOB #", value=str(hdr.get("job_number") or ""), key=f"{kp}_job_num", disabled=locked)
-    hdr["client_name"] = h2.text_input("CLIENT", value=str(hdr.get("client_name") or ""), key=f"{kp}_client", disabled=locked)
-    hdr["job_name"] = h3.text_input("JOB NAME", value=str(hdr.get("job_name") or ""), key=f"{kp}_jname", disabled=locked)
-    hdr["po_number"] = h4.text_input("P.O. #", value=str(hdr.get("po_number") or ""), key=f"{kp}_po", disabled=locked)
-    hdr["sheet_date"] = h5.text_input("DATE", value=str(hdr.get("sheet_date") or we.isoformat()), key=f"{kp}_sdate", disabled=locked)
-    st.session_state[sk] = hdr
-
-    btn1, btn2, btn3, btn4 = st.columns(4, gap="small")
-    if btn1.button("Reload from timekeeping", use_container_width=True, key=f"{kp}_reload", disabled=locked):
+            st.warning(f"Could not generate full timesheet: {exc}")
+            _store_header_only_draft(job_id, week_start)
+            st.rerun()
+    if act2.button("Reload from timekeeping", use_container_width=True, key=f"{kp}_reload", disabled=locked):
+        sk = _session_data_key(job_id, week_start)
+        hdr = st.session_state.get(sk, {})
         try:
             data = build_timesheet_data(
                 job_id,
@@ -498,8 +504,8 @@ def render_weekly_timesheet_builder(
             st.success("Loaded labor, equipment, materials, and work performed.")
             st.rerun()
         except Exception as exc:
-            st.error(str(exc))
-    if btn2.button("Load saved", use_container_width=True, key=f"{kp}_load_saved"):
+            st.warning(f"Could not reload all rows: {exc}")
+    if act3.button("Load saved", use_container_width=True, key=f"{kp}_load_saved"):
         row = fetch_timesheet_by_job_week(job_id, week_start)
         if not row:
             st.warning("No saved timesheet for this job and week.")
@@ -509,10 +515,39 @@ def render_weekly_timesheet_builder(
                 _store_session_data(loaded)
                 st.success("Loaded saved timesheet.")
                 st.rerun()
-    if btn3.button("Clear grids", use_container_width=True, key=f"{kp}_clear"):
+    if act4.button("Clear grids", use_container_width=True, key=f"{kp}_clear"):
+        sk = _session_data_key(job_id, week_start)
         st.session_state[f"{sk}_labor"] = _lines_to_labor_df([TimesheetLine(line_type="labor")])
         st.session_state[f"{sk}_material"] = _lines_to_material_df([TimesheetLine(line_type="material")])
         st.rerun()
+
+    if locked:
+        st.warning("This timesheet is approved/signed and locked. Void it to regenerate, or contact an admin.")
+
+    sk = _session_data_key(job_id, week_start)
+    if sk not in st.session_state and not locked:
+        try:
+            data = build_timesheet_data(job_id, week_start)
+            _store_session_data(data)
+        except Exception:
+            _store_header_only_draft(job_id, week_start)
+    elif locked and existing_row:
+        loaded = load_timesheet_data(str(existing_row["id"]))
+        if loaded:
+            _store_session_data(loaded)
+
+    hdr = st.session_state.get(sk, {})
+    if not str(hdr.get("job_number") or "").strip():
+        hdr.update(get_job_timesheet_header(job_id, week_start))
+        st.session_state[sk] = hdr
+
+    h1, h2, h3, h4, h5 = st.columns(5, gap="small")
+    hdr["job_number"] = h1.text_input("JOB #", value=str(hdr.get("job_number") or ""), key=f"{kp}_job_num", disabled=locked)
+    hdr["client_name"] = h2.text_input("CLIENT", value=str(hdr.get("client_name") or ""), key=f"{kp}_client", disabled=locked)
+    hdr["job_name"] = h3.text_input("JOB NAME", value=str(hdr.get("job_name") or ""), key=f"{kp}_jname", disabled=locked)
+    hdr["po_number"] = h4.text_input("P.O. #", value=str(hdr.get("po_number") or ""), key=f"{kp}_po", disabled=locked)
+    hdr["sheet_date"] = h5.text_input("DATE", value=str(hdr.get("sheet_date") or we.isoformat()), key=f"{kp}_sdate", disabled=locked)
+    st.session_state[sk] = hdr
 
     labor_df = st.session_state.get(f"{sk}_labor", _lines_to_labor_df([TimesheetLine(line_type="labor")]))
     st.markdown("**Labor / equipment**")
@@ -533,6 +568,11 @@ def render_weekly_timesheet_builder(
         },
     )
     st.session_state[f"{sk}_labor"] = labor_edited
+    if labor_edited.empty or (
+        len(labor_edited) == 1
+        and not str(labor_edited.iloc[0].get("employee_equipment") or "").strip()
+    ):
+        st.caption("No labor rows found from timekeeping.")
 
     mat_df = st.session_state.get(f"{sk}_material", _lines_to_material_df([TimesheetLine(line_type="material")]))
     st.markdown("**Materials / expenses**")
@@ -550,6 +590,11 @@ def render_weekly_timesheet_builder(
         },
     )
     st.session_state[f"{sk}_material"] = mat_edited
+    if mat_edited.empty or (
+        len(mat_edited) == 1
+        and not str(mat_edited.iloc[0].get("description") or "").strip()
+    ):
+        st.caption("No materials or expenses found for this week.")
 
     hdr["work_performed"] = st.text_area(
         "Work performed",
@@ -560,6 +605,8 @@ def render_weekly_timesheet_builder(
     )
     hdr["approved_by"] = st.text_input("Approved by", value=str(hdr.get("approved_by") or ""), key=f"{kp}_approved", disabled=locked)
     st.session_state[sk] = hdr
+    if not str(hdr.get("work_performed") or "").strip() and daily_updates_table_available():
+        st.caption("No daily updates found for this week. Work performed can be entered manually.")
 
     st.markdown("**Customer signature**")
     sig_mode = st.radio("Sign mode", ["Digital signature", "Print & sign manually"], horizontal=True, key=f"{kp}_sig_mode")
