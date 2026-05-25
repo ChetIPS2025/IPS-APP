@@ -3652,6 +3652,26 @@ footer {{
 [data-testid="stAppViewContainer"] > section.main > div {{
   padding-top: 0 !important;
 }}
+[data-testid="stAppViewContainer"] {{
+  padding-top: 0 !important;
+}}
+section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {{
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}}
+/* CSS/script injections are flex rows with zero height but still consume vertical gap */
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}}
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-main-header) {{
+  margin-top: 0 !important;
+}}
 
 /* Sidebar */
 section[data-testid="stSidebar"],

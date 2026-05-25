@@ -118,11 +118,8 @@ def render_module(slug: str | None = None) -> None:
         try:
             try:
                 from app.components.headers import render_main_brand_bar
-                from app.styles import inject_global_css
             except ImportError:
                 from components.headers import render_main_brand_bar  # type: ignore
-                from styles import inject_global_css  # type: ignore
-            inject_global_css()
             render_main_brand_bar()
             fn()  # type: ignore[operator]
         except Exception as exc:

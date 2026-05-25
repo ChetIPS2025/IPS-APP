@@ -17,7 +17,7 @@ _DEMO_FLAG = "ips_showing_demo_data"
 _MODULE_SHELL_KEY = "_ips_module_page_shell_open"
 
 
-def begin_module(slug: str, *, inject_css: bool = True) -> bool:
+def begin_module(slug: str, *, inject_css: bool = False) -> bool:
     """
     Per-page gate: foundation CSS + role check.
 
