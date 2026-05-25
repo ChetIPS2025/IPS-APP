@@ -2934,9 +2934,9 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
 }}
 
 .ips-compact-detail-header {{
-  padding: 4px 0 12px 0;
+  padding: 2px 0 10px 0;
   border-bottom: 1px solid #e5eaf1;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }}
 .ips-compact-detail-main {{
   display: flex;
@@ -2973,8 +2973,8 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-h
 .ips-compact-meta-grid {{
   display: grid;
   grid-template-columns: repeat(4, minmax(130px, 1fr));
-  gap: 10px;
-  margin: 10px 0 8px 0;
+  gap: 8px;
+  margin: 8px 0;
 }}
 @media (max-width: 900px) {{
   .ips-compact-meta-grid {{
@@ -2985,9 +2985,9 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-h
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 10px 12px;
-  min-height: 58px;
-  max-height: 70px;
+  padding: 9px 11px;
+  min-height: 56px;
+  max-height: 68px;
   overflow: hidden;
 }}
 .ips-compact-meta-label {{
@@ -3535,7 +3535,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v4">
+<style id="ips-global-styles-v5">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -3568,11 +3568,22 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   padding-left: 28px;
   padding-right: 28px;
 }}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] {{
+  gap: 0.4rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {{
+  margin-bottom: 0.25rem !important;
+}}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker),
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-main-header) {{
   padding-left: 0 !important;
   padding-right: 0 !important;
   background: {MAIN_HEADER_BG} !important;
+  margin-bottom: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker),
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-filter-bar-marker) {{
+  margin-bottom: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker) {{
   margin-top: -0.15rem !important;
@@ -3599,7 +3610,8 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
   width: auto !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button {{
-  min-height: 2.05rem !important;
+  min-height: 38px !important;
+  height: 38px !important;
   width: auto !important;
   min-width: fit-content !important;
   max-width: none !important;
@@ -3696,16 +3708,16 @@ section[data-testid="stSidebar"] .block-container {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
   border-radius: 12px;
-  padding: 0.85rem 1rem;
-  margin-bottom: 0.65rem;
+  padding: 16px;
+  margin-bottom: 0.5rem;
   box-shadow: 0 1px 2px rgba(15,23,42,0.04);
 }}
 .ips-metric-card {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
   border-radius: 12px;
-  padding: 0.75rem 0.9rem;
-  min-height: 4.5rem;
+  padding: 14px 16px;
+  min-height: 86px;
 }}
 .ips-metric-label {{
   font-size: 0.72rem;
@@ -3735,8 +3747,9 @@ section[data-testid="stSidebar"] .block-container {{
 .ips-main-header {{
   background: {MAIN_HEADER_BG};
   border-bottom: 1px solid #cfd8e3;
-  padding: 12px 28px;
-  min-height: 68px;
+  padding: 8px 28px;
+  min-height: 58px;
+  max-height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3751,9 +3764,9 @@ section[data-testid="stSidebar"] .block-container {{
   flex: 1 1 auto;
 }}
 .ips-main-header-logo {{
-  height: 46px;
+  height: 40px;
   width: auto;
-  max-width: 430px;
+  max-width: 420px;
   object-fit: contain;
   display: block;
   background: transparent;
@@ -3772,10 +3785,10 @@ section[data-testid="stSidebar"] .block-container {{
   flex: 0 0 auto;
 }}
 .ips-page-content {{
-  padding: 22px 28px 32px 28px;
+  padding: 18px 28px 28px 28px;
 }}
 .ips-page-header {{
-  margin: 0 0 18px 0;
+  margin: 0 0 14px 0;
 }}
 .ips-page-header-bar {{
   display: none !important;
@@ -3784,7 +3797,8 @@ section[data-testid="stSidebar"] .block-container {{
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
+  margin-bottom: 4px;
 }}
 .ips-page-title-block {{
   min-width: 0;
@@ -3798,14 +3812,15 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 .ips-page-title {{
   margin: 0;
-  font-size: 36px;
-  line-height: 1.1;
+  font-size: 34px;
+  line-height: 1.08;
   font-weight: 850;
   color: #0f172a;
   letter-spacing: -0.02em;
 }}
 .ips-page-subtitle {{
-  margin-top: 8px;
+  margin-top: 6px;
+  margin-bottom: 0;
   font-size: 15px;
   color: #64748b;
   line-height: 1.35;
@@ -3814,31 +3829,32 @@ section[data-testid="stSidebar"] .block-container {{
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+  padding-top: 2px;
 }}
 @media (max-width: 900px) {{
   .ips-main-header {{
-    padding: 10px 18px;
-    min-height: 58px;
+    min-height: 54px;
+    padding: 8px 14px;
   }}
   .ips-main-header-logo {{
-    height: 36px;
-    max-width: 85%;
+    height: 34px;
+    max-width: 90%;
   }}
   .ips-page-content {{
-    padding: 18px 16px 28px 16px;
+    padding: 14px 14px 24px 14px;
   }}
   section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 14px;
+    padding-right: 14px;
   }}
   .ips-page-title-row {{
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }}
   .ips-page-title {{
-    font-size: 30px;
+    font-size: 28px;
   }}
   .ips-page-actions {{
     width: 100%;
@@ -3847,12 +3863,33 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 
 /* Filter bar */
+.ips-filter-bar-marker {{
+  display: none !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-filter-bar-marker) {{
+  margin: 12px 0 18px 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 8px 10px !important;
+}}
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stTextInput"],
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stSelectbox"],
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stDateInput"],
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stMultiSelect"] {{
+  margin-bottom: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stTextInput"] input,
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stDateInput"] input,
+section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+  min-height: 40px !important;
+}}
 .ips-filter-bar {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
   border-radius: 12px;
-  padding: 0.65rem 0.75rem;
-  margin-bottom: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  margin: 12px 0 18px 0;
 }}
 
 /* Status pills */
@@ -3984,11 +4021,12 @@ a.ips-link, .ips-data-row a {{
 /* Compact Streamlit controls */
 section[data-testid="stMain"] .stButton > button,
 section[data-testid="stMain"] [data-testid="stButton"] > button {{
-  border-radius: 8px !important;
+  border-radius: 10px !important;
   font-size: 0.8125rem !important;
-  font-weight: 600 !important;
-  min-height: 2.1rem !important;
-  padding: 0.25rem 0.75rem !important;
+  font-weight: 700 !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 14px !important;
   border: 1px solid {BORDER} !important;
   background: #fff !important;
   color: {TEXT} !important;
@@ -4012,10 +4050,20 @@ section[data-testid="stMain"] .stButton > button:hover {{
 section[data-testid="stMain"] input,
 section[data-testid="stMain"] textarea,
 section[data-testid="stMain"] [data-baseweb="select"] > div {{
-  border-radius: 8px !important;
+  border-radius: 10px !important;
   border-color: {BORDER} !important;
-  min-height: 2.1rem !important;
   font-size: 0.8125rem !important;
+}}
+section[data-testid="stMain"] [data-testid="stTextInput"] input,
+section[data-testid="stMain"] [data-testid="stNumberInput"] input,
+section[data-testid="stMain"] [data-testid="stDateInput"] input {{
+  min-height: 40px !important;
+}}
+section[data-testid="stMain"] [data-testid="stTextArea"] textarea {{
+  min-height: 90px !important;
+}}
+section[data-testid="stMain"] [data-baseweb="select"] > div {{
+  min-height: 40px !important;
 }}
 
 /* Hide legacy Select buttons (removed from list tables) */
@@ -4175,13 +4223,13 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
 .ips-kpi-grid {{
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-top: 18px;
-  margin-bottom: 0.75rem;
+  gap: 0.55rem;
+  margin-top: 12px;
+  margin-bottom: 0.5rem;
 }}
 .ips-dashboard-metrics,
 .ips-metric-grid {{
-  margin-top: 18px;
+  margin-top: 12px;
 }}
 @media (max-width: 1200px) {{
   .ips-kpi-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
@@ -4193,8 +4241,8 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
   border-radius: 12px;
-  padding: 0.75rem 0.85rem;
-  min-height: 5.5rem;
+  padding: 14px 16px;
+  min-height: 86px;
 }}
 .ips-kpi-top {{
   display: flex;
@@ -4236,15 +4284,15 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
   border-radius: 12px;
-  padding: 0.75rem 0.85rem;
-  margin-bottom: 0.65rem;
-  min-height: 12rem;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  min-height: 9rem;
 }}
 .ips-panel-title {{
   font-size: 0.9rem;
   font-weight: 700;
   color: {TEXT};
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.45rem;
 }}
 .ips-chart-legend {{
   display: flex;
@@ -4357,23 +4405,24 @@ body.ips-auth-login section[data-testid="stMain"] .block-container {{
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 14px !important;
-  padding: 14px 16px 16px 16px !important;
-  margin-bottom: 0.65rem !important;
+  padding: 10px 12px 12px 12px !important;
+  margin-bottom: 0.5rem !important;
 }}
 .st-key-dashboard_quick_actions [data-testid="stVerticalBlock"] {{
-  gap: 12px !important;
+  gap: 8px !important;
 }}
-.st-key-dashboard_quick_actions [data-testid="stHorizontalBlock"] {{
-  gap: 12px !important;
-  align-items: stretch !important;
+.st-key-dashboard_quick_actions .ips-quick-actions-header {{
+  margin: 0 !important;
+  padding: 0 0 4px 0 !important;
 }}
-.st-key-dashboard_quick_actions [data-testid="stElementContainer"] {{
-  margin-bottom: 0 !important;
+.st-key-dashboard_quick_actions .ips-quick-actions-title {{
+  margin: 0 !important;
+  font-size: 0.9rem !important;
 }}
 .st-key-dashboard_quick_actions .stButton > button {{
-  min-height: 52px !important;
+  min-height: 46px !important;
   height: auto !important;
-  padding: 10px 12px !important;
+  padding: 8px 10px !important;
   background: #ffffff !important;
   border: 1px solid #dbe3ee !important;
   border-radius: 12px !important;
@@ -4951,11 +5000,135 @@ section[data-testid="stSidebar"] hr {{
   background: #f8fafc;
   border: 1px dashed {BORDER};
   border-radius: 10px;
-  padding: 1.25rem;
+  padding: 0.85rem;
   text-align: center;
   color: {TEXT_MUTED};
   font-size: 0.8125rem;
-  margin: 0.5rem 0;
+  margin: 0.35rem 0;
+}}
+
+/* Compact table/list layouts */
+.ips-table-count,
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptionContainer"] {{
+  margin: 8px 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptionContainer"] p {{
+  color: #64748b !important;
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}}
+.ips-table-wrap,
+.ips-users-table-wrap,
+.ips-jobs-table-wrap,
+.ips-customers-table-wrap,
+.ips-estimates-table-wrap,
+.ips-inventory-table-wrap,
+.ips-assets-table-wrap,
+.ips-timekeeping-table-wrap,
+.ips-updates-table-wrap,
+.ips-certifications-table-wrap,
+.ips-contacts-table-wrap,
+.ips-locations-table-wrap,
+.ips-pg-table-wrap,
+.ips-tasks-table-wrap,
+.ips-documents-table-wrap {{
+  margin-top: 10px !important;
+}}
+.ips-table-header-row,
+.ips-users-header-row,
+.ips-jobs-header-row,
+.ips-customers-header-row,
+.ips-estimates-header-row,
+.ips-inventory-header-row,
+.ips-assets-header-row,
+.ips-timekeeping-header-row,
+.ips-updates-header-row,
+.ips-certifications-header-row,
+.ips-contacts-header-row,
+.ips-locations-header-row,
+.ips-pg-header-row,
+.ips-tasks-header-row {{
+  padding: 7px 10px !important;
+  min-height: 38px !important;
+}}
+.ips-table-row,
+.ips-users-row,
+.ips-jobs-row,
+.ips-customers-row,
+.ips-estimates-row,
+.ips-inventory-row,
+.ips-assets-row,
+.ips-timekeeping-row,
+.ips-updates-row,
+.ips-certifications-row,
+.ips-contacts-row,
+.ips-locations-row,
+.ips-pg-row,
+.ips-tasks-row {{
+  padding: 6px 10px !important;
+  min-height: 50px !important;
+}}
+.ips-card-title,
+.ips-panel-title {{
+  margin-bottom: 10px !important;
+}}
+.ips-detail-panel {{
+  margin-top: 0.35rem !important;
+}}
+.ips-detail-header {{
+  margin-bottom: 0.45rem !important;
+}}
+.st-key-dashboard_quick_actions [data-testid="stHorizontalBlock"] {{
+  gap: 10px !important;
+  align-items: stretch !important;
+}}
+.st-key-dashboard_quick_actions [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+}}
+.ips-weekly-timesheets-page ~ [data-testid="stElementContainer"],
+section[data-testid="stMain"]:has(.ips-weekly-timesheets-page) [data-testid="stElementContainer"] {{
+  margin-bottom: 0.2rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-wjt-toolbar-marker) [data-testid="stElementContainer"]:has(.ips-wjt-toolbar-marker) {{
+  margin-bottom: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-wjt-toolbar-marker) [data-testid="stHorizontalBlock"] {{
+  align-items: center !important;
+  gap: 0.45rem !important;
+  margin-bottom: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-wjt-toolbar-marker) [data-testid="stElementContainer"] {{
+  margin-bottom: 0.15rem !important;
+}}
+.ips-wjt-toolbar-marker {{
+  display: none !important;
+}}
+.ips-wjt-week-end {{
+  margin: 0 !important;
+  padding-top: 0.35rem !important;
+  font-size: 0.875rem !important;
+  color: #64748b !important;
+  line-height: 1.25 !important;
+  text-align: right;
+}}
+.ips-wjt-week-end strong {{
+  color: #0f172a;
+  font-weight: 700;
+}}
+section[data-testid="stMain"]:has(.ips-weekly-timesheets-page) [data-testid="stSelectbox"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0.25rem !important;
+}}
+.ips-time-week-range {{
+  margin: 0 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25 !important;
+}}
+.ips-time-week-sub {{
+  margin: 0 !important;
+  font-size: 0.75rem !important;
+  line-height: 1.2 !important;
 }}
 </style>
 """,

@@ -9,6 +9,8 @@ try:
     from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
     from app.services.job_weekly_timesheets import monday_of_week, week_bounds
     from app.services.weekly_job_timesheet_service import (
+        TIMESHEET_TABLE,
+        TIMESHEET_TABLE_MISSING_MSG,
         TimesheetLine,
         WeeklyJobTimesheetData,
         build_timesheet_data,
@@ -27,6 +29,8 @@ except ImportError:
     from db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin  # type: ignore
     from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
     from services.weekly_job_timesheet_service import (  # type: ignore
+        TIMESHEET_TABLE,
+        TIMESHEET_TABLE_MISSING_MSG,
         TimesheetLine,
         WeeklyJobTimesheetData,
         build_timesheet_data,
@@ -42,7 +46,7 @@ except ImportError:
         export_weekly_timesheet_to_pdf,
     )
 
-_SHEET_TABLE = "weekly_job_timesheets"
+_SHEET_TABLE = TIMESHEET_TABLE
 _LOCKED = frozenset({"Approved", "Signed", "Voided"})
 
 

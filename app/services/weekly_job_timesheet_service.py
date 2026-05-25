@@ -37,10 +37,62 @@ except ImportError:
 
 _TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "weekly_job_timesheet.html"
 _FALLBACK_TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "weekly_timesheet_form.html"
-_SHEET_TABLE = "weekly_job_timesheets"
-_LINES_TABLE = "weekly_job_timesheet_lines"
+
+TIMESHEET_TABLE = "weekly_timesheets"
+TIMESHEET_LINES_TABLE = "weekly_timesheet_lines"
+TIMESHEET_TABLE_MISSING_MSG = "Weekly timesheets table is missing. Run the weekly timesheet migration."
+
+_SHEET_TABLE = TIMESHEET_TABLE
+_LINES_TABLE = TIMESHEET_LINES_TABLE
+_STORAGE_PREFIX = "weekly_timesheets"
+_table_available: bool | None = None
+
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 _HOUR_COLS = ("hours_mon", "hours_tue", "hours_wed", "hours_thu", "hours_fri", "hours_sat", "hours_sun")
+_LEGACY_HOUR_COLS = (
+    ("mon", "hours_mon", "monday_st"),
+    ("tue", "hours_tue", "tuesday_st"),
+    ("wed", "hours_wed", "wednesday_st"),
+    ("thu", "hours_thu", "thursday_st"),
+    ("fri", "hours_fri", "friday_st"),
+    ("sat", "hours_sat", "saturday_st"),
+    ("sun", "hours_sun", "sunday_st"),
+)
+
+
+def _is_missing_table_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "could not find" in msg or "does not exist" in msg
+
+
+def timesheet_table_available(*, force: bool = False) -> bool:
+    """Return False when ``public.weekly_timesheets`` is not present (graceful UI fallback)."""
+    global _table_available
+    if not force and _table_available is not None:
+        return _table_available
+    try:
+        fetch_table_admin(TIMESHEET_TABLE, limit=1)
+        _table_available = True
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            _table_available = False
+        else:
+            raise
+    return bool(_table_available)
+
+
+def ensure_timesheet_table() -> None:
+    if not timesheet_table_available():
+        raise RuntimeError(TIMESHEET_TABLE_MISSING_MSG)
+
+
+def _day_hours(row: dict[str, Any], _day: str, legacy_col: str, modern_col: str) -> float:
+    for key in (legacy_col, modern_col):
+        if key in row and row.get(key) is not None:
+            val = _num(row.get(key))
+            if val or str(row.get(key) or "").strip():
+                return val
+    return 0.0
 
 
 def _parse_date(v: Any) -> date | None:
@@ -535,22 +587,27 @@ def _line_to_db(line: TimesheetLine, timesheet_id: str, sort_order: int) -> dict
 
 
 def _line_from_db(row: dict[str, Any]) -> TimesheetLine:
+    mon, tue, wed, thu, fri, sat, sun = (
+        _day_hours(row, d, leg, mod) for d, leg, mod in _LEGACY_HOUR_COLS
+    )
+    qty = _num(row.get("qty") or row.get("quantity"))
+    cost = _num(row.get("cost") or row.get("total_cost"))
     return TimesheetLine(
         line_type=str(row.get("line_type") or "labor"),
-        description=str(row.get("description") or ""),
+        description=str(row.get("description") or row.get("employee_equipment") or ""),
         class_name=str(row.get("class_name") or ""),
-        mon=_num(row.get("hours_mon")),
-        tue=_num(row.get("hours_tue")),
-        wed=_num(row.get("hours_wed")),
-        thu=_num(row.get("hours_thu")),
-        fri=_num(row.get("hours_fri")),
-        sat=_num(row.get("hours_sat")),
-        sun=_num(row.get("hours_sun")),
-        st_hours=_num(row.get("st_hours")),
-        ot_hours=_num(row.get("ot_hours")),
-        dt_hours=_num(row.get("dt_hours")),
-        qty=_num(row.get("qty")),
-        cost=_num(row.get("cost")),
+        mon=mon,
+        tue=tue,
+        wed=wed,
+        thu=thu,
+        fri=fri,
+        sat=sat,
+        sun=sun,
+        st_hours=_num(row.get("st_hours") or row.get("total_st")),
+        ot_hours=_num(row.get("ot_hours") or row.get("total_ot")),
+        dt_hours=_num(row.get("dt_hours") or row.get("total_dt")),
+        qty=qty,
+        cost=cost,
         sort_order=int(row.get("sort_order") or 0),
     )
 
@@ -572,10 +629,10 @@ def _header_from_db(row: dict[str, Any], labor: list[TimesheetLine], materials: 
         sheet_date=str(row.get("sheet_date") or "")[:10],
         week_start=str(row.get("week_start") or "")[:10],
         week_end=str(row.get("week_end") or "")[:10],
-        approved_by=str(row.get("approved_by") or ""),
+        approved_by=str(row.get("approved_by") or row.get("approved_by_name") or ""),
         work_performed=str(row.get("work_performed") or ""),
         status=str(row.get("status") or "Draft"),
-        signature_data=str(row.get("signature_data") or ""),
+        signature_data=str(row.get("signature_data") or row.get("signature_path") or row.get("signature_png_base64") or ""),
         signed_at=str(row.get("signed_at") or "")[:19],
         labor_lines=labor,
         material_lines=materials,
@@ -583,17 +640,37 @@ def _header_from_db(row: dict[str, Any], labor: list[TimesheetLine], materials: 
 
 
 def fetch_timesheet_by_job_week(job_id: str, week_start: date) -> dict[str, Any] | None:
+    if not timesheet_table_available():
+        return None
     ws = monday_of_week(week_start)
-    rows = fetch_by_match_admin(_SHEET_TABLE, {"job_id": job_id, "week_start": ws.isoformat()}, limit=1)
+    try:
+        rows = fetch_by_match_admin(_SHEET_TABLE, {"job_id": job_id, "week_start": ws.isoformat()}, limit=1)
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            return None
+        raise
     return rows[0] if rows else None
 
 
 def load_timesheet_data(timesheet_id: str) -> WeeklyJobTimesheetData | None:
-    rows = fetch_by_match_admin(_SHEET_TABLE, {"id": timesheet_id}, limit=1)
+    if not timesheet_table_available():
+        return None
+    try:
+        rows = fetch_by_match_admin(_SHEET_TABLE, {"id": timesheet_id}, limit=1)
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            return None
+        raise
     if not rows:
         return None
     row = rows[0]
-    all_lines = fetch_table_admin(_LINES_TABLE, limit=5000)
+    try:
+        all_lines = fetch_table_admin(_LINES_TABLE, limit=5000)
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            all_lines = []
+        else:
+            raise
     line_rows = [r for r in all_lines if str(r.get("timesheet_id") or "") == str(timesheet_id)]
     line_rows = sorted(line_rows, key=lambda r: int(r.get("sort_order") or 0))
     labor = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") in {"labor", "equipment"}]
@@ -602,7 +679,14 @@ def load_timesheet_data(timesheet_id: str) -> WeeklyJobTimesheetData | None:
 
 
 def list_timesheets_for_job(job_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
-    rows = fetch_table_admin(_SHEET_TABLE, limit=limit, order_by="week_start")
+    if not timesheet_table_available():
+        return []
+    try:
+        rows = fetch_table_admin(_SHEET_TABLE, limit=limit, order_by="week_start")
+    except Exception as exc:
+        if _is_missing_table_error(exc):
+            return []
+        raise
     return [r for r in rows if str(r.get("job_id") or "") == str(job_id)]
 
 
@@ -614,6 +698,7 @@ def save_timesheet(
     regenerate_exports: bool = True,
 ) -> dict[str, Any]:
     """Persist draft or lock approved snapshot."""
+    ensure_timesheet_table()
     if lock and data.status in {"Approved", "Signed"}:
         data.status = "Approved" if data.status == "Approved" else "Signed"
     ws = _parse_date(data.week_start) or date.today()
@@ -625,7 +710,7 @@ def save_timesheet(
 
     pdf_bytes = build_timesheet_pdf_bytes(data)
     job_num = data.job_number or str(data.job_id)[:8]
-    pdf_storage = f"weekly_job_timesheets/{job_num}/{ws.isoformat()}/timesheet.pdf"
+    pdf_storage = f"{_STORAGE_PREFIX}/{job_num}/{ws.isoformat()}/timesheet.pdf"
     upload_bytes_admin(pdf_storage, pdf_bytes, content_type="application/pdf")
 
     excel_storage = ""
@@ -637,7 +722,7 @@ def save_timesheet(
         try:
             ensure_excel_template()
             excel_bytes = export_data_to_excel_bytes(data)
-            excel_storage = f"weekly_job_timesheets/{job_num}/{ws.isoformat()}/timesheet.xlsx"
+            excel_storage = f"{_STORAGE_PREFIX}/{job_num}/{ws.isoformat()}/timesheet.xlsx"
             upload_bytes_admin(
                 excel_storage,
                 excel_bytes,
@@ -711,8 +796,13 @@ def signed_url_for_timesheet(path: str) -> str:
 
 
 def fetch_timesheet_by_sign_token(token: str) -> dict[str, Any] | None:
-    rows = fetch_by_match_admin(_SHEET_TABLE, {"sign_token": token}, limit=1)
-    if rows:
-        return rows[0]
+    if timesheet_table_available():
+        try:
+            rows = fetch_by_match_admin(_SHEET_TABLE, {"sign_token": token}, limit=1)
+            if rows:
+                return rows[0]
+        except Exception as exc:
+            if not _is_missing_table_error(exc):
+                raise
     rows = fetch_by_match_admin("job_weekly_timesheets", {"sign_token": token}, limit=1)
     return rows[0] if rows else None

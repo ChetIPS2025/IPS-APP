@@ -23,9 +23,11 @@ def render_page_shell(page_fn: Callable[[], None], *, page_slug: str) -> None:
     """Inject CSS, render sidebar, then run the page body."""
     inject_global_css()
     render_sidebar(page_slug)
-    st.markdown(f'<{_OT} class="ips-page-content ips-page-{page_slug}">', unsafe_allow_html=True)
+    st.markdown(
+        f'<span class="ips-page-content ips-page-{page_slug} ips-page-body-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     page_fn()
-    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
 
 
 def render_selected_detail_panel(
@@ -39,7 +41,7 @@ def render_selected_detail_panel(
     body_fn: Callable[[], None] | None = None,
 ) -> None:
     """Detail panel below selected table row — tabs + action bar."""
-    st.markdown(f'<{_OT} class="ips-detail-panel">', unsafe_allow_html=True)
+    st.markdown(f'<span class="ips-detail-panel-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     if header_fn:
         header_fn()
     else:
@@ -55,14 +57,13 @@ def render_selected_detail_panel(
         tabs_fn()
     if body_fn:
         body_fn()
-    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
 
 
 def render_filter_bar(widgets_fn: Callable[[], None]) -> None:
-    """White card filter row with search + dropdowns."""
-    st.markdown(f'<{_OT} class="ips-filter-bar">', unsafe_allow_html=True)
-    widgets_fn()
-    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
+    """Compact white card filter row with search + dropdowns."""
+    with st.container(border=True):
+        st.markdown('<span class="ips-filter-bar-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+        widgets_fn()
 
 
 def render_tab_placeholder(message: str) -> None:

@@ -18,7 +18,7 @@ _ActionFn = Callable[[], None]
 def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None) -> None:
     """Light-gray IPS wording logo bar — call once per page (via phase2 shell)."""
     ot, ct = "d" + "iv", "/" + "d" + "iv"
-    logo = wording_logo_html(height=46)
+    logo = wording_logo_html(height=40)
     st.markdown(
         f'<{ot} class="ips-main-header">'
         f'<{ot} class="ips-main-header-brand">{logo}</{ct}>'

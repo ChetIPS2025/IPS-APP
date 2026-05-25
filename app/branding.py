@@ -86,7 +86,7 @@ def wording_logo_html(*, height: int = 46, alt: str = "Industrial Plant Solution
     src = _logo_data_uri(str(path))
     return (
         f'<img class="ips-main-header-logo" src="{src}" alt="{html.escape(alt)}" '
-        f'height="{int(height)}" />'
+        f'height="{int(height)}" style="height:{int(height)}px;" />'
     )
 
 

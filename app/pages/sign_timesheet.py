@@ -23,12 +23,14 @@ try:
     from app.device_label import request_user_agent
     from app.services.job_weekly_timesheets import build_timesheet_pdf_bytes, week_bounds
     from app.services.job_service import job_row_select_label
+    from app.services.weekly_job_timesheet_service import TIMESHEET_TABLE
 except ImportError:
     from branding import render_header  # type: ignore
     from db import create_signed_url, fetch_by_match_admin, fetch_table_admin, update_rows_admin, upload_bytes_admin  # type: ignore
     from device_label import request_user_agent  # type: ignore
     from services.job_weekly_timesheets import build_timesheet_pdf_bytes, week_bounds  # type: ignore
     from services.job_service import job_row_select_label  # type: ignore
+    from services.weekly_job_timesheet_service import TIMESHEET_TABLE  # type: ignore
 
 
 def _sig_b64(canvas_result) -> str | None:
@@ -59,8 +61,8 @@ def render_public(sign_token: str) -> None:
         st.error("Missing token.")
         return
 
-    rows = fetch_by_match_admin("weekly_job_timesheets", {"sign_token": tok}, limit=1)
-    ts_table = "weekly_job_timesheets"
+    rows = fetch_by_match_admin(TIMESHEET_TABLE, {"sign_token": tok}, limit=1)
+    ts_table = TIMESHEET_TABLE
     if not rows:
         rows = fetch_by_match_admin("job_weekly_timesheets", {"sign_token": tok}, limit=1)
         ts_table = "job_weekly_timesheets"
@@ -257,7 +259,7 @@ def render_public(sign_token: str) -> None:
         st.stop()
 
     # Build signed PDF by regenerating with signature.
-    if ts_table == "weekly_job_timesheets":
+    if ts_table == TIMESHEET_TABLE:
         try:
             from app.services.weekly_job_timesheet_service import (
                 build_timesheet_pdf_bytes as build_wjt_pdf,
@@ -281,7 +283,7 @@ def render_public(sign_token: str) -> None:
         data.status = "Signed"
         signed_pdf = build_wjt_pdf(data)
         job_num = str(data.job_number or job.get("job_number") or "")[:32] or str(ts.get("job_id"))[:8]
-        storage_path = f"weekly_job_timesheets/{job_num}/{ws_s}/signed.pdf"
+        storage_path = f"weekly_timesheets/{job_num}/{ws_s}/signed.pdf"
     else:
         signed_pdf = build_timesheet_pdf_bytes(
             job=job,
