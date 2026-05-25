@@ -73,6 +73,71 @@ def _session_data_key(job_id: str, week_start: date) -> str:
     return f"wjt_data_{safe}_{week_start.isoformat()}"
 
 
+def _week_start_key(key_prefix: str) -> str:
+    return f"{key_prefix}_week_start"
+
+
+def _week_picker_key(key_prefix: str) -> str:
+    return f"{key_prefix}_week_picker"
+
+
+def _init_week_state(key_prefix: str) -> None:
+    state_key = _week_start_key(key_prefix)
+    legacy_keys = (f"{key_prefix}_week", "wjt_page_week")
+    if state_key not in st.session_state:
+        for legacy_key in legacy_keys:
+            legacy = st.session_state.get(legacy_key)
+            if isinstance(legacy, date):
+                st.session_state[state_key] = monday_of_week(legacy)
+                break
+    if state_key not in st.session_state:
+        st.session_state[state_key] = monday_of_week(date.today())
+
+
+def _sync_week_picker(key_prefix: str, week_start: date) -> None:
+    picker_key = _week_picker_key(key_prefix)
+    if picker_key in st.session_state:
+        st.session_state[picker_key] = week_start
+
+
+def _previous_week(key_prefix: str) -> None:
+    state_key = _week_start_key(key_prefix)
+    cur = st.session_state.get(state_key, monday_of_week(date.today()))
+    if not isinstance(cur, date):
+        cur = monday_of_week(date.today())
+    new_start = monday_of_week(cur) - timedelta(days=7)
+    st.session_state[state_key] = new_start
+    _sync_week_picker(key_prefix, new_start)
+
+
+def _current_week(key_prefix: str) -> None:
+    state_key = _week_start_key(key_prefix)
+    new_start = monday_of_week(date.today())
+    st.session_state[state_key] = new_start
+    _sync_week_picker(key_prefix, new_start)
+
+
+def _next_week(key_prefix: str) -> None:
+    state_key = _week_start_key(key_prefix)
+    cur = st.session_state.get(state_key, monday_of_week(date.today()))
+    if not isinstance(cur, date):
+        cur = monday_of_week(date.today())
+    new_start = monday_of_week(cur) + timedelta(days=7)
+    st.session_state[state_key] = new_start
+    _sync_week_picker(key_prefix, new_start)
+
+
+def _week_picker_changed(key_prefix: str) -> None:
+    picker_key = _week_picker_key(key_prefix)
+    state_key = _week_start_key(key_prefix)
+    picked = st.session_state.get(picker_key)
+    if isinstance(picked, date):
+        mon = monday_of_week(picked)
+        st.session_state[state_key] = mon
+        if mon != picked:
+            st.session_state[picker_key] = mon
+
+
 def _lines_to_labor_df(lines: list[TimesheetLine]) -> pd.DataFrame:
     rows = []
     for ln in lines:
@@ -301,24 +366,40 @@ def render_weekly_timesheet_builder(
     job_id = str(fixed_job_id or "").strip()
 
     today_mon = monday_of_week(date.today())
+    _init_week_state(kp)
+    state_key = _week_start_key(kp)
+    picker_key = _week_picker_key(kp)
     nav1, nav2, nav3, nav4, nav5 = st.columns([1, 1, 1, 1, 2], gap="small")
-    if nav1.button("◀ Previous week", key=f"{kp}_prev"):
-        st.session_state[f"{kp}_week"] = today_mon - timedelta(days=7)
-        st.rerun()
-    if nav2.button("Current week", key=f"{kp}_curr"):
-        st.session_state[f"{kp}_week"] = today_mon
-        st.rerun()
-    if nav3.button("Next week ▶", key=f"{kp}_next"):
-        st.session_state[f"{kp}_week"] = today_mon + timedelta(days=7)
-        st.rerun()
-
-    week_default = st.session_state.get(f"{kp}_week", today_mon)
-    if not isinstance(week_default, date):
-        week_default = today_mon
-    week_start = nav5.date_input("Week starting (Mon)", value=monday_of_week(week_default), key=f"{kp}_week")
-    if week_start.weekday() != 0:
-        week_start = monday_of_week(week_start)
-    st.session_state[f"{kp}_week"] = week_start
+    nav1.button(
+        "◀ Previous week",
+        key=f"{kp}_prev",
+        on_click=_previous_week,
+        args=(kp,),
+    )
+    nav2.button(
+        "Current week",
+        key=f"{kp}_curr",
+        on_click=_current_week,
+        args=(kp,),
+    )
+    nav3.button(
+        "Next week ▶",
+        key=f"{kp}_next",
+        on_click=_next_week,
+        args=(kp,),
+    )
+    week_start = st.session_state[state_key]
+    if not isinstance(week_start, date):
+        week_start = today_mon
+        st.session_state[state_key] = week_start
+    nav5.date_input(
+        "Week starting (Mon)",
+        value=week_start,
+        key=picker_key,
+        on_change=_week_picker_changed,
+        args=(kp,),
+    )
+    week_start = monday_of_week(st.session_state[state_key])
     _, we = week_bounds(week_start)
     with nav4:
         st.caption(f"Week ending **{we.isoformat()}**")

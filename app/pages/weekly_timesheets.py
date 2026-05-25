@@ -46,4 +46,4 @@ def render() -> None:
     )
 
     pre_job = str(st.session_state.pop("wjt_prefill_job_id", "") or "").strip()
-    render_weekly_timesheet_builder(job_options=_job_options(), default_job_id=pre_job, key_prefix="wjt_page")
+    render_weekly_timesheet_builder(job_options=_job_options(), default_job_id=pre_job, key_prefix="wjt")
