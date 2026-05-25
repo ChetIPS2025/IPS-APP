@@ -58,11 +58,9 @@ try:
     )
     from app.components.estimate_actions import render_estimate_action_buttons
     from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.pages._core._crud import is_demo_id
@@ -129,11 +127,9 @@ except ImportError:
     )
     from components.estimate_actions import render_estimate_action_buttons  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from pages._core._crud import is_demo_id  # type: ignore
@@ -183,25 +179,12 @@ _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("TOTAL", None),
     ("ACTIONS", None),
 ]
-_ESTIMATE_FILTER_FIELDS = ["customer", "status"]
-_ESTIMATE_VIEW_FILTER_KEY = "est_view_filter"
 _PENDING_APPROVE_KEY = "est_pending_approve_id"
-_ESTIMATE_VIEW_OPTIONS = (
-    "Active Estimates",
-    "Approved / Converted",
-    "Rejected",
-    "All Estimates",
-)
 _NEW_ESTIMATE_DIALOG_KEY = "ips_est_new_dialog_open"
 _BUILD_MODE_PREFIX = "est_build_mode_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
-
-
-def _default_estimate_date_range() -> tuple[date, date]:
-    today = date.today()
-    return today.replace(day=1), today
 
 
 def _as_date(value: object) -> date | None:
@@ -1164,54 +1147,11 @@ def render() -> None:
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()
 
-    def _filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1.2, 1, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search estimates...",
-                key="est_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "View",
-                list(_ESTIMATE_VIEW_OPTIONS),
-                key=_ESTIMATE_VIEW_FILTER_KEY,
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.date_input(
-                "Date range",
-                value=_default_estimate_date_range(),
-                key="est_filter_dates",
-                label_visibility="collapsed",
-            )
-        with c4:
-            if st.button("Clear", key="est_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _ESTIMATE_FILTER_FIELDS,
-                    extra_keys=["est_search", _ESTIMATE_VIEW_FILTER_KEY],
-                )
-                st.session_state["est_filter_dates"] = _default_estimate_date_range()
-                st.session_state[_ESTIMATE_VIEW_FILTER_KEY] = "Active Estimates"
-                st.session_state.pop(_PENDING_APPROVE_KEY, None)
-                st.rerun()
-
-    layout_filter_bar(_filters)
-
-    date_range = st.session_state.get("est_filter_dates")
-    if not isinstance(date_range, tuple) or len(date_range) != 2:
-        date_range = _default_estimate_date_range()
-
-    view_filter = str(st.session_state.get(_ESTIMATE_VIEW_FILTER_KEY) or "Active Estimates")
-
     filtered = _filter_rows(
         rows,
-        q=str(st.session_state.get("est_search") or "").strip(),
-        date_range=date_range,
-        view_filter=view_filter,
+        q="",
+        date_range=None,
+        view_filter="Active Estimates",
     )
 
     rows_by_id = {str(r.get("id") or ""): r for r in rows if str(r.get("id") or "").strip()}
