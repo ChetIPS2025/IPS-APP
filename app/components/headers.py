@@ -17,7 +17,7 @@ def render_page_header(
     subtitle: str = "",
     *,
     actions_cols: list | None = None,
-    show_logo: bool = True,
+    show_logo: bool = False,
 ) -> None:
     """Compact page header row with optional logo, title, subtitle, and actions."""
     ot, ct = "d" + "iv", "/" + "d" + "iv"
