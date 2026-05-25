@@ -167,7 +167,7 @@ _ESTIMATE_TABS = [
     "Notes",
     "Activity",
 ]
-_ESTIMATE_COLS = [0.35, 1.0, 2.5, 1.6, 1.0, 1.0, 1.0, 1.0, 1.15]
+_ESTIMATE_COLS = [0.35, 1.05, 2.2, 1.55, 1.05, 1.05, 1.15, 0.95, 1.15]
 _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("ESTIMATE #", None),

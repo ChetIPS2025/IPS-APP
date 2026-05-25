@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v4"
+_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v5"
 
 
 def inject_table_header_filter_css_once() -> None:
@@ -126,18 +126,19 @@ def render_header_filter(
         f'<span class="ips-table-header-filter-marker{active_class}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    label_col, arrow_col = st.columns([0.9, 0.1], gap="small", vertical_alignment="center")
+    label_col, arrow_col = st.columns([0.88, 0.12], gap="small", vertical_alignment="center")
     with label_col:
         st.markdown(
             f'<span class="ips-table-header-filter-text{active_class}">{label_html}</span>',
             unsafe_allow_html=True,
         )
     with arrow_col:
-        with st.popover("▾", help=f"Filter {label}", type="tertiary"):
+        with st.popover("", icon=":material/expand_more:", help=f"Filter {label}", type="tertiary"):
             st.multiselect(
                 f"Filter {label}",
                 options=merged,
                 key=session_key,
+                label_visibility="collapsed",
             )
             if st.button("Clear filter", key=f"clear_{table_key}_{field}_filter"):
                 st.session_state[session_key] = []

@@ -1313,6 +1313,11 @@ def inject_estimates_module_css() -> None:
   min-height: 38px;
   display: flex;
   align-items: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.15;
+  word-break: keep-all;
 }}
 .ips-estimates-row {{
   background: #ffffff;
@@ -1427,7 +1432,8 @@ def inject_estimates_module_css() -> None:
 }}
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 40px;
+  min-height: 44px;
+  height: auto !important;
   padding: 8px 10px !important;
 }}
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
@@ -2022,20 +2028,25 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v4">
+<style id="ips-table-header-filter-v5">
 .ips-table-header-filter-marker {
   display: none !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [class*="-header-row"] {
   font-size: 12px;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   min-width: 0;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {
   display: block;
 }
 .ips-table-header-filter-text.ips-table-header-filter-active {
@@ -2100,7 +2111,6 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
   border: none !important;
   color: #2563eb !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) .stButton > button p {
   white-space: nowrap !important;
   margin: 0 !important;
@@ -2111,9 +2121,28 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
 }
-/* Hide Streamlit's built-in popover icon; label uses a single chevron character */
+/* Icon-only filter popover trigger beside header label */
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button svg {
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span {
   display: none !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopoverBody"] [data-testid="stMultiSelect"] label,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stMultiSelect"] > label {
+  display: none !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
+  min-height: 44px !important;
+  height: auto !important;
+  align-items: center !important;
 }
 .ips-filter-dot {
   width: 6px;
