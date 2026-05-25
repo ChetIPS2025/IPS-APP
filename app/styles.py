@@ -2022,26 +2022,67 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v1">
+<style id="ips-table-header-filter-v2">
+.ips-table-header-filter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.ips-table-header-filter-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ips-table-header-filter-wrap [data-testid="stPopover"] {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button,
 .ips-table-header-filter-wrap [data-testid="stPopover"] > button {
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0 !important;
-  min-height: 32px !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+  min-height: 20px !important;
+  max-height: 24px !important;
   height: auto !important;
-  font-size: 12px !important;
-  font-weight: 800 !important;
-  color: #475569 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  justify-content: flex-start !important;
+  min-width: 18px !important;
+  width: auto !important;
+  max-width: none !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover,
+.ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  color: #2563eb !important;
+}
+section[data-testid="stMain"] .ips-table-header-filter-wrap [data-testid="stPopover"] > button p,
+.ips-table-header-filter-wrap [data-testid="stPopover"] > button p {
+  white-space: nowrap !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  font-size: 11px !important;
+}
+.ips-table-header-filter-active-wrap .ips-table-header-filter-text {
+  color: #2563eb !important;
 }
 .ips-table-header-filter-active-wrap [data-testid="stPopover"] > button {
   color: #2563eb !important;
-}
-.ips-table-header-filter-wrap [data-testid="stPopover"] > button:hover {
-  color: #1d4ed8 !important;
 }
 .ips-table-header-filter {
   display: inline-flex;
@@ -2062,6 +2103,8 @@ def inject_table_header_filter_css() -> None:
   border-radius: 999px;
   background: #2563eb;
   display: inline-block;
+  vertical-align: middle;
+  margin-left: 3px;
 }
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopover"],

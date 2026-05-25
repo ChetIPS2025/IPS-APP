@@ -8,19 +8,18 @@ from typing import Any
 
 import streamlit as st
 
-_FILTER_CSS_INJECTED = False
+_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v2"
 
 
 def inject_table_header_filter_css_once() -> None:
-    global _FILTER_CSS_INJECTED
-    if _FILTER_CSS_INJECTED:
+    if st.session_state.get(_FILTER_CSS_SESSION_KEY):
         return
     try:
         from app.styles import inject_table_header_filter_css
     except ImportError:
         from styles import inject_table_header_filter_css  # type: ignore
     inject_table_header_filter_css()
-    _FILTER_CSS_INJECTED = True
+    st.session_state[_FILTER_CSS_SESSION_KEY] = True
 
 
 def filter_session_key(table_key: str, field: str) -> str:
@@ -107,6 +106,7 @@ def render_header_filter(
     options: list[str],
     *,
     wrap_class: str = "ips-table-header-filter-wrap",
+    header_class: str = "",
 ) -> None:
     inject_table_header_filter_css_once()
     session_key = filter_session_key(table_key, field)
@@ -117,12 +117,21 @@ def render_header_filter(
     merged = sorted(option_set, key=lambda s: (s == "—", s.lower()))
 
     wrap_classes = wrap_class
+    if header_class:
+        wrap_classes += f" {header_class}"
     if active:
         wrap_classes += " ips-table-header-filter-active-wrap"
 
-    trigger = f"{label} ●" if active else label
-    st.markdown(f'<div class="{wrap_classes}">', unsafe_allow_html=True)
-    with st.popover(f"{trigger} ▾"):
+    label_html = html.escape(label)
+    if active:
+        label_html += ' <span class="ips-filter-dot" aria-hidden="true"></span>'
+
+    st.markdown(
+        f'<div class="{wrap_classes}">'
+        f'<span class="ips-table-header-filter-text">{label_html}</span>',
+        unsafe_allow_html=True,
+    )
+    with st.popover("▾", help=f"Filter {label}"):
         st.multiselect(
             f"Filter {label}",
             options=merged,
@@ -143,7 +152,13 @@ def render_table_header_cell(
     base_class: str = "ips-timekeeping-header-row ips-timekeeping-cell",
 ) -> None:
     if table_key and filter_field and filter_options is not None:
-        render_header_filter(table_key, label, filter_field, filter_options)
+        render_header_filter(
+            table_key,
+            label,
+            filter_field,
+            filter_options,
+            header_class=base_class,
+        )
     else:
         st.markdown(
             f'<div class="{base_class}">{html.escape(label)}</div>',
