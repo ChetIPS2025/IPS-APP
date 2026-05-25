@@ -69,7 +69,7 @@ def render_page_brand_header(
     )
 
     if actions:
-        main_col, act_col = st.columns([3.2, 1], gap="small", vertical_alignment="top")
+        main_col, act_col = st.columns([2.55, 1.45], gap="small", vertical_alignment="top")
         with main_col:
             st.markdown(
                 f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
@@ -81,14 +81,19 @@ def render_page_brand_header(
                 unsafe_allow_html=True,
             )
             n = len(actions)
-            if n <= 2:
-                ac1, ac2 = st.columns(2, gap="small")
-                cols = [ac1, ac2]
+            if n == 1:
+                actions[0]()
+            elif n == 2:
+                bc1, bc2 = st.columns([0.78, 1.22], gap="small")
+                with bc1:
+                    actions[0]()
+                with bc2:
+                    actions[1]()
             else:
                 cols = st.columns(min(n, 3), gap="small")
-            for i, widget in enumerate(actions):
-                with cols[i % len(cols)]:
-                    widget()
+                for i, widget in enumerate(actions):
+                    with cols[i % len(cols)]:
+                        widget()
     else:
         st.markdown(
             f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',

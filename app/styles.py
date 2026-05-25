@@ -10,6 +10,7 @@ import streamlit as st
 
 # Design tokens
 APP_BG = "#f4f6f9"
+MAIN_HEADER_BG = "#e8ecf1"
 SIDEBAR_BG = "#ffffff"
 CARD_BG = "#ffffff"
 BORDER = "#e5eaf2"
@@ -3571,6 +3572,7 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElemen
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-main-header) {{
   padding-left: 0 !important;
   padding-right: 0 !important;
+  background: {MAIN_HEADER_BG} !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker) {{
   margin-top: -0.15rem !important;
@@ -3583,11 +3585,30 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stHorizontalBlock"] {{
   justify-content: flex-end !important;
-  width: 100% !important;
-  gap: 0.45rem !important;
+  width: auto !important;
+  max-width: 100% !important;
+  flex-wrap: nowrap !important;
+  gap: 0.55rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton {{
+  width: auto !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button {{
   min-height: 2.05rem !important;
+  width: auto !important;
+  min-width: fit-content !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  padding-left: 0.95rem !important;
+  padding-right: 0.95rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button p,
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stButton"] > button p {{
   white-space: nowrap !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-main-header-actions-marker) {{
@@ -3712,8 +3733,8 @@ section[data-testid="stSidebar"] .block-container {{
   padding: 0 !important;
 }}
 .ips-main-header {{
-  background: #f3f6fa;
-  border-bottom: 1px solid #dbe3ee;
+  background: {MAIN_HEADER_BG};
+  border-bottom: 1px solid #cfd8e3;
   padding: 12px 28px;
   min-height: 68px;
   display: flex;
