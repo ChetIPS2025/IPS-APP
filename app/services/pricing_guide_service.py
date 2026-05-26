@@ -129,6 +129,8 @@ def normalize_pricing_row(
     vendor_names: dict[str, str] | None = None,
     inventory_labels: dict[str, str] | None = None,
     asset_labels: dict[str, str] | None = None,
+    inventory_costs: dict[str, float] | None = None,
+    asset_costs: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     if raw.get("_source") == "estimate_materials":
         row = _legacy_material_to_row(raw)
@@ -195,7 +197,7 @@ def normalize_pricing_row(
         }
 
     active = row.get("is_active") is not False
-    live_cost = resolve_live_unit_cost(row)
+    live_cost = resolve_live_unit_cost(row, inv_costs=inventory_costs, asset_costs=asset_costs)
     return {
         **row,
         "item": row["description"],
@@ -208,10 +210,35 @@ def normalize_pricing_row(
     }
 
 
-def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+def _cost_from_row(row: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        val = row.get(key)
+        if val in (None, ""):
+            continue
+        try:
+            cost = float(val)
+            if cost > 0:
+                return cost
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _inventory_cost_from_row(row: dict[str, Any]) -> float | None:
+    return _cost_from_row(row, ("average_cost", "last_purchase_cost", "unit_cost"))
+
+
+def _asset_cost_from_row(row: dict[str, Any]) -> float | None:
+    return _cost_from_row(row, ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"))
+
+
+def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, float], dict[str, bool], dict[str, float]]:
     vendor_names: dict[str, str] = {}
     inventory_labels: dict[str, str] = {}
     asset_labels: dict[str, str] = {}
+    inventory_costs: dict[str, float] = {}
+    asset_flags: dict[str, bool] = {}
+    asset_costs: dict[str, float] = {}
     try:
         from app.db import fetch_table, fetch_table_admin
     except ImportError:
@@ -220,8 +247,6 @@ def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]]
     fetcher = fetch_table_admin or fetch_table
     for table, target, name_fields in (
         ("vendors", vendor_names, ("vendor_name", "name")),
-        ("inventory_items", inventory_labels, ("item_name", "name", "description")),
-        ("assets", asset_labels, ("asset_name", "name")),
     ):
         try:
             rows = list(fetcher(table, limit=10000) or [])
@@ -240,28 +265,51 @@ def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]]
                     break
             target[rid] = label or rid[:8]
 
-    return vendor_names, inventory_labels, asset_labels
-
-
-def _load_asset_pricing_guide_flags(
-    fetcher: Callable[..., list[dict[str, Any]]],
-) -> dict[str, bool]:
-    flags: dict[str, bool] = {}
     try:
-        rows = list(fetcher("assets", limit=10000) or [])
+        inv_rows = list(fetcher("inventory_items", limit=10000) or [])
     except Exception:
-        return flags
-    for row in rows:
+        inv_rows = []
+    for r in inv_rows:
+        if not isinstance(r, dict):
+            continue
+        rid = str(r.get("id") or "").strip()
+        if not rid:
+            continue
+        label = ""
+        for nf in ("item_name", "name", "description"):
+            label = str(r.get(nf) or "").strip()
+            if label:
+                break
+        inventory_labels[rid] = label or rid[:8]
+        cost = _inventory_cost_from_row(r)
+        if cost is not None:
+            inventory_costs[rid] = cost
+
+    try:
+        asset_rows = list(fetcher("assets", limit=10000) or [])
+    except Exception:
+        asset_rows = []
+    for row in asset_rows:
         if not isinstance(row, dict):
             continue
         aid = str(row.get("id") or "").strip()
         if not aid:
             continue
+        label = ""
+        for nf in ("asset_name", "name"):
+            label = str(row.get(nf) or "").strip()
+            if label:
+                break
+        asset_labels[aid] = label or aid[:8]
         if "include_in_pricing_guide" in row:
-            flags[aid] = bool(row.get("include_in_pricing_guide"))
+            asset_flags[aid] = bool(row.get("include_in_pricing_guide"))
         else:
-            flags[aid] = True
-    return flags
+            asset_flags[aid] = True
+        cost = _asset_cost_from_row(row)
+        if cost is not None:
+            asset_costs[aid] = cost
+
+    return vendor_names, inventory_labels, asset_labels, inventory_costs, asset_flags, asset_costs
 
 
 def pricing_guide_row_visible(row: dict[str, Any], asset_flags: dict[str, bool]) -> bool:
@@ -289,8 +337,7 @@ def fetch_pricing_guide_rows(
         fetch_table_admin = _fta
 
     fetcher = fetch_table_admin or fetch_table
-    vendors, inv_labels, asset_labels = _load_lookup_maps()
-    asset_flags = _load_asset_pricing_guide_flags(fetcher)
+    vendors, inv_labels, asset_labels, inv_costs, asset_flags, asset_costs = _load_lookup_maps()
     rows: list[dict[str, Any]] = []
     try:
         rows = list(fetcher("pricing_guide_items", limit=10000, order_by="description") or [])
@@ -305,6 +352,8 @@ def fetch_pricing_guide_rows(
                 vendor_names=vendors,
                 inventory_labels=inv_labels,
                 asset_labels=asset_labels,
+                inventory_costs=inv_costs,
+                asset_costs=asset_costs,
             )
             for r in rows
             if isinstance(r, dict) and str(r.get("description") or r.get("item_code") or "").strip()
@@ -468,44 +517,45 @@ def _sync_asset_link(
         pass
 
 
-def resolve_live_unit_cost(row: dict[str, Any]) -> float:
+def resolve_live_unit_cost(
+    row: dict[str, Any],
+    *,
+    inv_costs: dict[str, float] | None = None,
+    asset_costs: dict[str, float] | None = None,
+) -> float:
     """Pull current cost from linked inventory or asset rental rate when available."""
     base = float(row.get("default_cost") or 0)
     item_class = str(row.get("item_class") or "").strip()
     inv_id = str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
     ast_id = str(row.get("linked_asset_id") or row.get("asset_id") or "").strip()
     if item_class == "Inventory" and inv_id:
+        if inv_costs is not None:
+            cached = inv_costs.get(inv_id)
+            if cached and cached > 0:
+                return cached
         try:
             from app.pages._core._data import load_inventory
         except ImportError:
             from pages._core._data import load_inventory  # type: ignore
         inv = next((r for r in load_inventory() if str(r.get("id")) == inv_id), None)
         if inv:
-            for key in ("average_cost", "last_purchase_cost", "unit_cost"):
-                val = inv.get(key)
-                if val not in (None, ""):
-                    try:
-                        cost = float(val)
-                        if cost > 0:
-                            return cost
-                    except (TypeError, ValueError):
-                        continue
+            cost = _inventory_cost_from_row(inv)
+            if cost is not None:
+                return cost
     if item_class == "Asset" and ast_id:
+        if asset_costs is not None:
+            cached = asset_costs.get(ast_id)
+            if cached and cached > 0:
+                return cached
         try:
             from app.pages._core._data import load_assets
         except ImportError:
             from pages._core._data import load_assets  # type: ignore
         asset = next((r for r in load_assets() if str(r.get("id")) == ast_id), None)
         if asset:
-            for key in ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"):
-                val = asset.get(key)
-                if val not in (None, ""):
-                    try:
-                        cost = float(val)
-                        if cost > 0:
-                            return cost
-                    except (TypeError, ValueError):
-                        continue
+            cost = _asset_cost_from_row(asset)
+            if cost is not None:
+                return cost
     return base
 
 

@@ -17,6 +17,7 @@ try:
         build_filter_options,
         render_table_header_cell,
     )
+    from app.components.table_pagination import paginate_rows, render_table_pagination_controls
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -52,7 +53,6 @@ try:
     from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
     from app.services.assets_service import (
         clear_assets_cache,
-        ensure_asset_qr_tokens,
         generate_asset_qr_value,
         get_asset_document_view_url,
         get_asset_documents,
@@ -81,6 +81,7 @@ except ImportError:
         build_filter_options,
         render_table_header_cell,
     )
+    from components.table_pagination import paginate_rows, render_table_pagination_controls  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -116,7 +117,6 @@ except ImportError:
     from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
     from services.assets_service import (  # type: ignore
         clear_assets_cache,
-        ensure_asset_qr_tokens,
         generate_asset_qr_value,
         get_asset_document_view_url,
         get_asset_documents,
@@ -1001,10 +1001,6 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     rows = load_assets()
-    if not st.session_state.get("_ast_qr_tokens_seeded"):
-        ensure_asset_qr_tokens(rows)
-        st.session_state["_ast_qr_tokens_seeded"] = True
-        rows = load_assets()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     def _assets_export() -> None:
@@ -1020,7 +1016,13 @@ def render() -> None:
         actions=[_assets_export, _assets_new],
     )
 
-    render_kit_accountability_summary()
+    with st.expander("Tool Trailers & Kits", expanded=False):
+        if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
+            st.session_state["ast_kit_summary_on"] = True
+        if st.session_state.get("ast_kit_summary_on"):
+            render_kit_accountability_summary()
+        else:
+            st.caption("Load kit accountability metrics on demand to speed up the assets page.")
 
     if st.session_state.get("ips_ast_form"):
         with st.expander("New Asset", expanded=True):
@@ -1068,7 +1070,8 @@ def render() -> None:
 
     filtered = _filter_rows(rows)
 
-    st.caption(f"{len(filtered)} asset(s)")
+    render_table_pagination_controls(len(filtered), _TABLE_KEY, item_label="asset")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
 
@@ -1078,7 +1081,7 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    _render_custom_assets_table(filtered, filter_options=filter_options)
+    _render_custom_assets_table(page_rows, filter_options=filter_options)
 
     selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
     if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):

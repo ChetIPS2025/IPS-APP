@@ -144,6 +144,11 @@ def clear_assets_cache() -> None:
     clear_all_data_caches()
     clear_asset_image_url_cache()
     try:
+        from app.pages._core._data import clear_assets_list_cache
+    except ImportError:
+        from pages._core._data import clear_assets_list_cache  # type: ignore
+    clear_assets_list_cache()
+    try:
         from app.services.pricing_guide_images import clear_catalog_image_maps_cache
 
         clear_catalog_image_maps_cache()

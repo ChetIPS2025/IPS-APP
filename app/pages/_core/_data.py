@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
+import streamlit as st
+
 try:
     from app.utils.dates import week_dates
 except ImportError:
@@ -367,24 +369,44 @@ def materials_summary(materials: list[dict[str, Any]]) -> dict[str, float]:
     }
 
 
-def load_inventory() -> list[dict[str, Any]]:
+def clear_inventory_list_cache() -> None:
+    _cached_inventory_rows.clear()
+
+
+def clear_assets_list_cache() -> None:
+    _cached_assets_rows.clear()
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_inventory_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     try:
         from app.services.inventory_service import list_inventory
     except ImportError:
         from services.inventory_service import list_inventory  # type: ignore
     rows, used = list_inventory(demo=list(_DEMO_INVENTORY))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
 
 
-def load_assets() -> list[dict[str, Any]]:
+@st.cache_data(ttl=120, show_spinner=False)
+def _cached_assets_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     try:
         from app.services.assets_service import list_assets
     except ImportError:
         from services.assets_service import list_assets  # type: ignore
     rows, used = list_assets(demo=list(_DEMO_ASSETS))
+    return tuple(rows), used
+
+
+def load_inventory() -> list[dict[str, Any]]:
+    rows, used = _cached_inventory_rows()
     _mark_if_demo(used)
-    return rows
+    return list(rows)
+
+
+def load_assets() -> list[dict[str, Any]]:
+    rows, used = _cached_assets_rows()
+    _mark_if_demo(used)
+    return list(rows)
 
 
 ACTIVE_EMPLOYEE_KEY = "ips_active_employee_id"

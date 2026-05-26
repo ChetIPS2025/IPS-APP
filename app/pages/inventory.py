@@ -19,6 +19,7 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
+    from app.components.table_pagination import paginate_rows, render_table_pagination_controls, reset_table_page
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -56,7 +57,6 @@ try:
     from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
     from app.services.inventory_service import (
         clear_inventory_cache,
-        ensure_inventory_qr_tokens,
         generate_inventory_qr_value,
         get_inventory_image_url,
         get_inventory_transactions,
@@ -78,6 +78,7 @@ except ImportError:
         clear_table_filters,
         render_table_header_cell,
     )
+    from components.table_pagination import paginate_rows, render_table_pagination_controls, reset_table_page  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -115,7 +116,6 @@ except ImportError:
     from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
     from services.inventory_service import (  # type: ignore
         clear_inventory_cache,
-        ensure_inventory_qr_tokens,
         generate_inventory_qr_value,
         get_inventory_image_url,
         get_inventory_transactions,
@@ -786,10 +786,6 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     rows = load_inventory()
-    if not st.session_state.get("_inv_qr_tokens_seeded"):
-        ensure_inventory_qr_tokens(rows)
-        st.session_state["_inv_qr_tokens_seeded"] = True
-        rows = load_inventory()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     def _inv_export() -> None:
@@ -867,6 +863,7 @@ def render() -> None:
                     _FILTER_FIELDS,
                     extra_keys=["inv_search"],
                 )
+                reset_table_page(_TABLE_KEY)
                 _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
                 st.rerun()
 
@@ -877,10 +874,11 @@ def render() -> None:
         q=str(st.session_state.get("inv_search") or "").strip(),
     )
 
-    st.caption(f"{len(filtered)} item(s)")
+    render_table_pagination_controls(len(filtered), _TABLE_KEY, item_label="item")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_inventory_table(filtered, filter_options=filter_options)
+    _render_custom_inventory_table(page_rows, filter_options=filter_options)
 
     selected_inventory_id = st.session_state.get(SELECTED_INVENTORY_KEY)
     if selected_inventory_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
