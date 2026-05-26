@@ -28,6 +28,16 @@ IMAGE_STATUSES: tuple[str, ...] = (
     IMAGE_STATUS_REJECTED,
 )
 
+ITEM_IMAGE_FIELDS: tuple[str, ...] = (
+    "image_path",
+    "image_url",
+    "image_file_name",
+    "image_mime_type",
+    "image_uploaded_at",
+    "image_uploaded_by",
+    "image_status",
+)
+
 _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 
 try:
@@ -188,6 +198,44 @@ def can_apply_item_image(record: dict[str, Any] | None) -> bool:
     if not record:
         return True
     return not is_image_approved(record)
+
+
+def item_image_metadata_payload(source: dict[str, Any]) -> dict[str, Any]:
+    return {key: source.get(key) for key in ITEM_IMAGE_FIELDS if key in source}
+
+
+def image_metadata_matches(left: dict[str, Any] | None, right: dict[str, Any] | None) -> bool:
+    if not left or not right:
+        return False
+    return str(left.get("image_path") or "").strip() == str(right.get("image_path") or "").strip() and bool(
+        str(left.get("image_path") or "").strip()
+    )
+
+
+def copy_item_image_metadata(
+    source: dict[str, Any],
+    *,
+    table: str,
+    record_id: str,
+    existing: dict[str, Any] | None = None,
+    force: bool = False,
+) -> ServiceResult:
+    """Copy stored image metadata to another catalog row without re-uploading bytes."""
+    rid = str(record_id or "").strip()
+    if not rid:
+        return ServiceResult(ok=False, error="Missing record id.")
+    if not has_stored_item_image(source):
+        return ServiceResult(ok=True, data={"skipped": True})
+    if existing and not force:
+        if image_metadata_matches(existing, source):
+            return ServiceResult(ok=True, data={"skipped": True})
+        if record_has_item_image(existing):
+            return ServiceResult(ok=True, data={"skipped": True})
+
+    payload = item_image_metadata_payload(source)
+    if not str(payload.get("image_path") or "").strip() and not str(payload.get("image_url") or "").strip():
+        return ServiceResult(ok=True, data={"skipped": True})
+    return _update_item_image_row(table, payload, rid)
 
 
 def _bucket_for_image_path(path: str) -> str | None:

@@ -832,6 +832,16 @@ def link_inventory_to_pricing_item(
                     {"id": pid},
                 )
         clear_pricing_guide_cache()
+        try:
+            from app.services.catalog_image_sync import sync_linked_catalog_images
+
+            pg_row = next(
+                (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
+                {"id": pid, "linked_inventory_id": iid, "inventory_item_id": iid},
+            )
+            sync_linked_catalog_images(pg_row)
+        except Exception:
+            pass
         return True, "Linked to pricing guide item."
     except Exception as exc:
         return False, str(exc)
@@ -860,6 +870,16 @@ def link_asset_to_pricing_item(asset_id: str, pricing_item_id: str) -> tuple[boo
             {"id": pid},
         )
         clear_pricing_guide_cache()
+        try:
+            from app.services.catalog_image_sync import sync_linked_catalog_images
+
+            pg_row = next(
+                (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
+                {"id": pid, "linked_asset_id": aid, "asset_id": aid},
+            )
+            sync_linked_catalog_images(pg_row)
+        except Exception:
+            pass
         return True, "Linked to pricing guide item."
     except Exception as exc:
         return False, str(exc)

@@ -44,6 +44,8 @@ try:
     from app.pages._core._session import select_key
     from app.styles import inject_assets_module_css
     from app.services.asset_images import (
+        asset_display_record,
+        asset_image_is_inherited,
         clear_asset_image,
         upload_asset_image as upload_asset_image_file,
     )
@@ -105,6 +107,8 @@ except ImportError:
     from pages._core._session import select_key  # type: ignore
     from styles import inject_assets_module_css  # type: ignore
     from services.asset_images import (  # type: ignore
+        asset_display_record,
+        asset_image_is_inherited,
         clear_asset_image,
         upload_asset_image as upload_asset_image_file,
     )
@@ -297,6 +301,7 @@ def _current_user_id() -> str | None:
 def _render_asset_photo_manager(asset: dict) -> None:
     aid = str(asset.get("id") or "").strip()
     rk = record_session_key(asset, "id", "asset_number")
+    display = asset_display_record(asset)
     render_item_photo_manager(
         asset,
         record_id=aid,
@@ -308,7 +313,10 @@ def _render_asset_photo_manager(asset: dict) -> None:
         cache_key=_ASSETS_CACHE_KEY,
         on_change=clear_assets_cache,
         readonly=is_demo_id(aid),
+        preview_record=display,
     )
+    if asset_image_is_inherited(asset):
+        st.caption("Photo from linked Pricing Guide or inventory record.")
 
 
 def _render_asset_detail_image(asset: dict) -> None:

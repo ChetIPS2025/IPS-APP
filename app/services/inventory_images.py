@@ -6,11 +6,14 @@ from typing import Any
 
 from app.services.item_images import (
     INVENTORY_IMAGE_BUCKET,
+    ITEM_IMAGE_FIELDS,
     clear_item_image,
     clear_item_image_url_cache,
+    has_stored_item_image,
     persist_item_image,
     record_has_item_image,
     resolve_item_image_url,
+    resolve_stored_item_image_url,
     resize_item_image_bytes,
 )
 from app.services.repository import ServiceResult
@@ -20,13 +23,14 @@ __all__ = [
     "clear_inventory_image",
     "clear_inventory_image_url_cache",
     "get_inventory_image_url",
+    "inventory_display_record",
     "inventory_has_image",
+    "inventory_image_is_inherited",
     "inventory_item_image_storage_path",
     "resize_inventory_image_bytes",
     "upload_inventory_image",
 ]
 
-# Backward-compatible aliases
 resize_inventory_image_bytes = resize_item_image_bytes
 
 
@@ -39,12 +43,87 @@ def clear_inventory_image_url_cache() -> None:
     clear_item_image_url_cache()
 
 
+def _copy_image_fields(base: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key in ITEM_IMAGE_FIELDS:
+        if key in source:
+            merged[key] = source.get(key)
+    return merged
+
+
+def _linked_pricing_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    pid = str(item.get("pricing_guide_id") or item.get("pricing_item_id") or "").strip()
+    if not pid:
+        return None
+    try:
+        from app.services.pricing_guide_service import cached_pricing_guide_rows
+    except ImportError:
+        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    return next((r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid), None)
+
+
+def _linked_asset_row(item: dict[str, Any]) -> dict[str, Any] | None:
+    pg_row = _linked_pricing_row(item)
+    if not pg_row:
+        return None
+    ast_id = str(pg_row.get("linked_asset_id") or pg_row.get("asset_id") or "").strip()
+    if not ast_id:
+        return None
+    try:
+        from app.pages._core._data import load_assets
+    except ImportError:
+        from pages._core._data import load_assets  # type: ignore
+    return next((r for r in load_assets() if str(r.get("id") or "") == ast_id), None)
+
+
+def _resolve_linked_image_source(item: dict[str, Any], *, approved_only: bool) -> dict[str, Any] | None:
+    def _usable(record: dict[str, Any] | None) -> bool:
+        if not record:
+            return False
+        if approved_only:
+            return record_has_item_image(record)
+        return has_stored_item_image(record)
+
+    pg_row = _linked_pricing_row(item)
+    if _usable(pg_row):
+        return pg_row
+    asset_row = _linked_asset_row(item)
+    if _usable(asset_row):
+        return asset_row
+    return None
+
+
+def inventory_image_is_inherited(item: dict[str, Any]) -> bool:
+    if has_stored_item_image(item):
+        return False
+    return _resolve_linked_image_source(item, approved_only=False) is not None
+
+
+def inventory_display_record(item: dict[str, Any]) -> dict[str, Any]:
+    if has_stored_item_image(item):
+        return item
+    linked = _resolve_linked_image_source(item, approved_only=False)
+    if linked:
+        return _copy_image_fields(item, linked)
+    return item
+
+
 def inventory_has_image(item: dict[str, Any]) -> bool:
-    return record_has_item_image(item)
+    return get_inventory_image_url(item) is not None
 
 
 def get_inventory_image_url(item: dict[str, Any], *, expires_in: int = 3600) -> str | None:
-    return resolve_item_image_url(item, expires_in=expires_in)
+    if record_has_item_image(item):
+        return resolve_item_image_url(item, expires_in=expires_in)
+    linked = _resolve_linked_image_source(item, approved_only=True)
+    if linked:
+        return resolve_item_image_url(linked, expires_in=expires_in)
+    return None
+
+
+def get_inventory_stored_image_url(item: dict[str, Any], *, expires_in: int = 3600) -> str | None:
+    display = inventory_display_record(item)
+    return resolve_stored_item_image_url(display, expires_in=expires_in)
 
 
 def upload_inventory_image(
@@ -64,7 +143,7 @@ def upload_inventory_image(
     raw = uploaded_file.getvalue()
     if not raw:
         return ServiceResult(ok=False, error="Uploaded file is empty.")
-    return persist_item_image(
+    result = persist_item_image(
         table="inventory_items",
         record_id=iid,
         entity_type="inventory",
@@ -74,6 +153,16 @@ def upload_inventory_image(
         uploaded_by=uploaded_by,
         force=force,
     )
+    if result.ok and not (isinstance(result.data, dict) and result.data.get("skipped")):
+        try:
+            from app.services.catalog_image_sync import sync_catalog_images_for_inventory_item
+            from app.services.inventory_service import get_inventory_item
+
+            source = get_inventory_item(iid) or existing or {"id": iid}
+            sync_catalog_images_for_inventory_item(source)
+        except Exception:
+            pass
+    return result
 
 
 def clear_inventory_image(item_id: str) -> ServiceResult:

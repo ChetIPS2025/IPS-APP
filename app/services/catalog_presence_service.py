@@ -48,6 +48,26 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _filter_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        from app.services.repository import filter_payload_to_table
+    except ImportError:
+        from services.repository import filter_payload_to_table  # type: ignore
+    return filter_payload_to_table(table, payload)
+
+
+def _admin_insert_row(table: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        from app.db import insert_row_admin
+    except ImportError:
+        from db import insert_row_admin  # type: ignore
+    try:
+        inserted = insert_row_admin(table, _filter_table_payload(table, payload))
+        return inserted, None
+    except Exception as exc:
+        return None, str(exc)
+
+
 def _linked_inventory_id(row: dict[str, Any]) -> str:
     return str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
 
@@ -169,12 +189,14 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
     inv_id = _linked_inventory_id(row)
     if inv_id and get_inventory_item(inv_id):
         ok, msg = link_inventory_to_pricing_item(inv_id, pid, sync_cost=True)
-        return ServiceResult(ok=ok, error=None if ok else msg)
+        if ok:
+            try:
+                from app.services.catalog_image_sync import sync_linked_catalog_images
 
-    try:
-        from app.db import insert_row_admin
-    except ImportError:
-        from db import insert_row_admin  # type: ignore
+                sync_linked_catalog_images(_fresh_pricing_row(pid) or row)
+            except Exception:
+                pass
+        return ServiceResult(ok=ok, error=None if ok else msg)
 
     cost = float(row.get("default_cost") or 0)
     description = str(row.get("description") or row.get("item") or "Inventory Item").strip()
@@ -195,11 +217,10 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
         "created_at": now,
         "updated_at": now,
     }
-    try:
-        inserted = insert_row_admin("inventory_items", payload)
-        new_id = str((inserted or {}).get("id") or "")
-    except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+    inserted, err = _admin_insert_row("inventory_items", payload)
+    if err:
+        return ServiceResult(ok=False, error=err)
+    new_id = str((inserted or {}).get("id") or "")
     if not new_id:
         return ServiceResult(ok=False, error="Could not create inventory item.")
 
@@ -208,6 +229,13 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=False, error=msg)
     clear_inventory_cache()
     clear_pricing_guide_cache()
+    try:
+        from app.services.catalog_image_sync import sync_linked_catalog_images
+
+        fresh = _fresh_pricing_row(pid) or row
+        sync_linked_catalog_images(fresh)
+    except Exception:
+        pass
     return ServiceResult(ok=True, data={"inventory_id": new_id})
 
 
@@ -229,6 +257,17 @@ def _remove_inventory(row: dict[str, Any]) -> ServiceResult:
     ast_id = _linked_asset_id(row)
     ast_row = _load_asset_row(ast_id) if ast_id else None
     remaining_ast = str(ast_row.get("id") or "") if ast_row else ""
+    try:
+        from app.services.catalog_image_sync import preserve_catalog_image_before_catalog_remove
+
+        preserve_catalog_image_before_catalog_remove(
+            row,
+            removed_row=inv_row,
+            remaining_inventory=None,
+            remaining_asset=ast_row,
+        )
+    except Exception:
+        pass
     try:
         _recompute_item_class(
             pricing_item_id=pid,
@@ -266,12 +305,13 @@ def _ensure_asset(row: dict[str, Any], *, visible_on_pricing_guide: bool) -> Ser
         set_asset_include_in_pricing_guide(ast_id, visible_on_pricing_guide)
         clear_assets_cache()
         clear_pricing_guide_cache()
-        return ServiceResult(ok=True, data={"asset_id": ast_id})
+        try:
+            from app.services.catalog_image_sync import sync_linked_catalog_images
 
-    try:
-        from app.db import insert_row_admin
-    except ImportError:
-        from db import insert_row_admin  # type: ignore
+            sync_linked_catalog_images(_fresh_pricing_row(pid) or row)
+        except Exception:
+            pass
+        return ServiceResult(ok=True, data={"asset_id": ast_id})
 
     description = str(row.get("description") or row.get("item") or "Equipment").strip()
     cost = float(row.get("default_cost") or 0)
@@ -291,7 +331,6 @@ def _ensure_asset(row: dict[str, Any], *, visible_on_pricing_guide: bool) -> Ser
         "status": "Available",
         "purchase_cost": cost,
         "current_value": cost,
-        "hourly_rate": cost,
         "pricing_guide_id": pid,
         "pricing_item_id": pid,
         "include_in_pricing_guide": bool(visible_on_pricing_guide),
@@ -300,11 +339,10 @@ def _ensure_asset(row: dict[str, Any], *, visible_on_pricing_guide: bool) -> Ser
         "created_at": now,
         "updated_at": now,
     }
-    try:
-        inserted = insert_row_admin("assets", payload)
-        new_id = str((inserted or {}).get("id") or "")
-    except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+    inserted, err = _admin_insert_row("assets", payload)
+    if err:
+        return ServiceResult(ok=False, error=err)
+    new_id = str((inserted or {}).get("id") or "")
     if not new_id:
         return ServiceResult(ok=False, error="Could not create asset.")
 
@@ -313,6 +351,12 @@ def _ensure_asset(row: dict[str, Any], *, visible_on_pricing_guide: bool) -> Ser
         return ServiceResult(ok=False, error=msg)
     clear_assets_cache()
     clear_pricing_guide_cache()
+    try:
+        from app.services.catalog_image_sync import sync_linked_catalog_images
+
+        sync_linked_catalog_images(_fresh_pricing_row(pid) or row)
+    except Exception:
+        pass
     return ServiceResult(ok=True, data={"asset_id": new_id})
 
 
@@ -334,6 +378,17 @@ def _remove_asset(row: dict[str, Any]) -> ServiceResult:
     inv_id = _linked_inventory_id(row)
     inv_row = get_inventory_item(inv_id) if inv_id else None
     remaining_inv = str(inv_row.get("id") or "") if inv_row else ""
+    try:
+        from app.services.catalog_image_sync import preserve_catalog_image_before_catalog_remove
+
+        preserve_catalog_image_before_catalog_remove(
+            row,
+            removed_row=ast_row,
+            remaining_inventory=inv_row,
+            remaining_asset=None,
+        )
+    except Exception:
+        pass
     try:
         _recompute_item_class(
             pricing_item_id=pid,
@@ -395,6 +450,14 @@ def apply_catalog_presence(
             return result
         messages.append("Removed from Assets.")
         row = _fresh_pricing_row(str(row.get("id") or "")) or row
+
+    fresh_row = _fresh_pricing_row(str(row.get("id") or "")) or row
+    try:
+        from app.services.catalog_image_sync import sync_linked_catalog_images
+
+        sync_linked_catalog_images(fresh_row)
+    except Exception:
+        pass
 
     if (
         pricing_guide == current["pricing_guide"]

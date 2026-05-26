@@ -191,7 +191,7 @@ def upload_pricing_guide_image(
     raw = uploaded_file.getvalue()
     if not raw:
         return ServiceResult(ok=False, error="Uploaded file is empty.")
-    return persist_item_image(
+    result = persist_item_image(
         table="pricing_guide_items",
         record_id=iid,
         entity_type="pricing_guide",
@@ -201,6 +201,19 @@ def upload_pricing_guide_image(
         uploaded_by=uploaded_by,
         force=force,
     )
+    if result.ok and not (isinstance(result.data, dict) and result.data.get("skipped")):
+        try:
+            from app.services.catalog_image_sync import sync_linked_catalog_images
+            from app.services.pricing_guide_service import cached_pricing_guide_rows
+
+            source = next(
+                (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == iid),
+                existing or {"id": iid},
+            )
+            sync_linked_catalog_images(source)
+        except Exception:
+            pass
+    return result
 
 
 def clear_pricing_guide_image(item_id: str) -> ServiceResult:

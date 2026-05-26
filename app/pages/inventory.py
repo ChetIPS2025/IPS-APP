@@ -49,6 +49,8 @@ try:
     )
     from app.services.inventory_images import (
         clear_inventory_image,
+        inventory_display_record,
+        inventory_image_is_inherited,
         upload_inventory_image as upload_inventory_image_file,
     )
     from app.services.inventory_service import (
@@ -105,6 +107,8 @@ except ImportError:
     )
     from services.inventory_images import (  # type: ignore
         clear_inventory_image,
+        inventory_display_record,
+        inventory_image_is_inherited,
         upload_inventory_image as upload_inventory_image_file,
     )
     from services.inventory_service import (  # type: ignore
@@ -274,6 +278,7 @@ def _render_inventory_thumbnail(item: dict) -> None:
 def _render_inventory_photo_manager(item: dict) -> None:
     iid = str(item.get("id") or "").strip()
     record_key = record_session_key(item, "id")
+    display = inventory_display_record(item)
     render_item_photo_manager(
         item,
         record_id=iid,
@@ -285,7 +290,10 @@ def _render_inventory_photo_manager(item: dict) -> None:
         cache_key=_CACHE_KEY,
         on_change=clear_inventory_cache,
         readonly=is_demo_id(iid),
+        preview_record=display,
     )
+    if inventory_image_is_inherited(item):
+        st.caption("Photo from linked Pricing Guide or asset record.")
 
 
 def _render_inventory_detail_image(item: dict) -> None:
