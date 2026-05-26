@@ -62,6 +62,10 @@ try:
         type_pill_html,
     )
     from app.services.catalog_import_service import import_catalog_csv
+    from app.services.pricing_guide_images import (
+        get_pricing_guide_image_url,
+        upload_pricing_guide_image,
+    )
     from app.styles import inject_pricing_guide_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
@@ -119,6 +123,10 @@ except ImportError:
         type_pill_html,
     )
     from services.catalog_import_service import import_catalog_csv  # type: ignore
+    from services.pricing_guide_images import (  # type: ignore
+        get_pricing_guide_image_url,
+        upload_pricing_guide_image,
+    )
     from styles import inject_pricing_guide_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
@@ -130,9 +138,10 @@ _CACHE_KEY = "_ips_pg_modal_by_id"
 SELECTED_PG_KEY = "selected_pricing_guide_id"
 SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
 _ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
-_PG_COLS = [0.35, 3.0, 1.2, 1.25, 0.75, 1.0, 0.85, 1.1, 1.25, 0.95]
+_PG_COLS = [0.35, 0.55, 2.45, 1.05, 1.15, 0.7, 0.95, 0.8, 1.0, 1.15, 0.9]
 _PG_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
+    ("IMAGE", None),
     ("DESCRIPTION", None),
     ("CLASS", "item_class"),
     ("CATEGORY", "category"),
@@ -293,6 +302,39 @@ def _pg_status_pill_html(status: str) -> str:
     return f'<span class="ips-pg-status-pill {cls}">{html.escape(status)}</span>'
 
 
+def _render_pg_thumbnail(row: dict[str, Any]) -> None:
+    image_url = get_pricing_guide_image_url(row)
+    if image_url:
+        st.markdown(
+            (
+                f'<span class="ips-pg-thumb-cell">'
+                f'<img class="ips-pg-thumb-img" src="{html.escape(image_url, quote=True)}" '
+                f'alt="Pricing item image" />'
+                f"</span>"
+            ),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<span class="ips-pg-thumb-cell">'
+            '<span class="ips-pg-thumb-placeholder">—</span>'
+            "</span>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_pg_detail_image(row: dict[str, Any]) -> None:
+    image_url = get_pricing_guide_image_url(row)
+    if image_url:
+        st.markdown(
+            f'<img class="ips-pg-detail-image" src="{html.escape(image_url, quote=True)}" '
+            f'alt="Pricing item image" />',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("No item image uploaded.")
+
+
 def _render_custom_pricing_guide_table(
     filtered: list[dict[str, Any]],
     *,
@@ -353,51 +395,54 @@ def _render_custom_pricing_guide_table(
                 )
 
             with cols[1]:
+                _render_pg_thumbnail(row)
+
+            with cols[2]:
                 st.markdown(
                     f'<div class="ips-pg-title">{html.escape(item)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[2]:
+            with cols[3]:
                 st.markdown(class_pill_html(item_class), unsafe_allow_html=True)
 
-            with cols[3]:
+            with cols[4]:
                 st.markdown(
                     f'<div class="ips-pg-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[5]:
                 st.markdown(
                     f'<div class="ips-pg-muted ips-pg-cell">{html.escape(unit)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-pg-cell ips-pg-money">{html.escape(default_cost)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[6]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-pg-cell ips-pg-money">{html.escape(markup)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[8]:
                 st.markdown(
                     f'<div class="ips-pg-cell ips-pg-money">{html.escape(sell_price)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[8]:
+            with cols[9]:
                 st.markdown(
                     f'<div class="ips-pg-muted ips-pg-cell">{html.escape(vendor)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[9]:
+            with cols[10]:
                 st.markdown(_pg_status_pill_html(status), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -469,10 +514,23 @@ def _render_csv_import() -> None:
             key="pg_csv_upload",
             label_visibility="collapsed",
         )
+        image_uploads = st.file_uploader(
+            "Item images (optional — match by model #, item #, SKU, or filename)",
+            type=["png", "jpg", "jpeg", "webp"],
+            accept_multiple_files=True,
+            key="pg_csv_images",
+        )
+        st.caption(
+            "You can also drop image files in assets/item_images/ before import. "
+            "Existing item photos are not overwritten."
+        )
         if uploaded is not None:
             text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
             if st.button("Run Import", key="pg_csv_import", type="primary"):
-                result = import_catalog_csv(text)
+                image_files: list[tuple[str, bytes]] = []
+                for f in image_uploads or []:
+                    image_files.append((str(getattr(f, "name", "") or "image.jpg"), f.getvalue()))
+                result = import_catalog_csv(text, image_files=image_files or None)
                 if result.ok:
                     st.success(result.message)
                     if result.errors:
@@ -522,23 +580,28 @@ def _render_add_form() -> None:
 def _render_item_tabs(row: dict[str, Any]) -> None:
     tab = render_tabs(list(_DETAIL_TABS), session_key=f"ips_pg_tab_{row.get('id')}", default="Overview")
     if tab == "Overview":
-        st.markdown(
-            dialog_card_html(
-                "Overview",
-                f"{detail_field_html('Description', row.get('item'))}"
-                f"{detail_field_html('Item code', row.get('item_code') or row.get('item_key'))}"
-                f'{detail_field_html("Class", row.get("item_class"), html_value=class_pill_html(str(row.get("item_class") or "")))}'
-                f'{detail_field_html("Estimate type", row.get("item_type"), html_value=type_pill_html(str(row.get("item_type") or "")))}'
-                f"{detail_field_html('SKU', row.get('sku') or '—')}"
-                f"{detail_field_html('Item #', row.get('item_number') or '—')}"
-                f"{detail_field_html('Model #', row.get('model_number') or '—')}"
-                f"{detail_field_html('Category', row.get('category'))}"
-                f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
-                f"{detail_field_html('Unit', row.get('unit'))}"
-                f'{detail_field_html("Status", row.get("status"), html_value=modal_status_pill_html(str(row.get("status") or "")))}',
-            ),
-            unsafe_allow_html=True,
-        )
+        media, details = st.columns([1.0, 2.2])
+        with media:
+            st.markdown("**Item Image**")
+            _render_pg_detail_image(row)
+        with details:
+            st.markdown(
+                dialog_card_html(
+                    "Overview",
+                    f"{detail_field_html('Description', row.get('item'))}"
+                    f"{detail_field_html('Item code', row.get('item_code') or row.get('item_key'))}"
+                    f'{detail_field_html("Class", row.get("item_class"), html_value=class_pill_html(str(row.get("item_class") or "")))}'
+                    f'{detail_field_html("Estimate type", row.get("item_type"), html_value=type_pill_html(str(row.get("item_type") or "")))}'
+                    f"{detail_field_html('SKU', row.get('sku') or '—')}"
+                    f"{detail_field_html('Item #', row.get('item_number') or '—')}"
+                    f"{detail_field_html('Model #', row.get('model_number') or '—')}"
+                    f"{detail_field_html('Category', row.get('category'))}"
+                    f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
+                    f"{detail_field_html('Unit', row.get('unit'))}"
+                    f'{detail_field_html("Status", row.get("status"), html_value=modal_status_pill_html(str(row.get("status") or "")))}',
+                ),
+                unsafe_allow_html=True,
+            )
     elif tab == "Pricing":
         mk = float(row.get("markup_pct") or 0)
         st.markdown(
@@ -642,6 +705,12 @@ def _render_edit_form(row: dict[str, Any]) -> None:
 
     extra = _render_conditional_fields(f"pg_edit_{rk}", item_class, item_type)
     notes = st.text_area("Notes", value=str(row.get("notes") or ""), key=f"pg_edit_notes_{rk}")
+    st.file_uploader(
+        "Upload item image",
+        type=["png", "jpg", "jpeg", "webp"],
+        key=f"pg_edit_image_{rk}",
+    )
+    st.caption("PNG, JPG, JPEG, or WEBP. Saved when you click Save Changes. Won't replace an existing photo unless empty.")
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -669,6 +738,16 @@ def _render_edit_form(row: dict[str, Any]) -> None:
             },
             row_id=str(row.get("id") or ""),
         )
+        if ok:
+            uploaded_file = st.session_state.get(f"pg_edit_image_{rk}")
+            if uploaded_file is not None:
+                upload_result = upload_pricing_guide_image(
+                    str(row.get("id") or ""),
+                    uploaded_file,
+                    existing=row,
+                )
+                if not upload_result.ok:
+                    st.warning(upload_result.error or "Item saved, but image upload failed.")
         if apply_persist_feedback(ok, msg):
             set_view_mode(_MODULE, rk)
             st.rerun()

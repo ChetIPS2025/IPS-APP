@@ -187,6 +187,10 @@ def normalize_pricing_row(
             "vendor_name": vendors.get(vendor_id or "", "") if vendor_id else str(raw.get("vendor") or ""),
             "inventory_label": invs.get(inv_id or "", "") if inv_id else "",
             "asset_label": assets.get(asset_id or "", "") if asset_id else "",
+            "image_path": str(raw.get("image_path") or ""),
+            "image_url": str(raw.get("image_url") or ""),
+            "image_file_name": str(raw.get("image_file_name") or ""),
+            "qr_code_url": str(raw.get("qr_code_url") or ""),
         }
 
     active = row.get("is_active") is not False
@@ -301,6 +305,14 @@ def cached_pricing_guide_rows(*, include_inactive: bool = True) -> list[dict[str
 
 def clear_pricing_guide_cache() -> None:
     cached_pricing_guide_rows.clear()
+    try:
+        from app.services.item_images import clear_item_image_url_cache
+        from app.services.pricing_guide_images import clear_pricing_guide_image_cache
+
+        clear_pricing_guide_image_cache()
+        clear_item_image_url_cache()
+    except Exception:
+        pass
     try:
         from app.services.estimate_materials_catalog import clear_estimate_materials_catalog_cache
 
@@ -537,8 +549,6 @@ def save_pricing_item(
         "linked_asset_id": data.get("linked_asset_id") or data.get("asset_id") or None,
         "vendor_id": data.get("vendor_id") or None,
         "vendor": str(data.get("vendor") or data.get("vendor_name") or "").strip()[:200],
-        "image_url": str(data.get("image_url") or "").strip(),
-        "qr_code_url": str(data.get("qr_code_url") or "").strip(),
         "asset_recommended": bool(data.get("asset_recommended", False)),
         "labor_role": str(data.get("labor_role") or "").strip()[:200] or None,
         "equipment_type": str(data.get("equipment_type") or "").strip()[:200] or None,
@@ -546,6 +556,9 @@ def save_pricing_item(
         "notes": str(data.get("notes") or "").strip(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    for key in ("image_path", "image_url", "image_file_name", "image_mime_type", "qr_code_url"):
+        if key in data:
+            payload[key] = str(data.get(key) or "").strip()
 
     old_cost = 0.0
     saved_id = str(row_id or "").strip()

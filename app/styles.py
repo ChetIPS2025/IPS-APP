@@ -1870,6 +1870,39 @@ def inject_pricing_guide_module_css() -> None:
   text-align: right;
   white-space: nowrap;
 }}
+.st-key-pricing_guide_table_wrap .stMarkdown p:has(.ips-pg-thumb-cell) {{
+  margin: 0 !important;
+}}
+.ips-pg-thumb-cell {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}}
+.ips-pg-thumb-img {{
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  display: block;
+}}
+.ips-pg-thumb-placeholder {{
+  color: #94a3b8;
+  font-size: 12px;
+}}
+.ips-pg-detail-image {{
+  width: 100%;
+  max-width: 320px;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}}
 .ips-pg-status-pill {{
   display: inline-flex;
   align-items: center;

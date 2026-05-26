@@ -43,6 +43,9 @@ class CatalogImportResult:
     updated_inventory: int = 0
     created_assets: int = 0
     updated_assets: int = 0
+    images_attached: int = 0
+    images_skipped: int = 0
+    qr_tokens_generated: int = 0
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -176,10 +179,10 @@ def find_matching_pricing_item(
         field_map=(
             ("model_number", "model_number"),
             ("item_number", "item_number"),
-            ("sku", "sku"),
-            ("item_code", "sku"),
-            ("item_code", "item_number"),
             ("description", "description"),
+            ("sku", "model_number"),
+            ("item_code", "model_number"),
+            ("item_code", "item_number"),
         ),
     )
 
@@ -192,7 +195,7 @@ def find_matching_inventory_item(
         row,
         existing,
         field_map=(
-            ("sku", "sku"),
+            ("sku", "model_number"),
             ("sku", "item_number"),
             ("item_name", "description"),
             ("description", "description"),
@@ -209,9 +212,10 @@ def find_matching_asset_item(
         existing,
         field_map=(
             ("model", "model_number"),
+            ("asset_number", "model_number"),
+            ("asset_id", "model_number"),
             ("asset_number", "item_number"),
             ("asset_id", "item_number"),
-            ("serial_number", "sku"),
             ("asset_name", "description"),
         ),
     )
@@ -273,6 +277,31 @@ def _sync_catalog_links(
             _LOG.warning("Could not sync asset pricing link: %s", exc)
 
 
+def _default_catalog_markup_percent(*, item_class: str = "Inventory") -> float:
+    """Default markup from session app settings, fallback 25%."""
+    fallback = 25.0
+    try:
+        import streamlit as st
+
+        for prefix in ("ips_app_settings_admin", "ips_app_settings_settings"):
+            for key_suffix in (
+                "default_material_markup_pct",
+                "default_equipment_markup_pct",
+                "default_markup_pct",
+            ):
+                val = st.session_state.get(f"{prefix}_{key_suffix}")
+                if val not in (None, ""):
+                    return float(val)
+            val = st.session_state.get(f"{prefix}_default_markup")
+            if val not in (None, ""):
+                return float(val)
+    except Exception:
+        pass
+    if item_class == "Asset":
+        return fallback
+    return fallback
+
+
 def _upsert_pricing_guide(
     row: dict[str, Any],
     existing: dict[str, Any] | None,
@@ -285,13 +314,19 @@ def _upsert_pricing_guide(
         from services.pricing_guide_service import calc_sell_price, save_pricing_item, slug_item_code  # type: ignore
 
     cost = _num(row.get("unit_cost"))
+    item_class = normalize_item_class(row.get("item_class"))
     markup = _num(row.get("markup_percent"))
-    sell = calc_sell_price(cost, markup) if cost or markup else 0.0
-    item_code = _str(row.get("sku") or row.get("item_number")) or slug_item_code(row.get("description") or "ITEM")
+    if not markup:
+        markup = _default_catalog_markup_percent(item_class=item_class)
+    sell = calc_sell_price(cost, markup)
+    item_code = (
+        _str(row.get("sku") or row.get("model_number") or row.get("item_number"))
+        or slug_item_code(row.get("description") or "ITEM")
+    )
     payload: dict[str, Any] = {
         "item_code": item_code,
         "item_type": _str(row.get("item_type") or "Material"),
-        "item_class": normalize_item_class(row.get("item_class")),
+        "item_class": item_class,
         "description": _str(row.get("description")),
         "category": _str(row.get("category")),
         "subcategory": _str(row.get("subcategory")),
@@ -303,7 +338,7 @@ def _upsert_pricing_guide(
         "sell_price": sell,
         "item_number": _str(row.get("item_number")),
         "model_number": _str(row.get("model_number")),
-        "sku": _str(row.get("sku") or item_code),
+        "sku": _str(row.get("sku") or row.get("model_number") or row.get("item_number") or item_code),
         "taxable": _bool(row.get("taxable"), True),
         "vendor": _str(row.get("vendor")),
         "notes": _str(row.get("notes")),
@@ -345,7 +380,7 @@ def _upsert_inventory(row: dict[str, Any], pricing_item_id: str, existing: dict[
         "last_purchase_cost": cost,
         "average_cost": cost,
         "vendor": _str(row.get("vendor")),
-        "sku": _str(row.get("sku")),
+        "sku": _str(row.get("sku") or row.get("model_number") or row.get("item_number")),
         "stock_location": _str(row.get("stock_location")),
         "storage_location": _str(row.get("stock_location")),
         "pricing_guide_id": pricing_item_id,
@@ -375,7 +410,10 @@ def _upsert_inventory(row: dict[str, Any], pricing_item_id: str, existing: dict[
 def _upsert_asset(row: dict[str, Any], pricing_item_id: str, existing: dict[str, Any] | None) -> tuple[bool, str, str | None, bool]:
     _, insert_row_admin, update_rows_admin = _admin()
     now = datetime.now(timezone.utc).isoformat()
-    asset_no = _str(row.get("item_number") or row.get("sku")) or slug_asset_number(row.get("description") or "ASSET")
+    asset_no = (
+        _str(row.get("model_number") or row.get("item_number") or row.get("sku"))
+        or slug_asset_number(row.get("description") or "ASSET")
+    )
     payload: dict[str, Any] = {
         "asset_id": asset_no,
         "asset_number": asset_no,
@@ -418,10 +456,94 @@ def slug_asset_number(text: str) -> str:
     return slug_item_code(text, prefix="AST")
 
 
+def _build_import_image_index(
+    image_files: list[tuple[str, bytes]] | None = None,
+    *,
+    include_local_folder: bool = True,
+) -> dict[str, tuple[str, bytes]]:
+    try:
+        from app.services.item_images import build_uploaded_image_index, load_local_item_image_index
+    except ImportError:
+        from services.item_images import build_uploaded_image_index, load_local_item_image_index  # type: ignore
+
+    index = build_uploaded_image_index(image_files or [])
+    if include_local_folder:
+        for key, val in load_local_item_image_index().items():
+            index.setdefault(key, val)
+    return index
+
+
+def _attach_import_image(
+    *,
+    row: dict[str, Any],
+    image_index: dict[str, tuple[str, bytes]],
+    table: str,
+    record_id: str | None,
+    entity_type: str,
+    existing: dict[str, Any] | None,
+    result: CatalogImportResult,
+) -> None:
+    if not record_id:
+        return
+    try:
+        from app.services.item_images import find_image_bytes_for_row, persist_item_image
+    except ImportError:
+        from services.item_images import find_image_bytes_for_row, persist_item_image  # type: ignore
+
+    hit = find_image_bytes_for_row(row, image_index)
+    if not hit:
+        return
+    filename, data = hit
+    svc = persist_item_image(
+        table=table,
+        record_id=str(record_id),
+        entity_type=entity_type,
+        image_bytes=data,
+        filename=filename,
+        existing=existing,
+    )
+    if not svc.ok:
+        result.errors.append(f"Image for {table} {record_id}: {svc.error}")
+        return
+    if isinstance(svc.data, dict) and svc.data.get("skipped"):
+        result.images_skipped += 1
+    else:
+        result.images_attached += 1
+
+
+def _ensure_import_qr_codes(
+    inventory_ids: set[str],
+    asset_ids: set[str],
+) -> int:
+    """Generate QR tokens for imported inventory/asset rows missing them."""
+    generated = 0
+    try:
+        from app.services.assets_service import ensure_asset_qr_tokens, get_asset
+        from app.services.inventory_service import ensure_inventory_qr_tokens, get_inventory_item
+    except ImportError:
+        from services.assets_service import ensure_asset_qr_tokens, get_asset  # type: ignore
+        from services.inventory_service import ensure_inventory_qr_tokens, get_inventory_item  # type: ignore
+
+    inv_rows = [get_inventory_item(iid) for iid in inventory_ids if get_inventory_item(iid)]
+    if inv_rows:
+        inv_result = ensure_inventory_qr_tokens(inv_rows)
+        if inv_result.ok and isinstance(inv_result.data, dict):
+            generated += int(inv_result.data.get("updated") or 0)
+
+    ast_rows = [get_asset(aid) for aid in asset_ids if get_asset(aid)]
+    if ast_rows:
+        ast_result = ensure_asset_qr_tokens(ast_rows)
+        if ast_result.ok and isinstance(ast_result.data, dict):
+            generated += int(ast_result.data.get("updated") or 0)
+    return generated
+
+
 def import_catalog_csv(
     text: str,
     *,
     changed_by: str = "",
+    image_files: list[tuple[str, bytes]] | None = None,
+    include_local_image_folder: bool = True,
 ) -> CatalogImportResult:
     rows = parse_catalog_csv(text)
     if not rows:
@@ -430,8 +552,14 @@ def import_catalog_csv(
     pricing_rows = _fetch_all("pricing_guide_items")
     inventory_rows = _fetch_all("inventory_items")
     asset_rows = _fetch_all("assets")
+    image_index = _build_import_image_index(
+        image_files,
+        include_local_folder=include_local_image_folder,
+    )
 
     result = CatalogImportResult(ok=True, message="Import complete.")
+    touched_inventory_ids: set[str] = set()
+    touched_asset_ids: set[str] = set()
     for idx, row in enumerate(rows, start=1):
         item_class = normalize_item_class(row.get("item_class"))
         pg_existing = find_matching_pricing_item(row, pricing_rows)
@@ -453,7 +581,7 @@ def import_catalog_csv(
             if pg_existing and pg_existing.get("linked_inventory_id"):
                 inv_existing = next((r for r in inventory_rows if str(r.get("id")) == str(pg_existing.get("linked_inventory_id"))), None)
             if not inv_existing:
-                inv_existing = find_matching_pricing_item(row, inventory_rows)
+                inv_existing = find_matching_inventory_item(row, inventory_rows)
             ok_i, msg_i, inv_id, inv_upd = _upsert_inventory(row, pid, inv_existing)
             if not ok_i:
                 result.errors.append(f"Row {idx} inventory: {msg_i}")
@@ -463,6 +591,8 @@ def import_catalog_csv(
                 result.created_inventory += 1
                 if inv_id:
                     inventory_rows.append({"id": inv_id, **row})
+            if inv_id:
+                touched_inventory_ids.add(str(inv_id))
 
         elif item_class == "Asset":
             ast_existing = None
@@ -479,8 +609,43 @@ def import_catalog_csv(
                 result.created_assets += 1
                 if ast_id:
                     asset_rows.append({"id": ast_id, **row})
+            if ast_id:
+                touched_asset_ids.add(str(ast_id))
 
         _sync_catalog_links(pricing_item_id=pid, inventory_id=inv_id, asset_id=ast_id)
+
+        pg_record = pg_existing or next((r for r in pricing_rows if str(r.get("id")) == str(pid)), None)
+        _attach_import_image(
+            row=row,
+            image_index=image_index,
+            table="pricing_guide_items",
+            record_id=pid,
+            entity_type="pricing_guide",
+            existing=pg_record if isinstance(pg_record, dict) else None,
+            result=result,
+        )
+        if inv_id:
+            inv_record = inv_existing or next((r for r in inventory_rows if str(r.get("id")) == str(inv_id)), None)
+            _attach_import_image(
+                row=row,
+                image_index=image_index,
+                table="inventory_items",
+                record_id=inv_id,
+                entity_type="inventory",
+                existing=inv_record if isinstance(inv_record, dict) else None,
+                result=result,
+            )
+        if ast_id:
+            ast_record = ast_existing or next((r for r in asset_rows if str(r.get("id")) == str(ast_id)), None)
+            _attach_import_image(
+                row=row,
+                image_index=image_index,
+                table="assets",
+                record_id=ast_id,
+                entity_type="assets",
+                existing=ast_record if isinstance(ast_record, dict) else None,
+                result=result,
+            )
 
         pg_row = {**row, "id": pid, "linked_inventory_id": inv_id, "linked_asset_id": ast_id, "item_class": item_class}
         if pg_existing:
@@ -496,6 +661,7 @@ def import_catalog_csv(
     except ImportError:
         from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
     clear_pricing_guide_cache()
+    result.qr_tokens_generated = _ensure_import_qr_codes(touched_inventory_ids, touched_asset_ids)
 
     if result.errors:
         result.message = f"Imported with {len(result.errors)} warning(s)."
@@ -503,6 +669,8 @@ def import_catalog_csv(
         result.message = (
             f"Pricing Guide: {result.created_pricing} created, {result.updated_pricing} updated. "
             f"Inventory: {result.created_inventory} created, {result.updated_inventory} updated. "
-            f"Assets: {result.created_assets} created, {result.updated_assets} updated."
+            f"Assets: {result.created_assets} created, {result.updated_assets} updated. "
+            f"Images linked: {result.images_attached} ({result.images_skipped} skipped — existing photos). "
+            f"QR codes generated: {result.qr_tokens_generated}."
         )
     return result
