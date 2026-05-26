@@ -11,11 +11,9 @@ try:
     from app.auth import current_profile, current_role
     from app.components.user_actions import render_user_action_buttons
     from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.components.record_modal import (
@@ -59,11 +57,9 @@ except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from components.user_actions import render_user_action_buttons  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from components.record_modal import (  # type: ignore
@@ -123,8 +119,6 @@ _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("EMPLOYEE", "employee_type"),
     ("STATUS", "status"),
 ]
-_USER_FILTER_FIELDS = ["role", "employee_type", "status"]
-
 _EMPLOYEE_TABS = [
     "Overview",
     "Role & Permissions",
@@ -241,28 +235,8 @@ def _user_status_pill_html(status: str) -> str:
     return f'<span class="ips-user-pill {cls}">{html.escape(status)}</span>'
 
 
-def _filter_employees(rows: list[dict], *, q: str) -> list[dict]:
-    out = rows
-    activity = str(st.session_state.get("users_activity_filter") or "Active")
-    if activity == "Active":
-        out = [e for e in out if _normalize_user_status(e.get("status")) == "Active"]
-    elif activity == "Inactive":
-        out = [e for e in out if _normalize_user_status(e.get("status")) == "Inactive"]
-    elif activity == "Deleted":
-        out = [e for e in out if _normalize_user_status(e.get("status")) == "Deleted"]
-    if q:
-        ql = q.lower()
-        out = [
-            e
-            for e in out
-            if ql in _user_display_name(e).lower()
-            or ql in _user_display_email(e).lower()
-            or ql in str(e.get("username") or "").lower()
-            or ql in _user_display_role(e).lower()
-            or ql in _user_phone_raw(e).lower()
-            or ql in re.sub(r"\D", "", _user_phone_raw(e))
-        ]
-    return apply_column_filters(out, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
+def _filter_employees(rows: list[dict]) -> list[dict]:
+    return apply_column_filters(rows, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
 
 
 def _user_select_key(user_id: str) -> str:
@@ -790,35 +764,7 @@ def render() -> None:
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_emp_form",)):
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2, c3 = st.columns([5, 1.8, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search name, email, phone, username...",
-                key="emp_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "User status",
-                ["Active", "Inactive", "Deleted", "All Users"],
-                key="users_activity_filter",
-                label_visibility="collapsed",
-            )
-        with c3:
-            if st.button("Clear", key="emp_clear", use_container_width=True):
-                clear_table_filters(_TABLE_KEY, _USER_FILTER_FIELDS, extra_keys=["emp_search"])
-                st.session_state["users_activity_filter"] = "Active"
-                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
-                st.rerun()
-
-    layout_filter_bar(_filters)
-
-    filtered = _filter_employees(
-        all_emp,
-        q=str(st.session_state.get("emp_search") or "").strip(),
-    )
+    filtered = _filter_employees(all_emp)
 
     st.caption(f"{len(filtered)} user(s)")
 
