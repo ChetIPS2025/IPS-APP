@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v7"
+_FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v8"
 
 
 def inject_table_header_filter_css_once() -> None:
@@ -133,7 +133,7 @@ def render_header_filter(
             unsafe_allow_html=True,
         )
     with arrow_col:
-        with st.popover("", icon=":material/expand_more:", help=f"Filter {label}", type="tertiary"):
+        with st.popover("", help=f"Filter {label}", type="tertiary"):
             st.multiselect(
                 f"Filter {label}",
                 options=merged,

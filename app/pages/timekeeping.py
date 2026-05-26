@@ -10,11 +10,9 @@ import streamlit as st
 
 try:
     from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
     from app.components.record_modal import (
@@ -50,10 +48,8 @@ except ImportError:
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
-        clear_table_filters,
         render_table_header_cell,
     )
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -105,7 +101,6 @@ _TK_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
 ]
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
-_TK_FILTER_FIELDS = ["employee_name", "department", "week_start", "status"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
     ("department", None),
@@ -574,19 +569,8 @@ def _show_timecard_detail_modal() -> None:
 def _filter_timecards(
     summaries: list[dict],
     ws: date,
-    *,
-    q: str,
 ) -> list[dict]:
     rows = [_build_timecard_row(row, ws) for row in summaries]
-    if q:
-        ql = q.lower()
-        rows = [
-            r
-            for r in rows
-            if ql in str(r.get("employee_name") or "").lower()
-            or ql in str(r.get("department") or "").lower()
-            or ql in str(r.get("status") or "").lower()
-        ]
     return apply_column_filters(rows, _TABLE_KEY, _TK_COLUMN_FILTER_SPECS)
 
 
@@ -752,28 +736,7 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-    def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search employee...",
-                key="tk_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="tk_clear", use_container_width=True):
-                clear_table_filters(_TABLE_KEY, _TK_FILTER_FIELDS, extra_keys=["tk_search"])
-                _clear_timecard_selection(st.session_state.get(_ALL_TIMECARD_IDS_KEY))
-                st.rerun()
-
-    layout_filter_bar(_filters)
-
-    filtered = _filter_timecards(
-        summaries,
-        ws,
-        q=str(st.session_state.get("tk_search") or "").strip(),
-    )
+    filtered = _filter_timecards(summaries, ws)
 
     st.caption(f"{len(filtered)} timecard(s)")
 

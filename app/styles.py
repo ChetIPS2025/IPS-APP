@@ -2150,7 +2150,7 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v7">
+<style id="ips-table-header-filter-v8">
 .ips-table-header-filter-marker {
   display: none !important;
 }
@@ -2254,12 +2254,14 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
 }
-/* Icon-only filter trigger: one chevron, no duplicate label text */
+/* Icon-only filter trigger: one chevron, no duplicate icons or label text */
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button {
   gap: 0 !important;
+  font-size: 0 !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span:not([data-testid="stIconMaterial"]) {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span:not([data-testid="stIconMaterial"]),
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button img {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
@@ -2269,28 +2271,27 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
   margin: 0 !important;
   padding: 0 !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button > svg {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button > svg,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
   display: none !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:has([data-testid="stIconMaterial"]) [data-testid="stIconMaterial"]:first-of-type {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 14px !important;
   height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
   margin: 0 !important;
   flex: 0 0 14px !important;
+  font-size: 14px !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] svg {
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:has([data-testid="stIconMaterial"]) [data-testid="stIconMaterial"]:first-of-type svg {
   display: inline-block !important;
   width: 14px !important;
   height: 14px !important;
   margin: 0 !important;
-}
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] ~ [data-testid="stIconMaterial"],
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:not(:has([data-testid="stIconMaterial"])) > svg ~ svg,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button img {
-  display: none !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:not(:has([data-testid="stIconMaterial"])) > svg:first-of-type {
   display: inline-block !important;
