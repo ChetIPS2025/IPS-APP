@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 from datetime import date
 from functools import partial
+from typing import Any
 
 import streamlit as st
 
@@ -44,7 +45,6 @@ try:
     from app.services.certification_helpers import (
         CERT_STATUS_VALUES,
         can_view_certification_attachment,
-        cert_document_pill_html,
         cert_status_pill_html,
         coerce_date,
         days_until_expiration,
@@ -96,7 +96,6 @@ except ImportError:
     from services.certification_helpers import (  # type: ignore
         CERT_STATUS_VALUES,
         can_view_certification_attachment,
-        cert_document_pill_html,
         cert_status_pill_html,
         coerce_date,
         days_until_expiration,
@@ -151,6 +150,46 @@ _CERT_HEADER_SPECS_EMP: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("DOCUMENT", None),
 ]
+
+
+def _cert_upload_key(*, key_prefix: str, rk: str) -> str:
+    return f"{key_prefix}cert_upload_{rk}"
+
+
+def _resolve_saved_cert_id(cid: str, result: Any, row_id: str | None) -> str:
+    saved_id = str(row_id or cid or "").strip()
+    if saved_id and not is_demo_id(saved_id):
+        return saved_id
+    if isinstance(result, object) and getattr(result, "ok", False):
+        data = getattr(result, "data", None)
+        if isinstance(data, dict):
+            new_id = str(data.get("id") or "").strip()
+            if new_id and not is_demo_id(new_id):
+                return new_id
+    return ""
+
+
+def _persist_certification_upload(
+    *,
+    cert_id: str,
+    key_prefix: str,
+    rk: str,
+) -> tuple[bool, str]:
+    upload_key = _cert_upload_key(key_prefix=key_prefix, rk=rk)
+    uploaded_file = st.session_state.get(upload_key)
+    if uploaded_file is None:
+        return True, ""
+    if not cert_id or is_demo_id(cert_id):
+        return False, "Save the certification to Supabase before uploading a document."
+    upload_result = upload_certification_attachment(
+        cert_id,
+        uploaded_file,
+        uploaded_by=_current_user_id(),
+    )
+    if not upload_result.ok:
+        return False, upload_result.error or "Could not upload certification document."
+    st.session_state.pop(upload_key, None)
+    return True, ""
 
 
 def _cert_select_key(cert_id: str, *, prefix: str = "") -> str:
@@ -306,7 +345,7 @@ def _render_attachment_section(
         st.file_uploader(
             "Upload certification image or document",
             type=["png", "jpg", "jpeg", "webp", "pdf"],
-            key=f"{key_prefix}cert_upload_{cid or rk}",
+            key=_cert_upload_key(key_prefix=key_prefix, rk=rk),
         )
         st.caption("Upload PNG, JPG, WEBP, or PDF. File is saved when you click Save Changes.")
         if has_attachment and fname:
@@ -342,6 +381,40 @@ def _employee_options() -> tuple[list[str], dict[str, str]]:
     emp_opts = {str(e.get("name") or ""): str(e.get("id") or "") for e in employees if str(e.get("id") or "").strip()}
     names = [n for n in emp_opts if n]
     return names, emp_opts
+
+
+def _cert_document_button_label(cert: dict[str, Any]) -> str:
+    fname = str(cert.get("attachment_file_name") or "").strip()
+    if not fname:
+        path = str(cert.get("attachment_path") or "").strip().replace("\\", "/")
+        fname = path.rsplit("/", 1)[-1] if path else ""
+    if not fname:
+        return "View certificate"
+    if len(fname) > 28:
+        return f"{fname[:25]}..."
+    return fname
+
+
+def _render_cert_document_cell(cert: dict[str, Any], *, session_prefix: str = "") -> None:
+    cid = str(cert.get("id") or "").strip()
+    if not cert_has_attachment(cert):
+        st.markdown('<span class="ips-cert-doc-empty">—</span>', unsafe_allow_html=True)
+        return
+    if not _can_view_cert_attachment(cert):
+        st.markdown('<span class="ips-cert-doc-empty">Restricted</span>', unsafe_allow_html=True)
+        return
+    url = get_certification_attachment_url(cert)
+    if not url:
+        st.markdown('<span class="ips-cert-doc-empty">Unavailable</span>', unsafe_allow_html=True)
+        return
+    label = _cert_document_button_label(cert)
+    st.link_button(
+        label,
+        url,
+        key=f"{session_prefix}cert_doc_open_{cid}",
+        use_container_width=True,
+        help="Open certification document",
+    )
 
 
 def _render_certifications_table(
@@ -397,7 +470,6 @@ def _render_certifications_table(
             expires = fmt_date(cert.get("expiration_date"))
             status = str(cert.get("status") or "—")
             employee_name = str(cert.get("employee_name") or "—")
-            attached = cert_has_attachment(cert)
 
             cols = st.columns(col_ratios, gap="small", vertical_alignment="center")
 
@@ -454,10 +526,7 @@ def _render_certifications_table(
                     unsafe_allow_html=True,
                 )
             with cols[col_idx + 6]:
-                st.markdown(
-                    f'<div class="ips-certifications-cell">{cert_document_pill_html(attached)}</div>',
-                    unsafe_allow_html=True,
-                )
+                _render_cert_document_cell(cert, session_prefix=session_prefix)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -480,7 +549,13 @@ def _seed_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict[s
     st.session_state[f"cert_edit_notes_{rk}"] = str(cert.get("notes") or "")
 
 
-def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict[str, str]) -> None:
+def _render_cert_edit_form(
+    cert: dict,
+    employee_names: list[str],
+    emp_opts: dict[str, str],
+    *,
+    key_prefix: str = "",
+) -> None:
     rk = record_session_key(cert, "id")
     cid = str(cert.get("id") or "")
     if f"cert_edit_type_{rk}" not in st.session_state:
@@ -512,7 +587,7 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
             key=exp_key,
         )
     st.text_area("Notes", key=f"cert_edit_notes_{rk}", height=80)
-    _render_attachment_section(cert, rk=rk, edit_mode=True)
+    _render_attachment_section(cert, rk=rk, key_prefix=key_prefix, edit_mode=True)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -543,17 +618,15 @@ def _render_cert_edit_form(cert: dict, employee_names: list[str], emp_opts: dict
             st.error(result.error or "Could not save certification.")
             return
 
-        uploaded_file = st.session_state.get(f"cert_upload_{cid or rk}")
-        if uploaded_file is not None and row_id:
-            upload_result = upload_certification_attachment(
-                row_id,
-                uploaded_file,
-                uploaded_by=_current_user_id(),
-            )
-            if not upload_result.ok:
-                st.warning(upload_result.error or "Certification saved, but attachment upload failed.")
-            else:
-                clear_certifications_cache()
+        saved_id = _resolve_saved_cert_id(cid, result, row_id)
+        upload_ok, upload_msg = _persist_certification_upload(
+            cert_id=saved_id,
+            key_prefix=key_prefix,
+            rk=rk,
+        )
+        if not upload_ok:
+            st.error(upload_msg)
+            return
 
         clear_certifications_cache()
         set_view_mode(_MODULE, rk)
@@ -652,7 +725,7 @@ def render_certification_detail_dialog(
     )
 
     if edit_mode:
-        _render_cert_edit_form(cert, employee_names, emp_opts)
+        _render_cert_edit_form(cert, employee_names, emp_opts, key_prefix=session_prefix)
     else:
         _render_cert_detail_tabs(cert, key_prefix=session_prefix)
 
@@ -728,7 +801,7 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
     st.file_uploader(
         "Upload certification image or document",
         type=["png", "jpg", "jpeg", "webp", "pdf"],
-        key="cert_new_file",
+        key=_cert_upload_key(key_prefix="", rk="new"),
     )
     st.text_area("Notes", key="cert_new_notes", height=80)
 
@@ -746,18 +819,14 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
             }
             result = create_employee_certification(ui)
             if result.ok:
-                new_id = ""
-                if isinstance(result.data, dict):
-                    new_id = str(result.data.get("id") or "").strip()
-                uploaded_file = st.session_state.get("cert_new_file")
-                if uploaded_file is not None and new_id and not is_demo_id(new_id):
-                    upload_result = upload_certification_attachment(
-                        new_id,
-                        uploaded_file,
-                        uploaded_by=_current_user_id(),
-                    )
-                    if not upload_result.ok:
-                        st.warning(upload_result.error or "Certification saved, but attachment upload failed.")
+                new_id = _resolve_saved_cert_id("", result, None)
+                upload_ok, upload_msg = _persist_certification_upload(
+                    cert_id=new_id,
+                    key_prefix="",
+                    rk="new",
+                )
+                if not upload_ok:
+                    st.warning(upload_msg or "Certification saved, but attachment upload failed.")
                 clear_certifications_cache()
                 st.session_state["ips_cert_form_open"] = False
                 st.success("Certification saved.")

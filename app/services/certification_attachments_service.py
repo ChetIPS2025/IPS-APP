@@ -117,9 +117,26 @@ def upload_certification_attachment(
         "attachment_uploaded_at": datetime.now(timezone.utc).isoformat(),
         "attachment_uploaded_by": uploaded_by or None,
     }
+    try:
+        from app.services.repository import table_column_names
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+    cols = table_column_names("employee_certifications")
+    if cols and "attachment_path" not in cols:
+        return ServiceResult(
+            ok=False,
+            error="Certification attachment columns are missing. Run sql/070_employee_certification_attachments.sql in Supabase.",
+        )
     result = update_row("employee_certifications", payload, {"id": cid})
     if not result.ok:
         return ServiceResult(ok=False, error=result.error or "Could not save attachment metadata.")
+    if cols:
+        saved = {k: v for k, v in payload.items() if k in cols}
+        if "attachment_path" not in saved:
+            return ServiceResult(
+                ok=False,
+                error="Certification attachment metadata could not be saved. Check Supabase schema migrations.",
+            )
     return ServiceResult(ok=True, data={"attachment_path": storage_path, **payload})
 
 

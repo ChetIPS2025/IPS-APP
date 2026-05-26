@@ -1231,6 +1231,31 @@ def inject_certifications_module_css() -> None:
   min-height: 24px !important;
   margin: 0 !important;
 }}
+.st-key-certifications_table_wrap [data-testid="stLinkButton"] > a,
+.st-key-emp_certifications_table_wrap [data-testid="stLinkButton"] > a {{
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #93c5fd !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.st-key-certifications_table_wrap [data-testid="stLinkButton"] > a:hover,
+.st-key-emp_certifications_table_wrap [data-testid="stLinkButton"] > a:hover {{
+  background: #bfdbfe !important;
+  color: #1e3a8a !important;
+  border-color: #60a5fa !important;
+}}
 .ips-cert-doc-pill {{
   display: inline-flex;
   align-items: center;
