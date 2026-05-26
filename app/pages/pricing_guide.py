@@ -10,6 +10,7 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.components.catalog_presence_panel import render_catalog_presence_panel
+    from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
     from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
     from app.components.headers import render_page_brand_header
     from app.components.item_photo_manager import render_item_photo_manager
@@ -85,6 +86,7 @@ try:
 except ImportError:
     from auth import current_role  # type: ignore
     from components.catalog_presence_panel import render_catalog_presence_panel  # type: ignore
+    from components.catalog_stock_policy_panel import render_catalog_stock_policy_panel  # type: ignore
     from components.pricing_guide_actions import render_pricing_guide_action_buttons  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
@@ -820,6 +822,8 @@ def _render_item_tabs(row: dict[str, Any]) -> None:
         body = (
             f"{detail_field_html('Inventory item', inv_label)}"
             f"{detail_field_html('Asset / equipment', asset_label)}"
+            f"{detail_field_html('Stock policy', row.get('stock_policy_label') or 'Not stocked')}"
+            f"{detail_field_html('Default reorder point', int(float(row.get('default_reorder_point') or 0)))}"
             f"{detail_field_html('Vendor', row.get('vendor') or '—')}"
             f"{detail_field_html('Labor role', row.get('labor_role') or '—')}"
             f"{detail_field_html('Equipment type', row.get('equipment_type') or '—')}"
@@ -883,6 +887,29 @@ def _render_edit_form(row: dict[str, Any]) -> None:
         )
         unit = st.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"pg_edit_unit_{rk}")
         category = st.text_input("Category", value=str(row.get("category") or ""), key=f"pg_edit_cat_{rk}")
+        stock_labels = [
+            "Not stocked",
+            "Optional (extras only)",
+            "Mandatory (reorder when low)",
+        ]
+        stock_keys = ["none", "optional", "mandatory"]
+        cur_policy = str(row.get("stock_policy") or "none")
+        stock_ix = stock_keys.index(cur_policy) if cur_policy in stock_keys else 0
+        stock_label = st.selectbox(
+            "Stock policy",
+            stock_labels,
+            index=stock_ix,
+            key=f"pg_edit_stock_{rk}",
+        )
+        stock_policy = stock_keys[stock_labels.index(stock_label)]
+        default_reorder = st.number_input(
+            "Default reorder point",
+            min_value=0.0,
+            value=float(row.get("default_reorder_point") or 0),
+            step=1.0,
+            key=f"pg_edit_reorder_{rk}",
+            disabled=stock_policy == "none",
+        )
     with c2:
         purchase = st.number_input(
             "Cost",
@@ -929,12 +956,25 @@ def _render_edit_form(row: dict[str, Any]) -> None:
                 "default_sell_price": sell,
                 "is_active": active,
                 "notes": notes,
+                "stock_policy": stock_policy,
+                "default_reorder_point": float(default_reorder),
                 "item_code": row.get("item_code") or row.get("item_key"),
                 **extra,
             },
             row_id=str(row.get("id") or ""),
         )
         if apply_persist_feedback(ok, msg):
+            try:
+                from app.services.catalog_stock_policy_service import save_pricing_stock_settings
+
+                save_pricing_stock_settings(
+                    {**row, "id": row.get("id"), "stock_policy": stock_policy, "default_reorder_point": float(default_reorder)},
+                    stock_policy=stock_policy,
+                    default_reorder_point=float(default_reorder),
+                    ensure_inventory=True,
+                )
+            except Exception:
+                pass
             set_view_mode(_MODULE, rk)
             st.rerun()
         st.error(msg or "Could not save pricing item.")
@@ -984,6 +1024,11 @@ def _show_detail_modal() -> None:
         _render_edit_form(row)
     else:
         render_catalog_presence_panel(
+            row,
+            can_manage=_can_manage_pricing(),
+            on_change=clear_pricing_guide_cache,
+        )
+        render_catalog_stock_policy_panel(
             row,
             can_manage=_can_manage_pricing(),
             on_change=clear_pricing_guide_cache,

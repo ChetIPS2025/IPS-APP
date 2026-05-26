@@ -191,6 +191,12 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
         ok, msg = link_inventory_to_pricing_item(inv_id, pid, sync_cost=True)
         if ok:
             try:
+                from app.services.catalog_stock_policy_service import apply_pricing_stock_settings_to_inventory
+
+                apply_pricing_stock_settings_to_inventory(row)
+            except Exception:
+                pass
+            try:
                 from app.services.catalog_image_sync import sync_linked_catalog_images
 
                 sync_linked_catalog_images(_fresh_pricing_row(pid) or row)
@@ -200,12 +206,14 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
 
     cost = float(row.get("default_cost") or 0)
     description = str(row.get("description") or row.get("item") or "Inventory Item").strip()
+    reorder_point = float(row.get("default_reorder_point") or 0)
     now = _now_iso()
     payload: dict[str, Any] = {
         "item_name": description,
         "category": str(row.get("category") or "Inventory"),
         "unit": str(row.get("unit") or "EA"),
         "quantity_on_hand": 0,
+        "reorder_point": reorder_point,
         "unit_cost": cost,
         "last_purchase_cost": cost,
         "average_cost": cost,
@@ -227,6 +235,12 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
     ok, msg = link_inventory_to_pricing_item(new_id, pid, sync_cost=True)
     if not ok:
         return ServiceResult(ok=False, error=msg)
+    try:
+        from app.services.catalog_stock_policy_service import apply_pricing_stock_settings_to_inventory
+
+        apply_pricing_stock_settings_to_inventory({**row, "default_reorder_point": reorder_point})
+    except Exception:
+        pass
     clear_inventory_cache()
     clear_pricing_guide_cache()
     try:

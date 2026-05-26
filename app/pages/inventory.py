@@ -68,6 +68,12 @@ try:
         update_inventory_item,
         upload_inventory_image,
     )
+    from app.services.catalog_stock_policy_service import (
+        INVENTORY_VIEW_FILTERS,
+        enrich_inventory_rows,
+        inventory_needs_reorder,
+        passes_inventory_view_filter,
+    )
     from app.styles import inject_inventory_module_css
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.phone_helpers import format_phone_display
@@ -131,6 +137,12 @@ except ImportError:
         get_inventory_transactions,
         update_inventory_item,
         upload_inventory_image,
+    )
+    from services.catalog_stock_policy_service import (  # type: ignore
+        INVENTORY_VIEW_FILTERS,
+        enrich_inventory_rows,
+        inventory_needs_reorder,
+        passes_inventory_view_filter,
     )
     from styles import inject_inventory_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
@@ -458,8 +470,10 @@ def _filter_rows(
     rows: list[dict],
     *,
     q: str,
+    stock_view: str,
 ) -> list[dict]:
     out = rows
+    out = [r for r in out if passes_inventory_view_filter(r, view=stock_view)]
     if q:
         ql = q.lower()
         out = [
@@ -472,6 +486,7 @@ def _filter_rows(
             or ql in _inventory_location(r).lower()
             or ql in _inventory_vendor(r).lower()
             or ql in _normalize_inventory_status(r.get("status")).lower()
+            or ql in str(r.get("stock_policy_label") or "").lower()
         ]
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
@@ -642,6 +657,8 @@ def _render_inventory_detail_tabs(item: dict) -> None:
             f"{detail_field_html('Checked Out', int(float(item.get('quantity_checked_out') or 0)))}"
             f"{detail_field_html('Allocated to Jobs', int(float(item.get('quantity_allocated') or 0)))}"
             f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
+            f"{detail_field_html('Stock policy', item.get('stock_policy_label') or 'Not stocked')}"
+            f"{detail_field_html('Needs reorder', 'Yes' if inventory_needs_reorder(item) else 'No')}"
             f"{detail_field_html('Unit', _inventory_unit(item))}"
             f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
             f"</div>"
@@ -795,8 +812,11 @@ def render() -> None:
         '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    rows = load_inventory()
+    rows = enrich_inventory_rows(load_inventory())
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
+    reorder_count = sum(1 for r in rows if inventory_needs_reorder(r))
+    if reorder_count:
+        st.info(f"{reorder_count} mandatory item(s) need reorder — use the **Needs reorder** view.")
 
     def _inv_export() -> None:
         st.button("Export", key="inv_export", use_container_width=True)
@@ -858,7 +878,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -867,12 +887,20 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
+            st.selectbox(
+                "Stock view",
+                list(INVENTORY_VIEW_FILTERS),
+                key="inv_stock_view",
+                label_visibility="collapsed",
+            )
+        with c3:
             if st.button("Clear", key="inv_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
                     _FILTER_FIELDS,
-                    extra_keys=["inv_search"],
+                    extra_keys=["inv_search", "inv_stock_view"],
                 )
+                st.session_state["inv_stock_view"] = "In stock"
                 reset_table_page(_TABLE_KEY)
                 _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
                 st.rerun()
@@ -882,6 +910,7 @@ def render() -> None:
     filtered = _filter_rows(
         rows,
         q=str(st.session_state.get("inv_search") or "").strip(),
+        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
     )
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")

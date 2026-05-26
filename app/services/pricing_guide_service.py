@@ -27,6 +27,8 @@ PRICING_ITEM_TYPES: tuple[str, ...] = (
 
 PRICING_ITEM_CLASSES: tuple[str, ...] = ("Inventory", "Asset", "Non-Inventory")
 
+STOCK_POLICIES: tuple[str, ...] = ("none", "optional", "mandatory")
+
 TYPE_PILL_CSS: dict[str, str] = {
     "Inventory": "ips-pg-type-inventory",
     "Material": "ips-pg-type-material",
@@ -194,10 +196,18 @@ def normalize_pricing_row(
             "image_file_name": str(raw.get("image_file_name") or ""),
             "image_status": str(raw.get("image_status") or "missing"),
             "qr_code_url": str(raw.get("qr_code_url") or ""),
+            "stock_policy": str(raw.get("stock_policy") or "none").strip().lower(),
+            "default_reorder_point": float(raw.get("default_reorder_point") or 0),
+            "default_reorder_quantity": float(raw.get("default_reorder_quantity") or 0),
         }
 
     active = row.get("is_active") is not False
     live_cost = resolve_live_unit_cost(row, inv_costs=inventory_costs, asset_costs=asset_costs)
+    try:
+        from app.services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label
+    except ImportError:
+        from services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label  # type: ignore
+    policy = normalize_stock_policy(row.get("stock_policy"))
     return {
         **row,
         "item": row["description"],
@@ -207,6 +217,9 @@ def normalize_pricing_row(
         "sell_price": float(row.get("default_sell_price") or row.get("sell_price") or 0),
         "vendor": str(row.get("vendor_name") or row.get("vendor") or row.get("vendor_item_number") or "—"),
         "status": "Active" if active else "Inactive",
+        "stock_policy": policy,
+        "stock_policy_label": stock_policy_label(policy),
+        "default_reorder_point": float(row.get("default_reorder_point") or 0),
     }
 
 
@@ -640,6 +653,16 @@ def save_pricing_item(
         "notes": str(data.get("notes") or "").strip(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    try:
+        from app.services.catalog_stock_policy_service import normalize_stock_policy
+    except ImportError:
+        from services.catalog_stock_policy_service import normalize_stock_policy  # type: ignore
+    if "stock_policy" in data:
+        payload["stock_policy"] = normalize_stock_policy(data.get("stock_policy"))
+    if "default_reorder_point" in data:
+        payload["default_reorder_point"] = max(float(data.get("default_reorder_point") or 0), 0.0)
+    if "default_reorder_quantity" in data:
+        payload["default_reorder_quantity"] = max(float(data.get("default_reorder_quantity") or 0), 0.0)
     for key in ("image_path", "image_url", "image_file_name", "image_mime_type", "qr_code_url"):
         if key in data:
             payload[key] = str(data.get(key) or "").strip()
@@ -690,6 +713,13 @@ def save_pricing_item(
                 asset_id=str(ast_link),
                 update_rows_admin=update_rows_admin,
             )
+        if "stock_policy" in data or "default_reorder_point" in data:
+            try:
+                from app.services.catalog_stock_policy_service import sync_linked_inventory_reorder
+
+                sync_linked_inventory_reorder(saved_id)
+            except Exception:
+                pass
 
     clear_pricing_guide_cache()
     return True, "Saved."
