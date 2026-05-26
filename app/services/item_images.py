@@ -234,14 +234,17 @@ def persist_item_image(
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc))
 
-    payload = {
+    payload: dict[str, Any] = {
         "image_path": storage_path,
         "image_url": "",
         "image_file_name": filename,
         "image_mime_type": mime,
         "image_uploaded_at": datetime.now(timezone.utc).isoformat(),
-        "image_uploaded_by": uploaded_by or None,
     }
+    if table == "pricing_guide_items":
+        payload["image_uploaded_by"] = uploaded_by or ""
+    elif uploaded_by:
+        payload["image_uploaded_by"] = uploaded_by
     result = update_row(table, payload, {"id": rid})
     if not result.ok:
         return ServiceResult(ok=False, error=result.error or "Could not save image metadata.")
