@@ -26,6 +26,29 @@ def _draft_state_key(item_id: str, field: str) -> str:
     return f"catalog_presence_{field}_{item_id}"
 
 
+def _resync_state_key(item_id: str) -> str:
+    return f"catalog_presence_resync_{item_id}"
+
+
+def _reset_draft_keys(item_id: str) -> None:
+    for field in ("pg", "inv", "ast"):
+        st.session_state.pop(_draft_state_key(item_id, field), None)
+
+
+def _fresh_pricing_row(row: dict[str, Any]) -> dict[str, Any]:
+    pid = str(row.get("id") or "").strip()
+    if not pid:
+        return row
+    try:
+        from app.services.pricing_guide_service import cached_pricing_guide_rows
+    except ImportError:
+        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    return next(
+        (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
+        row,
+    )
+
+
 def _sync_draft_from_presence(item_id: str, presence: dict[str, Any]) -> None:
     st.session_state[_draft_state_key(item_id, "pg")] = bool(presence.get("pricing_guide"))
     st.session_state[_draft_state_key(item_id, "inv")] = bool(presence.get("inventory"))
@@ -81,6 +104,22 @@ def _build_confirm_message(
     return " ".join(parts)
 
 
+def _schedule_presence_resync(item_id: str, *, on_change: Callable[[], None] | None) -> None:
+    st.session_state[_resync_state_key(item_id)] = True
+    if on_change:
+        on_change()
+
+
+def _prepare_draft_state(row: dict[str, Any], item_id: str) -> dict[str, Any]:
+    if st.session_state.pop(_resync_state_key(item_id), False):
+        _reset_draft_keys(item_id)
+    fresh_row = _fresh_pricing_row(row)
+    presence = resolve_catalog_presence(fresh_row)
+    if _draft_state_key(item_id, "pg") not in st.session_state:
+        _sync_draft_from_presence(item_id, presence)
+    return presence
+
+
 def render_catalog_presence_panel(
     row: dict[str, Any],
     *,
@@ -93,9 +132,7 @@ def render_catalog_presence_panel(
         return
 
     item_key = "".join(ch if ch.isalnum() else "_" for ch in pid) or "pg"
-    presence = resolve_catalog_presence(row)
-    if _draft_state_key(pid, "pg") not in st.session_state:
-        _sync_draft_from_presence(pid, presence)
+    presence = _prepare_draft_state(row, pid)
 
     with st.container(key=f"catalog_presence_{item_key}"):
         st.markdown('<span class="ips-catalog-presence-marker"></span>', unsafe_allow_html=True)
@@ -151,10 +188,7 @@ def render_catalog_presence_panel(
                 if result.ok:
                     message_text = str((result.data or {}).get("message") or "Catalog presence updated.")
                     st.success(message_text)
-                    fresh = resolve_catalog_presence(row)
-                    _sync_draft_from_presence(pid, fresh)
-                    if on_change:
-                        on_change()
+                    _schedule_presence_resync(pid, on_change=on_change)
                     return True
                 st.error(result.error or "Could not update catalog presence.")
                 return False
@@ -193,9 +227,6 @@ def render_catalog_presence_panel(
                 if result.ok:
                     message_text = str((result.data or {}).get("message") or "Catalog presence updated.")
                     st.success(message_text)
-                    fresh = resolve_catalog_presence(row)
-                    _sync_draft_from_presence(pid, fresh)
-                    if on_change:
-                        on_change()
+                    _schedule_presence_resync(pid, on_change=on_change)
                     st.rerun()
                 st.error(result.error or "Could not update catalog presence.")
