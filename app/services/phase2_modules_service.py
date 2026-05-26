@@ -463,6 +463,11 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "assigned_to_name": str(row.get("assigned_to_name") or ""),
         "assigned_to_phone": str(row.get("assigned_to_phone") or ""),
         "assigned_job_id": str(row.get("assigned_job_id") or "").strip() or None,
+        "include_in_pricing_guide": (
+            bool(row.get("include_in_pricing_guide"))
+            if "include_in_pricing_guide" in row
+            else True
+        ),
     }
 
 
@@ -948,6 +953,7 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         "serial_number": ui.get("serial_number"),
         "manufacturer": ui.get("manufacturer"),
         "model": ui.get("model"),
+        "include_in_pricing_guide": bool(ui.get("include_in_pricing_guide")),
         "notes": ui.get("description") or ui.get("notes"),
         "current_value": ui.get("value") or ui.get("current_value"),
         "acquired_date": ui.get("acquired_date") or None,

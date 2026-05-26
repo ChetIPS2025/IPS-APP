@@ -243,6 +243,37 @@ def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]]
     return vendor_names, inventory_labels, asset_labels
 
 
+def _load_asset_pricing_guide_flags(
+    fetcher: Callable[..., list[dict[str, Any]]],
+) -> dict[str, bool]:
+    flags: dict[str, bool] = {}
+    try:
+        rows = list(fetcher("assets", limit=10000) or [])
+    except Exception:
+        return flags
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        aid = str(row.get("id") or "").strip()
+        if not aid:
+            continue
+        if "include_in_pricing_guide" in row:
+            flags[aid] = bool(row.get("include_in_pricing_guide"))
+        else:
+            flags[aid] = True
+    return flags
+
+
+def pricing_guide_row_visible(row: dict[str, Any], asset_flags: dict[str, bool]) -> bool:
+    """Hide Asset-class PG rows when the linked asset is fleet-only."""
+    if str(row.get("item_class") or "") != "Asset":
+        return True
+    ast_id = str(row.get("linked_asset_id") or row.get("asset_id") or "").strip()
+    if not ast_id:
+        return True
+    return asset_flags.get(ast_id, True)
+
+
 def fetch_pricing_guide_rows(
     *,
     include_inactive: bool = True,
@@ -257,9 +288,10 @@ def fetch_pricing_guide_rows(
         fetch_table = _ft
         fetch_table_admin = _fta
 
-    vendors, inv_labels, asset_labels = _load_lookup_maps()
-    rows: list[dict[str, Any]] = []
     fetcher = fetch_table_admin or fetch_table
+    vendors, inv_labels, asset_labels = _load_lookup_maps()
+    asset_flags = _load_asset_pricing_guide_flags(fetcher)
+    rows: list[dict[str, Any]] = []
     try:
         rows = list(fetcher("pricing_guide_items", limit=10000, order_by="description") or [])
     except Exception as exc:
@@ -277,6 +309,7 @@ def fetch_pricing_guide_rows(
             for r in rows
             if isinstance(r, dict) and str(r.get("description") or r.get("item_code") or "").strip()
         ]
+        out = [r for r in out if pricing_guide_row_visible(r, asset_flags)]
         if not include_inactive:
             out = [r for r in out if r.get("is_active") is not False]
         return out
@@ -815,7 +848,7 @@ def link_asset_to_pricing_item(asset_id: str, pricing_item_id: str) -> tuple[boo
     if not aid or not pid:
         return False, "Asset and pricing item are required."
     try:
-        update_rows_admin("assets", {"pricing_item_id": pid, "pricing_guide_id": pid}, {"id": aid})
+        update_rows_admin("assets", {"pricing_item_id": pid, "pricing_guide_id": pid, "include_in_pricing_guide": True}, {"id": aid})
         update_rows_admin(
             "pricing_guide_items",
             {

@@ -26,6 +26,12 @@ CSV_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "sku": ("sku", "vendor_sku"),
     "item_class": ("item_class", "class", "item_type_class"),
     "asset_recommended": ("asset_recommended", "asset_recommend", "recommend_asset"),
+    "include_in_pricing_guide": (
+        "include_in_pricing_guide",
+        "pricing_guide",
+        "billable",
+        "billable_on_estimates",
+    ),
     "vendor": ("vendor", "vendor_name"),
     "markup_percent": ("markup_percent", "markup", "default_markup_percent"),
     "taxable": ("taxable",),
@@ -112,6 +118,15 @@ def infer_estimate_item_type(item_class: str, *, description: str = "") -> str:
     return "Material"
 
 
+def asset_billable_for_pricing_guide(row: dict[str, Any]) -> bool:
+    """True when an Asset-class catalog row should create or stay on Pricing Guide."""
+    if normalize_item_class(row.get("item_class")) != "Asset":
+        return False
+    if _bool(row.get("include_in_pricing_guide")):
+        return True
+    return _bool(row.get("asset_recommended"))
+
+
 def parse_catalog_csv(text: str) -> list[dict[str, Any]]:
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
@@ -141,6 +156,7 @@ def parse_catalog_csv(text: str) -> list[dict[str, Any]]:
                 "sku": _str(_row_get(raw, "sku")),
                 "item_class": item_class,
                 "asset_recommended": asset_rec,
+                "include_in_pricing_guide": _bool(_row_get(raw, "include_in_pricing_guide")),
                 "vendor": _str(_row_get(raw, "vendor")),
                 "markup_percent": _num(_row_get(raw, "markup_percent")),
                 "taxable": _bool(_row_get(raw, "taxable"), True),
@@ -407,9 +423,19 @@ def _upsert_inventory(row: dict[str, Any], pricing_item_id: str, existing: dict[
         return False, str(exc), None, bool(existing)
 
 
-def _upsert_asset(row: dict[str, Any], pricing_item_id: str, existing: dict[str, Any] | None) -> tuple[bool, str, str | None, bool]:
+def _upsert_asset(
+    row: dict[str, Any],
+    pricing_item_id: str,
+    existing: dict[str, Any] | None,
+    *,
+    include_in_pricing_guide: bool | None = None,
+) -> tuple[bool, str, str | None, bool]:
     _, insert_row_admin, update_rows_admin = _admin()
     now = datetime.now(timezone.utc).isoformat()
+    pid = str(pricing_item_id or "").strip()
+    billable = include_in_pricing_guide
+    if billable is None:
+        billable = asset_billable_for_pricing_guide(row) if pid else False
     asset_no = (
         _str(row.get("model_number") or row.get("item_number") or row.get("sku"))
         or slug_asset_number(row.get("description") or "ASSET")
@@ -425,8 +451,9 @@ def _upsert_asset(row: dict[str, Any], pricing_item_id: str, existing: dict[str,
         "status": "Available",
         "purchase_cost": _num(row.get("unit_cost")),
         "current_value": _num(row.get("unit_cost")),
-        "pricing_guide_id": pricing_item_id,
-        "pricing_item_id": pricing_item_id,
+        "pricing_guide_id": pid or None,
+        "pricing_item_id": pid or None,
+        "include_in_pricing_guide": bool(billable),
         "notes": _str(row.get("notes")),
         "is_active": True,
         "updated_at": now,
@@ -567,6 +594,29 @@ def import_catalog_csv(
     touched_asset_ids: set[str] = set()
     for idx, row in enumerate(rows, start=1):
         item_class = normalize_item_class(row.get("item_class"))
+        billable_asset = asset_billable_for_pricing_guide(row)
+
+        if item_class == "Asset" and not billable_asset:
+            ast_existing = find_matching_asset_item(row, asset_rows)
+            ok_a, msg_a, ast_id, ast_upd = _upsert_asset(
+                row,
+                "",
+                ast_existing,
+                include_in_pricing_guide=False,
+            )
+            if not ok_a:
+                result.errors.append(f"Row {idx} asset: {msg_a}")
+                result.skipped += 1
+            elif ast_upd:
+                result.updated_assets += 1
+            else:
+                result.created_assets += 1
+                if ast_id:
+                    asset_rows.append({"id": ast_id, **row})
+            if ast_id:
+                touched_asset_ids.add(str(ast_id))
+            continue
+
         pg_existing = find_matching_pricing_item(row, pricing_rows)
         ok, msg, pid, was_update = _upsert_pricing_guide(row, pg_existing, changed_by=changed_by)
         if not ok or not pid:
@@ -607,7 +657,12 @@ def import_catalog_csv(
                 ast_existing = next((r for r in asset_rows if str(r.get("id")) == str(pg_existing.get("linked_asset_id"))), None)
             if not ast_existing:
                 ast_existing = find_matching_asset_item(row, asset_rows)
-            ok_a, msg_a, ast_id, ast_upd = _upsert_asset(row, pid, ast_existing)
+            ok_a, msg_a, ast_id, ast_upd = _upsert_asset(
+                row,
+                pid,
+                ast_existing,
+                include_in_pricing_guide=True,
+            )
             if not ok_a:
                 result.errors.append(f"Row {idx} asset: {msg_a}")
             elif ast_upd:

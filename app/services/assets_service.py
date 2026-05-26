@@ -156,6 +156,26 @@ def can_manage_asset_actions() -> bool:
     return can_admin_mutate()
 
 
+def asset_include_in_pricing_guide(asset: dict[str, Any]) -> bool:
+    return bool(asset.get("include_in_pricing_guide"))
+
+
+def set_asset_include_in_pricing_guide(asset_id: str, include: bool) -> ServiceResult:
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return ServiceResult(ok=False, error="Missing asset id.")
+    result = update_row(_ASSET_TABLE, {"include_in_pricing_guide": bool(include)}, {"id": aid})
+    if result.ok:
+        clear_assets_cache()
+        try:
+            from app.services.pricing_guide_service import clear_pricing_guide_cache
+
+            clear_pricing_guide_cache()
+        except Exception:
+            pass
+    return result
+
+
 def retire_asset(asset_id: str) -> ServiceResult:
     """Mark an asset as Retired."""
     aid = str(asset_id or "").strip()
