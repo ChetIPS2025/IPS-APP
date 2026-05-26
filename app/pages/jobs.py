@@ -79,7 +79,7 @@ SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
 CACHE_KEY = "_ips_jobs_modal_by_id"
-_JOB_COLS = [0.35, 1.0, 2.7, 2.0, 1.55, 1.25, 1.35, 1.35]
+_JOB_COLS = [0.35, 0.95, 2.35, 1.85, 1.85, 1.35, 1.25, 1.25]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("JOB #", None),

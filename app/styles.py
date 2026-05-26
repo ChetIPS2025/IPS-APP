@@ -683,7 +683,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v12">
+<style id="ips-jobs-module-v13">
 .ips-jobs-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -704,8 +704,8 @@ def inject_jobs_module_css() -> None:
   display: flex;
   align-items: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   line-height: 1.2;
 }}
 .ips-jobs-row {{
@@ -1319,8 +1319,8 @@ def inject_estimates_module_css() -> None:
   display: flex;
   align-items: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   line-height: 1.2;
 }}
 .ips-estimates-row {{
@@ -2032,7 +2032,7 @@ def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
     st.markdown(
         """
-<style id="ips-table-header-filter-v6">
+<style id="ips-table-header-filter-v7">
 .ips-table-header-filter-marker {
   display: none !important;
 }
@@ -2041,18 +2041,18 @@ def inject_table_header_filter_css() -> None:
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
   min-width: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text,
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [class*="-header-row"] {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   white-space: nowrap !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible !important;
+  text-overflow: clip !important;
   min-width: 0;
   line-height: 1.2;
   word-break: normal !important;
@@ -2081,12 +2081,14 @@ def inject_table_header_filter_css() -> None:
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
   flex: 1 1 auto !important;
   min-width: 0 !important;
+  overflow: visible !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 22px !important;
-  max-width: 28px !important;
+  flex: 0 0 18px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  overflow: visible !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child [data-testid="stElementContainer"] {
   display: flex !important;
@@ -2134,22 +2136,49 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-active) [data-testid="stPopover"] > button {
   color: #2563eb !important;
 }
-/* Single chevron trigger: text only, hide Streamlit/material duplicate icons */
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button svg,
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+/* Icon-only filter trigger: one chevron, no duplicate label text */
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button {
+  gap: 0 !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p,
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span:not([data-testid="stIconMaterial"]) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button > svg {
+  display: none !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  flex: 0 0 14px !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] svg {
+  display: inline-block !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button [data-testid="stIconMaterial"] ~ [data-testid="stIconMaterial"],
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:not(:has([data-testid="stIconMaterial"])) > svg ~ svg,
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button img {
   display: none !important;
 }
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button p {
-  display: block !important;
-  white-space: nowrap !important;
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button:not(:has([data-testid="stIconMaterial"])) > svg:first-of-type {
+  display: inline-block !important;
+  width: 14px !important;
+  height: 14px !important;
   margin: 0 !important;
-  padding: 0 !important;
-  line-height: 1 !important;
-  font-size: 12px !important;
-}
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stPopover"] > button span:not([data-testid]) {
-  display: none !important;
 }
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stPopoverBody"] [data-testid="stMultiSelect"] label,
 [class*="_table_wrap"] [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stMultiSelect"] > label {

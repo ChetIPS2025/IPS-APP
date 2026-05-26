@@ -40,6 +40,17 @@ LABOR_ROLE_TYPES = [
 
 DURATION_UNITS = ("Hours", "Days", "Weeks")
 
+_LABOR_LINES_TABLE = "estimate_labor_lines"
+_LABOR_LINES_MISSING_MSG = (
+    "Labor lines cannot be saved yet — run sql/089_create_estimate_labor_lines.sql in Supabase, "
+    "then refresh the app."
+)
+
+
+def _is_missing_table_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "pgrst205" in text or "could not find the table" in text or "schema cache" in text
+
 
 def _num(value: Any, default: float = 0.0) -> float:
     try:
@@ -255,9 +266,10 @@ def get_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]] | Non
 
 def get_estimate_labor(estimate_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
     eid = _str(estimate_id)
-    rows, err = fetch_rows("estimate_labor_lines", limit=500, order_by="sort_order")
+    rows, err = fetch_rows(_LABOR_LINES_TABLE, limit=500, order_by="sort_order")
     if err:
-        return [], True
+        demo_rows = [normalize_labor_line(r, eid) for r in (demo or []) if _str(r.get("estimate_id")) == eid]
+        return demo_rows, True
     return [normalize_labor_line(r, eid) for r in _filter_estimate_rows(rows, eid)], False
 
 
@@ -484,7 +496,9 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
         "notes": _str(data.get("notes")),
         "sort_order": _next_sort_order(existing),
     }
-    result = insert_row("estimate_labor_lines", payload)
+    result = insert_row(_LABOR_LINES_TABLE, payload)
+    if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
+        return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     if result.ok:
         recalculate_and_save_estimate_totals(eid)
     return result
@@ -521,7 +535,9 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
         "price_total": calc["price_total"],
         "notes": _str(data.get("notes")),
     }
-    result = update_row("estimate_labor_lines", payload, {"id": _str(line_id)})
+    result = update_row(_LABOR_LINES_TABLE, payload, {"id": _str(line_id)})
+    if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
+        return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     eid = _str(data.get("estimate_id"))
     if result.ok and eid:
         recalculate_and_save_estimate_totals(eid)
@@ -529,7 +545,9 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
 
 
 def delete_estimate_labor(line_id: str, *, estimate_id: str = "") -> ServiceResult:
-    result = delete_row("estimate_labor_lines", {"id": _str(line_id)})
+    result = delete_row(_LABOR_LINES_TABLE, {"id": _str(line_id)})
+    if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
+        return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     if result.ok and estimate_id:
         recalculate_and_save_estimate_totals(_str(estimate_id))
     return result

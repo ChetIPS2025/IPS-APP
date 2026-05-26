@@ -31,6 +31,7 @@ try:
     )
     from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
     from app.services.proposal_pdf_service import build_customer_quote_bundle
+    from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
     from app.services.estimate_builder_helpers import (
         equipment_line_totals,
         labor_line_totals,
@@ -74,6 +75,7 @@ except ImportError:
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
     from services.proposal_pdf_service import build_customer_quote_bundle  # type: ignore
+    from services.pricing_guide_service import create_pricing_item_from_estimate_line  # type: ignore
 
 
 def _service_ok(result) -> tuple[bool, str]:
@@ -503,6 +505,13 @@ def _render_add_material_form(
         else:
             item = {}
 
+        if custom:
+            st.text_input("Description", key=k("desc"), placeholder="Item description")
+            save_to_guide = st.checkbox(
+                "Save to Pricing Guide for future estimates",
+                key=k("save_pg"),
+            )
+
         qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
         markup = st.number_input(
             "Markup %",
@@ -545,7 +554,8 @@ def _render_add_material_form(
 
     with st.expander("Advanced details", expanded=False):
         st.markdown('<div class="ips-estimate-advanced-details">', unsafe_allow_html=True)
-        st.text_input("Description", key=k("desc"))
+        if not custom:
+            st.text_input("Description", key=k("desc"))
         st.text_input("SKU / Item code", key=k("sku"))
         st.text_input("Category", key=k("cat"))
         st.text_input("Vendor", key=k("vendor"))
@@ -568,6 +578,26 @@ def _render_add_material_form(
                     "unit_cost": float(st.session_state.get(k("uc")) or 0),
                     "taxable": bool(st.session_state.get(k("tax"), True)),
                 }
+            if custom and st.session_state.get(k("save_pg")):
+                pg_ok, pg_msg, pg_id = create_pricing_item_from_estimate_line(
+                    {
+                        "description": st.session_state.get(k("desc")),
+                        "sku": st.session_state.get(k("sku")),
+                        "category": st.session_state.get(k("cat")),
+                        "unit": st.session_state.get(k("unit")) or unit,
+                        "unit_cost": float(st.session_state.get(k("uc")) or 0),
+                        "markup_percent": markup,
+                        "taxable": bool(st.session_state.get(k("tax"), True)),
+                        "vendor_id": st.session_state.get(k("vendor_id")),
+                        "notes": notes,
+                    }
+                )
+                if not pg_ok:
+                    st.error(pg_msg)
+                    return
+                if pg_id:
+                    item_save["pricing_item_id"] = pg_id
+                    item_save["id"] = pg_id
             ok, err = _save_pricing_item_line(
                 eid,
                 est,
@@ -579,7 +609,10 @@ def _render_add_material_form(
             )
             if ok:
                 st.session_state.pop(fk, None)
-                st.success("Pricing item added.")
+                if custom and st.session_state.get(k("save_pg")):
+                    st.success("Pricing item added to this estimate and saved to the Pricing Guide.")
+                else:
+                    st.success("Pricing item added.")
                 st.rerun()
             st.error(err)
     with b2:

@@ -564,6 +564,49 @@ def create_pricing_item_from_inventory(
     return True, msg, pid
 
 
+def create_pricing_item_from_estimate_line(
+    data: dict[str, Any],
+    *,
+    changed_by: str = "",
+) -> tuple[bool, str, str | None]:
+    """Create a Pricing Guide master item from a custom estimate line."""
+    description = str(data.get("description") or "").strip()
+    if not description:
+        return False, "Description is required to save to the Pricing Guide.", None
+
+    sku = str(data.get("sku") or data.get("item_code") or "").strip()
+    item_code = sku or slug_item_code(description, prefix="PG")
+    ok, msg = save_pricing_item(
+        {
+            "item_type": str(data.get("item_type") or "Material"),
+            "item_code": item_code,
+            "description": description,
+            "category": str(data.get("category") or ""),
+            "unit": str(data.get("unit") or "EA"),
+            "default_cost": float(data.get("unit_cost") or 0),
+            "default_markup_percent": float(data.get("markup_percent") or 0),
+            "taxable": bool(data.get("taxable", True)),
+            "vendor_id": data.get("vendor_id") or None,
+            "inventory_item_id": data.get("inventory_item_id") or None,
+            "notes": str(data.get("notes") or ""),
+            "is_active": True,
+        },
+        changed_by=changed_by,
+    )
+    if not ok:
+        return False, msg, None
+
+    rows = cached_pricing_guide_rows(include_inactive=True)
+    for row in rows:
+        if str(row.get("item_code") or "") == item_code:
+            return True, "Added to Pricing Guide.", str(row.get("id") or "") or None
+    desc_key = description.lower()
+    for row in rows:
+        if str(row.get("description") or "").strip().lower() == desc_key:
+            return True, "Added to Pricing Guide.", str(row.get("id") or "") or None
+    return True, msg, None
+
+
 def link_inventory_to_pricing_item(
     inventory_id: str,
     pricing_item_id: str,
