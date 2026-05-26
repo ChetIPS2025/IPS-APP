@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html
 from collections.abc import Callable
 from typing import Any
 
@@ -66,11 +65,7 @@ def render_item_photo_manager(
     status_label = _STATUS_LABELS.get(status, status.replace("_", " ").title())
 
     if image_url:
-        st.markdown(
-            f'<img class="{html.escape(image_css_class, quote=True)}" '
-            f'src="{html.escape(image_url, quote=True)}" alt="Item photo preview" />',
-            unsafe_allow_html=True,
-        )
+        st.image(image_url, width=260)
     else:
         st.caption("No item photo uploaded.")
 

@@ -1565,11 +1565,50 @@ def inject_estimates_module_css() -> None:
     )
 
 
+def _list_table_checkbox_column_css(table_wrap_key: str) -> str:
+    """Full click target for row-selection checkbox in custom list tables."""
+    sel = f".st-key-{table_wrap_key}"
+    return f"""
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child {{
+  position: relative !important;
+  z-index: 3 !important;
+  overflow: visible !important;
+  flex: 0 0 2.75rem !important;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  max-width: 2.75rem !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+  pointer-events: auto !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] label {{
+  width: 100% !important;
+  min-width: 2.75rem !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}}
+"""
+
+
 def inject_inventory_module_css() -> None:
     """Inventory list custom table styling."""
+    checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
     st.markdown(
         f"""
-<style id="ips-inventory-module-v2">
+<style id="ips-inventory-module-v3">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -1719,10 +1758,7 @@ def inject_inventory_module_css() -> None:
 .st-key-inventory_table_wrap [data-testid="stCheckbox"] {{
   margin: 0 !important;
 }}
-.st-key-inventory_table_wrap [data-testid="stCheckbox"] label {{
-  min-height: 24px !important;
-  margin: 0 !important;
-}}
+{checkbox_css}
 .st-key-inventory_table_wrap [data-testid="stImage"] {{
   margin: 0 !important;
   display: flex;
@@ -1825,9 +1861,10 @@ def inject_inventory_module_css() -> None:
 
 def inject_pricing_guide_module_css() -> None:
     """Pricing Guide list custom table styling (matches Inventory table)."""
+    checkbox_css = _list_table_checkbox_column_css("pricing_guide_table_wrap")
     st.markdown(
         f"""
-<style id="ips-pricing-guide-module-v1">
+<style id="ips-pricing-guide-module-v2">
 .ips-pg-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -1872,6 +1909,7 @@ def inject_pricing_guide_module_css() -> None:
 }}
 .st-key-pricing_guide_table_wrap .stMarkdown p:has(.ips-pg-thumb-cell) {{
   margin: 0 !important;
+  line-height: 0 !important;
 }}
 .ips-pg-thumb-cell {{
   display: inline-flex;
@@ -1973,6 +2011,15 @@ def inject_pricing_guide_module_css() -> None:
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100%;
+  justify-content: center !important;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"] {{
   gap: 0.35rem !important;
@@ -2357,9 +2404,10 @@ div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) button[kind
 
 def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
+    checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     st.markdown(
         f"""
-<style id="ips-assets-module-v2">
+<style id="ips-assets-module-v3">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2547,10 +2595,7 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="stCheckbox"] {{
   margin: 0 !important;
 }}
-.st-key-assets_table_wrap [data-testid="stCheckbox"] label {{
-  min-height: 24px !important;
-  margin: 0 !important;
-}}
+{checkbox_css}
 .st-key-assets_table_wrap .stButton > button {{
   height: 32px !important;
   min-height: 32px !important;
@@ -3716,7 +3761,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v5">
+<style id="ips-global-styles-v6">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};

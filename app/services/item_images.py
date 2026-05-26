@@ -32,12 +32,12 @@ _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 
 try:
     from app.config import ROOT_DIR
-    from app.db import create_signed_url, upload_bytes_admin
-    from app.services.repository import ServiceResult, update_row
+    from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
+    from app.services.repository import ServiceResult, clear_all_data_caches, filter_payload_to_table
 except ImportError:
     from config import ROOT_DIR  # type: ignore
-    from db import create_signed_url, upload_bytes_admin  # type: ignore
-    from services.repository import ServiceResult, update_row  # type: ignore
+    from db import create_signed_url, update_rows_admin, upload_bytes_admin  # type: ignore
+    from services.repository import ServiceResult, clear_all_data_caches, filter_payload_to_table  # type: ignore
 
 
 @dataclass
@@ -213,6 +213,25 @@ def clear_item_image_url_cache() -> None:
     _signed_item_image_url_cached.cache_clear()
 
 
+def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) -> ServiceResult:
+    """Persist image metadata with the service-role client (matches storage upload permissions)."""
+    rid = str(record_id or "").strip()
+    if not rid:
+        return ServiceResult(ok=False, error="Missing record id.")
+    filtered = filter_payload_to_table(table, payload)
+    try:
+        rows = update_rows_admin(table, filtered, {"id": rid})
+    except Exception as exc:
+        return ServiceResult(ok=False, error=str(exc))
+    if not rows:
+        return ServiceResult(
+            ok=False,
+            error=f"Could not save image metadata to {table} (no row updated).",
+        )
+    clear_all_data_caches()
+    return ServiceResult(ok=True, data=rows[0])
+
+
 def resolve_stored_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:
     """Resolve a viewable URL for any stored item photo (never QR PNG fields)."""
     _ = expires_in
@@ -383,11 +402,14 @@ def persist_item_image(
         payload["image_uploaded_by"] = uploaded_by or ""
     elif uploaded_by:
         payload["image_uploaded_by"] = uploaded_by
-    result = update_row(table, payload, {"id": rid})
+    result = _update_item_image_row(table, payload, rid)
     if not result.ok:
         return ServiceResult(ok=False, error=result.error or "Could not save image metadata.")
     clear_item_image_url_cache()
-    return ServiceResult(ok=True, data={"image_path": storage_path, **payload})
+    merged = {"image_path": storage_path, **payload}
+    if isinstance(result.data, dict):
+        merged = {**merged, **result.data}
+    return ServiceResult(ok=True, data=merged)
 
 
 def clear_item_image(*, table: str, record_id: str) -> ServiceResult:
@@ -405,7 +427,7 @@ def clear_item_image(*, table: str, record_id: str) -> ServiceResult:
     }
     if table == "pricing_guide_items":
         payload["image_uploaded_by"] = ""
-    result = update_row(table, payload, {"id": rid})
+    result = _update_item_image_row(table, payload, rid)
     if not result.ok:
         return ServiceResult(ok=False, error=result.error or "Could not remove image.")
     clear_item_image_url_cache()
@@ -420,4 +442,8 @@ def set_image_status(table: str, record_id: str, status: str) -> ServiceResult:
     payload: dict[str, Any] = {"image_status": st}
     if st == IMAGE_STATUS_MISSING:
         payload["image_url"] = ""
-    return update_row(table, payload, {"id": rid})
+    result = _update_item_image_row(table, payload, rid)
+    if not result.ok:
+        return result
+    clear_item_image_url_cache()
+    return ServiceResult(ok=True, data=result.data or payload)
