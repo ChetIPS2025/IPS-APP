@@ -31,6 +31,8 @@ try:
     from app.services.weekly_job_timesheet_service import (
         TimesheetLine,
         WeeklyJobTimesheetData,
+        TIMESHEET_LABOR_MIN_ROWS,
+        TIMESHEET_MATERIAL_MIN_ROWS,
         _day_labels,
         _fmt_hours,
         _fmt_money,
@@ -47,6 +49,8 @@ except ImportError:
     from services.weekly_job_timesheet_service import (  # type: ignore
         TimesheetLine,
         WeeklyJobTimesheetData,
+        TIMESHEET_LABOR_MIN_ROWS,
+        TIMESHEET_MATERIAL_MIN_ROWS,
         _day_labels,
         _fmt_hours,
         _fmt_money,
@@ -421,7 +425,10 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     story.append(header_tbl)
     story.append(Spacer(1, 0.06 * inch))
 
-    labor = _pad_labor_rows([ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}], min_rows=8)
+    labor = _pad_labor_rows(
+        [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
+        min_rows=TIMESHEET_LABOR_MIN_ROWS,
+    )
     header = ["Employee / Equipment", "Class"] + [lbl.replace("<br>", "\n") for lbl in labels] + ["ST", "OT", "DT", "Total"]
     grid: list[list[str]] = [header]
     for ln in labor:
@@ -459,15 +466,14 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     story.append(t)
     story.append(Spacer(1, 0.05 * inch))
 
-    mats = _pad_material_rows(data.material_lines, 8)
-    half = (len(mats) + 1) // 2
-    left = mats[:half]
-    right = mats[half:]
+    mats_left, mats_right = _split_materials(data.material_lines)
+    mats_left = _pad_material_rows(mats_left, TIMESHEET_MATERIAL_MIN_ROWS)
+    mats_right = _pad_material_rows(mats_right, TIMESHEET_MATERIAL_MIN_ROWS)
     mat_grid = [["Materials / Expenses", "Qty", "Cost", "Materials / Expenses (cont.)", "Qty", "Cost"]]
     empty_mat = TimesheetLine(line_type="material")
-    for i in range(max(len(left), len(right))):
-        l = left[i] if i < len(left) else empty_mat
-        r = right[i] if i < len(right) else empty_mat
+    for i in range(max(len(mats_left), len(mats_right))):
+        l = mats_left[i] if i < len(mats_left) else empty_mat
+        r = mats_right[i] if i < len(mats_right) else empty_mat
         mat_grid.append([l.description, _fmt_hours(l.qty), _fmt_money(l.cost), r.description, _fmt_hours(r.qty), _fmt_money(r.cost)])
     tm = Table(mat_grid, colWidths=[1.85 * inch, 0.45 * inch, 0.55 * inch, 1.85 * inch, 0.45 * inch, 0.55 * inch])
     tm.setStyle(
@@ -483,19 +489,50 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     story.append(tm)
     story.append(Spacer(1, 0.05 * inch))
 
-    story.append(Paragraph("<b>WORK PERFORMED</b>", styles["Heading4"]))
-    story.append(Paragraph(html.escape(data.work_performed).replace("\n", "<br/>"), styles["BodyText"]))
+    work_body = html.escape(data.work_performed or " ").replace("\n", "<br/>") or "&nbsp;"
+    work_tbl = Table(
+        [[Paragraph(f"<b>WORK PERFORMED</b>", styles["Heading4"])], [Paragraph(work_body, styles["BodyText"])]],
+        colWidths=[7.0 * inch],
+        rowHeights=[0.18 * inch, 1.35 * inch],
+    )
+    work_tbl.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.35, colors.black),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    story.append(work_tbl)
     story.append(Spacer(1, 0.05 * inch))
-    story.append(Paragraph(f"<b>APPROVED BY:</b> {html.escape(data.approved_by)}", styles["Normal"]))
+
+    approval_row = [
+        Paragraph(f"<b>APPROVED BY</b><br/>{html.escape(data.approved_by or ' ')}", styles["Normal"]),
+        Paragraph("<b>SIGNATURE</b>", styles["Normal"]),
+        Paragraph(f"<b>DATE SIGNED</b><br/>{html.escape(data.signed_at[:10] if data.signed_at else ' ')}", styles["Normal"]),
+    ]
     sig = str(data.signature_data or "").strip()
     if sig.startswith("data:image"):
         try:
             b64 = sig.split(",", 1)[1]
-            story.append(RLImage(BytesIO(base64.b64decode(b64)), width=2.0 * inch, height=0.65 * inch))
+            approval_row[1] = RLImage(BytesIO(base64.b64decode(b64)), width=2.0 * inch, height=0.65 * inch)
         except Exception:
-            pass
-    if data.signed_at:
-        story.append(Paragraph(f"Date signed: {html.escape(data.signed_at[:10])}", styles["Normal"]))
+            approval_row[1] = Paragraph("<b>SIGNATURE</b>", styles["Normal"])
+    appr_tbl = Table([approval_row], colWidths=[2.3 * inch, 2.35 * inch, 2.35 * inch], rowHeights=[0.85 * inch])
+    appr_tbl.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.35, colors.black),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    story.append(appr_tbl)
 
     doc.build(story)
     return buf.getvalue()

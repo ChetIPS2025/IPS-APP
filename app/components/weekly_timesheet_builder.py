@@ -746,7 +746,7 @@ def render_weekly_timesheet_builder(
     if preview or st.session_state.get(f"{kp}_show_preview"):
         st.session_state[f"{kp}_show_preview"] = True
         html_doc = render_timesheet_html(data, week_start=week_start)
-        components.html(html_doc, height=920, scrolling=True)
+        components.html(html_doc, height=1080, scrolling=True)
         st.download_button(
             "Download HTML preview",
             data=html_doc,

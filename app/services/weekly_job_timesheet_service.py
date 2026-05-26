@@ -48,6 +48,9 @@ _STORAGE_PREFIX = "weekly_timesheets"
 _table_available: bool | None = None
 
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+TIMESHEET_LABOR_MIN_ROWS = 12
+TIMESHEET_MATERIAL_MIN_ROWS = 8
+TIMESHEET_PAGE_MIN_HEIGHT = "10.5in"
 _HOUR_COLS = ("hours_mon", "hours_tue", "hours_wed", "hours_thu", "hours_fri", "hours_sat", "hours_sun")
 _LEGACY_HOUR_COLS = (
     ("mon", "hours_mon", "monday_st"),
@@ -288,8 +291,13 @@ def render_timesheet_html(data: WeeklyJobTimesheetData, *, week_start: date | No
     labels = _day_labels(ws)
     template_path = _TEMPLATE_PATH if _TEMPLATE_PATH.is_file() else _FALLBACK_TEMPLATE
     template = template_path.read_text(encoding="utf-8")
-    labor = _pad_labor_rows([ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}])
+    labor = _pad_labor_rows(
+        [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
+        min_rows=TIMESHEET_LABOR_MIN_ROWS,
+    )
     mats_left, mats_right = _split_materials(data.material_lines)
+    mats_left = _pad_material_rows(mats_left, TIMESHEET_MATERIAL_MIN_ROWS)
+    mats_right = _pad_material_rows(mats_right, TIMESHEET_MATERIAL_MIN_ROWS)
     logo = header_logo_html(height=48) or "IPS"
     replacements = {
         "{{logo_html}}": logo,
