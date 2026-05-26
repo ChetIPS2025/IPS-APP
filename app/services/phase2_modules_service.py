@@ -1010,17 +1010,17 @@ def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> 
 
 def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
-        from app.services.certification_helpers import compute_certification_status
+        from app.services.certification_helpers import compute_certification_status, date_to_iso
     except ImportError:
-        from services.certification_helpers import compute_certification_status  # type: ignore
+        from services.certification_helpers import compute_certification_status, date_to_iso  # type: ignore
 
     payload = {
         "employee_id": ui.get("employee_id"),
         "cert_type": ui.get("cert_type") or ui.get("certification_type"),
         "cert_number": ui.get("cert_number") or ui.get("certification_number") or "",
         "issuer": ui.get("issuer") or ui.get("issuing_organization") or "",
-        "issue_date": ui.get("issue_date") or None,
-        "expiration_date": ui.get("expiration_date") or None,
+        "issue_date": date_to_iso(ui.get("issue_date")),
+        "expiration_date": date_to_iso(ui.get("expiration_date")),
         "notes": ui.get("notes") or "",
         "attachment_path": ui.get("attachment_path") or "",
         "attachment_url": ui.get("attachment_url") or "",

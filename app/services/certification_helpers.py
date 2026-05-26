@@ -41,6 +41,12 @@ def coerce_date(value: object) -> date | None:
     return None
 
 
+def date_to_iso(value: object) -> str | None:
+    """Serialize UI/date values for Supabase JSON payloads."""
+    parsed = coerce_date(value)
+    return parsed.isoformat() if parsed else None
+
+
 def compute_certification_status(row: dict[str, Any]) -> str:
     """Derive compliance status from expiration unless manually set to Not Required."""
     stored = str(row.get("status") or "").strip()
