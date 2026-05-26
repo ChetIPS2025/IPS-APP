@@ -8,8 +8,11 @@ qr_token, quantity_checked_out, quantity_allocated.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
+
+_DISPLAY_SKU_ID_RE = re.compile(r"^INV-([0-9A-F]{8})$", re.I)
 
 from app.services.inventory_images import (
     clear_inventory_image_url_cache,
@@ -263,15 +266,16 @@ def _ensure_item_qr_token(row: dict[str, Any]) -> str:
 
 
 def generate_inventory_qr_value(item: dict[str, Any]) -> str:
-    """Build scan URL using APP_BASE_URL, sku, and qr_token."""
+    """Build scan URL using APP_BASE_URL, item id, sku, and qr_token."""
     row = dict(item or {})
     if not row.get("qr_token"):
         row["qr_token"] = _ensure_item_qr_token(row)
     sku = resolve_inventory_sku(row)
     token = str(row.get("qr_token") or "").strip()
+    iid = str(row.get("id") or "").strip()
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
-    if base and sku and token:
-        return inventory_qr_link_url(sku=sku, qr_token=token, app_base_url=base, item_id=str(row.get("id") or ""))
+    if base and token and (iid or sku):
+        return inventory_qr_link_url(sku=sku, qr_token=token, app_base_url=base, item_id=iid)
     qrv = resolve_inventory_qr_value(row)
     if base and qrv:
         try:
@@ -304,6 +308,34 @@ def ensure_inventory_qr_tokens(items: list[dict[str, Any]] | None = None) -> Ser
     return ServiceResult(ok=True, data={"updated": updated})
 
 
+def _rows_for_inventory_qr_sku(sku_s: str) -> tuple[list[dict[str, Any]], str]:
+    """Match by DB sku, case-insensitive sku, or display SKU ``INV-XXXXXXXX`` id prefix."""
+    rows = _db_fetch_by_match(_INV_TABLE, {"sku": sku_s}, limit=5)
+    if len(rows) == 1:
+        return rows, ""
+    all_rows, _ = fetch_rows(_INV_TABLE, limit=8000, alt_tables=("inventory",))
+    ci = [r for r in all_rows if str(r.get("sku") or "").strip().lower() == sku_s.lower()]
+    if len(ci) == 1:
+        return ci, ""
+    if len(ci) > 1:
+        return ci, "ambiguous"
+    m = _DISPLAY_SKU_ID_RE.match(sku_s.strip())
+    if m:
+        prefix = m.group(1).lower()
+        by_id = [
+            r
+            for r in all_rows
+            if str(r.get("id") or "").replace("-", "").lower().startswith(prefix)
+        ]
+        if len(by_id) == 1:
+            return by_id, ""
+        if len(by_id) > 1:
+            return by_id, "ambiguous"
+    if rows:
+        return rows, ""
+    return [], "none"
+
+
 def get_inventory_item_by_qr(
     *,
     sku: str | None = None,
@@ -319,14 +351,11 @@ def get_inventory_item_by_qr(
     if iid:
         rows = _db_fetch_by_match(_INV_TABLE, {"id": iid}, limit=3)
     elif sku_s:
-        rows = _db_fetch_by_match(_INV_TABLE, {"sku": sku_s}, limit=5)
-        if len(rows) != 1:
-            all_rows, _ = fetch_rows(_INV_TABLE, limit=8000, alt_tables=("inventory",))
-            ci = [r for r in all_rows if str(r.get("sku") or "").strip().lower() == sku_s.lower()]
-            if len(ci) == 1:
-                rows = ci
-            elif len(ci) > 1:
-                return ServiceResult(ok=False, error="Ambiguous inventory SKU.")
+        rows, sku_reason = _rows_for_inventory_qr_sku(sku_s)
+        if sku_reason == "ambiguous":
+            return ServiceResult(ok=False, error="Ambiguous inventory SKU.")
+    elif token_s:
+        rows = _db_fetch_by_match(_INV_TABLE, {"qr_token": token_s}, limit=3)
     else:
         return ServiceResult(ok=False, error="Missing inventory identifier.")
 
@@ -339,7 +368,7 @@ def get_inventory_item_by_qr(
     stored_token = str(item.get("qr_token") or "").strip()
     if stored_token and token_s and token_s != stored_token:
         return ServiceResult(ok=False, error="Invalid inventory QR code.")
-    if stored_token and not token_s:
+    if stored_token and not token_s and not iid:
         return ServiceResult(ok=False, error="Invalid inventory QR code.")
     if not stored_token:
         item["qr_token"] = _ensure_item_qr_token(item)

@@ -1164,19 +1164,41 @@ _ACTION_LABELS: dict[str, str] = {
 _JOB_REQUIRED_ACTIONS = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
 
 
-def capture_inventory_scan_from_query() -> None:
-    """Persist inventory scan params before auth / asset routing."""
-    scan = _first_query_param("scan")
-    legacy_qr = _first_query_param("qr")
-    pg = urllib.parse.unquote_plus(_first_query_param("page")).strip().lower()
-    legacy_page = pg in {"scan inventory", "inventory scan"}
-    if scan != "inventory" and legacy_qr != "inventory" and not legacy_page:
-        return
+def _parse_inventory_scan_deeplink(raw: str) -> dict[str, str]:
+    """Extract ``scan=inventory`` params from a pasted URL or query string."""
+    s = str(raw or "").strip()
+    if not s:
+        return {}
+    try:
+        if "://" in s or s.startswith("/") or s.startswith("?"):
+            u = urlparse(s if "://" in s else f"https://placeholder.local{s if s.startswith('/') else '/' + s}")
+            q = parse_qs(u.query)
+        elif "scan=inventory" in s.lower() or "item_id=" in s.lower() or "token=" in s.lower():
+            q = parse_qs(s.lstrip("?"))
+        else:
+            return {}
+        out: dict[str, str] = {}
+        for key in ("sku", "token", "item_id", "code"):
+            vals = q.get(key) or []
+            if vals:
+                out[key] = str(vals[0]).strip()
+        scan_vals = q.get("scan") or []
+        if scan_vals and str(scan_vals[0]).strip().lower() == "inventory":
+            out["scan"] = "inventory"
+        return out
+    except Exception:
+        return {}
+
+
+def _apply_inventory_scan_params(
+    *,
+    sku: str = "",
+    token: str = "",
+    item_id: str = "",
+    legacy_code: str = "",
+) -> None:
+    """Persist scan identifiers in session for mobile inventory checkout."""
     st.session_state[_SCAN_SESSION_KEY] = True
-    sku = _first_query_param("sku")
-    token = _first_query_param("token")
-    item_id = _first_query_param("item_id")
-    legacy_code = _first_query_param("code")
     if sku:
         st.session_state["_ips_scan_inv_sku"] = sku
     if token:
@@ -1185,6 +1207,34 @@ def capture_inventory_scan_from_query() -> None:
         st.session_state["_ips_scan_inv_item_id"] = item_id
     if legacy_code:
         st.session_state["_ips_scan_legacy_code"] = _normalize_scan_input(legacy_code)
+
+
+def capture_inventory_scan_from_query() -> None:
+    """Persist inventory scan params before auth / asset routing."""
+    scan = _first_query_param("scan")
+    legacy_qr = _first_query_param("qr")
+    pg = urllib.parse.unquote_plus(_first_query_param("page")).strip().lower()
+    legacy_page = pg in {"scan inventory", "inventory scan"}
+    if scan != "inventory" and legacy_qr != "inventory" and not legacy_page:
+        return
+    sku = _first_query_param("sku")
+    token = _first_query_param("token")
+    item_id = _first_query_param("item_id")
+    legacy_code = _first_query_param("code")
+    _apply_inventory_scan_params(
+        sku=sku,
+        token=token,
+        item_id=item_id,
+        legacy_code=legacy_code,
+    )
+    if legacy_code:
+        parsed = _parse_inventory_scan_deeplink(legacy_code)
+        if parsed.get("scan") == "inventory":
+            _apply_inventory_scan_params(
+                sku=parsed.get("sku", ""),
+                token=parsed.get("token", ""),
+                item_id=parsed.get("item_id", ""),
+            )
 
 
 def inventory_scan_route_active() -> bool:
@@ -1245,14 +1295,72 @@ def _load_scan_item() -> tuple[dict[str, Any] | None, str]:
     sku = _first_query_param("sku") or str(st.session_state.get("_ips_scan_inv_sku") or "")
     token = _first_query_param("token") or str(st.session_state.get("_ips_scan_inv_token") or "")
     item_id = _first_query_param("item_id") or str(st.session_state.get("_ips_scan_inv_item_id") or "")
-    if not sku and not item_id and not token:
-        legacy = str(st.session_state.get("_ips_scan_legacy_code") or _first_query_param("code") or "").strip()
-        if legacy:
+    legacy = str(st.session_state.get("_ips_scan_legacy_code") or _first_query_param("code") or "").strip()
+    if legacy:
+        parsed = _parse_inventory_scan_deeplink(legacy)
+        if parsed.get("scan") == "inventory":
+            sku = sku or parsed.get("sku", "")
+            token = token or parsed.get("token", "")
+            item_id = item_id or parsed.get("item_id", "")
+        elif not sku and not item_id and not token:
             return _load_scan_item_legacy(legacy)
+    if not sku and not item_id and not token:
+        return None, "Missing inventory identifier. Scan a QR code or enter an item code below."
     result = get_inventory_item_by_qr(sku=sku or None, item_id=item_id or None, token=token or None)
     if not result.ok:
         return None, str(result.error or "Invalid inventory QR code.")
     return result.data, ""
+
+
+def _render_scan_manual_lookup(*, err: str = "") -> None:
+    """Manual lookup when QR params are missing or the item could not be resolved."""
+    if err:
+        st.error(err)
+    st.markdown("### Find item")
+    st.caption("Enter SKU, scan code, or paste the full checkout link from the inventory detail page.")
+    with st.form("inv_mobile_scan_lookup", clear_on_submit=False):
+        code = st.text_input(
+            "Item code or link",
+            key="inv_mobile_scan_lookup_code",
+            placeholder="SKU, INV-…, or checkout URL",
+        )
+        submit = st.form_submit_button("Find item", type="primary", use_container_width=True)
+    if not submit:
+        return
+    raw = str(code or "").strip()
+    if not raw:
+        st.warning("Enter an item code or link.")
+        return
+    parsed = _parse_inventory_scan_deeplink(raw)
+    if parsed.get("scan") == "inventory" or parsed.get("item_id") or parsed.get("token"):
+        _apply_inventory_scan_params(
+            sku=parsed.get("sku", ""),
+            token=parsed.get("token", ""),
+            item_id=parsed.get("item_id", ""),
+        )
+        try:
+            for qp, val in (
+                ("scan", "inventory"),
+                ("sku", parsed.get("sku", "")),
+                ("token", parsed.get("token", "")),
+                ("item_id", parsed.get("item_id", "")),
+            ):
+                if val:
+                    st.query_params[qp] = val
+        except Exception:
+            pass
+        st.rerun()
+    norm = _normalize_scan_input(raw)
+    item, legacy_err = _load_scan_item_legacy(norm or raw)
+    if item:
+        _apply_inventory_scan_params(
+            item_id=str(item.get("id") or ""),
+            token=str(item.get("qr_token") or ""),
+            sku=str(item.get("sku") or ""),
+        )
+        st.session_state.pop("_ips_scan_legacy_code", None)
+        st.rerun()
+    st.error(legacy_err or "Nothing found for that code.")
 
 
 def _scan_active_jobs() -> tuple[list[str], dict[str, str]]:
@@ -1327,8 +1435,8 @@ def render_inventory_scan_page() -> None:
 
     item, err = _load_scan_item()
     if err or not item:
-        st.error(err or "Invalid inventory QR code.")
-        st.stop()
+        _render_scan_manual_lookup(err=err or "Invalid inventory QR code.")
+        return
 
     if not _scan_can_submit():
         st.error("Your role cannot submit inventory actions.")

@@ -48,9 +48,10 @@ _STORAGE_PREFIX = "weekly_timesheets"
 _table_available: bool | None = None
 
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-TIMESHEET_LABOR_MIN_ROWS = 12
-TIMESHEET_MATERIAL_MIN_ROWS = 8
+TIMESHEET_LABOR_MIN_ROWS = 14
+TIMESHEET_MATERIAL_MIN_ROWS = 9
 TIMESHEET_PAGE_MIN_HEIGHT = "10.5in"
+TIMESHEET_CONTENT_WIDTH = "8in"
 _HOUR_COLS = ("hours_mon", "hours_tue", "hours_wed", "hours_thu", "hours_fri", "hours_sat", "hours_sun")
 _LEGACY_HOUR_COLS = (
     ("mon", "hours_mon", "monday_st"),

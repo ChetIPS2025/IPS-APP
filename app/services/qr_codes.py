@@ -20,30 +20,43 @@ def inventory_qr_link_url(*, sku: str, qr_token: str, app_base_url: str, item_id
     """
     Mobile inventory scan URL.
 
-    Format: ``{APP_BASE_URL}/?scan=inventory&sku={sku}&token={qr_token}``
+    Prefer ``item_id`` + ``token`` (stable DB key). ``sku`` is included for display only.
     """
     base = str(app_base_url or "").strip().rstrip("/")
     sku_q = quote(str(sku or "").strip(), safe="")
     token_q = quote(str(qr_token or "").strip(), safe="")
+    iid_q = quote(str(item_id or "").strip(), safe="")
     if not base or not token_q:
         return ""
+    if iid_q:
+        sku_part = f"&sku={sku_q}" if sku_q else ""
+        return f"{base}/?scan=inventory&item_id={iid_q}&token={token_q}{sku_part}"
     if sku_q:
         return f"{base}/?scan=inventory&sku={sku_q}&token={token_q}"
-    iid_q = quote(str(item_id or "").strip(), safe="")
-    if iid_q:
-        return f"{base}/?scan=inventory&item_id={iid_q}&token={token_q}"
     return ""
 
 
-def inventory_scan_link_url(*, qr_code_value: str, app_base_url: str, sku: str = "", qr_token: str = "") -> str:
+def inventory_scan_link_url(
+    *,
+    qr_code_value: str,
+    app_base_url: str,
+    sku: str = "",
+    qr_token: str = "",
+    item_id: str = "",
+) -> str:
     """
     Full URL for inventory QR labels.
 
-    Prefers tokenized mobile URL when ``sku`` and ``qr_token`` are provided.
+    Prefers tokenized mobile URL when ``qr_token`` and ``item_id`` or ``sku`` are provided.
     Falls back to legacy ``?page=Scan%20Inventory&code=`` format.
     """
-    if sku and qr_token:
-        link = inventory_qr_link_url(sku=sku, qr_token=qr_token, app_base_url=app_base_url)
+    if qr_token and (item_id or sku):
+        link = inventory_qr_link_url(
+            sku=sku,
+            qr_token=qr_token,
+            app_base_url=app_base_url,
+            item_id=item_id,
+        )
         if link:
             return link
     b = str(app_base_url or "").strip().rstrip("/")

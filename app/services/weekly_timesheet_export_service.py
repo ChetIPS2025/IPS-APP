@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -85,9 +85,10 @@ _CELL = {
     "signed_date": "J42",
 }
 _FIRST_LABOR_ROW = 12
-_LABOR_ROW_COUNT = 12
+_LABOR_ROW_COUNT = 14
 _FIRST_MATERIAL_ROW = 27
-_MATERIAL_ROW_COUNT = 8
+_MATERIAL_ROW_COUNT = 9
+_PDF_ROW_HEIGHT = 0.24 * inch
 
 
 def _thin_border() -> Border:
@@ -382,13 +383,17 @@ def export_data_to_pdf(data: WeeklyJobTimesheetData) -> bytes:
 def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> bytes:
     labels = _day_labels(week_start)
     buf = BytesIO()
+    margin = 0.25 * inch
+    page_w, page_h = letter
+    content_w = page_w - (2 * margin)
+    content_h = page_h - (2 * margin)
     doc = SimpleDocTemplate(
         buf,
         pagesize=letter,
-        leftMargin=0.25 * inch,
-        rightMargin=0.25 * inch,
-        topMargin=0.25 * inch,
-        bottomMargin=0.25 * inch,
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin,
     )
     styles = getSampleStyleSheet()
     story: list[Any] = []
@@ -397,11 +402,23 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     title_row: list[Any]
     if logo_path and logo_path.is_file():
         try:
-            title_row = [RLImage(str(logo_path), width=1.0 * inch, height=0.55 * inch), Paragraph("<b>WEEKLY TIMESHEET</b><br/><font size=8>INDUSTRIAL PLANT SOLUTIONS, LLC</font>", styles["Normal"])]
+            title_row = [
+                RLImage(str(logo_path), width=0.95 * inch, height=0.55 * inch),
+                Paragraph(
+                    "<b>WEEKLY TIMESHEET</b><br/><font size=8>INDUSTRIAL PLANT SOLUTIONS, LLC</font>",
+                    styles["Normal"],
+                ),
+            ]
         except Exception:
             title_row = [Paragraph("<b>IPS</b>", styles["Normal"]), Paragraph("<b>WEEKLY TIMESHEET</b>", styles["Normal"])]
     else:
-        title_row = [Paragraph("<b>IPS</b>", styles["Normal"]), Paragraph("<b>WEEKLY TIMESHEET</b><br/><font size=8>INDUSTRIAL PLANT SOLUTIONS, LLC</font>", styles["Normal"])]
+        title_row = [
+            Paragraph("<b>IPS</b>", styles["Normal"]),
+            Paragraph(
+                "<b>WEEKLY TIMESHEET</b><br/><font size=8>INDUSTRIAL PLANT SOLUTIONS, LLC</font>",
+                styles["Normal"],
+            ),
+        ]
 
     meta = [
         ["JOB #", data.job_number],
@@ -410,7 +427,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         ["P.O. #", data.po_number],
         ["DATE", f"{data.week_start} – {data.week_end}"],
     ]
-    meta_tbl = Table(meta, colWidths=[0.65 * inch, 2.0 * inch])
+    meta_tbl = Table(meta, colWidths=[0.72 * inch, 1.75 * inch])
     meta_tbl.setStyle(
         TableStyle(
             [
@@ -420,10 +437,19 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             ]
         )
     )
-    header_tbl = Table([[title_row[0], title_row[1], meta_tbl]], colWidths=[1.1 * inch, 2.5 * inch, 2.65 * inch])
-    header_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("BOX", (0, 0), (-1, -1), 1, colors.black)]))
+    header_tbl = Table(
+        [[title_row[0], title_row[1], meta_tbl]],
+        colWidths=[0.95 * inch, content_w - 0.95 * inch - 2.47 * inch, 2.47 * inch],
+    )
+    header_tbl.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BOX", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
     story.append(header_tbl)
-    story.append(Spacer(1, 0.06 * inch))
 
     labor = _pad_labor_rows(
         [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
@@ -449,9 +475,17 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
                 _fmt_hours(ln.total_hours),
             ]
         )
-    col_w = [1.15 * inch, 0.55 * inch] + [0.38 * inch] * 7 + [0.32 * inch] * 4
-    t = Table(grid, colWidths=col_w, repeatRows=1)
-    t.setStyle(
+    col_w = [
+        content_w * 0.20,
+        content_w * 0.08,
+        *[content_w * 0.07] * 7,
+        content_w * 0.04,
+        content_w * 0.04,
+        content_w * 0.04,
+        content_w * 0.07,
+    ]
+    labor_tbl = Table(grid, colWidths=col_w, repeatRows=1)
+    labor_tbl.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8eef7")),
@@ -463,8 +497,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             ]
         )
     )
-    story.append(t)
-    story.append(Spacer(1, 0.05 * inch))
+    story.append(labor_tbl)
 
     mats_left, mats_right = _split_materials(data.material_lines)
     mats_left = _pad_material_rows(mats_left, TIMESHEET_MATERIAL_MIN_ROWS)
@@ -474,9 +507,22 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     for i in range(max(len(mats_left), len(mats_right))):
         l = mats_left[i] if i < len(mats_left) else empty_mat
         r = mats_right[i] if i < len(mats_right) else empty_mat
-        mat_grid.append([l.description, _fmt_hours(l.qty), _fmt_money(l.cost), r.description, _fmt_hours(r.qty), _fmt_money(r.cost)])
-    tm = Table(mat_grid, colWidths=[1.85 * inch, 0.45 * inch, 0.55 * inch, 1.85 * inch, 0.45 * inch, 0.55 * inch])
-    tm.setStyle(
+        mat_grid.append(
+            [
+                l.description,
+                _fmt_hours(l.qty),
+                _fmt_money(l.cost),
+                r.description,
+                _fmt_hours(r.qty),
+                _fmt_money(r.cost),
+            ]
+        )
+    half_w = content_w / 2.0
+    mat_tbl = Table(
+        mat_grid,
+        colWidths=[half_w * 0.72, half_w * 0.14, half_w * 0.14, half_w * 0.72, half_w * 0.14, half_w * 0.14],
+    )
+    mat_tbl.setStyle(
         TableStyle(
             [
                 ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
@@ -486,14 +532,20 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             ]
         )
     )
-    story.append(tm)
-    story.append(Spacer(1, 0.05 * inch))
+    story.append(mat_tbl)
+
+    header_h = 0.72 * inch
+    labor_h = _PDF_ROW_HEIGHT * (1 + len(labor))
+    mat_h = _PDF_ROW_HEIGHT * (1 + max(len(mats_left), len(mats_right)))
+    approval_h = 1.05 * inch
+    work_h = content_h - header_h - labor_h - mat_h - approval_h
+    work_h = max(work_h, 1.35 * inch)
 
     work_body = html.escape(data.work_performed or " ").replace("\n", "<br/>") or "&nbsp;"
     work_tbl = Table(
-        [[Paragraph(f"<b>WORK PERFORMED</b>", styles["Heading4"])], [Paragraph(work_body, styles["BodyText"])]],
-        colWidths=[7.0 * inch],
-        rowHeights=[0.18 * inch, 1.35 * inch],
+        [[Paragraph("<b>WORK PERFORMED</b>", styles["Heading4"])], [Paragraph(work_body, styles["BodyText"])]],
+        colWidths=[content_w],
+        rowHeights=[0.22 * inch, work_h - 0.22 * inch],
     )
     work_tbl.setStyle(
         TableStyle(
@@ -507,7 +559,6 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         )
     )
     story.append(work_tbl)
-    story.append(Spacer(1, 0.05 * inch))
 
     approval_row = [
         Paragraph(f"<b>APPROVED BY</b><br/>{html.escape(data.approved_by or ' ')}", styles["Normal"]),
@@ -521,7 +572,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             approval_row[1] = RLImage(BytesIO(base64.b64decode(b64)), width=2.0 * inch, height=0.65 * inch)
         except Exception:
             approval_row[1] = Paragraph("<b>SIGNATURE</b>", styles["Normal"])
-    appr_tbl = Table([approval_row], colWidths=[2.3 * inch, 2.35 * inch, 2.35 * inch], rowHeights=[0.85 * inch])
+    appr_tbl = Table([approval_row], colWidths=[content_w / 3.0] * 3, rowHeights=[approval_h])
     appr_tbl.setStyle(
         TableStyle(
             [

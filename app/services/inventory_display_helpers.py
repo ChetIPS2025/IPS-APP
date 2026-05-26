@@ -53,12 +53,14 @@ def inventory_qr_embed_subject(row: dict[str, Any]) -> str:
     sku = resolve_inventory_sku(row)
     token = str(row.get("qr_token") or "").strip()
     qrv = resolve_inventory_qr_value(row)
-    if base and sku and token:
+    iid = str(row.get("id") or "").strip()
+    if base and token and (iid or sku):
         url = inventory_scan_link_url(
             qr_code_value=qrv,
             app_base_url=base,
             sku=sku,
             qr_token=token,
+            item_id=iid,
         )
         if url:
             return url
