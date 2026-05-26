@@ -1571,26 +1571,47 @@ def _list_table_checkbox_column_css(table_wrap_key: str) -> str:
     return f"""
 {sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child {{
   position: relative !important;
-  z-index: 3 !important;
+  z-index: 5 !important;
   overflow: visible !important;
-  flex: 0 0 2.75rem !important;
-  width: 2.75rem !important;
-  min-width: 2.75rem !important;
-  max-width: 2.75rem !important;
+  flex: 0 0 3rem !important;
+  width: 3rem !important;
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+  pointer-events: auto !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:nth-child(2) {{
+  position: relative !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:nth-child(2) * {{
+  pointer-events: none !important;
 }}
 {sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {{
   width: 100% !important;
-  min-width: 0 !important;
+  min-height: 44px !important;
+  position: relative !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stElementContainer"] {{
+  width: 100% !important;
+  min-height: 44px !important;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }}
 {sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] {{
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
-  min-width: 0 !important;
+  height: 100% !important;
+  margin: 0 !important;
   pointer-events: auto !important;
 }}
 {sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] label {{
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
-  min-width: 2.75rem !important;
-  min-height: 44px !important;
+  height: 100% !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1600,6 +1621,23 @@ def _list_table_checkbox_column_css(table_wrap_key: str) -> str:
   box-sizing: border-box !important;
   pointer-events: auto !important;
 }}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] label input {{
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  z-index: 2 !important;
+}}
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] label > div,
+{sel} [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child [data-testid="stCheckbox"] label > span {{
+  position: relative !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  flex-shrink: 0 !important;
+}}
 """
 
 
@@ -1608,7 +1646,7 @@ def inject_inventory_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
     st.markdown(
         f"""
-<style id="ips-inventory-module-v3">
+<style id="ips-inventory-module-v4">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -1864,7 +1902,7 @@ def inject_pricing_guide_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("pricing_guide_table_wrap")
     st.markdown(
         f"""
-<style id="ips-pricing-guide-module-v2">
+<style id="ips-pricing-guide-module-v3">
 .ips-pg-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2407,7 +2445,7 @@ def inject_assets_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     st.markdown(
         f"""
-<style id="ips-assets-module-v3">
+<style id="ips-assets-module-v4">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;

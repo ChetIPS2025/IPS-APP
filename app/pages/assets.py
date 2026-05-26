@@ -137,7 +137,7 @@ SELECTED_ASSET_KEY = "selected_asset_id"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _TABLE_KEY = "assets_list"
-_ASSET_COLS = [0.35, 0.9, 3.2, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
+_ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
 _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),

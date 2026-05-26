@@ -162,7 +162,7 @@ _CACHE_KEY = "_ips_pg_modal_by_id"
 SELECTED_PG_KEY = "selected_pricing_guide_id"
 SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
 _ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
-_PG_COLS = [0.35, 0.55, 2.45, 1.05, 1.15, 0.7, 0.95, 0.8, 1.0, 1.15, 0.9]
+_PG_COLS = [0.42, 0.55, 2.38, 1.05, 1.15, 0.7, 0.95, 0.8, 1.0, 1.15, 0.9]
 _PG_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
