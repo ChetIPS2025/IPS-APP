@@ -283,6 +283,57 @@ def _store_session_data(data: WeeklyJobTimesheetData) -> None:
     st.session_state[f"{key}_material"] = _lines_to_material_df(data.material_lines)
 
 
+def _load_context_key(key_prefix: str) -> str:
+    return f"{key_prefix}_loaded_context"
+
+
+def _load_timesheet_from_sources(
+    job_id: str,
+    week_start: date,
+    *,
+    preserve_header: dict[str, Any] | None = None,
+) -> None:
+    hdr = preserve_header or {}
+    try:
+        data = build_timesheet_data(
+            job_id,
+            week_start,
+            po_number=str(hdr.get("po_number") or ""),
+            approved_by=str(hdr.get("approved_by") or ""),
+            work_performed=str(hdr.get("work_performed") or ""),
+        )
+        _store_session_data(data)
+    except Exception:
+        _store_header_only_draft(job_id, week_start)
+
+
+def _sync_timesheet_for_job_week(
+    job_id: str,
+    week_start: date,
+    *,
+    key_prefix: str,
+    locked: bool,
+    existing_row: dict[str, Any] | None,
+) -> None:
+    """Auto-load labor/materials when the selected job or week changes."""
+    context = f"{job_id}|{monday_of_week(week_start).isoformat()}"
+    context_key = _load_context_key(key_prefix)
+    if locked and existing_row:
+        loaded = load_timesheet_data(str(existing_row["id"]))
+        if loaded:
+            _store_session_data(loaded)
+        st.session_state[context_key] = context
+        return
+    if st.session_state.get(context_key) == context:
+        sk = _session_data_key(job_id, week_start)
+        if sk in st.session_state:
+            return
+    sk = _session_data_key(job_id, week_start)
+    preserve = st.session_state.get(sk, {}) if isinstance(st.session_state.get(sk), dict) else {}
+    _load_timesheet_from_sources(job_id, week_start, preserve_header=preserve)
+    st.session_state[context_key] = context
+
+
 def _store_header_only_draft(job_id: str, week_start: date) -> None:
     ws = monday_of_week(week_start)
     _, we = week_bounds(ws)
@@ -492,19 +543,9 @@ def render_weekly_timesheet_builder(
     if act2.button("Reload from timekeeping", use_container_width=True, key=f"{kp}_reload", disabled=locked):
         sk = _session_data_key(job_id, week_start)
         hdr = st.session_state.get(sk, {})
-        try:
-            data = build_timesheet_data(
-                job_id,
-                week_start,
-                po_number=str(hdr.get("po_number") or ""),
-                approved_by=str(hdr.get("approved_by") or ""),
-                work_performed=str(hdr.get("work_performed") or ""),
-            )
-            _store_session_data(data)
-            st.success("Loaded labor, equipment, materials, and work performed.")
-            st.rerun()
-        except Exception as exc:
-            st.warning(f"Could not reload all rows: {exc}")
+        _load_timesheet_from_sources(job_id, week_start, preserve_header=hdr if isinstance(hdr, dict) else {})
+        st.success("Loaded labor, equipment, materials, and work performed.")
+        st.rerun()
     if act3.button("Load saved", use_container_width=True, key=f"{kp}_load_saved"):
         row = fetch_timesheet_by_job_week(job_id, week_start)
         if not row:
@@ -524,18 +565,15 @@ def render_weekly_timesheet_builder(
     if locked:
         st.warning("This timesheet is approved/signed and locked. Void it to regenerate, or contact an admin.")
 
-    sk = _session_data_key(job_id, week_start)
-    if sk not in st.session_state and not locked:
-        try:
-            data = build_timesheet_data(job_id, week_start)
-            _store_session_data(data)
-        except Exception:
-            _store_header_only_draft(job_id, week_start)
-    elif locked and existing_row:
-        loaded = load_timesheet_data(str(existing_row["id"]))
-        if loaded:
-            _store_session_data(loaded)
+    _sync_timesheet_for_job_week(
+        job_id,
+        week_start,
+        key_prefix=kp,
+        locked=locked,
+        existing_row=existing_row,
+    )
 
+    sk = _session_data_key(job_id, week_start)
     hdr = st.session_state.get(sk, {})
     if not str(hdr.get("job_number") or "").strip():
         hdr.update(get_job_timesheet_header(job_id, week_start))

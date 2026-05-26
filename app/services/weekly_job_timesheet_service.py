@@ -368,11 +368,34 @@ def _employees_map() -> dict[str, dict[str, Any]]:
     return {str(r.get("id")): r for r in rows if r.get("id")}
 
 
+def _timekeeping_row_matches_job(job_id: str, job: dict[str, Any], row: dict[str, Any]) -> bool:
+    if str(row.get("job_id") or "") == job_id:
+        return True
+    label = str(row.get("job_label") or "").strip()
+    low = label.lower()
+    if not label or low in {"— no job —", "- no job -", "no job", "none", "—", "-"}:
+        return False
+    try:
+        from app.services.jobs_service import resolve_job_id_from_label
+    except ImportError:
+        from services.jobs_service import resolve_job_id_from_label  # type: ignore
+    resolved = resolve_job_id_from_label(label)
+    if resolved and resolved == job_id:
+        return True
+    job_num = str(job.get("job_number") or "").strip()
+    job_name = str(job.get("job_name") or "").strip()
+    if job_num and label.startswith(job_num):
+        return True
+    friendly = f"{job_num} — {job_name}" if job_num and job_name else job_num or job_name
+    return bool(friendly and label == friendly)
+
+
 def _build_labor_from_timekeeping_days(job_id: str, ws: date, we: date, emp_map: dict[str, dict]) -> list[TimesheetLine]:
+    job = _fetch_job(job_id)
     rows = fetch_table_admin("employee_timekeeping_days", limit=20000)
     buckets: dict[tuple[str, str], TimesheetLine] = {}
     for row in rows:
-        if str(row.get("job_id") or "") != job_id:
+        if not _timekeeping_row_matches_job(job_id, job, row):
             continue
         wd = _parse_date(row.get("work_date"))
         if wd is None or wd < ws or wd > we:

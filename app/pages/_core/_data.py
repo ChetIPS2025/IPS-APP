@@ -1757,15 +1757,21 @@ def persist_timekeeping_days(
         from services.timekeeping_service import save_timekeeping_day  # type: ignore
     ws = week_start.isoformat()
     errors: list[str] = []
+    try:
+        from app.services.jobs_service import resolve_job_id_from_label
+    except ImportError:
+        from services.jobs_service import resolve_job_id_from_label  # type: ignore
     for row in grid:
         work_date = str(row.get("date") or "")[:10]
         if not work_date:
             continue
+        job_label = str(row.get("job") or "")
         ui = {
             "employee_id": employee_id,
             "week_start": ws,
             "work_date": work_date,
-            "job_label": row.get("job") or "",
+            "job_id": resolve_job_id_from_label(job_label),
+            "job_label": job_label,
             "st_hours": row.get("st") or 0,
             "ot_hours": row.get("ot") or 0,
             "dt_hours": row.get("dt") or 0,
