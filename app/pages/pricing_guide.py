@@ -9,8 +9,8 @@ import streamlit as st
 
 try:
     from app.auth import current_role
-    from app.components.action_styles import danger_outline_button
-    from app.components.modal_delete import modal_danger_zone, render_modal_delete_panel
+    from app.components.catalog_presence_panel import render_catalog_presence_panel
+    from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
     from app.components.headers import render_page_brand_header
     from app.components.item_photo_manager import render_item_photo_manager
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -55,7 +55,6 @@ try:
         cached_pricing_guide_rows,
         class_pill_html,
         clear_pricing_guide_cache,
-        delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
         save_pricing_item,
@@ -84,8 +83,8 @@ try:
     from app.utils.formatting import fmt_currency
 except ImportError:
     from auth import current_role  # type: ignore
-    from components.action_styles import danger_outline_button  # type: ignore
-    from components.modal_delete import modal_danger_zone, render_modal_delete_panel  # type: ignore
+    from components.catalog_presence_panel import render_catalog_presence_panel  # type: ignore
+    from components.pricing_guide_actions import render_pricing_guide_action_buttons  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -130,7 +129,6 @@ except ImportError:
         cached_pricing_guide_rows,
         class_pill_html,
         clear_pricing_guide_cache,
-        delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
         save_pricing_item,
@@ -944,57 +942,13 @@ def _render_pricing_actions_panel(row: dict) -> None:
     rk = record_session_key(row, "id")
     if is_edit_mode(_MODULE, rk):
         return
-    rid = str(row.get("id") or "").strip()
-    if not rid:
-        return
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
-    if is_demo_id(rid):
-        return
 
-    can_mutate = _can_manage_pricing()
-    with modal_danger_zone():
-        if danger_outline_button(
-            "Deactivate Item",
-            f"pg_deactivate_{rk}",
-            disabled=not can_mutate,
-            help="Marks this pricing item inactive.",
-        ):
-            try:
-                from app.services.repository import update_row
-            except ImportError:
-                from services.repository import update_row  # type: ignore
-            result = update_row("pricing_guide_items", {"is_active": False}, {"id": rid})
-            if result.ok:
-                try:
-                    from app.services.pricing_guide_service import clear_pricing_guide_cache
-                except ImportError:
-                    from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
-                clear_pricing_guide_cache()
-                _clear_modal()
-                st.success("Pricing item deactivated.")
-                st.rerun()
-            st.error(result.error or "Could not deactivate pricing item.")
-
-        def _delete_item() -> None:
-            ok, msg = delete_pricing_item(rid)
-            if ok:
-                _clear_modal()
-                st.success(msg or "Pricing item deleted.")
-                st.rerun()
-            st.error(msg or "Could not delete pricing item.")
-
-        render_modal_delete_panel(
-            prefix=f"pg_del_{rk}",
-            delete_label="Delete Item",
-            confirm_message="Delete this pricing guide item permanently? This cannot be undone.",
-            confirm_label="Confirm Delete",
-            can_delete=can_mutate,
-            disabled_reason="Only admin, manager, or supervisor can delete pricing items.",
-            on_confirm=_delete_item,
-        )
+    render_pricing_guide_action_buttons(
+        row,
+        can_manage=_can_manage_pricing(),
+        on_deactivate=_clear_modal,
+        on_delete=_clear_modal,
+    )
 
 
 @st.dialog("Pricing Guide Item", width="large", on_dismiss=_clear_modal)
@@ -1027,6 +981,11 @@ def _show_detail_modal() -> None:
     if edit_mode:
         _render_edit_form(row)
     else:
+        render_catalog_presence_panel(
+            row,
+            can_manage=_can_manage_pricing(),
+            on_change=clear_pricing_guide_cache,
+        )
         _render_pricing_actions_panel(row)
         _render_item_tabs(row)
 
