@@ -1,0 +1,3 @@
+# Approved catalog item photos only.
+# Place files in inventory/ or assets/ subfolders (matched by model #, item #, SKU, or description).
+# Do not store auto-cropped receipt thumbnails in this folder root.

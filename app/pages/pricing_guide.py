@@ -61,7 +61,16 @@ try:
         pricing_guide_summary,
         type_pill_html,
     )
-    from app.services.catalog_import_service import import_catalog_csv
+    from app.services.catalog_import_service import parse_catalog_csv
+    from app.services.catalog_image_review_service import (
+        DECISION_APPROVE,
+        DECISION_PENDING,
+        DECISION_REPLACE,
+        DECISION_SKIP,
+        ImportImageReviewRow,
+        build_import_image_review,
+        import_catalog_with_review,
+    )
     from app.services.pricing_guide_images import (
         get_pricing_guide_image_url,
         upload_pricing_guide_image,
@@ -122,7 +131,16 @@ except ImportError:
         pricing_guide_summary,
         type_pill_html,
     )
-    from services.catalog_import_service import import_catalog_csv  # type: ignore
+    from services.catalog_import_service import parse_catalog_csv  # type: ignore
+    from services.catalog_image_review_service import (  # type: ignore
+        DECISION_APPROVE,
+        DECISION_PENDING,
+        DECISION_REPLACE,
+        DECISION_SKIP,
+        ImportImageReviewRow,
+        build_import_image_review,
+        import_catalog_with_review,
+    )
     from services.pricing_guide_images import (  # type: ignore
         get_pricing_guide_image_url,
         upload_pricing_guide_image,
@@ -505,8 +523,8 @@ def _render_conditional_fields(prefix: str, item_class: str, item_type: str) -> 
 def _render_csv_import() -> None:
     with st.expander("Import Catalog CSV", expanded=False):
         st.caption(
-            "Always creates/updates Pricing Guide items. "
-            "Inventory and Asset rows are created only when item_class is Inventory or Asset."
+            "Imports Pricing Guide, Inventory, and Asset records from CSV. "
+            "Item photos require manual review — nothing is auto-attached from cropped thumbnails."
         )
         uploaded = st.file_uploader(
             "CSV file",
@@ -515,30 +533,178 @@ def _render_csv_import() -> None:
             label_visibility="collapsed",
         )
         image_uploads = st.file_uploader(
-            "Item images (optional — match by model #, item #, SKU, or filename)",
+            "Candidate item images (optional — match by model #, item #, SKU, then description)",
             type=["png", "jpg", "jpeg", "webp"],
             accept_multiple_files=True,
             key="pg_csv_images",
         )
         st.caption(
-            "You can also drop image files in assets/item_images/ before import. "
-            "Existing item photos are not overwritten."
+            "Approved images are saved under assets/item_images/inventory/ and assets/item_images/assets/. "
+            "Existing approved photos are never overwritten."
         )
-        if uploaded is not None:
-            text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
-            if st.button("Run Import", key="pg_csv_import", type="primary"):
-                image_files: list[tuple[str, bytes]] = []
-                for f in image_uploads or []:
-                    image_files.append((str(getattr(f, "name", "") or "image.jpg"), f.getvalue()))
-                result = import_catalog_csv(text, image_files=image_files or None)
-                if result.ok:
-                    st.success(result.message)
-                    if result.errors:
-                        for err in result.errors[:20]:
-                            st.warning(err)
-                    st.rerun()
-                else:
-                    st.error(result.message)
+
+        if uploaded is None:
+            return
+
+        text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
+        image_files: list[tuple[str, bytes]] = []
+        for f in image_uploads or []:
+            image_files.append((str(getattr(f, "name", "") or "image.jpg"), f.getvalue()))
+
+        c1, c2 = st.columns(2)
+        with c1:
+            prepare = st.button("Prepare Import Review", key="pg_csv_prepare", type="primary")
+        with c2:
+            if st.button("Clear Review", key="pg_csv_clear_review"):
+                for key in list(st.session_state.keys()):
+                    if isinstance(key, str) and key.startswith("pg_import_"):
+                        del st.session_state[key]
+                st.rerun()
+
+        if prepare:
+            rows = parse_catalog_csv(text)
+            if not rows:
+                st.error("No valid rows found in CSV.")
+                return
+            review = build_import_image_review(rows, image_files or None)
+            st.session_state["pg_import_csv_text"] = text
+            st.session_state["pg_import_review_meta"] = [
+                {
+                    "row_index": r.row_index,
+                    "description": r.description,
+                    "model_number": r.model_number,
+                    "item_number": r.item_number,
+                    "sku": r.sku,
+                    "item_class": r.item_class,
+                    "match_filename": r.match_filename,
+                    "match_field": r.match_field,
+                    "confidence": r.confidence,
+                    "decision": r.decision,
+                    "existing_approved": r.existing_approved,
+                    "row": r.row,
+                }
+                for r in review
+            ]
+            blob_cache: dict[str, bytes] = {}
+            for r in review:
+                if r.suggested_bytes:
+                    blob_cache[str(r.row_index)] = r.suggested_bytes
+            st.session_state["pg_import_image_blobs"] = blob_cache
+            for r in review:
+                st.session_state[f"pg_import_decision_{r.row_index}"] = r.decision
+            st.rerun()
+
+        meta = st.session_state.get("pg_import_review_meta")
+        if not meta:
+            return
+
+        st.markdown("### Image review (required before photos are saved)")
+        suggested = sum(1 for m in meta if m.get("match_filename"))
+        st.caption(
+            f"{len(meta)} catalog row(s) · {suggested} with suggested image(s). "
+            "Approve, replace, or skip each photo before import."
+        )
+
+        page_size = 10
+        total_pages = max(1, (len(meta) + page_size - 1) // page_size)
+        page = int(st.number_input("Review page", min_value=1, max_value=total_pages, value=1, key="pg_import_review_page"))
+        start = (page - 1) * page_size
+        batch = meta[start : start + page_size]
+        blobs: dict[str, bytes] = st.session_state.get("pg_import_image_blobs") or {}
+
+        for entry in batch:
+            idx = int(entry["row_index"])
+            decision_key = f"pg_import_decision_{idx}"
+            if decision_key not in st.session_state:
+                st.session_state[decision_key] = str(entry.get("decision") or DECISION_SKIP)
+
+            with st.container(border=True):
+                left, mid, right = st.columns([2.2, 1.2, 1.3])
+                with left:
+                    st.markdown(f"**{entry.get('description', '')[:120]}**")
+                    st.caption(
+                        f"Class: {entry.get('item_class')} · "
+                        f"Model: {entry.get('model_number') or '—'} · "
+                        f"Item #: {entry.get('item_number') or '—'} · "
+                        f"SKU: {entry.get('sku') or '—'}"
+                    )
+                    if entry.get("existing_approved"):
+                        st.info("Existing approved photo — will not be overwritten.")
+                with mid:
+                    blob = blobs.get(str(idx))
+                    if blob:
+                        st.image(blob, caption=entry.get("match_filename") or "Suggested", use_container_width=True)
+                        conf = str(entry.get("confidence") or "none")
+                        field = str(entry.get("match_field") or "")
+                        st.caption(f"Match: {field or '—'} ({conf})")
+                    else:
+                        st.caption("No suggested image")
+                with right:
+                    options = [DECISION_PENDING, DECISION_APPROVE, DECISION_SKIP, DECISION_REPLACE]
+                    if entry.get("existing_approved"):
+                        options = [DECISION_SKIP]
+                    current = str(st.session_state.get(decision_key) or entry.get("decision") or DECISION_PENDING)
+                    if current not in options:
+                        current = options[0]
+                    choice = st.selectbox(
+                        "Decision",
+                        options,
+                        index=options.index(current),
+                        key=f"pg_import_decision_select_{idx}",
+                        disabled=bool(entry.get("existing_approved")),
+                    )
+                    st.session_state[decision_key] = choice
+                    if choice == DECISION_REPLACE:
+                        repl = st.file_uploader(
+                            "Replacement image",
+                            type=["png", "jpg", "jpeg", "webp"],
+                            key=f"pg_import_replace_{idx}",
+                            label_visibility="collapsed",
+                        )
+                        if repl is not None:
+                            st.session_state[f"pg_import_replace_bytes_{idx}"] = repl.getvalue()
+                            st.session_state[f"pg_import_replace_name_{idx}"] = str(getattr(repl, "name", "") or "replacement.jpg")
+
+        if st.button("Import Catalog + Approved Images", key="pg_csv_import", type="primary"):
+            csv_text = str(st.session_state.get("pg_import_csv_text") or text)
+            review_rows: list[ImportImageReviewRow] = []
+            for entry in meta:
+                idx = int(entry["row_index"])
+                decision = str(st.session_state.get(f"pg_import_decision_{idx}") or DECISION_SKIP)
+                suggested_bytes = blobs.get(str(idx))
+                replace_bytes = st.session_state.get(f"pg_import_replace_bytes_{idx}")
+                replace_name = str(st.session_state.get(f"pg_import_replace_name_{idx}") or "")
+                review_rows.append(
+                    ImportImageReviewRow(
+                        row_index=idx,
+                        row=dict(entry.get("row") or {}),
+                        description=str(entry.get("description") or ""),
+                        model_number=str(entry.get("model_number") or ""),
+                        item_number=str(entry.get("item_number") or ""),
+                        sku=str(entry.get("sku") or ""),
+                        item_class=str(entry.get("item_class") or ""),
+                        match_filename=str(entry.get("match_filename") or ""),
+                        match_field=str(entry.get("match_field") or ""),
+                        confidence=str(entry.get("confidence") or "none"),
+                        suggested_bytes=suggested_bytes if isinstance(suggested_bytes, (bytes, bytearray)) else None,
+                        decision=decision,
+                        replace_filename=replace_name,
+                        replace_bytes=replace_bytes if isinstance(replace_bytes, (bytes, bytearray)) else None,
+                        existing_approved=bool(entry.get("existing_approved")),
+                    )
+                )
+            result, _img = import_catalog_with_review(csv_text, review_rows)
+            if result.ok:
+                st.success(result.message)
+                if result.errors:
+                    for err in result.errors[:20]:
+                        st.warning(err)
+                for key in list(st.session_state.keys()):
+                    if isinstance(key, str) and key.startswith("pg_import_"):
+                        del st.session_state[key]
+                st.rerun()
+            else:
+                st.error(result.message)
 
 
 def _render_add_form() -> None:
@@ -595,6 +761,7 @@ def _render_item_tabs(row: dict[str, Any]) -> None:
                     f"{detail_field_html('SKU', row.get('sku') or '—')}"
                     f"{detail_field_html('Item #', row.get('item_number') or '—')}"
                     f"{detail_field_html('Model #', row.get('model_number') or '—')}"
+                    f"{detail_field_html('Image status', row.get('image_status') or 'missing')}"
                     f"{detail_field_html('Category', row.get('category'))}"
                     f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
                     f"{detail_field_html('Unit', row.get('unit'))}"

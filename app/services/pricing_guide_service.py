@@ -190,6 +190,7 @@ def normalize_pricing_row(
             "image_path": str(raw.get("image_path") or ""),
             "image_url": str(raw.get("image_url") or ""),
             "image_file_name": str(raw.get("image_file_name") or ""),
+            "image_status": str(raw.get("image_status") or "missing"),
             "qr_code_url": str(raw.get("qr_code_url") or ""),
         }
 

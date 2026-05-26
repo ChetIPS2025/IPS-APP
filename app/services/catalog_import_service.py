@@ -482,18 +482,21 @@ def _attach_import_image(
     entity_type: str,
     existing: dict[str, Any] | None,
     result: CatalogImportResult,
+    high_confidence_only: bool = True,
 ) -> None:
     if not record_id:
         return
     try:
-        from app.services.item_images import find_image_bytes_for_row, persist_item_image
+        from app.services.item_images import find_image_match_for_row, persist_item_image
     except ImportError:
-        from services.item_images import find_image_bytes_for_row, persist_item_image  # type: ignore
+        from services.item_images import find_image_match_for_row, persist_item_image  # type: ignore
 
-    hit = find_image_bytes_for_row(row, image_index)
-    if not hit:
+    match = find_image_match_for_row(row, image_index)
+    if not match:
         return
-    filename, data = hit
+    if high_confidence_only and match.confidence != "high":
+        return
+    filename, data = match.filename, match.data
     svc = persist_item_image(
         table=table,
         record_id=str(record_id),
@@ -501,6 +504,7 @@ def _attach_import_image(
         image_bytes=data,
         filename=filename,
         existing=existing,
+        uploaded_by="catalog-import",
     )
     if not svc.ok:
         result.errors.append(f"Image for {table} {record_id}: {svc.error}")
@@ -543,7 +547,8 @@ def import_catalog_csv(
     *,
     changed_by: str = "",
     image_files: list[tuple[str, bytes]] | None = None,
-    include_local_image_folder: bool = True,
+    include_local_image_folder: bool = False,
+    attach_images: bool = False,
 ) -> CatalogImportResult:
     rows = parse_catalog_csv(text)
     if not rows:
@@ -575,6 +580,8 @@ def import_catalog_csv(
 
         inv_id: str | None = None
         ast_id: str | None = None
+        inv_existing: dict[str, Any] | None = None
+        ast_existing: dict[str, Any] | None = None
 
         if item_class == "Inventory":
             inv_existing = None
@@ -614,38 +621,42 @@ def import_catalog_csv(
 
         _sync_catalog_links(pricing_item_id=pid, inventory_id=inv_id, asset_id=ast_id)
 
-        pg_record = pg_existing or next((r for r in pricing_rows if str(r.get("id")) == str(pid)), None)
-        _attach_import_image(
-            row=row,
-            image_index=image_index,
-            table="pricing_guide_items",
-            record_id=pid,
-            entity_type="pricing_guide",
-            existing=pg_record if isinstance(pg_record, dict) else None,
-            result=result,
-        )
-        if inv_id:
-            inv_record = inv_existing or next((r for r in inventory_rows if str(r.get("id")) == str(inv_id)), None)
+        if attach_images:
+            pg_record = pg_existing or next((r for r in pricing_rows if str(r.get("id")) == str(pid)), None)
             _attach_import_image(
                 row=row,
                 image_index=image_index,
-                table="inventory_items",
-                record_id=inv_id,
-                entity_type="inventory",
-                existing=inv_record if isinstance(inv_record, dict) else None,
+                table="pricing_guide_items",
+                record_id=pid,
+                entity_type="pricing_guide",
+                existing=pg_record if isinstance(pg_record, dict) else None,
                 result=result,
+                high_confidence_only=True,
             )
-        if ast_id:
-            ast_record = ast_existing or next((r for r in asset_rows if str(r.get("id")) == str(ast_id)), None)
-            _attach_import_image(
-                row=row,
-                image_index=image_index,
-                table="assets",
-                record_id=ast_id,
-                entity_type="assets",
-                existing=ast_record if isinstance(ast_record, dict) else None,
-                result=result,
-            )
+            if inv_id:
+                inv_record = inv_existing or next((r for r in inventory_rows if str(r.get("id")) == str(inv_id)), None)
+                _attach_import_image(
+                    row=row,
+                    image_index=image_index,
+                    table="inventory_items",
+                    record_id=inv_id,
+                    entity_type="inventory",
+                    existing=inv_record if isinstance(inv_record, dict) else None,
+                    result=result,
+                    high_confidence_only=True,
+                )
+            if ast_id:
+                ast_record = ast_existing or next((r for r in asset_rows if str(r.get("id")) == str(ast_id)), None)
+                _attach_import_image(
+                    row=row,
+                    image_index=image_index,
+                    table="assets",
+                    record_id=ast_id,
+                    entity_type="assets",
+                    existing=ast_record if isinstance(ast_record, dict) else None,
+                    result=result,
+                    high_confidence_only=True,
+                )
 
         pg_row = {**row, "id": pid, "linked_inventory_id": inv_id, "linked_asset_id": ast_id, "item_class": item_class}
         if pg_existing:
@@ -670,7 +681,8 @@ def import_catalog_csv(
             f"Pricing Guide: {result.created_pricing} created, {result.updated_pricing} updated. "
             f"Inventory: {result.created_inventory} created, {result.updated_inventory} updated. "
             f"Assets: {result.created_assets} created, {result.updated_assets} updated. "
-            f"Images linked: {result.images_attached} ({result.images_skipped} skipped — existing photos). "
-            f"QR codes generated: {result.qr_tokens_generated}."
+            f"Images linked: {result.images_attached} ({result.images_skipped} skipped). "
+            f"QR codes generated: {result.qr_tokens_generated}. "
+            f"Use Import Review to approve item photos before attach."
         )
     return result

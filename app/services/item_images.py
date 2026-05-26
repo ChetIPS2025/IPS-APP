@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +17,19 @@ _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 INVENTORY_IMAGE_BUCKET = "inventory-images"
 ASSET_IMAGE_BUCKET = "asset-images"
 
+IMAGE_STATUS_MISSING = "missing"
+IMAGE_STATUS_NEEDS_REVIEW = "needs_review"
+IMAGE_STATUS_APPROVED = "approved"
+IMAGE_STATUS_REJECTED = "rejected"
+IMAGE_STATUSES: tuple[str, ...] = (
+    IMAGE_STATUS_MISSING,
+    IMAGE_STATUS_NEEDS_REVIEW,
+    IMAGE_STATUS_APPROVED,
+    IMAGE_STATUS_REJECTED,
+)
+
+_HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
+
 try:
     from app.config import ROOT_DIR
     from app.db import create_signed_url, upload_bytes_admin
@@ -24,6 +38,35 @@ except ImportError:
     from config import ROOT_DIR  # type: ignore
     from db import create_signed_url, upload_bytes_admin  # type: ignore
     from services.repository import ServiceResult, update_row  # type: ignore
+
+
+@dataclass
+class ImageMatchResult:
+    filename: str
+    data: bytes
+    matched_field: str
+    confidence: str  # high | low
+
+
+def normalize_image_status(raw: Any) -> str:
+    s = str(raw or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if s in ("missing", "none", ""):
+        return IMAGE_STATUS_MISSING
+    if s in ("needs_review", "needsreview", "review", "pending"):
+        return IMAGE_STATUS_NEEDS_REVIEW
+    if s in ("approved", "approve", "ok"):
+        return IMAGE_STATUS_APPROVED
+    if s in ("rejected", "reject", "skip", "skipped"):
+        return IMAGE_STATUS_REJECTED
+    if raw in IMAGE_STATUSES:
+        return str(raw)
+    return IMAGE_STATUS_MISSING
+
+
+def is_image_approved(record: dict[str, Any] | None) -> bool:
+    if not record:
+        return False
+    return normalize_image_status(record.get("image_status")) == IMAGE_STATUS_APPROVED
 
 
 def normalize_image_match_key(value: Any) -> str:
@@ -51,6 +94,46 @@ def _extension(name: str) -> str:
     return str(name[dot:]).lower()
 
 
+def _local_folder_for_item_class(item_class: str) -> str:
+    if str(item_class or "").strip().lower() == "asset":
+        return "assets"
+    return "inventory"
+
+
+def approved_local_filename(row: dict[str, Any]) -> str:
+    for field in ("model_number", "item_number", "sku", "item_code"):
+        val = str(row.get(field) or "").strip()
+        if val:
+            return _safe_filename(val) + ".jpg"
+    desc_key = description_image_match_key(row.get("description") or row.get("item_name") or row.get("asset_name"))
+    if desc_key:
+        return _safe_filename(desc_key) + ".jpg"
+    return "item-image.jpg"
+
+
+def save_approved_local_image(
+    row: dict[str, Any],
+    image_bytes: bytes,
+    filename: str,
+    *,
+    item_class: str = "Inventory",
+) -> Path | None:
+    """Save an approved copy under assets/item_images/inventory/ or assets/."""
+    folder = _local_folder_for_item_class(item_class)
+    root = Path(ROOT_DIR) / "assets" / "item_images" / folder
+    root.mkdir(parents=True, exist_ok=True)
+    out_name = approved_local_filename(row) if not filename else _safe_filename(filename)
+    if not out_name.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        out_name = approved_local_filename(row)
+    try:
+        data, _ = resize_item_image_bytes(image_bytes)
+        dest = root / out_name
+        dest.write_bytes(data)
+        return dest
+    except OSError:
+        return None
+
+
 def resize_item_image_bytes(data: bytes, *, max_side: int = _MAX_SIDE) -> tuple[bytes, str]:
     from PIL import Image
 
@@ -70,11 +153,19 @@ def item_image_storage_path(entity_type: str, record_id: str, filename: str) -> 
     if not safe.lower().endswith(".jpg"):
         safe = f"{safe.rsplit('.', 1)[0]}.jpg" if "." in safe else f"{safe}.jpg"
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    return f"{ITEM_IMAGES_PREFIX}/{entity_type}/{rid}/{ts}_{safe}"
+    et = str(entity_type or "").strip().lower()
+    if et in ("inventory", "inventory_items"):
+        folder = "inventory"
+    elif et in ("assets", "asset"):
+        folder = "assets"
+    else:
+        folder = "pricing_guide"
+    return f"{ITEM_IMAGES_PREFIX}/{folder}/{rid}/{ts}_{safe}"
 
 
 def record_has_item_image(record: dict[str, Any] | None) -> bool:
-    if not record:
+    """True only when an approved item photo exists."""
+    if not is_image_approved(record):
         return False
     if str(record.get("image_path") or "").strip():
         return True
@@ -87,7 +178,9 @@ def record_has_item_image(record: dict[str, Any] | None) -> bool:
 
 
 def can_apply_item_image(record: dict[str, Any] | None) -> bool:
-    return not record_has_item_image(record)
+    if not record:
+        return True
+    return not is_image_approved(record)
 
 
 def _bucket_for_image_path(path: str) -> str | None:
@@ -114,8 +207,10 @@ def clear_item_image_url_cache() -> None:
 
 
 def resolve_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:
-    """Resolve a viewable URL for an item photo (never QR PNG fields)."""
+    """Resolve a viewable URL for an approved item photo (never QR PNG fields)."""
     _ = expires_in
+    if not is_image_approved(record):
+        return None
     public = str(record.get("image_url") or record.get("photo_url") or "").strip()
     if public.startswith("http"):
         return public
@@ -164,42 +259,67 @@ def build_uploaded_image_index(
 
 
 def load_local_item_image_index(directory: Path | str | None = None) -> dict[str, tuple[str, bytes]]:
+    """Load approved local images from inventory/ and assets/ subfolders only."""
     root = Path(directory) if directory else (Path(ROOT_DIR) / "assets" / "item_images")
     if not root.is_dir():
         return {}
     pairs: list[tuple[str, bytes]] = []
-    for path in sorted(root.iterdir()):
-        if not path.is_file():
+    for sub in ("inventory", "assets"):
+        subdir = root / sub
+        if not subdir.is_dir():
             continue
-        if _extension(path.name) not in _ALLOWED_EXTENSIONS:
-            continue
-        try:
-            pairs.append((path.name, path.read_bytes()))
-        except OSError:
-            continue
+        for path in sorted(subdir.iterdir()):
+            if not path.is_file():
+                continue
+            if _extension(path.name) not in _ALLOWED_EXTENSIONS:
+                continue
+            try:
+                pairs.append((path.name, path.read_bytes()))
+            except OSError:
+                continue
     return build_uploaded_image_index(pairs)
+
+
+def find_image_match_for_row(
+    row: dict[str, Any],
+    index: dict[str, tuple[str, bytes]],
+) -> ImageMatchResult | None:
+    """Match uploaded/local images by model_number, item_number, sku, then description."""
+    if not index:
+        return None
+    field_order: tuple[tuple[str, str], ...] = (
+        ("model_number", "model_number"),
+        ("item_number", "item_number"),
+        ("sku", "sku"),
+        ("item_code", "model_number"),
+        ("item_code", "item_number"),
+    )
+    for field, row_key in field_order:
+        needle = normalize_image_match_key(row.get(row_key))
+        if not needle:
+            continue
+        hit = index.get(needle)
+        if hit:
+            filename, data = hit
+            return ImageMatchResult(filename=filename, data=data, matched_field=field, confidence="high")
+
+    desc_key = description_image_match_key(row.get("description") or row.get("item_name") or row.get("asset_name"))
+    if desc_key:
+        hit = index.get(desc_key)
+        if hit:
+            filename, data = hit
+            return ImageMatchResult(filename=filename, data=data, matched_field="description", confidence="low")
+    return None
 
 
 def find_image_bytes_for_row(
     row: dict[str, Any],
     index: dict[str, tuple[str, bytes]],
 ) -> tuple[str, bytes] | None:
-    if not index:
+    match = find_image_match_for_row(row, index)
+    if not match:
         return None
-    candidates: list[str] = []
-    for field in ("model_number", "item_number", "sku", "item_code"):
-        val = row.get(field)
-        key = normalize_image_match_key(val)
-        if key:
-            candidates.append(key)
-    desc_key = description_image_match_key(row.get("description") or row.get("item_name") or row.get("asset_name"))
-    if desc_key:
-        candidates.append(desc_key)
-    for key in candidates:
-        hit = index.get(key)
-        if hit:
-            return hit
-    return None
+    return match.filename, match.data
 
 
 def persist_item_image(
@@ -212,6 +332,7 @@ def persist_item_image(
     existing: dict[str, Any] | None = None,
     uploaded_by: str | None = None,
     force: bool = False,
+    image_status: str = IMAGE_STATUS_APPROVED,
 ) -> ServiceResult:
     rid = str(record_id or "").strip()
     if not rid:
@@ -234,12 +355,14 @@ def persist_item_image(
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc))
 
+    status = normalize_image_status(image_status)
     payload: dict[str, Any] = {
         "image_path": storage_path,
         "image_url": "",
         "image_file_name": filename,
         "image_mime_type": mime,
         "image_uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "image_status": status,
     }
     if table == "pricing_guide_items":
         payload["image_uploaded_by"] = uploaded_by or ""
@@ -250,3 +373,14 @@ def persist_item_image(
         return ServiceResult(ok=False, error=result.error or "Could not save image metadata.")
     clear_item_image_url_cache()
     return ServiceResult(ok=True, data={"image_path": storage_path, **payload})
+
+
+def set_image_status(table: str, record_id: str, status: str) -> ServiceResult:
+    rid = str(record_id or "").strip()
+    if not rid:
+        return ServiceResult(ok=False, error="Missing record id.")
+    st = normalize_image_status(status)
+    payload: dict[str, Any] = {"image_status": st}
+    if st == IMAGE_STATUS_MISSING:
+        payload["image_url"] = ""
+    return update_row(table, payload, {"id": rid})
