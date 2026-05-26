@@ -163,9 +163,9 @@ def item_image_storage_path(entity_type: str, record_id: str, filename: str) -> 
     return f"{ITEM_IMAGES_PREFIX}/{folder}/{rid}/{ts}_{safe}"
 
 
-def record_has_item_image(record: dict[str, Any] | None) -> bool:
-    """True only when an approved item photo exists."""
-    if not is_image_approved(record):
+def has_stored_item_image(record: dict[str, Any] | None) -> bool:
+    """True when any image metadata exists, regardless of approval status."""
+    if not record:
         return False
     if str(record.get("image_path") or "").strip():
         return True
@@ -175,6 +175,13 @@ def record_has_item_image(record: dict[str, Any] | None) -> bool:
     if url:
         return True
     return bool(str(record.get("photo_path") or "").strip())
+
+
+def record_has_item_image(record: dict[str, Any] | None) -> bool:
+    """True only when an approved item photo exists."""
+    if not is_image_approved(record):
+        return False
+    return has_stored_item_image(record)
 
 
 def can_apply_item_image(record: dict[str, Any] | None) -> bool:
@@ -206,10 +213,10 @@ def clear_item_image_url_cache() -> None:
     _signed_item_image_url_cached.cache_clear()
 
 
-def resolve_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:
-    """Resolve a viewable URL for an approved item photo (never QR PNG fields)."""
+def resolve_stored_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:
+    """Resolve a viewable URL for any stored item photo (never QR PNG fields)."""
     _ = expires_in
-    if not is_image_approved(record):
+    if not has_stored_item_image(record):
         return None
     public = str(record.get("image_url") or record.get("photo_url") or "").strip()
     if public.startswith("http"):
@@ -239,6 +246,14 @@ def resolve_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) ->
         except Exception:
             return None
     return None
+
+
+def resolve_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:
+    """Resolve a viewable URL for an approved item photo (never QR PNG fields)."""
+    _ = expires_in
+    if not is_image_approved(record):
+        return None
+    return resolve_stored_item_image_url(record, expires_in=expires_in)
 
 
 def build_uploaded_image_index(
@@ -373,6 +388,28 @@ def persist_item_image(
         return ServiceResult(ok=False, error=result.error or "Could not save image metadata.")
     clear_item_image_url_cache()
     return ServiceResult(ok=True, data={"image_path": storage_path, **payload})
+
+
+def clear_item_image(*, table: str, record_id: str) -> ServiceResult:
+    """Remove item photo metadata so the preview is cleared from lists and detail views."""
+    rid = str(record_id or "").strip()
+    if not rid:
+        return ServiceResult(ok=False, error="Missing record id.")
+    payload: dict[str, Any] = {
+        "image_path": "",
+        "image_url": "",
+        "image_file_name": "",
+        "image_mime_type": "",
+        "image_uploaded_at": None,
+        "image_status": IMAGE_STATUS_MISSING,
+    }
+    if table == "pricing_guide_items":
+        payload["image_uploaded_by"] = ""
+    result = update_row(table, payload, {"id": rid})
+    if not result.ok:
+        return ServiceResult(ok=False, error=result.error or "Could not remove image.")
+    clear_item_image_url_cache()
+    return ServiceResult(ok=True, data=payload)
 
 
 def set_image_status(table: str, record_id: str, status: str) -> ServiceResult:

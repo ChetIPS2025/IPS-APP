@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.components.asset_actions import render_asset_action_buttons
+    from app.components.item_photo_manager import render_item_photo_manager
     from app.components.headers import render_page_brand_header
     from app.components.table_filters import (
         apply_column_filters,
@@ -41,6 +42,10 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_assets_module_css
+    from app.services.asset_images import (
+        clear_asset_image,
+        upload_asset_image as upload_asset_image_file,
+    )
     from app.services.assets_service import (
         clear_assets_cache,
         ensure_asset_qr_tokens,
@@ -64,6 +69,7 @@ try:
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
 except ImportError:
     from components.asset_actions import render_asset_action_buttons  # type: ignore
+    from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -96,6 +102,10 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_assets_module_css  # type: ignore
+    from services.asset_images import (  # type: ignore
+        clear_asset_image,
+        upload_asset_image as upload_asset_image_file,
+    )
     from services.assets_service import (  # type: ignore
         clear_assets_cache,
         ensure_asset_qr_tokens,
@@ -282,16 +292,25 @@ def _current_user_id() -> str | None:
     return uid or None
 
 
+def _render_asset_photo_manager(asset: dict) -> None:
+    aid = str(asset.get("id") or "").strip()
+    rk = record_session_key(asset, "id", "asset_number")
+    render_item_photo_manager(
+        asset,
+        record_id=aid,
+        session_prefix=f"ast_photo_{rk}",
+        image_css_class="ips-asset-detail-image",
+        upload_image=upload_asset_image_file,
+        clear_image=clear_asset_image,
+        uploaded_by=_current_user_id(),
+        cache_key=_ASSETS_CACHE_KEY,
+        on_change=clear_assets_cache,
+        readonly=is_demo_id(aid),
+    )
+
+
 def _render_asset_detail_image(asset: dict) -> None:
-    image_url = get_asset_image_url(asset)
-    if image_url:
-        st.markdown(
-            f'<img class="ips-asset-detail-image" src="{html.escape(image_url, quote=True)}" '
-            f'alt="Asset image" />',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption("No asset image uploaded.")
+    _render_asset_photo_manager(asset)
 
 
 def _asset_select_key(asset_id: str) -> str:
@@ -722,12 +741,8 @@ def _render_asset_edit_form(asset: dict) -> None:
         st.text_input("Location", key=f"ast_edit_loc_{aid}")
         st.text_input("Serial", key=f"ast_edit_serial_{aid}")
 
-    st.file_uploader(
-        "Upload asset image",
-        type=["png", "jpg", "jpeg", "webp"],
-        key=f"ast_edit_image_{aid}",
-    )
-    st.caption("PNG, JPG, JPEG, or WEBP. Image is saved when you click Save Changes.")
+    st.markdown("**Item Photo**")
+    _render_asset_photo_manager(asset)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MOD,
@@ -750,15 +765,6 @@ def _render_asset_edit_form(asset: dict) -> None:
             row_id=aid,
         )
         if ok:
-            uploaded_file = st.session_state.get(f"ast_edit_image_{aid}")
-            if uploaded_file is not None and not is_demo_id(aid):
-                upload_result = upload_asset_image(
-                    aid,
-                    uploaded_file,
-                    uploaded_by=_current_user_id(),
-                )
-                if not upload_result.ok:
-                    st.warning(upload_result.error or "Asset saved, but image upload failed.")
             clear_assets_cache()
             set_view_mode(_MOD, rk)
             st.success(msg or "Asset saved.")
@@ -941,10 +947,8 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                 unsafe_allow_html=True,
             )
         with c4:
-            st.markdown(
-                f'<div class="ips-assets-summary-card"><h4>Image</h4>{_asset_image_html(asset)}</div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown("#### Image")
+            _render_asset_photo_manager(asset)
             _render_asset_qr_block(asset, aid)
 
         _render_asset_pricing_guide_section(asset)

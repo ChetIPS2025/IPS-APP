@@ -6,6 +6,7 @@ from typing import Any
 
 from app.services.item_images import (
     INVENTORY_IMAGE_BUCKET,
+    clear_item_image,
     clear_item_image_url_cache,
     persist_item_image,
     record_has_item_image,
@@ -16,6 +17,7 @@ from app.services.repository import ServiceResult
 
 __all__ = [
     "INVENTORY_IMAGE_BUCKET",
+    "clear_inventory_image",
     "clear_inventory_image_url_cache",
     "get_inventory_image_url",
     "inventory_has_image",
@@ -73,3 +75,6 @@ def upload_inventory_image(
         force=force,
     )
 
+
+def clear_inventory_image(item_id: str) -> ServiceResult:
+    return clear_item_image(table="inventory_items", record_id=item_id)

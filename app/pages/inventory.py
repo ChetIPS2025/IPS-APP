@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.components.inventory_actions import render_inventory_action_buttons
+    from app.components.item_photo_manager import render_item_photo_manager
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -45,6 +46,10 @@ try:
         inventory_qr_png_bytes,
         resolve_inventory_sku,
     )
+    from app.services.inventory_images import (
+        clear_inventory_image,
+        upload_inventory_image as upload_inventory_image_file,
+    )
     from app.services.inventory_service import (
         clear_inventory_cache,
         ensure_inventory_qr_tokens,
@@ -59,6 +64,7 @@ try:
     from app.utils.phone_helpers import format_phone_display
 except ImportError:
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
+    from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -94,6 +100,10 @@ except ImportError:
     from services.inventory_display_helpers import (  # type: ignore
         inventory_qr_png_bytes,
         resolve_inventory_sku,
+    )
+    from services.inventory_images import (  # type: ignore
+        clear_inventory_image,
+        upload_inventory_image as upload_inventory_image_file,
     )
     from services.inventory_service import (  # type: ignore
         clear_inventory_cache,
@@ -259,16 +269,25 @@ def _render_inventory_thumbnail(item: dict) -> None:
         )
 
 
+def _render_inventory_photo_manager(item: dict) -> None:
+    iid = str(item.get("id") or "").strip()
+    record_key = record_session_key(item, "id")
+    render_item_photo_manager(
+        item,
+        record_id=iid,
+        session_prefix=f"inv_photo_{record_key}",
+        image_css_class="ips-inventory-detail-image",
+        upload_image=upload_inventory_image_file,
+        clear_image=clear_inventory_image,
+        uploaded_by=_current_user_id(),
+        cache_key=_CACHE_KEY,
+        on_change=clear_inventory_cache,
+        readonly=is_demo_id(iid),
+    )
+
+
 def _render_inventory_detail_image(item: dict) -> None:
-    image_url = get_inventory_image_url(item)
-    if image_url:
-        st.markdown(
-            f'<img class="ips-inventory-detail-image" src="{html.escape(image_url, quote=True)}" '
-            f'alt="Inventory item image" />',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption("No item image uploaded.")
+    _render_inventory_photo_manager(item)
 
 
 def _inventory_select_key(item_id: str) -> str:
@@ -737,12 +756,8 @@ def _render_inventory_edit_form(item: dict) -> None:
         st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}")
         st.number_input("Unit cost", key=f"inv_edit_cost_{iid}")
 
-    st.file_uploader(
-        "Upload item image",
-        type=["png", "jpg", "jpeg", "webp"],
-        key=f"inv_edit_image_{iid}",
-    )
-    st.caption("PNG, JPG, JPEG, or WEBP. Image is saved when you click Save Changes.")
+    st.markdown("**Item Photo**")
+    _render_inventory_photo_manager(item)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -769,12 +784,6 @@ def _render_inventory_edit_form(item: dict) -> None:
         if not result.ok:
             st.error(result.error or "Could not save inventory item.")
             return
-
-        uploaded_file = st.session_state.get(f"inv_edit_image_{iid}")
-        if uploaded_file is not None:
-            upload_result = upload_inventory_image(iid, uploaded_file, uploaded_by=_current_user_id())
-            if not upload_result.ok:
-                st.warning(upload_result.error or "Item saved, but image upload failed.")
 
         clear_inventory_cache()
         set_view_mode(_MODULE, record_key)

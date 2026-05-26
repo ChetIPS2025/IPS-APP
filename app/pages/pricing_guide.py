@@ -12,6 +12,7 @@ try:
     from app.components.action_styles import danger_outline_button
     from app.components.modal_delete import modal_danger_zone, render_modal_delete_panel
     from app.components.headers import render_page_brand_header
+    from app.components.item_photo_manager import render_item_photo_manager
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -44,7 +45,7 @@ try:
     )
     from app.components.tabs import render_tabs
     from app.db import fetch_table, fetch_table_admin
-    from app.pages._core._crud import apply_persist_feedback
+    from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import load_assets, load_inventory
     from app.pages._core._session import select_key
     from app.services.pricing_guide_service import (
@@ -53,6 +54,7 @@ try:
         calc_sell_price,
         cached_pricing_guide_rows,
         class_pill_html,
+        clear_pricing_guide_cache,
         delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
@@ -72,6 +74,7 @@ try:
         import_catalog_with_review,
     )
     from app.services.pricing_guide_images import (
+        clear_pricing_guide_image,
         get_pricing_guide_image_url,
         upload_pricing_guide_image,
     )
@@ -82,6 +85,7 @@ except ImportError:
     from components.action_styles import danger_outline_button  # type: ignore
     from components.modal_delete import modal_danger_zone, render_modal_delete_panel  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
+    from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -114,7 +118,7 @@ except ImportError:
     )
     from components.tabs import render_tabs  # type: ignore
     from db import fetch_table, fetch_table_admin  # type: ignore
-    from pages._core._crud import apply_persist_feedback  # type: ignore
+    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import load_assets, load_inventory  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.pricing_guide_service import (  # type: ignore
@@ -123,6 +127,7 @@ except ImportError:
         calc_sell_price,
         cached_pricing_guide_rows,
         class_pill_html,
+        clear_pricing_guide_cache,
         delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
@@ -142,6 +147,7 @@ except ImportError:
         import_catalog_with_review,
     )
     from services.pricing_guide_images import (  # type: ignore
+        clear_pricing_guide_image,
         get_pricing_guide_image_url,
         upload_pricing_guide_image,
     )
@@ -341,16 +347,29 @@ def _render_pg_thumbnail(row: dict[str, Any]) -> None:
         )
 
 
+def _can_manage_pricing() -> bool:
+    return str(current_role() or "").strip().lower() in {"admin", "supervisor", "manager"}
+
+
+def _render_pg_photo_manager(row: dict[str, Any]) -> None:
+    rid = str(row.get("id") or "").strip()
+    rk = record_session_key(row, "id")
+    render_item_photo_manager(
+        row,
+        record_id=rid,
+        session_prefix=f"pg_photo_{rk}",
+        image_css_class="ips-pg-detail-image",
+        upload_image=upload_pricing_guide_image,
+        clear_image=clear_pricing_guide_image,
+        uploaded_by="",
+        cache_key=_CACHE_KEY,
+        on_change=clear_pricing_guide_cache,
+        readonly=not _can_manage_pricing() or is_demo_id(rid),
+    )
+
+
 def _render_pg_detail_image(row: dict[str, Any]) -> None:
-    image_url = get_pricing_guide_image_url(row)
-    if image_url:
-        st.markdown(
-            f'<img class="ips-pg-detail-image" src="{html.escape(image_url, quote=True)}" '
-            f'alt="Pricing item image" />',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption("No item image uploaded.")
+    _render_pg_photo_manager(row)
 
 
 def _render_custom_pricing_guide_table(
@@ -872,12 +891,8 @@ def _render_edit_form(row: dict[str, Any]) -> None:
 
     extra = _render_conditional_fields(f"pg_edit_{rk}", item_class, item_type)
     notes = st.text_area("Notes", value=str(row.get("notes") or ""), key=f"pg_edit_notes_{rk}")
-    st.file_uploader(
-        "Upload item image",
-        type=["png", "jpg", "jpeg", "webp"],
-        key=f"pg_edit_image_{rk}",
-    )
-    st.caption("PNG, JPG, JPEG, or WEBP. Saved when you click Save Changes. Won't replace an existing photo unless empty.")
+    st.markdown("**Item Photo**")
+    _render_pg_photo_manager(row)
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -905,24 +920,10 @@ def _render_edit_form(row: dict[str, Any]) -> None:
             },
             row_id=str(row.get("id") or ""),
         )
-        if ok:
-            uploaded_file = st.session_state.get(f"pg_edit_image_{rk}")
-            if uploaded_file is not None:
-                upload_result = upload_pricing_guide_image(
-                    str(row.get("id") or ""),
-                    uploaded_file,
-                    existing=row,
-                )
-                if not upload_result.ok:
-                    st.warning(upload_result.error or "Item saved, but image upload failed.")
         if apply_persist_feedback(ok, msg):
             set_view_mode(_MODULE, rk)
             st.rerun()
         st.error(msg or "Could not save pricing item.")
-
-
-def _can_manage_pricing() -> bool:
-    return str(current_role() or "").strip().lower() in {"admin", "supervisor", "manager"}
 
 
 def _render_pricing_actions_panel(row: dict) -> None:

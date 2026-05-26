@@ -6,6 +6,7 @@ from typing import Any
 
 from app.services.item_images import (
     can_apply_item_image,
+    clear_item_image,
     clear_item_image_url_cache,
     persist_item_image,
     record_has_item_image,
@@ -15,6 +16,7 @@ from app.services.repository import ServiceResult
 
 __all__ = [
     "can_apply_item_image",
+    "clear_pricing_guide_image",
     "clear_pricing_guide_image_cache",
     "get_pricing_guide_image_url",
     "pricing_guide_has_image",
@@ -59,3 +61,7 @@ def upload_pricing_guide_image(
         uploaded_by=uploaded_by,
         force=force,
     )
+
+
+def clear_pricing_guide_image(item_id: str) -> ServiceResult:
+    return clear_item_image(table="pricing_guide_items", record_id=item_id)

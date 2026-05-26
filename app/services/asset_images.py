@@ -6,6 +6,7 @@ from typing import Any
 
 from app.services.item_images import (
     ASSET_IMAGE_BUCKET,
+    clear_item_image,
     clear_item_image_url_cache,
     persist_item_image,
     record_has_item_image,
@@ -17,6 +18,7 @@ from app.services.repository import ServiceResult
 __all__ = [
     "ASSET_IMAGE_BUCKET",
     "asset_has_image",
+    "clear_asset_image",
     "clear_asset_image_url_cache",
     "get_asset_image_url",
     "resize_asset_image_bytes",
@@ -65,3 +67,7 @@ def upload_asset_image(
         uploaded_by=uploaded_by,
         force=force,
     )
+
+
+def clear_asset_image(asset_id: str) -> ServiceResult:
+    return clear_item_image(table="assets", record_id=asset_id)
