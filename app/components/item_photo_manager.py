@@ -53,6 +53,7 @@ def render_item_photo_manager(
     cache_key: str | None = None,
     on_change: Callable[[], None] | None = None,
     readonly: bool = False,
+    preview_record: dict[str, Any] | None = None,
 ) -> None:
     """Show current preview plus remove/replace actions without entering edit mode."""
     rid = str(record_id or "").strip()
@@ -60,8 +61,9 @@ def render_item_photo_manager(
         st.caption("Save this record before adding a photo.")
         return
 
-    image_url = resolve_stored_item_image_url(record)
-    status = normalize_image_status(record.get("image_status"))
+    preview = preview_record if isinstance(preview_record, dict) else record
+    image_url = resolve_stored_item_image_url(preview)
+    status = normalize_image_status(preview.get("image_status"))
     status_label = _STATUS_LABELS.get(status, status.replace("_", " ").title())
 
     if image_url:

@@ -76,6 +76,8 @@ try:
     from app.services.pricing_guide_images import (
         clear_pricing_guide_image,
         get_pricing_guide_image_url,
+        pricing_guide_display_record,
+        pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
     )
     from app.styles import inject_pricing_guide_module_css
@@ -149,6 +151,8 @@ except ImportError:
     from services.pricing_guide_images import (  # type: ignore
         clear_pricing_guide_image,
         get_pricing_guide_image_url,
+        pricing_guide_display_record,
+        pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
     )
     from styles import inject_pricing_guide_module_css  # type: ignore
@@ -354,6 +358,7 @@ def _can_manage_pricing() -> bool:
 def _render_pg_photo_manager(row: dict[str, Any]) -> None:
     rid = str(row.get("id") or "").strip()
     rk = record_session_key(row, "id")
+    display = pricing_guide_display_record(row)
     render_item_photo_manager(
         row,
         record_id=rid,
@@ -365,7 +370,16 @@ def _render_pg_photo_manager(row: dict[str, Any]) -> None:
         cache_key=_CACHE_KEY,
         on_change=clear_pricing_guide_cache,
         readonly=not _can_manage_pricing() or is_demo_id(rid),
+        preview_record=display,
     )
+    if pricing_guide_image_is_inherited(row):
+        item_class = str(row.get("item_class") or "").strip().lower()
+        if item_class == "asset":
+            st.caption("Photo from linked asset.")
+        elif item_class == "inventory":
+            st.caption("Photo from linked inventory item.")
+        else:
+            st.caption("Photo from linked catalog record.")
 
 
 def _render_pg_detail_image(row: dict[str, Any]) -> None:

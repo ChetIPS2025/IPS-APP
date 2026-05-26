@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.action_styles import success_solid_button
+    from app.components.action_styles import success_solid_button, warning_solid_button
     from app.pages._core._crud import is_demo_id
     from app.services.assets_service import (
         asset_include_in_pricing_guide,
@@ -24,7 +24,7 @@ try:
     )
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from components.action_styles import success_solid_button  # type: ignore
+    from components.action_styles import success_solid_button, warning_solid_button  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.assets_service import (  # type: ignore
         asset_include_in_pricing_guide,
@@ -111,6 +111,80 @@ def _create_pricing_item_from_asset(asset: dict[str, Any]) -> tuple[bool, str]:
     return True, msg
 
 
+def _handle_exclude_from_pricing_guide(
+    asset_id: str,
+    *,
+    on_change: Callable[[], None] | None,
+) -> bool:
+    result = set_asset_include_in_pricing_guide(asset_id, False)
+    if result.ok:
+        clear_assets_cache()
+        st.success("Removed from Pricing Guide.")
+        if on_change:
+            on_change()
+        return True
+    st.error(result.error or "Could not update asset.")
+    return False
+
+
+def _render_exclude_confirm_card(
+    *,
+    asset_id: str,
+    on_change: Callable[[], None] | None,
+) -> None:
+    confirm_key = _confirm_state_key(asset_id, "exclude")
+    st.markdown(
+        f'<div class="ips-confirm-card">'
+        f'<div class="ips-confirm-title">Remove from Pricing Guide</div>'
+        f'<div class="ips-confirm-text">This asset will stay in Assets but will no longer appear on '
+        f"the Pricing Guide or estimates catalog. You can include it again later.</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    btn_cancel, btn_confirm = st.columns(2, gap="small")
+    with btn_cancel:
+        if st.button("Cancel", key=f"asset_pg_exclude_cancel_{asset_id}", use_container_width=True):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+    with btn_confirm:
+        if warning_solid_button(
+            "Confirm Remove",
+            f"asset_pg_exclude_confirm_{asset_id}",
+            use_container_width=True,
+        ) and _handle_exclude_from_pricing_guide(asset_id, on_change=on_change):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+
+
+def _render_exclude_confirm_if_active(
+    *,
+    asset_id: str,
+    on_change: Callable[[], None] | None,
+) -> bool:
+    if st.session_state.get(_confirm_state_key(asset_id, "exclude")):
+        _render_exclude_confirm_card(asset_id=asset_id, on_change=on_change)
+        return True
+    return False
+
+
+def _render_remove_from_pricing_guide_button(
+    *,
+    asset_id: str,
+    asset_key: str,
+) -> None:
+    if not can_manage_asset_actions():
+        st.caption("Only admin, manager, or supervisor can change pricing guide settings.")
+        return
+
+    if warning_solid_button(
+        "Remove from Pricing Guide",
+        f"asset_pg_exclude_{asset_key}",
+        use_container_width=False,
+    ):
+        st.session_state[_confirm_state_key(asset_id, "exclude")] = True
+        st.rerun()
+
+
 def _render_confirm_link_card(*, asset_id: str, options: list[tuple[str, str]]) -> None:
     confirm_key = _confirm_state_key(asset_id, "link")
     st.markdown(
@@ -176,6 +250,9 @@ def render_asset_pricing_guide_actions(
                 st.error(result.error or "Could not update asset.")
             return
 
+        if _render_exclude_confirm_if_active(asset_id=aid, on_change=on_change):
+            return
+
         if linked:
             desc = html.escape(str(linked.get("description") or "Pricing item"))
             item_type = html.escape(str(linked.get("item_type") or ""))
@@ -187,6 +264,7 @@ def render_asset_pricing_guide_actions(
                 f"<br><span>Rate {rate}/hr · Sell {sell}</span></p>",
                 unsafe_allow_html=True,
             )
+            _render_remove_from_pricing_guide_button(asset_id=aid, asset_key=asset_key)
             return
 
         st.markdown(
@@ -232,3 +310,5 @@ def render_asset_pricing_guide_actions(
                 elif action == "link":
                     st.session_state[_confirm_state_key(aid, "link")] = True
                     st.rerun()
+
+        _render_remove_from_pricing_guide_button(asset_id=aid, asset_key=asset_key)
