@@ -10,7 +10,7 @@ from typing import Any, Callable
 import streamlit as st
 
 try:
-    from app.components.headers import render_page_header
+    from app.components.headers import render_page_brand_header
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.components.tabs import render_tabs
@@ -29,7 +29,7 @@ try:
     from app.styles import inject_global_css
     from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
 except ImportError:
-    from components.headers import render_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from components.tabs import render_tabs  # type: ignore
@@ -280,7 +280,11 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("reports", inject_css=False):
         return
-    render_page_header("Reports", "Operational summaries with CSV export.")
+    st.markdown(
+        '<span class="ips-reports-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    render_page_brand_header("Reports", "Operational summaries with CSV export.")
 
     tab = render_tabs(
         ["Financial", "Labor & Time", "Inventory & Assets", "Compliance"],

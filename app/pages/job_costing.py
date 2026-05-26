@@ -13,16 +13,14 @@ The UI also accepts optional column aliases if you add them later (``material_na
 Core rule: **Estimate = quote**, **Job = costing** — all costing rows use ``job_id`` only.
 """
 
+from contextlib import contextmanager
 from typing import Any
+import html
 
 import pandas as pd
 import streamlit as st
 
 from auth import current_role
-try:
-    from app.ui.page_shell import render_card, render_page_header
-except ImportError:
-    from ui.page_shell import render_card, render_page_header  # type: ignore
 
 from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
@@ -237,17 +235,35 @@ def _equipment_total(rows: list[dict]) -> float:
     return sum(_equipment_line_total(r) for r in rows)
 
 
-def _render_bordered_section(title: str) -> Any:
-    """Flat section with title (Job Costing / reports-style layout)."""
-    try:
-        from app.ui.page_shell import render_card
-    except ImportError:
-        from ui.page_shell import render_card  # type: ignore
-    return render_card(title=title)
+def _render_bordered_section(title: str):
+    """Flat section title matching the Phase 2 page shell."""
+    return _section_card(title=title)
+
+
+@contextmanager
+def _section_card(*, title: str | None = None):
+    st.markdown('<span class="ips-content-card-anchor ips-surface-soft"></span>', unsafe_allow_html=True)
+    if title:
+        st.markdown(f'<p class="ips-section-title">{html.escape(title)}</p>', unsafe_allow_html=True)
+    yield
 
 
 def render() -> None:
-    render_page_header(
+    try:
+        from app.pages._core._access import begin_module
+    except ImportError:
+        from pages._core._access import begin_module  # type: ignore
+    if not begin_module("job_costing"):
+        return
+    st.markdown(
+        '<span class="ips-job-costing-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    try:
+        from app.components.headers import render_page_brand_header
+    except ImportError:
+        from components.headers import render_page_brand_header  # type: ignore
+    render_page_brand_header(
         "Job Costing",
         "Costing by job — labor, materials, equipment, and estimate comparison.",
     )
@@ -384,7 +400,7 @@ def render() -> None:
     variance = (est_amt - total_job_cost) if est_amt is not None else None
 
     # --- Summary cards ---
-    with render_card(title="Summary"):
+    with _section_card(title="Summary"):
         st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("Labor cost", _money_str(labor_total))
@@ -535,7 +551,7 @@ def render() -> None:
         st.markdown(f"**Equipment total:** {_money_str(equipment_total)}")
 
     # --- Variance recap (compact) ---
-    with render_card(title="Totals & variance"):
+    with _section_card(title="Totals & variance"):
         st.markdown('<span class="ips-list-top-anchor"></span>', unsafe_allow_html=True)
         recap = pd.DataFrame(
             {

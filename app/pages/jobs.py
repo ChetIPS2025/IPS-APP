@@ -11,10 +11,18 @@ try:
     from app.components.job_actions import render_job_action_buttons
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
     from app.components.headers import render_page_brand_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
+    )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from app.pages._core._data import (
         customer_contact_select_options,
@@ -38,10 +46,18 @@ except ImportError:
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from pages._core._data import (  # type: ignore
         customer_filter_options,
@@ -91,6 +107,14 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("END DATE", None),
 ]
 _JOBS_DEFAULT_VIEW = "Active Jobs"
+_JOBS_VIEW_OPTIONS = [
+    "Active Jobs",
+    "All Jobs",
+    "Completed Jobs",
+    "Cancelled Jobs",
+    "Deleted/Archived Jobs",
+]
+_JOB_BAR_FILTER_FIELDS = ["customer", "supervisor", "status"]
 
 
 def _normalize_job_status(raw: object) -> str:
@@ -211,8 +235,30 @@ def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
     ]
 
 
-def _filter_jobs(rows: list[dict], *, view: str = _JOBS_DEFAULT_VIEW) -> list[dict]:
-    out = _apply_jobs_view_filter(rows, view)
+def _apply_jobs_search_filter(rows: list[dict], q: str) -> list[dict]:
+    query = str(q or "").strip()
+    if not query:
+        return rows
+    ql = query.lower()
+    return [
+        r
+        for r in rows
+        if ql in _job_number(r).lower()
+        or ql in _job_project(r).lower()
+        or ql in _job_customer(r).lower()
+        or ql in _job_supervisor(r).lower()
+    ]
+
+
+def _filter_jobs(
+    rows: list[dict],
+    *,
+    view: str | None = None,
+    q: str = "",
+) -> list[dict]:
+    view_val = str(view or st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW).strip()
+    out = _apply_jobs_view_filter(rows, view_val)
+    out = _apply_jobs_search_filter(out, q)
     return apply_column_filters(out, _TABLE_KEY, _JOB_COLUMN_FILTER_SPECS)
 
 
@@ -1130,9 +1176,44 @@ def render() -> None:
                     st.session_state.pop("ips_job_form", None)
                     st.rerun()
 
-    filtered = _filter_jobs(all_jobs)
+    def _filters() -> None:
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search job #, project, customer, supervisor…",
+                key="jobs_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "View",
+                _JOBS_VIEW_OPTIONS,
+                key="jobs_view",
+                label_visibility="collapsed",
+            )
+        with c3:
+            if st.button("Clear", key="jobs_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _JOB_BAR_FILTER_FIELDS,
+                    extra_keys=["jobs_search", "jobs_view"],
+                )
+                st.session_state["jobs_view"] = _JOBS_DEFAULT_VIEW
+                reset_table_page(_TABLE_KEY)
+                _clear_job_selection(st.session_state.get(_ALL_JOB_IDS_KEY))
+                st.rerun()
 
-    st.caption(f"{len(filtered)} job(s)")
+    layout_filter_bar(_filters)
+
+    filtered = _filter_jobs(
+        all_jobs,
+        q=str(st.session_state.get("jobs_search") or "").strip(),
+        view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
+    )
+
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="job")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     modal_cache = {
         str(job.get("id") or "").strip(): job
@@ -1147,7 +1228,8 @@ def render() -> None:
                 break
     st.session_state[CACHE_KEY] = modal_cache
 
-    _render_custom_jobs_table(filtered, filter_options=filter_options)
+    _render_custom_jobs_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_jobs_detail_modal()

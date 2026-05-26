@@ -10,10 +10,18 @@ import streamlit as st
 
 try:
     from app.components.headers import render_page_brand_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
+    )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from app.components.record_modal import (
         build_modal_cache,
@@ -62,10 +70,18 @@ try:
     from app.styles import inject_customers_module_css
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -249,6 +265,7 @@ def _customer_status_pill_html(status: str) -> str:
 _CUSTOMER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("status", lambda c: _normalize_customer_status(c.get("status"))),
 ]
+_CUSTOMER_BAR_FILTER_FIELDS = ["status"]
 
 
 def _customer_select_key(customer_id: str) -> str:
@@ -403,8 +420,44 @@ def _enrich_list_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _filter_customers(rows: list[dict]) -> list[dict]:
-    return apply_column_filters(rows, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
+def _apply_customers_search_filter(rows: list[dict], q: str) -> list[dict]:
+    query = str(q or "").strip()
+    if not query:
+        return rows
+    ql = query.lower()
+    return [
+        r
+        for r in rows
+        if ql in str(r.get("customer_name") or r.get("company_name") or "").lower()
+        or ql in str(r.get("customer_number") or "").lower()
+        or ql in str(r.get("city") or "").lower()
+        or ql in str(r.get("state") or "").lower()
+        or ql in str(r.get("main_email") or "").lower()
+        or ql in str(r.get("main_phone") or "").lower()
+    ]
+
+
+def _apply_customers_bar_status_filter(rows: list[dict], status: str) -> list[dict]:
+    status_val = str(status or "All Statuses").strip()
+    if not status_val or status_val == "All Statuses":
+        return rows
+    return [
+        r
+        for r in rows
+        if _normalize_customer_status(r.get("status")) == status_val
+        or str(r.get("status") or "").strip() == status_val
+    ]
+
+
+def _filter_customers(
+    rows: list[dict],
+    *,
+    q: str = "",
+    bar_status: str = "All Statuses",
+) -> list[dict]:
+    out = _apply_customers_search_filter(rows, q)
+    out = _apply_customers_bar_status_filter(out, bar_status)
+    return apply_column_filters(out, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
 
 
 def _location_name_map(locations: list[dict]) -> dict[str, dict]:
@@ -2436,12 +2489,48 @@ def render() -> None:
                     st.session_state.pop("ips_cust_form", None)
                     st.rerun()
 
-    filtered = _filter_customers(all_rows)
+    def _filters() -> None:
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search company, customer #, city, email…",
+                key="cust_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Status",
+                ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"],
+                key="cust_bar_status",
+                label_visibility="collapsed",
+            )
+        with c3:
+            if st.button("Clear", key="cust_clear", use_container_width=True):
+                clear_table_filters(
+                    _CUSTOMERS_TABLE_KEY,
+                    _CUSTOMER_BAR_FILTER_FIELDS,
+                    extra_keys=["cust_search", "cust_bar_status"],
+                )
+                st.session_state["cust_bar_status"] = "All Statuses"
+                reset_table_page(_CUSTOMERS_TABLE_KEY)
+                _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
+                st.rerun()
 
-    st.caption(f"{len(filtered)} customer(s)")
+    layout_filter_bar(_filters)
+
+    filtered = _filter_customers(
+        all_rows,
+        q=str(st.session_state.get("cust_search") or "").strip(),
+        bar_status=str(st.session_state.get("cust_bar_status") or "All Statuses"),
+    )
+
+    render_table_pagination_header(len(filtered), _CUSTOMERS_TABLE_KEY, item_label="customer")
+    page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_custom_customers_table(filtered, filter_options=filter_options)
+    _render_custom_customers_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
 
     selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
     if selected_customer_id and st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):
