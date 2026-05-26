@@ -17,27 +17,26 @@ try:
     )
     from app.components.record_modal import (
         build_modal_cache,
-        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
-        edit_mode_key,
-        is_edit_mode,
         placeholder_html,
         record_session_key,
-        render_edit_form_header,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
         render_missing_record,
-        render_save_cancel_actions,
-        set_edit_mode,
-        set_view_mode,
     )
     from app.pages._core._data import (
         default_weekly_grid,
         job_options_for_timekeeping,
+        load_timekeeping_grid,
         load_timekeeping_summaries,
+        persist_timekeeping_approve,
+        persist_timekeeping_days,
+        persist_timekeeping_reject,
+        persist_timekeeping_submit,
+        persist_timekeeping_week,
     )
     from app.pages._core._session import select_key
     from app.styles import inject_timekeeping_module_css
@@ -52,27 +51,26 @@ except ImportError:
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
-        clear_edit_modes,
         clear_record_modal,
         detail_field_html,
         dialog_card_html,
-        edit_mode_key,
-        is_edit_mode,
         placeholder_html,
         record_session_key,
-        render_edit_form_header,
         render_modal_header,
         render_modal_meta_grid,
         render_modal_shell,
         render_missing_record,
-        render_save_cancel_actions,
-        set_edit_mode,
-        set_view_mode,
     )
     from pages._core._data import (  # type: ignore
         default_weekly_grid,
         job_options_for_timekeeping,
+        load_timekeeping_grid,
         load_timekeeping_summaries,
+        persist_timekeeping_approve,
+        persist_timekeeping_days,
+        persist_timekeeping_reject,
+        persist_timekeeping_submit,
+        persist_timekeeping_week,
     )
     from pages._core._session import select_key  # type: ignore
     from styles import inject_timekeeping_module_css  # type: ignore
@@ -118,6 +116,65 @@ _DAY_GRID_LABELS = [
     "Total (Hrs)",
     "Notes",
 ]
+
+
+def _timecard_is_editable(status: str) -> bool:
+    return status in ("Draft", "Pending", "Rejected")
+
+
+def _db_status_for_save(status: str) -> str:
+    normalized = _normalize_timecard_status(status)
+    if normalized == "Approved":
+        return "Approved"
+    if normalized == "Rejected":
+        return "Rejected"
+    return "Pending"
+
+
+def _current_user_id() -> str | None:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    uid = str(current_profile().get("id") or "").strip()
+    return uid or None
+
+
+def _current_user_name() -> str:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    profile = current_profile()
+    return str(profile.get("name") or profile.get("email") or "User").strip() or "User"
+
+
+def _can_approve_timekeeping() -> bool:
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import can_approve_timekeeping
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import can_approve_timekeeping  # type: ignore
+    return can_approve_timekeeping(current_role())
+
+
+def _patch_timecard_cache(emp: dict, week_start_d: date, updates: dict[str, Any]) -> None:
+    tid = _timecard_id_for_row(emp, week_start_d)
+    cache = st.session_state.get(_CACHE_KEY) or {}
+    if not isinstance(cache, dict):
+        return
+    existing = cache.get(tid)
+    if isinstance(existing, dict):
+        cache[tid] = {**existing, **updates}
+        st.session_state[_CACHE_KEY] = cache
+
+
+def _invalidate_weekly_grid(emp: dict, week_start_d: date) -> None:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    gk = _grid_key(eid)
+    st.session_state.pop(gk, None)
+    st.session_state.pop(f"{gk}_week", None)
 
 
 def _current_week_start() -> date:
@@ -237,7 +294,6 @@ def _on_timecard_checkbox_change(timecard_id: str, all_timecard_ids: list[str]) 
 def _clear_timecard_modal() -> None:
     timecard_ids = st.session_state.get(_ALL_TIMECARD_IDS_KEY) or []
     _clear_timecard_selection([str(tid) for tid in timecard_ids])
-    clear_edit_modes(_MODULE)
     clear_record_modal(
         table_key=_TABLE_KEY,
         session_select_key=_SEL,
@@ -270,7 +326,10 @@ def _ensure_weekly_grid(emp: dict, week_start_d: date) -> list[dict]:
     gk = _grid_key(eid)
     week_sig = week_start_d.isoformat()
     if st.session_state.get(f"{gk}_week") != week_sig:
-        st.session_state[gk] = default_weekly_grid(eid, week_start_d)
+        try:
+            st.session_state[gk] = load_timekeeping_grid(eid, week_start_d)
+        except Exception:
+            st.session_state[gk] = default_weekly_grid(eid, week_start_d)
         st.session_state[f"{gk}_week"] = week_sig
     return st.session_state[gk]
 
@@ -433,29 +492,182 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     st.session_state[gk] = grid
 
 
-def _save_timekeeping_week(emp: dict, week_start_d: date) -> None:
+def _save_timekeeping_week(
+    emp: dict,
+    week_start_d: date,
+    *,
+    status: str | None = None,
+    show_message: bool = True,
+) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     grid = _ensure_weekly_grid(emp, week_start_d)
-    try:
-        from app.pages._core._data import persist_timekeeping_days, persist_timekeeping_week
-    except ImportError:
-        from pages._core._data import persist_timekeeping_days, persist_timekeeping_week  # type: ignore
+    current_status = _normalize_timecard_status(emp.get("status"))
+    save_status = _db_status_for_save(status or current_status)
     summary = {
         "st_total": sum(float(r.get("st") or 0) for r in grid),
         "ot_total": sum(float(r.get("ot") or 0) for r in grid),
         "dt_total": sum(float(r.get("dt") or 0) for r in grid),
-        "status": str(emp.get("status") or "Pending"),
+        "status": save_status,
+        "notes": str(emp.get("notes") or ""),
     }
     ok, msg = persist_timekeeping_week(eid, week_start_d, summary)
-    if ok:
-        ok2, msg2 = persist_timekeeping_days(eid, week_start_d, grid)
-        if ok2:
-            st.success(msg)
-        else:
-            detail = f" {msg2}" if msg2 else ""
-            st.warning(f"Week totals were saved, but daily entry details could not be saved.{detail}")
-    else:
+    if not ok:
         st.error(msg)
+        return False
+    ok2, msg2 = persist_timekeeping_days(eid, week_start_d, grid)
+    if ok2:
+        _patch_timecard_cache(
+            emp,
+            week_start_d,
+            {
+                **summary,
+                "status": _normalize_timecard_status(save_status),
+                "total_hours": summary["st_total"] + summary["ot_total"] + summary["dt_total"],
+            },
+        )
+        _invalidate_weekly_grid(emp, week_start_d)
+        if show_message:
+            st.success(msg)
+        return True
+    detail = f" {msg2}" if msg2 else ""
+    st.warning(f"Week totals were saved, but daily entry details could not be saved.{detail}")
+    return False
+
+
+def _submit_timekeeping_week(emp: dict, week_start_d: date) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    if not _save_timekeeping_week(emp, week_start_d, status="Pending", show_message=False):
+        return False
+    ok, msg = persist_timekeeping_submit(eid, week_start_d)
+    if ok:
+        _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _approve_timekeeping_week(emp: dict, week_start_d: date) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    ok, msg = persist_timekeeping_approve(eid, week_start_d, approved_by=approver)
+    if ok:
+        _patch_timecard_cache(
+            emp,
+            week_start_d,
+            {
+                "status": "Approved",
+                "approved_by": approver,
+                "approved_at": fmt_date(date.today()),
+            },
+        )
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    ok, msg = persist_timekeeping_reject(
+        eid,
+        week_start_d,
+        approved_by=approver,
+        notes=notes,
+    )
+    if ok:
+        _patch_timecard_cache(
+            emp,
+            week_start_d,
+            {
+                "status": "Rejected",
+                "notes": notes,
+                "approved_by": approver,
+            },
+        )
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
+    status = _normalize_timecard_status(emp.get("status"))
+    if _timecard_is_editable(status):
+        _render_weekly_grid_edit(emp, week_start_d)
+        action_left, action_right = st.columns([1, 1])
+        record_key = record_session_key(emp, "id")
+        with action_left:
+            if st.button("Save Hours", key=f"tk_save_hours_{record_key}", type="primary"):
+                if _save_timekeeping_week(emp, week_start_d):
+                    st.rerun()
+        with action_right:
+            if status in ("Draft", "Rejected") and st.button(
+                "Submit for Approval",
+                key=f"tk_submit_{record_key}",
+            ):
+                if _submit_timekeeping_week(emp, week_start_d):
+                    st.rerun()
+        if status == "Pending":
+            st.caption("Hours can still be edited while pending approval. Save changes, then wait for a supervisor to approve.")
+        elif status == "Rejected":
+            st.caption("This timecard was rejected. Update the hours and submit again for approval.")
+    else:
+        _render_weekly_grid_readonly(emp, week_start_d)
+        st.info("This week is approved and locked.")
+
+
+def _render_approval_tab(emp: dict, week_start_d: date) -> None:
+    status = _normalize_timecard_status(emp.get("status"))
+    approved_at = str(emp.get("approved_at") or "").strip()
+    notes = str(emp.get("notes") or "").strip()
+    st.markdown(
+        dialog_card_html(
+            "Approval Status",
+            f'<div class="ips-detail-grid">'
+            f'{detail_field_html("Status", status, html_value=_timecard_status_pill_html(status))}'
+            f"{detail_field_html('Employee', emp.get('name') or emp.get('employee_name'))}"
+            f"{detail_field_html('Week', f'{fmt_date(week_start_d)} – {fmt_date(week_end(week_start_d))}')}"
+            f"{detail_field_html('Reviewed At', fmt_date(approved_at) if approved_at else '—')}"
+            f"{detail_field_html('Reviewer Notes', notes or '—')}"
+            f"</div>",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if status == "Pending" and _can_approve_timekeeping():
+        reject_notes = st.text_area(
+            "Rejection notes (optional)",
+            key=f"tk_reject_notes_{record_session_key(emp, 'id')}",
+            height=80,
+            placeholder="Explain what needs to be corrected…",
+        )
+        approve_col, reject_col = st.columns(2)
+        with approve_col:
+            if st.button("Approve Timecard", key=f"tk_approve_{record_session_key(emp, 'id')}", type="primary"):
+                if _approve_timekeeping_week(emp, week_start_d):
+                    st.rerun()
+        with reject_col:
+            if st.button("Reject Timecard", key=f"tk_reject_{record_session_key(emp, 'id')}"):
+                if _reject_timekeeping_week(emp, week_start_d, reject_notes):
+                    st.rerun()
+    elif status == "Pending":
+        st.caption("Waiting for supervisor approval.")
+    elif status == "Draft":
+        st.caption("Enter hours on the Daily Entries tab, then submit for approval.")
+    elif status == "Rejected":
+        st.caption("Update hours on the Daily Entries tab and submit again for approval.")
+    elif status == "Approved":
+        st.caption(f"Approved by {_current_user_name() if not approved_at else 'supervisor'}.")
 
 
 def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
@@ -481,52 +693,32 @@ def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
         st.markdown(dialog_card_html("Week Summary", overview_html), unsafe_allow_html=True)
 
     with tab_daily:
-        _render_weekly_grid_readonly(emp, week_start_d)
+        _render_daily_entries_tab(emp, week_start_d)
 
     with tab_approval:
-        st.markdown(
-            dialog_card_html(
-                "Approval Status",
-                f'<div class="ips-detail-grid">'
-                f'{detail_field_html("Status", status, html_value=_timecard_status_pill_html(status))}'
-                f"{detail_field_html('Employee', emp.get('name') or emp.get('employee_name'))}"
-                f"{detail_field_html('Week', f'{fmt_date(week_start_d)} – {fmt_date(week_end(week_start_d))}')}"
-                f"</div>",
-            ),
-            unsafe_allow_html=True,
-        )
-        placeholder_html("Approval workflow history will appear here when connected to Supabase.")
+        _render_approval_tab(emp, week_start_d)
 
     with tab_notes:
-        placeholder_html("Timekeeping notes and approval history will appear here when connected to Supabase.")
+        note_text = str(emp.get("notes") or "").strip()
+        if note_text:
+            st.markdown(dialog_card_html("Notes", detail_field_html("Notes", note_text)), unsafe_allow_html=True)
+        else:
+            placeholder_html("No notes on this timecard yet.")
 
     with tab_activity:
-        placeholder_html("Timecard activity log will appear here when connected to Supabase.")
-
-
-def _render_timekeeping_edit_form(emp: dict, week_start_d: date) -> None:
-    record_key = record_session_key(emp, "id")
-    render_edit_form_header("Edit Weekly Time")
-    _render_weekly_grid_edit(emp, week_start_d)
-    cancelled, saved = render_save_cancel_actions(
-        module=_MODULE,
-        record_key=record_key,
-        cancel_key=f"tk_edit_cancel_{record_key}",
-        save_key=f"tk_edit_save_{record_key}",
-    )
-    if cancelled:
-        st.rerun()
-    if saved:
-        _save_timekeeping_week(emp, week_start_d)
-        set_view_mode(_MODULE, record_key)
-        st.rerun()
+        activity_lines: list[str] = []
+        if approved_at := str(emp.get("approved_at") or "").strip():
+            activity_lines.append(f"{fmt_date(approved_at)} — Status changed to {status}")
+        if activity_lines:
+            st.markdown(
+                dialog_card_html("Activity", "".join(detail_field_html("Event", line) for line in activity_lines)),
+                unsafe_allow_html=True,
+            )
+        else:
+            placeholder_html("Activity will appear after approval actions are recorded.")
 
 
 def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
-    record_key = record_session_key(emp, "id")
-    st.session_state.setdefault(edit_mode_key(_MODULE, record_key), False)
-    edit_mode = is_edit_mode(_MODULE, record_key)
-
     st_total, ot_total, dt_total, total = _emp_totals(emp)
     status = _normalize_timecard_status(emp.get("status"))
     render_modal_shell()
@@ -535,12 +727,6 @@ def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
         subtitle=str(emp.get("department") or ""),
         status=status,
     )
-    if not edit_mode:
-        st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-        _action_left, action_right = st.columns([8, 1], gap="small")
-        with action_right:
-            if st.button("Edit Week", key=f"tk_modal_{record_key}_edit", type="primary"):
-                set_edit_mode(_MODULE, record_key)
     render_modal_meta_grid(
         [
             ("Week", f"{fmt_date(week_start_d)} – {fmt_date(week_end(week_start_d))}"),
@@ -550,11 +736,7 @@ def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
             ("Total Hours", _fmt_table_hours(total)),
         ]
     )
-
-    if edit_mode:
-        _render_timekeeping_edit_form(emp, week_start_d)
-    else:
-        _render_timekeeping_view_tabs(emp, week_start_d)
+    _render_timekeeping_view_tabs(emp, week_start_d)
 
 
 @st.dialog("Timecard Details", width="large", on_dismiss=_clear_timecard_modal)

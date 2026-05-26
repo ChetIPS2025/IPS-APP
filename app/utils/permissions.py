@@ -132,6 +132,11 @@ def can_manage_weekly_timesheets(role: str) -> bool:
     return normalize_role(role) in {"admin", "supervisor", "project manager"}
 
 
+def can_approve_timekeeping(role: str) -> bool:
+    """Approve or reject employee weekly timecards."""
+    return can_manage_weekly_timesheets(role)
+
+
 def filter_nav_for_role(
     nav: Iterable[tuple[str, str, str]], role: str
 ) -> list[tuple[str, str, str]]:

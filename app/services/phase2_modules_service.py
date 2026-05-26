@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 try:
@@ -599,7 +599,8 @@ def normalize_task(row: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_timekeeping_summary(row: dict[str, Any], week_start: date) -> dict[str, Any]:
     return {
-        "id": str(row.get("id") or row.get("employee_id") or ""),
+        "id": str(row.get("employee_id") or row.get("id") or ""),
+        "week_id": str(row.get("id") or ""),
         "name": str(row.get("name") or row.get("employee_name") or ""),
         "department": str(row.get("department") or ""),
         "week_start": str(row.get("week_start") or week_start.isoformat())[:10],
@@ -607,6 +608,9 @@ def normalize_timekeeping_summary(row: dict[str, Any], week_start: date) -> dict
         "ot_total": float(row.get("ot_total") or 0),
         "dt_total": float(row.get("dt_total") or 0),
         "status": str(row.get("status") or "Pending"),
+        "approved_by": str(row.get("approved_by") or ""),
+        "approved_at": str(row.get("approved_at") or "")[:19],
+        "notes": str(row.get("notes") or ""),
     }
 
 
@@ -747,6 +751,35 @@ def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) 
             return [normalize_timekeeping_summary(r, week_start) for r in filtered], False
         return [normalize_timekeeping_summary(r, week_start) for r in rows], False
     return [normalize_timekeeping_summary(r, week_start) for r in demo], True
+
+
+def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, Any]]:
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return []
+    ws = week_start.isoformat()
+    rows, err = fetch_rows("employee_timekeeping_days", limit=100, order_by="work_date")
+    if err:
+        return []
+    return [
+        r
+        for r in rows
+        if str(r.get("employee_id") or "") == eid and str(r.get("week_start") or "")[:10] == ws
+    ]
+
+
+def _find_timekeeping_week(employee_id: str, week_start: date) -> dict[str, Any] | None:
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return None
+    ws = week_start.isoformat()
+    rows, err = fetch_rows("employee_timekeeping_weeks", limit=500)
+    if err:
+        return None
+    for row in rows:
+        if str(row.get("employee_id") or "") == eid and str(row.get("week_start") or "")[:10] == ws:
+            return row
+    return None
 
 
 # --- Writes (map UI -> DB) ---
@@ -1175,19 +1208,78 @@ def save_timekeeping_week(employee_id: str, week_start: date, ui_summary: dict[s
         "status": ui_summary.get("status") or "Pending",
         "notes": ui_summary.get("notes") or "",
     }
-    rows, err = fetch_rows("employee_timekeeping_weeks", limit=500)
-    existing: dict[str, Any] | None = None
-    if not err:
-        for r in rows:
-            if (
-                str(r.get("employee_id")) == str(employee_id)
-                and str(r.get("week_start") or "")[:10] == week_start.isoformat()
-            ):
-                existing = r
-                break
+    existing = _find_timekeeping_week(employee_id, week_start)
     if existing and existing.get("id"):
-        return update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
-    return insert_row("employee_timekeeping_weeks", payload)
+        result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
+    else:
+        result = insert_row("employee_timekeeping_weeks", payload)
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def submit_timekeeping_week(employee_id: str, week_start: date) -> ServiceResult:
+    existing = _find_timekeeping_week(employee_id, week_start)
+    if not existing:
+        return ServiceResult(ok=False, error="Save hours before submitting for approval.")
+    payload = {
+        "status": "Pending",
+        "approved_by": None,
+        "approved_at": None,
+    }
+    result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def approve_timekeeping_week(employee_id: str, week_start: date, *, approved_by: str) -> ServiceResult:
+    existing = _find_timekeeping_week(employee_id, week_start)
+    if not existing:
+        return ServiceResult(ok=False, error="No timecard found for this week.")
+    if str(existing.get("status") or "") != "Pending":
+        return ServiceResult(ok=False, error="Only pending timecards can be approved.")
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    payload = {
+        "status": "Approved",
+        "approved_by": approver,
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def reject_timekeeping_week(
+    employee_id: str,
+    week_start: date,
+    *,
+    approved_by: str,
+    notes: str = "",
+) -> ServiceResult:
+    existing = _find_timekeeping_week(employee_id, week_start)
+    if not existing:
+        return ServiceResult(ok=False, error="No timecard found for this week.")
+    if str(existing.get("status") or "") != "Pending":
+        return ServiceResult(ok=False, error="Only pending timecards can be rejected.")
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    payload: dict[str, Any] = {
+        "status": "Rejected",
+        "approved_by": approver,
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    note = str(notes or "").strip()
+    if note:
+        payload["notes"] = note
+    result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
+    if result.ok:
+        clear_all_data_caches()
+    return result
 
 
 def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
