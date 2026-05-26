@@ -9,23 +9,31 @@ from __future__ import annotations
 from datetime import date
 
 from app.services.phase2_modules_service import (
+    approve_timekeeping_day,
     approve_timekeeping_week,
     list_timekeeping_days,
     list_timekeeping_summaries,
     normalize_timekeeping_summary,
+    reject_timekeeping_day,
     reject_timekeeping_week,
     save_timekeeping_day,
     save_timekeeping_week,
+    submit_timekeeping_day,
     submit_timekeeping_week,
+    sync_timekeeping_week_from_days,
 )
 
 __all__ = [
+    "approve_timekeeping_day",
     "approve_timekeeping_week",
     "list_timekeeping_days",
     "list_timekeeping_summaries",
     "normalize_timekeeping_summary",
+    "reject_timekeeping_day",
     "reject_timekeeping_week",
     "save_timekeeping_day",
     "save_timekeeping_week",
+    "submit_timekeeping_day",
     "submit_timekeeping_week",
+    "sync_timekeeping_week_from_days",
 ]

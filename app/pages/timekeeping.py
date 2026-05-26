@@ -34,6 +34,9 @@ try:
         load_timekeeping_summaries,
         persist_timekeeping_approve,
         persist_timekeeping_days,
+        persist_timekeeping_day_approve,
+        persist_timekeeping_day_reject,
+        persist_timekeeping_day_submit,
         persist_timekeeping_reject,
         persist_timekeeping_submit,
         persist_timekeeping_week,
@@ -68,6 +71,9 @@ except ImportError:
         load_timekeeping_summaries,
         persist_timekeeping_approve,
         persist_timekeeping_days,
+        persist_timekeeping_day_approve,
+        persist_timekeeping_day_reject,
+        persist_timekeeping_day_submit,
         persist_timekeeping_reject,
         persist_timekeeping_submit,
         persist_timekeeping_week,
@@ -105,7 +111,7 @@ _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("week_start", lambda r: fmt_date(r.get("week_start"))),
     ("status", lambda r: _normalize_timecard_status(r.get("status"))),
 ]
-_DAY_GRID_COLS = [0.55, 0.7, 2.0, 0.75, 0.75, 0.75, 0.75, 1.3]
+_DAY_GRID_COLS = [0.5, 0.65, 1.6, 0.65, 0.65, 0.65, 0.65, 0.85, 1.0, 1.0, 0.3]
 _DAY_GRID_LABELS = [
     "Day",
     "Date",
@@ -114,12 +120,94 @@ _DAY_GRID_LABELS = [
     "OT (Hrs)",
     "DT (Hrs)",
     "Total (Hrs)",
+    "Status",
+    "Actions",
     "Notes",
 ]
 
 
 def _timecard_is_editable(status: str) -> bool:
     return status in ("Draft", "Pending", "Rejected")
+
+
+def _day_is_editable(status: str) -> bool:
+    return _normalize_timecard_status(status) in ("Draft", "Pending", "Rejected")
+
+
+def _default_st_for_day_index(day_index: int) -> float:
+    return 10.0 if 0 <= day_index < 4 else 0.0
+
+
+def _row_has_hours(row: dict[str, Any]) -> bool:
+    return (
+        float(row.get("st") or 0)
+        + float(row.get("ot") or 0)
+        + float(row.get("dt") or 0)
+    ) > 0
+
+
+def _ensure_day_id(emp: dict, week_start_d: date, row_index: int) -> str:
+    day_id = str(_ensure_weekly_grid(emp, week_start_d)[row_index].get("day_id") or "").strip()
+    if day_id:
+        return day_id
+    if _save_timekeeping_week(emp, week_start_d, show_message=False):
+        return str(_ensure_weekly_grid(emp, week_start_d)[row_index].get("day_id") or "").strip()
+    return ""
+
+
+def _handle_day_submit(emp: dict, week_start_d: date, row_index: int) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    day_id = _ensure_day_id(emp, week_start_d, row_index)
+    if not day_id:
+        st.error("Save the day before submitting for approval.")
+        return False
+    ok, msg = persist_timekeeping_day_submit(day_id, eid, week_start_d)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_day_approve(emp: dict, week_start_d: date, row_index: int) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    day_id = _ensure_day_id(emp, week_start_d, row_index)
+    if not day_id:
+        st.error("Save the day before approving.")
+        return False
+    ok, msg = persist_timekeeping_day_approve(day_id, eid, week_start_d, approved_by=approver)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_day_reject(emp: dict, week_start_d: date, row_index: int) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    day_id = _ensure_day_id(emp, week_start_d, row_index)
+    if not day_id:
+        st.error("Save the day before rejecting.")
+        return False
+    ok, msg = persist_timekeeping_day_reject(day_id, eid, week_start_d, approved_by=approver)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Rejected"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
 
 
 def _db_status_for_save(status: str) -> str:
@@ -390,10 +478,28 @@ def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
         with c[7]:
+            day_status = _normalize_timecard_status(row.get("status"))
+            st.markdown(_timecard_status_pill_html(day_status), unsafe_allow_html=True)
+        with c[8]:
+            st.markdown('<div class="ips-time-day-row">—</div>', unsafe_allow_html=True)
+        with c[9]:
             st.markdown(
                 f'<div class="ips-time-day-row">{html.escape(str(row.get("notes") or "—"))}</div>',
                 unsafe_allow_html=True,
             )
+
+
+def _week_status_from_grid(grid: list[dict[str, Any]]) -> str:
+    active = [_normalize_timecard_status(row.get("status")) for row in grid if _row_has_hours(row)]
+    if not active:
+        return "Draft"
+    if all(status == "Approved" for status in active):
+        return "Approved"
+    if any(status == "Rejected" for status in active):
+        return "Rejected"
+    if any(status == "Pending" for status in active):
+        return "Pending"
+    return "Draft"
 
 
 def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
@@ -402,8 +508,9 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     week_sig = week_start_d.isoformat()
     grid = _ensure_weekly_grid(emp, week_start_d)
     job_opts = job_options_for_timekeeping()
+    can_approve = _can_approve_timekeeping()
 
-    edit_cols = [0.55, 0.7, 2.0, 0.75, 0.75, 0.75, 0.75, 1.3, 0.35]
+    edit_cols = [0.5, 0.65, 1.6, 0.65, 0.65, 0.65, 0.65, 0.85, 1.0, 1.0, 0.3]
     header = st.columns(edit_cols)
     labels = [* _DAY_GRID_LABELS, ""]
     for col, lbl in zip(header, labels):
@@ -414,6 +521,8 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
             )
 
     for i, row in enumerate(grid):
+        day_status = _normalize_timecard_status(row.get("status"))
+        row_editable = _day_is_editable(day_status)
         c = st.columns(edit_cols)
         with c[0]:
             st.markdown(
@@ -434,6 +543,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 index=idx,
                 key=f"tk_job_{eid}_{week_sig}_{i}",
                 label_visibility="collapsed",
+                disabled=not row_editable,
             )
         with c[3]:
             grid[i]["st"] = st.number_input(
@@ -443,6 +553,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 label_visibility="collapsed",
                 step=0.5,
                 format="%.2f",
+                disabled=not row_editable,
             )
         with c[4]:
             grid[i]["ot"] = st.number_input(
@@ -452,6 +563,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 label_visibility="collapsed",
                 step=0.5,
                 format="%.2f",
+                disabled=not row_editable,
             )
         with c[5]:
             grid[i]["dt"] = st.number_input(
@@ -461,6 +573,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 label_visibility="collapsed",
                 step=0.5,
                 format="%.2f",
+                disabled=not row_editable,
             )
         with c[6]:
             row_total = (
@@ -473,20 +586,44 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
         with c[7]:
+            st.markdown(_timecard_status_pill_html(day_status), unsafe_allow_html=True)
+            grid[i]["status"] = day_status
+        with c[8]:
+            action_taken = False
+            if row_editable and _row_has_hours(row):
+                if day_status in ("Draft", "Rejected") and st.button(
+                    "Submit",
+                    key=f"tk_day_submit_{eid}_{week_sig}_{i}",
+                    use_container_width=True,
+                ):
+                    action_taken = _handle_day_submit(emp, week_start_d, i)
+                elif day_status == "Pending" and can_approve:
+                    approve_col, reject_col = st.columns(2)
+                    with approve_col:
+                        if st.button("OK", key=f"tk_day_ok_{eid}_{week_sig}_{i}", use_container_width=True):
+                            action_taken = _handle_day_approve(emp, week_start_d, i)
+                    with reject_col:
+                        if st.button("No", key=f"tk_day_no_{eid}_{week_sig}_{i}", use_container_width=True):
+                            action_taken = _handle_day_reject(emp, week_start_d, i)
+            if action_taken:
+                st.rerun()
+        with c[9]:
             grid[i]["notes"] = st.text_input(
                 "Notes",
                 value=str(row.get("notes") or ""),
                 key=f"tk_notes_{eid}_{week_sig}_{i}",
                 label_visibility="collapsed",
                 placeholder="Add notes...",
+                disabled=not row_editable,
             )
-        with c[8]:
-            if st.button("🗑", key=f"tk_del_{eid}_{week_sig}_{i}", help="Clear row"):
+        with c[10]:
+            if row_editable and st.button("🗑", key=f"tk_del_{eid}_{week_sig}_{i}", help="Clear row"):
                 grid[i]["job"] = job_opts[0] if job_opts else "— No job —"
-                grid[i]["st"] = 0.0
+                grid[i]["st"] = _default_st_for_day_index(i)
                 grid[i]["ot"] = 0.0
                 grid[i]["dt"] = 0.0
                 grid[i]["notes"] = ""
+                grid[i]["status"] = "Draft"
                 st.session_state[gk] = grid
                 st.rerun()
     st.session_state[gk] = grid
@@ -501,36 +638,31 @@ def _save_timekeeping_week(
 ) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     grid = _ensure_weekly_grid(emp, week_start_d)
-    current_status = _normalize_timecard_status(emp.get("status"))
-    save_status = _db_status_for_save(status or current_status)
-    summary = {
-        "st_total": sum(float(r.get("st") or 0) for r in grid),
-        "ot_total": sum(float(r.get("ot") or 0) for r in grid),
-        "dt_total": sum(float(r.get("dt") or 0) for r in grid),
-        "status": save_status,
-        "notes": str(emp.get("notes") or ""),
-    }
-    ok, msg = persist_timekeeping_week(eid, week_start_d, summary)
-    if not ok:
-        st.error(msg)
-        return False
+    for row in grid:
+        if not str(row.get("status") or "").strip():
+            row["status"] = "Draft"
     ok2, msg2 = persist_timekeeping_days(eid, week_start_d, grid)
     if ok2:
+        summary = {
+            "st_total": sum(float(r.get("st") or 0) for r in grid),
+            "ot_total": sum(float(r.get("ot") or 0) for r in grid),
+            "dt_total": sum(float(r.get("dt") or 0) for r in grid),
+            "status": _week_status_from_grid(grid),
+            "notes": str(emp.get("notes") or ""),
+        }
         _patch_timecard_cache(
             emp,
             week_start_d,
             {
                 **summary,
-                "status": _normalize_timecard_status(save_status),
                 "total_hours": summary["st_total"] + summary["ot_total"] + summary["dt_total"],
             },
         )
         _invalidate_weekly_grid(emp, week_start_d)
         if show_message:
-            st.success(msg)
+            st.success(msg2 or "Timekeeping saved.")
         return True
-    detail = f" {msg2}" if msg2 else ""
-    st.warning(f"Week totals were saved, but daily entry details could not be saved.{detail}")
+    st.warning(msg2 or "Could not save daily entry details.")
     return False
 
 
@@ -601,29 +733,30 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
 
 
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
-    status = _normalize_timecard_status(emp.get("status"))
-    if _timecard_is_editable(status):
-        _render_weekly_grid_edit(emp, week_start_d)
-        action_left, action_right = st.columns([1, 1])
-        record_key = record_session_key(emp, "id")
-        with action_left:
-            if st.button("Save Hours", key=f"tk_save_hours_{record_key}", type="primary"):
-                if _save_timekeeping_week(emp, week_start_d):
-                    st.rerun()
-        with action_right:
-            if status in ("Draft", "Rejected") and st.button(
-                "Submit for Approval",
-                key=f"tk_submit_{record_key}",
-            ):
-                if _submit_timekeeping_week(emp, week_start_d):
-                    st.rerun()
-        if status == "Pending":
-            st.caption("Hours can still be edited while pending approval. Save changes, then wait for a supervisor to approve.")
-        elif status == "Rejected":
-            st.caption("This timecard was rejected. Update the hours and submit again for approval.")
-    else:
+    week_status = _normalize_timecard_status(emp.get("status"))
+    if week_status == "Approved":
         _render_weekly_grid_readonly(emp, week_start_d)
         st.info("This week is approved and locked.")
+        return
+
+    _render_weekly_grid_edit(emp, week_start_d)
+    action_left, action_right = st.columns([1, 1])
+    record_key = record_session_key(emp, "id")
+    with action_left:
+        if st.button("Save Hours", key=f"tk_save_hours_{record_key}", type="primary"):
+            if _save_timekeeping_week(emp, week_start_d):
+                st.rerun()
+    with action_right:
+        if week_status in ("Draft", "Rejected", "Pending") and st.button(
+            "Submit All for Approval",
+            key=f"tk_submit_{record_key}",
+        ):
+            if _submit_timekeeping_week(emp, week_start_d):
+                st.rerun()
+    st.caption(
+        "Mon–Thu default to 10 ST hours. Submit each day from the Actions column, "
+        "or use Submit All for Approval for the whole week."
+    )
 
 
 def _render_approval_tab(emp: dict, week_start_d: date) -> None:
@@ -661,9 +794,9 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
                 if _reject_timekeeping_week(emp, week_start_d, reject_notes):
                     st.rerun()
     elif status == "Pending":
-        st.caption("Waiting for supervisor approval.")
+        st.caption("Approve individual days on the Daily Entries tab, or approve the full week below.")
     elif status == "Draft":
-        st.caption("Enter hours on the Daily Entries tab, then submit for approval.")
+        st.caption("Enter hours on the Daily Entries tab, then submit each day or the full week for approval.")
     elif status == "Rejected":
         st.caption("Update hours on the Daily Entries tab and submit again for approval.")
     elif status == "Approved":

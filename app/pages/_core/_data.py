@@ -717,14 +717,20 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
             "day": d.strftime("%A"),
             "date": d.isoformat(),
             "job": default_job,
-            "st": 0.0,
+            "st": _default_st_hours_for_day_index(i),
             "ot": 0.0,
             "dt": 0.0,
             "notes": "",
+            "status": "Draft",
         })
     if employee_id == "emp-mark" and len(grid) > 4:
         grid[4]["ot"] = 2.5
     return grid
+
+
+def _default_st_hours_for_day_index(day_index: int) -> float:
+    """Mon–Thu default to 10 ST hours; Fri–Sun start at 0."""
+    return 10.0 if 0 <= day_index < 4 else 0.0
 
 
 def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
@@ -744,7 +750,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
     job_opts = job_options_for_timekeeping()
     default_job = job_opts[0] if job_opts else "— No job —"
     grid: list[dict[str, Any]] = []
-    for day in days:
+    for i, day in enumerate(days):
         iso = day.isoformat()
         saved = by_date.get(iso)
         if saved:
@@ -757,16 +763,18 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
                 "ot": float(saved.get("ot_hours") or 0),
                 "dt": float(saved.get("dt_hours") or 0),
                 "notes": str(saved.get("notes") or ""),
+                "status": str(saved.get("status") or "Draft"),
             })
         else:
             grid.append({
                 "day": day.strftime("%A"),
                 "date": iso,
                 "job": default_job,
-                "st": 0.0,
+                "st": _default_st_hours_for_day_index(i),
                 "ot": 0.0,
                 "dt": 0.0,
                 "notes": "",
+                "status": "Draft",
             })
     return grid
 
@@ -1776,6 +1784,7 @@ def persist_timekeeping_days(
             "ot_hours": row.get("ot") or 0,
             "dt_hours": row.get("dt") or 0,
             "notes": row.get("notes") or "",
+            "status": str(row.get("status") or "Draft"),
         }
         res = save_timekeeping_day(ui, row_id=str(row.get("day_id") or "") or None)
         err = _persist_result(res, success="")
@@ -1783,7 +1792,69 @@ def persist_timekeeping_days(
             errors.append(err[1])
     if errors:
         return False, errors[0]
+    try:
+        from app.services.timekeeping_service import sync_timekeeping_week_from_days
+    except ImportError:
+        from services.timekeeping_service import sync_timekeeping_week_from_days  # type: ignore
+    sync_timekeeping_week_from_days(employee_id, week_start)
     return True, "Daily entries saved."
+
+
+def persist_timekeeping_day_submit(day_id: str, employee_id: str, week_start: date) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import submit_timekeeping_day, sync_timekeeping_week_from_days
+    except ImportError:
+        from services.timekeeping_service import submit_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    ok, msg = _persist_result(submit_timekeeping_day(day_id), success="Day submitted for approval.")
+    if ok:
+        sync_timekeeping_week_from_days(employee_id, week_start)
+    return ok, msg
+
+
+def persist_timekeeping_day_approve(
+    day_id: str,
+    employee_id: str,
+    week_start: date,
+    *,
+    approved_by: str,
+) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import approve_timekeeping_day, sync_timekeeping_week_from_days
+    except ImportError:
+        from services.timekeeping_service import approve_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    ok, msg = _persist_result(
+        approve_timekeeping_day(day_id, approved_by=approved_by),
+        success="Day approved.",
+    )
+    if ok:
+        sync_timekeeping_week_from_days(employee_id, week_start)
+    return ok, msg
+
+
+def persist_timekeeping_day_reject(
+    day_id: str,
+    employee_id: str,
+    week_start: date,
+    *,
+    approved_by: str,
+) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import reject_timekeeping_day, sync_timekeeping_week_from_days
+    except ImportError:
+        from services.timekeeping_service import reject_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    ok, msg = _persist_result(
+        reject_timekeeping_day(day_id, approved_by=approved_by),
+        success="Day rejected.",
+    )
+    if ok:
+        sync_timekeeping_week_from_days(employee_id, week_start)
+    return ok, msg
 
 
 def persist_timekeeping_submit(employee_id: str, week_start: date) -> tuple[bool, str]:

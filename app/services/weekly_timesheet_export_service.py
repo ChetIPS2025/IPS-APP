@@ -381,10 +381,10 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     doc = SimpleDocTemplate(
         buf,
         pagesize=letter,
-        leftMargin=0.4 * inch,
-        rightMargin=0.4 * inch,
-        topMargin=0.35 * inch,
-        bottomMargin=0.35 * inch,
+        leftMargin=0.25 * inch,
+        rightMargin=0.25 * inch,
+        topMargin=0.25 * inch,
+        bottomMargin=0.25 * inch,
     )
     styles = getSampleStyleSheet()
     story: list[Any] = []

@@ -1205,7 +1205,7 @@ def save_timekeeping_week(employee_id: str, week_start: date, ui_summary: dict[s
         "st_total": ui_summary.get("st_total"),
         "ot_total": ui_summary.get("ot_total"),
         "dt_total": ui_summary.get("dt_total"),
-        "status": ui_summary.get("status") or "Pending",
+        "status": "Pending" if str(ui_summary.get("status") or "Pending") == "Draft" else (ui_summary.get("status") or "Pending"),
         "notes": ui_summary.get("notes") or "",
     }
     existing = _find_timekeeping_week(employee_id, week_start)
@@ -1222,6 +1222,15 @@ def submit_timekeeping_week(employee_id: str, week_start: date) -> ServiceResult
     existing = _find_timekeeping_week(employee_id, week_start)
     if not existing:
         return ServiceResult(ok=False, error="Save hours before submitting for approval.")
+    for day in list_timekeeping_days(employee_id, week_start):
+        day_id = str(day.get("id") or "")
+        if not day_id:
+            continue
+        hours = float(day.get("st_hours") or 0) + float(day.get("ot_hours") or 0) + float(day.get("dt_hours") or 0)
+        if hours <= 0:
+            continue
+        if str(day.get("status") or "Draft") in ("Draft", "Rejected"):
+            submit_timekeeping_day(day_id)
     payload = {
         "status": "Pending",
         "approved_by": None,
@@ -1242,6 +1251,9 @@ def approve_timekeeping_week(employee_id: str, week_start: date, *, approved_by:
     approver = str(approved_by or "").strip()
     if not approver:
         return ServiceResult(ok=False, error="Missing approver profile.")
+    for day in list_timekeeping_days(employee_id, week_start):
+        if str(day.get("status") or "") == "Pending" and day.get("id"):
+            update_timekeeping_day_status(str(day["id"]), status="Approved", approved_by=approver)
     payload = {
         "status": "Approved",
         "approved_by": approver,
@@ -1276,6 +1288,9 @@ def reject_timekeeping_week(
     note = str(notes or "").strip()
     if note:
         payload["notes"] = note
+    for day in list_timekeeping_days(employee_id, week_start):
+        if str(day.get("status") or "") == "Pending" and day.get("id"):
+            update_timekeeping_day_status(str(day["id"]), status="Rejected", approved_by=approver)
     result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
     if result.ok:
         clear_all_data_caches()
@@ -1283,7 +1298,7 @@ def reject_timekeeping_week(
 
 
 def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    payload = {
+    payload: dict[str, Any] = {
         "employee_id": ui.get("employee_id"),
         "week_start": ui.get("week_start"),
         "work_date": ui.get("work_date"),
@@ -1293,10 +1308,97 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
         "ot_hours": ui.get("ot_hours") or 0,
         "dt_hours": ui.get("dt_hours") or 0,
         "notes": ui.get("notes") or "",
+        "status": ui.get("status") or "Draft",
     }
     if row_id:
-        return update_row("employee_timekeeping_days", payload, {"id": row_id})
-    return insert_row("employee_timekeeping_days", payload)
+        result = update_row("employee_timekeeping_days", payload, {"id": row_id})
+    else:
+        result = insert_row("employee_timekeeping_days", payload)
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def _derive_week_status_from_days(days: list[dict[str, Any]]) -> str:
+    def _hours(row: dict[str, Any]) -> float:
+        try:
+            return float(row.get("st_hours") or 0) + float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    active = [str(row.get("status") or "Draft") for row in days if _hours(row) > 0]
+    if not active:
+        return "Pending"
+    statuses = {s for s in active}
+    if statuses == {"Approved"}:
+        return "Approved"
+    if "Rejected" in statuses:
+        return "Rejected"
+    if "Pending" in statuses:
+        return "Pending"
+    return "Pending"
+
+
+def sync_timekeeping_week_from_days(employee_id: str, week_start: date) -> ServiceResult:
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return ServiceResult(ok=False, error="Missing employee id.")
+    days = list_timekeeping_days(eid, week_start)
+    st_total = sum(float(row.get("st_hours") or 0) for row in days)
+    ot_total = sum(float(row.get("ot_hours") or 0) for row in days)
+    dt_total = sum(float(row.get("dt_hours") or 0) for row in days)
+    week_status = _derive_week_status_from_days(days)
+    return save_timekeeping_week(
+        eid,
+        week_start,
+        {
+            "st_total": st_total,
+            "ot_total": ot_total,
+            "dt_total": dt_total,
+            "status": week_status,
+        },
+    )
+
+
+def update_timekeeping_day_status(
+    day_id: str,
+    *,
+    status: str,
+    approved_by: str | None = None,
+    clear_approval: bool = False,
+) -> ServiceResult:
+    rid = str(day_id or "").strip()
+    if not rid:
+        return ServiceResult(ok=False, error="Missing day id.")
+    payload: dict[str, Any] = {"status": status}
+    if clear_approval:
+        payload["approved_by"] = None
+        payload["approved_at"] = None
+    elif approved_by:
+        payload["approved_by"] = approved_by
+        payload["approved_at"] = datetime.now(timezone.utc).isoformat()
+    result = update_row("employee_timekeeping_days", payload, {"id": rid})
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def submit_timekeeping_day(day_id: str) -> ServiceResult:
+    return update_timekeeping_day_status(day_id, status="Pending", clear_approval=True)
+
+
+def approve_timekeeping_day(day_id: str, *, approved_by: str) -> ServiceResult:
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    return update_timekeeping_day_status(day_id, status="Approved", approved_by=approver)
+
+
+def reject_timekeeping_day(day_id: str, *, approved_by: str) -> ServiceResult:
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    return update_timekeeping_day_status(day_id, status="Rejected", approved_by=approver)
 
 
 def delete_estimate_line_item(row_id: str) -> ServiceResult:
