@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.services.item_images import (
+        ITEM_IMAGE_UPLOAD_TYPES,
         has_stored_item_image,
         normalize_image_status,
         resolve_stored_item_image_url,
@@ -16,6 +17,7 @@ try:
     from app.services.repository import ServiceResult
 except ImportError:
     from services.item_images import (  # type: ignore
+        ITEM_IMAGE_UPLOAD_TYPES,
         has_stored_item_image,
         normalize_image_status,
         resolve_stored_item_image_url,
@@ -82,7 +84,7 @@ def render_item_photo_manager(
 
     st.file_uploader(
         "Replace photo",
-        type=["png", "jpg", "jpeg", "webp"],
+        type=list(ITEM_IMAGE_UPLOAD_TYPES),
         key=upload_key,
         help="Choose a new image, then click Save Photo.",
     )

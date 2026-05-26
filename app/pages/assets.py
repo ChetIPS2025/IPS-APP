@@ -49,6 +49,7 @@ try:
         clear_asset_image,
         upload_asset_image as upload_asset_image_file,
     )
+    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
     from app.services.assets_service import (
         clear_assets_cache,
         ensure_asset_qr_tokens,
@@ -112,6 +113,7 @@ except ImportError:
         clear_asset_image,
         upload_asset_image as upload_asset_image_file,
     )
+    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
     from services.assets_service import (  # type: ignore
         clear_assets_cache,
         ensure_asset_qr_tokens,
@@ -1028,7 +1030,7 @@ def render() -> None:
             st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
             st.file_uploader(
                 "Upload asset image",
-                type=["png", "jpg", "jpeg", "webp"],
+                type=list(ITEM_IMAGE_UPLOAD_TYPES),
                 key="ast_new_image",
             )
             if st.button("Save asset", key="ast_save_new", type="primary"):

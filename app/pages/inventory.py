@@ -53,6 +53,7 @@ try:
         inventory_image_is_inherited,
         upload_inventory_image as upload_inventory_image_file,
     )
+    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
     from app.services.inventory_service import (
         clear_inventory_cache,
         ensure_inventory_qr_tokens,
@@ -111,6 +112,7 @@ except ImportError:
         inventory_image_is_inherited,
         upload_inventory_image as upload_inventory_image_file,
     )
+    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
     from services.inventory_service import (  # type: ignore
         clear_inventory_cache,
         ensure_inventory_qr_tokens,
@@ -811,7 +813,7 @@ def render() -> None:
             st.selectbox("Status", lookup_options("inventory_statuses"), key="inv_new_status")
             st.file_uploader(
                 "Upload item image",
-                type=["png", "jpg", "jpeg", "webp"],
+                type=list(ITEM_IMAGE_UPLOAD_TYPES),
                 key="inv_new_image",
             )
             if st.button("Save item", key="inv_save_new", type="primary"):

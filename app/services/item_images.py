@@ -13,7 +13,8 @@ from typing import Any, Iterable
 _MAX_SIDE = 480
 _JPEG_QUALITY = 86
 ITEM_IMAGES_PREFIX = "assets/item_images"
-_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
+ITEM_IMAGE_UPLOAD_TYPES: tuple[str, ...] = ("png", "jpg", "jpeg", "webp", "avif")
 INVENTORY_IMAGE_BUCKET = "inventory-images"
 ASSET_IMAGE_BUCKET = "asset-images"
 

@@ -79,6 +79,7 @@ try:
         pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
     )
+    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
     from app.styles import inject_pricing_guide_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
@@ -153,6 +154,7 @@ except ImportError:
         pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
     )
+    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
     from styles import inject_pricing_guide_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
@@ -565,7 +567,7 @@ def _render_csv_import() -> None:
         )
         image_uploads = st.file_uploader(
             "Candidate item images (optional — match by model #, item #, SKU, then description)",
-            type=["png", "jpg", "jpeg", "webp"],
+            type=list(ITEM_IMAGE_UPLOAD_TYPES),
             accept_multiple_files=True,
             key="pg_csv_images",
         )
@@ -688,7 +690,7 @@ def _render_csv_import() -> None:
                     if choice == DECISION_REPLACE:
                         repl = st.file_uploader(
                             "Replacement image",
-                            type=["png", "jpg", "jpeg", "webp"],
+                            type=list(ITEM_IMAGE_UPLOAD_TYPES),
                             key=f"pg_import_replace_{idx}",
                             label_visibility="collapsed",
                         )
