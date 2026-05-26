@@ -48,10 +48,12 @@ _STORAGE_PREFIX = "weekly_timesheets"
 _table_available: bool | None = None
 
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-TIMESHEET_LABOR_MIN_ROWS = 14
-TIMESHEET_MATERIAL_MIN_ROWS = 9
+TIMESHEET_LABOR_MIN_ROWS = 15
+TIMESHEET_MATERIAL_MIN_ROWS = 10
 TIMESHEET_PAGE_MIN_HEIGHT = "10.5in"
 TIMESHEET_CONTENT_WIDTH = "8in"
+TIMESHEET_GRID_ROW_HEIGHT = "0.26in"
+TIMESHEET_GRID_HEAD_HEIGHT = "0.30in"
 _HOUR_COLS = ("hours_mon", "hours_tue", "hours_wed", "hours_thu", "hours_fri", "hours_sat", "hours_sun")
 _LEGACY_HOUR_COLS = (
     ("mon", "hours_mon", "monday_st"),
@@ -285,7 +287,12 @@ def _signature_html(signature_data: str) -> str:
     return f'<img src="{src}" alt="Signature"/>'
 
 
-def render_timesheet_html(data: WeeklyJobTimesheetData, *, week_start: date | None = None) -> str:
+def render_timesheet_html(
+    data: WeeklyJobTimesheetData,
+    *,
+    week_start: date | None = None,
+    embed: bool = False,
+) -> str:
     """Render printable HTML from template. Edit app/templates/weekly_timesheet_form.html to adjust layout."""
     ws = _parse_date(data.week_start) or week_start or date.today()
     ws = monday_of_week(ws)
@@ -301,6 +308,7 @@ def render_timesheet_html(data: WeeklyJobTimesheetData, *, week_start: date | No
     mats_right = _pad_material_rows(mats_right, TIMESHEET_MATERIAL_MIN_ROWS)
     logo = header_logo_html(height=48) or "IPS"
     replacements = {
+        "{{body_class}}": "ips-wt-embed" if embed else "",
         "{{logo_html}}": logo,
         "{{job_number}}": html.escape(data.job_number),
         "{{client_name}}": html.escape(data.client_name),

@@ -5440,6 +5440,12 @@ section[data-testid="stMain"]:has(.ips-weekly-timesheets-page) [data-testid="stS
   margin-top: 0 !important;
   margin-bottom: 0.25rem !important;
 }}
+section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="stHtml"] iframe {{
+  width: 100% !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}}
 .ips-time-week-range {{
   margin: 0 !important;
   font-size: 0.875rem !important;

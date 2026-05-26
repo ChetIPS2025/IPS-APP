@@ -85,10 +85,13 @@ _CELL = {
     "signed_date": "J42",
 }
 _FIRST_LABOR_ROW = 12
-_LABOR_ROW_COUNT = 14
+_LABOR_ROW_COUNT = 15
 _FIRST_MATERIAL_ROW = 27
-_MATERIAL_ROW_COUNT = 9
-_PDF_ROW_HEIGHT = 0.24 * inch
+_MATERIAL_ROW_COUNT = 10
+_PDF_ROW_HEIGHT = 0.26 * inch
+_PDF_HEAD_HEIGHT = 0.30 * inch
+_PDF_HEADER_HEIGHT = 0.75 * inch
+_PDF_APPROVAL_HEIGHT = 1.05 * inch
 
 
 def _thin_border() -> Border:
@@ -440,6 +443,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     header_tbl = Table(
         [[title_row[0], title_row[1], meta_tbl]],
         colWidths=[0.95 * inch, content_w - 0.95 * inch - 2.47 * inch, 2.47 * inch],
+        rowHeights=[_PDF_HEADER_HEIGHT],
     )
     header_tbl.setStyle(
         TableStyle(
@@ -484,7 +488,8 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         content_w * 0.04,
         content_w * 0.07,
     ]
-    labor_tbl = Table(grid, colWidths=col_w, repeatRows=1)
+    labor_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * len(labor)
+    labor_tbl = Table(grid, colWidths=col_w, rowHeights=labor_heights, repeatRows=1)
     labor_tbl.setStyle(
         TableStyle(
             [
@@ -518,9 +523,12 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             ]
         )
     half_w = content_w / 2.0
+    mat_row_count = max(len(mats_left), len(mats_right))
+    mat_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * mat_row_count
     mat_tbl = Table(
         mat_grid,
         colWidths=[half_w * 0.72, half_w * 0.14, half_w * 0.14, half_w * 0.72, half_w * 0.14, half_w * 0.14],
+        rowHeights=mat_heights,
     )
     mat_tbl.setStyle(
         TableStyle(
@@ -534,18 +542,21 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     )
     story.append(mat_tbl)
 
-    header_h = 0.72 * inch
-    labor_h = _PDF_ROW_HEIGHT * (1 + len(labor))
-    mat_h = _PDF_ROW_HEIGHT * (1 + max(len(mats_left), len(mats_right)))
-    approval_h = 1.05 * inch
-    work_h = content_h - header_h - labor_h - mat_h - approval_h
-    work_h = max(work_h, 1.35 * inch)
+    work_h = (
+        content_h
+        - _PDF_HEADER_HEIGHT
+        - sum(labor_heights)
+        - sum(mat_heights)
+        - _PDF_APPROVAL_HEIGHT
+    )
+    work_h = max(work_h, 1.0 * inch)
+    work_label_h = 0.24 * inch
 
     work_body = html.escape(data.work_performed or " ").replace("\n", "<br/>") or "&nbsp;"
     work_tbl = Table(
         [[Paragraph("<b>WORK PERFORMED</b>", styles["Heading4"])], [Paragraph(work_body, styles["BodyText"])]],
         colWidths=[content_w],
-        rowHeights=[0.22 * inch, work_h - 0.22 * inch],
+        rowHeights=[work_label_h, max(work_h - work_label_h, 0.75 * inch)],
     )
     work_tbl.setStyle(
         TableStyle(
@@ -572,7 +583,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             approval_row[1] = RLImage(BytesIO(base64.b64decode(b64)), width=2.0 * inch, height=0.65 * inch)
         except Exception:
             approval_row[1] = Paragraph("<b>SIGNATURE</b>", styles["Normal"])
-    appr_tbl = Table([approval_row], colWidths=[content_w / 3.0] * 3, rowHeights=[approval_h])
+    appr_tbl = Table([approval_row], colWidths=[content_w / 3.0] * 3, rowHeights=[_PDF_APPROVAL_HEIGHT])
     appr_tbl.setStyle(
         TableStyle(
             [
