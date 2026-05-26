@@ -50,8 +50,34 @@ _KIT_CATEGORY_HINTS = (
     "welding rig",
     "service truck kit",
     "crew tool kit",
-    "kit",
 )
+
+_trailer_kit_parent_ids_cache: set[str] | None = None
+
+
+def _tool_trailer_kit_parent_asset_ids() -> set[str]:
+    """Asset ids registered as kit/trailer containers in tool_trailer_kits."""
+    global _trailer_kit_parent_ids_cache
+    if _trailer_kit_parent_ids_cache is not None:
+        return _trailer_kit_parent_ids_cache
+    ids: set[str] = set()
+    try:
+        rows, _ = fetch_rows("tool_trailer_kits", limit=5000)
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            pid = str(row.get("parent_asset_id") or "").strip()
+            if pid:
+                ids.add(pid)
+    except Exception:
+        pass
+    _trailer_kit_parent_ids_cache = ids
+    return ids
+
+
+def clear_trailer_kit_parent_cache() -> None:
+    global _trailer_kit_parent_ids_cache
+    _trailer_kit_parent_ids_cache = None
 
 
 def _now_iso() -> str:
@@ -102,7 +128,11 @@ def normalize_kit_item(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def asset_is_kit(asset: dict[str, Any]) -> bool:
+    """True for container kits/trailers — not individual tools with 'kit' in the name."""
     if asset.get("is_kit") is True:
+        return True
+    aid = str(asset.get("id") or "").strip()
+    if aid and aid in _tool_trailer_kit_parent_asset_ids():
         return True
     cat = str(asset.get("category") or asset.get("asset_type") or "").lower()
     name = str(asset.get("asset_name") or asset.get("name") or "").lower()
@@ -116,8 +146,8 @@ def infer_kit_type(asset: dict[str, Any]) -> str:
     cat = str(asset.get("category") or "").lower()
     name = str(asset.get("asset_name") or "").lower()
     for label, hints in (
-        ("Enclosed Tool Trailer", ("enclosed",)),
-        ("Tool Trailer", ("tool trailer", "trailer")),
+        ("Enclosed Tool Trailer", ("enclosed trailer", "enclosed tool trailer")),
+        ("Tool Trailer", ("tool trailer",)),
         ("Gang Box", ("gang box",)),
         ("Job Box", ("job box",)),
         ("Welding Rig", ("welding",)),
