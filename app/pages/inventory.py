@@ -563,7 +563,9 @@ def _render_inventory_transactions_tab(item: dict) -> None:
 
 def _render_inventory_pricing_guide_section(item: dict) -> None:
     iid = str(item.get("id") or "")
-    pricing_item_id = str(item.get("pricing_item_id") or "").strip()
+    pricing_item_id = str(
+        item.get("pricing_guide_id") or item.get("pricing_item_id") or ""
+    ).strip()
     st.markdown("#### Pricing Guide")
     try:
         from app.services.pricing_guide_service import (
@@ -592,7 +594,11 @@ def _render_inventory_pricing_guide_section(item: dict) -> None:
         )
     else:
         inv_linked = next(
-            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("inventory_item_id") or "") == iid),
+            (
+                r
+                for r in cached_pricing_guide_rows(include_inactive=True)
+                if str(r.get("linked_inventory_id") or r.get("inventory_item_id") or "") == iid
+            ),
             None,
         )
         if inv_linked:
@@ -625,7 +631,7 @@ def _render_inventory_pricing_guide_section(item: dict) -> None:
         options = [
             (f"{r.get('description')} — {r.get('item_type')}", str(r.get("id")))
             for r in cached_pricing_guide_rows(include_inactive=True)
-            if r.get("item_type") in {"Inventory", "Material", "Consumable"}
+            if r.get("item_class") == "Inventory"
         ]
         if options and st.button("Link to Pricing Guide Item", key=f"inv_link_pg_{iid}", use_container_width=True):
             st.session_state[f"inv_show_pg_link_{iid}"] = True

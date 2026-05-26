@@ -769,7 +769,9 @@ def _render_asset_edit_form(asset: dict) -> None:
 
 def _render_asset_pricing_guide_section(asset: dict) -> None:
     aid = str(asset.get("id") or "")
-    pricing_item_id = str(asset.get("pricing_item_id") or "").strip()
+    pricing_item_id = str(
+        asset.get("pricing_guide_id") or asset.get("pricing_item_id") or ""
+    ).strip()
     st.markdown("#### Pricing Guide")
     try:
         from app.services.pricing_guide_service import (
@@ -792,7 +794,11 @@ def _render_asset_pricing_guide_section(asset: dict) -> None:
         )
     if not linked:
         linked = next(
-            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("asset_id") or "") == aid),
+            (
+                r
+                for r in cached_pricing_guide_rows(include_inactive=True)
+                if str(r.get("linked_asset_id") or r.get("asset_id") or "") == aid
+            ),
             None,
         )
     if linked:
@@ -813,6 +819,7 @@ def _render_asset_pricing_guide_section(asset: dict) -> None:
             ok, msg = save_pricing_item(
                 {
                     "item_type": "Equipment",
+                    "item_class": "Asset",
                     "description": str(asset.get("asset_name") or asset.get("name") or "Equipment"),
                     "category": str(asset.get("category") or "Equipment"),
                     "unit": "HR",
@@ -820,13 +827,21 @@ def _render_asset_pricing_guide_section(asset: dict) -> None:
                     "default_markup_percent": 0.0,
                     "default_sell_price": cost,
                     "asset_id": aid,
+                    "linked_asset_id": aid,
                     "equipment_type": str(asset.get("category") or asset.get("asset_type") or ""),
                     "is_active": asset.get("is_active") is not False,
                 }
             )
             if ok:
                 rows = cached_pricing_guide_rows(include_inactive=True)
-                pid = next((str(r.get("id")) for r in rows if str(r.get("asset_id") or "") == aid), "")
+                pid = next(
+                    (
+                        str(r.get("id"))
+                        for r in rows
+                        if str(r.get("linked_asset_id") or r.get("asset_id") or "") == aid
+                    ),
+                    "",
+                )
                 if pid:
                     link_asset_to_pricing_item(aid, pid)
                 st.success(msg)
@@ -836,7 +851,7 @@ def _render_asset_pricing_guide_section(asset: dict) -> None:
         eq_options = [
             (f"{r.get('description')} — {r.get('item_type')}", str(r.get("id")))
             for r in cached_pricing_guide_rows(include_inactive=True)
-            if r.get("item_type") == "Equipment"
+            if r.get("item_class") == "Asset"
         ]
         if eq_options and st.button("Link to Pricing Guide Item", key=f"asset_link_pg_{aid}", use_container_width=True):
             st.session_state[f"asset_show_pg_link_{aid}"] = True

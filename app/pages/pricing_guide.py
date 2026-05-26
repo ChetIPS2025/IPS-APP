@@ -48,9 +48,11 @@ try:
     from app.pages._core._data import load_assets, load_inventory
     from app.pages._core._session import select_key
     from app.services.pricing_guide_service import (
+        PRICING_ITEM_CLASSES,
         PRICING_ITEM_TYPES,
         calc_sell_price,
         cached_pricing_guide_rows,
+        class_pill_html,
         delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
@@ -59,6 +61,7 @@ try:
         pricing_guide_summary,
         type_pill_html,
     )
+    from app.services.catalog_import_service import import_catalog_csv
     from app.styles import inject_pricing_guide_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
@@ -102,9 +105,11 @@ except ImportError:
     from pages._core._data import load_assets, load_inventory  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.pricing_guide_service import (  # type: ignore
+        PRICING_ITEM_CLASSES,
         PRICING_ITEM_TYPES,
         calc_sell_price,
         cached_pricing_guide_rows,
+        class_pill_html,
         delete_pricing_item,
         fetch_price_history,
         normalize_pricing_row,
@@ -113,6 +118,7 @@ except ImportError:
         pricing_guide_summary,
         type_pill_html,
     )
+    from services.catalog_import_service import import_catalog_csv  # type: ignore
     from styles import inject_pricing_guide_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
@@ -124,11 +130,11 @@ _CACHE_KEY = "_ips_pg_modal_by_id"
 SELECTED_PG_KEY = "selected_pricing_guide_id"
 SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
 _ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
-_PG_COLS = [0.35, 3.2, 1.15, 1.35, 0.75, 1.05, 0.85, 1.15, 1.35, 0.95]
+_PG_COLS = [0.35, 3.0, 1.2, 1.25, 0.75, 1.0, 0.85, 1.1, 1.25, 0.95]
 _PG_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("DESCRIPTION", None),
-    ("TYPE", "item_type"),
+    ("CLASS", "item_class"),
     ("CATEGORY", "category"),
     ("UNIT", None),
     ("COST", None),
@@ -137,9 +143,9 @@ _PG_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("VENDOR", "vendor"),
     ("STATUS", "status"),
 ]
-_FILTER_FIELDS = ["item_type", "category", "vendor", "status"]
+_FILTER_FIELDS = ["item_class", "category", "vendor", "status"]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("item_type", lambda r: str(r.get("item_type") or "—")),
+    ("item_class", lambda r: str(r.get("item_class") or "Non-Inventory")),
     ("category", lambda r: str(r.get("category") or "—")),
     ("vendor", lambda r: str(r.get("vendor") or "—")),
     ("status", lambda r: str(r.get("status") or "Active")),
@@ -204,12 +210,12 @@ def _render_summary_cards(rows: list[dict[str, Any]]) -> None:
     stats = pricing_guide_summary(rows)
     cards = [
         ("Active Items", str(stats["active_count"])),
-        ("Inventory Linked", str(stats["inventory_linked"])),
-        ("Labor Items", str(stats["labor_count"])),
-        ("Equipment Items", str(stats["equipment_count"])),
-        ("Travel Items", str(stats["travel_count"])),
+        ("Inventory Class", str(stats["inventory_class"])),
+        ("Asset Class", str(stats["asset_class"])),
+        ("Non-Inventory", str(stats["non_inventory_class"])),
+        ("Stock Linked", str(stats["inventory_linked"])),
+        ("Asset Linked", str(stats["asset_linked"])),
         ("Avg Markup", f"{stats['avg_markup']:.1f}%"),
-        ("Last Updated", stats["last_updated"]),
     ]
     html_cards = "".join(
         f'<div class="ips-pg-summary-card"><div class="lbl">{html.escape(lbl)}</div>'
@@ -326,7 +332,7 @@ def _render_custom_pricing_guide_table(
                 continue
 
             item = str(row.get("item") or "—")
-            item_type = str(row.get("item_type") or "Material")
+            item_class = str(row.get("item_class") or "Non-Inventory")
             category = str(row.get("category") or "—")
             unit = str(row.get("unit") or "—")
             default_cost = fmt_currency(row.get("default_cost"))
@@ -353,7 +359,7 @@ def _render_custom_pricing_guide_table(
                 )
 
             with cols[2]:
-                st.markdown(type_pill_html(item_type), unsafe_allow_html=True)
+                st.markdown(class_pill_html(item_class), unsafe_allow_html=True)
 
             with cols[3]:
                 st.markdown(
@@ -408,9 +414,9 @@ def _persist_row(data: dict[str, Any], row_id: str | None = None) -> tuple[bool,
     return save_pricing_item(data, row_id=row_id)
 
 
-def _render_conditional_fields(prefix: str, item_type: str) -> dict[str, Any]:
+def _render_conditional_fields(prefix: str, item_class: str, item_type: str) -> dict[str, Any]:
     extra: dict[str, Any] = {}
-    if item_type == "Inventory":
+    if item_class == "Inventory":
         inv_opts = _inventory_options()
         pick = st.selectbox(
             "Link inventory item",
@@ -418,8 +424,9 @@ def _render_conditional_fields(prefix: str, item_type: str) -> dict[str, Any]:
             key=f"{prefix}_inv",
         )
         inv_map = {label: vid for label, vid in inv_opts}
-        extra["inventory_item_id"] = inv_map.get(pick) or None
-    elif item_type == "Equipment":
+        extra["linked_inventory_id"] = inv_map.get(pick) or None
+        extra["inventory_item_id"] = extra["linked_inventory_id"]
+    elif item_class == "Asset":
         asset_opts = _asset_options()
         pick = st.selectbox(
             "Link asset",
@@ -427,7 +434,8 @@ def _render_conditional_fields(prefix: str, item_type: str) -> dict[str, Any]:
             key=f"{prefix}_asset",
         )
         asset_map = {label: aid for label, aid in asset_opts}
-        extra["asset_id"] = asset_map.get(pick) or None
+        extra["linked_asset_id"] = asset_map.get(pick) or None
+        extra["asset_id"] = extra["linked_asset_id"]
         extra["equipment_type"] = st.text_input("Equipment type", key=f"{prefix}_eq_type")
     elif item_type == "Labor":
         extra["labor_role"] = st.text_input("Labor role", key=f"{prefix}_labor_role")
@@ -449,12 +457,39 @@ def _render_conditional_fields(prefix: str, item_type: str) -> dict[str, Any]:
     return extra
 
 
+def _render_csv_import() -> None:
+    with st.expander("Import Catalog CSV", expanded=False):
+        st.caption(
+            "Always creates/updates Pricing Guide items. "
+            "Inventory and Asset rows are created only when item_class is Inventory or Asset."
+        )
+        uploaded = st.file_uploader(
+            "CSV file",
+            type=["csv"],
+            key="pg_csv_upload",
+            label_visibility="collapsed",
+        )
+        if uploaded is not None:
+            text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
+            if st.button("Run Import", key="pg_csv_import", type="primary"):
+                result = import_catalog_csv(text)
+                if result.ok:
+                    st.success(result.message)
+                    if result.errors:
+                        for err in result.errors[:20]:
+                            st.warning(err)
+                    st.rerun()
+                else:
+                    st.error(result.message)
+
+
 def _render_add_form() -> None:
     with st.expander("New Pricing Item", expanded=True):
         c1, c2 = st.columns(2, gap="small")
         with c1:
             description = st.text_input("Description *", key="pg_new_desc")
-            item_type = st.selectbox("Item Type *", list(PRICING_ITEM_TYPES), key="pg_new_type")
+            item_class = st.selectbox("Item Class *", list(PRICING_ITEM_CLASSES), key="pg_new_class")
+            item_type = st.selectbox("Estimate Line Type *", list(PRICING_ITEM_TYPES), key="pg_new_type")
             unit = st.text_input("Unit *", value="EA", key="pg_new_unit")
             category = st.text_input("Category", key="pg_new_cat")
         with c2:
@@ -464,11 +499,12 @@ def _render_add_form() -> None:
             st.metric("Sell Price", fmt_currency(sell))
             active = st.checkbox("Active", value=True, key="pg_new_active")
 
-        extra = _render_conditional_fields("pg_new", item_type)
+        extra = _render_conditional_fields("pg_new", item_class, item_type)
 
         if st.button("Save Pricing Item", key="pg_new_save", type="primary"):
             payload = {
                 "description": description,
+                "item_class": item_class,
                 "item_type": item_type,
                 "unit": unit,
                 "category": extra.get("category") or category,
@@ -491,7 +527,11 @@ def _render_item_tabs(row: dict[str, Any]) -> None:
                 "Overview",
                 f"{detail_field_html('Description', row.get('item'))}"
                 f"{detail_field_html('Item code', row.get('item_code') or row.get('item_key'))}"
-                f'{detail_field_html("Type", row.get("item_type"), html_value=type_pill_html(str(row.get("item_type") or "")))}'
+                f'{detail_field_html("Class", row.get("item_class"), html_value=class_pill_html(str(row.get("item_class") or "")))}'
+                f'{detail_field_html("Estimate type", row.get("item_type"), html_value=type_pill_html(str(row.get("item_type") or "")))}'
+                f"{detail_field_html('SKU', row.get('sku') or '—')}"
+                f"{detail_field_html('Item #', row.get('item_number') or '—')}"
+                f"{detail_field_html('Model #', row.get('model_number') or '—')}"
                 f"{detail_field_html('Category', row.get('category'))}"
                 f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
                 f"{detail_field_html('Unit', row.get('unit'))}"
@@ -562,8 +602,16 @@ def _render_edit_form(row: dict[str, Any]) -> None:
             value=str(row.get("description") or row.get("item") or ""),
             key=f"pg_edit_desc_{rk}",
         )
+        item_class = st.selectbox(
+            "Item Class",
+            list(PRICING_ITEM_CLASSES),
+            index=list(PRICING_ITEM_CLASSES).index(str(row.get("item_class") or "Non-Inventory"))
+            if str(row.get("item_class") or "Non-Inventory") in PRICING_ITEM_CLASSES
+            else 2,
+            key=f"pg_edit_class_{rk}",
+        )
         item_type = st.selectbox(
-            "Item Type",
+            "Estimate Line Type",
             list(PRICING_ITEM_TYPES),
             index=list(PRICING_ITEM_TYPES).index(str(row.get("item_type") or "Material"))
             if str(row.get("item_type") or "Material") in PRICING_ITEM_TYPES
@@ -592,7 +640,7 @@ def _render_edit_form(row: dict[str, Any]) -> None:
         st.metric("Sell Price", fmt_currency(sell))
         active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"pg_edit_active_{rk}")
 
-    extra = _render_conditional_fields(f"pg_edit_{rk}", item_type)
+    extra = _render_conditional_fields(f"pg_edit_{rk}", item_class, item_type)
     notes = st.text_area("Notes", value=str(row.get("notes") or ""), key=f"pg_edit_notes_{rk}")
 
     cancelled, saved = render_save_cancel_actions(
@@ -607,6 +655,7 @@ def _render_edit_form(row: dict[str, Any]) -> None:
         ok, msg = _persist_row(
             {
                 "description": description,
+                "item_class": item_class,
                 "item_type": item_type,
                 "category": extra.get("category") or category,
                 "unit": unit,
@@ -705,7 +754,8 @@ def _show_detail_modal() -> None:
         render_modal_edit_button(module=_MODULE, record_key=rk)
     render_modal_meta_grid(
         [
-            ("Type", row.get("item_type")),
+            ("Class", row.get("item_class")),
+            ("Estimate type", row.get("item_type")),
             ("Category", row.get("category")),
             ("Unit", row.get("unit")),
             ("Cost", fmt_currency(row.get("default_cost"))),
@@ -743,11 +793,13 @@ def render() -> None:
 
     render_page_brand_header(
         "Pricing Guide",
-        "Master estimating database: inventory-linked items, labor, equipment, travel, subcontractors, and more.",
+        "Master estimating catalog: inventory materials, asset rentals, labor, travel, and estimate-only items.",
         actions=[_pg_new],
     )
 
     _render_summary_cards(rows)
+
+    _render_csv_import()
 
     if st.session_state.get("pg_add_form"):
         _render_add_form()
@@ -757,7 +809,7 @@ def render() -> None:
         with c1:
             st.text_input(
                 "Search",
-                placeholder="Search description, type, category, vendor, labor role…",
+                placeholder="Search description, class, category, vendor, SKU, model #…",
                 key="pg_search",
                 label_visibility="collapsed",
             )

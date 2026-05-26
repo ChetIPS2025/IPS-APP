@@ -25,6 +25,8 @@ PRICING_ITEM_TYPES: tuple[str, ...] = (
     "Assembly",
 )
 
+PRICING_ITEM_CLASSES: tuple[str, ...] = ("Inventory", "Asset", "Non-Inventory")
+
 TYPE_PILL_CSS: dict[str, str] = {
     "Inventory": "ips-pg-type-inventory",
     "Material": "ips-pg-type-material",
@@ -68,6 +70,19 @@ def type_pill_html(item_type: str) -> str:
     t = str(item_type or "Material").strip() or "Material"
     cls = TYPE_PILL_CSS.get(t, "ips-pg-type-material")
     return f'<span class="ips-pg-type-pill {cls}">{html.escape(t)}</span>'
+
+
+CLASS_PILL_CSS: dict[str, str] = {
+    "Inventory": "ips-pg-type-inventory",
+    "Asset": "ips-pg-type-equipment",
+    "Non-Inventory": "ips-pg-type-material",
+}
+
+
+def class_pill_html(item_class: str) -> str:
+    c = str(item_class or "Non-Inventory").strip() or "Non-Inventory"
+    cls = CLASS_PILL_CSS.get(c, "ips-pg-type-material")
+    return f'<span class="ips-pg-type-pill {cls}">{html.escape(c)}</span>'
 
 
 def _legacy_material_to_row(raw: dict[str, Any]) -> dict[str, Any]:
@@ -126,16 +141,25 @@ def normalize_pricing_row(
         else:
             sell = calc_sell_price(cost, markup)
         vendor_id = str(raw.get("vendor_id") or "").strip() or None
-        inv_id = str(raw.get("inventory_item_id") or "").strip() or None
-        asset_id = str(raw.get("asset_id") or "").strip() or None
+        inv_id = str(raw.get("linked_inventory_id") or raw.get("inventory_item_id") or "").strip() or None
+        asset_id = str(raw.get("linked_asset_id") or raw.get("asset_id") or "").strip() or None
+        item_class = str(raw.get("item_class") or "").strip()
+        if not item_class or item_class not in PRICING_ITEM_CLASSES:
+            if inv_id:
+                item_class = "Inventory"
+            elif asset_id:
+                item_class = "Asset"
+            else:
+                item_class = "Non-Inventory"
         vendors = vendor_names or {}
         invs = inventory_labels or {}
         assets = asset_labels or {}
         row = {
             **raw,
             "id": str(raw.get("id") or ""),
-            "item_code": str(raw.get("item_code") or ""),
+            "item_code": str(raw.get("item_code") or raw.get("sku") or ""),
             "item_type": str(raw.get("item_type") or "Material"),
+            "item_class": item_class,
             "description": str(raw.get("description") or ""),
             "category": str(raw.get("category") or ""),
             "subcategory": str(raw.get("subcategory") or ""),
@@ -143,29 +167,38 @@ def normalize_pricing_row(
             "default_cost": cost,
             "default_markup_percent": markup if markup else calc_markup_percent(cost, sell),
             "default_sell_price": sell,
+            "markup_percent": float(raw.get("markup_percent") or markup or 0),
+            "sell_price": float(raw.get("sell_price") or sell or 0),
+            "item_number": str(raw.get("item_number") or raw.get("item_code") or ""),
+            "model_number": str(raw.get("model_number") or ""),
+            "sku": str(raw.get("sku") or raw.get("item_code") or ""),
             "taxable": raw.get("taxable") is not False,
             "is_active": raw.get("is_active") is not False,
             "inventory_item_id": inv_id,
             "asset_id": asset_id,
+            "linked_inventory_id": inv_id,
+            "linked_asset_id": asset_id,
             "vendor_id": vendor_id,
+            "vendor": str(raw.get("vendor") or ""),
             "labor_role": raw.get("labor_role"),
             "equipment_type": raw.get("equipment_type"),
             "travel_type": raw.get("travel_type"),
             "notes": str(raw.get("notes") or ""),
-            "vendor_name": vendors.get(vendor_id or "", "") if vendor_id else "",
+            "vendor_name": vendors.get(vendor_id or "", "") if vendor_id else str(raw.get("vendor") or ""),
             "inventory_label": invs.get(inv_id or "", "") if inv_id else "",
             "asset_label": assets.get(asset_id or "", "") if asset_id else "",
         }
 
     active = row.get("is_active") is not False
+    live_cost = resolve_live_unit_cost(row)
     return {
         **row,
         "item": row["description"],
-        "default_cost": float(row.get("default_cost") or 0),
-        "markup_pct": float(row.get("default_markup_percent") or 0),
-        "customer_price": float(row.get("default_sell_price") or 0),
-        "sell_price": float(row.get("default_sell_price") or 0),
-        "vendor": str(row.get("vendor_name") or row.get("vendor_item_number") or "—"),
+        "default_cost": live_cost,
+        "markup_pct": float(row.get("default_markup_percent") or row.get("markup_percent") or 0),
+        "customer_price": float(row.get("default_sell_price") or row.get("sell_price") or 0),
+        "sell_price": float(row.get("default_sell_price") or row.get("sell_price") or 0),
+        "vendor": str(row.get("vendor_name") or row.get("vendor") or row.get("vendor_item_number") or "—"),
         "status": "Active" if active else "Inactive",
     }
 
@@ -287,7 +320,13 @@ def pricing_guide_summary(rows: list[dict[str, Any]] | None = None) -> dict[str,
             last_updated = ts
     return {
         "active_count": len(active),
-        "inventory_linked": sum(1 for r in active if r.get("inventory_item_id")),
+        "inventory_linked": sum(
+            1 for r in active if r.get("linked_inventory_id") or r.get("inventory_item_id")
+        ),
+        "asset_linked": sum(1 for r in active if r.get("linked_asset_id") or r.get("asset_id")),
+        "inventory_class": sum(1 for r in active if r.get("item_class") == "Inventory"),
+        "asset_class": sum(1 for r in active if r.get("item_class") == "Asset"),
+        "non_inventory_class": sum(1 for r in active if r.get("item_class") == "Non-Inventory"),
         "labor_count": sum(1 for r in active if r.get("item_type") == "Labor"),
         "equipment_count": sum(1 for r in active if r.get("item_type") == "Equipment"),
         "travel_count": sum(1 for r in active if r.get("item_type") == "Travel"),
@@ -329,13 +368,25 @@ def _sync_inventory_link(
     inventory_item_id: str | None,
     update_rows_admin: Callable[..., list[dict[str, Any]]],
 ) -> None:
-    if not pricing_item_id:
+    if not pricing_item_id or not inventory_item_id:
         return
     try:
         update_rows_admin(
             "inventory_items",
-            {"pricing_item_id": pricing_item_id},
+            {
+                "pricing_item_id": pricing_item_id,
+                "pricing_guide_id": pricing_item_id,
+            },
             {"id": inventory_item_id},
+        )
+        update_rows_admin(
+            "pricing_guide_items",
+            {
+                "inventory_item_id": inventory_item_id,
+                "linked_inventory_id": inventory_item_id,
+                "item_class": "Inventory",
+            },
+            {"id": pricing_item_id},
         )
     except Exception:
         pass
@@ -352,11 +403,64 @@ def _sync_asset_link(
     try:
         update_rows_admin(
             "assets",
-            {"pricing_item_id": pricing_item_id},
+            {
+                "pricing_item_id": pricing_item_id,
+                "pricing_guide_id": pricing_item_id,
+            },
             {"id": asset_id},
+        )
+        update_rows_admin(
+            "pricing_guide_items",
+            {
+                "asset_id": asset_id,
+                "linked_asset_id": asset_id,
+                "item_class": "Asset",
+            },
+            {"id": pricing_item_id},
         )
     except Exception:
         pass
+
+
+def resolve_live_unit_cost(row: dict[str, Any]) -> float:
+    """Pull current cost from linked inventory or asset rental rate when available."""
+    base = float(row.get("default_cost") or 0)
+    item_class = str(row.get("item_class") or "").strip()
+    inv_id = str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
+    ast_id = str(row.get("linked_asset_id") or row.get("asset_id") or "").strip()
+    if item_class == "Inventory" and inv_id:
+        try:
+            from app.pages._core._data import load_inventory
+        except ImportError:
+            from pages._core._data import load_inventory  # type: ignore
+        inv = next((r for r in load_inventory() if str(r.get("id")) == inv_id), None)
+        if inv:
+            for key in ("average_cost", "last_purchase_cost", "unit_cost"):
+                val = inv.get(key)
+                if val not in (None, ""):
+                    try:
+                        cost = float(val)
+                        if cost > 0:
+                            return cost
+                    except (TypeError, ValueError):
+                        continue
+    if item_class == "Asset" and ast_id:
+        try:
+            from app.pages._core._data import load_assets
+        except ImportError:
+            from pages._core._data import load_assets  # type: ignore
+        asset = next((r for r in load_assets() if str(r.get("id")) == ast_id), None)
+        if asset:
+            for key in ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"):
+                val = asset.get(key)
+                if val not in (None, ""):
+                    try:
+                        cost = float(val)
+                        if cost > 0:
+                            return cost
+                    except (TypeError, ValueError):
+                        continue
+    return base
 
 
 def save_pricing_item(
@@ -388,6 +492,17 @@ def save_pricing_item(
     if item_type not in PRICING_ITEM_TYPES:
         item_type = "Material"
 
+    inv_link = data.get("linked_inventory_id") or data.get("inventory_item_id")
+    ast_link = data.get("linked_asset_id") or data.get("asset_id")
+    item_class = str(data.get("item_class") or "").strip()
+    if item_class not in PRICING_ITEM_CLASSES:
+        if inv_link:
+            item_class = "Inventory"
+        elif ast_link:
+            item_class = "Asset"
+        else:
+            item_class = "Non-Inventory"
+
     item_code = str(data.get("item_code") or data.get("item_key") or "").strip()
     if not item_code:
         prefix = {
@@ -401,6 +516,7 @@ def save_pricing_item(
     payload: dict[str, Any] = {
         "item_code": item_code[:500],
         "item_type": item_type,
+        "item_class": str(data.get("item_class") or "Non-Inventory").strip()[:32],
         "description": description[:2000],
         "category": str(data.get("category") or "").strip()[:200],
         "subcategory": str(data.get("subcategory") or data.get("subgroup") or "").strip()[:200],
@@ -408,11 +524,22 @@ def save_pricing_item(
         "default_cost": cost,
         "default_markup_percent": markup,
         "default_sell_price": float(sell),
+        "markup_percent": markup,
+        "sell_price": float(sell),
+        "item_number": str(data.get("item_number") or item_code).strip()[:200],
+        "model_number": str(data.get("model_number") or "").strip()[:200],
+        "sku": str(data.get("sku") or item_code).strip()[:200],
         "taxable": bool(data.get("taxable", True)),
         "is_active": bool(data.get("is_active", True)),
-        "inventory_item_id": data.get("inventory_item_id") or None,
-        "asset_id": data.get("asset_id") or None,
+        "inventory_item_id": data.get("linked_inventory_id") or data.get("inventory_item_id") or None,
+        "asset_id": data.get("linked_asset_id") or data.get("asset_id") or None,
+        "linked_inventory_id": data.get("linked_inventory_id") or data.get("inventory_item_id") or None,
+        "linked_asset_id": data.get("linked_asset_id") or data.get("asset_id") or None,
         "vendor_id": data.get("vendor_id") or None,
+        "vendor": str(data.get("vendor") or data.get("vendor_name") or "").strip()[:200],
+        "image_url": str(data.get("image_url") or "").strip(),
+        "qr_code_url": str(data.get("qr_code_url") or "").strip(),
+        "asset_recommended": bool(data.get("asset_recommended", False)),
         "labor_role": str(data.get("labor_role") or "").strip()[:200] or None,
         "equipment_type": str(data.get("equipment_type") or "").strip()[:200] or None,
         "travel_type": str(data.get("travel_type") or "").strip()[:200] or None,
@@ -452,16 +579,18 @@ def save_pricing_item(
         return _save_legacy_estimate_material(data, row_id=row_id, exc=str(exc))
 
     if saved_id:
-        if payload.get("inventory_item_id"):
+        inv_link = payload.get("linked_inventory_id") or payload.get("inventory_item_id")
+        if inv_link:
             _sync_inventory_link(
                 pricing_item_id=saved_id,
-                inventory_item_id=str(payload["inventory_item_id"]),
+                inventory_item_id=str(inv_link),
                 update_rows_admin=update_rows_admin,
             )
-        if payload.get("asset_id"):
+        ast_link = payload.get("linked_asset_id") or payload.get("asset_id")
+        if ast_link:
             _sync_asset_link(
                 pricing_item_id=saved_id,
-                asset_id=str(payload["asset_id"]),
+                asset_id=str(ast_link),
                 update_rows_admin=update_rows_admin,
             )
 
@@ -546,13 +675,16 @@ def create_pricing_item_from_inventory(
     unit_cost = float(inventory_row.get("unit_cost") or 0)
     ok, msg = save_pricing_item(
         {
-            "item_type": "Inventory",
+            "item_type": "Material",
+            "item_class": "Inventory",
             "description": description,
             "category": str(inventory_row.get("category") or "Inventory"),
             "unit": str(inventory_row.get("unit") or "EA"),
             "default_cost": unit_cost,
             "default_markup_percent": 25.0,
             "inventory_item_id": iid,
+            "linked_inventory_id": iid,
+            "sku": str(inventory_row.get("sku") or ""),
             "is_active": inventory_row.get("is_active") is not False,
         },
         changed_by=changed_by,
@@ -631,7 +763,12 @@ def link_inventory_to_pricing_item(
         update_rows_admin("inventory_items", inv_payload, {"id": iid})
         update_rows_admin(
             "pricing_guide_items",
-            {"inventory_item_id": iid, "item_type": "Inventory"},
+            {
+                "inventory_item_id": iid,
+                "linked_inventory_id": iid,
+                "item_type": "Inventory",
+                "item_class": "Inventory",
+            },
             {"id": pid},
         )
         if sync_cost:
@@ -664,10 +801,15 @@ def link_asset_to_pricing_item(asset_id: str, pricing_item_id: str) -> tuple[boo
     if not aid or not pid:
         return False, "Asset and pricing item are required."
     try:
-        update_rows_admin("assets", {"pricing_item_id": pid}, {"id": aid})
+        update_rows_admin("assets", {"pricing_item_id": pid, "pricing_guide_id": pid}, {"id": aid})
         update_rows_admin(
             "pricing_guide_items",
-            {"asset_id": aid, "item_type": "Equipment"},
+            {
+                "asset_id": aid,
+                "linked_asset_id": aid,
+                "item_type": "Equipment",
+                "item_class": "Asset",
+            },
             {"id": pid},
         )
         clear_pricing_guide_cache()
@@ -678,18 +820,24 @@ def link_asset_to_pricing_item(asset_id: str, pricing_item_id: str) -> tuple[boo
 
 def pricing_item_to_estimate_option(row: dict[str, Any]) -> dict[str, Any]:
     """Map normalized pricing row → estimate picker option."""
-    cost = float(row.get("default_cost") or 0)
-    markup = float(row.get("markup_pct") or row.get("default_markup_percent") or 0)
-    sell = float(row.get("default_sell_price") or row.get("customer_price") or calc_sell_price(cost, markup))
+    cost = resolve_live_unit_cost(row)
+    markup = float(row.get("markup_pct") or row.get("markup_percent") or row.get("default_markup_percent") or 0)
+    sell = float(row.get("default_sell_price") or row.get("sell_price") or row.get("customer_price") or calc_sell_price(cost, markup))
     item_type = str(row.get("item_type") or "Material")
+    item_class = str(row.get("item_class") or "Non-Inventory")
     description = str(row.get("description") or "—").strip()
+    inv_id = row.get("linked_inventory_id") or row.get("inventory_item_id")
+    ast_id = row.get("linked_asset_id") or row.get("asset_id")
     return {
         "id": str(row.get("id") or ""),
         "pricing_item_id": str(row.get("id") or ""),
         "item_type": item_type,
+        "item_class": item_class,
         "description": description,
-        "item_key": str(row.get("item_code") or ""),
-        "sku": str(row.get("item_code") or ""),
+        "item_key": str(row.get("item_code") or row.get("sku") or ""),
+        "sku": str(row.get("sku") or row.get("item_code") or ""),
+        "item_number": str(row.get("item_number") or ""),
+        "model_number": str(row.get("model_number") or ""),
         "category": str(row.get("category") or ""),
         "subcategory": str(row.get("subcategory") or ""),
         "unit": str(row.get("unit") or "EA"),
@@ -700,12 +848,14 @@ def pricing_item_to_estimate_option(row: dict[str, Any]) -> dict[str, Any]:
         "vendor": str(row.get("vendor") or row.get("vendor_name") or ""),
         "vendor_name": str(row.get("vendor") or row.get("vendor_name") or ""),
         "taxable": row.get("taxable") is not False,
-        "inventory_item_id": row.get("inventory_item_id"),
-        "asset_id": row.get("asset_id"),
+        "inventory_item_id": inv_id,
+        "asset_id": ast_id,
+        "linked_inventory_id": inv_id,
+        "linked_asset_id": ast_id,
         "labor_role": row.get("labor_role"),
         "equipment_type": row.get("equipment_type"),
         "travel_type": row.get("travel_type"),
-        "label": f"{description} — {item_type}",
+        "label": f"{description} — {item_class}",
     }
 
 
@@ -721,6 +871,10 @@ def search_pricing_rows(rows: list[dict[str, Any]], query: str) -> list[dict[str
                 "description",
                 "item_code",
                 "item_type",
+                "item_class",
+                "item_number",
+                "model_number",
+                "sku",
                 "category",
                 "subcategory",
                 "vendor",

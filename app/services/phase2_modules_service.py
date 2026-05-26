@@ -357,21 +357,38 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
     qty = row.get("qty_on_hand")
     if qty is None:
         qty = row.get("quantity_on_hand")
+    pricing_guide_id = str(row.get("pricing_guide_id") or row.get("pricing_item_id") or "").strip() or None
+    qty_allocated = float(row.get("quantity_allocated") or 0)
+    qty_available = row.get("quantity_available")
+    if qty_available is None:
+        qty_available = max(float(qty or 0) - qty_allocated, 0)
     return {
         "id": iid or sku,
         "sku": sku,
+        "barcode": str(row.get("barcode") or ""),
         "qr_code_value": resolve_inventory_qr_value(row),
         "name": str(row.get("name") or row.get("item_name") or "—"),
         "category": str(row.get("category") or "—"),
-        "location": str(row.get("location") or row.get("storage_location") or row.get("location_name") or "—"),
+        "location": str(
+            row.get("stock_location")
+            or row.get("location")
+            or row.get("storage_location")
+            or row.get("location_name")
+            or "—"
+        ),
+        "stock_location": str(row.get("stock_location") or row.get("storage_location") or ""),
         "department": str(row.get("department") or "—"),
         "status": str(row.get("status") or "In Stock"),
         "qty_on_hand": int(float(qty or 0)),
         "reorder_point": int(float(row.get("reorder_point") or 0)),
         "unit_cost": float(row.get("unit_cost") or 0),
+        "last_purchase_cost": float(row.get("last_purchase_cost") or row.get("unit_cost") or 0),
+        "average_cost": float(row.get("average_cost") or row.get("unit_cost") or 0),
         "vendor_id": str(row.get("vendor_id") or "") or None,
         "vendor": str(row.get("vendor") or row.get("vendor_name") or "—"),
         "description": str(row.get("description") or row.get("item_name") or row.get("name") or "—"),
+        "pricing_guide_id": pricing_guide_id,
+        "pricing_item_id": pricing_guide_id,
         "taxable": row.get("taxable") if row.get("taxable") is not None else True,
         "image_path": str(row.get("image_path") or ""),
         "image_url": str(row.get("image_url") or ""),
@@ -381,13 +398,15 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
         "qr_token": str(row.get("qr_token") or "").strip(),
         "quantity_checked_out": float(row.get("quantity_checked_out") or 0),
-        "quantity_allocated": float(row.get("quantity_allocated") or 0),
+        "quantity_allocated": qty_allocated,
+        "quantity_available": float(qty_available or 0),
     }
 
 
 def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
     aid = str(row.get("id") or "").strip()
     num = str(row.get("asset_number") or row.get("asset_id") or row.get("tag") or aid[:8])
+    pricing_guide_id = str(row.get("pricing_guide_id") or row.get("pricing_item_id") or "").strip() or None
     return {
         "id": aid or num,
         "asset_number": num,
@@ -399,10 +418,21 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "status": str(row.get("status") or "In Service"),
         "acquired_date": str(row.get("acquired_date") or row.get("purchase_date") or "")[:10],
         "value": float(row.get("value") or row.get("current_value") or row.get("purchase_cost") or 0),
+        "purchase_price": float(row.get("purchase_cost") or row.get("purchase_price") or 0),
+        "current_value": float(row.get("current_value") or row.get("purchase_cost") or 0),
         "serial_number": str(row.get("serial_number") or "—"),
         "manufacturer": str(row.get("manufacturer") or "—"),
         "model": str(row.get("model") or "—"),
-        "operator": str(row.get("operator") or row.get("assigned_employee") or "—"),
+        "operator": str(row.get("operator") or row.get("assigned_employee") or row.get("assigned_to") or "—"),
+        "assigned_to": str(row.get("assigned_to") or row.get("assigned_employee") or row.get("operator") or "—"),
+        "assigned_trailer_id": str(row.get("assigned_trailer_id") or "") or None,
+        "assigned_job_id": str(row.get("assigned_job_id") or row.get("job_id") or "") or None,
+        "service_due": str(row.get("service_due") or row.get("next_service_due") or "")[:10],
+        "inspection_due": str(row.get("inspection_due") or "")[:10],
+        "manuals": str(row.get("manuals") or ""),
+        "certifications": str(row.get("certifications") or ""),
+        "pricing_guide_id": pricing_guide_id,
+        "pricing_item_id": pricing_guide_id,
         "description": str(row.get("description") or row.get("notes") or ""),
         "qr_code_value": str(row.get("qr_code_value") or "").strip(),
         "qr_token": str(row.get("qr_token") or ""),
