@@ -17,7 +17,11 @@ try:
         build_filter_options,
         render_table_header_cell,
     )
-    from app.components.table_pagination import paginate_rows, render_table_pagination_controls
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -81,7 +85,11 @@ except ImportError:
         build_filter_options,
         render_table_header_cell,
     )
-    from components.table_pagination import paginate_rows, render_table_pagination_controls  # type: ignore
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -1070,7 +1078,7 @@ def render() -> None:
 
     filtered = _filter_rows(rows)
 
-    render_table_pagination_controls(len(filtered), _TABLE_KEY, item_label="asset")
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
@@ -1082,6 +1090,7 @@ def render() -> None:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
     _render_custom_assets_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
     if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):

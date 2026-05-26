@@ -19,7 +19,12 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
-    from app.components.table_pagination import paginate_rows, render_table_pagination_controls, reset_table_page
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -78,7 +83,12 @@ except ImportError:
         clear_table_filters,
         render_table_header_cell,
     )
-    from components.table_pagination import paginate_rows, render_table_pagination_controls, reset_table_page  # type: ignore
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
         clear_edit_modes,
@@ -874,11 +884,12 @@ def render() -> None:
         q=str(st.session_state.get("inv_search") or "").strip(),
     )
 
-    render_table_pagination_controls(len(filtered), _TABLE_KEY, item_label="item")
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
     _render_custom_inventory_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_inventory_id = st.session_state.get(SELECTED_INVENTORY_KEY)
     if selected_inventory_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
