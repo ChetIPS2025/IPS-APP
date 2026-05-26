@@ -3574,6 +3574,16 @@ div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) {
     text-transform: uppercase;
     color: #475569;
 }
+.ips-inventory-pg-status {
+    margin: 0 0 0.55rem 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: #334155;
+}
+.ips-inventory-pg-status span {
+    color: #64748b;
+    font-size: 0.75rem;
+}
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="stHorizontalBlock"],

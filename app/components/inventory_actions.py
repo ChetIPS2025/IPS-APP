@@ -16,6 +16,7 @@ try:
         clear_inventory_cache,
         deactivate_inventory_item,
         delete_inventory_item,
+        remove_inventory_keep_pricing_item,
     )
 except ImportError:
     from components.action_styles import danger_solid_button, warning_solid_button  # type: ignore
@@ -25,6 +26,7 @@ except ImportError:
         clear_inventory_cache,
         deactivate_inventory_item,
         delete_inventory_item,
+        remove_inventory_keep_pricing_item,
     )
 
 
@@ -64,7 +66,7 @@ def _render_confirm_card(
             st.rerun()
     with btn_confirm:
         clicked = False
-        if action == "deactivate":
+        if action in {"deactivate", "remove_keep_pricing"}:
             clicked = warning_solid_button(confirm_label, f"confirm_{action}_{item_id}", use_container_width=True)
         else:
             clicked = danger_solid_button(confirm_label, f"confirm_{action}_{item_id}", use_container_width=True)
@@ -78,6 +80,7 @@ def render_inventory_action_buttons(
     *,
     on_deactivate: Callable[[], None] | None = None,
     on_delete: Callable[[], None] | None = None,
+    on_remove_keep_pricing: Callable[[], None] | None = None,
 ) -> None:
     """Render compact Inventory Actions row with inline confirmation panels."""
     iid = str(item.get("id") or "").strip()
@@ -91,7 +94,7 @@ def render_inventory_action_buttons(
     item_key = "".join(ch if ch.isalnum() else "_" for ch in iid) or "inv"
     show_deactivate = not _is_discontinued(item)
 
-    for action in ("deactivate", "delete"):
+    for action in ("deactivate", "remove_keep_pricing", "delete"):
         if st.session_state.get(_confirm_state_key(iid, action)):
             if action == "deactivate":
                 _render_confirm_card(
@@ -101,6 +104,18 @@ def render_inventory_action_buttons(
                     message="Are you sure you want to deactivate this inventory item?",
                     confirm_label="Confirm Deactivate",
                     confirm_fn=lambda: _handle_deactivate(iid, on_deactivate),
+                )
+            elif action == "remove_keep_pricing":
+                _render_confirm_card(
+                    item_id=iid,
+                    action=action,
+                    title="Remove from Inventory",
+                    message=(
+                        "Remove this stock record from Inventory and keep the linked Pricing Guide "
+                        "item as Non-Inventory for estimates. This cannot be undone."
+                    ),
+                    confirm_label="Confirm Remove",
+                    confirm_fn=lambda: _handle_remove_keep_pricing(iid, on_remove_keep_pricing),
                 )
             else:
                 _render_confirm_card(
@@ -116,6 +131,14 @@ def render_inventory_action_buttons(
     action_specs: list[tuple[str, Any, str, str]] = []
     if show_deactivate:
         action_specs.append(("deactivate", warning_solid_button, "Deactivate Item", f"open_deactivate_{item_key}"))
+    action_specs.append(
+        (
+            "remove_keep_pricing",
+            warning_solid_button,
+            "Remove from Inventory",
+            f"open_remove_keep_pricing_{item_key}",
+        )
+    )
     action_specs.append(("delete", danger_solid_button, "Delete Item", f"open_delete_{item_key}"))
 
     with st.container(key=f"inventory_actions_{item_key}"):
@@ -137,6 +160,23 @@ def _handle_deactivate(item_id: str, on_deactivate: Callable[[], None] | None) -
             on_deactivate()
         return True
     st.error(result.error or "Could not deactivate item.")
+    return False
+
+
+def _handle_remove_keep_pricing(
+    item_id: str,
+    on_remove_keep_pricing: Callable[[], None] | None,
+) -> bool:
+    result = remove_inventory_keep_pricing_item(item_id)
+    if result.ok:
+        message = "Removed from inventory."
+        if isinstance(result.data, dict):
+            message = str(result.data.get("message") or message)
+        st.success(message)
+        if on_remove_keep_pricing:
+            on_remove_keep_pricing()
+        return True
+    st.error(result.error or "Could not remove inventory item.")
     return False
 
 

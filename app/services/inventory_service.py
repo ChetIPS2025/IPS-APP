@@ -55,6 +55,7 @@ __all__ = [
     "clear_inventory_cache",
     "deactivate_inventory_item",
     "delete_inventory_item",
+    "remove_inventory_keep_pricing_item",
     "ensure_inventory_qr_tokens",
     "generate_inventory_qr_value",
     "get_inventory",
@@ -95,6 +96,98 @@ def deactivate_inventory_item(item_id: str) -> ServiceResult:
     if result.ok:
         clear_inventory_cache()
     return result
+
+
+def _linked_pricing_item_ids(inventory_id: str, inventory_row: dict[str, Any] | None) -> set[str]:
+    iid = str(inventory_id or "").strip()
+    if not iid:
+        return set()
+    pg_ids: set[str] = set()
+    if inventory_row:
+        for key in ("pricing_guide_id", "pricing_item_id"):
+            pid = str(inventory_row.get(key) or "").strip()
+            if pid:
+                pg_ids.add(pid)
+    try:
+        from app.db import fetch_table_admin
+    except ImportError:
+        from db import fetch_table_admin  # type: ignore
+    try:
+        pg_rows = list(fetch_table_admin("pricing_guide_items", limit=10000) or [])
+    except Exception:
+        pg_rows = []
+    for row in pg_rows:
+        if not isinstance(row, dict):
+            continue
+        link = str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
+        if link != iid:
+            continue
+        pid = str(row.get("id") or "").strip()
+        if pid:
+            pg_ids.add(pid)
+    return pg_ids
+
+
+def remove_inventory_keep_pricing_item(item_id: str) -> ServiceResult:
+    """Delete the stock record and keep linked pricing guide item(s) as Non-Inventory."""
+    iid = str(item_id or "").strip()
+    if not iid:
+        return ServiceResult(ok=False, error="Missing inventory item id.")
+    try:
+        from app.pages._core._crud import is_demo_id
+    except ImportError:
+        from pages._core._crud import is_demo_id  # type: ignore
+    if is_demo_id(iid):
+        return ServiceResult(ok=False, error="Demo records cannot be removed.")
+
+    inv = get_inventory_item(iid)
+    if not inv:
+        return ServiceResult(ok=False, error="Inventory item not found.")
+
+    pg_ids = _linked_pricing_item_ids(iid, inv)
+    try:
+        from app.db import update_rows_admin
+    except ImportError:
+        from db import update_rows_admin  # type: ignore
+
+    updated: list[str] = []
+    now = datetime.now(timezone.utc).isoformat()
+    for pid in sorted(pg_ids):
+        try:
+            update_rows_admin(
+                "pricing_guide_items",
+                {
+                    "inventory_item_id": None,
+                    "linked_inventory_id": None,
+                    "item_class": "Non-Inventory",
+                    "updated_at": now,
+                },
+                {"id": pid},
+            )
+            updated.append(pid)
+        except Exception as exc:
+            return ServiceResult(ok=False, error=f"Could not update pricing guide item: {exc}")
+
+    delete_result = delete_inventory_item(iid)
+    if not delete_result.ok:
+        return delete_result
+
+    try:
+        from app.services.pricing_guide_service import clear_pricing_guide_cache
+
+        clear_pricing_guide_cache()
+    except Exception:
+        pass
+    clear_inventory_cache()
+
+    if updated:
+        msg = (
+            f"Removed from inventory. Kept {len(updated)} pricing guide item(s) "
+            "as Non-Inventory for estimating."
+        )
+    else:
+        msg = "Removed from inventory. No linked pricing guide item was found."
+    return ServiceResult(ok=True, data={"pricing_item_ids": updated, "message": msg})
 
 
 def get_inventory() -> list[dict[str, Any]]:
