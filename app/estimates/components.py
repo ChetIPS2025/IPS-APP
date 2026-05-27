@@ -335,12 +335,12 @@ def render_estimates_table(
         delete_estimate_unlink_first = None  # type: ignore
 
     try:
+        from app.navigation import IPS_NAV_PENDING_KEY
+    except ImportError:
         try:
-            from ui import IPS_NAV_PENDING_KEY
+            from navigation import IPS_NAV_PENDING_KEY  # type: ignore
         except ImportError:
             from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-    except Exception:
-        IPS_NAV_PENDING_KEY = "_ips_nav_pending"
 
     from app.estimates.queries import is_admin_reader
 
@@ -626,12 +626,12 @@ def render_estimate_detail_panel(
         create_job_from_estimate = None  # type: ignore
 
     try:
+        from app.navigation import IPS_NAV_PENDING_KEY
+    except ImportError:
         try:
-            from ui import IPS_NAV_PENDING_KEY
+            from navigation import IPS_NAV_PENDING_KEY  # type: ignore
         except ImportError:
             from app.ui import IPS_NAV_PENDING_KEY  # type: ignore
-    except Exception:
-        IPS_NAV_PENDING_KEY = "_ips_nav_pending"
 
     try:
         try:

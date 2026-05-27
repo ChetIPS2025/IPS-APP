@@ -56,22 +56,22 @@ except ImportError:
 try:
     from app.components.sidebar import render_sidebar
     from app.navigation import (
+        apply_pending_navigation,
         current_nav_slug,
         ensure_nav_defaults,
         on_nav_change,
         render_module,
-        set_nav_slug,
     )
     from app.styles import inject_authenticated_shell_css, inject_global_css, inject_unauthenticated_shell_css
     from app.utils.constants import SESSION_NAV_KEY
 except ImportError:
     from components.sidebar import render_sidebar  # type: ignore
     from navigation import (  # type: ignore
+        apply_pending_navigation,
         current_nav_slug,
         ensure_nav_defaults,
         on_nav_change,
         render_module,
-        set_nav_slug,
     )
     from styles import inject_authenticated_shell_css, inject_global_css, inject_unauthenticated_shell_css  # type: ignore
     from utils.constants import SESSION_NAV_KEY  # type: ignore
@@ -172,6 +172,11 @@ def main() -> None:
     init_session()
     bootstrap_auth_at_startup()
     inject_global_css()
+    try:
+        from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
+    except ImportError:
+        from mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once  # type: ignore
+    inject_ips_global_mobile_css()
 
     try:
         from app.pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active
@@ -235,12 +240,31 @@ def main() -> None:
 
     persist_auth_cookies_if_pending()
     inject_authenticated_shell_css()
+    inject_sidebar_mobile_auto_collapse_once()
     log_auth_state("app_authenticated")
 
     if must_reset_password():
         _render_password_reset()
         if must_reset_password():
             st.stop()
+
+    apply_pending_navigation()
+
+    if inventory_scan_route_active():
+        try:
+            from app.pages.inventory_scan import render_inventory_scan_page
+        except ImportError:
+            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
+        render_inventory_scan_page()
+        st.stop()
+
+    if asset_scan_route_active():
+        try:
+            from app.pages.asset_scan import render_asset_scan_page
+        except ImportError:
+            from pages.asset_scan import render_asset_scan_page  # type: ignore
+        render_asset_scan_page()
+        st.stop()
 
     ensure_nav_defaults()
     prev_slug = st.session_state.get("_ips_last_slug")

@@ -86,7 +86,75 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Labor": "reports",
     "Job Costing": "job_costing",
     "Customers / Jobs": "customers",
+    "Work & Plan (Supervisor)": "tasks",
+    "Assign Tasks (PM)": "tasks",
+    "Daily Reports": "reports",
+    "Daily crew report": "reports",
+    "Supervisor Daily Reports": "reports",
+    "Who Has What": "assets",
+    "Tool Trailer Audits": "assets",
+    "Asset Scanner": "assets",
+    "Scan Asset": "assets",
+    "Certifications": "employee_certifications",
+    "Employee Documents": "employee_documents",
 }
+
+# Deferred cross-page jumps (legacy labels + slugs). Consumed in ``apply_pending_navigation()``.
+IPS_NAV_PENDING_KEY = "ips_nav_pending"
+_INVENTORY_SCAN_SESSION_KEY = "_ips_inventory_scan_page"
+_ASSET_SCAN_SESSION_KEY = "_ips_asset_scan_page"
+
+PENDING_NAV_ALIASES: dict[str, str] = {
+    "Tool Checkout": "Scan Inventory",
+    "Planning & Goals": "Work & Plan (Supervisor)",
+    "Daily Tasks": "Work & Plan (Supervisor)",
+    "Supervisor Daily Reports": "Daily Reports",
+    "Daily crew report": "Daily Reports",
+    "Materials Catalog": "Pricing Guide",
+    "Material Catalog": "Pricing Guide",
+    "Materials": "Pricing Guide",
+    "PM Matrix Time Entry": "Timekeeping",
+}
+
+_SCAN_INVENTORY_LABELS = frozenset({"Scan Inventory", "Inventory Scan"})
+_SCAN_ASSET_LABELS = frozenset({"Asset Scanner", "Scan Asset", "Asset Scan"})
+
+
+def queue_pending_nav(label_or_slug: str) -> None:
+    """Queue a sidebar/page change for the next ``main()`` run (before the sidebar renders)."""
+    label = str(label_or_slug or "").strip()
+    if label:
+        st.session_state[IPS_NAV_PENDING_KEY] = label
+
+
+def apply_pending_navigation() -> None:
+    """
+    Apply deferred navigation from ``IPS_NAV_PENDING_KEY``.
+
+    Maps legacy sidebar labels to rebuilt module slugs and arms dedicated scan routes.
+    """
+    pending = st.session_state.pop(IPS_NAV_PENDING_KEY, None)
+    if not pending:
+        return
+
+    label = PENDING_NAV_ALIASES.get(str(pending).strip(), str(pending).strip())
+    if not label:
+        return
+
+    if label in _SCAN_INVENTORY_LABELS:
+        st.session_state[_INVENTORY_SCAN_SESSION_KEY] = True
+        return
+    if label in _SCAN_ASSET_LABELS:
+        st.session_state[_ASSET_SCAN_SESSION_KEY] = True
+        return
+    if label in {"Asset Detail", "Asset Manager"}:
+        set_nav_slug("assets")
+        return
+    if label in {"Users", "Employees", "People", "Employee Toolbox"}:
+        set_nav_slug("employees")
+        return
+
+    set_nav_slug(label)
 
 
 def normalize_nav_slug(raw: str | None) -> str:
@@ -125,11 +193,15 @@ except ImportError:
 __all__ = [
     "ACTIVE_MODULE_SLUGS",
     "BUILT_MODULES",
+    "IPS_NAV_PENDING_KEY",
     "LEGACY_PAGE_LABEL_TO_SLUG",
+    "PENDING_NAV_ALIASES",
+    "apply_pending_navigation",
     "current_nav_slug",
     "ensure_nav_defaults",
     "normalize_nav_slug",
     "on_nav_change",
+    "queue_pending_nav",
     "render_module",
     "set_nav_slug",
 ]

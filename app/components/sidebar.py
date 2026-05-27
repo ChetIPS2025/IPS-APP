@@ -10,12 +10,12 @@ import streamlit as st
 try:
     from app.auth import current_profile, current_role, sign_out
     from app.config import APP_VERSION, ROOT_DIR
-    from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES, SESSION_NAV_KEY
+    from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES
     from app.utils.permissions import filter_nav_for_role, normalize_role
 except ImportError:
     from auth import current_profile, current_role, sign_out  # type: ignore
     from config import APP_VERSION, ROOT_DIR  # type: ignore
-    from utils.constants import FIELD_NAV_PAGES, NAV_PAGES, SESSION_NAV_KEY  # type: ignore
+    from utils.constants import FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
     from utils.permissions import filter_nav_for_role, normalize_role  # type: ignore
 
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
@@ -68,7 +68,11 @@ def render_sidebar(active_slug: str) -> None:
                 type="primary" if is_active else "secondary",
             ):
                 if not is_active:
-                    st.session_state[SESSION_NAV_KEY] = slug
+                    try:
+                        from app.navigation import set_nav_slug
+                    except ImportError:
+                        from navigation import set_nav_slug  # type: ignore
+                    set_nav_slug(slug)
                     st.rerun()
 
         st.markdown(f'<{_OT} class="ips-sidebar-spacer"><{_CT}>', unsafe_allow_html=True)

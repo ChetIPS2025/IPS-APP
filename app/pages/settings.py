@@ -1,12 +1,8 @@
-"""Settings page — delegates to admin module with settings context."""
+"""Settings page — same admin module with settings context."""
 
 from __future__ import annotations
 
 try:
-    from app.pages.modules import admin
+    from app.pages.admin import render
 except ImportError:
-    from pages.modules import admin  # type: ignore
-
-
-def render() -> None:
-    admin.render()
+    from pages.admin import render  # type: ignore

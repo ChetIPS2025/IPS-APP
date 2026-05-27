@@ -202,7 +202,11 @@ def render_dashboard_quick_actions(
                         use_container_width=True,
                     ):
                         if slug:
-                            st.session_state["ips_nav_page"] = slug
+                            try:
+                                from app.navigation import set_nav_slug
+                            except ImportError:
+                                from navigation import set_nav_slug  # type: ignore
+                            set_nav_slug(slug)
                             st.rerun()
 
 
