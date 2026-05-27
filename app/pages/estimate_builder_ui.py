@@ -381,7 +381,6 @@ def render_cost_builder_tab(
         st.info("Save this estimate to Supabase before building costs.")
         return
 
-    bundle = get_estimate_bundle(eid)
     totals = calculate_estimate_totals(eid)
     render_cost_summary_cards(est, totals)
 
@@ -411,18 +410,6 @@ def render_cost_builder_tab(
             else:
                 st.error(err)
     st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("#### Recent Lines")
-    preview_rows: list[list[str]] = []
-    for row in bundle["materials"][:3]:
-        preview_rows.append(["Material", row.get("description", ""), fmt_currency(row.get("price_total"))])
-    for row in bundle["labor"][:2]:
-        preview_rows.append(["Labor", row.get("role_name", ""), fmt_currency(row.get("price_total"))])
-    for row in bundle["equipment"][:2]:
-        preview_rows.append(["Equipment", row.get("equipment_name", ""), fmt_currency(row.get("price_total"))])
-    for row in bundle.get("travel", [])[:2]:
-        preview_rows.append(["Travel", row.get("description") or row.get("travel_type", ""), fmt_currency(row.get("price_total"))])
-    _line_table(["Type", "Description", "Price"], preview_rows)
 
     if add_mat:
         st.session_state[f"ecb_form_mat_{eid}"] = True
@@ -468,6 +455,8 @@ def render_cost_builder_tab(
         )
     if st.session_state.get(f"ecb_form_other_{eid}"):
         _render_add_other_form(eid, est, key_prefix="ecb_oth", form_state_key=f"ecb_form_other_{eid}")
+
+    _render_cost_builder_line_sections(est)
 
 
 def _render_add_material_form(
@@ -1056,6 +1045,130 @@ def _render_add_travel_form(
             st.session_state.pop(fk, None)
             st.rerun()
     _close_compact_form_card()
+
+
+def _render_cost_builder_line_sections(est: dict[str, Any]) -> None:
+    """Full line lists for each cost category (managed from Cost Builder)."""
+    eid = str(est.get("id") or "")
+    bundle = get_estimate_bundle(eid)
+
+    st.markdown("#### Pricing Items")
+    _render_deletable_lines(
+        eid,
+        ["SKU", "Description", "Qty", "Unit Cost", "Cost", "Price"],
+        bundle["materials"],
+        row_cells=lambda r: [
+            html.escape(str(r.get("sku") or "—")),
+            html.escape(str(r.get("description") or "—")),
+            html.escape(str(r.get("quantity") or "")),
+            html.escape(fmt_currency(r.get("unit_cost"))),
+            html.escape(fmt_currency(r.get("cost_total"))),
+            html.escape(fmt_currency(r.get("price_total"))),
+        ],
+        delete_fn=delete_estimate_material,
+        key_prefix="ecb_mat",
+    )
+
+    st.markdown("#### Labor")
+    _render_deletable_lines(
+        eid,
+        ["Role", "ST/OT/DT", "Cost", "Price"],
+        bundle["labor"],
+        row_cells=lambda r: [
+            html.escape(str(r.get("role_name") or "—")),
+            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}/{r.get('dt_hours',0)}"),
+            html.escape(fmt_currency(r.get("cost_total"))),
+            html.escape(fmt_currency(r.get("price_total"))),
+        ],
+        delete_fn=delete_estimate_labor,
+        key_prefix="ecb_lab",
+    )
+
+    st.markdown("#### Equipment")
+    _render_deletable_lines(
+        eid,
+        ["Equipment", "Duration", "Cost", "Price"],
+        bundle["equipment"],
+        row_cells=lambda r: [
+            html.escape(str(r.get("equipment_name") or "—")),
+            html.escape(f"{r.get('duration',0)} {r.get('duration_unit','')}" ),
+            html.escape(fmt_currency(r.get("cost_total"))),
+            html.escape(fmt_currency(r.get("price_total"))),
+        ],
+        delete_fn=delete_estimate_equipment,
+        key_prefix="ecb_eq",
+    )
+
+    st.markdown("#### Travel")
+    travel_lines = bundle.get("travel") or []
+    if not travel_lines:
+        st.caption("No travel lines yet.")
+    else:
+        for row in travel_lines:
+            rid = str(row.get("id") or "")
+            cells = [
+                html.escape(str(row.get("travel_type") or "—")),
+                html.escape(str(row.get("description") or "—")),
+                html.escape(str(row.get("origin") or "—")),
+                html.escape(str(row.get("destination") or "—")),
+                html.escape(_travel_basis_text(row)),
+                html.escape(fmt_currency(row.get("cost_total"))),
+                html.escape(f"{float(row.get('markup_percent') or 0):.1f}%"),
+                html.escape(fmt_currency(row.get("price_total"))),
+                html.escape("Yes" if row.get("taxable") else "No"),
+            ]
+            c0, c_del = st.columns([8, 1], gap="small")
+            with c0:
+                _line_table(
+                    [
+                        "Type",
+                        "Description",
+                        "Origin",
+                        "Destination",
+                        "Qty / Basis",
+                        "Cost",
+                        "Markup %",
+                        "Customer Price",
+                        "Taxable",
+                    ],
+                    [cells],
+                )
+            with c_del:
+                if st.button("✕", key=f"ecb_trv_del_{rid}", help="Delete travel line"):
+                    ok, err = _service_ok(delete_estimate_travel(rid, estimate_id=eid))
+                    if ok:
+                        st.rerun()
+                    st.error(err)
+
+    st.markdown("#### Subcontractors")
+    _render_deletable_lines(
+        eid,
+        ["Subcontractor", "Scope", "Cost", "Price"],
+        bundle["subcontractors"],
+        row_cells=lambda r: [
+            html.escape(str(r.get("subcontractor_name") or "—")),
+            html.escape(str(r.get("description") or "—")),
+            html.escape(fmt_currency(r.get("cost_total"))),
+            html.escape(fmt_currency(r.get("price_total"))),
+        ],
+        delete_fn=delete_estimate_subcontractor,
+        key_prefix="ecb_sub",
+    )
+
+    st.markdown("#### Other Costs")
+    _render_deletable_lines(
+        eid,
+        ["Description", "Category", "Cost", "Price"],
+        bundle["other_costs"],
+        row_cells=lambda r: [
+            html.escape(str(r.get("description") or "—")),
+            html.escape(str(r.get("category") or "—")),
+            html.escape(fmt_currency(r.get("cost_total"))),
+            html.escape(fmt_currency(r.get("price_total"))),
+        ],
+        delete_fn=delete_estimate_other_cost,
+        key_prefix="ecb_oth",
+    )
 
 
 def render_travel_tab(est: dict[str, Any]) -> None:

@@ -32,15 +32,9 @@ try:
     )
     from app.pages.estimate_builder_ui import (
         render_cost_builder_tab,
-        render_equipment_tab,
-        render_labor_tab,
         render_markups_tab,
-        render_materials_tab,
-        render_other_costs_tab,
         render_proposal_preview_tab,
-        render_subcontractors_tab,
         render_summary_tab,
-        render_travel_tab,
     )
     from app.pages._core._data import (
         ACTIVE_ESTIMATE_KEY,
@@ -101,15 +95,9 @@ except ImportError:
     )
     from pages.estimate_builder_ui import (  # type: ignore
         render_cost_builder_tab,
-        render_equipment_tab,
-        render_labor_tab,
         render_markups_tab,
-        render_materials_tab,
-        render_other_costs_tab,
         render_proposal_preview_tab,
-        render_subcontractors_tab,
         render_summary_tab,
-        render_travel_tab,
     )
     from pages._core._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
@@ -155,11 +143,6 @@ _NEW_CUST_PREV = "est_new_cust_prev"
 _ESTIMATE_TABS = [
     "Overview",
     "Cost Builder",
-    "Materials",
-    "Labor",
-    "Equipment",
-    "Travel",
-    "Subcontractors",
     "Markups",
     "Summary",
     "Proposal Preview",
@@ -868,16 +851,11 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     vendor_opts = _vendor_options()
 
     if st.session_state.get(_build_mode_key(est)):
-        st.info("Build mode — add materials, labor, equipment, travel, and review totals in the tabs below.")
+        st.info("Build mode — add lines and review totals in Cost Builder.")
 
     (
         tab_overview,
         tab_cost_builder,
-        tab_materials,
-        tab_labor,
-        tab_equipment,
-        tab_travel,
-        tab_subcontractors,
         tab_markups,
         tab_summary,
         tab_proposal,
@@ -924,22 +902,6 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             vendor_options=vendor_opts,
             on_saved=lambda: None,
         )
-
-    with tab_materials:
-        render_materials_tab(est, pricing_guide_options=pg_opts, inventory_options=inv_opts)
-
-    with tab_labor:
-        render_labor_tab(est)
-
-    with tab_equipment:
-        render_equipment_tab(est, asset_options=asset_opts)
-
-    with tab_travel:
-        render_travel_tab(est)
-
-    with tab_subcontractors:
-        render_subcontractors_tab(est, vendor_options=vendor_opts)
-        render_other_costs_tab(est)
 
     with tab_markups:
         render_markups_tab(est, persist_fn=_persist_markup_settings)
