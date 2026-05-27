@@ -3736,6 +3736,14 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-h
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
   justify-content: flex-end !important;
 }}
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="stHorizontalBlock"] {{
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}}
 .ips-compact-meta-grid {{
   display: grid;
   grid-template-columns: repeat(4, minmax(130px, 1fr));
@@ -4151,6 +4159,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marke
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker),
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker),
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker),
@@ -4183,6 +4192,7 @@ div[data-testid="stElementContainer"]:has(.ips-catalog-presence-marker) {
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="stHorizontalBlock"],
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [data-testid="stHorizontalBlock"],
@@ -4193,6 +4203,7 @@ div[data-testid="stElementContainer"]:has(.ips-catalog-presence-marker) [data-te
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="column"],
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="column"],
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [data-testid="column"],
@@ -4207,6 +4218,9 @@ div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [class*="st-k
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
@@ -4229,6 +4243,9 @@ div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-job-a
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button,

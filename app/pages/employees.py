@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Callable
 
 import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.components.user_actions import render_user_action_buttons
+    from app.components.user_actions import (
+        is_user_action_confirm_open,
+        render_user_action_button_row,
+        render_user_action_confirm_panel,
+    )
     from app.components.headers import render_page_brand_header
     from app.components.table_filters import (
         apply_column_filters,
@@ -59,7 +64,11 @@ try:
     from app.utils.permissions import can_view_hr_documents, normalize_role
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
-    from components.user_actions import render_user_action_buttons  # type: ignore
+    from components.user_actions import (  # type: ignore
+        is_user_action_confirm_open,
+        render_user_action_button_row,
+        render_user_action_confirm_panel,
+    )
     from components.headers import render_page_brand_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -756,21 +765,38 @@ def _render_user_login_invite_panel(emp: dict, rk: str) -> None:
                 st.code(repr(exc), language="text")
 
 
+def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
+    def _after_deactivate_or_delete() -> None:
+        _clear_employee_modal()
+
+    return _after_deactivate_or_delete, _after_deactivate_or_delete
+
+
+def _render_user_header_actions(emp: dict) -> None:
+    if is_user_action_confirm_open(emp):
+        return
+    on_deactivate, on_delete = _user_action_callbacks()
+    render_user_action_button_row(
+        emp,
+        layout="header",
+        on_deactivate=on_deactivate,
+        on_delete=on_delete,
+    )
+
+
 def _render_user_actions_panel(emp: dict, rk: str) -> None:
-    """Activate, deactivate, or archive a user from the detail modal."""
+    """Confirm panel for activate/deactivate/delete when triggered from the header."""
     if is_edit_mode(MODULE, rk):
         return
     eid = str(emp.get("id") or "").strip()
     if not eid or is_demo_id(eid):
         return
 
-    def _after_deactivate_or_delete() -> None:
-        _clear_employee_modal()
-
-    render_user_action_buttons(
+    on_deactivate, on_delete = _user_action_callbacks()
+    render_user_action_confirm_panel(
         emp,
-        on_deactivate=_after_deactivate_or_delete,
-        on_delete=_after_deactivate_or_delete,
+        on_deactivate=on_deactivate,
+        on_delete=on_delete,
     )
 
 
@@ -795,6 +821,8 @@ def render_employee_detail_dialog(emp: dict) -> None:
 
     render_modal_shell(compact=True)
     if not is_edit_mode(MODULE, rk):
+        eid = str(emp.get("id") or "").strip()
+        show_header_actions = bool(eid) and not is_demo_id(eid)
         render_compact_modal_header(
             title=name,
             subtitle=subtitle,
@@ -802,6 +830,7 @@ def render_employee_detail_dialog(emp: dict) -> None:
             module=MODULE,
             record_key=rk,
             key_prefix=f"emp_modal_{rk}",
+            extra_actions=(lambda: _render_user_header_actions(emp)) if show_header_actions else None,
         )
         render_compact_modal_meta_grid(
             [

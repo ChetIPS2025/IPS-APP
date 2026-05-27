@@ -86,27 +86,29 @@ def _render_confirm_card(
             st.rerun()
 
 
-def render_user_action_buttons(
+def is_user_action_confirm_open(user: dict) -> bool:
+    uid = str(user.get("id") or "").strip()
+    if not uid:
+        return False
+    return any(st.session_state.get(_confirm_state_key(uid, action)) for action in ("activate", "deactivate", "delete"))
+
+
+def render_user_action_confirm_panel(
     user: dict,
     *,
     on_activate: Callable[[], None] | None = None,
     on_deactivate: Callable[[], None] | None = None,
     on_delete: Callable[[], None] | None = None,
-) -> None:
-    """Render compact User Actions row with inline confirmation panels."""
+) -> bool:
+    """Render inline confirmation when an action is pending. Returns True if shown."""
     uid = str(user.get("id") or "").strip()
     if not uid:
-        return
-
-    if not can_manage_user_actions():
-        st.caption("Only admin or supervisor can manage user status.")
-        return
+        return False
 
     check = can_delete_user(uid, current_user=current_profile())
-    status = _normalize_status(user)
-    user_key = "".join(ch if ch.isalnum() else "_" for ch in uid) or "user"
     actor = current_profile()
     actor_id = str(actor.get("id") or "").strip() or None
+    user_key = "".join(ch if ch.isalnum() else "_" for ch in uid) or "user"
 
     for action in ("activate", "deactivate", "delete"):
         if st.session_state.get(_confirm_state_key(uid, action)):
@@ -148,7 +150,31 @@ def render_user_action_buttons(
                     reason_key=f"user_delete_reason_{user_key}",
                     reason_label="Delete reason (optional)",
                 )
-            return
+            return True
+    return False
+
+
+def render_user_action_button_row(
+    user: dict,
+    *,
+    layout: str = "panel",
+    on_activate: Callable[[], None] | None = None,
+    on_deactivate: Callable[[], None] | None = None,
+    on_delete: Callable[[], None] | None = None,
+) -> None:
+    """Render activate/deactivate/delete buttons (no confirmation panel)."""
+    uid = str(user.get("id") or "").strip()
+    if not uid:
+        return
+
+    if not can_manage_user_actions():
+        if layout != "header":
+            st.caption("Only admin or supervisor can manage user status.")
+        return
+
+    check = can_delete_user(uid, current_user=current_profile())
+    status = _normalize_status(user)
+    user_key = "".join(ch if ch.isalnum() else "_" for ch in uid) or "user"
 
     show_activate = status != "Active"
     show_deactivate = status == "Active"
@@ -163,12 +189,19 @@ def render_user_action_buttons(
         action_specs.append(("delete", danger_solid_button, "Delete User", f"open_delete_{user_key}"))
 
     if not action_specs:
-        st.caption("No user actions available for this status.")
+        if layout != "header":
+            st.caption("No user actions available for this status.")
         return
 
+    marker_class = (
+        "ips-user-actions-header-marker"
+        if layout == "header"
+        else "ips-user-actions-marker"
+    )
     with st.container(key=f"user_actions_{user_key}"):
-        st.markdown('<span class="ips-user-actions-marker"></span>', unsafe_allow_html=True)
-        st.markdown('<p class="ips-user-actions-title">User Actions</p>', unsafe_allow_html=True)
+        st.markdown(f'<span class="{marker_class}"></span>', unsafe_allow_html=True)
+        if layout != "header":
+            st.markdown('<p class="ips-user-actions-title">User Actions</p>', unsafe_allow_html=True)
         cols = st.columns(len(action_specs), gap="small")
         for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
             with col:
@@ -178,8 +211,33 @@ def render_user_action_buttons(
                     st.session_state[_confirm_state_key(uid, action)] = True
                     st.rerun()
 
-    if not check.allowed and check.reason and status != "Deleted":
+    if layout != "header" and not check.allowed and check.reason and status != "Deleted":
         st.caption(check.reason)
+
+
+def render_user_action_buttons(
+    user: dict,
+    *,
+    layout: str = "panel",
+    on_activate: Callable[[], None] | None = None,
+    on_deactivate: Callable[[], None] | None = None,
+    on_delete: Callable[[], None] | None = None,
+) -> None:
+    """Render user action buttons with inline confirmation panels."""
+    if render_user_action_confirm_panel(
+        user,
+        on_activate=on_activate,
+        on_deactivate=on_deactivate,
+        on_delete=on_delete,
+    ):
+        return
+    render_user_action_button_row(
+        user,
+        layout=layout,
+        on_activate=on_activate,
+        on_deactivate=on_deactivate,
+        on_delete=on_delete,
+    )
 
 
 def _handle_activate(

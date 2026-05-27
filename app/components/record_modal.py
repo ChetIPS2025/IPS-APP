@@ -229,6 +229,7 @@ def render_compact_modal_header(
     record_key: str,
     on_edit: Callable[[], None] | None = None,
     key_prefix: str | None = None,
+    extra_actions: Callable[[], None] | None = None,
 ) -> None:
     """Compact view-mode header: title/subtitle left, status pill + Edit right."""
     if is_edit_mode(module, record_key):
@@ -242,7 +243,9 @@ def render_compact_modal_header(
     status_html = status_pill_html(status) if status not in (None, "") else ""
 
     st.markdown('<div class="ips-compact-detail-header">', unsafe_allow_html=True)
-    title_col, actions_col = st.columns([5.4, 2.1], gap="small")
+    title_ratio = 4.2 if extra_actions else 5.4
+    actions_ratio = 3.8 if extra_actions else 2.1
+    title_col, actions_col = st.columns([title_ratio, actions_ratio], gap="small")
     with title_col:
         st.markdown(
             f'<div class="ips-compact-detail-main">'
@@ -254,7 +257,11 @@ def render_compact_modal_header(
             unsafe_allow_html=True,
         )
     with actions_col:
-        pill_col, edit_col = st.columns([1.15, 1], gap="small")
+        if extra_actions:
+            pill_col, edit_col, user_col = st.columns([0.9, 0.72, 2.4], gap="small")
+        else:
+            pill_col, edit_col = st.columns([1.15, 1], gap="small")
+            user_col = None
         with pill_col:
             if status_html:
                 st.markdown(
@@ -271,6 +278,9 @@ def render_compact_modal_header(
                     set_edit_mode(module, record_key)
 
             st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
+        if user_col is not None:
+            with user_col:
+                extra_actions()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
