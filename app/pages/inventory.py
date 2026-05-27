@@ -82,6 +82,7 @@ try:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_scan_bar,
         toggle_field_expanded,
@@ -160,6 +161,7 @@ except ImportError:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_scan_bar,
         toggle_field_expanded,
@@ -439,7 +441,7 @@ def _render_custom_inventory_table(
             unit_cost = fmt_currency(item.get("unit_cost"))
             status = _normalize_inventory_status(item.get("status"))
             vendor = _inventory_vendor(item)
-            field_mode = is_field_mode()
+            field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_INVENTORY_KEY) == iid
 
             cols = st.columns(_INV_COLS, gap="small", vertical_alignment="center")
@@ -862,7 +864,7 @@ def render() -> None:
     if not begin_module("inventory"):
         return
     inject_inventory_module_css()
-    if is_field_mode():
+    if is_field_context():
         inject_field_row_expand_css()
     st.markdown(
         '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
@@ -887,7 +889,7 @@ def render() -> None:
         actions=[_inv_export, _inv_new],
     )
 
-    if is_field_mode():
+    if is_field_context():
         render_field_scan_bar(("📦 Scan Stock", "scan_inventory"))
 
     if st.session_state.get("ips_inv_form"):

@@ -44,7 +44,7 @@ try:
     from app.pages._core._session import select_key
     from app.styles import inject_timekeeping_module_css
     from app.utils.dates import week_end, week_start
-    from app.utils.field_context import is_field_mode, render_field_job_bar
+    from app.utils.field_context import is_field_context, is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
@@ -82,7 +82,7 @@ except ImportError:
     from pages._core._session import select_key  # type: ignore
     from styles import inject_timekeeping_module_css  # type: ignore
     from utils.dates import week_end, week_start  # type: ignore
-    from utils.field_context import is_field_mode, render_field_job_bar  # type: ignore
+    from utils.field_context import is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("timekeeping")
@@ -130,7 +130,7 @@ _DAY_GRID_LABELS = [
 
 
 def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
-    if not is_field_mode():
+    if not is_field_context():
         return summaries
     try:
         from app.auth import current_profile, current_role
@@ -1134,7 +1134,7 @@ def render() -> None:
         actions=[_tk_export],
     )
 
-    if is_field_mode():
+    if is_field_context():
         try:
             from app.db import fetch_jobs_with_order_fallback
             from app.services.job_service import sort_jobs_by_number_then_name
@@ -1198,3 +1198,24 @@ def render() -> None:
         if st.button("Open Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
             st.session_state["ips_nav_page"] = "weekly_timesheets"
             st.rerun()
+
+
+def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
+    """Compact weekly hour entry for the field day shell."""
+    inject_timekeeping_module_css()
+    ws = _current_week_start()
+    we = week_end(ws)
+    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
+    rows = [_build_timecard_row(row, ws) for row in summaries]
+    if not rows:
+        st.info("No timecard loaded for this week yet.")
+        return
+    st.caption(
+        f"{fmt_date(ws)} – {fmt_date(we)} · enter daily job and hours below."
+    )
+    target = rows[0]
+    st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+    _render_inline_daily_entries(target, ws)
+    st.markdown("</div>", unsafe_allow_html=True)
+    if len(rows) > 1:
+        st.caption(f"{len(rows)} timecard(s) this week — open **Log Time** for the full crew list.")

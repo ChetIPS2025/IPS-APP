@@ -17,7 +17,7 @@ try:
     from app.navigation import set_nav_slug
     from app.services.field_dashboard import field_dashboard_snapshot
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    from app.utils.field_context import navigate_to_field_page, open_job_detail
+    from app.utils.field_context import navigate_to_field_page, navigate_to_field_day, open_job_detail
 except ImportError:
     from components.cards import render_kpi_card  # type: ignore
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
@@ -27,7 +27,7 @@ except ImportError:
     from navigation import set_nav_slug  # type: ignore
     from services.field_dashboard import field_dashboard_snapshot  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-    from utils.field_context import navigate_to_field_page, open_job_detail  # type: ignore
+    from utils.field_context import navigate_to_field_page, navigate_to_field_day, open_job_detail  # type: ignore
 
 
 def _admin_read() -> bool:
@@ -105,6 +105,7 @@ def render() -> None:
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     quick_actions: list[tuple[str, str, str]] = [
+        ("📋", "Today's Work", "field_day"),
         ("📝", "Daily Report", "field_daily_reports"),
         ("👷", "Crew Time", "field_crew_time"),
         ("✅", "Today's Tasks", "tasks"),
@@ -122,7 +123,7 @@ def render() -> None:
             jid = str(item.get("id") or "").strip()
             lbl = str(item.get("label") or "Job").strip()
             if jid and st.button(lbl, key=f"field_missing_rep_{jid}", use_container_width=True):
-                navigate_to_field_page("field_daily_reports", job_id=jid)
+                navigate_to_field_day(job_id=jid, tab="Report")
                 st.rerun()
     elif snap.get("missing_sample_labels"):
         st.markdown("##### Missing daily reports (active jobs)")

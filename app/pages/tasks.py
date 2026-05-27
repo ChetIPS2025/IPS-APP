@@ -70,6 +70,7 @@ try:
         field_expanded_id,
         get_field_job_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_job_bar,
         toggle_field_expanded,
@@ -131,7 +132,7 @@ except ImportError:
         update_task,
     )
     from styles import inject_tasks_module_css  # type: ignore
-    from utils.field_context import get_field_job_id, is_field_mode, render_field_job_bar  # type: ignore
+    from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_TASK_KEY,
         clear_field_expanded,
@@ -328,7 +329,7 @@ def _task_matches_field_assignee(task: dict, assignee_lookup: dict[str, str]) ->
 
 
 def _apply_field_task_filters(rows: list[dict], *, assignee_lookup: dict[str, str]) -> list[dict]:
-    if not is_field_mode():
+    if not is_field_context():
         return rows
     out = list(rows)
     fid = get_field_job_id()
@@ -370,9 +371,9 @@ def _task_count_caption(count: int, view: str) -> str:
 
 
 def _render_task_view_selector() -> None:
-    opts = FIELD_TASK_VIEW_OPTS if is_field_mode() else TASK_VIEW_OPTS
+    opts = FIELD_TASK_VIEW_OPTS if is_field_context() else TASK_VIEW_OPTS
     if TASK_VIEW_KEY not in st.session_state:
-        st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_mode() else "Open Tasks"
+        st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open Tasks"
     current = str(st.session_state.get(TASK_VIEW_KEY) or "")
     if current not in opts:
         st.session_state[TASK_VIEW_KEY] = opts[0]
@@ -938,7 +939,7 @@ def _render_custom_task_table(
             if current_job_id is None and str(task.get("linked_job") or "") in job_labels:
                 current_job_label = str(task.get("linked_job"))
 
-            field_mode = is_field_mode()
+            field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_TASK_KEY) == tid
 
             cols = st.columns(_TASK_COLS, gap="small", vertical_alignment="center")
@@ -1228,7 +1229,7 @@ def render() -> None:
         return
 
     inject_tasks_module_css()
-    if is_field_mode():
+    if is_field_context():
         inject_field_row_expand_css()
     st.markdown('<span class="ips-tasks-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
 
@@ -1280,7 +1281,7 @@ def render() -> None:
                 )
                 _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_TASK_KEY)
-                st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_mode() else "Open Tasks"
+                st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open Tasks"
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1338,8 +1339,8 @@ def render() -> None:
                     clear_tasks_cache()
                     st.rerun()
 
-    view = str(st.session_state.get(TASK_VIEW_KEY) or ("Due Today" if is_field_mode() else "Open Tasks"))
-    view_opts = FIELD_TASK_VIEW_OPTS if is_field_mode() else TASK_VIEW_OPTS
+    view = str(st.session_state.get(TASK_VIEW_KEY) or ("Due Today" if is_field_context() else "Open Tasks"))
+    view_opts = FIELD_TASK_VIEW_OPTS if is_field_context() else TASK_VIEW_OPTS
     if view not in view_opts:
         view = view_opts[0]
         st.session_state[TASK_VIEW_KEY] = view
@@ -1362,6 +1363,46 @@ def render() -> None:
         job_options=job_options,
     )
 
+    selected_task_id = st.session_state.get(SELECTED_TASK_KEY)
+    if selected_task_id and st.session_state.get(SHOW_MODAL_KEY):
+        _show_task_modal(assignee_lookup, jobs_by_id, job_options)
+
+
+def render_field_tasks_panel(*, key_prefix: str = "ftp") -> None:
+    """Due-today task list for the active field job (embedded in field day shell)."""
+    inject_tasks_module_css()
+    if is_field_context():
+        inject_field_row_expand_css()
+
+    assignee_lookup = _build_assignee_lookup()
+    jobs_by_id = _build_jobs_lookup()
+    job_options = get_job_options(include_all=True)
+    all_tasks = _merge_task_overrides(get_tasks())
+    enriched_tasks = [
+        _enrich_task_row(
+            t,
+            assignee_lookup=assignee_lookup,
+            jobs_by_id=jobs_by_id,
+            job_options=job_options,
+        )
+        for t in all_tasks
+    ]
+    filter_options = build_filter_options(enriched_tasks, _COLUMN_FILTER_SPECS)
+    viewed = _apply_task_view_filter(enriched_tasks, "Due Today")
+    viewed = _apply_field_task_filters(viewed, assignee_lookup=assignee_lookup)
+    st.caption(_task_count_caption(len(viewed), "Due Today"))
+    if not viewed:
+        st.info("No tasks due today for this job.")
+        return
+
+    build_modal_cache(viewed, cache_key=CACHE_KEY)
+    _render_custom_task_table(
+        viewed,
+        filter_options=filter_options,
+        assignee_lookup=assignee_lookup,
+        jobs_by_id=jobs_by_id,
+        job_options=job_options,
+    )
     selected_task_id = st.session_state.get(SELECTED_TASK_KEY)
     if selected_task_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_task_modal(assignee_lookup, jobs_by_id, job_options)

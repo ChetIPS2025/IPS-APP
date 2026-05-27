@@ -47,6 +47,7 @@ try:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_job_bar,
         set_field_job_id,
@@ -87,6 +88,7 @@ except ImportError:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_job_bar,
         set_field_job_id,
@@ -369,7 +371,7 @@ def _render_custom_jobs_table(
             status = _normalize_job_status(job.get("status"))
             start = fmt_date(job.get("start_date"))
             end = fmt_date(job.get("end_date"))
-            field_mode = is_field_mode()
+            field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
             cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
@@ -1192,7 +1194,7 @@ def render_job_detail_dialog(job: dict) -> None:
         _render_job_edit_form(job)
     else:
         _render_job_actions_panel(job)
-        if is_field_mode():
+        if is_field_context():
             _render_field_job_detail_tabs(job)
         else:
             _render_job_detail_tabs(job)
@@ -1222,7 +1224,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     inject_jobs_module_css()
-    if is_field_mode():
+    if is_field_context():
         inject_field_row_expand_css()
     all_jobs = load_jobs()
     filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)

@@ -16,6 +16,17 @@ FIELD_EXPANDED_JOB_KEY = "ips_field_expanded_job_id"
 FIELD_EXPANDED_TASK_KEY = "ips_field_expanded_task_id"
 FIELD_EXPANDED_INVENTORY_KEY = "ips_field_expanded_inv_id"
 FIELD_EXPANDED_ASSET_KEY = "ips_field_expanded_asset_id"
+FIELD_DAY_TAB_KEY = "ips_field_day_tab"
+FIELD_PAGE_SLUGS = frozenset(
+    {
+        "field_dashboard",
+        "field_day",
+        "field_daily_reports",
+        "field_crew_time",
+    }
+)
+FIELD_DAY_TABS = ("Report", "Crew", "Time", "Tasks")
+SDR_WIZARD_STEP_PREFIX = "ips_sdr_wizard_step"
 
 
 def _inject_field_job_bar_css() -> None:
@@ -45,6 +56,170 @@ def _inject_field_job_bar_css() -> None:
 
 def is_field_mode() -> bool:
     return bool(st.session_state.get("ips_field_mode"))
+
+
+def _active_nav_slug(slug: str | None = None) -> str:
+    if slug:
+        return str(slug).strip()
+    try:
+        from app.pages._core._session import nav_slug
+    except ImportError:
+        from pages._core._session import nav_slug  # type: ignore
+    return str(nav_slug() or st.session_state.get("ips_nav_page") or "").strip()
+
+
+def is_field_context(*, slug: str | None = None) -> bool:
+    """True when UI should use field-optimized layouts (wizard, expand rows, slim tabs)."""
+    if is_field_mode():
+        return True
+    return _active_nav_slug(slug) in FIELD_PAGE_SLUGS
+
+
+def get_field_day_tab() -> str:
+    tab = str(st.session_state.get(FIELD_DAY_TAB_KEY) or "Report").strip()
+    return tab if tab in FIELD_DAY_TABS else "Report"
+
+
+def set_field_day_tab(tab: str) -> None:
+    picked = str(tab or "Report").strip()
+    st.session_state[FIELD_DAY_TAB_KEY] = picked if picked in FIELD_DAY_TABS else "Report"
+
+
+def navigate_to_field_day(*, job_id: str | None = None, tab: str = "Report") -> None:
+    set_field_day_tab(tab)
+    navigate_to_field_page("field_day", job_id=job_id)
+
+
+def sdr_wizard_step(job_id: str) -> int:
+    jid = str(job_id or "").strip()
+    key = f"{SDR_WIZARD_STEP_PREFIX}_{jid}"
+    try:
+        step = int(st.session_state.get(key) or 0)
+    except (TypeError, ValueError):
+        step = 0
+    return max(0, min(2, step))
+
+
+def set_sdr_wizard_step(job_id: str, step: int) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    st.session_state[f"{SDR_WIZARD_STEP_PREFIX}_{jid}"] = max(0, min(2, int(step)))
+
+
+def inject_field_day_shell_css() -> None:
+    if st.session_state.get("_ips_field_day_shell_css"):
+        return
+    st.session_state["_ips_field_day_shell_css"] = True
+    inject_field_row_expand_css()
+    st.markdown(
+        """
+<style id="ips-field-day-shell-v1">
+.ips-field-day-shell {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px 4px;
+  margin: 0 0 0.75rem;
+}
+.ips-field-wizard-steps {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 0.65rem;
+  flex-wrap: wrap;
+}
+.ips-field-wizard-step {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  background: #f8fafc;
+}
+.ips-field-wizard-step.is-active {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.ips-field-wizard-step.is-done {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_field_day_tab_bar(*, key_prefix: str = "field_day") -> str:
+    """Horizontal section picker for the unified field day shell."""
+    inject_field_day_shell_css()
+    tabs = list(FIELD_DAY_TABS)
+    current = get_field_day_tab()
+    if current not in tabs:
+        current = tabs[0]
+        set_field_day_tab(current)
+    st.markdown('<div class="ips-field-day-shell">', unsafe_allow_html=True)
+    picked = st.radio(
+        "Today's work",
+        tabs,
+        index=tabs.index(current),
+        horizontal=True,
+        key=f"{key_prefix}_tab_radio",
+        label_visibility="collapsed",
+    )
+    set_field_day_tab(str(picked))
+    st.caption("One job, four workflows — switch sections without leaving the page.")
+    st.markdown("</div>", unsafe_allow_html=True)
+    return str(picked)
+
+
+def render_field_checkin_block(
+    *,
+    job_id: str,
+    user_id: str | None,
+    user_name: str,
+    admin: bool,
+    key_prefix: str = "fci",
+) -> None:
+    """Site check-in / check-out for the active field job."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    try:
+        from app.services.job_checkins import check_in, check_out, fetch_open_checkin
+    except ImportError:
+        from services.job_checkins import check_in, check_out, fetch_open_checkin  # type: ignore
+
+    open_ci = fetch_open_checkin(job_id=jid, user_id=user_id, admin=admin)
+    with st.expander("Site check-in / check-out", expanded=open_ci is None):
+        if open_ci:
+            st.success(f"Checked in since {str(open_ci.get('check_in_time') or '')[:16]}")
+            note_out = st.text_input("Check-out note", key=f"{key_prefix}_co_note")
+            if st.button("Check out", type="primary", key=f"{key_prefix}_checkout"):
+                try:
+                    check_out(checkin_id=str(open_ci["id"]), notes=note_out, admin=admin)
+                    st.success("Checked out.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+        else:
+            note_in = st.text_input("Check-in note (GPS optional later)", key=f"{key_prefix}_ci_note")
+            if st.button("Check in on site", type="primary", key=f"{key_prefix}_checkin"):
+                try:
+                    check_in(
+                        job_id=jid,
+                        user_id=user_id,
+                        user_name=user_name,
+                        notes=note_in,
+                        admin=admin,
+                    )
+                    st.success("Checked in.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
 
 
 def get_field_job_id() -> str:

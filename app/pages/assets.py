@@ -83,6 +83,7 @@ try:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_scan_bar,
         toggle_field_expanded,
@@ -162,6 +163,7 @@ except ImportError:
         clear_field_expanded,
         field_expanded_id,
         inject_field_row_expand_css,
+        is_field_context,
         is_field_mode,
         render_field_scan_bar,
         toggle_field_expanded,
@@ -454,7 +456,7 @@ def _render_custom_assets_table(
             status = _normalize_asset_status(asset.get("status"))
             assigned = _asset_assigned_to(asset)
             next_service = _asset_next_service(asset)
-            field_mode = is_field_mode()
+            field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_ASSET_KEY) == aid
 
             cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
@@ -1120,7 +1122,7 @@ def render() -> None:
     apply_pending_asset_deeplink()
     inject_assets_page_styles()
     inject_assets_module_css()
-    if is_field_mode():
+    if is_field_context():
         inject_field_row_expand_css()
     st.markdown(
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
@@ -1142,7 +1144,7 @@ def render() -> None:
         actions=[_assets_export, _assets_new],
     )
 
-    if is_field_mode():
+    if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
 
     with st.expander("Tool Trailers & Kits", expanded=False):

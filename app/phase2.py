@@ -24,6 +24,7 @@ try:
         field_crew_time,
         field_daily_reports,
         field_dashboard,
+        field_day,
         inventory,
         job_costing,
         jobs,
@@ -54,6 +55,7 @@ except ImportError:
         field_crew_time,
         field_daily_reports,
         field_dashboard,
+        field_day,
         inventory,
         job_costing,
         jobs,
@@ -90,6 +92,7 @@ BUILT_MODULES: dict[str, object] = {
     "admin": admin.render,
     "settings": settings.render,
     "field_dashboard": field_dashboard.render,
+    "field_day": field_day.render,
     "field_daily_reports": field_daily_reports.render,
     "field_crew_time": field_crew_time.render,
 }
