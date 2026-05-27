@@ -2678,7 +2678,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v1">
+<style id="ips-timekeeping-module-v2">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2762,6 +2762,19 @@ def inject_timekeeping_module_css() -> None:
   background: #fee2e2;
   color: #991b1b;
 }}
+.ips-timekeeping-row-expand {{
+  background: #f8fafc;
+  border-top: 1px solid #dbeafe;
+  border-bottom: 2px solid #cbd5e1;
+  padding: 12px 14px 16px;
+  margin: 0;
+}}
+.ips-timekeeping-expand-title {{
+  margin: 0 0 0.65rem;
+  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}}
 .ips-time-week-range {{
   margin: 0;
   text-align: right;
@@ -2811,8 +2824,17 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
 }}
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:hover {{
+  background: #eef5ff;
+}}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
   background: #eaf2ff !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stButton"] button {{
+  min-height: 2rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.85rem;
+  line-height: 1;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stElementContainer"] {{
   margin-bottom: 0 !important;

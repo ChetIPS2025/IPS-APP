@@ -92,6 +92,7 @@ _WEEK_KEY = "ips_timekeeping_week_start"
 SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
+_EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TK_COLS = [0.35, 2.4, 1.8, 1.4, 1.0, 1.0, 1.0, 1.2, 1.3]
 _TK_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -352,6 +353,35 @@ def _build_timecard_row(row: dict, ws: date) -> dict:
 
 def _timecard_select_key(timecard_id: str) -> str:
     return f"timecard_select_{timecard_id}"
+
+
+def _expanded_timecard_id() -> str | None:
+    tid = str(st.session_state.get(_EXPANDED_TIMECARD_KEY) or "").strip()
+    return tid or None
+
+
+def _clear_expanded_timecard() -> None:
+    st.session_state.pop(_EXPANDED_TIMECARD_KEY, None)
+
+
+def _toggle_expanded_timecard(timecard_id: str) -> None:
+    tid = str(timecard_id or "").strip()
+    if not tid:
+        return
+    if _expanded_timecard_id() == tid:
+        _clear_expanded_timecard()
+    else:
+        st.session_state[_EXPANDED_TIMECARD_KEY] = tid
+        st.session_state[SELECTED_TIMECARD_KEY] = None
+        st.session_state[SHOW_TIMECARD_MODAL_KEY] = False
+
+
+def _emp_from_timecard_row(row: dict) -> dict:
+    return {
+        **row,
+        "id": str(row.get("employee_id") or row.get("id") or "").strip(),
+        "name": str(row.get("employee_name") or row.get("name") or "—"),
+    }
 
 
 def _clear_timecard_selection(timecard_ids: list[str] | None = None) -> None:
@@ -732,6 +762,28 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
     return False
 
 
+def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
+    emp = _emp_from_timecard_row(row)
+    timecard_id = str(row.get("timecard_id") or "").strip()
+    st.markdown(
+        f'<p class="ips-timekeeping-expand-title">Daily entries — '
+        f"{html.escape(str(emp.get('name') or 'Employee'))}</p>",
+        unsafe_allow_html=True,
+    )
+    _render_daily_entries_tab(emp, week_start_d)
+    detail_col, _ = st.columns([1, 3])
+    with detail_col:
+        if st.button(
+            "Approval, notes & activity",
+            key=f"tk_open_modal_{timecard_id}",
+            use_container_width=True,
+        ):
+            st.session_state[SELECTED_TIMECARD_KEY] = timecard_id
+            st.session_state[SHOW_TIMECARD_MODAL_KEY] = True
+            st.session_state[_MODAL_KEY] = timecard_id
+            st.rerun()
+
+
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
     week_status = _normalize_timecard_status(emp.get("status"))
     if week_status == "Approved":
@@ -893,6 +945,7 @@ def _render_custom_timekeeping_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
+    week_start_d: date,
 ) -> list[str]:
     if not filtered:
         st.info("No timecards match your filters.")
@@ -935,67 +988,75 @@ def _render_custom_timekeeping_table(
             department = str(row.get("department") or "—")
             week_label = fmt_date(row.get("week_start"))
             status = _normalize_timecard_status(row.get("status"))
+            expanded = _expanded_timecard_id() == timecard_id
 
-            cols = st.columns(_TK_COLS, gap="small", vertical_alignment="center")
+            with st.container(key=f"tk_row_{timecard_id}"):
+                cols = st.columns(_TK_COLS, gap="small", vertical_alignment="center")
 
-            with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_timecard_select_key(timecard_id),
-                    label_visibility="collapsed",
-                    on_change=_on_timecard_checkbox_change,
-                    args=(timecard_id, all_timecard_ids),
-                )
+                with cols[0]:
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"tk_expand_{timecard_id}",
+                        help="Expand daily job and hour entry",
+                        use_container_width=True,
+                    ):
+                        _toggle_expanded_timecard(timecard_id)
+                        st.rerun()
 
-            with cols[1]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-employee">{html.escape(employee_name)}</div>',
-                    unsafe_allow_html=True,
-                )
+                with cols[1]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-employee">{html.escape(employee_name)}</div>',
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-muted ips-timekeeping-cell">'
-                    f"{html.escape(department)}</div>",
-                    unsafe_allow_html=True,
-                )
+                with cols[2]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-muted ips-timekeeping-cell">'
+                        f"{html.escape(department)}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-cell">{html.escape(week_label)}</div>',
-                    unsafe_allow_html=True,
-                )
+                with cols[3]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-cell">{html.escape(week_label)}</div>',
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                    f"{html.escape(_fmt_table_hours(row.get('st_total')))}</div>",
-                    unsafe_allow_html=True,
-                )
+                with cols[4]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
+                        f"{html.escape(_fmt_table_hours(row.get('st_total')))}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                    f"{html.escape(_fmt_table_hours(row.get('ot_total')))}</div>",
-                    unsafe_allow_html=True,
-                )
+                with cols[5]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
+                        f"{html.escape(_fmt_table_hours(row.get('ot_total')))}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                    f"{html.escape(_fmt_table_hours(row.get('dt_total')))}</div>",
-                    unsafe_allow_html=True,
-                )
+                with cols[6]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
+                        f"{html.escape(_fmt_table_hours(row.get('dt_total')))}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                    f"{html.escape(_fmt_table_hours(row.get('total_hours')))}</div>",
-                    unsafe_allow_html=True,
-                )
+                with cols[7]:
+                    st.markdown(
+                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
+                        f"{html.escape(_fmt_table_hours(row.get('total_hours')))}</div>",
+                        unsafe_allow_html=True,
+                    )
 
-            with cols[8]:
-                st.markdown(_timecard_status_pill_html(status), unsafe_allow_html=True)
+                with cols[8]:
+                    st.markdown(_timecard_status_pill_html(status), unsafe_allow_html=True)
+
+                if expanded:
+                    st.markdown('<div class="ips-timekeeping-row-expand">', unsafe_allow_html=True)
+                    _render_inline_daily_entries(row, week_start_d)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1035,14 +1096,17 @@ def render() -> None:
     with nav1:
         if st.button("Previous Week", key="tk_prev_week", use_container_width=True):
             st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
+            _clear_expanded_timecard()
             st.rerun()
     with nav2:
         if st.button("Current Week", key="tk_current_week", use_container_width=True):
             st.session_state[_WEEK_KEY] = week_start()
+            _clear_expanded_timecard()
             st.rerun()
     with nav3:
         if st.button("Next Week", key="tk_next_week", use_container_width=True):
             st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
+            _clear_expanded_timecard()
             st.rerun()
     with week_col:
         st.markdown(
@@ -1053,10 +1117,10 @@ def render() -> None:
 
     filtered = _filter_timecards(summaries, ws)
 
-    st.caption(f"{len(filtered)} timecard(s)")
+    st.caption(f"{len(filtered)} timecard(s) · Click ▸ on a row to enter daily job and hours.")
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
-    _render_custom_timekeeping_table(filtered, filter_options=filter_options)
+    _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()
