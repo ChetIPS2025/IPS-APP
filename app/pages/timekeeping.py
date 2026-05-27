@@ -43,7 +43,7 @@ try:
     )
     from app.pages._core._session import select_key
     from app.styles import inject_timekeeping_module_css
-    from app.utils.dates import week_end, week_start
+    from app.utils.dates import week_dates, week_end, week_start
     from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
 except ImportError:
@@ -81,7 +81,7 @@ except ImportError:
     )
     from pages._core._session import select_key  # type: ignore
     from styles import inject_timekeeping_module_css  # type: ignore
-    from utils.dates import week_end, week_start  # type: ignore
+    from utils.dates import week_dates, week_end, week_start  # type: ignore
     from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
