@@ -2805,6 +2805,109 @@ def inject_timekeeping_module_css() -> None:
   color: #111827;
   font-size: 0.82rem;
 }}
+.ips-time-hgrid-wrap {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 0.65rem;
+}}
+.ips-time-hgrid-head {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 4px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}}
+.ips-time-hgrid-head:first-child {{
+  text-align: left;
+  justify-content: flex-start;
+  padding-left: 10px;
+}}
+.ips-time-hgrid-head-sub {{
+  margin-top: 0.15rem;
+  font-size: 0.58rem;
+  font-weight: 650;
+  color: #94a3b8;
+  text-transform: none;
+  letter-spacing: 0;
+}}
+.ips-time-hgrid-hour-lbl {{
+  font-size: 0.58rem;
+  font-weight: 750;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.15rem 0 0.05rem;
+  text-align: center;
+}}
+.ips-time-hgrid-employee {{
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+  padding: 4px 0 0 6px;
+}}
+.ips-time-hgrid-dept {{
+  font-size: 0.68rem;
+  color: #64748b;
+  padding-left: 6px;
+}}
+.ips-time-hgrid-total {{
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: center;
+  padding-top: 0.35rem;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"],
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.25rem !important;
+  align-items: flex-start !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 8px !important;
+  margin: 0 !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover,
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stNumberInput"] input,
+.st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"] input,
+.st-key-ftp_wrap [data-testid="stNumberInput"] input {{
+  text-align: center;
+  padding: 0.35rem 0.25rem;
+  min-height: 2rem;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.st-key-ftp_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  min-height: 2rem;
+  font-size: 0.72rem;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"] {{
+  border-bottom: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}}
 .st-key-timekeeping_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}

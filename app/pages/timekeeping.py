@@ -44,7 +44,7 @@ try:
     from app.pages._core._session import select_key
     from app.styles import inject_timekeeping_module_css
     from app.utils.dates import week_end, week_start
-    from app.utils.field_context import is_field_context, is_field_mode, render_field_job_bar
+    from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
@@ -82,7 +82,7 @@ except ImportError:
     from pages._core._session import select_key  # type: ignore
     from styles import inject_timekeeping_module_css  # type: ignore
     from utils.dates import week_end, week_start  # type: ignore
-    from utils.field_context import is_field_context, is_field_mode, render_field_job_bar  # type: ignore
+    from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("timekeeping")
@@ -95,6 +95,10 @@ SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
 _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
+_TK_VIEW_KEY = "ips_timekeeping_view_mode"
+_TK_VIEW_GRID = "Week grid"
+_TK_VIEW_LIST = "List"
+_HGRID_COLS = [1.5, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 0.72]
 _TK_COLS = [0.35, 2.4, 1.8, 1.4, 1.0, 1.0, 1.0, 1.2, 1.3]
 _TK_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -127,6 +131,192 @@ _DAY_GRID_LABELS = [
     "Actions",
     "Notes",
 ]
+
+
+def _default_timekeeping_view() -> str:
+    return _TK_VIEW_GRID
+
+
+def _active_field_job_label() -> str | None:
+    jid = get_field_job_id()
+    if not jid:
+        return None
+    try:
+        from app.services.jobs_service import get_job_options
+    except ImportError:
+        from services.jobs_service import get_job_options  # type: ignore
+    for opt in get_job_options(include_all=True):
+        if str(opt.get("id") or "").strip() == jid:
+            label = str(opt.get("label") or "").strip()
+            return label or None
+    return None
+
+
+def _apply_active_field_job_to_grid(grid: list[dict[str, Any]]) -> None:
+    job_label = _active_field_job_label()
+    if not job_label:
+        return
+    for row in grid:
+        if _day_is_editable(_normalize_timecard_status(row.get("status"))):
+            row["job"] = job_label
+
+
+def _render_timekeeping_view_toggle() -> str:
+    opts = [_TK_VIEW_GRID, _TK_VIEW_LIST]
+    default = _default_timekeeping_view()
+    current = str(st.session_state.get(_TK_VIEW_KEY) or default)
+    if current not in opts:
+        current = default
+        st.session_state[_TK_VIEW_KEY] = current
+    picked = st.radio(
+        "Timekeeping view",
+        opts,
+        index=opts.index(current),
+        horizontal=True,
+        key="tk_view_mode_radio",
+        label_visibility="collapsed",
+    )
+    st.session_state[_TK_VIEW_KEY] = picked
+    return str(picked)
+
+
+def _save_all_timekeeping_grids(rows: list[dict], week_start_d: date) -> None:
+    saved = 0
+    failed = 0
+    for row in rows:
+        emp = _emp_from_timecard_row(row)
+        if _save_timekeeping_week(emp, week_start_d, show_message=False):
+            saved += 1
+        else:
+            failed += 1
+    if failed:
+        st.warning(f"Saved {saved} employee(s); {failed} could not be saved.")
+    elif saved:
+        st.success(f"Saved hours for {saved} employee(s).")
+    else:
+        st.info("No employees to save.")
+    st.rerun()
+
+
+def _render_horizontal_week_grid(
+    filtered: list[dict],
+    *,
+    week_start_d: date,
+    key_prefix: str = "tk_hgrid",
+) -> None:
+    """All employees × 7 days on one screen — job, ST, and OT inline."""
+    if not filtered:
+        st.info("No timecards for this week.")
+        return
+
+    days = week_dates(week_start_d)
+    job_opts = job_options_for_timekeeping()
+    field_job = _active_field_job_label()
+    if field_job:
+        st.caption(
+            f"Active job **{field_job}** pre-fills editable days — change any day with the job picker."
+        )
+    else:
+        st.caption("Each day: **job**, **ST** (straight time), **OT** (overtime).")
+
+    with st.container(key=f"{key_prefix}_wrap"):
+        st.markdown('<div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
+
+        header = st.columns(_HGRID_COLS, gap="small")
+        header_labels = ["Employee", *[d.strftime("%a %m/%d") for d in days], "Week"]
+        for col, label in zip(header, header_labels):
+            with col:
+                sub = ""
+                if label != "Employee" and label != "Week":
+                    sub = '<div class="ips-time-hgrid-head-sub">Job · ST · OT</div>'
+                st.markdown(
+                    f'<div class="ips-time-hgrid-head">{html.escape(label)}{sub}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        for row in filtered:
+            emp = _emp_from_timecard_row(row)
+            eid = str(emp.get("id") or emp.get("employee_id") or "").strip()
+            if not eid:
+                continue
+            gk = _grid_key(eid)
+            week_sig = week_start_d.isoformat()
+            grid = _ensure_weekly_grid(emp, week_start_d)
+            _apply_active_field_job_to_grid(grid)
+
+            cols = st.columns(_HGRID_COLS, gap="small")
+            with cols[0]:
+                dept = str(row.get("department") or "").strip()
+                sub = f'<div class="ips-time-hgrid-dept">{html.escape(dept)}</div>' if dept else ""
+                st.markdown(
+                    f'<div class="ips-time-hgrid-employee">{html.escape(str(row.get("employee_name") or "—"))}</div>'
+                    f"{sub}",
+                    unsafe_allow_html=True,
+                )
+
+            row_total = 0.0
+            for day_ix, col in enumerate(cols[1:8]):
+                day_status = _normalize_timecard_status(grid[day_ix].get("status"))
+                editable = _day_is_editable(day_status)
+                with col:
+                    cur_job = str(grid[day_ix].get("job") or (job_opts[0] if job_opts else "— No job —"))
+                    job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
+                    grid[day_ix]["job"] = st.selectbox(
+                        "Job",
+                        job_opts,
+                        index=job_ix,
+                        key=f"tk_job_{eid}_{week_sig}_{day_ix}",
+                        label_visibility="collapsed",
+                        disabled=not editable,
+                    )
+                    st_col, ot_col = st.columns(2, gap="small")
+                    with st_col:
+                        st.markdown('<div class="ips-time-hgrid-hour-lbl">ST</div>', unsafe_allow_html=True)
+                        grid[day_ix]["st"] = st.number_input(
+                            "ST",
+                            value=float(grid[day_ix].get("st") or 0),
+                            key=f"tk_st_{eid}_{week_sig}_{day_ix}",
+                            label_visibility="collapsed",
+                            step=0.5,
+                            min_value=0.0,
+                            max_value=24.0,
+                            format="%.1f",
+                            disabled=not editable,
+                        )
+                    with ot_col:
+                        st.markdown('<div class="ips-time-hgrid-hour-lbl">OT</div>', unsafe_allow_html=True)
+                        grid[day_ix]["ot"] = st.number_input(
+                            "OT",
+                            value=float(grid[day_ix].get("ot") or 0),
+                            key=f"tk_ot_{eid}_{week_sig}_{day_ix}",
+                            label_visibility="collapsed",
+                            step=0.5,
+                            min_value=0.0,
+                            max_value=24.0,
+                            format="%.1f",
+                            disabled=not editable,
+                        )
+                    if not editable:
+                        st.markdown(
+                            _timecard_status_pill_html(day_status),
+                            unsafe_allow_html=True,
+                        )
+                row_total += float(grid[day_ix].get("st") or 0) + float(grid[day_ix].get("ot") or 0)
+
+            with cols[8]:
+                st.markdown(
+                    f'<div class="ips-time-hgrid-total">{html.escape(_fmt_table_hours(row_total))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.session_state[gk] = grid
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    save_col, _ = st.columns([1, 3])
+    with save_col:
+        if st.button("Save all hours", type="primary", key=f"{key_prefix}_save_all", use_container_width=True):
+            _save_all_timekeeping_grids(filtered, week_start_d)
 
 
 def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
@@ -1176,11 +1366,18 @@ def render() -> None:
         )
 
     filtered = _filter_timecards(summaries, ws)
-
-    st.caption(f"{len(filtered)} timecard(s) · Click ▸ on a row to enter daily job and hours.")
+    view_mode = _render_timekeeping_view_toggle()
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
-    _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
+
+    if view_mode == _TK_VIEW_GRID:
+        st.caption(
+            f"{len(filtered)} employee(s) · set job, ST, and OT for each day, then **Save all hours**."
+        )
+        _render_horizontal_week_grid(filtered, week_start_d=ws, key_prefix="tk_page")
+    else:
+        st.caption(f"{len(filtered)} timecard(s) · Click ▸ on a row for full daily detail (job, OT, DT).")
+        _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()
@@ -1210,12 +1407,5 @@ def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
     if not rows:
         st.info("No timecard loaded for this week yet.")
         return
-    st.caption(
-        f"{fmt_date(ws)} – {fmt_date(we)} · enter daily job and hours below."
-    )
-    target = rows[0]
-    st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
-    _render_inline_daily_entries(target, ws)
-    st.markdown("</div>", unsafe_allow_html=True)
-    if len(rows) > 1:
-        st.caption(f"{len(rows)} timecard(s) this week — open **Log Time** for the full crew list.")
+    st.caption(f"{fmt_date(ws)} – {fmt_date(we)} · job, ST, and OT for all seven days.")
+    _render_horizontal_week_grid(rows, week_start_d=ws, key_prefix=key_prefix)
