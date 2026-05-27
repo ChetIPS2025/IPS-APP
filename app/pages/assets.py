@@ -76,7 +76,7 @@ try:
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
-    from app.services.asset_kits_service import asset_is_kit
+    from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
     from app.utils.field_context import (
         FIELD_EXPANDED_ASSET_KEY,
@@ -156,7 +156,7 @@ except ImportError:
         summary_card_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from services.asset_kits_service import asset_is_kit  # type: ignore
+    from services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_ASSET_KEY,
@@ -177,7 +177,24 @@ SELECTED_ASSET_KEY = "selected_asset_id"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _TABLE_KEY = "assets_list"
+_SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
+_SMALL_TOOL_COLS = [0.55, 2.6, 1.1, 1.9, 1.5, 1.1, 1.0]
+_SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("TOOL", None),
+    ("TYPE", "item_type"),
+    ("PARENT KIT", "parent_kit"),
+    ("LOCATION", "location"),
+    ("STATUS", "status"),
+    ("VALUE", None),
+]
+_SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
+    ("item_type", lambda r: _small_tool_type(r)),
+    ("parent_kit", lambda r: _small_tool_parent_kit(r)),
+    ("location", lambda r: _small_tool_location(r)),
+    ("status", lambda r: _small_tool_status(r)),
+]
 _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
@@ -249,6 +266,118 @@ def _asset_name(row: dict) -> str:
 
 def _asset_category(row: dict) -> str:
     return str(row.get("category") or "").strip() or "—"
+
+
+def _is_small_tool_asset(row: dict) -> bool:
+    """Standalone assets tracked as small tools (not kit/trailer containers)."""
+    if asset_is_kit(row):
+        return False
+    cat = str(row.get("category") or row.get("asset_type") or "").strip().lower()
+    return cat == "tool"
+
+
+def _small_tool_row_id(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return f"kititem_{row.get('id') or ''}"
+    return str(row.get("id") or "")
+
+
+def _small_tool_name(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return str(row.get("item_name") or "—").strip() or "—"
+    return _asset_name(row)
+
+
+def _small_tool_type(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return str(row.get("item_type") or "Tool").strip() or "Tool"
+    return _asset_category(row)
+
+
+def _small_tool_parent_kit(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        parent = str(row.get("parent_asset_name") or "—").strip() or "—"
+        number = str(row.get("parent_asset_number") or "").strip()
+        if number and number != "—":
+            return f"{number} · {parent}"
+        return parent
+    return "—"
+
+
+def _small_tool_location(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return str(row.get("parent_location") or "—").strip() or "—"
+    return _asset_location(row)
+
+
+def _small_tool_status(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return str(row.get("status") or "Present").strip() or "Present"
+    return _normalize_asset_status(row.get("status"))
+
+
+def _small_tool_value(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return fmt_currency(row.get("total_value") or 0)
+    return fmt_currency(row.get("value") or row.get("purchase_price") or 0)
+
+
+def _build_small_tool_list(all_assets: list[dict]) -> list[dict]:
+    assets_by_id = {
+        str(a.get("id") or "").strip(): a for a in all_assets if str(a.get("id") or "").strip()
+    }
+    tool_asset_ids = {str(a.get("id") or "").strip() for a in all_assets if _is_small_tool_asset(a)}
+
+    unified: list[dict] = []
+    for asset in all_assets:
+        if _is_small_tool_asset(asset):
+            unified.append({**asset, "row_type": "asset"})
+
+    for item in list_all_kit_items_enriched(assets_by_id):
+        child_id = str(item.get("child_asset_id") or "").strip()
+        if child_id and child_id in tool_asset_ids:
+            continue
+        unified.append(item)
+
+    return unified
+
+
+def _filter_small_tool_rows(
+    rows: list[dict],
+    *,
+    q: str = "",
+    status: str = "All Statuses",
+    parent_kit: str = "All Kits",
+) -> list[dict]:
+    out = list(rows)
+    if q:
+        ql = q.lower()
+        out = [
+            r
+            for r in out
+            if ql in _small_tool_name(r).lower()
+            or ql in _small_tool_type(r).lower()
+            or ql in _small_tool_parent_kit(r).lower()
+            or ql in _small_tool_location(r).lower()
+        ]
+    status_val = str(status or "All Statuses").strip()
+    if status_val and status_val != "All Statuses":
+        out = [r for r in out if _small_tool_status(r) == status_val]
+    parent_val = str(parent_kit or "All Kits").strip()
+    if parent_val and parent_val != "All Kits":
+        out = [r for r in out if _small_tool_parent_kit(r) == parent_val]
+    return apply_column_filters(out, _SMALL_TOOLS_TABLE_KEY, _SMALL_TOOL_FILTER_SPECS)
+
+
+def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
+    if str(row.get("row_type") or "") == "kit_item":
+        parent_id = str(row.get("parent_asset_id") or "").strip()
+        if parent_id:
+            _open_assets_detail_modal(parent_id, assets_by_id.get(parent_id))
+        return
+    aid = str(row.get("id") or "").strip()
+    if aid:
+        _open_assets_detail_modal(aid, row)
 
 
 def _asset_location(row: dict) -> str:
@@ -529,6 +658,246 @@ def _render_custom_assets_table(
         st.markdown("</div>", unsafe_allow_html=True)
 
     return all_asset_ids
+
+
+def _render_small_tools_table(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+    assets_by_id: dict[str, dict],
+) -> None:
+    if not filtered:
+        st.info("No small tools match your filters.")
+        return
+
+    with st.container(key="assets_small_tools_table_wrap"):
+        st.markdown('<div class="ips-assets-table-wrap ips-small-tools-table-wrap">', unsafe_allow_html=True)
+
+        header_cols = st.columns(_SMALL_TOOL_COLS, gap="small", vertical_alignment="center")
+        for col, (label, field) in zip(header_cols, _SMALL_TOOL_HEADER_SPECS):
+            with col:
+                if field:
+                    render_table_header_cell(
+                        label,
+                        table_key=_SMALL_TOOLS_TABLE_KEY,
+                        filter_field=field,
+                        filter_options=filter_options.get(field, []),
+                        base_class="ips-assets-header-row ips-assets-cell",
+                    )
+                else:
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-assets-header-row ips-assets-cell",
+                    )
+
+        for row in filtered:
+            rid = _small_tool_row_id(row)
+            if not rid:
+                continue
+            name = _small_tool_name(row)
+            tool_type = _small_tool_type(row)
+            parent_kit = _small_tool_parent_kit(row)
+            location = _small_tool_location(row)
+            status = _small_tool_status(row)
+            value = _small_tool_value(row)
+
+            cols = st.columns(_SMALL_TOOL_COLS, gap="small", vertical_alignment="center")
+            with cols[0]:
+                if st.button("View", key=f"st_open_{rid}", use_container_width=True):
+                    _open_small_tool_row(row, assets_by_id)
+                    st.rerun()
+            with cols[1]:
+                st.markdown(
+                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(tool_type)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[3]:
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(parent_kit)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[5]:
+                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-assets-cell ips-assets-hours">{html.escape(value)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_equipment_list(
+    rows: list[dict],
+) -> None:
+    equipment_rows = [r for r in rows if not _is_small_tool_asset(r)]
+    filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
+    categories = sorted(
+        {_asset_category(r) for r in equipment_rows if _asset_category(r) and _asset_category(r) != "—"}
+    )
+    locations = sorted(
+        {_asset_location(r) for r in equipment_rows if _asset_location(r) and _asset_location(r) != "—"}
+    )
+    departments = sorted(
+        {_asset_department(r) for r in equipment_rows if _asset_department(r) and _asset_department(r) != "—"}
+    )
+    status_options = sorted(
+        {_normalize_asset_status(r.get("status")) for r in equipment_rows if _normalize_asset_status(r.get("status"))}
+    )
+
+    def _filters() -> None:
+        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.1, 1.1, 1.1, 1.1, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search asset #, name, category, location…",
+                key="ast_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Category",
+                ["All Categories", *categories],
+                key="ast_bar_category",
+                label_visibility="collapsed",
+            )
+        with c3:
+            st.selectbox(
+                "Location",
+                ["All Locations", *locations],
+                key="ast_bar_location",
+                label_visibility="collapsed",
+            )
+        with c4:
+            st.selectbox(
+                "Status",
+                ["All Statuses", *status_options],
+                key="ast_bar_status",
+                label_visibility="collapsed",
+            )
+        with c5:
+            st.selectbox(
+                "Department",
+                ["All Departments", *departments],
+                key="ast_bar_department",
+                label_visibility="collapsed",
+            )
+        with c6:
+            if st.button("Clear", key="ast_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _ASSET_BAR_FILTER_FIELDS,
+                    extra_keys=[
+                        "ast_search",
+                        "ast_bar_category",
+                        "ast_bar_location",
+                        "ast_bar_status",
+                        "ast_bar_department",
+                    ],
+                )
+                st.session_state["ast_bar_category"] = "All Categories"
+                st.session_state["ast_bar_location"] = "All Locations"
+                st.session_state["ast_bar_status"] = "All Statuses"
+                st.session_state["ast_bar_department"] = "All Departments"
+                reset_table_page(_TABLE_KEY)
+                _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
+                st.rerun()
+
+    layout_filter_bar(_filters)
+
+    filtered = _filter_rows(
+        equipment_rows,
+        q=str(st.session_state.get("ast_search") or "").strip(),
+        category=str(st.session_state.get("ast_bar_category") or "All Categories"),
+        location=str(st.session_state.get("ast_bar_location") or "All Locations"),
+        status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
+        department=str(st.session_state.get("ast_bar_department") or "All Departments"),
+    )
+
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
+    _render_custom_assets_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+
+
+def _render_small_tools_list(rows: list[dict]) -> None:
+    assets_by_id = {
+        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
+    }
+    small_tool_rows = _build_small_tool_list(rows)
+    filter_options = build_filter_options(small_tool_rows, _SMALL_TOOL_FILTER_SPECS)
+    parent_kits = sorted(
+        {
+            _small_tool_parent_kit(r)
+            for r in small_tool_rows
+            if _small_tool_parent_kit(r) and _small_tool_parent_kit(r) != "—"
+        }
+    )
+    status_options = sorted({_small_tool_status(r) for r in small_tool_rows if _small_tool_status(r)})
+
+    def _filters() -> None:
+        c1, c2, c3, c4 = st.columns([2.4, 1.2, 1.2, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search tool name, kit, location…",
+                key="ast_st_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Parent kit",
+                ["All Kits", *parent_kits],
+                key="ast_st_parent_kit",
+                label_visibility="collapsed",
+            )
+        with c3:
+            st.selectbox(
+                "Status",
+                ["All Statuses", *status_options],
+                key="ast_st_status",
+                label_visibility="collapsed",
+            )
+        with c4:
+            if st.button("Clear", key="ast_st_clear", use_container_width=True):
+                clear_table_filters(
+                    _SMALL_TOOLS_TABLE_KEY,
+                    ["item_type", "parent_kit", "location", "status"],
+                    extra_keys=["ast_st_search", "ast_st_parent_kit", "ast_st_status"],
+                )
+                st.session_state["ast_st_parent_kit"] = "All Kits"
+                st.session_state["ast_st_status"] = "All Statuses"
+                reset_table_page(_SMALL_TOOLS_TABLE_KEY)
+                st.rerun()
+
+    st.caption(
+        "Hand tools and kit inventory — standalone Tool assets plus items stored in tool trailers and kits."
+    )
+    layout_filter_bar(_filters)
+
+    filtered = _filter_small_tool_rows(
+        small_tool_rows,
+        q=str(st.session_state.get("ast_st_search") or "").strip(),
+        status=str(st.session_state.get("ast_st_status") or "All Statuses"),
+        parent_kit=str(st.session_state.get("ast_st_parent_kit") or "All Kits"),
+    )
+
+    render_table_pagination_header(len(filtered), _SMALL_TOOLS_TABLE_KEY, item_label="tool")
+    page_rows, _, _, _ = paginate_rows(filtered, _SMALL_TOOLS_TABLE_KEY)
+    _render_small_tools_table(page_rows, filter_options=filter_options, assets_by_id=assets_by_id)
+    render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -1129,7 +1498,6 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     rows = load_assets()
-    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     def _assets_export() -> None:
         st.button("Export", key="ast_export", use_container_width=True)
@@ -1146,14 +1514,6 @@ def render() -> None:
 
     if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
-
-    with st.expander("Tool Trailers & Kits", expanded=False):
-        if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
-            st.session_state["ast_kit_summary_on"] = True
-        if st.session_state.get("ast_kit_summary_on"):
-            render_kit_accountability_summary()
-        else:
-            st.caption("Load kit accountability metrics on demand to speed up the assets page.")
 
     if st.session_state.get("ips_ast_form"):
         with st.expander("New Asset", expanded=True):
@@ -1199,89 +1559,7 @@ def render() -> None:
                     st.success("Asset saved.")
                     st.rerun()
 
-    categories = sorted({_asset_category(r) for r in rows if _asset_category(r) and _asset_category(r) != "—"})
-    locations = sorted({_asset_location(r) for r in rows if _asset_location(r) and _asset_location(r) != "—"})
-    departments = sorted(
-        {_asset_department(r) for r in rows if _asset_department(r) and _asset_department(r) != "—"}
-    )
-    status_options = sorted(
-        {_normalize_asset_status(r.get("status")) for r in rows if _normalize_asset_status(r.get("status"))}
-    )
-
-    def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.1, 1.1, 1.1, 1.1, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search asset #, name, category, location…",
-                key="ast_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "Category",
-                ["All Categories", *categories],
-                key="ast_bar_category",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Location",
-                ["All Locations", *locations],
-                key="ast_bar_location",
-                label_visibility="collapsed",
-            )
-        with c4:
-            st.selectbox(
-                "Status",
-                ["All Statuses", *status_options],
-                key="ast_bar_status",
-                label_visibility="collapsed",
-            )
-        with c5:
-            st.selectbox(
-                "Department",
-                ["All Departments", *departments],
-                key="ast_bar_department",
-                label_visibility="collapsed",
-            )
-        with c6:
-            if st.button("Clear", key="ast_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _ASSET_BAR_FILTER_FIELDS,
-                    extra_keys=[
-                        "ast_search",
-                        "ast_bar_category",
-                        "ast_bar_location",
-                        "ast_bar_status",
-                        "ast_bar_department",
-                    ],
-                )
-                st.session_state["ast_bar_category"] = "All Categories"
-                st.session_state["ast_bar_location"] = "All Locations"
-                st.session_state["ast_bar_status"] = "All Statuses"
-                st.session_state["ast_bar_department"] = "All Departments"
-                reset_table_page(_TABLE_KEY)
-                _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
-                clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
-                st.rerun()
-
-    layout_filter_bar(_filters)
-
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("ast_search") or "").strip(),
-        category=str(st.session_state.get("ast_bar_category") or "All Categories"),
-        location=str(st.session_state.get("ast_bar_location") or "All Locations"),
-        status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
-        department=str(st.session_state.get("ast_bar_department") or "All Departments"),
-    )
-
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-
-    build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
+    build_modal_cache(rows, cache_key=_ASSETS_CACHE_KEY)
 
     deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
     if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
@@ -1289,8 +1567,20 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    _render_custom_assets_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    tab_equipment, tab_small_tools = st.tabs(["Equipment", "Small Tools"])
+
+    with tab_equipment:
+        with st.expander("Tool Trailers & Kits", expanded=False):
+            if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
+                st.session_state["ast_kit_summary_on"] = True
+            if st.session_state.get("ast_kit_summary_on"):
+                render_kit_accountability_summary()
+            else:
+                st.caption("Load kit accountability metrics on demand to speed up the assets page.")
+        _render_equipment_list(rows)
+
+    with tab_small_tools:
+        _render_small_tools_list(rows)
 
     selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
     if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):

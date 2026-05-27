@@ -159,6 +159,49 @@ def infer_kit_type(asset: dict[str, Any]) -> str:
     return "Tool Trailer"
 
 
+def list_all_kit_items_enriched(
+    assets_by_id: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """All active kit items with parent asset context for cross-kit lists."""
+    rows, _ = fetch_rows(_KIT_ITEMS, limit=10000, order_by="item_name")
+    if assets_by_id is None:
+        try:
+            from app.services.phase2_modules_service import list_assets, normalize_asset
+        except ImportError:
+            from services.phase2_modules_service import list_assets, normalize_asset  # type: ignore
+        assets_by_id = {
+            str(a.get("id") or "").strip(): normalize_asset(a)
+            for a in list_assets()
+            if str(a.get("id") or "").strip()
+        }
+    out: list[dict[str, Any]] = []
+    for r in rows or []:
+        if not isinstance(r, dict) or r.get("is_active") is False:
+            continue
+        item = normalize_kit_item(r)
+        pid = str(item.get("parent_asset_id") or "").strip()
+        parent = assets_by_id.get(pid) or {}
+        parent_name = str(parent.get("asset_name") or parent.get("name") or "—").strip() or "—"
+        parent_number = str(parent.get("asset_number") or parent.get("asset_id") or "—").strip() or "—"
+        parent_loc = str(parent.get("location") or "—").strip() or "—"
+        out.append(
+            {
+                **item,
+                "row_type": "kit_item",
+                "parent_asset_name": parent_name,
+                "parent_asset_number": parent_number,
+                "parent_location": parent_loc,
+            }
+        )
+    return sorted(
+        out,
+        key=lambda x: (
+            str(x.get("parent_asset_name") or "").lower(),
+            str(x.get("item_name") or "").lower(),
+        ),
+    )
+
+
 def get_asset_kit_items(parent_asset_id: str) -> list[dict[str, Any]]:
     pid = str(parent_asset_id or "").strip()
     if not pid:
