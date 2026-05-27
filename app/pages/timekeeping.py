@@ -115,7 +115,7 @@ _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("week_start", lambda r: fmt_date(r.get("week_start"))),
     ("status", lambda r: _normalize_timecard_status(r.get("status"))),
 ]
-_DAY_GRID_COLS = [0.5, 0.65, 1.6, 0.65, 0.65, 0.65, 0.85, 1.0, 1.0]
+_DAY_GRID_COLS = [0.38, 0.52, 1.28, 0.52, 0.52, 0.5, 0.68, 0.82, 0.88]
 _DAY_GRID_EDIT_COLS = [*_DAY_GRID_COLS, 0.3]
 _DAY_GRID_LABELS = [
     "Day",
@@ -511,6 +511,43 @@ def _day_hours_total(day_row: dict) -> float:
     )
 
 
+def _day_has_job(day_row: dict) -> bool:
+    job = str(day_row.get("job") or "").strip().lower()
+    if not job:
+        return False
+    if job in {"—", "-", "— no job —", "no job"}:
+        return False
+    return "no job" not in job
+
+
+def _day_entry_complete(day_row: dict) -> bool:
+    """Green day box when a job is selected and hours are entered."""
+    return _day_has_job(day_row) and _day_hours_total(day_row) > 0
+
+
+def _day_row_with_widget_values(
+    row: dict,
+    *,
+    eid: str,
+    week_sig: str,
+    index: int,
+) -> dict:
+    """Merge in-flight job/ST/OT/hours widgets for live complete-state styling."""
+    merged = dict(row)
+    job_key = f"tk_job_{eid}_{week_sig}_{index}"
+    if job_key in st.session_state:
+        merged["job"] = st.session_state[job_key]
+    for field, prefix in (("st", "tk_st"), ("ot", "tk_ot")):
+        key = f"{prefix}_{eid}_{week_sig}_{index}"
+        if key in st.session_state:
+            merged[field] = float(st.session_state[key] or 0)
+    hrs_key = f"tk_hrs_{eid}_{week_sig}_{index}"
+    if hrs_key in st.session_state:
+        merged = dict(merged)
+        _set_day_job_hours(merged, float(st.session_state[hrs_key] or 0))
+    return merged
+
+
 def _sync_row_hrs_from_grid(grid: list[dict], *, eid: str, week_sig: str) -> None:
     """Keep inline row hour widgets aligned when ST/OT is edited in the expanded grid."""
     for i, row in enumerate(grid):
@@ -549,10 +586,11 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
 
     for i, (col, day_d) in enumerate(zip(day_cols, days)):
         day_row = grid[i] if i < len(grid) else {}
+        day_row = _day_row_with_widget_values(day_row, eid=eid, week_sig=week_sig, index=i)
         day_status = _normalize_timecard_status(day_row.get("status"))
         editable = week_status != "Approved" and _day_is_editable(day_status)
         total = _day_hours_total(day_row)
-        filled_marker = "ips-time-week-day-filled" if total > 0 else ""
+        filled_marker = "ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
 
         with col:
             st.markdown(
@@ -952,7 +990,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
 
     edit_cols = _DAY_GRID_EDIT_COLS
-    header = st.columns(edit_cols)
+    header = st.columns(edit_cols, gap="small")
     labels = [* _DAY_GRID_LABELS, ""]
     for col, lbl in zip(header, labels):
         with col:
@@ -964,9 +1002,13 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     for i, row in enumerate(grid):
         day_status = _normalize_timecard_status(row.get("status"))
         row_editable = _day_is_editable(day_status)
-        c = st.columns(edit_cols)
+        live_row = _day_row_with_widget_values(row, eid=eid, week_sig=week_sig, index=i)
+        row_complete = _day_entry_complete(live_row)
+        c = st.columns(edit_cols, gap="small")
         with c[0]:
+            row_marker = "ips-time-day-row-filled" if row_complete else ""
             st.markdown(
+                f'<span class="ips-time-day-row-marker {row_marker}" aria-hidden="true"></span>'
                 f'<div class="ips-time-day-row">{html.escape(_short_day(str(row.get("day") or "")))}</div>',
                 unsafe_allow_html=True,
             )
@@ -976,7 +1018,12 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
         with c[2]:
-            cur_job = str(row.get("job") or job_opts[0])
+            marker_cls = "ips-time-day-job-filled" if row_complete else ""
+            st.markdown(
+                f'<span class="ips-time-day-job-marker {marker_cls}" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            cur_job = str(live_row.get("job") or row.get("job") or job_opts[0])
             idx = job_opts.index(cur_job) if cur_job in job_opts else 0
             grid[i]["job"] = st.selectbox(
                 "Job",

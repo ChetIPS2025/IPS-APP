@@ -2548,13 +2548,85 @@ def inject_assets_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     st.markdown(
         f"""
-<style id="ips-assets-module-v4">
+<style id="ips-assets-module-v5">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+}}
+.ips-small-tools-table-wrap {{
+  width: max-content;
+  max-width: 100%;
+}}
+.st-key-assets_small_tools_table_wrap {{
+  overflow-x: auto;
+  max-width: 100%;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+  width: max-content;
+  max-width: 100%;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] {{
+  gap: 0.45rem !important;
+  align-items: center !important;
+  width: max-content;
+  max-width: 100%;
+  justify-content: flex-start !important;
+  padding: 6px 8px !important;
+  min-height: 44px;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 38px;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  flex: 0 1 360px !important;
+  width: 360px !important;
+  min-width: 220px !important;
+  max-width: 420px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
+  flex: 0 0 72px !important;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
+  flex: 0 1 180px !important;
+  width: 180px !important;
+  min-width: 110px !important;
+  max-width: 220px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {{
+  flex: 0 0 78px !important;
+  width: 78px !important;
+  min-width: 78px !important;
+  max-width: 78px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
+  flex: 0 0 72px !important;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+}}
+.st-key-assets_small_tools_table_wrap .stButton > button {{
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 12px !important;
+}}
+.st-key-assets_small_tools_table_wrap .ips-assets-hours {{
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }}
 .ips-assets-header-row {{
   background: #f8fafc;
@@ -2755,7 +2827,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v8">
+<style id="ips-timekeeping-module-v9">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2853,21 +2925,70 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 0 0.75rem;
 }}
 .ips-time-week-inline {{
-  margin: 0.15rem 0 0.35rem;
-  padding: 0 0 0.35rem;
+  margin: 0.1rem 0 0.25rem;
+  padding: 0 0 0.25rem;
   border-bottom: 1px solid #eef2f7;
+}}
+.ips-time-week-inline [data-testid="stHorizontalBlock"] {{
+  gap: 0.2rem !important;
 }}
 .ips-time-week-inline [data-testid="column"] {{
   background: #fff5f5;
   border: 1px solid #fca5a5;
   border-radius: 6px;
-  padding: 0.12rem 0.15rem 0.1rem;
+  padding: 0.08rem 0.1rem 0.08rem;
   text-align: center;
   min-height: 0;
 }}
 .ips-time-week-inline [data-testid="column"]:has(.ips-time-week-day-filled) {{
   background: #dcfce7;
   border-color: #22c55e;
+}}
+.ips-time-day-job-marker {{
+  display: none;
+}}
+.ips-time-day-row-marker {{
+  display: none;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"]:has(.ips-time-day-row-filled) > [data-testid="column"]:nth-child(3) {{
+  background: #dcfce7 !important;
+  border: 1px solid #22c55e !important;
+  border-radius: 6px !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"]:has(.ips-time-day-row-filled) > [data-testid="column"]:nth-child(4),
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"]:has(.ips-time-day-row-filled) > [data-testid="column"]:nth-child(5),
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"]:has(.ips-time-day-row-filled) > [data-testid="column"]:nth-child(6) {{
+  background: #ecfdf3 !important;
+  border-radius: 6px !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"]:has(.ips-time-day-row-filled) > [data-testid="column"]:has(.ips-time-day-job-filled) {{
+  background: #dcfce7 !important;
+  border: 1px solid #22c55e !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"] {{
+  gap: 0.12rem !important;
+  padding: 2px 4px !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  align-items: center !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="column"] {{
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}}
+.ips-timekeeping-row-expand {{
+  padding: 8px 8px 10px;
 }}
 .ips-time-week-inline-spacer {{
   display: block;
@@ -3242,10 +3363,10 @@ def inject_timekeeping_module_css() -> None:
   gap: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
+  gap: 0.2rem !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
+  padding: 5px 6px !important;
   margin: 0 !important;
   min-height: 52px;
 }}

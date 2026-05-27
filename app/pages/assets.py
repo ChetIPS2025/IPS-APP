@@ -179,20 +179,17 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
-_SMALL_TOOL_COLS = [0.55, 2.6, 1.1, 1.9, 1.5, 1.1, 1.0]
+_SMALL_TOOL_COLS = [0.42, 3.4, 0.85, 1.55, 0.82, 0.78]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("TOOL", None),
-    ("TYPE", "item_type"),
+    ("ASSET #", None),
     ("PARENT KIT", "parent_kit"),
-    ("LOCATION", "location"),
     ("STATUS", "status"),
     ("VALUE", None),
 ]
 _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
-    ("item_type", lambda r: _small_tool_type(r)),
     ("parent_kit", lambda r: _small_tool_parent_kit(r)),
-    ("location", lambda r: _small_tool_location(r)),
     ("status", lambda r: _small_tool_status(r)),
 ]
 _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
@@ -294,6 +291,15 @@ def _small_tool_type(row: dict) -> str:
     return _asset_category(row)
 
 
+def _small_tool_asset_number(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        serial = str(row.get("serial_number") or "").strip()
+        if serial:
+            return serial
+        return "—"
+    return _asset_number(row)
+
+
 def _small_tool_parent_kit(row: dict) -> str:
     if str(row.get("row_type") or "") == "kit_item":
         parent = str(row.get("parent_asset_name") or "—").strip() or "—"
@@ -356,9 +362,8 @@ def _filter_small_tool_rows(
             r
             for r in out
             if ql in _small_tool_name(r).lower()
-            or ql in _small_tool_type(r).lower()
+            or ql in _small_tool_asset_number(r).lower()
             or ql in _small_tool_parent_kit(r).lower()
-            or ql in _small_tool_location(r).lower()
         ]
     status_val = str(status or "All Statuses").strip()
     if status_val and status_val != "All Statuses":
@@ -695,9 +700,8 @@ def _render_small_tools_table(
             if not rid:
                 continue
             name = _small_tool_name(row)
-            tool_type = _small_tool_type(row)
+            asset_number = _small_tool_asset_number(row)
             parent_kit = _small_tool_parent_kit(row)
-            location = _small_tool_location(row)
             status = _small_tool_status(row)
             value = _small_tool_value(row)
 
@@ -713,7 +717,7 @@ def _render_small_tools_table(
                 )
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(tool_type)}</div>',
+                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(asset_number)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[3]:
@@ -722,13 +726,8 @@ def _render_small_tools_table(
                     unsafe_allow_html=True,
                 )
             with cols[4]:
-                st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[5]:
                 st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
-            with cols[6]:
+            with cols[5]:
                 st.markdown(
                     f'<div class="ips-assets-cell ips-assets-hours">{html.escape(value)}</div>',
                     unsafe_allow_html=True,
@@ -852,7 +851,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         with c1:
             st.text_input(
                 "Search",
-                placeholder="Search tool name, kit, location…",
+                placeholder="Search tool name, asset #, kit…",
                 key="ast_st_search",
                 label_visibility="collapsed",
             )
@@ -874,7 +873,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
             if st.button("Clear", key="ast_st_clear", use_container_width=True):
                 clear_table_filters(
                     _SMALL_TOOLS_TABLE_KEY,
-                    ["item_type", "parent_kit", "location", "status"],
+                    ["parent_kit", "status"],
                     extra_keys=["ast_st_search", "ast_st_parent_kit", "ast_st_status"],
                 )
                 st.session_state["ast_st_parent_kit"] = "All Kits"
