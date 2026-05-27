@@ -626,13 +626,24 @@ def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
 
 
 def job_options_for_timekeeping() -> list[str]:
+    special_jobs = ("IPS Shop", "Administrator", "Vacation")
     jobs = load_jobs()
     opts = ["— No job —"]
+    seen = {opts[0].casefold()}
     for j in jobs:
         num = str(j.get("job_number") or "")
         name = str(j.get("job_name") or "")
         if num:
-            opts.append(f"{num} — {name}")
+            label = f"{num} — {name}"
+            key = label.casefold()
+            if key not in seen:
+                opts.append(label)
+                seen.add(key)
+    for label in special_jobs:
+        key = label.casefold()
+        if key not in seen:
+            opts.append(label)
+            seen.add(key)
     if len(opts) == 1:
         opts.append("J26047 — Maintenance Shop Bathroom Remodel")
     return opts
