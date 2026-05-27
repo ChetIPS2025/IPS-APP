@@ -77,6 +77,15 @@ try:
     from app.styles import inject_inventory_module_css
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.phone_helpers import format_phone_display
+    from app.utils.field_context import (
+        FIELD_EXPANDED_INVENTORY_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_scan_bar,
+        toggle_field_expanded,
+    )
 except ImportError:
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
     from components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions  # type: ignore
@@ -146,6 +155,15 @@ except ImportError:
     )
     from styles import inject_inventory_module_css  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
+    from utils.field_context import (  # type: ignore
+        FIELD_EXPANDED_INVENTORY_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_scan_bar,
+        toggle_field_expanded,
+    )
 
 _SEL = select_key("inventory")
 _MODAL_KEY = "ips_inventory_detail_modal_id"
@@ -355,6 +373,26 @@ def _on_inventory_checkbox_change(item_id: str, all_item_ids: list[str]) -> None
         st.session_state[SHOW_INVENTORY_MODAL_KEY] = False
 
 
+def _render_inventory_expand_panel(item: dict) -> None:
+    iid = str(item.get("id") or "").strip()
+    status = str(item.get("status") or "")
+    stock_html = (
+        f'<div class="ips-detail-grid">'
+        f"{detail_field_html('SKU', item.get('sku'))}"
+        f"{detail_field_html('Description', _inventory_description(item))}"
+        f"{detail_field_html('Location', item.get('location'))}"
+        f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
+        f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
+        f"{detail_field_html('Unit', _inventory_unit(item))}"
+        f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
+        f"</div>"
+    )
+    st.markdown(dialog_card_html("Stock at a glance", stock_html), unsafe_allow_html=True)
+    if st.button("Full item details", key=f"inv_full_modal_{iid}", use_container_width=True):
+        _open_inventory_modal(iid, item)
+        st.rerun()
+
+
 def _render_custom_inventory_table(
     filtered: list[dict],
     *,
@@ -401,17 +439,28 @@ def _render_custom_inventory_table(
             unit_cost = fmt_currency(item.get("unit_cost"))
             status = _normalize_inventory_status(item.get("status"))
             vendor = _inventory_vendor(item)
+            field_mode = is_field_mode()
+            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_INVENTORY_KEY) == iid
 
             cols = st.columns(_INV_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_inventory_select_key(iid),
-                    label_visibility="collapsed",
-                    on_change=_on_inventory_checkbox_change,
-                    args=(iid, all_item_ids),
-                )
+                if field_mode:
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"inv_expand_{iid}",
+                        help="Expand item details",
+                    ):
+                        toggle_field_expanded(FIELD_EXPANDED_INVENTORY_KEY, iid)
+                        st.rerun()
+                else:
+                    st.checkbox(
+                        "",
+                        key=_inventory_select_key(iid),
+                        label_visibility="collapsed",
+                        on_change=_on_inventory_checkbox_change,
+                        args=(iid, all_item_ids),
+                    )
 
             with cols[1]:
                 _render_inventory_thumbnail(item)
@@ -460,6 +509,11 @@ def _render_custom_inventory_table(
                     f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            if expanded:
+                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+                _render_inventory_expand_panel(item)
+                st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -808,6 +862,8 @@ def render() -> None:
     if not begin_module("inventory"):
         return
     inject_inventory_module_css()
+    if is_field_mode():
+        inject_field_row_expand_css()
     st.markdown(
         '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -830,6 +886,9 @@ def render() -> None:
         "Track and manage all inventory items and stock levels.",
         actions=[_inv_export, _inv_new],
     )
+
+    if is_field_mode():
+        render_field_scan_bar(("📦 Scan Stock", "scan_inventory"))
 
     if st.session_state.get("ips_inv_form"):
         with st.expander("New Item", expanded=True):
@@ -903,6 +962,7 @@ def render() -> None:
                 st.session_state["inv_stock_view"] = "In stock"
                 reset_table_page(_TABLE_KEY)
                 _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_INVENTORY_KEY)
                 st.rerun()
 
     layout_filter_bar(_filters)

@@ -78,6 +78,15 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
     from app.services.asset_kits_service import asset_is_kit
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
+    from app.utils.field_context import (
+        FIELD_EXPANDED_ASSET_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_scan_bar,
+        toggle_field_expanded,
+    )
 except ImportError:
     from components.asset_actions import render_asset_action_buttons  # type: ignore
     from components.asset_pricing_guide_actions import render_asset_pricing_guide_actions  # type: ignore
@@ -148,6 +157,15 @@ except ImportError:
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
     from services.asset_kits_service import asset_is_kit  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
+    from utils.field_context import (  # type: ignore
+        FIELD_EXPANDED_ASSET_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_scan_bar,
+        toggle_field_expanded,
+    )
 
 _SEL = select_key("assets")
 _MOD = "assets"
@@ -371,6 +389,26 @@ def _on_asset_checkbox_change(asset_id: str, all_asset_ids: list[str]) -> None:
         st.session_state[SHOW_ASSET_MODAL_KEY] = False
 
 
+def _render_asset_expand_panel(asset: dict) -> None:
+    aid = str(asset.get("id") or "").strip()
+    status = str(asset.get("status") or "")
+    details_html = (
+        f'<div class="ips-detail-grid">'
+        f"{detail_field_html('Asset #', asset.get('asset_number'))}"
+        f"{detail_field_html('Name', _asset_name(asset))}"
+        f"{detail_field_html('Category', _asset_category(asset))}"
+        f"{detail_field_html('Location', _asset_location(asset))}"
+        f'{detail_field_html("Status", status, html_value=status_badge_html(status))}'
+        f"{detail_field_html('Assigned To', _asset_assigned_to(asset))}"
+        f"{detail_field_html('Next Service', _asset_next_service(asset))}"
+        f"</div>"
+    )
+    st.markdown(dialog_card_html("Asset at a glance", details_html), unsafe_allow_html=True)
+    if st.button("Full asset details", key=f"ast_full_modal_{aid}", use_container_width=True):
+        _open_assets_detail_modal(aid, asset)
+        st.rerun()
+
+
 def _render_custom_assets_table(
     filtered: list[dict],
     *,
@@ -416,17 +454,28 @@ def _render_custom_assets_table(
             status = _normalize_asset_status(asset.get("status"))
             assigned = _asset_assigned_to(asset)
             next_service = _asset_next_service(asset)
+            field_mode = is_field_mode()
+            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_ASSET_KEY) == aid
 
             cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_asset_select_key(aid),
-                    label_visibility="collapsed",
-                    on_change=_on_asset_checkbox_change,
-                    args=(aid, all_asset_ids),
-                )
+                if field_mode:
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"ast_expand_{aid}",
+                        help="Expand asset details",
+                    ):
+                        toggle_field_expanded(FIELD_EXPANDED_ASSET_KEY, aid)
+                        st.rerun()
+                else:
+                    st.checkbox(
+                        "",
+                        key=_asset_select_key(aid),
+                        label_visibility="collapsed",
+                        on_change=_on_asset_checkbox_change,
+                        args=(aid, all_asset_ids),
+                    )
 
             with cols[1]:
                 _render_asset_thumbnail(asset)
@@ -469,6 +518,11 @@ def _render_custom_assets_table(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            if expanded:
+                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+                _render_asset_expand_panel(asset)
+                st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1066,6 +1120,8 @@ def render() -> None:
     apply_pending_asset_deeplink()
     inject_assets_page_styles()
     inject_assets_module_css()
+    if is_field_mode():
+        inject_field_row_expand_css()
     st.markdown(
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -1085,6 +1141,9 @@ def render() -> None:
         "Track and manage all company assets and equipment.",
         actions=[_assets_export, _assets_new],
     )
+
+    if is_field_mode():
+        render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
 
     with st.expander("Tool Trailers & Kits", expanded=False):
         if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
@@ -1203,6 +1262,7 @@ def render() -> None:
                 st.session_state["ast_bar_department"] = "All Departments"
                 reset_table_page(_TABLE_KEY)
                 _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
                 st.rerun()
 
     layout_filter_bar(_filters)

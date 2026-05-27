@@ -12,6 +12,10 @@ except ImportError:
     from services.job_service import job_row_select_label  # type: ignore
 
 FIELD_JOB_SESSION_KEY = "ips_field_job_id"
+FIELD_EXPANDED_JOB_KEY = "ips_field_expanded_job_id"
+FIELD_EXPANDED_TASK_KEY = "ips_field_expanded_task_id"
+FIELD_EXPANDED_INVENTORY_KEY = "ips_field_expanded_inv_id"
+FIELD_EXPANDED_ASSET_KEY = "ips_field_expanded_asset_id"
 
 
 def _inject_field_job_bar_css() -> None:
@@ -103,6 +107,72 @@ def navigate_to_field_page(slug: str, *, job_id: str | None = None) -> None:
     except ImportError:
         from navigation import set_nav_slug  # type: ignore
     set_nav_slug(slug)
+
+
+def inject_field_row_expand_css() -> None:
+    if st.session_state.get("_ips_field_row_expand_css"):
+        return
+    st.session_state["_ips_field_row_expand_css"] = True
+    st.markdown(
+        """
+<style id="ips-field-row-expand-v1">
+.ips-field-row-expand {
+  background: #f8fafc;
+  border-top: 1px solid #dbeafe;
+  border-bottom: 2px solid #cbd5e1;
+  padding: 12px 14px 16px;
+  margin: 0;
+}
+.ips-field-scan-bar {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 12px 14px 8px;
+  margin: 0 0 0.75rem;
+}
+.ips-field-scan-bar [data-testid="stCaptionContainer"] p {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #475569;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def field_expanded_id(session_key: str) -> str | None:
+    rid = str(st.session_state.get(session_key) or "").strip()
+    return rid or None
+
+
+def toggle_field_expanded(session_key: str, record_id: str) -> None:
+    rid = str(record_id or "").strip()
+    if not rid:
+        return
+    if field_expanded_id(session_key) == rid:
+        st.session_state.pop(session_key, None)
+    else:
+        st.session_state[session_key] = rid
+
+
+def clear_field_expanded(session_key: str) -> None:
+    st.session_state.pop(session_key, None)
+
+
+def render_field_scan_bar(*actions: tuple[str, str]) -> None:
+    """Primary scan CTAs for field inventory/assets. Each action is (label, nav slug)."""
+    if not actions:
+        return
+    inject_field_row_expand_css()
+    st.markdown('<div class="ips-field-scan-bar">', unsafe_allow_html=True)
+    cols = st.columns(len(actions))
+    for col, (label, slug) in zip(cols, actions):
+        with col:
+            if st.button(label, key=f"field_scan_{slug}", type="primary", use_container_width=True):
+                navigate_to_field_page(slug)
+    st.caption("Scan a QR code for the fastest checkout, check-in, and lookup.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def open_job_detail(job_id: str) -> None:

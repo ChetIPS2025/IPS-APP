@@ -42,6 +42,16 @@ try:
     from app.utils.formatting import fmt_date
     from app.services.inventory_service import get_inventory_transactions
     from app.utils.phone_helpers import format_phone_display
+    from app.utils.field_context import (
+        FIELD_EXPANDED_JOB_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_job_bar,
+        set_field_job_id,
+        toggle_field_expanded,
+    )
 except ImportError:
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
@@ -72,6 +82,16 @@ except ImportError:
     from pages.tasks import render_job_linked_tasks_tab  # type: ignore
     from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
+    from utils.field_context import (  # type: ignore
+        FIELD_EXPANDED_JOB_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_job_bar,
+        set_field_job_id,
+        toggle_field_expanded,
+    )
 
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
@@ -91,6 +111,7 @@ _JOB_TABS = [
     "Notes",
     "Activity",
 ]
+_FIELD_JOB_TABS = ["Overview", "Tasks", "Photos", "Daily Report"]
 SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
@@ -348,17 +369,29 @@ def _render_custom_jobs_table(
             status = _normalize_job_status(job.get("status"))
             start = fmt_date(job.get("start_date"))
             end = fmt_date(job.get("end_date"))
+            field_mode = is_field_mode()
+            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
             cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_job_select_key(jid),
-                    label_visibility="collapsed",
-                    on_change=_on_job_checkbox_change,
-                    args=(jid, all_job_ids),
-                )
+                if field_mode:
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"job_expand_{jid}",
+                        help="Expand job details",
+                    ):
+                        toggle_field_expanded(FIELD_EXPANDED_JOB_KEY, jid)
+                        set_field_job_id(jid)
+                        st.rerun()
+                else:
+                    st.checkbox(
+                        "",
+                        key=_job_select_key(jid),
+                        label_visibility="collapsed",
+                        on_change=_on_job_checkbox_change,
+                        args=(jid, all_job_ids),
+                    )
 
             with cols[1]:
                 st.markdown(
@@ -398,6 +431,14 @@ def _render_custom_jobs_table(
                     f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(end)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            if expanded:
+                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+                _render_field_job_detail_tabs(job)
+                if st.button("All job details", key=f"job_full_modal_{jid}", use_container_width=True):
+                    _open_jobs_detail_modal(jid, job)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -760,6 +801,75 @@ def _render_job_inventory_tab(job: dict) -> None:
     st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
 
 
+def _field_admin_read() -> bool:
+    try:
+        from auth import current_role
+    except ImportError:
+        from app.auth import current_role  # type: ignore
+    return current_role() in {"admin", "manager"}
+
+
+def _render_field_job_detail_tabs(job: dict) -> None:
+    """Compact job detail for field mode (4 tabs)."""
+    jn = _safe_value(job.get("job_number"))
+    jname = _safe_value(job.get("job_name"))
+    status = _safe_value(job.get("status"))
+    customer = _safe_value(job.get("customer"))
+    supervisor = _safe_value(job.get("supervisor"))
+    jid = str(job.get("id") or "").strip()
+
+    try:
+        from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+        from app.services.job_service import job_row_select_label
+    except ImportError:
+        from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
+        from services.job_service import job_row_select_label  # type: ignore
+
+    tab_overview, tab_tasks, tab_photos, tab_daily = st.tabs(_FIELD_JOB_TABS)
+
+    with tab_overview:
+        overview_html = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Job Number', jn)}"
+            f"{_detail_field('Project', jname)}"
+            f"{_detail_field('Customer', customer)}"
+            f'{_detail_field("Status", status, html_value=_status_pill(status))}'
+            f"{_detail_field('Supervisor', supervisor)}"
+            f"{_detail_field('Location', job.get('location'))}"
+            f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
+            f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
+            f"</div>"
+        )
+        st.markdown(_dialog_card("Overview", overview_html), unsafe_allow_html=True)
+        scope_text = _safe_value(job.get("scope") or job.get("description"), "No scope defined.")
+        scope_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(scope_text)}"
+            f"</p>"
+        )
+        st.markdown(_dialog_card("Scope", scope_html), unsafe_allow_html=True)
+
+    with tab_tasks:
+        inject_tasks_module_css()
+        render_job_linked_tasks_tab(job)
+
+    with tab_photos:
+        _render_dialog_placeholder("Job photos will appear here when connected to Supabase.")
+
+    with tab_daily:
+        if jid:
+            render_daily_reports_for_job(
+                job_id=jid,
+                job_label=job_row_select_label(job),
+                admin_read=_field_admin_read(),
+                show_title=False,
+                inline=True,
+                expand_sections=True,
+            )
+        else:
+            _render_dialog_placeholder("Save this job before filing daily reports.")
+
+
 def _render_job_detail_tabs(job: dict) -> None:
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
@@ -1082,7 +1192,10 @@ def render_job_detail_dialog(job: dict) -> None:
         _render_job_edit_form(job)
     else:
         _render_job_actions_panel(job)
-        _render_job_detail_tabs(job)
+        if is_field_mode():
+            _render_field_job_detail_tabs(job)
+        else:
+            _render_job_detail_tabs(job)
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
@@ -1109,6 +1222,8 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     inject_jobs_module_css()
+    if is_field_mode():
+        inject_field_row_expand_css()
     all_jobs = load_jobs()
     filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
 
@@ -1124,6 +1239,15 @@ def render() -> None:
         "Track and manage all company jobs, assignments, and costing.",
         actions=[_jobs_export, _jobs_new],
     )
+
+    if is_field_mode():
+        try:
+            from app.services.job_service import sort_jobs_by_number_then_name
+        except ImportError:
+            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+        field_jobs = sort_jobs_by_number_then_name(all_jobs)
+        if field_jobs:
+            render_field_job_bar(field_jobs, key_prefix="jobs")
 
     if st.session_state.get("ips_job_form"):
         with st.expander("New Job", expanded=True):
@@ -1202,6 +1326,7 @@ def render() -> None:
                 st.session_state["jobs_view"] = _JOBS_DEFAULT_VIEW
                 reset_table_page(_TABLE_KEY)
                 _clear_job_selection(st.session_state.get(_ALL_JOB_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
                 st.rerun()
 
     layout_filter_bar(_filters)

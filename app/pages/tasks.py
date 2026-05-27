@@ -64,7 +64,16 @@ try:
         update_task,
     )
     from app.styles import inject_tasks_module_css
-    from app.utils.field_context import get_field_job_id, is_field_mode, render_field_job_bar
+    from app.utils.field_context import (
+        FIELD_EXPANDED_TASK_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        get_field_job_id,
+        inject_field_row_expand_css,
+        is_field_mode,
+        render_field_job_bar,
+        toggle_field_expanded,
+    )
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
@@ -123,6 +132,13 @@ except ImportError:
     )
     from styles import inject_tasks_module_css  # type: ignore
     from utils.field_context import get_field_job_id, is_field_mode, render_field_job_bar  # type: ignore
+    from utils.field_context import (  # type: ignore
+        FIELD_EXPANDED_TASK_KEY,
+        clear_field_expanded,
+        field_expanded_id,
+        inject_field_row_expand_css,
+        toggle_field_expanded,
+    )
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("tasks")
@@ -779,6 +795,71 @@ def render_task_detail_dialog(
         _render_task_detail_tabs(task, assignee_lookup, jobs_by_id, job_options)
 
 
+def _open_task_detail_modal(
+    task: dict,
+    *,
+    assignee_lookup: dict[str, str],
+    jobs_by_id: dict[str, dict],
+    job_options: list[dict],
+) -> None:
+    tid = str(task.get("id") or "").strip()
+    if not tid:
+        return
+    st.session_state[SELECTED_TASK_KEY] = tid
+    st.session_state[SHOW_MODAL_KEY] = True
+    open_record_modal(
+        tid,
+        task,
+        session_select_key=_SEL,
+        modal_key=MODAL_KEY,
+        module=MODULE,
+        id_fields=("id", "title"),
+    )
+
+
+def _render_task_expand_panel(
+    task: dict,
+    *,
+    assignee_lookup: dict[str, str],
+    jobs_by_id: dict[str, dict],
+    job_options: list[dict],
+) -> None:
+    tid = str(task.get("id") or "").strip()
+    description = safe_value(task.get("description"), "No description.")
+    notes_text = safe_value(task.get("notes"), "No notes entered.")
+    linked_job = _format_job_label(task, jobs_by_id, job_options)
+
+    st.markdown(
+        f'<p class="ips-timekeeping-expand-title">{html.escape(str(task.get("title") or "Task"))}</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        dialog_card_html(
+            "Description",
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(description)}</p>",
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        dialog_card_html(
+            "Notes",
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes_text)}</p>",
+        ),
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Linked job: {linked_job}")
+    if st.button("Full task details", key=f"task_full_modal_{tid}", use_container_width=True):
+        _open_task_detail_modal(
+            task,
+            assignee_lookup=assignee_lookup,
+            jobs_by_id=jobs_by_id,
+            job_options=job_options,
+        )
+        st.rerun()
+
+
 @st.dialog("Task Details", width="large", on_dismiss=_clear_task_modal)
 def _show_task_modal(
     assignee_lookup: dict[str, str],
@@ -857,16 +938,28 @@ def _render_custom_task_table(
             if current_job_id is None and str(task.get("linked_job") or "") in job_labels:
                 current_job_label = str(task.get("linked_job"))
 
+            field_mode = is_field_mode()
+            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_TASK_KEY) == tid
+
             cols = st.columns(_TASK_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_task_select_key(tid),
-                    label_visibility="collapsed",
-                    on_change=_on_task_checkbox_change,
-                    args=(tid, all_task_ids),
-                )
+                if field_mode:
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"task_expand_{tid}",
+                        help="Expand task details",
+                    ):
+                        toggle_field_expanded(FIELD_EXPANDED_TASK_KEY, tid)
+                        st.rerun()
+                else:
+                    st.checkbox(
+                        "",
+                        key=_task_select_key(tid),
+                        label_visibility="collapsed",
+                        on_change=_on_task_checkbox_change,
+                        args=(tid, all_task_ids),
+                    )
 
             with cols[1]:
                 st.markdown(
@@ -929,6 +1022,16 @@ def _render_custom_task_table(
                     f'<div class="ips-task-cell ips-task-due">{html.escape(due)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            if expanded:
+                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+                _render_task_expand_panel(
+                    task,
+                    assignee_lookup=assignee_lookup,
+                    jobs_by_id=jobs_by_id,
+                    job_options=job_options,
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1125,6 +1228,8 @@ def render() -> None:
         return
 
     inject_tasks_module_css()
+    if is_field_mode():
+        inject_field_row_expand_css()
     st.markdown('<span class="ips-tasks-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     assignee_lookup = _build_assignee_lookup()
@@ -1174,6 +1279,7 @@ def render() -> None:
                     extra_keys=["task_search", TASK_VIEW_KEY],
                 )
                 _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_TASK_KEY)
                 st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_mode() else "Open Tasks"
                 st.rerun()
 
