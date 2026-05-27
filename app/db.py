@@ -1111,10 +1111,79 @@ def invite_auth_user(
     return {"id": str(user_id), "email": str(user_email), "role": str(role_norm)}
 
 
+def _invite_redirect_url() -> str | None:
+    base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
+    return f"{base}/" if base else None
+
+
+def _profile_for_email(email: str) -> dict[str, Any] | None:
+    em = str(email or "").strip().lower()
+    if not em:
+        return None
+    try:
+        rows = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=2)  # type: ignore[name-defined]
+        if rows:
+            return rows[0]
+    except Exception:
+        pass
+    try:
+        row = fetch_one("profiles", {"email": em})
+        if row:
+            return row
+    except Exception:
+        pass
+    return None
+
+
+def _admin_invite_user_by_email(email: str, *, redirect_to: str | None = None) -> None:
+    """Send Supabase invite email; creates auth user when missing."""
+    admin = get_admin_client()
+    fn = getattr(admin.auth.admin, "invite_user_by_email", None)
+    if fn is None:
+        raise AttributeError("auth.admin.invite_user_by_email is not available in this Supabase client.")
+    try:
+        if redirect_to:
+            fn(email, {"redirect_to": redirect_to})
+        else:
+            fn(email)
+    except TypeError:
+        try:
+            if redirect_to:
+                fn({"email": email, "options": {"redirect_to": redirect_to}})
+            else:
+                fn({"email": email})
+        except TypeError:
+            try:
+                fn(email)
+            except TypeError:
+                fn({"email": email})
+
+
+def _send_password_setup_email(email: str, *, redirect_to: str | None = None) -> None:
+    """Email an existing auth user a link to set or reset their password."""
+    client = get_client()
+    fn = getattr(client.auth, "reset_password_for_email", None)
+    if fn is None:
+        raise AttributeError("auth.reset_password_for_email is not available in this Supabase client.")
+    opts = {"redirect_to": redirect_to} if redirect_to else {}
+    try:
+        if opts:
+            fn(email, opts)
+        else:
+            fn(email)
+    except TypeError:
+        if opts:
+            fn(email, options=opts)
+        else:
+            fn(email)
+
+
 def resend_invite_by_email(*, email: str) -> None:
     """
-    Re-send an invite (magic link) for an existing auth user.
-    Uses Supabase Admin ``invite_user_by_email`` without creating a new profile.
+    Re-send access email for an invited or existing login.
+
+    New users get a Supabase invite. Existing linked logins get a password-setup
+    email instead of ``invite_user_by_email`` (which fails once auth.users exists).
     """
     em = str(email or "").strip().lower()
     if not em:
@@ -1122,28 +1191,19 @@ def resend_invite_by_email(*, email: str) -> None:
     if "@" not in em:
         raise RuntimeError("A valid email is required.")
 
-    admin = get_admin_client()
-    fn = getattr(admin.auth.admin, "invite_user_by_email", None)
-    if fn is None:
-        raise AttributeError("auth.admin.invite_user_by_email is not available in this Supabase client.")
-    base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
-    redirect_to = f"{base}/" if base else None
+    redirect_to = _invite_redirect_url()
+    profile = _profile_for_email(em)
+
     try:
-        if redirect_to:
-            fn(em, {"redirect_to": redirect_to})
-        else:
-            fn(em)
-    except TypeError:
-        try:
-            if redirect_to:
-                fn({"email": em, "options": {"redirect_to": redirect_to}})
-            else:
-                fn({"email": em})
-        except TypeError:
+        if profile and str(profile.get("id") or "").strip():
+            _send_password_setup_email(em, redirect_to=redirect_to)
             try:
-                fn(em)
-            except TypeError:
-                fn({"email": em})
+                update_profile_admin(str(profile["id"]), {"must_reset_password": True})
+            except Exception:
+                pass
+            return
+
+        _admin_invite_user_by_email(em, redirect_to=redirect_to)
     except Exception as exc:
         raise RuntimeError(f"Could not resend invite for {em!r}: {exc!r}") from exc
 

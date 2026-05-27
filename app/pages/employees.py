@@ -717,7 +717,7 @@ def _render_user_login_invite_panel(emp: dict, rk: str) -> None:
         return
 
     if has_login:
-        st.caption(f"Login linked · {email}")
+        st.caption(f"Login linked · {email} · resend sends a password setup link")
         if st.button(
             "Resend invite",
             key=f"emp_resend_invite_{rk}",
