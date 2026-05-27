@@ -43,13 +43,16 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "job_costing",
         "admin",
         "settings",
+        "field_dashboard",
+        "field_daily_reports",
+        "field_crew_time",
     }
 )
 
 # Legacy sidebar / deep-link labels from ``app.ui`` → rebuilt module slugs.
 LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Dashboard": "dashboard",
-    "Field Dashboard": "dashboard",
+    "Field Dashboard": "field_dashboard",
     "Company Updates": "company_updates",
     "Jobs": "jobs",
     "Job Database": "jobs",
@@ -69,6 +72,8 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Asset Manager": "assets",
     "Asset Detail": "assets",
     "Timekeeping": "timekeeping",
+    "Daily Reports": "field_daily_reports",
+    "Crew Time": "field_crew_time",
     "Time Tracking": "timekeeping",
     "Weekly Timesheets": "weekly_timesheets",
     "Weekly Timesheet": "weekly_timesheets",
@@ -88,9 +93,6 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Customers / Jobs": "customers",
     "Work & Plan (Supervisor)": "tasks",
     "Assign Tasks (PM)": "tasks",
-    "Daily Reports": "reports",
-    "Daily crew report": "reports",
-    "Supervisor Daily Reports": "reports",
     "Who Has What": "assets",
     "Tool Trailer Audits": "assets",
     "Asset Scanner": "assets",
@@ -108,8 +110,10 @@ PENDING_NAV_ALIASES: dict[str, str] = {
     "Tool Checkout": "Scan Inventory",
     "Planning & Goals": "Work & Plan (Supervisor)",
     "Daily Tasks": "Work & Plan (Supervisor)",
-    "Supervisor Daily Reports": "Daily Reports",
-    "Daily crew report": "Daily Reports",
+    "Daily Reports": "field_daily_reports",
+    "Daily crew report": "field_daily_reports",
+    "Supervisor Daily Reports": "field_daily_reports",
+    "Crew Time": "field_crew_time",
     "Materials Catalog": "Pricing Guide",
     "Material Catalog": "Pricing Guide",
     "Materials": "Pricing Guide",
@@ -182,7 +186,14 @@ def current_nav_slug() -> str:
 
 
 def set_nav_slug(slug: str) -> None:
-    st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(slug)
+    raw = str(slug or "").strip()
+    if raw == "scan_inventory":
+        st.session_state[_INVENTORY_SCAN_SESSION_KEY] = True
+        return
+    if raw == "scan_asset":
+        st.session_state[_ASSET_SCAN_SESSION_KEY] = True
+        return
+    st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(raw)
 
 
 try:

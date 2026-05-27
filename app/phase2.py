@@ -21,6 +21,9 @@ try:
         estimate_materials,
         pricing_guide,
         estimates,
+        field_crew_time,
+        field_daily_reports,
+        field_dashboard,
         inventory,
         job_costing,
         jobs,
@@ -48,6 +51,9 @@ except ImportError:
         estimate_materials,
         pricing_guide,
         estimates,
+        field_crew_time,
+        field_daily_reports,
+        field_dashboard,
         inventory,
         job_costing,
         jobs,
@@ -83,11 +89,15 @@ BUILT_MODULES: dict[str, object] = {
     "reports": reports.render,
     "admin": admin.render,
     "settings": settings.render,
+    "field_dashboard": field_dashboard.render,
+    "field_daily_reports": field_daily_reports.render,
+    "field_crew_time": field_crew_time.render,
 }
 
 
 def ensure_nav_defaults() -> None:
-    st.session_state.setdefault(SESSION_NAV_KEY, "dashboard")
+    default = "field_dashboard" if st.session_state.get("ips_field_mode") else "dashboard"
+    st.session_state.setdefault(SESSION_NAV_KEY, default)
 
 
 def on_nav_change(prev_slug: str, new_slug: str) -> None:

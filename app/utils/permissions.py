@@ -27,6 +27,9 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             ("tasks",),
             ("documents",),
             ("reports",),
+            ("field_dashboard",),
+            ("field_daily_reports",),
+            ("field_crew_time",),
             ("admin",),
             ("settings",),
         ]
@@ -51,6 +54,9 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "tasks",
             "documents",
             "reports",
+            "field_dashboard",
+            "field_daily_reports",
+            "field_crew_time",
             "settings",
         }
     ),
@@ -74,6 +80,9 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "tasks",
             "documents",
             "reports",
+            "field_dashboard",
+            "field_daily_reports",
+            "field_crew_time",
             "settings",
         }
     ),
@@ -86,6 +95,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "company_updates",
             "tasks",
             "documents",
+            "field_dashboard",
             "settings",
         }
     ),
@@ -135,6 +145,17 @@ def can_manage_weekly_timesheets(role: str) -> bool:
 def can_approve_timekeeping(role: str) -> bool:
     """Approve or reject employee weekly timecards."""
     return can_manage_weekly_timesheets(role)
+
+
+def filter_field_nav_for_role(nav: Iterable[tuple[str, str]], role: str) -> list[tuple[str, str]]:
+    """Field-mode sidebar items, including scan shortcuts gated by underlying module access."""
+    scan_targets = {"scan_inventory": "inventory", "scan_asset": "assets"}
+    out: list[tuple[str, str]] = []
+    for slug, label in nav:
+        target = scan_targets.get(slug, slug)
+        if role_can_access_page(role, target):
+            out.append((slug, label))
+    return out
 
 
 def filter_nav_for_role(

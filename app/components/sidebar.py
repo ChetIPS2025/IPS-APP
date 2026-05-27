@@ -10,13 +10,25 @@ import streamlit as st
 try:
     from app.auth import current_profile, current_role, sign_out
     from app.config import APP_VERSION, ROOT_DIR
+    from app.navigation import set_nav_slug
     from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES
-    from app.utils.permissions import filter_nav_for_role, normalize_role
+    from app.utils.permissions import (
+        filter_field_nav_for_role,
+        filter_nav_for_role,
+        normalize_role,
+        role_can_access_page,
+    )
 except ImportError:
     from auth import current_profile, current_role, sign_out  # type: ignore
     from config import APP_VERSION, ROOT_DIR  # type: ignore
+    from navigation import set_nav_slug  # type: ignore
     from utils.constants import FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
-    from utils.permissions import filter_nav_for_role, normalize_role  # type: ignore
+    from utils.permissions import (  # type: ignore
+        filter_field_nav_for_role,
+        filter_nav_for_role,
+        normalize_role,
+        role_can_access_page,
+    )
 
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
@@ -32,8 +44,13 @@ def _logo_path() -> Path | None:
 def render_sidebar(active_slug: str) -> None:
     role = normalize_role(current_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
-    nav_items = FIELD_NAV_PAGES if field_mode else filter_nav_for_role(NAV_PAGES, role)
+    nav_items = (
+        filter_field_nav_for_role(FIELD_NAV_PAGES, role)
+        if field_mode
+        else filter_nav_for_role(NAV_PAGES, role)
+    )
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
+    _SCAN_SLUGS = frozenset({"scan_inventory", "scan_asset"})
 
     with st.sidebar:
         st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
@@ -60,18 +77,14 @@ def render_sidebar(active_slug: str) -> None:
                     unsafe_allow_html=True,
                 )
                 estimating_header_shown = True
-            is_active = slug == active_slug
+            is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
             if st.button(
                 label,
                 key=f"nav_{slug}",
                 use_container_width=True,
                 type="primary" if is_active else "secondary",
             ):
-                if not is_active:
-                    try:
-                        from app.navigation import set_nav_slug
-                    except ImportError:
-                        from navigation import set_nav_slug  # type: ignore
+                if not is_active or slug in _SCAN_SLUGS:
                     set_nav_slug(slug)
                     st.rerun()
 
@@ -80,6 +93,8 @@ def render_sidebar(active_slug: str) -> None:
         fm = st.toggle("Field Supervisor Mode", value=field_mode, key="ips_field_mode_toggle")
         if fm != field_mode:
             st.session_state["ips_field_mode"] = fm
+            if fm and role_can_access_page(role, "field_dashboard"):
+                set_nav_slug("field_dashboard")
             st.rerun()
 
         prof = current_profile()

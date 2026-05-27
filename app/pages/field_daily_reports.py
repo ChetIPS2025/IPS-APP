@@ -1,4 +1,4 @@
-"""Daily Reports — field supervisor module (wraps supervisor daily reports + check-in)."""
+"""Daily Reports — field supervisor module (crew narrative, photos, site check-in)."""
 
 from __future__ import annotations
 
@@ -7,17 +7,19 @@ import streamlit as st
 from auth import current_profile, current_role
 
 try:
+    from app.components.headers import render_page_brand_header
     from app.db import fetch_jobs_with_order_fallback
+    from app.mobile_ui import ensure_narrow_viewport_detected
     from app.pages.supervisor_daily_reports import render_daily_reports_for_job
     from app.services.job_checkins import check_in, check_out, fetch_open_checkin
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    from app.ui.page_shell import inject_ips_dashboard_layout, render_page_header
 except ImportError:
+    from components.headers import render_page_brand_header  # type: ignore
     from db import fetch_jobs_with_order_fallback  # type: ignore
+    from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
     from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
     from services.job_checkins import check_in, check_out, fetch_open_checkin  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-    from ui.page_shell import inject_ips_dashboard_layout, render_page_header  # type: ignore
 
 
 def _admin_read() -> bool:
@@ -25,11 +27,23 @@ def _admin_read() -> bool:
 
 
 def render() -> None:
-    inject_ips_dashboard_layout()
-    render_page_header(
-        "Daily Reports",
+    try:
+        from app.pages._core._access import begin_module
+    except ImportError:
+        from pages._core._access import begin_module  # type: ignore
+    if not begin_module("field_daily_reports"):
+        return
+
+    ensure_narrow_viewport_detected()
+    st.markdown(
+        '<span class="ips-field-daily-reports-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    render_page_brand_header(
+        "Daily Report",
         "Field daily reports with crew, photos, safety, and site check-in.",
     )
+
     admin = _admin_read()
     prof = current_profile() or {}
     uid = str(prof.get("id") or "").strip() or None

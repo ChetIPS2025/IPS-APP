@@ -9,8 +9,10 @@ import streamlit as st
 from auth import current_profile, current_role
 
 try:
+    from app.components.headers import render_page_brand_header
     from app.data_cache import fetch_table_for_session
     from app.db import fetch_jobs_with_order_fallback
+    from app.mobile_ui import ensure_narrow_viewport_detected
     from app.services.field_crew_time import (
         TIME_TYPES,
         approve_batch_and_sync_time_entries,
@@ -22,10 +24,11 @@ try:
         upsert_crew_time_batch,
     )
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    from app.ui.page_shell import inject_ips_dashboard_layout, render_page_header
 except ImportError:
+    from components.headers import render_page_brand_header  # type: ignore
     from data_cache import fetch_table_for_session  # type: ignore
     from db import fetch_jobs_with_order_fallback  # type: ignore
+    from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
     from services.field_crew_time import (  # type: ignore
         TIME_TYPES,
         approve_batch_and_sync_time_entries,
@@ -37,7 +40,6 @@ except ImportError:
         upsert_crew_time_batch,
     )
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-    from ui.page_shell import inject_ips_dashboard_layout, render_page_header  # type: ignore
 
 
 def _admin() -> bool:
@@ -45,8 +47,23 @@ def _admin() -> bool:
 
 
 def render() -> None:
-    inject_ips_dashboard_layout()
-    render_page_header("Crew Time", "Batch crew hours by job — ST, OT, DT, travel, per diem.")
+    try:
+        from app.pages._core._access import begin_module
+    except ImportError:
+        from pages._core._access import begin_module  # type: ignore
+    if not begin_module("field_crew_time"):
+        return
+
+    ensure_narrow_viewport_detected()
+    st.markdown(
+        '<span class="ips-field-crew-time-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    render_page_brand_header(
+        "Crew Time",
+        "Batch crew hours by job — ST, OT, DT, travel, and per diem.",
+    )
+
     admin = _admin()
     prof = current_profile() or {}
     uid = str(prof.get("id") or "").strip() or None
