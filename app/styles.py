@@ -2678,7 +2678,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v5">
+<style id="ips-timekeeping-module-v6">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2805,6 +2805,21 @@ def inject_timekeeping_module_css() -> None:
   color: #111827;
   font-size: 0.82rem;
 }}
+.ips-time-hgrid-scroll {{
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 0.45rem;
+  max-width: 100%;
+}}
+.ips-time-hgrid-scroll .ips-time-hgrid-wrap {{
+  min-width: 960px;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+}}
 .ips-time-hgrid-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2872,6 +2887,25 @@ def inject_timekeeping_module_css() -> None:
 .ips-time-hgrid-day-total-active {{
   color: #0f172a;
 }}
+.ips-time-hgrid-locked {{
+  padding: 2px 0;
+}}
+.ips-time-hgrid-locked-job {{
+  font-size: 0.62rem;
+  font-weight: 650;
+  color: #475569;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.15rem;
+}}
+.ips-time-hgrid-locked-row {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}}
 .ips-timekeeping-status-pill-compact {{
   height: 14px;
   padding: 0 5px;
@@ -2898,12 +2932,39 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"],
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.15rem !important;
-  align-items: center !important;
+  gap: 0.2rem !important;
+  align-items: flex-start !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 2px 4px !important;
+  padding: 4px 6px !important;
   margin: 0 !important;
   min-height: 0 !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #ffffff;
+  box-shadow: 4px 0 8px -4px rgba(15, 23, 42, 0.12);
+  min-width: 118px;
+  max-width: 148px;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child,
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+  background: #f8fafc;
+  z-index: 4;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover > [data-testid="column"]:first-child,
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover > [data-testid="column"]:first-child {{
+  background: #eef5ff;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child),
+.st-key-ftp_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child) {{
+  min-width: 96px;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
@@ -2929,17 +2990,44 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"] input,
 .st-key-ftp_wrap [data-testid="stNumberInput"] input {{
   text-align: center;
-  padding: 0.15rem 0.2rem;
-  min-height: 1.45rem;
-  font-size: 0.72rem;
+  padding: 0.25rem 0.35rem;
+  min-height: 1.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-ftp_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
-  min-height: 1.45rem;
+  min-height: 1.75rem;
   font-size: 0.68rem;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  max-width: 100%;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+.st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+.st-key-ftp_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] span {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.st-key-ftp_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] {{
+  display: block !important;
+  font-size: 0.58rem !important;
+  font-weight: 750 !important;
+  color: #64748b !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.1rem 0 0.05rem !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+.st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+.st-key-ftp_wrap [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] {{
+  display: none !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
@@ -2950,10 +3038,10 @@ def inject_timekeeping_module_css() -> None:
   background: transparent !important;
   gap: 0.1rem !important;
 }}
-.st-key-tk_hgrid_wrap [data-testid="stWidgetLabel"],
-.st-key-tk_page_hgrid_wrap [data-testid="stWidgetLabel"],
-.st-key-ftp_wrap [data-testid="stWidgetLabel"] {{
-  display: none !important;
+.st-key-tk_hgrid_wrap [data-testid="column"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([data-testid="stNumberInput"]),
+.st-key-tk_page_hgrid_wrap [data-testid="column"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([data-testid="stNumberInput"]),
+.st-key-ftp_wrap [data-testid="column"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([data-testid="stNumberInput"]) {{
+  margin-top: 0.05rem !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;

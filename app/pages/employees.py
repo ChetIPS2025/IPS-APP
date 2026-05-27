@@ -49,6 +49,10 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.config import settings
+    from app.db import invite_auth_user, resend_invite_by_email
+    from app.services.repository import clear_all_data_caches
+    from app.services.users_service import can_manage_user_actions, get_user_delete_context
     from app.styles import inject_users_module_css
     from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
     from app.utils.formatting import fmt_date
@@ -95,6 +99,10 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from config import settings  # type: ignore
+    from db import invite_auth_user, resend_invite_by_email  # type: ignore
+    from services.repository import clear_all_data_caches  # type: ignore
+    from services.users_service import can_manage_user_actions, get_user_delete_context  # type: ignore
     from styles import inject_users_module_css  # type: ignore
     from utils.constants import DEPARTMENTS, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -620,6 +628,128 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.error(msg or "Could not save employee.")
 
 
+def _norm_invite_email(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _email_domain_allowed(email: str) -> bool:
+    em = _norm_invite_email(email)
+    if not em or "@" not in em:
+        return False
+    dom = em.split("@", 1)[1]
+    allow = str(
+        getattr(settings, "allowed_email_domain", "")
+        or getattr(settings, "company_email_domain", "")
+        or ""
+    ).strip().lower()
+    if not allow:
+        return True
+    return dom == allow
+
+
+def _invite_role_from_employee(emp: dict) -> str:
+    role_norm = normalize_role(str(emp.get("role") or "employee"))
+    if role_norm in {"pm", "estimator", "project manager", "supervisor"}:
+        return "manager"
+    if role_norm in {"admin", "viewer", "employee", "manager"}:
+        return role_norm
+    return "employee"
+
+
+def _employee_invite_email(emp: dict) -> str:
+    ctx = get_user_delete_context(str(emp.get("id") or ""))
+    email = _norm_invite_email(ctx.get("email") or emp.get("email"))
+    if email in {"", "—", "none"}:
+        return ""
+    return email
+
+
+def _send_employee_invite(emp: dict) -> str:
+    eid = str(emp.get("id") or "").strip()
+    email = _employee_invite_email(emp)
+    if not email or "@" not in email:
+        raise RuntimeError("Add a valid work email before sending an invite.")
+    if "indfustrial" in email:
+        raise RuntimeError("Check spelling of company domain (found 'indfustrial').")
+    if not _email_domain_allowed(email):
+        raise RuntimeError("Email domain is not allowed for app login.")
+
+    ctx = get_user_delete_context(eid)
+    if ctx.get("has_login"):
+        raise RuntimeError("This user already has a login. Use Resend invite instead.")
+
+    invite_auth_user(
+        email=email,
+        role=_invite_role_from_employee(emp),
+        employee_id=eid or None,
+        require_employee_link=False,
+    )
+    clear_all_data_caches()
+    return email
+
+
+def _resend_employee_invite(emp: dict) -> str:
+    email = _employee_invite_email(emp)
+    if not email or "@" not in email:
+        raise RuntimeError("No email on file for this user.")
+    resend_invite_by_email(email=email)
+    return email
+
+
+def _render_user_login_invite_panel(emp: dict, rk: str) -> None:
+    """Send or resend Supabase magic-link invites from the user detail modal."""
+    if not can_manage_user_actions():
+        return
+    eid = str(emp.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        return
+
+    ctx = get_user_delete_context(eid)
+    email = _employee_invite_email(emp)
+    has_login = bool(ctx.get("has_login"))
+
+    st.markdown(
+        '<p class="ips-user-actions-title">App Login</p>',
+        unsafe_allow_html=True,
+    )
+    if not email or "@" not in email:
+        st.caption("Add a valid work email on this user, then send an invite.")
+        return
+
+    if has_login:
+        st.caption(f"Login linked · {email}")
+        if st.button(
+            "Resend invite",
+            key=f"emp_resend_invite_{rk}",
+            use_container_width=True,
+        ):
+            try:
+                sent_to = _resend_employee_invite(emp)
+                st.session_state["users_action_flash"] = ("success", f"Invite resent to {sent_to}.")
+                st.rerun()
+            except Exception as exc:
+                st.error("Could not resend invite.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+        return
+
+    st.caption(f"No login yet · invite will go to {email}")
+    if st.button(
+        "Send invite",
+        type="primary",
+        key=f"emp_send_invite_{rk}",
+        use_container_width=True,
+    ):
+        try:
+            sent_to = _send_employee_invite(emp)
+            st.session_state["users_action_flash"] = ("success", f"Invite sent to {sent_to}.")
+            st.rerun()
+        except Exception as exc:
+            st.error("Could not send invite.")
+            with st.expander("Technical details"):
+                st.code(repr(exc), language="text")
+
+
 def _render_user_actions_panel(emp: dict, rk: str) -> None:
     """Activate, deactivate, or archive a user from the detail modal."""
     if is_edit_mode(MODULE, rk):
@@ -677,6 +807,7 @@ def render_employee_detail_dialog(emp: dict) -> None:
                 ("Status", status),
             ]
         )
+        _render_user_login_invite_panel(emp, rk)
         _render_user_actions_panel(emp, rk)
 
     if is_edit_mode(MODULE, rk):
@@ -751,17 +882,50 @@ def render() -> None:
                     help="Mobile or office number for this user.",
                 )
                 st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
+            if can_manage_user_actions():
+                st.checkbox(
+                    "Send invite email after save",
+                    value=True,
+                    key="emp_new_send_invite",
+                    help="Emails a magic link so they can set a password and log in.",
+                )
             if st.button("Save User", key="emp_save_new", type="primary"):
+                new_email = str(st.session_state.get("emp_new_email") or "").strip()
                 ok, msg = persist_employee(
                     {
                         "name": st.session_state.get("emp_new_name"),
-                        "email": st.session_state.get("emp_new_email"),
+                        "email": new_email,
                         "phone": st.session_state.get("emp_new_phone"),
                         "role": st.session_state.get("emp_new_role"),
                         "status": "Active",
                     }
                 )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_emp_form",)):
+                if not ok:
+                    st.error(msg or "Could not save employee.")
+                else:
+                    st.session_state.pop("ips_emp_form", None)
+                    flash_kind = "success"
+                    flash_msg = msg or "Employee saved."
+                    if can_manage_user_actions() and st.session_state.get("emp_new_send_invite"):
+                        fresh = next(
+                            (
+                                e
+                                for e in load_employees()
+                                if _norm_invite_email(e.get("email")) == _norm_invite_email(new_email)
+                            ),
+                            None,
+                        )
+                        if fresh:
+                            try:
+                                sent_to = _send_employee_invite(fresh)
+                                flash_msg = f"Employee saved. Invite sent to {sent_to}."
+                            except Exception as exc:
+                                flash_kind = "warning"
+                                flash_msg = f"Employee saved. Invite failed: {exc}"
+                        elif new_email:
+                            flash_kind = "warning"
+                            flash_msg = "Employee saved, but could not send invite."
+                    st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 
     filtered = _filter_employees(all_emp)

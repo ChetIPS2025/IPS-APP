@@ -1113,13 +1113,39 @@ def invite_auth_user(
 
 def resend_invite_by_email(*, email: str) -> None:
     """
-    Re-send an invite (magic link) to an existing email.
-    Supabase treats this as another invite operation.
+    Re-send an invite (magic link) for an existing auth user.
+    Uses Supabase Admin ``invite_user_by_email`` without creating a new profile.
     """
     em = str(email or "").strip().lower()
     if not em:
         raise RuntimeError("Email is required.")
-    _ = invite_auth_user(email=em, role="employee", require_employee_link=False)
+    if "@" not in em:
+        raise RuntimeError("A valid email is required.")
+
+    admin = get_admin_client()
+    fn = getattr(admin.auth.admin, "invite_user_by_email", None)
+    if fn is None:
+        raise AttributeError("auth.admin.invite_user_by_email is not available in this Supabase client.")
+    base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
+    redirect_to = f"{base}/" if base else None
+    try:
+        if redirect_to:
+            fn(em, {"redirect_to": redirect_to})
+        else:
+            fn(em)
+    except TypeError:
+        try:
+            if redirect_to:
+                fn({"email": em, "options": {"redirect_to": redirect_to}})
+            else:
+                fn({"email": em})
+        except TypeError:
+            try:
+                fn(em)
+            except TypeError:
+                fn({"email": em})
+    except Exception as exc:
+        raise RuntimeError(f"Could not resend invite for {em!r}: {exc!r}") from exc
 
 
 def update_auth_user_email_admin(*, user_id: str, new_email: str) -> None:
