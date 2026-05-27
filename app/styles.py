@@ -2678,7 +2678,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v4">
+<style id="ips-timekeeping-module-v5">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;

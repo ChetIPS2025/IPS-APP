@@ -204,7 +204,7 @@ def _render_horizontal_week_grid(
     week_start_d: date,
     key_prefix: str = "tk_hgrid",
 ) -> None:
-    """All employees × 7 days on one screen — job, ST, and OT inline."""
+    """All employees × 7 days — job picker and hours for that job on one line."""
     if not filtered:
         st.info("No timecards for this week.")
         return
@@ -217,7 +217,7 @@ def _render_horizontal_week_grid(
             f"Active job **{field_job}** pre-fills editable days — change any day with the job picker."
         )
     else:
-        st.caption("Job picker per day; **ST** / **OT** update the live day total on the same row.")
+        st.caption("Pick the job and enter **hours** for that job each day. Use **List** view for ST/OT/DT split.")
 
     with st.container(key=f"{key_prefix}_wrap"):
         st.markdown('<div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
@@ -228,7 +228,7 @@ def _render_horizontal_week_grid(
             with col:
                 sub = ""
                 if label not in ("Employee", "Week"):
-                    sub = '<div class="ips-time-hgrid-head-sub">Job · ST · OT · Σ</div>'
+                    sub = '<div class="ips-time-hgrid-head-sub">Job · Hrs</div>'
                 st.markdown(
                     f'<div class="ips-time-hgrid-head">{html.escape(label)}{sub}</div>',
                     unsafe_allow_html=True,
@@ -261,42 +261,34 @@ def _render_horizontal_week_grid(
                 with col:
                     cur_job = str(grid[day_ix].get("job") or (job_opts[0] if job_opts else "— No job —"))
                     job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
-                    grid[day_ix]["job"] = st.selectbox(
-                        "Job",
-                        job_opts,
-                        index=job_ix,
-                        key=f"tk_job_{eid}_{week_sig}_{day_ix}",
-                        label_visibility="collapsed",
-                        disabled=not editable,
-                    )
-                    st_col, ot_col, total_col = st.columns([1, 1, 0.85], gap="small")
-                    with st_col:
-                        grid[day_ix]["st"] = st.number_input(
-                            "ST",
-                            value=float(grid[day_ix].get("st") or 0),
-                            key=f"tk_st_{eid}_{week_sig}_{day_ix}",
+                    job_col, hrs_col = st.columns([1.45, 0.55], gap="small")
+                    with job_col:
+                        grid[day_ix]["job"] = st.selectbox(
+                            "Job",
+                            job_opts,
+                            index=job_ix,
+                            key=f"tk_job_{eid}_{week_sig}_{day_ix}",
                             label_visibility="collapsed",
-                            step=0.5,
-                            min_value=0.0,
-                            max_value=24.0,
-                            format="%.1f",
                             disabled=not editable,
                         )
-                    with ot_col:
-                        grid[day_ix]["ot"] = st.number_input(
-                            "OT",
-                            value=float(grid[day_ix].get("ot") or 0),
-                            key=f"tk_ot_{eid}_{week_sig}_{day_ix}",
-                            label_visibility="collapsed",
-                            step=0.5,
-                            min_value=0.0,
-                            max_value=24.0,
-                            format="%.1f",
-                            disabled=not editable,
-                        )
-                    with total_col:
-                        day_total = _day_hours_total(grid[day_ix])
-                        st.markdown(_hgrid_day_total_html(day_total), unsafe_allow_html=True)
+                    with hrs_col:
+                        if editable:
+                            hrs = st.number_input(
+                                "Hrs",
+                                value=_day_hours_total(grid[day_ix]),
+                                key=f"tk_hrs_{eid}_{week_sig}_{day_ix}",
+                                label_visibility="collapsed",
+                                step=0.5,
+                                min_value=0.0,
+                                max_value=24.0,
+                                format="%.1f",
+                            )
+                            _set_day_job_hours(grid[day_ix], hrs)
+                        else:
+                            st.markdown(
+                                _hgrid_day_total_html(_day_hours_total(grid[day_ix])),
+                                unsafe_allow_html=True,
+                            )
                     if not editable:
                         st.markdown(
                             _timecard_status_pill_html(day_status, compact=True),
@@ -539,6 +531,13 @@ def _day_hours_total(day_row: dict) -> float:
         + float(day_row.get("ot") or 0)
         + float(day_row.get("dt") or 0)
     )
+
+
+def _set_day_job_hours(day_row: dict, hours: float) -> None:
+    """Grid entry: hours apply to the selected job (stored as ST)."""
+    day_row["st"] = float(hours)
+    day_row["ot"] = 0.0
+    day_row["dt"] = 0.0
 
 
 def _hgrid_day_total_html(total: float) -> str:
