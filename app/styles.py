@@ -2678,7 +2678,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v2">
+<style id="ips-timekeeping-module-v4">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2808,97 +2808,138 @@ def inject_timekeeping_module_css() -> None:
 .ips-time-hgrid-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.45rem;
 }}
 .ips-time-hgrid-head {{
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
-  padding: 8px 4px;
-  font-size: 0.66rem;
+  padding: 4px 2px;
+  font-size: 0.62rem;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   text-align: center;
-  min-height: 36px;
+  min-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1.1;
 }}
 .ips-time-hgrid-head:first-child {{
   text-align: left;
   justify-content: flex-start;
-  padding-left: 10px;
+  padding-left: 6px;
 }}
 .ips-time-hgrid-head-sub {{
-  margin-top: 0.15rem;
-  font-size: 0.58rem;
+  margin-top: 0.05rem;
+  font-size: 0.52rem;
   font-weight: 650;
   color: #94a3b8;
   text-transform: none;
   letter-spacing: 0;
-}}
-.ips-time-hgrid-hour-lbl {{
-  font-size: 0.58rem;
-  font-weight: 750;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0.15rem 0 0.05rem;
-  text-align: center;
+  line-height: 1;
 }}
 .ips-time-hgrid-employee {{
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.2;
-  padding: 4px 0 0 6px;
-}}
-.ips-time-hgrid-dept {{
-  font-size: 0.68rem;
-  color: #64748b;
-  padding-left: 6px;
+  line-height: 1.15;
+  padding: 2px 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-time-hgrid-total {{
-  font-size: 0.875rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #0f172a;
   text-align: center;
-  padding-top: 0.35rem;
+  padding-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}}
+.ips-time-hgrid-day-total {{
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-align: center;
+  padding-top: 0.18rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45rem;
+}}
+.ips-time-hgrid-day-total-active {{
+  color: #0f172a;
+}}
+.ips-timekeeping-status-pill-compact {{
+  height: 14px;
+  padding: 0 5px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  margin-top: 1px;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stVerticalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="stVerticalBlock"],
+.st-key-ftp_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"],
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"],
+.st-key-ftp_wrap [data-testid="stElementContainer"] {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="column"] [data-testid="stVerticalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"] [data-testid="stVerticalBlock"],
+.st-key-ftp_wrap [data-testid="column"] [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"],
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.25rem !important;
-  align-items: flex-start !important;
+  gap: 0.15rem !important;
+  align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 6px 8px !important;
+  padding: 2px 4px !important;
   margin: 0 !important;
+  min-height: 0 !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
+  min-height: 24px;
+  padding: 3px 4px !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover,
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover,
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
 }}
+.st-key-tk_hgrid_wrap [data-testid="stSelectbox"],
+.st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"],
+.st-key-ftp_wrap [data-testid="stSelectbox"],
+.st-key-tk_hgrid_wrap [data-testid="stNumberInput"],
+.st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"],
+.st-key-ftp_wrap [data-testid="stNumberInput"] {{
+  margin-bottom: 0 !important;
+}}
 .st-key-tk_hgrid_wrap [data-testid="stNumberInput"] input,
 .st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"] input,
 .st-key-ftp_wrap [data-testid="stNumberInput"] input {{
   text-align: center;
-  padding: 0.35rem 0.25rem;
-  min-height: 2rem;
+  padding: 0.15rem 0.2rem;
+  min-height: 1.45rem;
+  font-size: 0.72rem;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-ftp_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
-  min-height: 2rem;
-  font-size: 0.72rem;
+  min-height: 1.45rem;
+  font-size: 0.68rem;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"],
@@ -2907,6 +2948,12 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   min-height: 0 !important;
   background: transparent !important;
+  gap: 0.1rem !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stWidgetLabel"],
+.st-key-tk_page_hgrid_wrap [data-testid="stWidgetLabel"],
+.st-key-ftp_wrap [data-testid="stWidgetLabel"] {{
+  display: none !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;

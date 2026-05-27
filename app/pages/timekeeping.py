@@ -98,7 +98,7 @@ _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TK_VIEW_KEY = "ips_timekeeping_view_mode"
 _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
-_HGRID_COLS = [1.5, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 0.72]
+_HGRID_COLS = [1.15, 1.22, 1.22, 1.22, 1.22, 1.22, 1.22, 1.22, 0.55]
 _TK_COLS = [0.35, 2.4, 1.8, 1.4, 1.0, 1.0, 1.0, 1.2, 1.3]
 _TK_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -217,7 +217,7 @@ def _render_horizontal_week_grid(
             f"Active job **{field_job}** pre-fills editable days — change any day with the job picker."
         )
     else:
-        st.caption("Each day: **job**, **ST** (straight time), **OT** (overtime).")
+        st.caption("Job picker per day; **ST** / **OT** update the live day total on the same row.")
 
     with st.container(key=f"{key_prefix}_wrap"):
         st.markdown('<div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
@@ -227,8 +227,8 @@ def _render_horizontal_week_grid(
         for col, label in zip(header, header_labels):
             with col:
                 sub = ""
-                if label != "Employee" and label != "Week":
-                    sub = '<div class="ips-time-hgrid-head-sub">Job · ST · OT</div>'
+                if label not in ("Employee", "Week"):
+                    sub = '<div class="ips-time-hgrid-head-sub">Job · ST · OT · Σ</div>'
                 st.markdown(
                     f'<div class="ips-time-hgrid-head">{html.escape(label)}{sub}</div>',
                     unsafe_allow_html=True,
@@ -246,11 +246,11 @@ def _render_horizontal_week_grid(
 
             cols = st.columns(_HGRID_COLS, gap="small")
             with cols[0]:
+                name = str(row.get("employee_name") or "—")
                 dept = str(row.get("department") or "").strip()
-                sub = f'<div class="ips-time-hgrid-dept">{html.escape(dept)}</div>' if dept else ""
+                label = f"{name} · {dept}" if dept else name
                 st.markdown(
-                    f'<div class="ips-time-hgrid-employee">{html.escape(str(row.get("employee_name") or "—"))}</div>'
-                    f"{sub}",
+                    f'<div class="ips-time-hgrid-employee">{html.escape(label)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -269,9 +269,8 @@ def _render_horizontal_week_grid(
                         label_visibility="collapsed",
                         disabled=not editable,
                     )
-                    st_col, ot_col = st.columns(2, gap="small")
+                    st_col, ot_col, total_col = st.columns([1, 1, 0.85], gap="small")
                     with st_col:
-                        st.markdown('<div class="ips-time-hgrid-hour-lbl">ST</div>', unsafe_allow_html=True)
                         grid[day_ix]["st"] = st.number_input(
                             "ST",
                             value=float(grid[day_ix].get("st") or 0),
@@ -284,7 +283,6 @@ def _render_horizontal_week_grid(
                             disabled=not editable,
                         )
                     with ot_col:
-                        st.markdown('<div class="ips-time-hgrid-hour-lbl">OT</div>', unsafe_allow_html=True)
                         grid[day_ix]["ot"] = st.number_input(
                             "OT",
                             value=float(grid[day_ix].get("ot") or 0),
@@ -296,12 +294,15 @@ def _render_horizontal_week_grid(
                             format="%.1f",
                             disabled=not editable,
                         )
+                    with total_col:
+                        day_total = _day_hours_total(grid[day_ix])
+                        st.markdown(_hgrid_day_total_html(day_total), unsafe_allow_html=True)
                     if not editable:
                         st.markdown(
-                            _timecard_status_pill_html(day_status),
+                            _timecard_status_pill_html(day_status, compact=True),
                             unsafe_allow_html=True,
                         )
-                row_total += float(grid[day_ix].get("st") or 0) + float(grid[day_ix].get("ot") or 0)
+                row_total += _day_hours_total(grid[day_ix])
 
             with cols[8]:
                 st.markdown(
@@ -532,6 +533,21 @@ def _fmt_table_hours(val: object) -> str:
         return "0.00"
 
 
+def _day_hours_total(day_row: dict) -> float:
+    return (
+        float(day_row.get("st") or 0)
+        + float(day_row.get("ot") or 0)
+        + float(day_row.get("dt") or 0)
+    )
+
+
+def _hgrid_day_total_html(total: float) -> str:
+    cls = "ips-time-hgrid-day-total"
+    if total > 0:
+        cls += " ips-time-hgrid-day-total-active"
+    return f'<div class="{cls}">{html.escape(_fmt_table_hours(total))}</div>'
+
+
 def _normalize_timecard_status(raw: object) -> str:
     s = str(raw or "").strip().lower()
     if s in ("", "draft"):
@@ -545,7 +561,7 @@ def _normalize_timecard_status(raw: object) -> str:
     return str(raw or "Draft").strip().title() or "Draft"
 
 
-def _timecard_status_pill_html(status: str) -> str:
+def _timecard_status_pill_html(status: str, *, compact: bool = False) -> str:
     cls_map = {
         "Draft": "ips-timekeeping-status-draft",
         "Pending": "ips-timekeeping-status-pending",
@@ -553,8 +569,9 @@ def _timecard_status_pill_html(status: str) -> str:
         "Rejected": "ips-timekeeping-status-rejected",
     }
     cls = cls_map.get(status, "ips-timekeeping-status-draft")
+    compact_cls = " ips-timekeeping-status-pill-compact" if compact else ""
     return (
-        f'<span class="ips-timekeeping-status-pill {cls}">'
+        f'<span class="ips-timekeeping-status-pill {cls}{compact_cls}">'
         f"{html.escape(status)}</span>"
     )
 
