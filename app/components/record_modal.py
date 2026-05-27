@@ -258,7 +258,7 @@ def render_compact_modal_header(
         )
     with actions_col:
         if extra_actions:
-            pill_col, edit_col, user_col = st.columns([0.9, 0.72, 2.4], gap="small")
+            pill_col, edit_col, user_col = st.columns([0.8, 0.62, 3.35], gap="small")
         else:
             pill_col, edit_col = st.columns([1.15, 1], gap="small")
             user_col = None

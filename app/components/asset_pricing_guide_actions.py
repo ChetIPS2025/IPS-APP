@@ -167,6 +167,71 @@ def _render_exclude_confirm_if_active(
     return False
 
 
+def _asset_key(asset: dict[str, Any]) -> str:
+    aid = str(asset.get("id") or "").strip()
+    return "".join(ch if ch.isalnum() else "_" for ch in aid) or "asset"
+
+
+def is_asset_pricing_guide_confirm_open(asset: dict[str, Any]) -> bool:
+    aid = str(asset.get("id") or "").strip()
+    if not aid:
+        return False
+    return any(
+        st.session_state.get(_confirm_state_key(aid, action))
+        for action in ("exclude", "link")
+    )
+
+
+def pricing_guide_header_action_spec(
+    asset: dict[str, Any],
+) -> tuple[str, Any, str, str] | None:
+    """Primary pricing guide toggle button for the modal header."""
+    if not can_manage_asset_actions():
+        return None
+
+    asset_key = _asset_key(asset)
+    include = asset_include_in_pricing_guide(asset)
+    if include:
+        return (
+            "exclude",
+            warning_solid_button,
+            "Remove from Pricing Guide",
+            f"asset_pg_exclude_{asset_key}",
+        )
+    return (
+        "include",
+        success_solid_button,
+        "Include on Pricing Guide",
+        f"asset_pg_enable_{asset_key}",
+    )
+
+
+def render_asset_pricing_guide_confirm_panel(
+    asset: dict[str, Any],
+    *,
+    on_change: Callable[[], None] | None = None,
+) -> bool:
+    """Render inline confirmation for pricing guide actions. Returns True if shown."""
+    aid = str(asset.get("id") or "").strip()
+    if not aid or is_demo_id(aid):
+        return False
+
+    if _render_exclude_confirm_if_active(asset_id=aid, on_change=on_change):
+        return True
+
+    if st.session_state.get(_confirm_state_key(aid, "link")):
+        options = _asset_pricing_options()
+        if not options:
+            st.caption("No asset-class pricing guide items are available to link.")
+            if st.button("Close", key=f"asset_pg_link_close_{aid}"):
+                st.session_state.pop(_confirm_state_key(aid, "link"), None)
+                st.rerun()
+            return True
+        _render_confirm_link_card(asset_id=aid, options=options)
+        return True
+    return False
+
+
 def _render_remove_from_pricing_guide_button(
     *,
     asset_id: str,
@@ -213,19 +278,121 @@ def _render_confirm_link_card(*, asset_id: str, options: list[tuple[str, str]]) 
             st.error(msg)
 
 
-def render_asset_pricing_guide_actions(
+def handle_pricing_guide_header_click(
+    asset: dict[str, Any],
+    action: str,
+    *,
+    on_change: Callable[[], None] | None = None,
+) -> None:
+    """Handle primary pricing guide header button clicks."""
+    aid = str(asset.get("id") or "").strip()
+    if not aid:
+        return
+    if action == "include":
+        result = set_asset_include_in_pricing_guide(aid, True)
+        if result.ok:
+            clear_assets_cache()
+            if on_change:
+                on_change()
+            st.rerun()
+        st.error(result.error or "Could not update asset.")
+        return
+    if action == "exclude":
+        st.session_state[_confirm_state_key(aid, "exclude")] = True
+        st.rerun()
+
+
+def render_asset_pricing_guide_status_panel(
     asset: dict[str, Any],
     *,
     on_change: Callable[[], None] | None = None,
 ) -> None:
-    """Render pricing guide link status and actions using Asset Actions styling."""
+    """Render pricing guide status and secondary link actions (header holds primary toggle)."""
     aid = str(asset.get("id") or "").strip()
     if not aid or is_demo_id(aid):
         return
 
-    asset_key = "".join(ch if ch.isalnum() else "_" for ch in aid) or "asset"
+    asset_key = _asset_key(asset)
     include = asset_include_in_pricing_guide(asset)
     linked = _resolve_linked_pricing_item(asset) if include else None
+
+    if not include:
+        st.markdown(
+            '<p class="ips-inventory-pg-status">Not included on Pricing Guide. '
+            "This asset is tracked in Assets only.</p>",
+            unsafe_allow_html=True,
+        )
+        if not can_manage_asset_actions():
+            st.caption("Only admin, manager, or supervisor can change pricing guide settings.")
+        return
+
+    if linked:
+        desc = html.escape(str(linked.get("description") or "Pricing item"))
+        item_type = html.escape(str(linked.get("item_type") or ""))
+        rate = fmt_currency(linked.get("default_cost"))
+        sell = fmt_currency(linked.get("default_sell_price"))
+        st.markdown(
+            f'<p class="ips-inventory-pg-status">Linked: <strong>{desc}</strong>'
+            f"{f' ({item_type})' if item_type else ''}"
+            f"<br><span>Rate {rate}/hr · Sell {sell}</span></p>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        '<p class="ips-inventory-pg-status">Included on Pricing Guide, but no item is linked yet.</p>',
+        unsafe_allow_html=True,
+    )
+
+    if not can_manage_asset_actions():
+        st.caption("Only admin, manager, or supervisor can link pricing guide items.")
+        return
+
+    action_specs: list[tuple[str, str, str]] = [
+        ("create", "Create Pricing Item", f"open_pg_create_{asset_key}"),
+    ]
+    options = _asset_pricing_options()
+    if options:
+        action_specs.append(("link", "Link to Pricing Guide", f"open_pg_link_{asset_key}"))
+
+    cols = st.columns(len(action_specs), gap="small")
+    for col, (action, label, suffix) in zip(cols, action_specs):
+        with col:
+            if not success_solid_button(label, suffix, use_container_width=False):
+                continue
+            if action == "create":
+                ok, msg = _create_pricing_item_from_asset(asset)
+                if ok:
+                    st.success(msg)
+                    if on_change:
+                        on_change()
+                    st.rerun()
+                st.error(msg)
+            elif action == "link":
+                st.session_state[_confirm_state_key(aid, "link")] = True
+                st.rerun()
+
+
+def render_asset_pricing_guide_actions(
+    asset: dict[str, Any],
+    *,
+    on_change: Callable[[], None] | None = None,
+    buttons_in_header: bool = False,
+) -> None:
+    """Render pricing guide confirmations and status panel."""
+    aid = str(asset.get("id") or "").strip()
+    if not aid or is_demo_id(aid):
+        return
+
+    if render_asset_pricing_guide_confirm_panel(asset, on_change=on_change):
+        return
+
+    if buttons_in_header:
+        render_asset_pricing_guide_status_panel(asset, on_change=on_change)
+        return
+
+    asset_key = _asset_key(asset)
+    include = asset_include_in_pricing_guide(asset)
 
     with st.container(key=f"asset_pg_actions_{asset_key}"):
         st.markdown('<span class="ips-asset-actions-marker"></span>', unsafe_allow_html=True)
@@ -250,65 +417,9 @@ def render_asset_pricing_guide_actions(
                 st.error(result.error or "Could not update asset.")
             return
 
-        if _render_exclude_confirm_if_active(asset_id=aid, on_change=on_change):
-            return
-
+        render_asset_pricing_guide_status_panel(asset, on_change=on_change)
+        linked = _resolve_linked_pricing_item(asset)
         if linked:
-            desc = html.escape(str(linked.get("description") or "Pricing item"))
-            item_type = html.escape(str(linked.get("item_type") or ""))
-            rate = fmt_currency(linked.get("default_cost"))
-            sell = fmt_currency(linked.get("default_sell_price"))
-            st.markdown(
-                f'<p class="ips-inventory-pg-status">Linked: <strong>{desc}</strong>'
-                f"{f' ({item_type})' if item_type else ''}"
-                f"<br><span>Rate {rate}/hr · Sell {sell}</span></p>",
-                unsafe_allow_html=True,
-            )
             _render_remove_from_pricing_guide_button(asset_id=aid, asset_key=asset_key)
-            return
-
-        st.markdown(
-            '<p class="ips-inventory-pg-status">Included on Pricing Guide, but no item is linked yet.</p>',
-            unsafe_allow_html=True,
-        )
-
-        if not can_manage_asset_actions():
-            st.caption("Only admin, manager, or supervisor can link pricing guide items.")
-            return
-
-        if st.session_state.get(_confirm_state_key(aid, "link")):
-            options = _asset_pricing_options()
-            if not options:
-                st.caption("No asset-class pricing guide items are available to link.")
-                if st.button("Close", key=f"asset_pg_link_close_{aid}"):
-                    st.session_state.pop(_confirm_state_key(aid, "link"), None)
-                    st.rerun()
-                return
-            _render_confirm_link_card(asset_id=aid, options=options)
-            return
-
-        action_specs: list[tuple[str, str, str]] = [
-            ("create", "Create Pricing Item", f"open_pg_create_{asset_key}"),
-        ]
-        options = _asset_pricing_options()
-        if options:
-            action_specs.append(("link", "Link to Pricing Guide", f"open_pg_link_{asset_key}"))
-
-        cols = st.columns(len(action_specs), gap="small")
-        for col, (action, label, suffix) in zip(cols, action_specs):
-            with col:
-                if not success_solid_button(label, suffix, use_container_width=False):
-                    continue
-                if action == "create":
-                    ok, msg = _create_pricing_item_from_asset(asset)
-                    if ok:
-                        st.success(msg)
-                        if on_change:
-                            on_change()
-                        st.rerun()
-                    st.error(msg)
-                elif action == "link":
-                    st.session_state[_confirm_state_key(aid, "link")] = True
-                    st.rerun()
-
-        _render_remove_from_pricing_guide_button(asset_id=aid, asset_key=asset_key)
+        elif can_manage_asset_actions():
+            _render_remove_from_pricing_guide_button(asset_id=aid, asset_key=asset_key)

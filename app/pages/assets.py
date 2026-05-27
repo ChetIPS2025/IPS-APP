@@ -8,8 +8,19 @@ import html
 import streamlit as st
 
 try:
-    from app.components.asset_actions import render_asset_action_buttons
-    from app.components.asset_pricing_guide_actions import render_asset_pricing_guide_actions
+    from app.components.asset_actions import (
+        asset_retire_delete_action_specs,
+        is_asset_action_confirm_open,
+        open_asset_action_confirm,
+        render_asset_action_confirm_panel,
+    )
+    from app.components.asset_pricing_guide_actions import (
+        handle_pricing_guide_header_click,
+        is_asset_pricing_guide_confirm_open,
+        pricing_guide_header_action_spec,
+        render_asset_pricing_guide_actions,
+        render_asset_pricing_guide_confirm_panel,
+    )
     from app.components.item_photo_manager import render_item_photo_manager
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -39,6 +50,7 @@ try:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_compact_modal_header,
         render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
@@ -89,8 +101,19 @@ try:
         toggle_field_expanded,
     )
 except ImportError:
-    from components.asset_actions import render_asset_action_buttons  # type: ignore
-    from components.asset_pricing_guide_actions import render_asset_pricing_guide_actions  # type: ignore
+    from components.asset_actions import (  # type: ignore
+        asset_retire_delete_action_specs,
+        is_asset_action_confirm_open,
+        open_asset_action_confirm,
+        render_asset_action_confirm_panel,
+    )
+    from components.asset_pricing_guide_actions import (  # type: ignore
+        handle_pricing_guide_header_click,
+        is_asset_pricing_guide_confirm_open,
+        pricing_guide_header_action_spec,
+        render_asset_pricing_guide_actions,
+        render_asset_pricing_guide_confirm_panel,
+    )
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -120,6 +143,7 @@ except ImportError:
         render_edit_form_header,
         render_missing_record,
         render_modal_header,
+        render_compact_modal_header,
         render_modal_edit_button,
         render_modal_meta_grid,
         render_modal_shell,
@@ -1411,6 +1435,47 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         placeholder_html("Asset activity history will appear here when connected to Supabase.")
 
 
+def _asset_action_callbacks() -> tuple[object, object]:
+    def _after_action() -> None:
+        _clear_assets_detail_modal()
+
+    return _after_action, _after_action
+
+
+def _render_asset_header_actions(asset: dict) -> None:
+    if is_asset_action_confirm_open(asset) or is_asset_pricing_guide_confirm_open(asset):
+        return
+
+    aid = str(asset.get("id") or "").strip()
+    if not aid or is_demo_id(aid):
+        return
+
+    on_retire, on_delete = _asset_action_callbacks()
+    action_specs = list(asset_retire_delete_action_specs(asset))
+    pg_spec = pricing_guide_header_action_spec(asset)
+    if pg_spec:
+        action_specs.append(pg_spec)
+    if not action_specs:
+        return
+
+    asset_key = "".join(ch if ch.isalnum() else "_" for ch in aid) or "asset"
+    with st.container(key=f"asset_header_actions_{asset_key}"):
+        st.markdown('<span class="ips-asset-actions-header-marker"></span>', unsafe_allow_html=True)
+        cols = st.columns(len(action_specs), gap="small")
+        for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
+            with col:
+                if not btn_fn(label, suffix, use_container_width=False):
+                    continue
+                if action in {"retire", "delete"}:
+                    open_asset_action_confirm(aid, action)
+                elif action in {"include", "exclude"}:
+                    handle_pricing_guide_header_click(
+                        asset,
+                        action,
+                        on_change=on_retire,
+                    )
+
+
 def _render_asset_actions_panel(asset: dict) -> None:
     rk = record_session_key(asset, "id", "asset_number")
     if is_edit_mode(_MOD, rk):
@@ -1419,11 +1484,10 @@ def _render_asset_actions_panel(asset: dict) -> None:
     if not aid or is_demo_id(aid):
         return
 
-    def _after_action() -> None:
-        _clear_assets_detail_modal()
-
-    render_asset_action_buttons(asset, on_retire=_after_action, on_delete=_after_action)
-    render_asset_pricing_guide_actions(asset)
+    on_retire, on_delete = _asset_action_callbacks()
+    render_asset_action_confirm_panel(asset, on_retire=on_retire, on_delete=on_delete)
+    render_asset_pricing_guide_confirm_panel(asset, on_change=on_retire)
+    render_asset_pricing_guide_actions(asset, on_change=on_retire, buttons_in_header=True)
 
 
 def render_asset_detail_dialog(asset: dict) -> None:
@@ -1432,29 +1496,34 @@ def render_asset_detail_dialog(asset: dict) -> None:
     asset_name = safe_value(asset.get("asset_name"))
     status = safe_value(asset.get("status"))
 
-    render_modal_shell()
-    render_modal_header(title=asset_number, subtitle=asset_name, status=status)
+    render_modal_shell(compact=True)
+    if not is_edit_mode(_MOD, rk):
+        aid = str(asset.get("id") or "").strip()
+        show_header_actions = bool(aid) and not is_demo_id(aid)
+        render_compact_modal_header(
+            title=asset_number,
+            subtitle=asset_name,
+            status=status,
+            module=_MOD,
+            record_key=rk,
+            on_edit=lambda: _set_asset_edit_mode(asset),
+            key_prefix=f"assets_modal_{rk}",
+            extra_actions=(lambda: _render_asset_header_actions(asset)) if show_header_actions else None,
+        )
 
-    render_modal_edit_button(
-        module=_MOD,
-        record_key=rk,
-        on_edit=lambda: _set_asset_edit_mode(asset),
-        key_prefix=f"assets_modal_{rk}",
-    )
-
-    render_modal_meta_grid(
-        [
-            ("Category", safe_value(asset.get("category"))),
-            ("Location", safe_value(asset.get("location"))),
-            ("Department", safe_value(asset.get("department"))),
-            ("Current Value", fmt_currency(asset.get("value"))),
-        ]
-    )
+        render_modal_meta_grid(
+            [
+                ("Category", safe_value(asset.get("category"))),
+                ("Location", safe_value(asset.get("location"))),
+                ("Department", safe_value(asset.get("department"))),
+                ("Current Value", fmt_currency(asset.get("value"))),
+            ]
+        )
+        _render_asset_actions_panel(asset)
 
     if is_edit_mode(_MOD, rk):
         _render_asset_edit_form(asset)
     else:
-        _render_asset_actions_panel(asset)
         _render_asset_detail_tabs(asset)
 
 
