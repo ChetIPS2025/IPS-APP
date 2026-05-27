@@ -318,6 +318,57 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
     return None
 
 
+_INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM: FrozenSet[str] = frozenset(
+    {"archived", "deleted", "cancelled", "canceled", "closed", "completed"}
+)
+
+
+def _norm_job_status(status: object) -> str:
+    return str(status or "").strip().lower().replace("_", " ")
+
+
+def job_number_conflict_is_reclaimable(blocking_job: dict[str, Any], *, estimate_id: str) -> bool:
+    """Inactive, unlinked jobs should not block estimate conversion numbers."""
+    _ = estimate_id
+    if str(blocking_job.get("estimate_id") or "").strip():
+        return False
+    return _norm_job_status(blocking_job.get("status")) in _INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM
+
+
+def reclaim_inactive_job_number(blocking_job: dict[str, Any], proposed_jn: str) -> bool:
+    """Move an inactive job off ``proposed_jn`` so estimate conversion can reuse it."""
+    jid = str(blocking_job.get("id") or "").strip()
+    if not jid:
+        return False
+    old = str(blocking_job.get("job_number") or proposed_jn).strip() or proposed_jn
+    archived_num = f"{old}-A{jid.replace('-', '')[:6].upper()}"[:120]
+    try:
+        update_rows_admin("jobs", {"job_number": archived_num}, {"id": jid})
+        return True
+    except Exception:
+        return False
+
+
+def resolve_job_number_collision(
+    hit: dict[str, Any],
+    *,
+    estimate_id: str,
+    proposed_jn: str,
+) -> tuple[str, dict[str, Any] | None]:
+    """
+    Resolve a proposed job number collision.
+
+    Returns ``(outcome, job)`` where outcome is ``reuse``, ``released``, or ``blocked``.
+    """
+    hest = str(hit.get("estimate_id") or "").strip()
+    if hest == estimate_id:
+        return "reuse", hit
+    if job_number_conflict_is_reclaimable(hit, estimate_id=estimate_id):
+        if reclaim_inactive_job_number(hit, proposed_jn):
+            return "released", None
+    return "blocked", hit
+
+
 def _fallback_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: str) -> str:
     """
     Job name when :func:`get_estimate_description` is empty.
@@ -504,16 +555,20 @@ def create_job_from_estimate(
         hits = fetch_by_match_admin(
             "jobs",
             {"job_number": proposed_jn},
-            columns="id,job_number,job_name,estimate_id,customer_id",
+            columns="id,job_number,job_name,estimate_id,customer_id,status",
             limit=10,
         )
         if hits:
             hit0 = hits[0]
-            hest = str(hit0.get("estimate_id") or "").strip()
-            if hest == eid:
-                inserted = dict(hit0)
+            outcome, collision_job = resolve_job_number_collision(
+                hit0,
+                estimate_id=eid,
+                proposed_jn=proposed_jn,
+            )
+            if outcome == "reuse":
+                inserted = dict(collision_job or hit0)
                 skip_insert = True
-            else:
+            elif outcome == "blocked":
                 return CreateJobFromEstimateResult(
                     ok=False,
                     message=(
