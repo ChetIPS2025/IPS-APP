@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import date
 
 import streamlit as st
 
@@ -63,6 +64,7 @@ try:
         update_task,
     )
     from app.styles import inject_tasks_module_css
+    from app.utils.field_context import get_field_job_id, is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
@@ -120,6 +122,7 @@ except ImportError:
         update_task,
     )
     from styles import inject_tasks_module_css  # type: ignore
+    from utils.field_context import get_field_job_id, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("tasks")
@@ -164,6 +167,7 @@ _TASK_STATUS_OPTS = ["Open", "Closed"]
 _PRIORITY_FILTER_OPTS = ["All Priorities", "High", "Medium", "Low"]
 TASK_VIEW_KEY = "task_view_filter"
 TASK_VIEW_OPTS = ["Open Tasks", "Closed Tasks", "All Tasks"]
+FIELD_TASK_VIEW_OPTS = ["Due Today", *TASK_VIEW_OPTS]
 JOB_TASK_VIEW_OPTS = ["Open", "Closed", "All"]
 
 
@@ -270,7 +274,68 @@ def _priority_pill_html(priority: object) -> str:
     return f'<span class="ips-priority-pill {css}">{html.escape(pri)}</span>'
 
 
+def _field_assignee_match_keys() -> set[str]:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    prof = current_profile() or {}
+    keys: set[str] = set()
+    for val in (
+        prof.get("id"),
+        prof.get("employee_id"),
+        prof.get("email"),
+        prof.get("full_name"),
+        prof.get("name"),
+    ):
+        s = str(val or "").strip().lower()
+        if s:
+            keys.add(s)
+    emp = st.session_state.get("auth_employee") or {}
+    if isinstance(emp, dict):
+        for val in (emp.get("id"), emp.get("name"), emp.get("email")):
+            s = str(val or "").strip().lower()
+            if s:
+                keys.add(s)
+    return keys
+
+
+def _task_matches_field_assignee(task: dict, assignee_lookup: dict[str, str]) -> bool:
+    raw = str(task.get("assigned_to") or "").strip().lower()
+    if not raw or raw in {"—", "— unassigned —"}:
+        return False
+    keys = _field_assignee_match_keys()
+    if raw in keys:
+        return True
+    display = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup).strip().lower()
+    return bool(display and display in keys)
+
+
+def _apply_field_task_filters(rows: list[dict], *, assignee_lookup: dict[str, str]) -> list[dict]:
+    if not is_field_mode():
+        return rows
+    out = list(rows)
+    fid = get_field_job_id()
+    if fid:
+        out = [t for t in out if str(t.get("job_id") or "").strip() == fid]
+    try:
+        from app.auth import current_role
+    except ImportError:
+        from auth import current_role  # type: ignore
+    if str(current_role() or "").strip().lower() == "employee":
+        out = [t for t in out if _task_matches_field_assignee(t, assignee_lookup)]
+    return out
+
+
 def _apply_task_view_filter(rows: list[dict], view: str) -> list[dict]:
+    if view == "Due Today":
+        today = date.today().isoformat()
+        return [
+            t
+            for t in rows
+            if normalize_task_status(t.get("status")) == "Open"
+            and str(t.get("due_date") or "")[:10] == today
+        ]
     if view == "Closed Tasks":
         return [t for t in rows if normalize_task_status(t.get("status")) == "Closed"]
     if view == "Open Tasks":
@@ -279,6 +344,8 @@ def _apply_task_view_filter(rows: list[dict], view: str) -> list[dict]:
 
 
 def _task_count_caption(count: int, view: str) -> str:
+    if view == "Due Today":
+        return f"{count} task(s) due today"
     if view == "Open Tasks":
         return f"{count} open task(s)"
     if view == "Closed Tasks":
@@ -287,20 +354,24 @@ def _task_count_caption(count: int, view: str) -> str:
 
 
 def _render_task_view_selector() -> None:
+    opts = FIELD_TASK_VIEW_OPTS if is_field_mode() else TASK_VIEW_OPTS
     if TASK_VIEW_KEY not in st.session_state:
-        st.session_state[TASK_VIEW_KEY] = "Open Tasks"
+        st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_mode() else "Open Tasks"
+    current = str(st.session_state.get(TASK_VIEW_KEY) or "")
+    if current not in opts:
+        st.session_state[TASK_VIEW_KEY] = opts[0]
     st.markdown('<div class="ips-task-view-toggle">', unsafe_allow_html=True)
     if hasattr(st, "segmented_control"):
         st.segmented_control(
             "Task view",
-            TASK_VIEW_OPTS,
+            opts,
             key=TASK_VIEW_KEY,
             label_visibility="collapsed",
         )
     else:
         st.radio(
             "Task view",
-            TASK_VIEW_OPTS,
+            opts,
             key=TASK_VIEW_KEY,
             horizontal=True,
             label_visibility="collapsed",
@@ -1081,6 +1152,15 @@ def render() -> None:
         actions=[_task_new],
     )
 
+    if is_field_mode():
+        try:
+            from app.services.job_service import sort_jobs_by_number_then_name
+        except ImportError:
+            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+        jobs = sort_jobs_by_number_then_name(load_jobs())
+        if jobs:
+            render_field_job_bar(jobs, key_prefix="tasks")
+
     def _filters() -> None:
         _render_task_view_selector()
         c1, c2 = st.columns([5, 0.6])
@@ -1094,7 +1174,7 @@ def render() -> None:
                     extra_keys=["task_search", TASK_VIEW_KEY],
                 )
                 _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
-                st.session_state[TASK_VIEW_KEY] = "Open Tasks"
+                st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_mode() else "Open Tasks"
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1152,12 +1232,14 @@ def render() -> None:
                     clear_tasks_cache()
                     st.rerun()
 
-    view = str(st.session_state.get(TASK_VIEW_KEY) or "Open Tasks")
-    if view not in TASK_VIEW_OPTS:
-        view = "Open Tasks"
+    view = str(st.session_state.get(TASK_VIEW_KEY) or ("Due Today" if is_field_mode() else "Open Tasks"))
+    view_opts = FIELD_TASK_VIEW_OPTS if is_field_mode() else TASK_VIEW_OPTS
+    if view not in view_opts:
+        view = view_opts[0]
         st.session_state[TASK_VIEW_KEY] = view
 
     viewed = _apply_task_view_filter(enriched_tasks, view)
+    viewed = _apply_field_task_filters(viewed, assignee_lookup=assignee_lookup)
     filtered = _filter_tasks(
         viewed,
         q=str(st.session_state.get("task_search") or "").strip(),

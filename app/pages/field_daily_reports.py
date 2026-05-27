@@ -12,14 +12,16 @@ try:
     from app.mobile_ui import ensure_narrow_viewport_detected
     from app.pages.supervisor_daily_reports import render_daily_reports_for_job
     from app.services.job_checkins import check_in, check_out, fetch_open_checkin
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from app.services.job_service import sort_jobs_by_number_then_name
+    from app.utils.field_context import render_field_job_bar
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from db import fetch_jobs_with_order_fallback  # type: ignore
     from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
     from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
     from services.job_checkins import check_in, check_out, fetch_open_checkin  # type: ignore
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+    from utils.field_context import render_field_job_bar  # type: ignore
 
 
 def _admin_read() -> bool:
@@ -55,14 +57,13 @@ def render() -> None:
     if not jobs:
         st.warning("No jobs loaded.")
         return
-    labels = [job_row_select_label(j) for j in jobs]
-    ids = [str(j.get("id")) for j in jobs]
-    ix = st.selectbox("Job", range(len(ids)), format_func=lambda i: labels[i], key="fdr_job_ix")
-    jid = ids[int(ix)]
-    label = labels[int(ix)]
 
-    with st.expander("Site check-in / check-out", expanded=False):
-        open_ci = fetch_open_checkin(job_id=jid, user_id=uid, admin=admin)
+    jid, label, _job = render_field_job_bar(jobs, key_prefix="fdr")
+    if not jid:
+        return
+
+    open_ci = fetch_open_checkin(job_id=jid, user_id=uid, admin=admin)
+    with st.expander("Site check-in / check-out", expanded=open_ci is None):
         if open_ci:
             st.success(f"Checked in since {str(open_ci.get('check_in_time') or '')[:16]}")
             note_out = st.text_input("Check-out note", key="fdr_co_note")
@@ -89,4 +90,11 @@ def render() -> None:
                 except Exception as exc:
                     st.error(str(exc))
 
-    render_daily_reports_for_job(job_id=jid, job_label=label, admin_read=admin, show_title=False)
+    render_daily_reports_for_job(
+        job_id=jid,
+        job_label=label,
+        admin_read=admin,
+        show_title=False,
+        inline=True,
+        expand_sections=True,
+    )

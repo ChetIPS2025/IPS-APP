@@ -523,6 +523,7 @@ def dashboard_daily_report_snapshot(
     }
     missing = 0
     missing_labels: list[str] = []
+    missing_jobs: list[dict[str, str]] = []
     for j in active_jobs:
         jid = str(j.get("id") or "").strip()
         if jid and jid not in reported_job_ids_today:
@@ -533,7 +534,9 @@ def dashboard_daily_report_snapshot(
                 except ImportError:
                     from services.job_service import job_row_select_label  # type: ignore
 
-                missing_labels.append(job_row_select_label(j))
+                label = job_row_select_label(j)
+                missing_labels.append(label)
+                missing_jobs.append({"id": jid, "label": label})
 
     delay_jobs_recent: set[str] = set()
     for r in reports_recent or []:
@@ -554,4 +557,5 @@ def dashboard_daily_report_snapshot(
         "repeated_delay_reasons": delay_pairs[:6],
         "jobs_over_labor": over_list[:12],
         "missing_sample_labels": missing_labels,
+        "missing_sample_jobs": missing_jobs,
     }

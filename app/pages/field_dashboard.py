@@ -17,6 +17,7 @@ try:
     from app.navigation import set_nav_slug
     from app.services.field_dashboard import field_dashboard_snapshot
     from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from app.utils.field_context import navigate_to_field_page, open_job_detail
 except ImportError:
     from components.cards import render_kpi_card  # type: ignore
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
@@ -26,6 +27,7 @@ except ImportError:
     from navigation import set_nav_slug  # type: ignore
     from services.field_dashboard import field_dashboard_snapshot  # type: ignore
     from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from utils.field_context import navigate_to_field_page, open_job_detail  # type: ignore
 
 
 def _admin_read() -> bool:
@@ -113,10 +115,18 @@ def render() -> None:
 
     render_dashboard_quick_actions(quick_actions, key_prefix="ips_field_dash_qa", title="Field Actions")
 
-    missing_rep = snap.get("missing_sample_labels") or []
+    missing_rep = snap.get("missing_sample_jobs") or []
     if missing_rep:
         st.markdown("##### Missing daily reports (active jobs)")
-        for lbl in missing_rep:
+        for item in missing_rep:
+            jid = str(item.get("id") or "").strip()
+            lbl = str(item.get("label") or "Job").strip()
+            if jid and st.button(lbl, key=f"field_missing_rep_{jid}", use_container_width=True):
+                navigate_to_field_page("field_daily_reports", job_id=jid)
+                st.rerun()
+    elif snap.get("missing_sample_labels"):
+        st.markdown("##### Missing daily reports (active jobs)")
+        for lbl in snap.get("missing_sample_labels") or []:
             st.caption(f"• {lbl}")
 
     missing_time = snap.get("jobs_missing_time_today") or []
@@ -137,8 +147,7 @@ def render() -> None:
         for j in active[:12]:
             label = job_row_select_label(j)
             if st.button(label, key=f"field_dash_job_{j.get('id')}", use_container_width=True):
-                set_nav_slug("jobs")
-                st.session_state["ips_sel_jobs"] = str(j.get("id") or "")
+                open_job_detail(str(j.get("id") or ""))
                 st.rerun()
     else:
         st.info("No jobs loaded.")

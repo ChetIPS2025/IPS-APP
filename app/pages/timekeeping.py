@@ -44,6 +44,7 @@ try:
     from app.pages._core._session import select_key
     from app.styles import inject_timekeeping_module_css
     from app.utils.dates import week_end, week_start
+    from app.utils.field_context import is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
@@ -81,6 +82,7 @@ except ImportError:
     from pages._core._session import select_key  # type: ignore
     from styles import inject_timekeeping_module_css  # type: ignore
     from utils.dates import week_end, week_start  # type: ignore
+    from utils.field_context import is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
 _SEL = select_key("timekeeping")
@@ -125,6 +127,46 @@ _DAY_GRID_LABELS = [
     "Actions",
     "Notes",
 ]
+
+
+def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
+    if not is_field_mode():
+        return summaries
+    try:
+        from app.auth import current_profile, current_role
+    except ImportError:
+        from auth import current_profile, current_role  # type: ignore
+    if str(current_role() or "").strip().lower() != "employee":
+        return summaries
+
+    prof = current_profile() or {}
+    match_ids: set[str] = set()
+    for key in ("employee_id", "id"):
+        val = str(prof.get(key) or "").strip()
+        if val:
+            match_ids.add(val)
+    emp = st.session_state.get("auth_employee") or {}
+    if isinstance(emp, dict):
+        eid = str(emp.get("id") or "").strip()
+        if eid:
+            match_ids.add(eid)
+
+    if not match_ids:
+        name = str(prof.get("full_name") or prof.get("name") or "").strip().lower()
+        if not name:
+            return summaries
+        return [
+            row
+            for row in summaries
+            if name in str(row.get("name") or row.get("employee_name") or "").strip().lower()
+        ]
+
+    filtered: list[dict] = []
+    for row in summaries:
+        rid = str(row.get("id") or row.get("employee_id") or "").strip()
+        if rid in match_ids:
+            filtered.append(row)
+    return filtered or summaries
 
 
 def _timecard_is_editable(status: str) -> bool:
@@ -1079,7 +1121,7 @@ def render() -> None:
 
     ws = _current_week_start()
     we = week_end(ws)
-    summaries = load_timekeeping_summaries(ws)
+    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
     all_rows = [_build_timecard_row(row, ws) for row in summaries]
     filter_options = build_filter_options(all_rows, _TK_COLUMN_FILTER_SPECS)
 
@@ -1091,6 +1133,24 @@ def render() -> None:
         "View and edit employee weekly time entries.",
         actions=[_tk_export],
     )
+
+    if is_field_mode():
+        try:
+            from app.db import fetch_jobs_with_order_fallback
+            from app.services.job_service import sort_jobs_by_number_then_name
+        except ImportError:
+            from db import fetch_jobs_with_order_fallback  # type: ignore
+            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+        try:
+            from app.auth import current_role as _tk_role
+        except ImportError:
+            from auth import current_role as _tk_role  # type: ignore
+        if _tk_role() in {"admin", "manager", "supervisor", "project manager", "pm"}:
+            jobs = sort_jobs_by_number_then_name(
+                list(fetch_jobs_with_order_fallback(limit=3000, use_admin=True) or [])
+            )
+            if jobs:
+                render_field_job_bar(jobs, key_prefix="tk")
 
     nav1, nav2, nav3, week_col = st.columns([1, 1, 1, 2.2], gap="small")
     with nav1:

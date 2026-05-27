@@ -23,7 +23,8 @@ try:
         submit_batch,
         upsert_crew_time_batch,
     )
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    from app.services.job_service import sort_jobs_by_number_then_name
+    from app.utils.field_context import render_field_job_bar
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from data_cache import fetch_table_for_session  # type: ignore
@@ -39,7 +40,8 @@ except ImportError:
         submit_batch,
         upsert_crew_time_batch,
     )
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+    from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+    from utils.field_context import render_field_job_bar  # type: ignore
 
 
 def _admin() -> bool:
@@ -75,10 +77,10 @@ def render() -> None:
     if not jobs:
         st.warning("No jobs loaded.")
         return
-    labels = [job_row_select_label(j) for j in jobs]
-    ids = [str(j.get("id")) for j in jobs]
-    ix = st.selectbox("Job", range(len(ids)), format_func=lambda i: labels[i], key="fct_job_ix")
-    jid = ids[int(ix)]
+
+    jid, _label, _job = render_field_job_bar(jobs, key_prefix="fct")
+    if not jid:
+        return
     wd = st.date_input("Work date", value=date.today(), key="fct_work_date")
     if isinstance(wd, datetime):
         wd = wd.date()

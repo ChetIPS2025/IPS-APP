@@ -120,6 +120,8 @@ def render_daily_reports_for_job(
     job_label: str,
     admin_read: bool | None = None,
     show_title: bool = True,
+    inline: bool = False,
+    expand_sections: bool = False,
 ) -> None:
     """
     Collapsible supervisor daily report form + history for one job.
@@ -131,7 +133,9 @@ def render_daily_reports_for_job(
     if admin_read is None:
         admin_read = _admin_read()
     title = "Daily Reports" if show_title else "Daily reports (this job)"
-    with st.expander(title, expanded=False):
+    section_open = expand_sections
+
+    def _body() -> None:
         st.caption(
             f"**{job_label}** — one report per calendar day. Summaries appear on **Dashboard**."
         )
@@ -216,7 +220,7 @@ def render_daily_reports_for_job(
             st.number_input("Crew size", min_value=0, max_value=500, step=1, key=f"sdr_crew_size_{jid}")
             st.text_area("Main goal for the day", key=f"sdr_main_goal_{jid}", height=68, placeholder="What success looks like today")
 
-        with st.expander("Midday check", expanded=False):
+        with st.expander("Midday check", expanded=section_open):
             st.radio(
                 "On track at midday?",
                 ["Yes", "No"],
@@ -230,7 +234,7 @@ def render_daily_reports_for_job(
                 placeholder="Only if you selected No",
             )
 
-        with st.expander("Weather & field notes", expanded=False):
+        with st.expander("Weather & field notes", expanded=section_open):
             st.text_input("Weather", key=f"sdr_weather_{jid}", placeholder="Clear, rain, heat…")
             st.number_input(
                 "Total hours worked (crew)",
@@ -244,12 +248,12 @@ def render_daily_reports_for_job(
             st.text_area("Materials used", key=f"sdr_materials_{jid}", height=56)
             st.text_area("Customer conversations", key=f"sdr_customer_{jid}", height=56)
 
-        with st.expander("Completed & carryover", expanded=False):
+        with st.expander("Completed & carryover", expanded=section_open):
             st.text_area("Completed today", key=f"sdr_done_{jid}", height=80)
             st.text_area("Not completed", key=f"sdr_not_done_{jid}", height=60)
             st.text_area("Reason not completed", key=f"sdr_not_done_why_{jid}", height=60)
 
-        with st.expander("Delays / inefficiency", expanded=False):
+        with st.expander("Delays / inefficiency", expanded=section_open):
             st.caption("Check all that applied today.")
             labels = delay_labels_map()
             keys = list(labels.keys())
@@ -286,10 +290,10 @@ def render_daily_reports_for_job(
                     st.number_input("Hours", min_value=0.0, max_value=24.0, step=0.25, key=f"sdr_crew_h_{jid}_{idx}")
                 st.text_input("Notes", key=f"sdr_crew_notes_{jid}_{idx}", placeholder="Optional")
 
-        with st.expander("Tomorrow’s plan", expanded=False):
+        with st.expander("Tomorrow’s plan", expanded=section_open):
             st.text_area("Plan", key=f"sdr_tomorrow_{jid}", height=72, placeholder="Tomorrow’s priorities")
 
-        with st.expander("Photos", expanded=False):
+        with st.expander("Photos", expanded=section_open):
             st.file_uploader(
                 "Add photos (optional)",
                 type=["jpg", "jpeg", "png", "gif", "webp"],
@@ -412,6 +416,12 @@ def render_daily_reports_for_job(
                             st.rerun()
                         except Exception as exc:
                             st.error(str(exc))
+
+    if inline:
+        _body()
+    else:
+        with st.expander(title, expanded=expand_sections):
+            _body()
 
 
 def render() -> None:
