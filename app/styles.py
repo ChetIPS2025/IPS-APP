@@ -26,7 +26,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v8">
+<style id="ips-users-module-v9">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -72,6 +72,9 @@ def inject_users_module_css() -> None:
   font-weight: 700;
   color: #0f172a;
   line-height: 1.25;
+  display: block;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -79,6 +82,9 @@ def inject_users_module_css() -> None:
 .ips-users-muted {{
   font-size: 13px;
   color: #64748b;
+  display: block;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -150,7 +156,7 @@ def inject_users_module_css() -> None:
   width: max-content;
   max-width: 100%;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
   display: grid !important;
   grid-template-columns: 26px 170px 56px 186px 102px 116px 82px 56px !important;
   gap: 3px !important;
@@ -165,7 +171,7 @@ def inject_users_module_css() -> None:
   box-sizing: border-box !important;
   justify-content: start !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   flex: unset !important;
   flex-grow: 0 !important;
   flex-shrink: 0 !important;
@@ -174,17 +180,29 @@ def inject_users_module_css() -> None:
   max-width: none !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
-  overflow: hidden !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
   overflow: visible !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(8) {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-content: center !important;
+}}
+.st-key-users_table_wrap [data-testid="stMarkdownContainer"],
+.st-key-users_table_wrap .stMarkdown,
+.st-key-users_table_wrap .stMarkdown p {{
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(8) {{
   display: flex !important;
   align-items: center !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-users-header-row {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type .ips-users-header-row {{
   font-size: 11px;
   letter-spacing: 0.02em;
   padding: 0;
@@ -197,26 +215,28 @@ def inject_users_module_css() -> None:
   padding: 0 7px;
   font-size: 11px;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 36px;
   padding: 6px 6px !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  grid-template-columns: none !important;
   width: 100% !important;
   max-width: 100% !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   overflow: hidden !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {{
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
   background: #eaf2ff !important;
 }}
 .st-key-users_table_wrap [data-testid="stElementContainer"] {{
@@ -2826,7 +2846,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v9">
+<style id="ips-timekeeping-module-v10">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2924,22 +2944,48 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 0 0.75rem;
 }}
 .ips-time-week-inline {{
-  margin: 0.1rem 0 0.25rem;
-  padding: 0 0 0.25rem;
+  margin: 0.05rem 0 0.15rem;
+  padding: 0;
   border-bottom: 1px solid #eef2f7;
 }}
-.ips-time-week-inline [data-testid="stHorizontalBlock"] {{
-  gap: 0.2rem !important;
+.ips-time-week-inline [data-testid="stHorizontalBlock"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) {{
+  display: grid !important;
+  grid-template-columns: 22px repeat(7, 38px) !important;
+  gap: 2px !important;
+  width: fit-content !important;
+  max-width: 100%;
+  align-items: stretch !important;
 }}
-.ips-time-week-inline [data-testid="column"] {{
+.ips-time-week-inline [data-testid="stHorizontalBlock"] {{
+  gap: 2px !important;
+}}
+.ips-time-week-inline [data-testid="column"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) > [data-testid="column"] {{
+  flex: unset !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 1px 2px !important;
+  overflow: hidden !important;
+}}
+.ips-time-week-inline [data-testid="column"]:not(:first-child),
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) > [data-testid="column"]:not(:first-child) {{
   background: #fff5f5;
   border: 1px solid #fca5a5;
-  border-radius: 6px;
-  padding: 0.08rem 0.1rem 0.08rem;
+  border-radius: 4px;
+  padding: 1px 2px !important;
   text-align: center;
   min-height: 0;
 }}
-.ips-time-week-inline [data-testid="column"]:has(.ips-time-week-day-filled) {{
+.ips-time-week-inline [data-testid="column"]:first-child,
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) > [data-testid="column"]:first-child {{
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}}
+.ips-time-week-inline [data-testid="column"]:has(.ips-time-week-day-filled),
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) > [data-testid="column"]:has(.ips-time-week-day-filled) {{
   background: #dcfce7;
   border-color: #22c55e;
 }}
@@ -3013,47 +3059,50 @@ def inject_timekeeping_module_css() -> None:
   border-color: #22c55e;
 }}
 .ips-time-week-day-label {{
-  font-size: 0.52rem;
+  font-size: 0.44rem;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   line-height: 1;
 }}
 .ips-time-week-day-date {{
-  font-size: 0.48rem;
+  font-size: 0.4rem;
   font-weight: 650;
   color: #64748b;
   line-height: 1;
-  margin-bottom: 0.05rem;
+  margin-bottom: 0;
 }}
 .ips-time-week-day-hours {{
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1;
 }}
 .ips-time-week-day-hours-ro {{
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-  padding: 0.05rem 0;
+  line-height: 1;
+  padding: 0;
 }}
-.ips-time-week-inline [data-testid="stNumberInput"] {{
+.ips-time-week-inline [data-testid="stNumberInput"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stNumberInput"] {{
   margin: 0 !important;
 }}
-.ips-time-week-inline [data-testid="stNumberInput"] > div {{
+.ips-time-week-inline [data-testid="stNumberInput"] > div,
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stNumberInput"] > div {{
   padding: 0 !important;
   min-height: 0 !important;
 }}
-.ips-time-week-inline [data-testid="stNumberInput"] input {{
-  min-height: 1.35rem !important;
-  height: 1.35rem !important;
-  padding: 0.05rem 0.1rem !important;
-  font-size: 0.72rem !important;
+.ips-time-week-inline [data-testid="stNumberInput"] input,
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stNumberInput"] input {{
+  min-height: 0.95rem !important;
+  height: 0.95rem !important;
+  padding: 0 !important;
+  font-size: 0.62rem !important;
   font-weight: 800 !important;
   text-align: center;
   border: none !important;
@@ -3061,8 +3110,15 @@ def inject_timekeeping_module_css() -> None:
   box-shadow: none !important;
 }}
 .ips-time-week-inline [data-testid="stNumberInput"] [data-testid="stNumberInputStepUp"],
-.ips-time-week-inline [data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"] {{
+.ips-time-week-inline [data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stNumberInputStepUp"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stNumberInputStepDown"] {{
   display: none !important;
+}}
+.ips-time-week-inline [data-testid="stElementContainer"],
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) [data-testid="stElementContainer"] {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }}
 .ips-time-hour-readonly {{
   text-align: center;
@@ -3402,7 +3458,7 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) {{
   min-height: 0 !important;
-  padding: 0 10px 2px !important;
+  padding: 0 6px 2px !important;
   border-bottom: none !important;
   background: transparent !important;
 }}
@@ -3418,7 +3474,7 @@ def inject_timekeeping_module_css() -> None:
 <script>
 (function () {
   function bindSelectOnFocus(root) {
-    root.querySelectorAll(".ips-time-week-inline input[type=\\"number\\"]").forEach(function (el) {
+    root.querySelectorAll(".ips-time-week-inline input[type=\\"number\\"], .st-key-tk_row_ [data-testid=\\"stHorizontalBlock\\"]:has(.ips-time-week-inline-spacer) input[type=\\"number\\"]").forEach(function (el) {
       if (el.dataset.ipsSelectOnFocus) return;
       el.dataset.ipsSelectOnFocus = "1";
       el.addEventListener("focus", function () { this.select(); });

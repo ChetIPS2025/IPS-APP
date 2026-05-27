@@ -125,7 +125,7 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.24, 1.72, 0.54, 1.82, 0.98, 1.12, 0.7, 0.52]
+_USER_COLS = [1, 1, 1, 1, 1, 1, 1, 1]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),

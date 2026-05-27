@@ -580,7 +580,7 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     days = week_dates(week_start_d)
 
     st.markdown('<div class="ips-time-week-inline">', unsafe_allow_html=True)
-    spacer, *day_cols = st.columns([0.35, 1, 1, 1, 1, 1, 1, 1], gap="small")
+    spacer, *day_cols = st.columns([0.18, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28], gap="small")
     with spacer:
         st.markdown('<span class="ips-time-week-inline-spacer" aria-hidden="true"></span>', unsafe_allow_html=True)
 
