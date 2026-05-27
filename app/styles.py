@@ -2678,7 +2678,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v6">
+<style id="ips-timekeeping-module-v7">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2768,6 +2768,70 @@ def inject_timekeeping_module_css() -> None:
   border-bottom: 2px solid #cbd5e1;
   padding: 12px 14px 16px;
   margin: 0;
+}}
+.ips-time-week-summary {{
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+}}
+.ips-time-week-day {{
+  background: #fff5f5;
+  border: 2px solid #fca5a5;
+  border-radius: 10px;
+  padding: 0.35rem 0.25rem;
+  text-align: center;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.05rem;
+}}
+.ips-time-week-day-filled {{
+  background: #dcfce7;
+  border-color: #22c55e;
+}}
+.ips-time-week-day-label {{
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}}
+.ips-time-week-day-date {{
+  font-size: 0.58rem;
+  font-weight: 650;
+  color: #64748b;
+  line-height: 1.1;
+}}
+.ips-time-week-day-hours {{
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  margin-top: 0.1rem;
+}}
+.ips-time-hour-readonly {{
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  padding-top: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stHorizontalBlock"] [data-testid="stButton"] > button {{
+  min-height: 1.65rem !important;
+  padding: 0.1rem 0.2rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+}}
+.ips-timekeeping-row-expand:has(.ips-time-day-edit-marker) [data-testid="stNumberInput"] input {{
+  min-height: 1.65rem !important;
+  padding: 0.15rem 0.2rem !important;
+  font-size: 0.78rem !important;
+  text-align: center;
 }}
 .ips-timekeeping-expand-title {{
   margin: 0 0 0.65rem;
