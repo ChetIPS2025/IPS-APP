@@ -116,7 +116,7 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.35, 2.0, 1.0, 2.4, 1.3, 1.2, 1.0, 1.0]
+_USER_COLS = [0.28, 2.6, 0.48, 2.4, 0.72, 0.82, 0.52, 0.46]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),
@@ -383,15 +383,21 @@ def _render_custom_users_table(
 
             with cols[5]:
                 st.markdown(
-                    f'<div class="ips-users-cell">{html.escape(role)}</div>',
+                    f'<div class="ips-users-cell ips-users-role">{html.escape(role)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[6]:
-                st.markdown(_employee_type_pill_html(user), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
+                    unsafe_allow_html=True,
+                )
 
             with cols[7]:
-                st.markdown(_user_status_pill_html(status), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-users-pill-col">{_user_status_pill_html(status)}</div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("</div>", unsafe_allow_html=True)
 

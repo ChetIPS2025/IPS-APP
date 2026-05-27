@@ -762,8 +762,8 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
 
 
 def _default_st_hours_for_day_index(day_index: int) -> float:
-    """Mon–Thu default to 10 ST hours; Fri–Sun start at 0."""
-    return 10.0 if 0 <= day_index < 4 else 0.0
+    """New days start at 0 hours."""
+    return 0.0
 
 
 def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:

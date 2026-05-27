@@ -26,13 +26,15 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v5">
+<style id="ips-users-module-v6">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+  width: max-content;
+  max-width: 100%;
 }}
 .ips-users-header-row {{
   background: #f8fafc;
@@ -82,6 +84,19 @@ def inject_users_module_css() -> None:
   white-space: nowrap;
   color: #334155;
 }}
+.ips-users-emp-num {{
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}}
+.ips-users-role {{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-users-pill-col {{
+  display: flex;
+  align-items: center;
+}}
 .ips-user-pill {{
   display: inline-flex;
   align-items: center;
@@ -121,16 +136,78 @@ def inject_users_module_css() -> None:
   background: #fef3c7;
   color: #92400e;
 }}
+.st-key-users_table_wrap {{
+  overflow-x: auto;
+  max-width: 100%;
+}}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
+  width: max-content;
+  max-width: 100%;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
+  gap: 0.45rem !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
+  padding: 6px 8px !important;
   margin: 0 !important;
-  min-height: 52px;
+  min-height: 46px;
+  width: max-content;
+  max-width: 100%;
+  justify-content: flex-start !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  flex: 0 1 220px !important;
+  width: 220px !important;
+  min-width: 150px !important;
+  max-width: 240px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
+  flex: 0 0 68px !important;
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
+  flex: 0 1 240px !important;
+  width: 240px !important;
+  min-width: 170px !important;
+  max-width: 280px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {{
+  flex: 0 0 112px !important;
+  width: 112px !important;
+  min-width: 112px !important;
+  max-width: 112px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
+  flex: 0 0 118px !important;
+  width: 118px !important;
+  min-width: 96px !important;
+  max-width: 132px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
+  flex: 0 0 84px !important;
+  width: 84px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(8) {{
+  flex: 0 0 68px !important;
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+}}
+.st-key-users_table_wrap .ips-user-pill {{
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
@@ -2678,7 +2755,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v7">
+<style id="ips-timekeeping-module-v8">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2772,46 +2849,100 @@ def inject_timekeeping_module_css() -> None:
 .ips-time-week-summary {{
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.45rem;
+  gap: 0.35rem;
   margin: 0 0 0.75rem;
+}}
+.ips-time-week-inline {{
+  margin: 0.15rem 0 0.35rem;
+  padding: 0 0 0.35rem;
+  border-bottom: 1px solid #eef2f7;
+}}
+.ips-time-week-inline [data-testid="column"] {{
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  padding: 0.12rem 0.15rem 0.1rem;
+  text-align: center;
+  min-height: 0;
+}}
+.ips-time-week-inline [data-testid="column"]:has(.ips-time-week-day-filled) {{
+  background: #dcfce7;
+  border-color: #22c55e;
+}}
+.ips-time-week-inline-spacer {{
+  display: block;
+  width: 100%;
+}}
+.ips-time-week-day-marker {{
+  display: none;
 }}
 .ips-time-week-day {{
   background: #fff5f5;
-  border: 2px solid #fca5a5;
-  border-radius: 10px;
-  padding: 0.35rem 0.25rem;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  padding: 0.12rem 0.15rem 0.1rem;
   text-align: center;
-  min-height: 58px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.05rem;
+  gap: 0;
 }}
 .ips-time-week-day-filled {{
   background: #dcfce7;
   border-color: #22c55e;
 }}
 .ips-time-week-day-label {{
-  font-size: 0.68rem;
+  font-size: 0.52rem;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
+  letter-spacing: 0.03em;
+  line-height: 1;
 }}
 .ips-time-week-day-date {{
-  font-size: 0.58rem;
+  font-size: 0.48rem;
   font-weight: 650;
   color: #64748b;
-  line-height: 1.1;
+  line-height: 1;
+  margin-bottom: 0.05rem;
 }}
 .ips-time-week-day-hours {{
-  font-size: 0.95rem;
+  font-size: 0.72rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  margin-top: 0.1rem;
+  line-height: 1.1;
+}}
+.ips-time-week-day-hours-ro {{
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  padding: 0.05rem 0;
+}}
+.ips-time-week-inline [data-testid="stNumberInput"] {{
+  margin: 0 !important;
+}}
+.ips-time-week-inline [data-testid="stNumberInput"] > div {{
+  padding: 0 !important;
+  min-height: 0 !important;
+}}
+.ips-time-week-inline [data-testid="stNumberInput"] input {{
+  min-height: 1.35rem !important;
+  height: 1.35rem !important;
+  padding: 0.05rem 0.1rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  text-align: center;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}}
+.ips-time-week-inline [data-testid="stNumberInput"] [data-testid="stNumberInputStepUp"],
+.ips-time-week-inline [data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"] {{
+  display: none !important;
 }}
 .ips-time-hour-readonly {{
   text-align: center;
@@ -3149,7 +3280,38 @@ def inject_timekeeping_module_css() -> None:
   min-height: 24px !important;
   margin: 0 !important;
 }}
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer) {{
+  min-height: 0 !important;
+  padding: 0 10px 2px !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}}
+.st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.ips-time-week-inline-spacer):hover {{
+  background: transparent !important;
+}}
 </style>
+""",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+<script>
+(function () {
+  function bindSelectOnFocus(root) {
+    root.querySelectorAll(".ips-time-week-inline input[type=\\"number\\"]").forEach(function (el) {
+      if (el.dataset.ipsSelectOnFocus) return;
+      el.dataset.ipsSelectOnFocus = "1";
+      el.addEventListener("focus", function () { this.select(); });
+      el.addEventListener("click", function () { this.select(); });
+    });
+  }
+  bindSelectOnFocus(document);
+  if (!window.__ipsTkDayBoxObserver) {
+    window.__ipsTkDayBoxObserver = new MutationObserver(function () { bindSelectOnFocus(document); });
+    window.__ipsTkDayBoxObserver.observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
 """,
         unsafe_allow_html=True,
     )
