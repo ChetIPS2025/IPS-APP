@@ -26,7 +26,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v7">
+<style id="ips-users-module-v8">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -143,82 +143,54 @@ def inject_users_module_css() -> None:
 .st-key-users_table_wrap {{
   overflow-x: auto;
   max-width: 100%;
-  width: fit-content;
+  width: max-content;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
-  width: fit-content;
+  width: max-content;
   max-width: 100%;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.18rem !important;
+  display: grid !important;
+  grid-template-columns: 26px 170px 56px 186px 102px 116px 82px 56px !important;
+  gap: 3px !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
   padding: 5px 6px !important;
   margin: 0 !important;
   min-height: 44px;
-  width: fit-content !important;
-  max-width: 100%;
-  justify-content: flex-start !important;
+  width: 827px !important;
+  min-width: 827px !important;
+  max-width: 827px !important;
+  box-sizing: border-box !important;
+  justify-content: start !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  flex: unset !important;
   flex-grow: 0 !important;
   flex-shrink: 0 !important;
-  padding-left: 2px !important;
-  padding-right: 2px !important;
+  width: auto !important;
   min-width: 0 !important;
+  max-width: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  overflow: hidden !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
-  flex: 0 0 26px !important;
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
+  overflow: visible !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
-  flex: 0 0 176px !important;
-  width: 176px !important;
-  min-width: 176px !important;
-  max-width: 176px !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
-  flex: 0 0 56px !important;
-  width: 56px !important;
-  min-width: 56px !important;
-  max-width: 56px !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
-  flex: 0 0 186px !important;
-  width: 186px !important;
-  min-width: 186px !important;
-  max-width: 186px !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {{
-  flex: 0 0 102px !important;
-  width: 102px !important;
-  min-width: 102px !important;
-  max-width: 102px !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
-  flex: 0 0 116px !important;
-  width: 116px !important;
-  min-width: 116px !important;
-  max-width: 116px !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
-  flex: 0 0 74px !important;
-  width: 74px !important;
-  min-width: 74px !important;
-  max-width: 74px !important;
-}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7),
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(8) {{
-  flex: 0 0 58px !important;
-  width: 58px !important;
-  min-width: 58px !important;
-  max-width: 58px !important;
+  display: flex !important;
+  align-items: center !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-users-header-row {{
   font-size: 11px;
   letter-spacing: 0.02em;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
 }}
 .st-key-users_table_wrap .ips-user-pill {{
   height: 22px;
@@ -229,6 +201,17 @@ def inject_users_module_css() -> None:
   background: #f8fafc;
   min-height: 36px;
   padding: 6px 6px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  overflow: hidden !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {{
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
