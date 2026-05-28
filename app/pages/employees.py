@@ -125,11 +125,10 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [1, 1, 1, 1, 1, 1, 1, 1]
+_USER_COLS = [1, 1, 1, 1, 1, 1, 1]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),
-    ("EMP #", None),
     ("EMAIL", None),
     ("PHONE", None),
     ("ROLE", "role"),
@@ -349,7 +348,6 @@ def _render_custom_users_table(
                 continue
 
             name = _user_display_name(user)
-            emp_num = _user_display_employee_number(user)
             email = _user_display_email(user)
             phone = _user_display_phone(user)
             role = _user_display_role(user)
@@ -374,35 +372,29 @@ def _render_custom_users_table(
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-emp-num">{html.escape(emp_num)}</div>',
+                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
+                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
+                    f'<div class="ips-users-cell ips-users-role">{html.escape(role)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-role">{html.escape(role)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
                     f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-users-pill-col">{_user_status_pill_html(status)}</div>',
                     unsafe_allow_html=True,

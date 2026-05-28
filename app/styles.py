@@ -26,7 +26,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v10">
+<style id="ips-users-module-v13">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -106,6 +106,8 @@ def inject_users_module_css() -> None:
 .ips-users-pill-col {{
   display: flex;
   align-items: center;
+  width: fit-content;
+  max-width: 100%;
 }}
 .ips-user-pill {{
   display: inline-flex;
@@ -158,18 +160,38 @@ def inject_users_module_css() -> None:
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: 24px 158px 48px 162px 92px 98px 66px 46px !important;
-  gap: 2px !important;
+  grid-template-columns: 18px 172px 172px 96px 82px 50px 38px !important;
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+  gap: 0 !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 4px 4px !important;
+  padding: 2px 2px !important;
   margin: 0 !important;
-  min-height: 40px;
-  width: 716px !important;
-  min-width: 716px !important;
-  max-width: 716px !important;
+  min-height: 36px;
+  width: 632px !important;
+  min-width: 632px !important;
+  max-width: 632px !important;
   box-sizing: border-box !important;
   justify-content: start !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  padding-right: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
+  padding-right: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
+  padding-left: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {{
+  padding-left: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
+  padding-left: 0 !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   flex: unset !important;
@@ -184,11 +206,13 @@ def inject_users_module_css() -> None:
   align-items: center !important;
   align-self: stretch !important;
   overflow: visible !important;
+  justify-content: flex-start !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
   width: 100% !important;
   min-width: 0 !important;
   justify-content: center !important;
+  align-items: flex-start !important;
 }}
 .st-key-users_table_wrap [data-testid="stMarkdownContainer"],
 .st-key-users_table_wrap .stMarkdown,
@@ -197,8 +221,8 @@ def inject_users_module_css() -> None:
   min-width: 0 !important;
   margin: 0 !important;
 }}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(8) {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
   display: flex !important;
   align-items: center !important;
 }}
@@ -211,20 +235,27 @@ def inject_users_module_css() -> None:
   background: transparent;
 }}
 .st-key-users_table_wrap .ips-user-pill {{
-  height: 20px;
-  padding: 0 6px;
+  height: 19px;
+  padding: 0 5px;
   font-size: 10px;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 32px;
-  padding: 4px 4px !important;
+  min-height: 28px;
+  padding: 2px 2px !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
   display: flex !important;
   grid-template-columns: none !important;
+  gap: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  flex: 0 0 10px !important;
+  width: 10px !important;
+  min-width: 10px !important;
+  max-width: 10px !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   overflow: hidden !important;
