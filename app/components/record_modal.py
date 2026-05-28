@@ -245,7 +245,7 @@ def render_compact_modal_header(
     st.markdown('<div class="ips-compact-detail-header">', unsafe_allow_html=True)
     title_ratio = 4.2 if extra_actions else 5.4
     actions_ratio = 3.8 if extra_actions else 2.1
-    title_col, actions_col = st.columns([title_ratio, actions_ratio], gap="small")
+    title_col, actions_col = st.columns([title_ratio, actions_ratio], gap="small", vertical_alignment="center")
     with title_col:
         st.markdown(
             f'<div class="ips-compact-detail-main">'
@@ -258,9 +258,9 @@ def render_compact_modal_header(
         )
     with actions_col:
         if extra_actions:
-            pill_col, edit_col, user_col = st.columns([0.8, 0.62, 3.35], gap="small")
+            pill_col, edit_col, user_col = st.columns([0.8, 0.62, 3.35], gap="small", vertical_alignment="center")
         else:
-            pill_col, edit_col = st.columns([1.15, 1], gap="small")
+            pill_col, edit_col = st.columns([1.15, 1], gap="small", vertical_alignment="center")
             user_col = None
         with pill_col:
             if status_html:

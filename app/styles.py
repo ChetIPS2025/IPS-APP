@@ -3981,10 +3981,17 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   min-height: 36px;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="stHorizontalBlock"] {{
-  align-items: flex-start !important;
+  align-items: center !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="column"] {{
+  align-self: center !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
   justify-content: flex-end !important;
+}}
+.ips-user-actions-header-marker,
+.ips-asset-actions-header-marker {{
+  display: none !important;
 }}
 div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker),
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker) {{
@@ -3995,6 +4002,13 @@ div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker) [data-testid="stHorizontalBlock"] {{
   gap: 8px !important;
   flex-wrap: nowrap !important;
+  align-items: center !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [class*="st-key-ips_dng_s_"] [data-testid="stButton"] > button {{
+  height: 36px !important;
+  min-height: 36px !important;
 }}
 .ips-compact-meta-grid {{
   display: grid;
@@ -4411,8 +4425,6 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-modal-danger-zone-marke
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker),
-div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker),
-div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker),
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker),
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker),
@@ -4445,13 +4457,18 @@ div[data-testid="stElementContainer"]:has(.ips-catalog-presence-marker) {
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-user-actions-marker) [data-testid="stHorizontalBlock"],
-div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-estimate-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-inventory-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-catalog-presence-marker) [data-testid="stHorizontalBlock"] {
     gap: 12px !important;
     flex-wrap: wrap !important;
+    align-items: center !important;
+}
+div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="stHorizontalBlock"],
+div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker) [data-testid="stHorizontalBlock"] {
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
 }
 div[data-testid="stElementContainer"]:has(.ips-job-actions-marker) [data-testid="column"],

@@ -202,7 +202,7 @@ def render_user_action_button_row(
         st.markdown(f'<span class="{marker_class}"></span>', unsafe_allow_html=True)
         if layout != "header":
             st.markdown('<p class="ips-user-actions-title">User Actions</p>', unsafe_allow_html=True)
-        cols = st.columns(len(action_specs), gap="small")
+        cols = st.columns(len(action_specs), gap="small", vertical_alignment="center")
         for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
             with col:
                 disabled = action in {"deactivate", "delete"} and not check.allowed
