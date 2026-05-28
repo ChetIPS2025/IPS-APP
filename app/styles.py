@@ -26,7 +26,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v9">
+<style id="ips-users-module-v10">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -68,10 +68,10 @@ def inject_users_module_css() -> None:
   min-width: 0;
 }}
 .ips-users-name {{
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.25;
+  line-height: 1.2;
   display: block;
   width: 100%;
   max-width: 100%;
@@ -80,7 +80,7 @@ def inject_users_module_css() -> None:
   white-space: nowrap;
 }}
 .ips-users-muted {{
-  font-size: 13px;
+  font-size: 12px;
   color: #64748b;
   display: block;
   width: 100%;
@@ -90,7 +90,7 @@ def inject_users_module_css() -> None:
   white-space: nowrap;
 }}
 .ips-users-phone {{
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   white-space: nowrap;
   color: #334155;
 }}
@@ -158,16 +158,16 @@ def inject_users_module_css() -> None:
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: 26px 170px 56px 186px 102px 116px 82px 56px !important;
-  gap: 3px !important;
+  grid-template-columns: 24px 158px 48px 162px 92px 98px 66px 46px !important;
+  gap: 2px !important;
   align-items: center !important;
   border-bottom: 1px solid #e2e8f0;
-  padding: 5px 6px !important;
+  padding: 4px 4px !important;
   margin: 0 !important;
-  min-height: 44px;
-  width: 827px !important;
-  min-width: 827px !important;
-  max-width: 827px !important;
+  min-height: 40px;
+  width: 716px !important;
+  min-width: 716px !important;
+  max-width: 716px !important;
   box-sizing: border-box !important;
   justify-content: start !important;
 }}
@@ -211,14 +211,14 @@ def inject_users_module_css() -> None:
   background: transparent;
 }}
 .st-key-users_table_wrap .ips-user-pill {{
-  height: 22px;
-  padding: 0 7px;
-  font-size: 11px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 36px;
-  padding: 6px 6px !important;
+  min-height: 32px;
+  padding: 4px 4px !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
   display: flex !important;
