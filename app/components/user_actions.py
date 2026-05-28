@@ -158,6 +158,7 @@ def render_user_action_button_row(
     user: dict,
     *,
     layout: str = "panel",
+    header_cols: list[Any] | None = None,
     on_activate: Callable[[], None] | None = None,
     on_deactivate: Callable[[], None] | None = None,
     on_delete: Callable[[], None] | None = None,
@@ -198,11 +199,8 @@ def render_user_action_button_row(
         if layout == "header"
         else "ips-user-actions-marker"
     )
-    with st.container(key=f"user_actions_{user_key}"):
-        st.markdown(f'<span class="{marker_class}"></span>', unsafe_allow_html=True)
-        if layout != "header":
-            st.markdown('<p class="ips-user-actions-title">User Actions</p>', unsafe_allow_html=True)
-        cols = st.columns(len(action_specs), gap="small", vertical_alignment="center")
+
+    def _render_buttons(cols: list[Any]) -> None:
         for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
             with col:
                 disabled = action in {"deactivate", "delete"} and not check.allowed
@@ -210,6 +208,18 @@ def render_user_action_button_row(
                 if btn_fn(label, suffix, use_container_width=False, disabled=disabled, help=help):
                     st.session_state[_confirm_state_key(uid, action)] = True
                     st.rerun()
+
+    if layout == "header" and header_cols is not None:
+        st.markdown(f'<span class="{marker_class}"></span>', unsafe_allow_html=True)
+        _render_buttons(header_cols[: len(action_specs)])
+        return
+
+    with st.container(key=f"user_actions_{user_key}"):
+        st.markdown(f'<span class="{marker_class}"></span>', unsafe_allow_html=True)
+        if layout != "header":
+            st.markdown('<p class="ips-user-actions-title">User Actions</p>', unsafe_allow_html=True)
+        cols = st.columns(len(action_specs), gap="small", vertical_alignment="center")
+        _render_buttons(cols)
 
     if layout != "header" and not check.allowed and check.reason and status != "Deleted":
         st.caption(check.reason)

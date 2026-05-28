@@ -3977,8 +3977,43 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 2px;
+  padding-top: 0;
   min-height: 36px;
+}}
+.ips-compact-detail-actions-row-marker {{
+  display: none !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="stElementContainer"] {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {{
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="stButton"] > button {{
+  height: 36px !important;
+  min-height: 36px !important;
+  white-space: nowrap !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="stHorizontalBlock"] {{
   align-items: center !important;

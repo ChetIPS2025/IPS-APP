@@ -229,7 +229,7 @@ def render_compact_modal_header(
     record_key: str,
     on_edit: Callable[[], None] | None = None,
     key_prefix: str | None = None,
-    extra_actions: Callable[[], None] | None = None,
+    extra_actions: Callable[[list[Any]], None] | None = None,
 ) -> None:
     """Compact view-mode header: title/subtitle left, status pill + Edit right."""
     if is_edit_mode(module, record_key):
@@ -257,30 +257,43 @@ def render_compact_modal_header(
             unsafe_allow_html=True,
         )
     with actions_col:
+        prefix = key_prefix or f"{module}_modal_{record_key}"
+
+        def _edit() -> None:
+            if on_edit:
+                on_edit()
+            else:
+                set_edit_mode(module, record_key)
+
         if extra_actions:
-            pill_col, edit_col, user_col = st.columns([0.8, 0.62, 3.35], gap="small", vertical_alignment="center")
+            st.markdown(
+                '<span class="ips-compact-detail-actions-row-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            pill_col, edit_col, act1_col, act2_col, act3_col = st.columns(
+                [0.52, 0.56, 0.98, 0.98, 0.98],
+                gap="small",
+                vertical_alignment="center",
+            )
+            with pill_col:
+                if status_html:
+                    st.markdown(
+                        f'<div class="ips-compact-detail-actions">{status_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+            with edit_col:
+                st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
+            extra_actions([act1_col, act2_col, act3_col])
         else:
             pill_col, edit_col = st.columns([1.15, 1], gap="small", vertical_alignment="center")
-            user_col = None
-        with pill_col:
-            if status_html:
-                st.markdown(
-                    f'<div class="ips-compact-detail-actions">{status_html}</div>',
-                    unsafe_allow_html=True,
-                )
-        with edit_col:
-            prefix = key_prefix or f"{module}_modal_{record_key}"
-
-            def _edit() -> None:
-                if on_edit:
-                    on_edit()
-                else:
-                    set_edit_mode(module, record_key)
-
-            st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
-        if user_col is not None:
-            with user_col:
-                extra_actions()
+            with pill_col:
+                if status_html:
+                    st.markdown(
+                        f'<div class="ips-compact-detail-actions">{status_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+            with edit_col:
+                st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
     st.markdown("</div>", unsafe_allow_html=True)
 
 

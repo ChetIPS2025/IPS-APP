@@ -764,13 +764,14 @@ def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
     return _after_deactivate_or_delete, _after_deactivate_or_delete
 
 
-def _render_user_header_actions(emp: dict) -> None:
+def _render_user_header_actions(emp: dict, header_cols: list | None = None) -> None:
     if is_user_action_confirm_open(emp):
         return
     on_deactivate, on_delete = _user_action_callbacks()
     render_user_action_button_row(
         emp,
         layout="header",
+        header_cols=header_cols,
         on_deactivate=on_deactivate,
         on_delete=on_delete,
     )
@@ -822,7 +823,9 @@ def render_employee_detail_dialog(emp: dict) -> None:
             module=MODULE,
             record_key=rk,
             key_prefix=f"emp_modal_{rk}",
-            extra_actions=(lambda: _render_user_header_actions(emp)) if show_header_actions else None,
+            extra_actions=(lambda cols: _render_user_header_actions(emp, header_cols=cols))
+            if show_header_actions
+            else None,
         )
         render_compact_modal_meta_grid(
             [

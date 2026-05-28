@@ -1442,7 +1442,7 @@ def _asset_action_callbacks() -> tuple[object, object]:
     return _after_action, _after_action
 
 
-def _render_asset_header_actions(asset: dict) -> None:
+def _render_asset_header_actions(asset: dict, header_cols: list | None = None) -> None:
     if is_asset_action_confirm_open(asset) or is_asset_pricing_guide_confirm_open(asset):
         return
 
@@ -1459,9 +1459,8 @@ def _render_asset_header_actions(asset: dict) -> None:
         return
 
     asset_key = "".join(ch if ch.isalnum() else "_" for ch in aid) or "asset"
-    with st.container(key=f"asset_header_actions_{asset_key}"):
-        st.markdown('<span class="ips-asset-actions-header-marker"></span>', unsafe_allow_html=True)
-        cols = st.columns(len(action_specs), gap="small")
+
+    def _render_in_cols(cols: list) -> None:
         for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
             with col:
                 if not btn_fn(label, suffix, use_container_width=False):
@@ -1474,6 +1473,16 @@ def _render_asset_header_actions(asset: dict) -> None:
                         action,
                         on_change=on_retire,
                     )
+
+    if header_cols is not None:
+        st.markdown('<span class="ips-asset-actions-header-marker"></span>', unsafe_allow_html=True)
+        _render_in_cols(header_cols[: len(action_specs)])
+        return
+
+    with st.container(key=f"asset_header_actions_{asset_key}"):
+        st.markdown('<span class="ips-asset-actions-header-marker"></span>', unsafe_allow_html=True)
+        cols = st.columns(len(action_specs), gap="small")
+        _render_in_cols(cols)
 
 
 def _render_asset_actions_panel(asset: dict) -> None:
@@ -1508,7 +1517,9 @@ def render_asset_detail_dialog(asset: dict) -> None:
             record_key=rk,
             on_edit=lambda: _set_asset_edit_mode(asset),
             key_prefix=f"assets_modal_{rk}",
-            extra_actions=(lambda: _render_asset_header_actions(asset)) if show_header_actions else None,
+            extra_actions=(lambda cols: _render_asset_header_actions(asset, header_cols=cols))
+            if show_header_actions
+            else None,
         )
 
         render_modal_meta_grid(
