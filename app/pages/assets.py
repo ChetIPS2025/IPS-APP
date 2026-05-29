@@ -203,9 +203,9 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
-_SMALL_TOOL_COLS = [0.42, 3.4, 0.85, 1.55, 0.82, 0.78]
+_SMALL_TOOL_COLS = [0.9, 3.0, 0.85, 1.55, 0.82, 0.88]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
+    ("IMAGE", None),
     ("TOOL", None),
     ("ASSET #", None),
     ("PARENT KIT", "parent_kit"),
@@ -407,6 +407,16 @@ def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
     aid = str(row.get("id") or "").strip()
     if aid:
         _open_assets_detail_modal(aid, row)
+
+
+def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
+    if str(row.get("row_type") or "") == "kit_item":
+        child_id = str(row.get("child_asset_id") or "").strip()
+        if child_id:
+            linked = assets_by_id.get(child_id)
+            if linked:
+                return linked
+    return row
 
 
 def _asset_location(row: dict) -> str:
@@ -730,15 +740,17 @@ def _render_small_tools_table(
             value = _small_tool_value(row)
 
             cols = st.columns(_SMALL_TOOL_COLS, gap="small", vertical_alignment="center")
+            image_asset = _small_tool_image_asset(row, assets_by_id)
             with cols[0]:
-                if st.button("View", key=f"st_open_{rid}", use_container_width=True):
-                    _open_small_tool_row(row, assets_by_id)
-                    st.rerun()
+                _render_asset_thumbnail(image_asset)
             with cols[1]:
                 st.markdown(
-                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
+                    '<span class="ips-small-tool-name-btn-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
+                if st.button(name, key=f"st_open_{rid}", use_container_width=True):
+                    _open_small_tool_row(row, assets_by_id)
+                    st.rerun()
             with cols[2]:
                 st.markdown(
                     f'<div class="ips-assets-number ips-assets-cell">{html.escape(asset_number)}</div>',
@@ -1442,6 +1454,13 @@ def _asset_action_callbacks() -> tuple[object, object]:
     return _after_action, _after_action
 
 
+def _asset_header_action_slot_count(asset: dict) -> int:
+    count = len(asset_retire_delete_action_specs(asset))
+    if pricing_guide_header_action_spec(asset):
+        count += 1
+    return max(count, 1)
+
+
 def _render_asset_header_actions(asset: dict, header_cols: list | None = None) -> None:
     if is_asset_action_confirm_open(asset) or is_asset_pricing_guide_confirm_open(asset):
         return
@@ -1517,6 +1536,7 @@ def render_asset_detail_dialog(asset: dict) -> None:
             record_key=rk,
             on_edit=lambda: _set_asset_edit_mode(asset),
             key_prefix=f"assets_modal_{rk}",
+            extra_action_slots=_asset_header_action_slot_count(asset) if show_header_actions else 3,
             extra_actions=(lambda cols: _render_asset_header_actions(asset, header_cols=cols))
             if show_header_actions
             else None,

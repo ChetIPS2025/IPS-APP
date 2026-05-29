@@ -195,13 +195,13 @@ def pricing_guide_header_action_spec(
         return (
             "exclude",
             warning_solid_button,
-            "Remove from Pricing Guide",
+            "Remove from Guide",
             f"asset_pg_exclude_{asset_key}",
         )
     return (
         "include",
         success_solid_button,
-        "Include on Pricing Guide",
+        "Add to Guide",
         f"asset_pg_enable_{asset_key}",
     )
 

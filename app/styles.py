@@ -2706,10 +2706,13 @@ def inject_assets_module_css() -> None:
   max-width: 78px !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
-  flex: 0 0 72px !important;
-  width: 72px !important;
-  min-width: 72px !important;
-  max-width: 72px !important;
+  flex: 0 0 88px !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+}}
+.st-key-assets_small_tools_table_wrap .stMarkdown p:has(.ips-asset-thumb-cell) {{
+  line-height: 0 !important;
 }}
 .st-key-assets_small_tools_table_wrap .stButton > button {{
   height: 28px !important;
@@ -2717,9 +2720,33 @@ def inject_assets_module_css() -> None:
   padding: 0 8px !important;
   font-size: 12px !important;
 }}
+.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 0 !important;
+  min-height: 36px !important;
+  height: auto !important;
+  white-space: normal !important;
+  line-height: 1.35 !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button:hover {{
+  background: transparent !important;
+  color: #2563eb !important;
+  text-decoration: underline !important;
+}}
 .st-key-assets_small_tools_table_wrap .ips-assets-hours {{
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}}
+.ips-small-tool-name-btn-marker {{
+  display: none !important;
 }}
 .ips-assets-header-row {{
   background: #f8fafc;
@@ -3967,6 +3994,18 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   margin: 0;
   line-height: 1.15;
 }}
+.ips-compact-detail-title-row {{
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}}
+.ips-compact-detail-status {{
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 36px;
+}}
 .ips-compact-detail-subtitle {{
   font-size: 14px;
   color: {TEXT_MUTED};
@@ -3983,12 +4022,17 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
 .ips-compact-detail-actions-row-marker {{
   display: none !important;
 }}
+div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="column"]:last-child {{
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {{
   display: flex !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
+  row-gap: 8px !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   flex: 0 0 auto !important;
@@ -4007,13 +4051,17 @@ div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-h
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {{
   gap: 8px !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
+  justify-content: flex-end !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header:has(.ips-compact-detail-actions-row-marker) [data-testid="stButton"] > button {{
   height: 36px !important;
   min-height: 36px !important;
   white-space: nowrap !important;
+  padding-left: 0.65rem !important;
+  padding-right: 0.65rem !important;
+  font-size: 0.8125rem !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [data-testid="stHorizontalBlock"] {{
   align-items: center !important;
@@ -4036,8 +4084,9 @@ div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker) {{
 div[data-testid="stElementContainer"]:has(.ips-user-actions-header-marker) [data-testid="stHorizontalBlock"],
 div[data-testid="stElementContainer"]:has(.ips-asset-actions-header-marker) [data-testid="stHorizontalBlock"] {{
   gap: 8px !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
+  justify-content: flex-end !important;
 }}
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [class*="st-key-ips_succ_s_"] [data-testid="stButton"] > button,
 div[data-testid="stDialog"]:has(.ips-compact-detail-modal) .ips-compact-detail-header [class*="st-key-ips_warn_s_"] [data-testid="stButton"] > button,

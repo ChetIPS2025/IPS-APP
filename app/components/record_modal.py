@@ -161,6 +161,12 @@ def status_class(status: object) -> str:
         "canceled": "danger",
         "closed": "completed",
         "inactive": "draft",
+        "available": "active",
+        "assigned": "active",
+        "checked out": "pending",
+        "in shop": "pending",
+        "maintenance": "pending",
+        "retired": "draft",
     }
     slug = aliases.get(raw, "draft")
     return f"ips-pill ips-pill-{slug}"
@@ -230,6 +236,7 @@ def render_compact_modal_header(
     on_edit: Callable[[], None] | None = None,
     key_prefix: str | None = None,
     extra_actions: Callable[[list[Any]], None] | None = None,
+    extra_action_slots: int = 3,
 ) -> None:
     """Compact view-mode header: title/subtitle left, status pill + Edit right."""
     if is_edit_mode(module, record_key):
@@ -241,16 +248,25 @@ def render_compact_modal_header(
         else ""
     )
     status_html = status_pill_html(status) if status not in (None, "") else ""
+    status_in_title = bool(extra_actions and status_html)
+    title_status_html = (
+        f'<div class="ips-compact-detail-title-row">'
+        f'<h2 class="ips-compact-detail-title">{html.escape(title)}</h2>'
+        f'<div class="ips-compact-detail-status">{status_html}</div>'
+        f"</div>"
+        if status_in_title
+        else f'<h2 class="ips-compact-detail-title">{html.escape(title)}</h2>'
+    )
 
     st.markdown('<div class="ips-compact-detail-header">', unsafe_allow_html=True)
-    title_ratio = 4.2 if extra_actions else 5.4
-    actions_ratio = 3.8 if extra_actions else 2.1
+    title_ratio = 3.4 if extra_actions else 5.4
+    actions_ratio = 4.6 if extra_actions else 2.1
     title_col, actions_col = st.columns([title_ratio, actions_ratio], gap="small", vertical_alignment="center")
     with title_col:
         st.markdown(
             f'<div class="ips-compact-detail-main">'
-            f'<div>'
-            f'<h2 class="ips-compact-detail-title">{html.escape(title)}</h2>'
+            f"<div>"
+            f"{title_status_html}"
             f"{subtitle_html}"
             f"</div>"
             f"</div>",
@@ -270,20 +286,13 @@ def render_compact_modal_header(
                 '<span class="ips-compact-detail-actions-row-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            pill_col, edit_col, act1_col, act2_col, act3_col = st.columns(
-                [0.52, 0.56, 0.98, 0.98, 0.98],
-                gap="small",
-                vertical_alignment="center",
-            )
-            with pill_col:
-                if status_html:
-                    st.markdown(
-                        f'<div class="ips-compact-detail-actions">{status_html}</div>',
-                        unsafe_allow_html=True,
-                    )
+            slot_count = max(1, min(int(extra_action_slots or 1), 4))
+            action_ratios = [0.72] + [1.0] * slot_count
+            action_cols = st.columns(action_ratios, gap="small", vertical_alignment="center")
+            edit_col, *action_slot_cols = action_cols
             with edit_col:
                 st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
-            extra_actions([act1_col, act2_col, act3_col])
+            extra_actions(action_slot_cols)
         else:
             pill_col, edit_col = st.columns([1.15, 1], gap="small", vertical_alignment="center")
             with pill_col:
