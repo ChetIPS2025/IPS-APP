@@ -98,17 +98,8 @@ _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TK_VIEW_KEY = "ips_timekeeping_view_mode"
 _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
-_HGRID_COLS = [1.35, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 0.5]
-_TK_COLS = [0.35, 2.8, 1.4, 1.0, 1.0, 1.2, 1.3]
-_TK_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
-    ("EMPLOYEE", "employee_name"),
-    ("WEEK START", "week_start"),
-    ("ST TOTAL", None),
-    ("OT TOTAL", None),
-    ("TOTAL HOURS", None),
-    ("STATUS", "status"),
-]
+_HGRID_COLS = [260, 155, 155, 155, 155, 155, 155, 155, 90]
+_WEEKLY_TS_LIST_COLS = [42, 260, 155, 155, 155, 155, 155, 155, 155, 90]
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
@@ -231,7 +222,7 @@ def _render_horizontal_week_grid(
         st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
 
         header = st.columns(_HGRID_COLS, gap="small")
-        header_labels = ["Employee", *[d.strftime("%a %d") for d in days], "Week"]
+        header_labels = ["Employee", *[d.strftime("%a %m/%d").upper() for d in days], "Week"]
         for col, label in zip(header, header_labels):
             with col:
                 sub = ""
@@ -254,19 +245,25 @@ def _render_horizontal_week_grid(
 
             cols = st.columns(_HGRID_COLS, gap="small")
             with cols[0]:
+                st.markdown(
+                    '<span class="weekly-timesheet-row-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 name = str(row.get("employee_name") or "—")
                 st.markdown(
-                    f'<div class="ips-time-hgrid-employee" title="{html.escape(name)}">'
+                    f'<span class="employee-label">Employee</span>'
+                    f'<div class="employee-name ips-time-hgrid-employee" title="{html.escape(name)}">'
                     f"{html.escape(name)}</div>",
                     unsafe_allow_html=True,
                 )
 
             row_total = 0.0
-            for day_ix, col in enumerate(cols[1:8]):
+            for day_ix, (day_d, col) in enumerate(zip(days, cols[1:8])):
                 day_status = _normalize_timecard_status(grid[day_ix].get("status"))
                 editable = _day_is_editable(day_status)
                 with col:
                     _render_hgrid_day_cell(
+                        day_d=day_d,
                         emp_id=eid,
                         week_sig=week_sig,
                         day_ix=day_ix,
@@ -279,7 +276,7 @@ def _render_horizontal_week_grid(
 
             with cols[8]:
                 st.markdown(
-                    f'<div class="ips-time-hgrid-total">{html.escape(_fmt_table_hours(row_total))}</div>',
+                    f'<div class="week-total ips-time-hgrid-total">{html.escape(_fmt_table_hours(row_total))}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -625,7 +622,10 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     week_status = _normalize_timecard_status(emp.get("status"))
     days = week_dates(week_start_d)
 
-    st.markdown('<div class="ips-time-week-inline timesheet-days-grid-wrap timesheet-days-grid">', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="timesheet-days-inline-grid timesheet-days-grid-wrap timesheet-days-grid-marker-wrap" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     day_cols = st.columns(7, gap="xxsmall")
 
     for i, (col, day_d) in enumerate(zip(day_cols, days)):
@@ -663,7 +663,6 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
                 )
 
     st.session_state[gk] = grid
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _row_totals_from_grid(grid: list[dict]) -> tuple[float, float, float]:
@@ -692,6 +691,9 @@ def _hour_stepper_input(
     max_value: float = 24.0,
     disabled: bool = False,
     fmt: str = "%.1f",
+    down_label: str = "▼",
+    up_label: str = "▲",
+    compact: bool = False,
 ) -> float:
     if disabled:
         st.markdown(
@@ -702,9 +704,19 @@ def _hour_stepper_input(
 
     down_key = f"{widget_key}_dn"
     up_key = f"{widget_key}_up"
-    dn_col, val_col, up_col = st.columns([0.26, 0.48, 0.26], gap="small")
+    if compact:
+        st.markdown(
+            '<span class="weekly-timesheet-stepper-marker hours-control" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+    dn_col, val_col, up_col = st.columns([0.52, 0.24, 0.24] if compact else [0.26, 0.48, 0.26], gap="small")
     with dn_col:
-        if st.button("▼", key=down_key, use_container_width=True, help=f"Decrease {label}"):
+        if st.button(
+            down_label,
+            key=down_key,
+            use_container_width=True,
+            help=f"Decrease {label}",
+        ):
             cur = float(st.session_state.get(widget_key, value))
             st.session_state[widget_key] = max(0.0, round(cur - step, 2))
             st.rerun()
@@ -720,11 +732,96 @@ def _hour_stepper_input(
             format=fmt,
         )
     with up_col:
-        if st.button("▲", key=up_key, use_container_width=True, help=f"Increase {label}"):
+        if st.button(
+            up_label,
+            key=up_key,
+            use_container_width=True,
+            help=f"Increase {label}",
+        ):
             cur = float(st.session_state.get(widget_key, value))
             st.session_state[widget_key] = min(max_value, round(cur + step, 2))
             st.rerun()
     return float(hours)
+
+
+def _render_weekly_compact_hrs_control(
+    *,
+    value: float,
+    widget_key: str,
+    editable: bool = True,
+) -> float:
+    """Compact HRS label + minus/value/plus control for weekly timesheet rows."""
+    if not editable:
+        st.markdown(
+            f'<div class="hours-row">'
+            f'<span class="hrs-label">HRS</span>'
+            f'<span class="hours-value">{html.escape(_fmt_day_hours(value))}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        return float(value)
+
+    st.markdown(
+        '<span class="weekly-timesheet-hrs-marker hours-row" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    lbl_col, ctrl_col = st.columns([0.26, 1], gap="small", vertical_alignment="center")
+    with lbl_col:
+        st.markdown('<span class="hrs-label">HRS</span>', unsafe_allow_html=True)
+    with ctrl_col:
+        return _hour_stepper_input(
+            label="Hours",
+            value=float(value),
+            widget_key=widget_key,
+            down_label="−",
+            up_label="+",
+            compact=True,
+        )
+
+
+def _render_weekly_timesheet_day_cell(
+    *,
+    day_d: date,
+    day_ix: int,
+    day_row: dict,
+    emp_id: str,
+    week_sig: str,
+    job_opts: list[str],
+    editable: bool,
+    day_status: str,
+) -> None:
+    filled_marker = " ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
+    st.markdown(
+        f'<span class="weekly-timesheet-day-marker day-cell{filled_marker}" aria-hidden="true"></span>'
+        f'<div class="day-header">'
+        f'<span class="day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
+        f'<span class="day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    if editable:
+        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No job —"))
+        job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
+        st.markdown(
+            '<span class="weekly-timesheet-job-marker job-select" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        day_row["job"] = st.selectbox(
+            "Job",
+            job_opts,
+            index=job_ix,
+            key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
+            label_visibility="collapsed",
+        )
+        hrs = _render_weekly_compact_hrs_control(
+            value=_day_hours_total(day_row),
+            widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
+            editable=True,
+        )
+        _set_day_job_hours(day_row, hrs)
+        return
+
+    st.markdown(_hgrid_locked_day_html(day_row, status=day_status), unsafe_allow_html=True)
 
 
 def _set_day_job_hours(day_row: dict, hours: float) -> None:
@@ -760,6 +857,7 @@ def _hgrid_locked_day_html(day_row: dict, *, status: str) -> str:
 
 def _render_hgrid_day_cell(
     *,
+    day_d: date,
     emp_id: str,
     week_sig: str,
     day_ix: int,
@@ -769,25 +867,16 @@ def _render_hgrid_day_cell(
     day_status: str,
 ) -> None:
     day_row = grid[day_ix]
-    if editable:
-        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No job —"))
-        job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
-        day_row["job"] = st.selectbox(
-            "Job",
-            job_opts,
-            index=job_ix,
-            key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
-            label_visibility="collapsed",
-        )
-        hrs = _render_daily_hrs_input(
-            value=_day_hours_total(day_row),
-            widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
-            day_label=f"Day {day_ix + 1}",
-        )
-        _set_day_job_hours(day_row, hrs)
-        return
-
-    st.markdown(_hgrid_locked_day_html(day_row, status=day_status), unsafe_allow_html=True)
+    _render_weekly_timesheet_day_cell(
+        day_d=day_d,
+        day_ix=day_ix,
+        day_row=day_row,
+        emp_id=emp_id,
+        week_sig=week_sig,
+        job_opts=job_opts,
+        editable=editable,
+        day_status=day_status,
+    )
 
 
 def _normalize_timecard_status(raw: object) -> str:
@@ -1249,11 +1338,6 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
 def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
     emp = _emp_from_timecard_row(row)
     timecard_id = str(row.get("timecard_id") or "").strip()
-    st.markdown(
-        f'<p class="ips-timekeeping-expand-title">Daily entries — '
-        f"{html.escape(str(emp.get('name') or 'Employee'))}</p>",
-        unsafe_allow_html=True,
-    )
     _render_daily_entries_tab(emp, week_start_d)
     detail_col, _ = st.columns([1, 3])
     with detail_col:
@@ -1290,8 +1374,8 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
             if _submit_timekeeping_week(emp, week_start_d):
                 st.rerun()
     st.caption(
-        "Enter hours in the day boxes on each row, or expand for job/ST/OT detail. "
-        "Submit each day from the Actions column, or use Submit All for Approval."
+        "Use expand for job/ST/OT detail. Submit each day from the Actions column, "
+        "or use Submit All for Approval."
     )
 
 
@@ -1440,19 +1524,22 @@ def _render_custom_timekeeping_table(
         if str(r.get("timecard_id") or "").strip()
     ]
     st.session_state[_ALL_TIMECARD_IDS_KEY] = all_timecard_ids
+    days = week_dates(week_start_d)
+    job_opts = job_options_for_timekeeping()
 
     with st.container(key="timekeeping_table_wrap"):
         st.markdown('<div class="ips-timekeeping-table-wrap">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_TK_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _TK_HEADER_SPECS):
+        header_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="small")
+        header_labels = ["", "EMPLOYEE", *[d.strftime("%a %m/%d").upper() for d in days], "WEEK"]
+        for col, (label, day_ix) in zip(header_cols, enumerate(header_labels)):
             with col:
-                if field:
+                if day_ix == 1:
                     render_table_header_cell(
                         label,
                         table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
+                        filter_field="employee_name",
+                        filter_options=filter_options.get("employee_name", []),
                         base_class="ips-timekeeping-header-row ips-timekeeping-cell",
                     )
                 else:
@@ -1467,79 +1554,86 @@ def _render_custom_timekeeping_table(
                 continue
 
             employee_name = str(row.get("employee_name") or "—")
-            week_label = fmt_date(row.get("week_start"))
             status = _normalize_timecard_status(row.get("status"))
             expanded = _expanded_timecard_id() == timecard_id
             emp = _emp_from_timecard_row(row)
             eid = str(emp.get("id") or emp.get("employee_id") or "")
-            grid = _ensure_weekly_grid(emp, week_start_d) if eid else []
             week_sig = week_start_d.isoformat()
+            grid = _ensure_weekly_grid(emp, week_start_d) if eid else []
+            total_hours = float(row.get("total_hours") or 0)
             if eid:
                 grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
                 _sync_row_hrs_from_grid(grid, eid=eid, week_sig=week_sig)
                 _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
-                st_total, ot_total, total_hours = _row_totals_from_grid(grid)
-                st.session_state[_grid_key(eid)] = grid
-            else:
-                st_total = float(row.get("st_total") or 0)
-                ot_total = float(row.get("ot_total") or 0)
-                total_hours = float(row.get("total_hours") or 0)
+                _apply_active_field_job_to_grid(grid)
+                _, _, total_hours = _row_totals_from_grid(grid)
 
             with st.container(key=f"tk_row_{timecard_id}"):
-                cols = st.columns(_TK_COLS, gap="small", vertical_alignment="center")
+                st.markdown(
+                    '<span class="timesheet-employee-card-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                row_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="small")
 
-                with cols[0]:
+                with row_cols[0]:
+                    st.markdown(
+                        '<span class="weekly-timesheet-row-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     if st.button(
                         "▾" if expanded else "▸",
                         key=f"tk_expand_{timecard_id}",
-                        help="Expand daily job and hour entry",
+                        help="Expand ST/OT detail, notes, and daily submit",
                         use_container_width=True,
                     ):
                         _toggle_expanded_timecard(timecard_id)
                         st.rerun()
 
-                with cols[1]:
+                with row_cols[1]:
                     st.markdown(
-                        f'<div class="ips-timekeeping-employee">{html.escape(employee_name)}</div>',
+                        f'<span class="employee-label">Employee</span>'
+                        f'<div class="employee-name ips-timekeeping-employee" title="{html.escape(employee_name)}">'
+                        f"{html.escape(employee_name)}</div>"
+                        f'{_timecard_status_pill_html(status, compact=True)}',
                         unsafe_allow_html=True,
                     )
 
-                with cols[2]:
-                    st.markdown(
-                        f'<div class="ips-timekeeping-cell">{html.escape(week_label)}</div>',
-                        unsafe_allow_html=True,
-                    )
+                if eid:
+                    for day_ix, (col, day_d) in enumerate(zip(row_cols[2:9], days)):
+                        day_row = grid[day_ix] if day_ix < len(grid) else {}
+                        day_row = _day_row_with_widget_values(
+                            day_row, eid=eid, week_sig=week_sig, index=day_ix
+                        )
+                        day_status = _normalize_timecard_status(day_row.get("status"))
+                        week_status = _normalize_timecard_status(emp.get("status"))
+                        editable = week_status != "Approved" and _day_is_editable(day_status)
+                        with col:
+                            _render_weekly_timesheet_day_cell(
+                                day_d=day_d,
+                                day_ix=day_ix,
+                                day_row=day_row,
+                                emp_id=eid,
+                                week_sig=week_sig,
+                                job_opts=job_opts,
+                                editable=editable,
+                                day_status=day_status,
+                            )
+                    st.session_state[_grid_key(eid)] = grid
+                    total_hours = sum(_day_hours_total(r) for r in grid)
 
-                with cols[3]:
+                with row_cols[9]:
                     st.markdown(
-                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                        f"{html.escape(_fmt_table_hours(st_total))}</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                with cols[4]:
-                    st.markdown(
-                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
-                        f"{html.escape(_fmt_table_hours(ot_total))}</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                with cols[5]:
-                    st.markdown(
-                        f'<div class="ips-timekeeping-hours ips-timekeeping-cell">'
+                        f'<div class="week-total ips-timekeeping-hours">'
                         f"{html.escape(_fmt_table_hours(total_hours))}</div>",
                         unsafe_allow_html=True,
                     )
 
-                with cols[6]:
-                    st.markdown(_timecard_status_pill_html(status), unsafe_allow_html=True)
-
-                _render_list_row_week_boxes(emp, week_start_d)
-
                 if expanded:
-                    st.markdown('<div class="ips-timekeeping-row-expand">', unsafe_allow_html=True)
+                    st.markdown(
+                        '<div class="timesheet-employee-expand-detail">',
+                        unsafe_allow_html=True,
+                    )
                     _render_inline_daily_entries(row, week_start_d)
-                    st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 

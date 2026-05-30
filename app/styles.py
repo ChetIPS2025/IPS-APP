@@ -2957,7 +2957,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v18">
+<style id="ips-timekeeping-module-v19">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3652,7 +3652,7 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100%;
 }}
 .ips-time-hgrid-scroll .ips-time-hgrid-wrap {{
-  min-width: 960px;
+  min-width: 1435px;
   border: none;
   border-radius: 0;
   margin-bottom: 0;
@@ -3750,7 +3750,351 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 5px;
   font-size: 0.55rem;
   font-weight: 700;
-  margin-top: 1px;
+  margin-top: 4px;
+}}
+.weekly-timesheet-row-marker,
+.weekly-timesheet-day-marker,
+.weekly-timesheet-job-marker,
+.weekly-timesheet-hrs-marker,
+.weekly-timesheet-stepper-marker {{
+  display: none !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  display: grid !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  grid-template-columns: 42px 260px repeat(7, 155px) 90px !important;
+  min-width: 1477px !important;
+  padding: 12px 14px !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  grid-template-columns: 260px repeat(7, 155px) 90px !important;
+  padding: 12px 14px !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"],
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"],
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"] {{
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  flex: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:nth-child(2),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(2),
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child {{
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:nth-child(n+3):nth-child(-n+9),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(n+3):nth-child(-n+9),
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:nth-child(n+2):nth-child(-n+8),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:nth-child(n+2):nth-child(-n+8) {{
+  width: 155px !important;
+  min-width: 155px !important;
+  max-width: 155px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:last-child,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:last-child,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:last-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:last-child {{
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .employee-name,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .employee-name {{
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .employee-label,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .employee-label {{
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  display: block;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .day-header,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-header,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-header {{
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 6px;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .day-label,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-label,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-label {{
+  font-size: 11px;
+  font-weight: 900;
+  color: #111827;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .day-date,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-date,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .day-date {{
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .week-total,
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .week-total,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) .week-total {{
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-day-marker),
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker) {{
+  width: 155px !important;
+  min-width: 155px !important;
+  max-width: 155px !important;
+  padding: 0 2px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] {{
+  width: 135px !important;
+  max-width: 135px !important;
+  margin-bottom: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  width: 135px !important;
+  max-width: 135px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span {{
+  font-size: 12px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label {{
+  font-size: 10px;
+  font-weight: 800;
+  color: #334155;
+  width: 26px;
+  display: inline-block;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-top: 6px !important;
+  width: fit-content !important;
+  max-width: 132px !important;
+  border-bottom: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  flex: 0 0 26px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  flex: 0 0 100px !important;
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] {{
+  display: grid !important;
+  grid-template-columns: 52px 24px 24px !important;
+  width: 100px !important;
+  height: 30px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 7px !important;
+  overflow: hidden !important;
+  background: #f8fafc !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-bottom: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] {{
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  margin: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] > div,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] > div,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] > div {{
+  border: none !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  min-height: 30px !important;
+  height: 30px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input {{
+  width: 52px !important;
+  text-align: center !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 0 !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  background: #ffffff !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepUp"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepDown"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepUp"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepDown"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepUp"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepDown"] {{
+  display: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] {{
+  width: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  margin: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button {{
+  width: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-left: 1px solid #cbd5e1 !important;
+  border-radius: 0 !important;
+  background: #f8fafc !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"],
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"],
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  padding: 0 !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  width: 52px !important;
+  max-width: 52px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child),
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child),
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
+  width: 24px !important;
+  max-width: 24px !important;
+}}
+.ips-timekeeping-table-wrap {{
+  overflow-x: auto;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] {{
+  min-width: 1477px;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  margin-bottom: 8px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):hover {{
+  background: #f8fbff !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  background: #ffffff !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):hover,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):hover {{
+  background: #f8fbff !important;
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child {{
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #ffffff;
+  box-shadow: 4px 0 8px -4px rgba(15, 23, 42, 0.12);
+}}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):hover > [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):hover > [data-testid="column"]:first-child {{
+  background: #f8fbff;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] {{
+  display: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child [data-testid="stButton"] button,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+  min-width: 42px !important;
+  width: 42px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:first-child [data-testid="stButton"] button {{
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] {{
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 0 8px 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:hover {{
+  background: transparent !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stVerticalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="stVerticalBlock"],
