@@ -573,6 +573,45 @@ def _apply_row_hrs_to_grid(grid: list[dict], *, eid: str, week_sig: str) -> None
             _set_day_job_hours(row, float(st.session_state[hrs_key] or 0))
 
 
+def _render_daily_hrs_input(
+    *,
+    value: float,
+    widget_key: str,
+    day_label: str,
+    editable: bool = True,
+) -> float:
+    """Compact daily hours control: HRS label left, spinner number_input right."""
+    if not editable:
+        st.markdown(
+            f'<div class="ips-day-hrs-row ips-day-hrs-row-ro">'
+            f'<span class="ips-day-hrs-label">HRS</span>'
+            f'<span class="ips-day-hrs-value">{html.escape(_fmt_day_hours(value))}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        return float(value)
+
+    st.markdown(
+        '<span class="ips-compact-hours-input-marker ips-day-hrs-row-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    lbl_col, inp_col = st.columns([0.42, 1], gap="xxsmall", vertical_alignment="center")
+    with lbl_col:
+        st.markdown('<div class="ips-day-hrs-label">HRS</div>', unsafe_allow_html=True)
+    with inp_col:
+        hours = st.number_input(
+            f"{day_label} hours",
+            value=float(value),
+            key=widget_key,
+            label_visibility="collapsed",
+            step=0.5,
+            min_value=0.0,
+            max_value=24.0,
+            format="%.1f",
+        )
+    return float(hours)
+
+
 def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     """Compact 7-day hour boxes — always visible on each list row."""
     eid = str(emp.get("id") or emp.get("employee_id") or "")
@@ -610,25 +649,18 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
             if editable:
-                st.markdown(
-                    '<span class="ips-compact-hours-input-marker" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                hrs = st.number_input(
-                    "Hours",
+                hrs = _render_daily_hrs_input(
                     value=total,
-                    key=f"tk_hrs_{eid}_{week_sig}_{i}",
-                    label_visibility="collapsed",
-                    step=0.5,
-                    min_value=0.0,
-                    max_value=24.0,
-                    format="%.1f",
+                    widget_key=f"tk_hrs_{eid}_{week_sig}_{i}",
+                    day_label=day_d.strftime("%a"),
                 )
                 _set_day_job_hours(day_row, hrs)
             else:
-                st.markdown(
-                    f'<div class="ips-time-week-day-hours-ro">{html.escape(_fmt_day_hours(total))}</div>',
-                    unsafe_allow_html=True,
+                _render_daily_hrs_input(
+                    value=total,
+                    widget_key=f"tk_hrs_{eid}_{week_sig}_{i}",
+                    day_label=day_d.strftime("%a"),
+                    editable=False,
                 )
 
     st.session_state[gk] = grid
@@ -748,19 +780,10 @@ def _render_hgrid_day_cell(
             key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
             label_visibility="collapsed",
         )
-        st.markdown(
-            '<span class="ips-compact-hours-input-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        hrs = st.number_input(
-            "Hours",
+        hrs = _render_daily_hrs_input(
             value=_day_hours_total(day_row),
-            key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
-            label_visibility="collapsed",
-            step=0.5,
-            min_value=0.0,
-            max_value=24.0,
-            format="%.1f",
+            widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
+            day_label=f"Day {day_ix + 1}",
         )
         _set_day_job_hours(day_row, hrs)
         return

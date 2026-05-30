@@ -2957,7 +2957,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v11">
+<style id="ips-timekeeping-module-v12">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3066,7 +3066,7 @@ def inject_timekeeping_module_css() -> None:
 .compact-hours-grid [data-testid="stHorizontalBlock"],
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: 48px repeat(7, 96px) !important;
+  grid-template-columns: 36px repeat(7, 68px) !important;
   gap: 0 !important;
   width: fit-content !important;
   max-width: 100%;
@@ -3082,7 +3082,7 @@ def inject_timekeeping_module_css() -> None:
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
-  padding: 6px 0 !important;
+  padding: 4px 0 !important;
   margin: 0 !important;
   overflow: visible !important;
   display: flex !important;
@@ -3092,6 +3092,62 @@ def inject_timekeeping_module_css() -> None:
   border-right: 1px solid #e5e7eb;
   box-sizing: border-box !important;
   background: #ffffff;
+}}
+.ips-day-hrs-label {{
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 2px;
+}}
+.ips-day-hrs-row-ro {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 32px;
+}}
+.ips-day-hrs-value {{
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: center;
+}}
+.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) {{
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="stHorizontalBlock"] {{
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  gap: 2px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"] {{
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  min-width: 0 !important;
+}}
+.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:first-child {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 24px !important;
+}}
+.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:last-child {{
+  flex: 0 0 auto !important;
+  width: auto !important;
 }}
 .compact-hours-grid [data-testid="column"]:first-child,
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
@@ -3122,33 +3178,34 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap .compact-hours-grid [data-testid="stNumberInput"],
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"],
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] {{
-  width: 92px !important;
-  min-width: 92px !important;
-  max-width: 92px !important;
-  margin: 0 auto !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  margin: 0 !important;
 }}
 .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div,
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div {{
   padding: 0 !important;
-  min-height: 38px !important;
+  min-height: 32px !important;
+  height: 32px !important;
   align-items: center !important;
 }}
 .compact-hours-grid input[type="number"],
 .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input {{
-  width: 70px !important;
-  min-width: 70px !important;
-  max-width: 70px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 4px 8px !important;
-  font-size: 14px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 2px 4px !important;
+  font-size: 12px !important;
   font-weight: 700 !important;
   text-align: center !important;
   border: 1px solid #e5e7eb !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   background: #ffffff !important;
   box-shadow: none !important;
   font-variant-numeric: tabular-nums;
@@ -3162,6 +3219,8 @@ def inject_timekeeping_module_css() -> None:
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  width: 16px !important;
+  min-width: 16px !important;
   opacity: 1 !important;
   visibility: visible !important;
 }}
@@ -3301,15 +3360,15 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1;
 }}
 .ips-time-week-day-hours-ro {{
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
-  line-height: 38px;
-  min-height: 38px;
+  line-height: 32px;
+  min-height: 32px;
   padding: 0;
   text-align: center;
-  width: 70px;
+  width: auto;
   margin: 0 auto;
 }}
 .ips-time-week-inline [data-testid="stElementContainer"],
@@ -3565,13 +3624,13 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-tk_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_page_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input {{
-  width: 70px !important;
-  min-width: 70px !important;
-  max-width: 70px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 4px 8px !important;
-  font-size: 14px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 2px 4px !important;
+  font-size: 12px !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
