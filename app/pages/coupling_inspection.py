@@ -1,4 +1,4 @@
-"""Coupling Inspection & Torque Verification — digital V6 form."""
+"""Coupling Inspection & Torque Verification — IPS digital V7 form."""
 
 from __future__ import annotations
 
@@ -11,66 +11,81 @@ import streamlit as st
 
 try:
     from app.auth import current_profile
+    from app.branding import header_logo_html
     from app.components.coupling_inspection_launcher import coupling_inspection_context
-    from app.components.signature_pad import render_compact_signature_pad, render_signature_pad
+    from app.components.signature_pad import render_signature_field
     from app.pages._core._access import begin_module
     from app.pages._core._data import load_assets, load_jobs
     from app.services.coupling_inspection_pdf import build_coupling_inspection_pdf_bytes
     from app.services.coupling_inspection_service import (
         PHOTO_SLOTS,
+        PHOTO_SLOT_LABELS,
+        SIGNATURE_ROLES,
         build_header_context,
         completion_percentage,
         get_coupling_inspection,
         list_coupling_inspections,
         new_inspection_payload,
+        pdf_export_filename,
         photo_view_url,
         save_coupling_inspection,
         upload_inspection_photo,
         validate_for_complete,
-        PHOTO_SLOT_LABELS,
     )
     from app.services.coupling_inspection_specs import (
         COUPLING_MODEL_OPTIONS,
+        FORM_VERSION,
+        INSPECTION_RESULT_ITEMS,
+        default_inspection_results,
         normalize_torque_rows,
         specs_for_model,
         torque_pattern_svg,
-        torque_sequence_caption,
         torque_pass_labels,
+        torque_sequence_caption,
     )
     from app.styles import inject_coupling_inspection_css
-    from app.ui.page_shell import render_page_header
 except ImportError:
     from auth import current_profile  # type: ignore
+    from branding import header_logo_html  # type: ignore
     from components.coupling_inspection_launcher import coupling_inspection_context  # type: ignore
-    from components.signature_pad import render_compact_signature_pad, render_signature_pad  # type: ignore
+    from components.signature_pad import render_signature_field  # type: ignore
     from pages._core._access import begin_module  # type: ignore
     from pages._core._data import load_assets, load_jobs  # type: ignore
     from services.coupling_inspection_pdf import build_coupling_inspection_pdf_bytes  # type: ignore
     from services.coupling_inspection_service import (  # type: ignore
         PHOTO_SLOTS,
+        PHOTO_SLOT_LABELS,
+        SIGNATURE_ROLES,
         build_header_context,
         completion_percentage,
         get_coupling_inspection,
         list_coupling_inspections,
         new_inspection_payload,
+        pdf_export_filename,
         photo_view_url,
         save_coupling_inspection,
         upload_inspection_photo,
         validate_for_complete,
-        PHOTO_SLOT_LABELS,
     )
     from services.coupling_inspection_specs import (  # type: ignore
         COUPLING_MODEL_OPTIONS,
+        FORM_VERSION,
+        INSPECTION_RESULT_ITEMS,
+        default_inspection_results,
         normalize_torque_rows,
         specs_for_model,
         torque_pattern_svg,
-        torque_sequence_caption,
         torque_pass_labels,
+        torque_sequence_caption,
     )
     from styles import inject_coupling_inspection_css  # type: ignore
-    from ui.page_shell import render_page_header  # type: ignore
 
 _DRAFT_KEY = "coupling_insp_draft"
+_SIGNATURE_LABELS = {
+    "technician": "Technician",
+    "supervisor": "Supervisor",
+    "customer_representative": "Customer Representative",
+}
 
 
 def _find_job(job_id: str | None) -> dict[str, Any] | None:
@@ -93,6 +108,15 @@ def _find_equipment(equipment_id: str | None) -> dict[str, Any] | None:
 
 def _session_key(record: dict[str, Any]) -> str:
     return f"ci_{record.get('id') or 'new'}"
+
+
+def _status_label(status: str) -> str:
+    s = str(status or "draft").strip().lower()
+    if s == "complete":
+        return "Completed"
+    if s == "exported":
+        return "Exported"
+    return "Draft"
 
 
 def _load_draft(ctx: dict[str, str | None]) -> dict[str, Any]:
@@ -121,28 +145,61 @@ def _apply_model_change(record: dict[str, Any], model: str) -> dict[str, Any]:
     out = dict(record)
     out["coupling_model"] = model
     out["specs"] = specs_for_model(model)
-    fields = dict(out.get("inspection_fields") or {})
-    if not fields.get("lubricant_type"):
-        fields["lubricant_type"] = out["specs"].get("lubricant_type_default") or ""
+    fields = default_inspection_results()
+    prev = dict(out.get("inspection_fields") or {})
+    if isinstance(prev, dict):
+        for key in fields:
+            if key in prev and isinstance(prev[key], dict):
+                fields[key] = prev[key]
+    lub = out["specs"].get("lubricant_type_default") or ""
+    if lub and not str(fields.get("lubricant_type", {}).get("value") or "").strip():
+        fields["lubricant_type"]["value"] = lub
     out["inspection_fields"] = fields
     out["torque_rows"] = normalize_torque_rows([], model_key=model)
     return out
 
 
+def _render_form_header(record: dict[str, Any]) -> None:
+    status = _status_label(str(record.get("status") or "draft"))
+    status_cls = status.lower().replace(" ", "-")
+    hdr = record.get("header") or {}
+    st.markdown(
+        f'<div class="ips-coupling-v7-header">'
+        f'{header_logo_html(height=52, alt="IPS")}'
+        f'<div class="ips-coupling-v7-header-text">'
+        f'<div class="ips-coupling-v7-title">IPS Coupling Inspection &amp; Torque Verification</div>'
+        f'<div class="ips-coupling-v7-meta">'
+        f'<span class="ips-coupling-v7-version">{html.escape(FORM_VERSION)}</span>'
+        f'<span class="ips-coupling-v7-status ips-coupling-v7-status-{html.escape(status_cls)}">'
+        f"{html.escape(status)}</span>"
+        f"</div></div></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="ips-coupling-v7-job-bar">'
+        f"<span><strong>Customer:</strong> {html.escape(str(hdr.get('customer') or '—'))}</span>"
+        f"<span><strong>Job #:</strong> {html.escape(str(hdr.get('job_number') or '—'))}</span>"
+        f"<span><strong>WO #:</strong> {html.escape(str(hdr.get('work_order_number') or '—'))}</span>"
+        f"<span><strong>Equipment:</strong> {html.escape(str(hdr.get('equipment_name') or '—'))}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_header_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
+    st.markdown("## 1. Job Information")
     hdr = dict(record.get("header") or {})
-    st.markdown("### Job & Equipment")
-    c1, c2 = st.columns(2, gap="small")
+    c1, c2 = st.columns(2, gap="medium")
     with c1:
         st.text_input("Customer", value=str(hdr.get("customer") or ""), disabled=True, key=f"{sk}_hdr_customer")
-        st.text_input("Job number", value=str(hdr.get("job_number") or ""), disabled=True, key=f"{sk}_hdr_job")
-        st.text_input("Work order #", value=str(hdr.get("work_order_number") or ""), disabled=True, key=f"{sk}_hdr_wo")
+        st.text_input("Job #", value=str(hdr.get("job_number") or ""), disabled=True, key=f"{sk}_hdr_job")
+        st.text_input("Work Order #", value=str(hdr.get("work_order_number") or ""), disabled=True, key=f"{sk}_hdr_wo")
         st.text_input("Equipment", value=str(hdr.get("equipment_name") or ""), disabled=True, key=f"{sk}_hdr_eq")
-    with c2:
         st.text_input("Asset #", value=str(hdr.get("asset_number") or ""), disabled=True, key=f"{sk}_hdr_asset")
+    with c2:
         st.text_input("Location", value=str(hdr.get("location") or ""), disabled=True, key=f"{sk}_hdr_loc")
         insp_date = st.date_input(
-            "Inspection date",
+            "Date",
             value=date.fromisoformat(str(hdr.get("inspection_date") or date.today().isoformat())[:10]),
             disabled=locked,
             key=f"{sk}_hdr_date",
@@ -154,19 +211,40 @@ def _render_header_section(record: dict[str, Any], *, sk: str, locked: bool) -> 
             disabled=locked,
             key=f"{sk}_hdr_tech",
         ).strip()
+        hdr["supervisor"] = st.text_input(
+            "Supervisor",
+            value=str(hdr.get("supervisor") or ""),
+            disabled=locked,
+            key=f"{sk}_hdr_sup",
+        ).strip()
+        hdr["customer_representative"] = st.text_input(
+            "Customer Representative",
+            value=str(hdr.get("customer_representative") or ""),
+            disabled=locked,
+            key=f"{sk}_hdr_custrep",
+        ).strip()
     record["header"] = hdr
     return record
 
 
+def _spec_card(label: str, value: str) -> str:
+    return (
+        f'<div class="ips-coupling-spec-card">'
+        f'<div class="ips-coupling-spec-label">{html.escape(label)}</div>'
+        f'<div class="ips-coupling-spec-value">{html.escape(value)}</div>'
+        f"</div>"
+    )
+
+
 def _render_specs_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
-    st.markdown("### Coupling Specification")
+    st.markdown("## 2. Coupling Specifications")
     model_ix = (
         COUPLING_MODEL_OPTIONS.index(record.get("coupling_model"))
         if record.get("coupling_model") in COUPLING_MODEL_OPTIONS
         else 0
     )
     model = st.selectbox(
-        "Coupling spec",
+        "Coupling model",
         COUPLING_MODEL_OPTIONS,
         index=model_ix,
         disabled=locked,
@@ -177,53 +255,31 @@ def _render_specs_section(record: dict[str, Any], *, sk: str, locked: bool) -> d
 
     specs = dict(record.get("specs") or specs_for_model(model))
     custom = model == "Manual/Custom Coupling"
-    s1, s2 = st.columns(2, gap="small")
-    with s1:
-        specs["coupling_type"] = st.text_input(
-            "Coupling type",
-            value=str(specs.get("coupling_type") or ""),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_type",
+
+    if custom:
+        s1, s2 = st.columns(2, gap="small")
+        with s1:
+            specs["coupling_type"] = st.text_input("Coupling Type", value=str(specs.get("coupling_type") or ""), disabled=locked, key=f"{sk}_spec_type")
+            specs["flange_bolts"] = st.text_input("Flange Bolts", value=str(specs.get("flange_bolts") or ""), disabled=locked, key=f"{sk}_spec_bolts")
+        with s2:
+            specs["final_torque_ft_lb"] = st.number_input("Final Torque (ft-lb)", value=float(specs.get("final_torque_ft_lb") or 150), disabled=locked, key=f"{sk}_spec_final")
+            specs["standard_hub_gap_in"] = st.number_input("Standard Hub Gap (in)", value=float(specs.get("standard_hub_gap_in") or 0.188), format="%.3f", disabled=locked, key=f"{sk}_spec_gap")
+    else:
+        gap = specs.get("standard_hub_gap_in")
+        lb = specs.get("lubricant_quantity_lb")
+        oz = specs.get("lubricant_quantity_oz")
+        cards = (
+            _spec_card("Coupling Model", str(model))
+            + _spec_card("Coupling Type", str(specs.get("coupling_type") or "—"))
+            + _spec_card("Bolt Count", str(specs.get("bolt_count") or 8))
+            + _spec_card("Bolt Size", str(specs.get("flange_bolts") or "—"))
+            + _spec_card("Final Torque", f"{specs.get('final_torque_ft_lb', '—')} ft-lb / {specs.get('final_torque_nm', '—')} Nm")
+            + _spec_card("Standard Hub Gap", f"{gap:g} in" if gap is not None else "—")
+            + _spec_card("Lubricant Type", str(specs.get("lubricant_type_default") or "—"))
+            + _spec_card("Lubricant Quantity", f"{lb:g} lb / {oz:g} oz" if lb is not None else "—")
         )
-        specs["flange_bolts"] = st.text_input(
-            "Flange bolts",
-            value=str(specs.get("flange_bolts") or ""),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_bolts",
-        )
-        gap_val = specs.get("standard_hub_gap_in")
-        specs["standard_hub_gap_in"] = st.number_input(
-            "Standard hub gap (in)",
-            value=float(gap_val) if gap_val not in (None, "") else 0.0,
-            format="%.3f",
-            disabled=locked and not custom,
-            key=f"{sk}_spec_gap",
-        )
-    with s2:
-        specs["pass1_torque_ft_lb"] = st.number_input(
-            "Pass 1 torque (ft-lb)",
-            value=float(specs.get("pass1_torque_ft_lb") or 75),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_p1",
-        )
-        specs["pass2_torque_ft_lb"] = st.number_input(
-            "Pass 2 torque (ft-lb)",
-            value=float(specs.get("pass2_torque_ft_lb") or 112),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_p2",
-        )
-        specs["final_torque_ft_lb"] = st.number_input(
-            "Final torque (ft-lb)",
-            value=float(specs.get("final_torque_ft_lb") or 150),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_final",
-        )
-        specs["final_torque_nm"] = st.number_input(
-            "Final torque (Nm)",
-            value=float(specs.get("final_torque_nm") or 203),
-            disabled=locked and not custom,
-            key=f"{sk}_spec_nm",
-        )
+        st.markdown(f'<div class="ips-coupling-spec-grid">{cards}</div>', unsafe_allow_html=True)
+
     record["coupling_model"] = model
     record["specs"] = specs
     return record
@@ -232,120 +288,115 @@ def _render_specs_section(record: dict[str, Any], *, sk: str, locked: bool) -> d
 def _render_torque_table(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
     specs = record.get("specs") or {}
     p1_lbl, p2_lbl, pf_lbl = torque_pass_labels(specs)
-    st.markdown("### Torque Verification")
+    st.markdown("## 3. Torque Verification")
     st.caption(f"8-bolt sequence: {torque_sequence_caption()}")
 
-    pat_col, seq_col = st.columns([1, 1.6], gap="medium")
+    pat_col, _ = st.columns([1, 2], gap="medium")
     with pat_col:
-        st.markdown("**Torque pattern (8-bolt crisscross)**", unsafe_allow_html=True)
         st.markdown(torque_pattern_svg(), unsafe_allow_html=True)
-    with seq_col:
-        st.markdown("**Torque order**")
-        for row in normalize_torque_rows(
-            record.get("torque_rows"),
-            model_key=str(record.get("coupling_model") or "1030G20"),
-        ):
-            st.markdown(f"{row.get('order')}. **{row.get('clock_position')}**")
 
-    rows = normalize_torque_rows(
-        record.get("torque_rows"),
-        model_key=str(record.get("coupling_model") or "1030G20"),
-    )
+    rows = normalize_torque_rows(record.get("torque_rows"), model_key=str(record.get("coupling_model") or "1030G20"))
     updated: list[dict[str, Any]] = []
 
-    hdr_cols = st.columns([0.4, 0.9, 1.1, 1.1, 1.1, 1.1, 1.4])
-    for col, lbl in zip(hdr_cols, ["#", "Clock", p1_lbl, p2_lbl, pf_lbl, "Witness", "Initial"]):
+    hdr = st.columns([0.35, 0.75, 0.85, 0.85, 0.85, 0.9, 0.55, 0.55, 1.2])
+    for col, lbl in zip(
+        hdr,
+        ["Bolt #", "Clock", p1_lbl, p2_lbl, pf_lbl, "Witness Initial", "Pass", "Fail", "Notes"],
+    ):
         col.markdown(f"**{lbl}**")
 
     for i, row in enumerate(rows):
-        rcols = st.columns([0.4, 0.9, 1.1, 1.1, 1.1, 1.1, 1.4], gap="small")
+        rcols = st.columns([0.35, 0.75, 0.85, 0.85, 0.85, 0.9, 0.55, 0.55, 1.2], gap="small")
         with rcols[0]:
             st.markdown(f"**{row.get('order', i + 1)}**")
         with rcols[1]:
             st.markdown(str(row.get("clock_position") or ""))
         with rcols[2]:
-            row["pass1_checked"] = st.checkbox(
-                "P1", value=bool(row.get("pass1_checked")), disabled=locked, key=f"{sk}_p1_{i}", label_visibility="collapsed"
-            )
+            row["pass1_checked"] = st.checkbox("75", value=bool(row.get("pass1_checked")), disabled=locked, key=f"{sk}_p1_{i}", label_visibility="collapsed")
         with rcols[3]:
-            row["pass2_checked"] = st.checkbox(
-                "P2", value=bool(row.get("pass2_checked")), disabled=locked, key=f"{sk}_p2_{i}", label_visibility="collapsed"
-            )
+            row["pass2_checked"] = st.checkbox("112", value=bool(row.get("pass2_checked")), disabled=locked, key=f"{sk}_p2_{i}", label_visibility="collapsed")
         with rcols[4]:
-            row["final_checked"] = st.checkbox(
-                "Final", value=bool(row.get("final_checked")), disabled=locked, key=f"{sk}_pf_{i}", label_visibility="collapsed"
-            )
+            row["final_checked"] = st.checkbox("150", value=bool(row.get("final_checked")), disabled=locked, key=f"{sk}_pf_{i}", label_visibility="collapsed")
         with rcols[5]:
-            row["witness_mark_checked"] = st.checkbox(
-                "W", value=bool(row.get("witness_mark_checked")), disabled=locked, key=f"{sk}_w_{i}", label_visibility="collapsed"
-            )
-        with rcols[6]:
-            row["initial_signature"] = render_compact_signature_pad(
-                label="",
-                key=f"{sk}_bolt_sig_{i}",
-                existing_data=str(row.get("initial_signature") or ""),
+            row["witness_initials"] = st.text_input(
+                "Initials",
+                value=str(row.get("witness_initials") or ""),
                 disabled=locked,
-            )
+                key=f"{sk}_wit_{i}",
+                label_visibility="collapsed",
+                placeholder="Initials",
+            ).strip()
+        pf = row.get("pass_fail")
+        with rcols[6]:
+            pass_ok = st.checkbox("Pass", value=(pf == "pass"), disabled=locked, key=f"{sk}_pass_{i}", label_visibility="collapsed")
+        with rcols[7]:
+            fail_ok = st.checkbox("Fail", value=(pf == "fail"), disabled=locked, key=f"{sk}_fail_{i}", label_visibility="collapsed")
+        if pass_ok and not fail_ok:
+            row["pass_fail"] = "pass"
+        elif fail_ok and not pass_ok:
+            row["pass_fail"] = "fail"
+        elif not pass_ok and not fail_ok:
+            row["pass_fail"] = None
+        with rcols[8]:
+            row["notes"] = st.text_input("Notes", value=str(row.get("notes") or ""), disabled=locked, key=f"{sk}_notes_{i}", label_visibility="collapsed")
         updated.append(row)
 
     record["torque_rows"] = updated
     return record
 
 
-def _render_inspection_fields(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
-    st.markdown("### Inspection Fields")
-    fields = dict(record.get("inspection_fields") or {})
-    teeth_opts = ["", "Good", "Fair", "Worn", "Damaged"]
-    grease_opts = ["", "Good", "Dry", "Contaminated", "Replace"]
-    seal_opts = ["", "Good", "Fair", "Leaking", "Replace"]
+def _render_inspection_results(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
+    st.markdown("## 4. Inspection Results")
+    fields = dict(record.get("inspection_fields") or default_inspection_results())
 
-    f1, f2 = st.columns(2, gap="small")
-    with f1:
-        hub_val = fields.get("actual_hub_gap_in")
-        fields["actual_hub_gap_in"] = st.number_input(
-            "Actual hub gap (in) *",
-            value=float(hub_val) if hub_val not in (None, "") else 0.0,
-            format="%.3f",
-            disabled=locked,
-            key=f"{sk}_hub_gap",
-        )
-        fields["lubricant_type"] = st.text_input(
-            "Lubricant type", value=str(fields.get("lubricant_type") or ""), disabled=locked, key=f"{sk}_lub_type"
-        )
-        fields["lubricant_quantity_added"] = st.text_input(
-            "Lubricant quantity added",
-            value=str(fields.get("lubricant_quantity_added") or ""),
-            disabled=locked,
-            key=f"{sk}_lub_qty",
-        )
-        teeth_ix = teeth_opts.index(str(fields.get("coupling_teeth_condition") or "")) if str(fields.get("coupling_teeth_condition") or "") in teeth_opts else 0
-        fields["coupling_teeth_condition"] = st.selectbox(
-            "Coupling teeth condition", teeth_opts, index=teeth_ix, disabled=locked, key=f"{sk}_teeth"
-        )
-    with f2:
-        grease_ix = grease_opts.index(str(fields.get("grease_condition") or "")) if str(fields.get("grease_condition") or "") in grease_opts else 0
-        fields["grease_condition"] = st.selectbox(
-            "Grease condition", grease_opts, index=grease_ix, disabled=locked, key=f"{sk}_grease"
-        )
-        seal_ix = seal_opts.index(str(fields.get("seal_condition") or "")) if str(fields.get("seal_condition") or "") in seal_opts else 0
-        fields["seal_condition"] = st.selectbox(
-            "Seal condition", seal_opts, index=seal_ix, disabled=locked, key=f"{sk}_seal"
-        )
-        fields["cover_installed"] = st.checkbox(
-            "Cover installed", value=bool(fields.get("cover_installed")), disabled=locked, key=f"{sk}_cover"
-        )
-        fields["fasteners_witness_marked"] = st.checkbox(
-            "Fasteners witness marked",
-            value=bool(fields.get("fasteners_witness_marked")),
-            disabled=locked,
-            key=f"{sk}_fast_wit",
-        )
-        fields["guard_installed"] = st.checkbox(
-            "Guard installed", value=bool(fields.get("guard_installed")), disabled=locked, key=f"{sk}_guard"
-        )
-    fields["notes"] = st.text_area(
-        "Notes / comments", value=str(fields.get("notes") or ""), height=100, disabled=locked, key=f"{sk}_notes"
-    )
+    for field_key, label, kind in INSPECTION_RESULT_ITEMS:
+        item = dict(fields.get(field_key) or {"value": "", "pass": False, "fail": False, "na": False, "notes": ""})
+        st.markdown(f"**{label}**")
+        cols = st.columns([1.4, 0.5, 0.5, 0.5, 1.6], gap="small")
+        with cols[0]:
+            if kind == "number":
+                val = item.get("value")
+                item["value"] = st.number_input(
+                    label,
+                    value=float(val) if val not in (None, "") else 0.0,
+                    format="%.3f",
+                    disabled=locked,
+                    key=f"{sk}_insp_val_{field_key}",
+                    label_visibility="collapsed",
+                )
+            elif kind == "bool":
+                item["value"] = st.checkbox(
+                    label,
+                    value=bool(item.get("value")),
+                    disabled=locked,
+                    key=f"{sk}_insp_val_{field_key}",
+                    label_visibility="collapsed",
+                )
+            else:
+                item["value"] = st.text_input(
+                    label,
+                    value=str(item.get("value") or ""),
+                    disabled=locked,
+                    key=f"{sk}_insp_val_{field_key}",
+                    label_visibility="collapsed",
+                )
+        with cols[1]:
+            item["pass"] = st.checkbox("Pass", value=bool(item.get("pass")), disabled=locked, key=f"{sk}_insp_pass_{field_key}")
+        with cols[2]:
+            item["fail"] = st.checkbox("Fail", value=bool(item.get("fail")), disabled=locked, key=f"{sk}_insp_fail_{field_key}")
+        with cols[3]:
+            item["na"] = st.checkbox("N/A", value=bool(item.get("na")), disabled=locked, key=f"{sk}_insp_na_{field_key}")
+        with cols[4]:
+            item["notes"] = st.text_input(
+                "Notes",
+                value=str(item.get("notes") or ""),
+                disabled=locked,
+                key=f"{sk}_insp_notes_{field_key}",
+                label_visibility="collapsed",
+                placeholder="Notes",
+            )
+        fields[field_key] = item
+
     record["inspection_fields"] = fields
     return record
 
@@ -361,62 +412,70 @@ def _upload_record_id(record: dict[str, Any]) -> str:
 
 
 def _render_photos_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
-    st.markdown("### Photo Attachments")
+    st.markdown("## 5. Photos / Attachments")
     attachments = list(record.get("photo_attachments") or [])
     rid = _upload_record_id(record)
     if not record.get("id"):
-        st.caption("Photos upload immediately. Save draft to link them to the inspection record.")
+        st.caption("Save draft to link uploads to the inspection record.")
 
     for slot in PHOTO_SLOTS:
         label = PHOTO_SLOT_LABELS.get(slot, slot)
-        existing = next((a for a in attachments if str(a.get("slot") or "") == slot), None)
+        existing = next((a for a in attachments if str(a.get("slot") or a.get("category") or "") == slot), None)
+        st.markdown(f"**{label}**")
         if existing:
             url = photo_view_url(existing)
+            cap = str(existing.get("caption") or label)
             if url:
-                st.image(url, caption=label, use_container_width=True)
+                st.image(url, caption=cap, use_container_width=True)
             else:
-                st.caption(f"{label}: {existing.get('file_name') or 'on file'}")
+                st.caption(f"{cap} — {existing.get('file_name') or 'on file'}")
         if not locked:
-            up = st.file_uploader(label, type=["jpg", "jpeg", "png", "webp"], key=f"{sk}_photo_{slot}")
+            caption = st.text_input(
+                "Caption",
+                value=str(existing.get("caption") or "") if existing else "",
+                key=f"{sk}_photo_cap_{slot}",
+                placeholder="Optional caption",
+            )
+            up = st.file_uploader(
+                "Upload or capture photo",
+                type=["jpg", "jpeg", "png", "webp"],
+                key=f"{sk}_photo_{slot}",
+                help="Use iPad camera or photo library",
+            )
             if up is not None:
                 attachments, err = upload_inspection_photo(
                     inspection_id=rid,
                     slot=slot,
                     uploaded_file=up,
                     existing_attachments=attachments,
+                    caption=caption,
                 )
                 if err:
                     st.error(err)
+                else:
+                    st.success(f"{label} uploaded.")
     record["photo_attachments"] = attachments
     return record
 
 
 def _render_signatures_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
-    st.markdown("### Signatures")
-    record["technician_signature"] = render_signature_pad(
-        label="Technician signature *",
-        key=f"{sk}_sig_tech",
-        existing_data=str(record.get("technician_signature") or ""),
-        disabled=locked,
-        width=680,
-        height=140,
-    )
-    record["supervisor_signature"] = render_signature_pad(
-        label="Supervisor signature",
-        key=f"{sk}_sig_sup",
-        existing_data=str(record.get("supervisor_signature") or ""),
-        disabled=locked,
-        width=680,
-        height=120,
-    )
-    record["customer_signature"] = render_signature_pad(
-        label="Customer representative signature *",
-        key=f"{sk}_sig_cust",
-        existing_data=str(record.get("customer_signature") or ""),
-        disabled=locked,
-        width=680,
-        height=140,
-    )
+    st.markdown("## 6. Signatures")
+    meta = dict(record.get("signatures_meta") or {})
+    updated: dict[str, Any] = {}
+    for role in SIGNATURE_ROLES:
+        label = _SIGNATURE_LABELS.get(role, role.replace("_", " ").title())
+        required = role in ("technician", "customer_representative")
+        updated[role] = render_signature_field(
+            label=label,
+            role_key=f"{sk}_{role}",
+            existing=meta.get(role),
+            disabled=locked,
+            required=required,
+        )
+    record["signatures_meta"] = updated
+    record["technician_signature"] = updated["technician"]["signature_image"]
+    record["supervisor_signature"] = updated["supervisor"]["signature_image"]
+    record["customer_signature"] = updated["customer_representative"]["signature_image"]
     return record
 
 
@@ -425,26 +484,26 @@ def _render_inspection_form(record: dict[str, Any]) -> None:
     locked = str(record.get("status") or "").lower() in {"complete", "exported"} and not st.session_state.get(
         f"{sk}_edit_mode"
     )
+    _render_form_header(record)
     pct = completion_percentage(record)
     st.progress(min(pct / 100.0, 1.0), text=f"Completion: {pct}%")
-    st.caption(f"Status: **{html.escape(str(record.get('status') or 'draft').title())}**")
 
     record = _render_header_section(record, sk=sk, locked=locked)
     record = _render_specs_section(record, sk=sk, locked=locked)
     record = _render_torque_table(record, sk=sk, locked=locked)
-    record = _render_inspection_fields(record, sk=sk, locked=locked)
+    record = _render_inspection_results(record, sk=sk, locked=locked)
     record = _render_photos_section(record, sk=sk, locked=locked)
     record = _render_signatures_section(record, sk=sk, locked=locked)
     st.session_state[_DRAFT_KEY] = record
 
+    st.markdown("## 7. Final PDF Export")
     a1, a2, a3, a4 = st.columns(4, gap="small")
-    save_draft = a1.button("Save draft", type="secondary", use_container_width=True, key=f"{sk}_save", disabled=locked)
-    mark_complete = a2.button("Mark complete", type="primary", use_container_width=True, key=f"{sk}_complete", disabled=locked)
-    gen_pdf = a3.button("Generate PDF", use_container_width=True, key=f"{sk}_pdf")
-    if locked:
-        if a4.button("Reopen for edit", use_container_width=True, key=f"{sk}_reopen"):
-            st.session_state[f"{sk}_edit_mode"] = True
-            st.rerun()
+    save_draft = a1.button("Save Draft", type="secondary", use_container_width=True, key=f"{sk}_save", disabled=locked)
+    mark_complete = a2.button("Mark Completed", type="primary", use_container_width=True, key=f"{sk}_complete", disabled=locked)
+    gen_pdf = a3.button("Generate Final PDF", use_container_width=True, key=f"{sk}_pdf")
+    if locked and a4.button("Reopen for Edit", use_container_width=True, key=f"{sk}_reopen"):
+        st.session_state[f"{sk}_edit_mode"] = True
+        st.rerun()
 
     if save_draft:
         if st.session_state.get(f"{sk}_edit_mode"):
@@ -462,16 +521,14 @@ def _render_inspection_form(record: dict[str, Any]) -> None:
     if mark_complete:
         errors = validate_for_complete(record)
         if errors:
-            for err in errors[:6]:
+            for err in errors[:8]:
                 st.error(err)
         else:
-            result = save_coupling_inspection(
-                record, inspection_id=str(record.get("id") or "") or None, mark_complete=True
-            )
+            result = save_coupling_inspection(record, inspection_id=str(record.get("id") or "") or None, mark_complete=True)
             if result.ok and result.data:
                 st.session_state[_DRAFT_KEY] = result.data
                 st.session_state.pop(f"{sk}_edit_mode", None)
-                st.success("Inspection marked complete.")
+                st.success("Inspection marked completed.")
                 st.rerun()
             else:
                 st.error(result.error or "Could not complete inspection.")
@@ -482,9 +539,9 @@ def _render_inspection_form(record: dict[str, Any]) -> None:
             if record.get("id"):
                 save_coupling_inspection(record, inspection_id=str(record.get("id")), mark_exported=True)
             st.download_button(
-                "Download Coupling Inspection PDF",
+                "Download IPS Coupling Inspection PDF",
                 data=pdf_bytes,
-                file_name=f"coupling_inspection_{record.get('id') or 'draft'}.pdf",
+                file_name=pdf_export_filename(record),
                 mime="application/pdf",
                 use_container_width=True,
                 key=f"{sk}_pdf_dl",
@@ -499,7 +556,7 @@ def _render_existing_list(ctx: dict[str, str | None]) -> str | None:
         return None
     st.markdown("#### Existing inspections")
     options = ["— New inspection —"] + [
-        f"{r.get('header', {}).get('inspection_date', '—')} · {str(r.get('status') or 'draft').title()} · {r.get('coupling_model')}"
+        f"{r.get('header', {}).get('inspection_date', '—')} · {_status_label(str(r.get('status') or 'draft'))} · {r.get('coupling_model')}"
         for r in rows
     ]
     pick = st.selectbox("Open inspection", options, key="ci_pick_existing")
@@ -512,10 +569,7 @@ def render() -> None:
     if not begin_module("coupling_inspection", inject_css=True):
         return
     inject_coupling_inspection_css()
-    render_page_header(
-        "Coupling Inspection",
-        "Torque verification, photos, signatures, and IPS V6 PDF export.",
-    )
+    st.markdown('<span class="ips-page-coupling_inspection" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     ctx = coupling_inspection_context()
     if not ctx.get("job_id") and not ctx.get("equipment_id") and not ctx.get("inspection_id"):
@@ -528,7 +582,7 @@ def render() -> None:
             st.session_state["coupling_insp_id"] = picked
             st.rerun()
 
-    if st.button("Start new inspection", key="ci_new_insp"):
+    if st.button("Start New Inspection", key="ci_new_insp", use_container_width=False):
         job = _find_job(ctx.get("job_id"))
         equip = _find_equipment(ctx.get("equipment_id"))
         prof = current_profile() or {}

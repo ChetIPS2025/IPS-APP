@@ -1,9 +1,11 @@
-"""Coupling model specifications and torque verification defaults."""
+"""Coupling model specifications and torque verification defaults (IPS V7)."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
+
+FORM_VERSION = "V7"
 
 COUPLING_MODEL_OPTIONS: tuple[str, ...] = (
     "1030G20",
@@ -38,7 +40,7 @@ CLOCK_POSITION_ANGLES: dict[str, float] = {
 
 _MODEL_SPECS: dict[str, dict[str, Any]] = {
     "1030G20": {
-        "coupling_type": "Falk Lifelign 1030G20 / 1030G20 Gear Coupling",
+        "coupling_type": "Falk Lifelign 1030G20 Gear Coupling",
         "flange_bolts": "8 bolts, 1/2-20 x 2.0 in",
         "bolt_count": BOLT_COUNT,
         "pass1_torque_ft_lb": 75,
@@ -88,8 +90,9 @@ def default_torque_rows(model_key: str | None = None) -> list[dict[str, Any]]:
             "pass1_checked": False,
             "pass2_checked": False,
             "final_checked": False,
-            "witness_mark_checked": False,
-            "initial_signature": "",
+            "witness_initials": "",
+            "pass_fail": None,
+            "notes": "",
             "pass1_torque_ft_lb": specs.get("pass1_torque_ft_lb"),
             "pass2_torque_ft_lb": specs.get("pass2_torque_ft_lb"),
             "final_torque_ft_lb": specs.get("final_torque_ft_lb"),
@@ -113,6 +116,11 @@ def normalize_torque_rows(rows: list[dict[str, Any]] | None, *, model_key: str |
             merged.update(existing)
             merged["order"] = i + 1
             merged["clock_position"] = pos
+            # V7: migrate legacy V6 fields
+            if not merged.get("witness_initials") and merged.get("initial_signature"):
+                merged["witness_initials"] = ""
+            merged.pop("initial_signature", None)
+            merged.pop("witness_mark_checked", None)
         out.append(merged)
     return out
 
@@ -195,3 +203,24 @@ def torque_pass_labels(specs: dict[str, Any]) -> tuple[str, str, str]:
         f"{p2:g} ft-lb" if p2 is not None else "Pass 2",
         f"{pf:g} ft-lb" if pf is not None else "Final",
     )
+
+
+INSPECTION_RESULT_ITEMS: tuple[tuple[str, str, str], ...] = (
+    ("actual_hub_gap_in", "Actual Hub Gap", "number"),
+    ("lubricant_type", "Lubricant Type", "text"),
+    ("lubricant_quantity_added", "Lubricant Qty Added", "text"),
+    ("coupling_teeth_condition", "Coupling Teeth Condition", "text"),
+    ("grease_condition", "Grease Condition", "text"),
+    ("seal_condition", "Seal Condition", "text"),
+    ("cover_installed", "Cover Installed", "bool"),
+    ("fasteners_witness_marked", "Fasteners Witness Marked", "bool"),
+    ("guard_installed", "Guard Installed", "bool"),
+    ("final_inspection_complete", "Final Inspection Complete", "bool"),
+)
+
+
+def default_inspection_results() -> dict[str, Any]:
+    return {
+        key: {"value": "" if kind != "bool" else False, "pass": False, "fail": False, "na": False, "notes": ""}
+        for key, _, kind in INSPECTION_RESULT_ITEMS
+    }

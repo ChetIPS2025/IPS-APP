@@ -2957,7 +2957,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v17">
+<style id="ips-timekeeping-module-v18">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3048,6 +3048,69 @@ def inject_timekeeping_module_css() -> None:
   padding: 12px 14px 16px;
   margin: 0;
 }}
+.timesheet-employee-card-marker {{
+  display: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] {{
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 8px 10px 10px !important;
+  box-shadow: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:hover {{
+  background: #f8fbff !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] {{
+  border-bottom: none !important;
+  background: transparent !important;
+  min-height: 0 !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:first-of-type {{
+  min-height: 34px !important;
+  align-items: center !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:hover {{
+  background: transparent !important;
+}}
+.timesheet-header-row {{
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}}
+.timesheet-header-row .employee-name {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}}
+.employee-summary-value {{
+  text-align: right;
+  width: 100%;
+}}
+.timesheet-days-inline-grid {{
+  width: 100%;
+  max-width: 100%;
+  margin: 2px 0 0 0;
+  padding: 0;
+}}
+.timesheet-employee-expand-detail {{
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  background: transparent;
+}}
+.timesheet-employee-expand-detail .ips-timekeeping-expand-title {{
+  display: none;
+}}
 .ips-time-week-summary {{
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -3062,7 +3125,7 @@ def inject_timekeeping_module_css() -> None:
 .timesheet-days-grid,
 .timesheet-days-grid-wrap {{
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
   max-width: 100%;
 }}
@@ -3071,24 +3134,26 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100%;
 }}
 .st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"] [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker),
 .ips-time-week-inline.timesheet-days-grid-wrap [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker) {{
   display: grid !important;
-  grid-template-columns: repeat(7, 56px) !important;
+  grid-template-columns: repeat(7, 52px) !important;
   gap: 0 !important;
   width: fit-content !important;
   max-width: 100% !important;
-  margin: 0 auto !important;
-  justify-content: center !important;
+  margin: 0 !important;
+  justify-content: flex-start !important;
   align-items: stretch !important;
   border-bottom: none !important;
   padding: 0 !important;
 }}
 .st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker) > [data-testid="column"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"] [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker) > [data-testid="column"],
 .ips-time-week-inline.timesheet-days-grid-wrap [data-testid="stHorizontalBlock"]:has(.timesheet-days-grid-marker) > [data-testid="column"] {{
-  flex: 0 0 56px !important;
-  width: 56px !important;
-  min-width: 56px !important;
-  max-width: 56px !important;
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
   padding: 1px 0 !important;
   margin: 0 !important;
   overflow: visible !important;
@@ -3829,7 +3894,7 @@ def inject_timekeeping_module_css() -> None:
   min-height: 40px;
   padding: 8px 10px !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-days-grid-marker)):not(:has(.timesheet-days-grid-marker-wrap)):hover {{
   background: #eef5ff;
 }}
 .st-key-timekeeping_table_wrap .st-key-tk_row_ [data-testid="stHorizontalBlock"]:hover {{
@@ -6634,26 +6699,115 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 
 
 def inject_coupling_inspection_css() -> None:
-    """Mobile/iPad-friendly coupling inspection form styling."""
+    """Mobile/iPad-friendly coupling inspection V7 form styling."""
     st.markdown(
         """
-<style id="ips-coupling-inspection-v1">
+<style id="ips-coupling-inspection-v7">
 .ips-page-coupling_inspection [data-testid="stCheckbox"] label {
-  min-height: 2rem !important;
-  min-width: 2rem !important;
+  min-height: 2.25rem !important;
+  min-width: 2.25rem !important;
+  padding: 0.35rem 0.5rem !important;
 }
 .ips-page-coupling_inspection [data-testid="stCheckbox"] label p {
   font-size: 1rem !important;
+  font-weight: 600 !important;
 }
 .ips-page-coupling_inspection [data-testid="stButton"] > button {
-  min-height: 2.75rem !important;
+  min-height: 2.85rem !important;
   font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+.ips-page-coupling_inspection [data-testid="stTextInput"] input,
+.ips-page-coupling_inspection [data-testid="stNumberInput"] input {
+  min-height: 2.5rem !important;
+  font-size: 1rem !important;
 }
 .ips-page-coupling_inspection [data-testid="stFileUploader"] {
-  padding: 0.35rem 0 !important;
+  padding: 0.5rem 0 !important;
 }
 .ips-page-coupling_inspection [data-testid="column"] {
   min-width: 0 !important;
+}
+.ips-coupling-v7-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.ips-coupling-v7-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+.ips-coupling-v7-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ips-coupling-v7-version {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ips-coupling-v7-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.ips-coupling-v7-status-draft { background: #f1f5f9; color: #475569; }
+.ips-coupling-v7-status-completed { background: #dcfce7; color: #166534; }
+.ips-coupling-v7-status-exported { background: #dbeafe; color: #1d4ed8; }
+.ips-coupling-v7-job-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #334155;
+}
+.ips-coupling-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.ips-coupling-spec-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.ips-coupling-spec-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.ips-coupling-spec-value {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: #0f172a;
+  line-height: 1.3;
 }
 .ips-coupling-torque-pattern {
   display: block;
@@ -6663,6 +6817,10 @@ def inject_coupling_inspection_css() -> None:
 @media (max-width: 768px) {
   .ips-page-coupling_inspection [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
+  }
+  .ips-coupling-v7-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

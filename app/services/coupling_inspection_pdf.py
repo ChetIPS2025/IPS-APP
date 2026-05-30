@@ -1,9 +1,10 @@
-"""Portrait IPS Coupling Inspection PDF export (V6 layout)."""
+"""Portrait IPS Coupling Inspection PDF export (V7 layout)."""
 
 from __future__ import annotations
 
 import base64
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from reportlab.graphics.shapes import Circle, Drawing, Line, String
@@ -15,20 +16,36 @@ from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 try:
-    from app.services.coupling_inspection_service import PHOTO_SLOT_LABELS, photo_view_url
+    from app.branding import get_header_logo_path
+    from app.services.coupling_inspection_service import (
+        PHOTO_SLOT_LABELS,
+        normalize_inspection_results,
+        normalize_signatures_meta,
+        photo_view_url,
+    )
     from app.services.coupling_inspection_specs import (
         BOLT_COUNT,
         CLOCK_POSITION_ANGLES,
+        FORM_VERSION,
+        INSPECTION_RESULT_ITEMS,
         TORQUE_CLOCK_SEQUENCE,
         normalize_torque_rows,
         torque_pass_labels,
         torque_sequence_caption,
     )
 except ImportError:
-    from services.coupling_inspection_service import PHOTO_SLOT_LABELS, photo_view_url  # type: ignore
+    from branding import get_header_logo_path  # type: ignore
+    from services.coupling_inspection_service import (  # type: ignore
+        PHOTO_SLOT_LABELS,
+        normalize_inspection_results,
+        normalize_signatures_meta,
+        photo_view_url,
+    )
     from services.coupling_inspection_specs import (  # type: ignore
         BOLT_COUNT,
         CLOCK_POSITION_ANGLES,
+        FORM_VERSION,
+        INSPECTION_RESULT_ITEMS,
         TORQUE_CLOCK_SEQUENCE,
         normalize_torque_rows,
         torque_pass_labels,
@@ -61,42 +78,62 @@ def _rl_image_from_sig(signature_data: str, *, width: float, height: float) -> R
         return None
 
 
+def _logo_flowable(*, width: float = 0.85 * inch, height: float = 0.55 * inch) -> RLImage | None:
+    path = get_header_logo_path()
+    if not path or not Path(path).is_file():
+        return None
+    try:
+        return RLImage(str(path), width=width, height=height)
+    except Exception:
+        return None
+
+
 def _checkmark(checked: bool) -> str:
     return "✓" if checked else ""
 
 
-def _torque_pattern_drawing(*, size: float = 170) -> Drawing:
-    """8-bolt crisscross/star flange pattern."""
+def _result_label(item: dict[str, Any]) -> str:
+    if item.get("pass"):
+        return "Pass"
+    if item.get("fail"):
+        return "Fail"
+    if item.get("na"):
+        return "N/A"
+    return "—"
+
+
+def _format_field_value(item: dict[str, Any], kind: str) -> str:
+    val = item.get("value")
+    if kind == "bool":
+        return "Yes" if val else "No"
+    if val in (None, ""):
+        return "—"
+    return str(val)
+
+
+def _torque_pattern_drawing(*, size: float = 150) -> Drawing:
     import math
 
     d = Drawing(size, size)
     cx = cy = size / 2
-    r = size / 2 - 24
-    d.add(Circle(cx, cy, r + 6, fillColor=colors.HexColor("#f8fafc"), strokeColor=colors.HexColor("#cbd5e1")))
+    r = size / 2 - 22
+    d.add(Circle(cx, cy, r + 5, fillColor=colors.HexColor("#f8fafc"), strokeColor=colors.HexColor("#cbd5e1")))
     d.add(Circle(cx, cy, r, fillColor=None, strokeColor=colors.HexColor("#94a3b8"), strokeDashArray=[3, 2]))
-
     points: list[tuple[float, float, int, str]] = []
     for i, clock in enumerate(TORQUE_CLOCK_SEQUENCE, start=1):
         deg = CLOCK_POSITION_ANGLES.get(clock, 0.0)
         rad = math.radians(deg)
         x = cx + r * math.cos(rad)
-        y = cy + r * math.sin(rad)  # reportlab y-up
+        y = cy + r * math.sin(rad)
         points.append((x, y, i, clock))
-
     for a, b in ((0, 4), (1, 5), (2, 6), (3, 7)):
         x1, y1, _, _ = points[a]
         x2, y2, _, _ = points[b]
-        d.add(Line(x1, y1, x2, y2, strokeColor=colors.HexColor("#2563eb"), strokeWidth=1.2))
-
-    for i in range(len(points)):
-        x1, y1, _, _ = points[i]
-        x2, y2, _, _ = points[(i + 1) % len(points)]
-        d.add(Line(x1, y1, x2, y2, strokeColor=colors.HexColor("#64748b"), strokeWidth=0.8, strokeDashArray=[2, 2]))
-
+        d.add(Line(x1, y1, x2, y2, strokeColor=colors.HexColor("#2563eb"), strokeWidth=1.1))
     for x, y, num, clock in points:
-        d.add(Circle(x, y, 9, fillColor=colors.HexColor("#2563eb"), strokeColor=colors.white, strokeWidth=1))
-        d.add(String(x - 3, y - 3, str(num), fontSize=8, fillColor=colors.white))
-        d.add(String(x - 10, y - 16, clock, fontSize=6, fillColor=colors.HexColor("#475569")))
+        d.add(Circle(x, y, 8, fillColor=colors.HexColor("#2563eb"), strokeColor=colors.white, strokeWidth=1))
+        d.add(String(x - 2, y - 3, str(num), fontSize=7, fillColor=colors.white))
+        d.add(String(x - 9, y - 14, clock, fontSize=5, fillColor=colors.HexColor("#475569")))
     return d
 
 
@@ -105,8 +142,8 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
     title_style = ParagraphStyle(
         "CouplingTitle",
         parent=styles["Title"],
-        fontSize=16,
-        spaceAfter=6,
+        fontSize=15,
+        spaceAfter=4,
         textColor=colors.HexColor("#0f172a"),
     )
     sub_style = ParagraphStyle(
@@ -117,27 +154,43 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
     )
     hdr = record.get("header") or {}
     specs = record.get("specs") or {}
-    fields = record.get("inspection_fields") or {}
+    fields = normalize_inspection_results(record.get("inspection_fields"))
+    sig_meta = normalize_signatures_meta(record)
     rows = normalize_torque_rows(
         list(record.get("torque_rows") or []),
         model_key=str(record.get("coupling_model") or "1030G20"),
     )
     p1_lbl, p2_lbl, pf_lbl = torque_pass_labels(specs)
+    status = str(record.get("status") or "draft").title()
+    if status.lower() == "complete":
+        status = "Completed"
 
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
         pagesize=letter,
-        leftMargin=0.55 * inch,
-        rightMargin=0.55 * inch,
-        topMargin=0.45 * inch,
-        bottomMargin=0.45 * inch,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+        topMargin=0.4 * inch,
+        bottomMargin=0.4 * inch,
     )
     story: list[Any] = []
 
-    story.append(Paragraph("IPS Coupling Inspection &amp; Torque Verification", title_style))
-    story.append(Paragraph("Industrial Plant Services — V6 Coupling Report", sub_style))
-    story.append(Spacer(1, 0.12 * inch))
+    logo = _logo_flowable()
+    header_row: list[Any] = []
+    if logo:
+        header_row.append(logo)
+    header_row.append(
+        Paragraph(
+            f"<b>IPS Coupling Inspection &amp; Torque Verification</b><br/>"
+            f"Industrial Plant Services — {FORM_VERSION} · Status: {status}",
+            title_style,
+        )
+    )
+    header_table = Table([header_row], colWidths=[0.9 * inch, 5.7 * inch])
+    header_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story.append(header_table)
+    story.append(Spacer(1, 0.1 * inch))
 
     meta = [
         ["Customer", str(hdr.get("customer") or "—")],
@@ -148,64 +201,64 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         ["Location", str(hdr.get("location") or "—")],
         ["Date", str(hdr.get("inspection_date") or "—")],
         ["Technician", str(hdr.get("technician") or "—")],
+        ["Supervisor", str(hdr.get("supervisor") or "—")],
+        ["Customer Representative", str(hdr.get("customer_representative") or "—")],
         ["Coupling Model", str(record.get("coupling_model") or "—")],
-        ["Status", str(record.get("status") or "draft").title()],
     ]
-    meta_table = Table(meta, colWidths=[1.35 * inch, 5.0 * inch])
+    meta_table = Table(meta, colWidths=[1.45 * inch, 5.15 * inch])
     meta_table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
                 ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#64748b")),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
                 ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#f1f5f9")),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ]
         )
     )
     story.append(meta_table)
-    story.append(Spacer(1, 0.14 * inch))
+    story.append(Spacer(1, 0.12 * inch))
 
     story.append(Paragraph("Coupling Specifications", styles["Heading3"]))
+    gap = specs.get("standard_hub_gap_in")
+    lb = specs.get("lubricant_quantity_lb")
+    oz = specs.get("lubricant_quantity_oz")
     spec_rows = [
         ["Coupling Type", str(specs.get("coupling_type") or "—")],
         ["Flange Bolts", str(specs.get("flange_bolts") or "—")],
+        ["Bolt Count", str(specs.get("bolt_count") or BOLT_COUNT)],
         ["Final Torque", f"{specs.get('final_torque_ft_lb', '—')} ft-lb / {specs.get('final_torque_nm', '—')} Nm"],
-        ["Standard Hub Gap", f"{specs.get('standard_hub_gap_in', '—')} in"],
-        [
-            "Lubricant Quantity",
-            f"{specs.get('lubricant_quantity_lb', '—')} lb / {specs.get('lubricant_quantity_oz', '—')} oz",
-        ],
+        ["Standard Hub Gap", f"{gap:g} in" if gap is not None else "—"],
+        ["Lubricant Type", str(specs.get("lubricant_type_default") or "—")],
+        ["Lubricant Quantity", f"{lb:g} lb / {oz:g} oz" if lb is not None else "—"],
     ]
-    spec_table = Table(spec_rows, colWidths=[1.5 * inch, 4.85 * inch])
+    spec_table = Table(spec_rows, colWidths=[1.5 * inch, 5.1 * inch])
     spec_table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f8fafc")),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                 ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
             ]
         )
     )
     story.append(spec_table)
-    story.append(Spacer(1, 0.12 * inch))
-
-    story.append(Paragraph("Torque Sequence Pattern (8-bolt crisscross)", styles["Heading4"]))
+    story.append(Spacer(1, 0.08 * inch))
     story.append(_torque_pattern_drawing())
-    story.append(Spacer(1, 0.06 * inch))
-    story.append(Paragraph(torque_sequence_caption(), styles["Normal"]))
-    story.append(Spacer(1, 0.1 * inch))
+    story.append(Paragraph(torque_sequence_caption(), sub_style))
+    story.append(Spacer(1, 0.08 * inch))
 
     story.append(Paragraph("Torque Verification Chart", styles["Heading3"]))
-    torque_header = ["#", "Clock", p1_lbl, p2_lbl, pf_lbl, "Witness", "Initial"]
+    torque_header = ["#", "Clock", p1_lbl, p2_lbl, pf_lbl, "Witness", "P/F", "Notes"]
     torque_data = [torque_header]
     for row in rows[:BOLT_COUNT]:
-        init_sig = "Signed" if str(row.get("initial_signature") or "").strip() else ""
+        initials = str(row.get("witness_initials") or "").strip()
+        pf = row.get("pass_fail")
+        pf_txt = "Pass" if pf == "pass" else ("Fail" if pf == "fail" else "")
         torque_data.append(
             [
                 str(row.get("order") or ""),
@@ -213,71 +266,71 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
                 _checkmark(bool(row.get("pass1_checked"))),
                 _checkmark(bool(row.get("pass2_checked"))),
                 _checkmark(bool(row.get("final_checked"))),
-                _checkmark(bool(row.get("witness_mark_checked"))),
-                init_sig,
+                initials,
+                pf_txt,
+                str(row.get("notes") or ""),
             ]
         )
     torque_table = Table(
         torque_data,
-        colWidths=[0.35 * inch, 0.75 * inch, 0.85 * inch, 0.85 * inch, 0.85 * inch, 0.65 * inch, 0.75 * inch],
+        colWidths=[0.3 * inch, 0.65 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 0.65 * inch, 0.45 * inch, 1.35 * inch],
         repeatRows=1,
     )
     torque_table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTSIZE", (0, 0), (-1, -1), 7.5),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563eb")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#94a3b8")),
                 ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
             ]
         )
     )
     story.append(torque_table)
-    story.append(Spacer(1, 0.12 * inch))
+    story.append(Spacer(1, 0.1 * inch))
 
     story.append(Paragraph("Inspection Results", styles["Heading3"]))
-    insp_rows = [
-        ["Actual Hub Gap (in)", str(fields.get("actual_hub_gap_in") or "—")],
-        ["Lubricant Type", str(fields.get("lubricant_type") or "—")],
-        ["Lubricant Qty Added", str(fields.get("lubricant_quantity_added") or "—")],
-        ["Coupling Teeth", str(fields.get("coupling_teeth_condition") or "—")],
-        ["Grease Condition", str(fields.get("grease_condition") or "—")],
-        ["Seal Condition", str(fields.get("seal_condition") or "—")],
-        ["Cover Installed", "Yes" if fields.get("cover_installed") else "No"],
-        ["Fasteners Witness Marked", "Yes" if fields.get("fasteners_witness_marked") else "No"],
-        ["Guard Installed", "Yes" if fields.get("guard_installed") else "No"],
-    ]
-    insp_table = Table(insp_rows, colWidths=[1.75 * inch, 4.6 * inch])
+    insp_data = [["Item", "Value", "Result", "Notes"]]
+    for field_key, label, kind in INSPECTION_RESULT_ITEMS:
+        item = fields.get(field_key) or {}
+        insp_data.append(
+            [
+                label,
+                _format_field_value(item, kind),
+                _result_label(item),
+                str(item.get("notes") or ""),
+            ]
+        )
+    insp_table = Table(insp_data, colWidths=[1.55 * inch, 1.35 * inch, 0.75 * inch, 2.55 * inch], repeatRows=1)
     insp_table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                 ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
             ]
         )
     )
     story.append(insp_table)
-    notes = str(fields.get("notes") or "").strip()
-    if notes:
-        story.append(Spacer(1, 0.08 * inch))
-        story.append(Paragraph("Notes / Comments", styles["Heading4"]))
-        story.append(Paragraph(notes.replace("\n", "<br/>"), styles["Normal"]))
+    story.append(Spacer(1, 0.1 * inch))
 
     photos = list(record.get("photo_attachments") or [])
     if photos:
-        story.append(Spacer(1, 0.12 * inch))
         story.append(Paragraph("Photo Attachments", styles["Heading3"]))
-        for att in photos[:6]:
-            slot = str(att.get("slot") or "")
+        for att in photos[:8]:
+            slot = str(att.get("slot") or att.get("category") or "")
             label = PHOTO_SLOT_LABELS.get(slot, slot or "Photo")
-            story.append(Paragraph(label, styles["Heading4"]))
+            caption = str(att.get("caption") or label)
+            uploaded = str(att.get("uploaded_at") or "")[:19]
+            by = str(att.get("uploaded_by") or "")
+            meta_line = " · ".join(x for x in (caption, by, uploaded) if x)
+            story.append(Paragraph(meta_line, styles["Heading4"]))
             url = photo_view_url(att)
             if url:
                 try:
@@ -285,25 +338,28 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
 
                     with urllib.request.urlopen(url, timeout=8) as resp:
                         img_bytes = resp.read()
-                    img = RLImage(BytesIO(img_bytes), width=2.8 * inch, height=2.1 * inch)
+                    img = RLImage(BytesIO(img_bytes), width=2.6 * inch, height=1.95 * inch)
                     story.append(img)
                 except Exception:
                     story.append(Paragraph(str(att.get("file_name") or "Photo on file"), styles["Normal"]))
-            else:
-                story.append(Paragraph(str(att.get("file_name") or "Photo on file"), styles["Normal"]))
-            story.append(Spacer(1, 0.06 * inch))
+            story.append(Spacer(1, 0.05 * inch))
 
-    story.append(Spacer(1, 0.12 * inch))
+    story.append(Spacer(1, 0.08 * inch))
     story.append(Paragraph("Signatures", styles["Heading3"]))
     sig_rows: list[list[Any]] = []
-    for label, key in (
-        ("Technician", "technician_signature"),
-        ("Supervisor", "supervisor_signature"),
-        ("Customer Representative", "customer_signature"),
-    ):
-        img = _rl_image_from_sig(str(record.get(key) or ""), width=2.2 * inch, height=0.55 * inch)
-        sig_rows.append([label, img if img else Paragraph("—", styles["Normal"])])
-    sig_table = Table(sig_rows, colWidths=[1.4 * inch, 4.95 * inch])
+    role_labels = {
+        "technician": "Technician",
+        "supervisor": "Supervisor",
+        "customer_representative": "Customer Representative",
+    }
+    for role, label in role_labels.items():
+        entry = sig_meta.get(role) or {}
+        name = str(entry.get("signer_name") or "").strip()
+        signed_at = str(entry.get("signed_at") or "")[:19]
+        img = _rl_image_from_sig(str(entry.get("signature_image") or ""), width=2.0 * inch, height=0.5 * inch)
+        detail = "<br/>".join(x for x in (name, signed_at) if x) or "—"
+        sig_rows.append([label, img if img else Paragraph("—", styles["Normal"]), Paragraph(detail, sub_style)])
+    sig_table = Table(sig_rows, colWidths=[1.35 * inch, 2.5 * inch, 2.35 * inch])
     sig_table.setStyle(
         TableStyle(
             [
@@ -311,11 +367,13 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
                 ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                 ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
                 ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
             ]
         )
     )
     story.append(sig_table)
+    story.append(Spacer(1, 0.08 * inch))
+    story.append(Paragraph(f"Generated {FORM_VERSION} report — Status: {status}", sub_style))
 
     doc.build(story)
     return buf.getvalue()

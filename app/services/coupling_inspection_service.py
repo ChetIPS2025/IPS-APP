@@ -20,6 +20,8 @@ try:
     from app.services.coupling_inspection_specs import (
         BOLT_COUNT,
         COUPLING_MODEL_OPTIONS,
+        FORM_VERSION,
+        default_inspection_results,
         default_torque_rows,
         normalize_torque_rows,
         specs_for_model,
@@ -38,6 +40,8 @@ except ImportError:
     from services.coupling_inspection_specs import (  # type: ignore
         BOLT_COUNT,
         COUPLING_MODEL_OPTIONS,
+        FORM_VERSION,
+        default_inspection_results,
         default_torque_rows,
         normalize_torque_rows,
         specs_for_model,
@@ -48,22 +52,38 @@ except ImportError:
 _LOG = logging.getLogger(__name__)
 
 TABLE = "coupling_inspections"
+TORQUE_TABLE = "coupling_torque_checks"
+PHOTOS_TABLE = "coupling_inspection_photos"
+SIGNATURES_TABLE = "coupling_inspection_signatures"
 STORAGE_PREFIX = "coupling-inspections"
 
 PHOTO_SLOTS: tuple[str, ...] = (
-    "before",
-    "coupling",
-    "torque_witness",
-    "final",
-    "additional",
+    "before_service",
+    "coupling_teeth",
+    "hub_gap",
+    "grease_condition",
+    "torque_verification",
+    "witness_marks",
+    "guard_installed",
+    "final_condition",
 )
 
 PHOTO_SLOT_LABELS: dict[str, str] = {
-    "before": "Before photo",
-    "coupling": "Coupling inspection photo",
-    "torque_witness": "Torque / witness mark photo",
-    "final": "Final completed photo",
-    "additional": "Additional photo",
+    "before_service": "Coupling before service",
+    "coupling_teeth": "Coupling teeth",
+    "hub_gap": "Hub gap measurement",
+    "grease_condition": "Grease/lubricant condition",
+    "torque_verification": "Torque verification",
+    "witness_marks": "Witness marks",
+    "guard_installed": "Guard installed",
+    "final_condition": "Final completed condition",
+}
+
+SIGNATURE_ROLES: tuple[str, ...] = ("technician", "supervisor", "customer_representative")
+SIGNATURE_ROLE_LABELS: dict[str, str] = {
+    "technician": "Technician",
+    "supervisor": "Supervisor",
+    "customer_representative": "Customer Representative",
 }
 
 
@@ -95,16 +115,94 @@ def _as_list(v: Any) -> list[Any]:
     return []
 
 
+def normalize_inspection_results(raw: Any) -> dict[str, Any]:
+    """Normalize V7 pass/fail/N/A inspection result rows."""
+    base = default_inspection_results()
+    if not isinstance(raw, dict):
+        return base
+    # Legacy flat V6 fields → migrate into structured results
+    if "actual_hub_gap_in" in raw and not isinstance(raw.get("actual_hub_gap_in"), dict):
+        legacy_map = {
+            "actual_hub_gap_in": raw.get("actual_hub_gap_in"),
+            "lubricant_type": raw.get("lubricant_type"),
+            "lubricant_quantity_added": raw.get("lubricant_quantity_added"),
+            "coupling_teeth_condition": raw.get("coupling_teeth_condition"),
+            "grease_condition": raw.get("grease_condition"),
+            "seal_condition": raw.get("seal_condition"),
+            "cover_installed": raw.get("cover_installed"),
+            "fasteners_witness_marked": raw.get("fasteners_witness_marked"),
+            "guard_installed": raw.get("guard_installed"),
+            "final_inspection_complete": raw.get("final_inspection_complete", False),
+        }
+        for key, val in legacy_map.items():
+            if key not in base:
+                continue
+            base[key]["value"] = val if val is not None else base[key]["value"]
+        notes = str(raw.get("notes") or "").strip()
+        if notes and base.get("final_inspection_complete"):
+            base["final_inspection_complete"]["notes"] = notes
+        return base
+    for key in base:
+        item = raw.get(key)
+        if isinstance(item, dict):
+            base[key].update({k: item.get(k, base[key].get(k)) for k in ("value", "pass", "fail", "na", "notes")})
+    return base
+
+
+def normalize_signatures_meta(
+    data: dict[str, Any],
+    *,
+    technician_signature: str = "",
+    supervisor_signature: str = "",
+    customer_signature: str = "",
+) -> dict[str, dict[str, Any]]:
+    raw = _as_dict(data.get("signatures_meta"))
+    if not raw:
+        hdr = _as_dict(data.get("header"))
+        raw = _as_dict(hdr.get("signatures_meta"))
+    out: dict[str, dict[str, Any]] = {}
+    legacy = {
+        "technician": technician_signature,
+        "supervisor": supervisor_signature,
+        "customer_representative": customer_signature,
+    }
+    hdr = _as_dict(data.get("header"))
+    default_names = {
+        "technician": str(hdr.get("technician") or ""),
+        "supervisor": str(hdr.get("supervisor") or ""),
+        "customer_representative": str(hdr.get("customer_representative") or ""),
+    }
+    for role in SIGNATURE_ROLES:
+        entry = _as_dict(raw.get(role))
+        img = str(entry.get("signature_image") or legacy.get(role) or "").strip()
+        out[role] = {
+            "signer_name": str(entry.get("signer_name") or default_names.get(role) or "").strip(),
+            "signature_image": img,
+            "signed_at": str(entry.get("signed_at") or "").strip(),
+        }
+    return out
+
+
 def normalize_coupling_inspection(row: dict[str, Any]) -> dict[str, Any]:
     out = dict(row)
+    out["form_version"] = str(row.get("form_version") or FORM_VERSION)
     out["header"] = _as_dict(row.get("header"))
     out["specs"] = _as_dict(row.get("specs"))
     out["torque_rows"] = normalize_torque_rows(
         _as_list(row.get("torque_rows")),
         model_key=str(row.get("coupling_model") or "1030G20"),
     )
-    out["inspection_fields"] = _as_dict(row.get("inspection_fields"))
+    out["inspection_fields"] = normalize_inspection_results(row.get("inspection_fields"))
     out["photo_attachments"] = _as_list(row.get("photo_attachments"))
+    out["signatures_meta"] = normalize_signatures_meta(
+        out,
+        technician_signature=str(row.get("technician_signature") or ""),
+        supervisor_signature=str(row.get("supervisor_signature") or ""),
+        customer_signature=str(row.get("customer_signature") or ""),
+    )
+    out["technician_signature"] = out["signatures_meta"]["technician"]["signature_image"]
+    out["supervisor_signature"] = out["signatures_meta"]["supervisor"]["signature_image"]
+    out["customer_signature"] = out["signatures_meta"]["customer_representative"]["signature_image"]
     return out
 
 
@@ -126,6 +224,8 @@ def build_header_context(
         "location": str(job.get("location") or equipment.get("location") or "").strip(),
         "inspection_date": date.today().isoformat(),
         "technician": technician.strip(),
+        "supervisor": "",
+        "customer_representative": "",
     }
 
 
@@ -149,22 +249,15 @@ def new_inspection_payload(
         "equipment_id": equipment_id or None,
         "customer_id": customer_id or None,
         "coupling_model": model,
+        "form_version": FORM_VERSION,
         "header": hdr,
         "specs": specs,
         "torque_rows": default_torque_rows(model),
-        "inspection_fields": {
-            "actual_hub_gap_in": None,
-            "lubricant_type": specs.get("lubricant_type_default") or "",
-            "lubricant_quantity_added": "",
-            "coupling_teeth_condition": "",
-            "grease_condition": "",
-            "seal_condition": "",
-            "cover_installed": False,
-            "fasteners_witness_marked": False,
-            "guard_installed": False,
-            "notes": "",
-        },
+        "inspection_fields": default_inspection_results(),
         "photo_attachments": [],
+        "signatures_meta": {
+            role: {"signer_name": "", "signature_image": "", "signed_at": ""} for role in SIGNATURE_ROLES
+        },
         "technician_signature": "",
         "supervisor_signature": "",
         "customer_signature": "",
@@ -198,6 +291,87 @@ def get_coupling_inspection(inspection_id: str) -> dict[str, Any] | None:
     return row
 
 
+def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
+    """Mirror JSON payload into V7 child tables (best-effort)."""
+    if not inspection_id:
+        return
+    try:
+        from app.db import delete_rows_admin, insert_row_admin
+    except ImportError:
+        from db import delete_rows_admin, insert_row_admin  # type: ignore
+
+    try:
+        delete_rows_admin(TORQUE_TABLE, {"inspection_id": inspection_id})
+        for row in normalize_torque_rows(
+            _as_list(data.get("torque_rows")),
+            model_key=str(data.get("coupling_model") or "1030G20"),
+        ):
+            pf = row.get("pass_fail")
+            insert_row_admin(
+                TORQUE_TABLE,
+                {
+                    "inspection_id": inspection_id,
+                    "bolt_order": int(row.get("order") or 0),
+                    "clock_position": str(row.get("clock_position") or ""),
+                    "pass1_checked": bool(row.get("pass1_checked")),
+                    "pass2_checked": bool(row.get("pass2_checked")),
+                    "final_checked": bool(row.get("final_checked")),
+                    "witness_initials": str(row.get("witness_initials") or "").strip(),
+                    "pass_fail": pf if pf in ("pass", "fail") else None,
+                    "notes": str(row.get("notes") or "").strip(),
+                    "updated_at": _utc_now_iso(),
+                },
+            )
+
+        delete_rows_admin(PHOTOS_TABLE, {"inspection_id": inspection_id})
+        prof = current_profile() or {}
+        uploader = str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
+        for att in _as_list(data.get("photo_attachments")):
+            slot = str(att.get("slot") or att.get("category") or "").strip()
+            if not slot:
+                continue
+            insert_row_admin(
+                PHOTOS_TABLE,
+                {
+                    "inspection_id": inspection_id,
+                    "category": slot,
+                    "storage_path": str(att.get("storage_path") or att.get("path") or ""),
+                    "file_name": str(att.get("file_name") or ""),
+                    "caption": str(att.get("caption") or ""),
+                    "uploaded_by": str(att.get("uploaded_by") or uploader),
+                    "uploaded_at": str(att.get("uploaded_at") or _utc_now_iso()),
+                },
+            )
+
+        delete_rows_admin(SIGNATURES_TABLE, {"inspection_id": inspection_id})
+        meta = normalize_signatures_meta(data)
+        for role in SIGNATURE_ROLES:
+            entry = meta.get(role) or {}
+            if not str(entry.get("signature_image") or "").strip() and not str(entry.get("signer_name") or "").strip():
+                continue
+            signed_at = str(entry.get("signed_at") or "").strip() or None
+            insert_row_admin(
+                SIGNATURES_TABLE,
+                {
+                    "inspection_id": inspection_id,
+                    "role": role,
+                    "signer_name": str(entry.get("signer_name") or ""),
+                    "signature_image": str(entry.get("signature_image") or ""),
+                    "signed_at": signed_at,
+                    "updated_at": _utc_now_iso(),
+                },
+            )
+    except Exception as exc:
+        _LOG.warning("coupling inspection child sync failed: %s", exc)
+
+
+def pdf_export_filename(record: dict[str, Any]) -> str:
+    hdr = _as_dict(record.get("header"))
+    job_no = str(hdr.get("job_number") or "JOB").strip().replace(" ", "_")
+    insp_date = str(hdr.get("inspection_date") or date.today().isoformat())[:10]
+    return f"IPS_Coupling_Inspection_V7_{job_no}_{insp_date}.pdf"
+
+
 def save_coupling_inspection(
     data: dict[str, Any],
     *,
@@ -205,19 +379,23 @@ def save_coupling_inspection(
     mark_complete: bool = False,
     mark_exported: bool = False,
 ) -> ServiceResult:
+    sig_meta = normalize_signatures_meta(data)
+    header = dict(data.get("header") or {})
+    header["signatures_meta"] = sig_meta
     payload = {
         "job_id": data.get("job_id") or None,
         "equipment_id": data.get("equipment_id") or None,
         "customer_id": data.get("customer_id") or None,
         "coupling_model": str(data.get("coupling_model") or "1030G20"),
-        "header": data.get("header") or {},
+        "form_version": str(data.get("form_version") or FORM_VERSION),
+        "header": header,
         "specs": data.get("specs") or {},
         "torque_rows": normalize_torque_rows(data.get("torque_rows") or [], model_key=str(data.get("coupling_model") or "1030G20")),
-        "inspection_fields": data.get("inspection_fields") or {},
+        "inspection_fields": normalize_inspection_results(data.get("inspection_fields")),
         "photo_attachments": data.get("photo_attachments") or [],
-        "technician_signature": str(data.get("technician_signature") or ""),
-        "supervisor_signature": str(data.get("supervisor_signature") or ""),
-        "customer_signature": str(data.get("customer_signature") or ""),
+        "technician_signature": sig_meta["technician"]["signature_image"],
+        "supervisor_signature": sig_meta["supervisor"]["signature_image"],
+        "customer_signature": sig_meta["customer_representative"]["signature_image"],
         "updated_at": _utc_now_iso(),
     }
     status = str(data.get("status") or "draft").strip().lower()
@@ -238,12 +416,17 @@ def save_coupling_inspection(
             rows = update_rows_admin(TABLE, payload, {"id": rid})
             clear_all_data_caches()
             row = rows[0] if rows else None
+            if row and rid:
+                _sync_child_records(rid, {**data, **payload, "signatures_meta": sig_meta})
             return ServiceResult(ok=True, data=normalize_coupling_inspection(row) if row else None)
         payload["created_at"] = _utc_now_iso()
         if "created_by" not in payload or not payload.get("created_by"):
             payload["created_by"] = (current_profile() or {}).get("id")
         row = insert_row_admin(TABLE, payload)
         clear_all_data_caches()
+        new_id = str(row.get("id") or "") if row else ""
+        if new_id:
+            _sync_child_records(new_id, {**data, **payload, "signatures_meta": sig_meta})
         return ServiceResult(ok=True, data=normalize_coupling_inspection(row) if row else None)
     except Exception as exc:
         msg = f"Could not save coupling inspection: {exc}"
@@ -262,16 +445,23 @@ def validate_for_complete(data: dict[str, Any]) -> list[str]:
     else:
         for i, row in enumerate(rows, start=1):
             if not row.get("final_checked"):
-                errors.append(f"Bolt {i}: final torque checkbox required")
-            if not row.get("witness_mark_checked"):
-                errors.append(f"Bolt {i}: witness mark checkbox required")
-            if not str(row.get("initial_signature") or "").strip():
-                errors.append(f"Bolt {i}: initial/signature required")
+                errors.append(f"Bolt {i}: 150 ft-lb checkbox required")
+            pf = row.get("pass_fail")
+            if pf not in ("pass", "fail"):
+                errors.append(f"Bolt {i}: Pass/Fail selection required")
+            if not str(row.get("witness_initials") or "").strip():
+                errors.append(f"Bolt {i}: witness initials required")
 
-    if not str(data.get("technician_signature") or "").strip():
+    sig = normalize_signatures_meta(data)
+    if not str(sig["technician"]["signature_image"] or "").strip():
         errors.append("Technician signature is required")
-    if not str(data.get("customer_signature") or "").strip():
-        errors.append("Customer signature is required")
+    if not str(sig["customer_representative"]["signature_image"] or "").strip():
+        errors.append("Customer representative signature is required")
+
+    results = normalize_inspection_results(data.get("inspection_fields"))
+    for key, item in results.items():
+        if not (item.get("pass") or item.get("fail") or item.get("na")):
+            errors.append(f"Inspection item '{key}': Pass, Fail, or N/A required")
 
     photos = _as_list(data.get("photo_attachments"))
     if not photos:
@@ -290,13 +480,14 @@ def completion_percentage(data: dict[str, Any]) -> float:
     for row in rows[:BOLT_COUNT]:
         if row.get("final_checked"):
             done += 1
-        if row.get("witness_mark_checked"):
+        if row.get("pass_fail") in ("pass", "fail"):
             done += 1
-        if str(row.get("initial_signature") or "").strip():
+        if str(row.get("witness_initials") or "").strip():
             done += 1
-    if str(data.get("technician_signature") or "").strip():
+    sig = normalize_signatures_meta(data)
+    if str(sig["technician"]["signature_image"] or "").strip():
         done += 1
-    if str(data.get("customer_signature") or "").strip():
+    if str(sig["customer_representative"]["signature_image"] or "").strip():
         done += 1
     if _as_list(data.get("photo_attachments")):
         done += 1
@@ -309,6 +500,7 @@ def upload_inspection_photo(
     slot: str,
     uploaded_file: Any,
     existing_attachments: list[dict[str, Any]] | None = None,
+    caption: str = "",
 ) -> tuple[list[dict[str, Any]], str | None]:
     if uploaded_file is None:
         return list(existing_attachments or []), None
@@ -323,12 +515,17 @@ def upload_inspection_photo(
     except Exception as exc:
         return list(existing_attachments or []), f"Upload failed: {exc}"
 
-    attachments = [a for a in (existing_attachments or []) if str(a.get("slot") or "") != slot]
+    attachments = [a for a in (existing_attachments or []) if str(a.get("slot") or a.get("category") or "") != slot]
+    prof = current_profile() or {}
+    uploader = str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
     attachments.append(
         {
             "slot": slot,
+            "category": slot,
             "storage_path": storage_path,
             "file_name": str(getattr(uploaded_file, "name", "") or fname),
+            "caption": str(caption or "").strip(),
+            "uploaded_by": uploader,
             "uploaded_at": _utc_now_iso(),
         }
     )
