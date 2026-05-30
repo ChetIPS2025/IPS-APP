@@ -583,8 +583,8 @@ def _render_daily_hrs_input(
     """Compact daily hours control: HRS label left, spinner number_input right."""
     if not editable:
         st.markdown(
-            f'<div class="ips-day-hrs-row ips-day-hrs-row-ro">'
-            f'<span class="ips-day-hrs-label">HRS</span>'
+            f'<div class="hours-row ips-day-hrs-row ips-day-hrs-row-ro">'
+            f'<span class="hrs-label ips-day-hrs-label">HRS</span>'
             f'<span class="ips-day-hrs-value">{html.escape(_fmt_day_hours(value))}</span>'
             f"</div>",
             unsafe_allow_html=True,
@@ -592,12 +592,12 @@ def _render_daily_hrs_input(
         return float(value)
 
     st.markdown(
-        '<span class="ips-compact-hours-input-marker ips-day-hrs-row-marker" aria-hidden="true"></span>',
+        '<span class="ips-compact-hours-input-marker ips-day-hrs-row-marker hours-row" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    lbl_col, inp_col = st.columns([0.42, 1], gap="xxsmall", vertical_alignment="center")
+    lbl_col, inp_col = st.columns([0.38, 1], gap="xxsmall", vertical_alignment="center")
     with lbl_col:
-        st.markdown('<div class="ips-day-hrs-label">HRS</div>', unsafe_allow_html=True)
+        st.markdown('<span class="hrs-label ips-day-hrs-label">HRS</span>', unsafe_allow_html=True)
     with inp_col:
         hours = st.number_input(
             f"{day_label} hours",
@@ -625,13 +625,8 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     week_status = _normalize_timecard_status(emp.get("status"))
     days = week_dates(week_start_d)
 
-    st.markdown(
-        '<div class="ips-time-week-inline"><div class="compact-hours-grid">',
-        unsafe_allow_html=True,
-    )
-    spacer, *day_cols = st.columns([0.52, 1, 1, 1, 1, 1, 1, 1], gap="xxsmall")
-    with spacer:
-        st.markdown('<span class="ips-time-week-inline-spacer" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown('<div class="ips-time-week-inline timesheet-days-grid-wrap timesheet-days-grid">', unsafe_allow_html=True)
+    day_cols = st.columns(7, gap="xxsmall")
 
     for i, (col, day_d) in enumerate(zip(day_cols, days)):
         day_row = grid[i] if i < len(grid) else {}
@@ -640,12 +635,16 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
         editable = week_status != "Approved" and _day_is_editable(day_status)
         total = _day_hours_total(day_row)
         filled_marker = "ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
+        grid_marker = " timesheet-days-grid-marker" if i == 0 else ""
 
         with col:
             st.markdown(
-                f'<span class="ips-time-week-day-marker {filled_marker}" aria-hidden="true"></span>'
-                f'<div class="ips-time-week-day-label">{html.escape(day_d.strftime("%a"))}</div>'
-                f'<div class="ips-time-week-day-date">{html.escape(day_d.strftime("%m/%d"))}</div>',
+                f'<span class="day-block-marker day-card-marker ips-time-week-day-marker{grid_marker} {filled_marker}" aria-hidden="true"></span>'
+                f'<div class="day-card">'
+                f'<div class="day-date-line">'
+                f'<span class="day-label ips-time-week-day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
+                f'<span class="day-date ips-time-week-day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
+                f"</div></div>",
                 unsafe_allow_html=True,
             )
             if editable:
@@ -664,7 +663,7 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
                 )
 
     st.session_state[gk] = grid
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _row_totals_from_grid(grid: list[dict]) -> tuple[float, float, float]:
