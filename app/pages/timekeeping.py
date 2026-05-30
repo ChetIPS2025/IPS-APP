@@ -99,14 +99,14 @@ _TK_VIEW_KEY = "ips_timekeeping_view_mode"
 _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
 _TS_EXPAND = 32
-_TS_EMPLOYEE = 160
+_TS_EMPLOYEE = 180
 _TS_DAY = 112
-_TS_WEEK = 64
+_TS_WEEK = 70
 _TS_LIST_EXPAND = 32
-_TS_LIST_EMPLOYEE = 200
-_TS_LIST_DAY = 78
-_TS_LIST_SUMMARY = 68
-_TS_LIST_STATUS = 88
+_TS_LIST_EMPLOYEE = 140
+_TS_LIST_DAY = 72
+_TS_LIST_SUMMARY = 46
+_TS_LIST_STATUS = 64
 _HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _WEEKLY_TS_LIST_COLS = (
     [_TS_LIST_EXPAND, _TS_LIST_EMPLOYEE]
@@ -235,7 +235,7 @@ def _render_horizontal_week_grid(
     with st.container(key=f"{key_prefix}_wrap"):
         st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
 
-        header = st.columns(_HGRID_COLS, gap="small")
+        header = st.columns(_HGRID_COLS, gap="xxsmall")
         header_labels = ["Employee", *[d.strftime("%a %m/%d").upper() for d in days], "Week"]
         for col, label in zip(header, header_labels):
             with col:
@@ -257,7 +257,7 @@ def _render_horizontal_week_grid(
             grid = _ensure_weekly_grid(emp, week_start_d)
             _apply_active_field_job_to_grid(grid)
 
-            cols = st.columns(_HGRID_COLS, gap="small")
+            cols = st.columns(_HGRID_COLS, gap="xxsmall")
             with cols[0]:
                 st.markdown(
                     '<span class="weekly-timesheet-row-marker" aria-hidden="true"></span>',
@@ -265,9 +265,11 @@ def _render_horizontal_week_grid(
                 )
                 name = str(row.get("employee_name") or "—")
                 st.markdown(
+                    f'<div class="weekly-timesheet-employee">'
                     f'<span class="employee-label">Employee</span>'
-                    f'<div class="employee-name ips-time-hgrid-employee" title="{html.escape(name)}">'
-                    f"{html.escape(name)}</div>",
+                    f'<div class="weekly-timesheet-employee-name employee-name ips-time-hgrid-employee" '
+                    f'title="{html.escape(name)}">{html.escape(name)}</div>'
+                    f"</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -290,7 +292,8 @@ def _render_horizontal_week_grid(
 
             with cols[8]:
                 st.markdown(
-                    f'<div class="week-total ips-time-hgrid-total">{html.escape(_fmt_table_hours(row_total))}</div>',
+                    f'<div class="week-total weekly-timesheet-week-total ips-time-hgrid-total">'
+                    f'{html.escape(_fmt_table_hours(row_total))}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -848,9 +851,11 @@ def _render_weekly_timesheet_day_cell(
     header_html = ""
     if show_day_header:
         header_html = (
-            f'<div class="day-header">'
-            f'<span class="day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
-            f'<span class="day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
+            f'<div class="weekly-timesheet-day day-header">'
+            f'<span class="weekly-timesheet-day-label day-label">'
+            f'{html.escape(day_d.strftime("%a").upper())}</span>'
+            f'<span class="weekly-timesheet-day-date day-date">'
+            f'{html.escape(day_d.strftime("%m/%d"))}</span>'
             f"</div>"
         )
     st.markdown(
@@ -862,7 +867,7 @@ def _render_weekly_timesheet_day_cell(
         cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No job —"))
         job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
         st.markdown(
-            '<span class="weekly-timesheet-job-marker job-select" aria-hidden="true"></span>',
+            '<span class="weekly-timesheet-job-marker weekly-timesheet-job-select job-select" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         day_row["job"] = st.selectbox(
@@ -1644,23 +1649,31 @@ def _render_custom_timekeeping_table(
 
                 with row_cols[0]:
                     st.markdown(
-                        '<span class="weekly-timesheet-row-marker timesheet-list-row-marker" aria-hidden="true"></span>',
+                        '<span class="weekly-timesheet-row-marker timesheet-list-row-marker" '
+                        'aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    if st.button(
-                        "▾" if expanded else "▸",
-                        key=f"tk_expand_{timecard_id}",
-                        help="Expand ST/OT detail, notes, and daily submit",
-                        use_container_width=True,
-                    ):
-                        _toggle_expanded_timecard(timecard_id)
-                        st.rerun()
+                    expand_col, _ = st.columns([0.22, 0.78], gap="xxsmall")
+                    with expand_col:
+                        st.markdown(
+                            '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand" '
+                            'aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        if st.button(
+                            "▾" if expanded else "▸",
+                            key=f"tk_expand_{timecard_id}",
+                            help="Expand ST/OT detail, notes, and daily submit",
+                        ):
+                            _toggle_expanded_timecard(timecard_id)
+                            st.rerun()
 
                 with row_cols[1]:
                     st.markdown(
-                        f'<div class="weekly-employee-cell timesheet-list-employee-cell">'
-                        f'<div class="employee-name ips-timekeeping-employee" title="{html.escape(employee_name)}">'
-                        f"{html.escape(employee_name)}</div>"
+                        f'<div class="weekly-timesheet-employee weekly-employee-cell '
+                        f'timesheet-list-employee-cell">'
+                        f'<div class="weekly-timesheet-employee-name employee-name ips-timekeeping-employee" '
+                        f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
                         f"</div>",
                         unsafe_allow_html=True,
                     )
