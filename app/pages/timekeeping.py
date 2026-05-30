@@ -98,10 +98,10 @@ _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TK_VIEW_KEY = "ips_timekeeping_view_mode"
 _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
-_TS_EXPAND = 36
-_TS_EMPLOYEE = 180
-_TS_DAY = 128
-_TS_WEEK = 72
+_TS_EXPAND = 32
+_TS_EMPLOYEE = 160
+_TS_DAY = 112
+_TS_WEEK = 64
 _HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _WEEKLY_TS_LIST_COLS = [_TS_EXPAND, _TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
@@ -713,7 +713,7 @@ def _hour_stepper_input(
             '<span class="weekly-timesheet-stepper-marker hours-control" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-    dn_col, val_col, up_col = st.columns([0.52, 0.24, 0.24] if compact else [0.26, 0.48, 0.26], gap="small")
+    dn_col, val_col, up_col = st.columns([0.5, 0.25, 0.25] if compact else [0.26, 0.48, 0.26], gap="small")
     with dn_col:
         if st.button(
             down_label,
@@ -769,7 +769,7 @@ def _render_weekly_compact_hrs_control(
         '<span class="weekly-timesheet-hrs-marker hours-row" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    lbl_col, ctrl_col = st.columns([0.26, 1], gap="small", vertical_alignment="center")
+    lbl_col, ctrl_col = st.columns([0.22, 1], gap="xxsmall", vertical_alignment="center")
     with lbl_col:
         st.markdown('<span class="hrs-label">HRS</span>', unsafe_allow_html=True)
     with ctrl_col:
@@ -1540,7 +1540,7 @@ def _render_custom_timekeeping_table(
     with st.container(key="timekeeping_table_wrap"):
         st.markdown('<div class="ips-timekeeping-table-wrap">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="small")
+        header_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="xxsmall")
         header_labels = ["", "EMPLOYEE", *[d.strftime("%a %m/%d").upper() for d in days], "WEEK"]
         for col, (day_ix, label) in zip(header_cols, enumerate(header_labels)):
             with col:
@@ -1583,7 +1583,7 @@ def _render_custom_timekeeping_table(
                     '<span class="timesheet-employee-card-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                row_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="small")
+                row_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="xxsmall")
 
                 with row_cols[0]:
                     st.markdown(
@@ -1601,9 +1601,11 @@ def _render_custom_timekeeping_table(
 
                 with row_cols[1]:
                     st.markdown(
+                        f'<div class="weekly-employee-cell">'
                         f'<div class="employee-name ips-timekeeping-employee" title="{html.escape(employee_name)}">'
                         f"{html.escape(employee_name)}</div>"
-                        f'{_timecard_status_pill_html(status, compact=True)}',
+                        f'{_timecard_status_pill_html(status, compact=True)}'
+                        f"</div>",
                         unsafe_allow_html=True,
                     )
 
