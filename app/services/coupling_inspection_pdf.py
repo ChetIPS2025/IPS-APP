@@ -165,14 +165,28 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
     if status.lower() == "complete":
         status = "Completed"
 
+    page_w, _page_h = letter
+    left_margin = 0.3 * inch
+    right_margin = 0.3 * inch
+    top_margin = 0.35 * inch
+    bottom_margin = 0.35 * inch
+    content_w = page_w - left_margin - right_margin
+
+    def _scale_cols(widths: list[float], total: float = content_w) -> list[float]:
+        base = sum(widths)
+        if base <= 0:
+            return widths
+        factor = total / base
+        return [w * factor for w in widths]
+
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
         pagesize=letter,
-        leftMargin=0.5 * inch,
-        rightMargin=0.5 * inch,
-        topMargin=0.4 * inch,
-        bottomMargin=0.4 * inch,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
     )
     story: list[Any] = []
 
@@ -187,7 +201,7 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
             title_style,
         )
     )
-    header_table = Table([header_row], colWidths=[0.9 * inch, 5.7 * inch])
+    header_table = Table([header_row], colWidths=[0.95 * inch, content_w - 0.95 * inch])
     header_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
     story.append(header_table)
     story.append(Spacer(1, 0.1 * inch))
@@ -205,7 +219,7 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         ["Customer Representative", str(hdr.get("customer_representative") or "—")],
         ["Coupling Model", str(record.get("coupling_model") or "—")],
     ]
-    meta_table = Table(meta, colWidths=[1.45 * inch, 5.15 * inch])
+    meta_table = Table(meta, colWidths=[1.55 * inch, content_w - 1.55 * inch])
     meta_table.setStyle(
         TableStyle(
             [
@@ -235,7 +249,7 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         ["Lubricant Type", str(specs.get("lubricant_type_default") or "—")],
         ["Lubricant Quantity", f"{lb:g} lb / {oz:g} oz" if lb is not None else "—"],
     ]
-    spec_table = Table(spec_rows, colWidths=[1.5 * inch, 5.1 * inch])
+    spec_table = Table(spec_rows, colWidths=[1.55 * inch, content_w - 1.55 * inch])
     spec_table.setStyle(
         TableStyle(
             [
@@ -273,7 +287,9 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         )
     torque_table = Table(
         torque_data,
-        colWidths=[0.3 * inch, 0.65 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 0.65 * inch, 0.45 * inch, 1.35 * inch],
+        colWidths=_scale_cols(
+            [0.3 * inch, 0.65 * inch, 0.7 * inch, 0.7 * inch, 0.7 * inch, 0.65 * inch, 0.45 * inch, 1.35 * inch]
+        ),
         repeatRows=1,
     )
     torque_table.setStyle(
@@ -305,7 +321,11 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
                 str(item.get("notes") or ""),
             ]
         )
-    insp_table = Table(insp_data, colWidths=[1.55 * inch, 1.35 * inch, 0.75 * inch, 2.55 * inch], repeatRows=1)
+    insp_table = Table(
+        insp_data,
+        colWidths=_scale_cols([1.55 * inch, 1.35 * inch, 0.75 * inch, 2.55 * inch]),
+        repeatRows=1,
+    )
     insp_table.setStyle(
         TableStyle(
             [
@@ -359,7 +379,7 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         img = _rl_image_from_sig(str(entry.get("signature_image") or ""), width=2.0 * inch, height=0.5 * inch)
         detail = "<br/>".join(x for x in (name, signed_at) if x) or "—"
         sig_rows.append([label, img if img else Paragraph("—", styles["Normal"]), Paragraph(detail, sub_style)])
-    sig_table = Table(sig_rows, colWidths=[1.35 * inch, 2.5 * inch, 2.35 * inch])
+    sig_table = Table(sig_rows, colWidths=_scale_cols([1.35 * inch, 2.5 * inch, 2.35 * inch]))
     sig_table.setStyle(
         TableStyle(
             [

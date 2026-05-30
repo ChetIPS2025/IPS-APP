@@ -1591,7 +1591,6 @@ def _render_custom_timekeeping_table(
 
                 with row_cols[1]:
                     st.markdown(
-                        f'<span class="employee-label">Employee</span>'
                         f'<div class="employee-name ips-timekeeping-employee" title="{html.escape(employee_name)}">'
                         f"{html.escape(employee_name)}</div>"
                         f'{_timecard_status_pill_html(status, compact=True)}',
