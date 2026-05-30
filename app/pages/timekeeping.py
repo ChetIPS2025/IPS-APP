@@ -98,8 +98,12 @@ _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TK_VIEW_KEY = "ips_timekeeping_view_mode"
 _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
-_HGRID_COLS = [260, 155, 155, 155, 155, 155, 155, 155, 90]
-_WEEKLY_TS_LIST_COLS = [42, 260, 155, 155, 155, 155, 155, 155, 155, 90]
+_TS_EXPAND = 36
+_TS_EMPLOYEE = 180
+_TS_DAY = 128
+_TS_WEEK = 72
+_HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
+_WEEKLY_TS_LIST_COLS = [_TS_EXPAND, _TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
@@ -789,14 +793,20 @@ def _render_weekly_timesheet_day_cell(
     job_opts: list[str],
     editable: bool,
     day_status: str,
+    show_day_header: bool = True,
 ) -> None:
     filled_marker = " ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
+    header_html = ""
+    if show_day_header:
+        header_html = (
+            f'<div class="day-header">'
+            f'<span class="day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
+            f'<span class="day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
+            f"</div>"
+        )
     st.markdown(
         f'<span class="weekly-timesheet-day-marker day-cell{filled_marker}" aria-hidden="true"></span>'
-        f'<div class="day-header">'
-        f'<span class="day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
-        f'<span class="day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
-        f"</div>",
+        f"{header_html}",
         unsafe_allow_html=True,
     )
     if editable:
@@ -1616,6 +1626,7 @@ def _render_custom_timekeeping_table(
                                 job_opts=job_opts,
                                 editable=editable,
                                 day_status=day_status,
+                                show_day_header=False,
                             )
                     st.session_state[_grid_key(eid)] = grid
                     total_hours = sum(_day_hours_total(r) for r in grid)
