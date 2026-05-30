@@ -125,7 +125,7 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [1, 1, 1, 1, 1, 1, 1]
+_USER_COLS = [0.52, 2.6, 2.8, 1.5, 1.8, 1.3, 1.1]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),
@@ -330,9 +330,9 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
-        st.markdown('<div class="ips-users-table-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-users-table-wrap ips-users-table-grid">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
+        header_cols = st.columns(_USER_COLS, gap="none", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
             with col:
                 if field:
@@ -360,9 +360,13 @@ def _render_custom_users_table(
             role = _user_display_role(user)
             status = _normalize_user_status(user.get("status"))
 
-            cols = st.columns(_USER_COLS, gap="small", vertical_alignment="center")
+            cols = st.columns(_USER_COLS, gap="none", vertical_alignment="center")
 
             with cols[0]:
+                st.markdown(
+                    '<span class="ips-users-checkbox-cell-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 st.checkbox(
                     "",
                     key=_user_select_key(uid),
