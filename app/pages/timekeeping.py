@@ -228,7 +228,7 @@ def _render_horizontal_week_grid(
             _save_all_timekeeping_grids(filtered, week_start_d)
 
     with st.container(key=f"{key_prefix}_wrap"):
-        st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap compact-hours-grid">', unsafe_allow_html=True)
 
         header = st.columns(_HGRID_COLS, gap="small")
         header_labels = ["Employee", *[d.strftime("%a %d") for d in days], "Week"]
@@ -503,6 +503,13 @@ def _fmt_table_hours(val: object) -> str:
         return "0.00"
 
 
+def _fmt_day_hours(val: object) -> str:
+    try:
+        return f"{float(val):.1f}"
+    except (TypeError, ValueError):
+        return "0.0"
+
+
 def _day_hours_total(day_row: dict) -> float:
     return (
         float(day_row.get("st") or 0)
@@ -579,8 +586,11 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     week_status = _normalize_timecard_status(emp.get("status"))
     days = week_dates(week_start_d)
 
-    st.markdown('<div class="ips-time-week-inline">', unsafe_allow_html=True)
-    spacer, *day_cols = st.columns([0.18, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28], gap="small")
+    st.markdown(
+        '<div class="ips-time-week-inline"><div class="compact-hours-grid">',
+        unsafe_allow_html=True,
+    )
+    spacer, *day_cols = st.columns([0.52, 1, 1, 1, 1, 1, 1, 1], gap="xxsmall")
     with spacer:
         st.markdown('<span class="ips-time-week-inline-spacer" aria-hidden="true"></span>', unsafe_allow_html=True)
 
@@ -600,6 +610,10 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
             if editable:
+                st.markdown(
+                    '<span class="ips-compact-hours-input-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 hrs = st.number_input(
                     "Hours",
                     value=total,
@@ -608,17 +622,17 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
                     step=0.5,
                     min_value=0.0,
                     max_value=24.0,
-                    format="%.2f",
+                    format="%.1f",
                 )
                 _set_day_job_hours(day_row, hrs)
             else:
                 st.markdown(
-                    f'<div class="ips-time-week-day-hours-ro">{html.escape(_fmt_table_hours(total))}</div>',
+                    f'<div class="ips-time-week-day-hours-ro">{html.escape(_fmt_day_hours(total))}</div>',
                     unsafe_allow_html=True,
                 )
 
     st.session_state[gk] = grid
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
 
 def _row_totals_from_grid(grid: list[dict]) -> tuple[float, float, float]:
@@ -646,7 +660,7 @@ def _hour_stepper_input(
     step: float = 0.5,
     max_value: float = 24.0,
     disabled: bool = False,
-    fmt: str = "%.2f",
+    fmt: str = "%.1f",
 ) -> float:
     if disabled:
         st.markdown(
@@ -693,7 +707,7 @@ def _hgrid_day_total_html(total: float) -> str:
     cls = "ips-time-hgrid-day-total"
     if total > 0:
         cls += " ips-time-hgrid-day-total-active"
-    return f'<div class="{cls}">{html.escape(_fmt_table_hours(total))}</div>'
+    return f'<div class="{cls}">{html.escape(_fmt_day_hours(total))}</div>'
 
 
 def _hgrid_locked_day_html(day_row: dict, *, status: str) -> str:
@@ -734,11 +748,15 @@ def _render_hgrid_day_cell(
             key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
             label_visibility="collapsed",
         )
+        st.markdown(
+            '<span class="ips-compact-hours-input-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         hrs = st.number_input(
             "Hours",
             value=_day_hours_total(day_row),
             key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
-            label_visibility="visible",
+            label_visibility="collapsed",
             step=0.5,
             min_value=0.0,
             max_value=24.0,

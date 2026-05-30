@@ -332,7 +332,7 @@ def _render_custom_users_table(
     with st.container(key="users_table_wrap"):
         st.markdown('<div class="ips-users-table-wrap ips-users-table-grid">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_USER_COLS, gap="none", vertical_alignment="center")
+        header_cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
             with col:
                 if field:
@@ -360,7 +360,7 @@ def _render_custom_users_table(
             role = _user_display_role(user)
             status = _normalize_user_status(user.get("status"))
 
-            cols = st.columns(_USER_COLS, gap="none", vertical_alignment="center")
+            cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
 
             with cols[0]:
                 st.markdown(
