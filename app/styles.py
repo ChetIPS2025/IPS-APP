@@ -4704,7 +4704,7 @@ def inject_ips_dialog_styles() -> None:
     """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
     st.markdown(
         f"""
-<style id="ips-dialog-styles-v2">
+<style id="ips-dialog-styles-v3">
 div[data-testid="stBackdrop"] {{
   background: rgba(15, 23, 42, 0.42) !important;
   backdrop-filter: blur(3px) !important;
@@ -4904,6 +4904,46 @@ div[data-testid="stDialog"] [data-testid="stRadio"] {{
   color: {TEXT};
   line-height: 1.35;
   word-break: break-word;
+}}
+.job-detail-actions-row-marker {{
+  display: none !important;
+}}
+div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) {{
+  margin-top: 16px !important;
+  margin-bottom: 18px !important;
+}}
+div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="stHorizontalBlock"],
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: wrap !important;
+  gap: 14px !important;
+  width: 100% !important;
+}}
+div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="column"],
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}}
+div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="stButton"] > button {{
+  height: 40px !important;
+  min-height: 40px !important;
+  min-width: 110px !important;
+  border-radius: 8px !important;
+  padding: 0 16px !important;
+}}
+div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="column"]:has(.job-detail-edit-marker) [data-testid="stButton"] > button,
+div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.job-detail-actions-row-marker) [data-testid="column"]:has(.job-detail-edit-marker) [data-testid="stButton"] > button {{
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #111827 !important;
+  box-shadow: none !important;
+}}
+.job-detail-edit-marker {{
+  display: none !important;
 }}
 
 .ips-compact-detail-header {{

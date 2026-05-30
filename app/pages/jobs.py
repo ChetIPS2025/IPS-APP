@@ -1225,6 +1225,8 @@ def _render_job_actions_panel(job: dict) -> None:
 
     render_job_action_buttons(
         job,
+        on_edit=_set_job_edit_mode,
+        edit_key=f"jobs_modal_edit_{_job_session_key(job)}",
         on_complete=_after_complete_or_delete,
         on_delete=_after_complete_or_delete,
     )
@@ -1261,18 +1263,6 @@ def render_job_detail_dialog(job: dict) -> None:
         f"</div>",
         unsafe_allow_html=True,
     )
-
-    if not edit_mode:
-        st.markdown('<span class="ips-dialog-actions" aria-hidden="true"></span>', unsafe_allow_html=True)
-        _action_left, action_right = st.columns([8, 1], gap="small")
-        with action_right:
-            st.button(
-                "Edit",
-                key=f"jobs_modal_edit_{job_key}",
-                type="primary",
-                on_click=_set_job_edit_mode,
-                args=(job,),
-            )
 
     st.markdown(
         f'<div class="ips-dialog-meta-grid">'

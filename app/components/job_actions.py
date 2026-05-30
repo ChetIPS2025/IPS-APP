@@ -94,25 +94,20 @@ def _render_confirm_card(
 def render_job_action_buttons(
     job: dict,
     *,
+    on_edit: Callable[[dict], None] | None = None,
+    edit_key: str | None = None,
     on_complete: Callable[[], None] | None = None,
     on_cancel: Callable[[], None] | None = None,
     on_delete: Callable[[], None] | None = None,
 ) -> None:
-    """Render compact Job Actions row with inline confirmation panels."""
+    """Render Job Details action row: Edit, Complete, Cancel, Delete."""
     jid = str(job.get("id") or "").strip()
     if not jid:
         return
 
-    if _job_is_archived(job):
-        st.caption("This job is archived. Restore is not yet available.")
-        return
-
-    if not can_manage_job_actions():
-        st.caption("Only admin, supervisor, or project manager can change job status.")
-        return
-
-    status = _normalize_status(job)
     job_key = "".join(ch if ch.isalnum() else "_" for ch in jid) or "job"
+    archived = _job_is_archived(job)
+    can_manage = can_manage_job_actions()
 
     for action in ("complete", "cancel", "delete"):
         if st.session_state.get(_confirm_state_key(jid, action)):
@@ -152,24 +147,53 @@ def render_job_action_buttons(
                 )
             return
 
-    show_complete = status not in {"Completed", "Closed"}
-    show_cancel = status != "Cancelled"
     action_specs: list[tuple[str, Any, str, str]] = []
-    if show_complete:
-        action_specs.append(("complete", success_solid_button, "Job Complete", f"open_complete_{job_key}"))
-    if show_cancel:
-        action_specs.append(("cancel", warning_solid_button, "Cancel Job", f"open_cancel_{job_key}"))
-    action_specs.append(("delete", danger_solid_button, "Delete Job", f"open_delete_{job_key}"))
+    if on_edit is not None:
+        action_specs.append(("edit", None, "Edit", edit_key or f"job_detail_edit_{job_key}"))
+
+    if not archived and can_manage:
+        status = _normalize_status(job)
+        show_complete = status not in {"Completed", "Closed"}
+        show_cancel = status != "Cancelled"
+        if show_complete:
+            action_specs.append(("complete", success_solid_button, "Job Complete", f"open_complete_{job_key}"))
+        if show_cancel:
+            action_specs.append(("cancel", warning_solid_button, "Cancel Job", f"open_cancel_{job_key}"))
+        action_specs.append(("delete", danger_solid_button, "Delete Job", f"open_delete_{job_key}"))
+
+    if not action_specs:
+        if archived:
+            st.caption("This job is archived. Restore is not yet available.")
+        elif not can_manage:
+            st.caption("Only admin, supervisor, or project manager can change job status.")
+        return
 
     with st.container(key=f"job_actions_{job_key}"):
-        st.markdown('<span class="ips-job-actions-marker"></span>', unsafe_allow_html=True)
-        st.markdown('<p class="ips-job-actions-title">Job Actions</p>', unsafe_allow_html=True)
+        st.markdown(
+            '<span class="job-detail-actions-row-marker ips-job-actions-marker"></span>',
+            unsafe_allow_html=True,
+        )
         cols = st.columns(len(action_specs), gap="small")
         for col, (action, btn_fn, label, suffix) in zip(cols, action_specs):
             with col:
-                if btn_fn(label, suffix, use_container_width=False):
+                if action == "edit":
+                    st.markdown('<span class="job-detail-edit-marker"></span>', unsafe_allow_html=True)
+                    st.button(
+                        label,
+                        key=suffix,
+                        type="secondary",
+                        use_container_width=False,
+                        on_click=on_edit,
+                        args=(job,),
+                    )
+                elif btn_fn(label, suffix, use_container_width=False):
                     st.session_state[_confirm_state_key(jid, action)] = True
                     st.rerun()
+
+    if archived and on_edit is not None:
+        st.caption("This job is archived. Restore is not yet available.")
+    elif not can_manage and on_edit is not None:
+        st.caption("Only admin, supervisor, or project manager can change job status.")
 
 
 def _handle_complete(job_id: str, on_complete: Callable[[], None] | None, *, reason: str | None = None) -> bool:
