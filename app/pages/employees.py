@@ -239,6 +239,13 @@ def _employee_type_pill_html(user: dict) -> str:
     return f'<span class="ips-user-pill {cls}">{html.escape(label)}</span>'
 
 
+def _users_cell_html(value: str, css_class: str) -> str:
+    text = str(value or "—").strip() or "—"
+    safe = html.escape(text)
+    title = html.escape(text, quote=True)
+    return f'<div class="{css_class}" title="{title}">{safe}</div>'
+
+
 def _user_status_pill_html(status: str) -> str:
     cls_map = {
         "Active": "ips-user-status-active",
@@ -365,26 +372,23 @@ def _render_custom_users_table(
                 )
 
             with cols[1]:
-                st.markdown(
-                    f'<div class="ips-users-name">{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(_users_cell_html(name, "ips-users-name ips-users-ellipsis"), unsafe_allow_html=True)
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-users-muted ips-users-cell">{html.escape(email)}</div>',
+                    _users_cell_html(email, "ips-users-muted ips-users-cell ips-users-ellipsis"),
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-phone">{html.escape(phone)}</div>',
+                    _users_cell_html(phone, "ips-users-cell ips-users-phone ips-users-ellipsis"),
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-users-cell ips-users-role">{html.escape(role)}</div>',
+                    _users_cell_html(role, "ips-users-cell ips-users-role ips-users-ellipsis"),
                     unsafe_allow_html=True,
                 )
 
