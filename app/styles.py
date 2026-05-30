@@ -2957,7 +2957,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v12">
+<style id="ips-timekeeping-module-v13">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3063,7 +3063,7 @@ def inject_timekeeping_module_css() -> None:
   width: fit-content;
   max-width: 100%;
 }}
-.compact-hours-grid [data-testid="stHorizontalBlock"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stHorizontalBlock"],
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] {{
   display: grid !important;
   grid-template-columns: 36px repeat(7, 68px) !important;
@@ -3076,7 +3076,7 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   margin: 0 !important;
 }}
-.compact-hours-grid [data-testid="column"],
+.ips-time-week-inline .compact-hours-grid [data-testid="column"],
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   flex: unset !important;
   width: auto !important;
@@ -3118,7 +3118,9 @@ def inject_timekeeping_module_css() -> None:
   min-width: 34px;
   text-align: center;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker),
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) {{
   width: 100% !important;
   display: flex !important;
   justify-content: center !important;
@@ -3126,7 +3128,10 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 !important;
   padding: 0 !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="stHorizontalBlock"] {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="stHorizontalBlock"],
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
   width: fit-content !important;
   max-width: 100% !important;
   margin: 0 auto !important;
@@ -3134,38 +3139,47 @@ def inject_timekeeping_module_css() -> None:
   align-items: center !important;
   justify-content: center !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"] {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"],
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"],
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"] {{
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
   min-width: 0 !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:first-child {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:first-child,
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:first-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:first-child {{
   flex: 0 0 auto !important;
   width: auto !important;
   max-width: 24px !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:last-child {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:last-child,
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:last-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-day-hrs-row-marker) [data-testid="column"]:last-child {{
   flex: 0 0 auto !important;
   width: auto !important;
 }}
-.compact-hours-grid [data-testid="column"]:first-child,
+.ips-time-week-inline .compact-hours-grid [data-testid="column"]:first-child,
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
 }}
-.compact-hours-grid [data-testid="column"]:last-child {{
+.ips-time-week-inline .compact-hours-grid [data-testid="column"]:last-child,
+.st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
   border-right: none !important;
 }}
-.compact-hours-grid [data-testid="column"]:has(.ips-time-week-day-filled),
+.ips-time-week-inline .compact-hours-grid [data-testid="column"]:has(.ips-time-week-day-filled),
 .st-key-timekeeping_table_wrap .st-key-tk_row_ .compact-hours-grid [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.ips-time-week-day-filled) {{
   background: #f0fdf4 !important;
 }}
 .ips-compact-hours-input-marker {{
   display: none !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) {{
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker),
+.st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) {{
   width: 100% !important;
   display: flex !important;
   justify-content: center !important;
@@ -3173,9 +3187,7 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 !important;
   padding: 0 !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"],
-.st-key-tk_hgrid_wrap .compact-hours-grid [data-testid="stNumberInput"],
-.st-key-tk_page_hgrid_wrap .compact-hours-grid [data-testid="stNumberInput"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"],
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"],
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] {{
   width: 52px !important;
@@ -3183,7 +3195,7 @@ def inject_timekeeping_module_css() -> None:
   max-width: 52px !important;
   margin: 0 !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div,
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div,
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] > div {{
   padding: 0 !important;
@@ -3191,8 +3203,8 @@ def inject_timekeeping_module_css() -> None:
   height: 32px !important;
   align-items: center !important;
 }}
-.compact-hours-grid input[type="number"],
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
+.ips-time-week-inline .compact-hours-grid input[type="number"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input {{
   width: 34px !important;
@@ -3210,8 +3222,8 @@ def inject_timekeeping_module_css() -> None:
   box-shadow: none !important;
   font-variant-numeric: tabular-nums;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepUp"],
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepDown"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepUp"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepDown"],
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepUp"],
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepDown"],
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInputStepUp"],
@@ -3224,7 +3236,7 @@ def inject_timekeeping_module_css() -> None:
   opacity: 1 !important;
   visibility: visible !important;
 }}
-.compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.ips-time-week-inline .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
 .st-key-tk_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
 .st-key-tk_page_hgrid_wrap [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] {{
   display: none !important;
@@ -3501,6 +3513,8 @@ def inject_timekeeping_module_css() -> None:
   text-align: center;
   padding-top: 0.15rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 3.25rem;
 }}
 .ips-time-hgrid-day-total {{
   font-size: 0.72rem;
@@ -3593,6 +3607,10 @@ def inject_timekeeping_module_css() -> None:
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child) {{
   min-width: 96px;
 }}
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  min-width: 3.25rem;
+}}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
@@ -3622,16 +3640,6 @@ def inject_timekeeping_module_css() -> None:
   font-size: 0.8rem;
   font-weight: 700;
 }}
-.st-key-tk_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input,
-.st-key-tk_page_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] input {{
-  width: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 2px 4px !important;
-  font-size: 12px !important;
-}}
 .st-key-tk_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-ftp_wrap [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
@@ -3651,10 +3659,6 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_hgrid_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
 .st-key-tk_page_hgrid_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
 .st-key-ftp_wrap [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] {{
-  display: none !important;
-}}
-.st-key-tk_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
-.st-key-tk_page_hgrid_wrap .compact-hours-grid [data-testid="stElementContainer"]:has(.ips-compact-hours-input-marker) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] {{
   display: none !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],

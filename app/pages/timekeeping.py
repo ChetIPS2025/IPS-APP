@@ -228,7 +228,7 @@ def _render_horizontal_week_grid(
             _save_all_timekeeping_grids(filtered, week_start_d)
 
     with st.container(key=f"{key_prefix}_wrap"):
-        st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap compact-hours-grid">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-time-hgrid-scroll"><div class="ips-time-hgrid-wrap">', unsafe_allow_html=True)
 
         header = st.columns(_HGRID_COLS, gap="small")
         header_labels = ["Employee", *[d.strftime("%a %d") for d in days], "Week"]
