@@ -1532,7 +1532,7 @@ def _render_custom_timekeeping_table(
 
         header_cols = st.columns(_WEEKLY_TS_LIST_COLS, gap="small")
         header_labels = ["", "EMPLOYEE", *[d.strftime("%a %m/%d").upper() for d in days], "WEEK"]
-        for col, (label, day_ix) in zip(header_cols, enumerate(header_labels)):
+        for col, (day_ix, label) in zip(header_cols, enumerate(header_labels)):
             with col:
                 if day_ix == 1:
                     render_table_header_cell(
