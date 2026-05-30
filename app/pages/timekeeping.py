@@ -638,9 +638,8 @@ def _render_list_row_day_cell(
     st.markdown(
         f'<span class="timesheet-list-day-marker day-block-marker{grid_marker}{filled_marker}" aria-hidden="true"></span>'
         f'<div class="day-card timesheet-list-day-card">'
-        f'<div class="day-date-line">'
-        f'<span class="day-label">{html.escape(day_d.strftime("%a").upper())}</span>'
-        f'<span class="day-date">{html.escape(day_d.strftime("%m/%d"))}</span>'
+        f'<div class="day-date-line timesheet-list-day-heading">'
+        f'{html.escape(day_d.strftime("%a %m/%d").upper())}'
         f"</div></div>",
         unsafe_allow_html=True,
     )
@@ -1593,7 +1592,7 @@ def _render_custom_timekeeping_table(
         header_labels = [
             "",
             "EMPLOYEE",
-            *[d.strftime("%a %m/%d").upper() for d in days],
+            *([""] * 7),
             "ST",
             "OT",
             "TOTAL",
