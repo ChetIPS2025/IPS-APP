@@ -12,6 +12,7 @@ except ImportError:
 SESSION_JOB_KEY = "coupling_insp_job_id"
 SESSION_EQUIPMENT_KEY = "coupling_insp_equipment_id"
 SESSION_INSPECTION_KEY = "coupling_insp_id"
+SESSION_TASK_KEY = "coupling_insp_task_id"
 
 
 def open_coupling_inspection(
@@ -19,11 +20,16 @@ def open_coupling_inspection(
     job_id: str | None = None,
     equipment_id: str | None = None,
     inspection_id: str | None = None,
+    task_id: str | None = None,
 ) -> None:
     if job_id:
         st.session_state[SESSION_JOB_KEY] = str(job_id).strip()
     if equipment_id:
         st.session_state[SESSION_EQUIPMENT_KEY] = str(equipment_id).strip()
+    if task_id:
+        st.session_state[SESSION_TASK_KEY] = str(task_id).strip()
+    else:
+        st.session_state.pop(SESSION_TASK_KEY, None)
     if inspection_id:
         st.session_state[SESSION_INSPECTION_KEY] = str(inspection_id).strip()
     else:
@@ -37,6 +43,7 @@ def coupling_inspection_context() -> dict[str, str | None]:
         "job_id": str(st.session_state.get(SESSION_JOB_KEY) or "").strip() or None,
         "equipment_id": str(st.session_state.get(SESSION_EQUIPMENT_KEY) or "").strip() or None,
         "inspection_id": str(st.session_state.get(SESSION_INSPECTION_KEY) or "").strip() or None,
+        "task_id": str(st.session_state.get(SESSION_TASK_KEY) or "").strip() or None,
     }
 
 
@@ -44,6 +51,7 @@ def render_coupling_inspection_launcher(
     *,
     job_id: str | None = None,
     equipment_id: str | None = None,
+    task_id: str | None = None,
     key_prefix: str = "ci_launch",
 ) -> None:
     st.markdown("#### Inspection Forms")
@@ -54,4 +62,4 @@ def render_coupling_inspection_launcher(
         use_container_width=True,
         key=f"{key_prefix}_open",
     ):
-        open_coupling_inspection(job_id=job_id, equipment_id=equipment_id)
+        open_coupling_inspection(job_id=job_id, equipment_id=equipment_id, task_id=task_id)

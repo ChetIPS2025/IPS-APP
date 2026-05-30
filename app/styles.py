@@ -7512,6 +7512,18 @@ def inject_coupling_inspection_css() -> None:
   font-size: 0.85rem;
   color: #334155;
 }
+.ips-coupling-v7-task-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 6px 12px;
+  margin: -4px 0 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: #1e3a8a;
+}
 .ips-coupling-spec-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

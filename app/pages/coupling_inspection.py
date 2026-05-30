@@ -21,14 +21,19 @@ try:
         PHOTO_SLOTS,
         PHOTO_SLOT_LABELS,
         SIGNATURE_ROLES,
+        apply_task_link_to_payload,
         build_header_context,
         completion_percentage,
+        fetch_job_task,
         get_coupling_inspection,
         list_coupling_inspections,
+        list_job_tasks_for_job,
         new_inspection_payload,
         pdf_export_filename,
         photo_view_url,
         save_coupling_inspection,
+        task_link_option_label,
+        task_link_snapshot,
         upload_inspection_photo,
         validate_for_complete,
     )
@@ -56,14 +61,19 @@ except ImportError:
         PHOTO_SLOTS,
         PHOTO_SLOT_LABELS,
         SIGNATURE_ROLES,
+        apply_task_link_to_payload,
         build_header_context,
         completion_percentage,
+        fetch_job_task,
         get_coupling_inspection,
         list_coupling_inspections,
+        list_job_tasks_for_job,
         new_inspection_payload,
         pdf_export_filename,
         photo_view_url,
         save_coupling_inspection,
+        task_link_option_label,
+        task_link_snapshot,
         upload_inspection_photo,
         validate_for_complete,
     )
@@ -130,14 +140,17 @@ def _load_draft(ctx: dict[str, str | None]) -> dict[str, Any]:
         return cached
     job = _find_job(ctx.get("job_id"))
     equip = _find_equipment(ctx.get("equipment_id"))
+    job_task = fetch_job_task(ctx.get("task_id"))
     prof = current_profile() or {}
     tech = str(prof.get("full_name") or prof.get("name") or "").strip()
-    header = build_header_context(job=job, equipment=equip, technician=tech)
+    header = build_header_context(job=job, equipment=equip, technician=tech, job_task=job_task)
     return new_inspection_payload(
         job_id=ctx.get("job_id"),
         equipment_id=ctx.get("equipment_id"),
         customer_id=str(job.get("customer_id") or "") if job else None,
         header=header,
+        task_id=ctx.get("task_id"),
+        job_task=job_task,
     )
 
 
@@ -184,10 +197,85 @@ def _render_form_header(record: dict[str, Any]) -> None:
         f"</div>",
         unsafe_allow_html=True,
     )
+    task_label = str(record.get("subjob_name") or hdr.get("subjob_name") or "").strip()
+    task_title = str(record.get("task_title") or hdr.get("task_title") or "").strip()
+    if task_label:
+        extra = f" — {html.escape(task_title)}" if task_title and task_title != task_label else ""
+        st.markdown(
+            f'<div class="ips-coupling-v7-task-bar">'
+            f"<span><strong>Task / Subjob:</strong> {html.escape(task_label)}{extra}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_task_link_section(
+    record: dict[str, Any],
+    *,
+    sk: str,
+    locked: bool,
+    job_id: str | None,
+) -> dict[str, Any]:
+    """Pick the job task / subjob this inspection belongs to."""
+    jid = str(job_id or record.get("job_id") or "").strip()
+    if not jid:
+        return record
+
+    tasks = list_job_tasks_for_job(jid)
+    if not tasks:
+        st.caption("No tasks on this job yet. Add tasks under **Job Database → Tasks** to link this inspection.")
+        return record
+
+    options: list[str | None] = [None, *[str(t.get("id") or "").strip() for t in tasks]]
+    labels = ["— Select task / subjob —"] + [task_link_option_label(t) for t in tasks]
+    cur_tid = str(record.get("task_id") or record.get("subjob_id") or "").strip() or None
+    try:
+        pick_ix = options.index(cur_tid)
+    except ValueError:
+        pick_ix = 0
+
+    picked = st.selectbox(
+        "Task / Subjob",
+        options,
+        index=pick_ix,
+        format_func=lambda tid, _labels=labels, _opts=options: _labels[_opts.index(tid)],
+        disabled=locked,
+        key=f"{sk}_task_link",
+        help="Link this inspection to the correct PM task or subjob under the job.",
+    )
+    if picked:
+        job_task = next((t for t in tasks if str(t.get("id") or "") == picked), None)
+        if job_task:
+            record = apply_task_link_to_payload(record, job_task=job_task, job_id=jid)
+            hdr = dict(record.get("header") or {})
+            snap = task_link_snapshot(job_task)
+            hdr.update(
+                {
+                    "task_id": snap.get("task_id"),
+                    "subjob_name": snap.get("subjob_name"),
+                    "task_title": snap.get("task_title"),
+                    "linked_task_status": snap.get("linked_task_status"),
+                }
+            )
+            loc = str(job_task.get("location") or "").strip()
+            if loc:
+                hdr["location"] = loc
+            record["header"] = hdr
+            record["job_id"] = jid
+    elif cur_tid:
+        for key in ("task_id", "subjob_id", "subjob_name", "task_title", "linked_task_status"):
+            record[key] = None if key.endswith("_id") else ""
+    return record
 
 
 def _render_header_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
     st.markdown("## 1. Job Information")
+    record = _render_task_link_section(
+        record,
+        sk=sk,
+        locked=locked,
+        job_id=str(record.get("job_id") or ""),
+    )
     hdr = dict(record.get("header") or {})
     c1, c2 = st.columns(2, gap="medium")
     with c1:
@@ -551,14 +639,25 @@ def _render_inspection_form(record: dict[str, Any]) -> None:
 
 
 def _render_existing_list(ctx: dict[str, str | None]) -> str | None:
-    rows = list_coupling_inspections(job_id=ctx.get("job_id"), equipment_id=ctx.get("equipment_id"))
+    rows = list_coupling_inspections(
+        job_id=ctx.get("job_id"),
+        equipment_id=ctx.get("equipment_id"),
+        task_id=ctx.get("task_id"),
+    )
     if not rows:
         return None
     st.markdown("#### Existing inspections")
-    options = ["— New inspection —"] + [
-        f"{r.get('header', {}).get('inspection_date', '—')} · {_status_label(str(r.get('status') or 'draft'))} · {r.get('coupling_model')}"
-        for r in rows
-    ]
+
+    def _row_label(r: dict[str, Any]) -> str:
+        task = str(r.get("subjob_name") or "").strip()
+        task_part = f" · {task}" if task else ""
+        return (
+            f"{r.get('header', {}).get('inspection_date', '—')} · "
+            f"{_status_label(str(r.get('status') or 'draft'))} · "
+            f"{r.get('coupling_model')}{task_part}"
+        )
+
+    options = ["— New inspection —"] + [_row_label(r) for r in rows]
     pick = st.selectbox("Open inspection", options, key="ci_pick_existing")
     if pick == "— New inspection —":
         return None
@@ -585,17 +684,21 @@ def render() -> None:
     if st.button("Start New Inspection", key="ci_new_insp", use_container_width=False):
         job = _find_job(ctx.get("job_id"))
         equip = _find_equipment(ctx.get("equipment_id"))
+        job_task = fetch_job_task(ctx.get("task_id"))
         prof = current_profile() or {}
         header = build_header_context(
             job=job,
             equipment=equip,
             technician=str(prof.get("full_name") or prof.get("name") or ""),
+            job_task=job_task,
         )
         st.session_state[_DRAFT_KEY] = new_inspection_payload(
             job_id=ctx.get("job_id"),
             equipment_id=ctx.get("equipment_id"),
             customer_id=str(job.get("customer_id") or "") if job else None,
             header=header,
+            task_id=ctx.get("task_id"),
+            job_task=job_task,
         )
         st.session_state.pop("coupling_insp_id", None)
         st.rerun()

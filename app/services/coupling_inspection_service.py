@@ -51,7 +51,13 @@ except ImportError:
 
 _LOG = logging.getLogger(__name__)
 
+try:
+    from app.services.task_display import task_number_display
+except ImportError:
+    from services.task_display import task_number_display  # type: ignore
+
 TABLE = "coupling_inspections"
+JOB_TASKS_TABLE = "job_tasks"
 TORQUE_TABLE = "coupling_torque_checks"
 PHOTOS_TABLE = "coupling_inspection_photos"
 SIGNATURES_TABLE = "coupling_inspection_signatures"
@@ -211,11 +217,12 @@ def build_header_context(
     job: dict[str, Any] | None,
     equipment: dict[str, Any] | None,
     technician: str = "",
+    job_task: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     job = job or {}
     equipment = equipment or {}
     job_number = str(job.get("job_number") or "").strip()
-    return {
+    hdr = {
         "customer": str(job.get("customer") or job.get("customer_name") or "").strip(),
         "job_number": job_number,
         "work_order_number": job_number,
@@ -227,6 +234,93 @@ def build_header_context(
         "supervisor": "",
         "customer_representative": "",
     }
+    if job_task:
+        snap = task_link_snapshot(job_task)
+        hdr["task_id"] = snap.get("task_id")
+        hdr["subjob_name"] = snap.get("subjob_name")
+        hdr["task_title"] = snap.get("task_title")
+        hdr["linked_task_status"] = snap.get("linked_task_status")
+    return hdr
+
+
+def task_link_snapshot(job_task: dict[str, Any] | None) -> dict[str, Any]:
+    """Denormalized task/subjob fields for coupling_inspections."""
+    if not job_task:
+        return {
+            "task_id": None,
+            "subjob_id": None,
+            "subjob_name": "",
+            "task_title": "",
+            "linked_task_status": "",
+        }
+    tid = str(job_task.get("id") or "").strip() or None
+    subjob_name = task_number_display(job_task)
+    issue = str(job_task.get("issue") or "").strip()
+    action = str(job_task.get("action_required") or "").strip()
+    task_title = issue or action or subjob_name
+    status = str(job_task.get("status") or "not_started").strip().lower()
+    if status == "open":
+        status = "not_started"
+    return {
+        "task_id": tid,
+        "subjob_id": tid,
+        "subjob_name": subjob_name,
+        "task_title": task_title[:500],
+        "linked_task_status": status,
+    }
+
+
+def fetch_job_task(task_id: str | None) -> dict[str, Any] | None:
+    tid = str(task_id or "").strip()
+    if not tid:
+        return None
+    row = fetch_by_id(JOB_TASKS_TABLE, tid)
+    return row if isinstance(row, dict) else None
+
+
+def list_job_tasks_for_job(job_id: str | None, *, limit: int = 500) -> list[dict[str, Any]]:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return []
+    try:
+        rows = fetch_by_match_admin(JOB_TASKS_TABLE, {"job_id": jid}, limit=limit) or []
+    except Exception as exc:
+        _LOG.warning("list_job_tasks_for_job failed: %s", exc)
+        return []
+    rows = [r for r in rows if isinstance(r, dict)]
+    rows.sort(key=lambda r: task_number_display(r).lower())
+    return rows
+
+
+def task_link_option_label(job_task: dict[str, Any]) -> str:
+    snap = task_link_snapshot(job_task)
+    name = str(snap.get("subjob_name") or "—")
+    title = str(snap.get("task_title") or "").strip()
+    if title and title != name:
+        short = title if len(title) <= 60 else title[:57] + "…"
+        return f"{name} — {short}"
+    return name
+
+
+def apply_task_link_to_payload(
+    payload: dict[str, Any],
+    *,
+    job_task: dict[str, Any] | None,
+    job_id: str | None = None,
+) -> dict[str, Any]:
+    out = dict(payload)
+    snap = task_link_snapshot(job_task)
+    if snap.get("task_id"):
+        out["task_id"] = snap["task_id"]
+        out["subjob_id"] = snap["subjob_id"]
+        out["subjob_name"] = snap["subjob_name"]
+        out["task_title"] = snap["task_title"]
+        out["linked_task_status"] = snap["linked_task_status"]
+        if job_id:
+            out["job_id"] = str(job_id).strip() or out.get("job_id")
+        elif job_task:
+            out["job_id"] = str(job_task.get("job_id") or out.get("job_id") or "") or None
+    return out
 
 
 def new_inspection_payload(
@@ -236,6 +330,8 @@ def new_inspection_payload(
     customer_id: str | None,
     coupling_model: str = "1030G20",
     header: dict[str, Any] | None = None,
+    task_id: str | None = None,
+    job_task: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     model = coupling_model if coupling_model in COUPLING_MODEL_OPTIONS else "1030G20"
     specs = specs_for_model(model)
@@ -244,7 +340,9 @@ def new_inspection_payload(
     hdr = dict(header or {})
     if tech and not hdr.get("technician"):
         hdr["technician"] = tech
-    return {
+    if not job_task and task_id:
+        job_task = fetch_job_task(task_id)
+    payload = {
         "job_id": job_id or None,
         "equipment_id": equipment_id or None,
         "customer_id": customer_id or None,
@@ -263,13 +361,21 @@ def new_inspection_payload(
         "customer_signature": "",
         "status": "draft",
         "created_by": prof.get("id"),
+        "task_id": None,
+        "subjob_id": None,
+        "subjob_name": "",
+        "task_title": "",
+        "linked_task_status": "",
     }
+    return apply_task_link_to_payload(payload, job_task=job_task, job_id=job_id)
 
 
 def list_coupling_inspections(
     *,
     job_id: str | None = None,
     equipment_id: str | None = None,
+    task_id: str | None = None,
+    subjob_id: str | None = None,
     limit: int = 200,
 ) -> list[dict[str, Any]]:
     match: dict[str, Any] = {}
@@ -277,6 +383,9 @@ def list_coupling_inspections(
         match["job_id"] = job_id
     if equipment_id:
         match["equipment_id"] = equipment_id
+    tid = str(task_id or subjob_id or "").strip()
+    if tid:
+        match["task_id"] = tid
     try:
         rows = fetch_by_match_admin(TABLE, match, limit=limit) or []
     except Exception as exc:
@@ -386,6 +495,11 @@ def save_coupling_inspection(
         "job_id": data.get("job_id") or None,
         "equipment_id": data.get("equipment_id") or None,
         "customer_id": data.get("customer_id") or None,
+        "task_id": data.get("task_id") or None,
+        "subjob_id": data.get("subjob_id") or None,
+        "subjob_name": str(data.get("subjob_name") or "").strip() or None,
+        "task_title": str(data.get("task_title") or "").strip() or None,
+        "linked_task_status": str(data.get("linked_task_status") or "").strip() or None,
         "coupling_model": str(data.get("coupling_model") or "1030G20"),
         "form_version": str(data.get("form_version") or FORM_VERSION),
         "header": header,

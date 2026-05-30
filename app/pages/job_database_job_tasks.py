@@ -42,6 +42,13 @@ except ImportError:
     )
 
 try:
+    from app.components.coupling_inspection_launcher import open_coupling_inspection
+    from app.services.coupling_inspection_service import list_coupling_inspections
+except ImportError:
+    from components.coupling_inspection_launcher import open_coupling_inspection  # type: ignore
+    from services.coupling_inspection_service import list_coupling_inspections  # type: ignore
+
+try:
     from app.services import task_photos as _tp_svc
 except ImportError:
     import services.task_photos as _tp_svc  # type: ignore
@@ -152,6 +159,55 @@ def _task_status_badge(slug: str) -> str:
         f'<span class="ips-status-badge" style="--ips-status-color:{html.escape(col)};">'
         f"{html.escape(_task_status_display(s))}</span>"
     )
+
+
+def _coupling_insp_status_label(status: str) -> str:
+    s = str(status or "draft").strip().lower()
+    if s == "complete":
+        return "Completed"
+    if s == "exported":
+        return "Exported"
+    return "Draft"
+
+
+def _render_task_coupling_inspections(
+    *,
+    job_id: str,
+    task_id: str,
+    key_prefix: str,
+) -> None:
+    """Coupling inspections linked to this task/subjob."""
+    rows = list_coupling_inspections(job_id=job_id, task_id=task_id)
+    st.markdown("**Coupling inspections**")
+    if rows:
+        for insp in rows[:8]:
+            iid = str(insp.get("id") or "").strip()
+            if not iid:
+                continue
+            label = (
+                f"{insp.get('header', {}).get('inspection_date', '—')} · "
+                f"{_coupling_insp_status_label(str(insp.get('status') or 'draft'))} · "
+                f"{insp.get('coupling_model') or '—'}"
+            )
+            if st.button(
+                label,
+                key=f"{key_prefix}_ci_open_{iid}",
+                use_container_width=True,
+            ):
+                open_coupling_inspection(
+                    job_id=job_id,
+                    task_id=task_id,
+                    inspection_id=iid,
+                )
+    else:
+        st.caption("No coupling inspections linked to this task yet.")
+    if st.button(
+        "New Coupling Inspection",
+        type="secondary",
+        key=f"{key_prefix}_ci_new",
+        use_container_width=True,
+    ):
+        open_coupling_inspection(job_id=job_id, task_id=task_id)
 
 
 def _priority_badge_html(priority: Any) -> str:
@@ -971,6 +1027,8 @@ def _task_view_details_dialog(
                 else:
                     st.caption("—")
 
+    _render_task_coupling_inspections(job_id=job_id, task_id=tid, key_prefix=f"jdt_vd_{job_id}_{tid}")
+
     with st.expander("Supervisor & assignment", expanded=False):
         if can_edit:
             with st.form(f"jdt_vd_sup_f_{job_id}_{tid}"):
@@ -1678,6 +1736,13 @@ def render_job_tasks_tab(
                                 f"{html.escape(str(t.get('notes') or '—'))}</p>",
                                 unsafe_allow_html=True,
                             )
+
+                    with st.expander("Coupling inspections", expanded=False):
+                        _render_task_coupling_inspections(
+                            job_id=str(job_id),
+                            task_id=tid,
+                            key_prefix=f"jdt_card_{job_id}_{tid}",
+                        )
 
                 with c_prev:
                     st.markdown(
