@@ -40,7 +40,6 @@ try:
     from app.pages.tasks import render_job_linked_tasks_tab
     from app.styles import inject_jobs_module_css, inject_tasks_module_css
     from app.utils.formatting import fmt_date
-    from app.services.inventory_service import get_inventory_transactions
     from app.utils.phone_helpers import format_phone_display
     from app.utils.field_context import (
         FIELD_EXPANDED_JOB_KEY,
@@ -772,6 +771,46 @@ def _job_inventory_action_label(txn_type: str) -> str:
         "RETURN": "Return From Job",
     }
     return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
+
+
+def get_inventory_transactions(job_id=None, limit=200):
+    """
+    Safe inventory transaction fetcher for Job Detail Inventory tab.
+    Prevents Job Details modal/page from crashing if inventory transaction data is missing.
+    """
+    try:
+        from app.services.inventory_service import get_inventory_transactions as _fetch_txns
+
+        return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
+    except ImportError:
+        try:
+            from services.inventory_service import get_inventory_transactions as _fetch_txns  # type: ignore
+
+            return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    try:
+        from app.db import get_client
+    except ImportError:
+        from db import get_client  # type: ignore
+
+    try:
+        client = get_client()
+        query = client.table("inventory_transactions").select("*")
+        if job_id:
+            query = query.eq("job_id", str(job_id).strip())
+        result = (
+            query
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+    except Exception:
+        return []
 
 
 def _render_job_inventory_tab(job: dict) -> None:
