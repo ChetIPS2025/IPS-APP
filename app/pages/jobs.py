@@ -104,6 +104,7 @@ _JOB_TABS = [
     "Financials",
     "Estimates",
     "Inventory",
+    "Equipment",
     "Schedule",
     "Tasks",
     "Weekly Timesheets",
@@ -803,6 +804,56 @@ def _render_job_inventory_tab(job: dict) -> None:
     st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
 
 
+def _render_job_equipment_tab(job: dict) -> None:
+    """Job equipment list and inspection form launchers."""
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        _render_dialog_placeholder("Save this job before linking equipment inspections.")
+        return
+
+    try:
+        from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
+        from app.db import fetch_table
+        from app.pages._core._data import load_assets
+    except ImportError:
+        from components.coupling_inspection_launcher import render_coupling_inspection_launcher  # type: ignore
+        from db import fetch_table  # type: ignore
+        from pages._core._data import load_assets  # type: ignore
+
+    equip_rows: list[dict] = []
+    try:
+        equip_rows = fetch_table("job_equipment", limit=500, order_by="created_at") or []
+    except Exception:
+        equip_rows = []
+    equip_rows = [r for r in equip_rows if str(r.get("job_id") or "") == jid]
+
+    assets_by_id = {str(a.get("id") or ""): a for a in load_assets()}
+    st.markdown(_dialog_card("Equipment on Job", ""), unsafe_allow_html=True)
+    if equip_rows:
+        for row in equip_rows:
+            asset_id = str(row.get("asset_id") or "").strip()
+            asset = assets_by_id.get(asset_id) or {}
+            label = str(row.get("asset_label") or asset.get("asset_name") or "Equipment")
+            asset_no = str(asset.get("asset_number") or asset.get("asset_id") or "—")
+            st.markdown(
+                f"**{html.escape(label)}** · Asset #{html.escape(asset_no)}",
+            )
+            render_coupling_inspection_launcher(
+                job_id=jid,
+                equipment_id=asset_id or None,
+                key_prefix=f"job_eq_ci_{jid}_{asset_id or row.get('id')}",
+            )
+            st.divider()
+    else:
+        st.caption("No equipment lines on this job yet. You can still start a coupling inspection for the job.")
+
+    render_coupling_inspection_launcher(
+        job_id=jid,
+        equipment_id=None,
+        key_prefix=f"job_ci_{jid}",
+    )
+
+
 def _field_admin_read() -> bool:
     try:
         from auth import current_role
@@ -886,6 +937,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_financials,
         tab_estimates,
         tab_inventory,
+        tab_equipment,
         tab_schedule,
         tab_tasks,
         tab_weekly_ts,
@@ -990,6 +1042,9 @@ def _render_job_detail_tabs(job: dict) -> None:
 
     with tab_inventory:
         _render_job_inventory_tab(job)
+
+    with tab_equipment:
+        _render_job_equipment_tab(job)
 
     with tab_schedule:
         sched_html = (

@@ -31,6 +31,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             ("field_day",),
             ("field_daily_reports",),
             ("field_crew_time",),
+            ("coupling_inspection",),
             ("admin",),
             ("settings",),
         ]
@@ -59,6 +60,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "field_day",
             "field_daily_reports",
             "field_crew_time",
+            "coupling_inspection",
             "settings",
         }
     ),
@@ -86,6 +88,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "field_day",
             "field_daily_reports",
             "field_crew_time",
+            "coupling_inspection",
             "settings",
         }
     ),
@@ -100,6 +103,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "documents",
             "field_dashboard",
             "field_day",
+            "coupling_inspection",
             "settings",
         }
     ),

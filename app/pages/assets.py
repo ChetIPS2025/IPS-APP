@@ -1211,6 +1211,19 @@ def _render_asset_documents_tab(asset: dict) -> None:
 
 def _render_asset_maintenance_tab(asset: dict) -> None:
     aid = str(asset.get("id") or "")
+    try:
+        from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
+    except ImportError:
+        from components.coupling_inspection_launcher import render_coupling_inspection_launcher  # type: ignore
+
+    job_id = str(asset.get("assigned_job_id") or asset.get("job_id") or "").strip() or None
+    render_coupling_inspection_launcher(
+        job_id=job_id,
+        equipment_id=aid,
+        key_prefix=f"asset_ci_{aid}",
+    )
+    st.divider()
+
     inspections = get_asset_inspections(aid)
     issues = get_asset_issues(aid)
     if inspections or issues:

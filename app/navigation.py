@@ -47,6 +47,7 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "field_day",
         "field_daily_reports",
         "field_crew_time",
+        "coupling_inspection",
     }
 )
 

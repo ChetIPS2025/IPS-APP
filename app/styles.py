@@ -6497,3 +6497,41 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
     inject_table_header_filter_css()
     inject_ips_dialog_styles()
     inject_action_colors_css()
+
+
+def inject_coupling_inspection_css() -> None:
+    """Mobile/iPad-friendly coupling inspection form styling."""
+    st.markdown(
+        """
+<style id="ips-coupling-inspection-v1">
+.ips-page-coupling_inspection [data-testid="stCheckbox"] label {
+  min-height: 2rem !important;
+  min-width: 2rem !important;
+}
+.ips-page-coupling_inspection [data-testid="stCheckbox"] label p {
+  font-size: 1rem !important;
+}
+.ips-page-coupling_inspection [data-testid="stButton"] > button {
+  min-height: 2.75rem !important;
+  font-weight: 700 !important;
+}
+.ips-page-coupling_inspection [data-testid="stFileUploader"] {
+  padding: 0.35rem 0 !important;
+}
+.ips-page-coupling_inspection [data-testid="column"] {
+  min-width: 0 !important;
+}
+.ips-coupling-torque-pattern {
+  display: block;
+  max-width: 220px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .ips-page-coupling_inspection [data-testid="stHorizontalBlock"] {
+    flex-wrap: wrap !important;
+  }
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )

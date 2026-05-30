@@ -12,6 +12,7 @@ try:
         admin,
         assets,
         company_updates,
+        coupling_inspection,
         customers,
         dashboard,
         documents,
@@ -43,6 +44,7 @@ except ImportError:
         admin,
         assets,
         company_updates,
+        coupling_inspection,
         customers,
         dashboard,
         documents,
@@ -95,6 +97,7 @@ BUILT_MODULES: dict[str, object] = {
     "field_day": field_day.render,
     "field_daily_reports": field_daily_reports.render,
     "field_crew_time": field_crew_time.render,
+    "coupling_inspection": coupling_inspection.render,
 }
 
 
