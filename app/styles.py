@@ -3058,11 +3058,11 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_grid = (
-        "28px 28px 220px repeat(7, 112px) 86px 82px 96px 92px"
+        "24px 28px 220px repeat(7, 108px) 92px 84px 96px 92px"
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v29">
+<style id="ips-timekeeping-module-v30">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -4344,8 +4344,8 @@ def inject_timekeeping_module_css() -> None:
   display: grid !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  gap: 8px !important;
-  column-gap: 8px !important;
+  gap: 10px !important;
+  column-gap: 10px !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -4353,7 +4353,7 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
   overflow: visible !important;
-  min-width: 1400px !important;
+  min-width: 1380px !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
@@ -4390,7 +4390,12 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"] {{
   min-width: 0 !important;
-  max-width: none !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+11):nth-child(-n+14),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(n+11):nth-child(-n+14) {{
   overflow: visible !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"],
@@ -4405,9 +4410,9 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:first-child,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:first-child {{
-  width: 28px !important;
-  min-width: 28px !important;
-  max-width: 28px !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
   padding: 0 !important;
   overflow: visible !important;
   display: flex !important;
@@ -4442,34 +4447,36 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) {{
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  flex: 0 0 112px !important;
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
+  flex: 0 0 108px !important;
   overflow: hidden !important;
   padding: 0 2px !important;
   box-sizing: border-box !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(10),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(10) {{
-  padding-right: 4px !important;
+  padding-right: 2px !important;
+  overflow: hidden !important;
+  contain: inline-size !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(11),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(11) {{
-  width: 86px !important;
-  min-width: 86px !important;
-  max-width: 86px !important;
-  flex: 0 0 86px !important;
-  padding-left: 4px !important;
-  overflow: visible !important;
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+  flex: 0 0 92px !important;
+  padding-left: 8px !important;
+  overflow: hidden !important;
   isolation: isolate !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(12),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(12) {{
-  width: 82px !important;
-  min-width: 82px !important;
-  max-width: 82px !important;
-  flex: 0 0 82px !important;
+  width: 84px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+  flex: 0 0 84px !important;
   overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(13),
@@ -4512,7 +4519,7 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1.1;
   margin: 0 0 4px 0;
   width: 100%;
-  max-width: 112px;
+  max-width: 108px;
 }}
 .timekeeping-day-cell {{
   box-sizing: border-box;
@@ -4520,9 +4527,9 @@ def inject_timekeeping_module_css() -> None:
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  width: 112px;
-  max-width: 112px;
-  min-width: 112px;
+  width: 108px;
+  max-width: 108px;
+  min-width: 108px;
   margin: 0 auto;
 }}
 .timekeeping-hour-input,
@@ -4548,9 +4555,9 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 auto;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] {{
-  width: 112px !important;
-  max-width: 112px !important;
-  min-width: 112px !important;
+  width: 108px !important;
+  max-width: 108px !important;
+  min-width: 108px !important;
   margin: 0 auto !important;
   border: none !important;
   background: transparent !important;
@@ -4558,9 +4565,9 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] > div {{
-  width: 112px !important;
-  max-width: 112px !important;
-  min-width: 112px !important;
+  width: 108px !important;
+  max-width: 108px !important;
+  min-width: 108px !important;
   margin: 0 auto !important;
   padding: 0 !important;
 }}
@@ -4569,9 +4576,9 @@ def inject_timekeeping_module_css() -> None:
   flex-direction: column !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  width: 112px !important;
-  max-width: 112px !important;
-  min-width: 112px !important;
+  width: 108px !important;
+  max-width: 108px !important;
+  min-width: 108px !important;
   gap: 0 !important;
   margin: 0 auto !important;
 }}
@@ -4591,10 +4598,22 @@ def inject_timekeeping_module_css() -> None:
   color: #0f172a;
   line-height: 1.2;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
   width: 100%;
   max-width: 100%;
   min-height: 36px;
+  box-sizing: border-box;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) [data-testid="stElementContainer"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) [data-testid="stVerticalBlock"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] {{
+  max-width: 108px !important;
+  overflow: hidden !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(11) .timesheet-list-summary-cell {{
+  padding-left: 0 !important;
+  margin-left: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+11):nth-child(-n+14) {{
   align-self: center !important;
@@ -4624,16 +4643,16 @@ def inject_timekeeping_module_css() -> None:
   gap: 0 !important;
   padding: 2px 0 !important;
   overflow: hidden !important;
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  flex: 0 0 112px !important;
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
+  flex: 0 0 108px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:has(.timesheet-list-hour-box-marker) {{
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  flex: 0 0 112px !important;
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
+  flex: 0 0 108px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:has(.ips-time-week-day-filled) {{
   background: transparent !important;
@@ -4641,9 +4660,9 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:has(.timesheet-list-day-marker) [data-testid="stVerticalBlock"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:has(.timesheet-list-day-marker) [data-testid="stElementContainer"] {{
-  width: 112px !important;
-  max-width: 112px !important;
-  min-width: 112px !important;
+  width: 108px !important;
+  max-width: 108px !important;
+  min-width: 108px !important;
   overflow: hidden !important;
   align-items: center !important;
   justify-content: center !important;
@@ -4745,20 +4764,21 @@ def inject_timekeeping_module_css() -> None:
   display: none !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] {{
-  width: 84px !important;
-  max-width: 84px !important;
-  min-width: 84px !important;
+  width: 80px !important;
+  max-width: 80px !important;
+  min-width: 80px !important;
   margin: 0 auto !important;
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
+  overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 22px !important;
-  width: 84px !important;
-  max-width: 84px !important;
-  min-width: 84px !important;
+  grid-template-columns: minmax(0, 1fr) 20px !important;
+  width: 80px !important;
+  max-width: 80px !important;
+  min-width: 80px !important;
   height: 36px !important;
   border: 1px solid #d8dee8 !important;
   border-radius: 8px !important;
@@ -4828,10 +4848,10 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
   padding: 0 !important;
   margin: 0 !important;
-  min-width: 22px !important;
-  max-width: 22px !important;
-  width: 22px !important;
-  flex: 0 0 22px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  width: 20px !important;
+  flex: 0 0 20px !important;
   grid-column: 2 !important;
   grid-row: 1 !important;
   align-self: stretch !important;
@@ -4842,21 +4862,21 @@ def inject_timekeeping_module_css() -> None:
   flex-direction: column !important;
   height: 36px !important;
   gap: 0 !important;
-  width: 22px !important;
-  min-width: 22px !important;
-  max-width: 22px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stButton"] {{
-  width: 22px !important;
-  min-width: 22px !important;
-  max-width: 22px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
   margin: 0 !important;
   flex: 1 1 50% !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stButton"] button {{
-  width: 22px !important;
-  min-width: 22px !important;
-  max-width: 22px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
   height: 18px !important;
   min-height: 18px !important;
   padding: 0 !important;
@@ -4880,7 +4900,7 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   margin: 0 !important;
   min-width: 0 !important;
-  max-width: calc(84px - 22px) !important;
+  max-width: calc(80px - 20px) !important;
   width: auto !important;
   flex: 1 1 0 !important;
   grid-column: 1 !important;
@@ -5015,7 +5035,7 @@ def inject_timekeeping_module_css() -> None:
   }}
   .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
   .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
-    min-width: 1400px !important;
+    min-width: 1380px !important;
   }}
   .ips-time-hgrid-scroll {{
     overflow-x: auto;
