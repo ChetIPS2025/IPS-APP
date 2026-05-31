@@ -74,7 +74,10 @@ except ImportError:
         reset_table_page,
     )
     from pages._core._data import (  # type: ignore
+        customer_contact_select_options,
         customer_filter_options,
+        customer_id_for_name,
+        customer_location_select_options,
         employee_options,
         load_estimates,
         load_jobs,
