@@ -104,7 +104,7 @@ _TS_DAY = 140
 _TS_WEEK = 70
 _TS_LIST_HANDLE = 24
 _TS_LIST_EMPLOYEE = 200
-_TS_LIST_DAY = 120
+_TS_LIST_DAY = 88
 _TS_LIST_TOTAL = 90
 _TS_LIST_OVERTIME = 110
 _TS_LIST_BILLED = 90
@@ -661,7 +661,7 @@ def _render_list_day_hour_stepper(
     widget_key: str,
     day_label: str,
 ) -> float:
-    """List view: hour input with explicit ▲/▼ stepper buttons."""
+    """List view: centered hour input with a compact ▲/▼ button strip."""
     step = _LIST_VIEW_HOUR_STEP
     down_key = f"{widget_key}_dn"
     up_key = f"{widget_key}_up"
@@ -669,11 +669,16 @@ def _render_list_day_hour_stepper(
 
     with st.container(key=spin_key):
         st.markdown(
-            '<span class="timekeeping-list-hour-spinner-marker" aria-hidden="true"></span>',
+            '<span class="timekeeping-list-hour-spinner-marker" aria-hidden="true"></span>'
+            '<div class="timekeeping-hour-spinner">',
             unsafe_allow_html=True,
         )
-        val_col, btn_col = st.columns([0.68, 0.32], gap="small")
-        with val_col:
+        inp_col, btns_col = st.columns([0.76, 0.24], gap="xxsmall", vertical_alignment="center")
+        with inp_col:
+            st.markdown(
+                '<span class="timekeeping-hour-input-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             hours = st.number_input(
                 f"{day_label} hours",
                 value=float(value),
@@ -684,7 +689,11 @@ def _render_list_day_hour_stepper(
                 max_value=24.0,
                 format="%.1f",
             )
-        with btn_col:
+        with btns_col:
+            st.markdown(
+                '<span class="timekeeping-spinner-buttons-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             if st.button(
                 "▲",
                 key=up_key,
@@ -724,7 +733,7 @@ def _render_list_row_day_cell(
 
     with st.container(key=f"tk_list_day_{emp_id}_{week_sig}_{day_ix}"):
         st.markdown(
-            f'<span class="timesheet-list-day-marker day-block-marker{grid_marker}{filled_marker}" '
+            f'<span class="timesheet-list-day-marker day-block-marker timekeeping-day-cell-marker{grid_marker}{filled_marker}" '
             f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )

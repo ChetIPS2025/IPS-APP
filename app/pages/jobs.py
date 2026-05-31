@@ -130,6 +130,8 @@ SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
 CACHE_KEY = "_ips_jobs_modal_by_id"
+JOB_DOC_UPLOAD_MODE_KEY = "job_detail_doc_upload_job_id"
+_JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
 _JOB_COLS = [0.35, 0.95, 2.35, 1.85, 1.85, 1.35, 1.25, 1.25]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -350,6 +352,7 @@ def _clear_jobs_detail_modal() -> None:
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
+    st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
 
 
 def _render_custom_jobs_table(
@@ -721,6 +724,96 @@ def _job_subjob_label_map(job_id: str) -> dict[str, str]:
         return {}
 
 
+def _job_doc_upload_active(job_id: str) -> bool:
+    return str(st.session_state.get(JOB_DOC_UPLOAD_MODE_KEY) or "") == str(job_id or "").strip()
+
+
+def _set_job_doc_upload(job_id: str, active: bool) -> None:
+    jid = str(job_id or "").strip()
+    if active and jid:
+        st.session_state[JOB_DOC_UPLOAD_MODE_KEY] = jid
+    elif st.session_state.get(JOB_DOC_UPLOAD_MODE_KEY) == jid:
+        st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
+
+
+def _current_document_uploader_name() -> str:
+    try:
+        from app.auth import current_profile
+    except ImportError:
+        from auth import current_profile  # type: ignore
+    prof = current_profile() or {}
+    return str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
+
+
+def _render_job_document_upload_form(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    job_key = _job_session_key(job)
+    pk = f"job_doc_upload_{job_key}"
+    admin = _field_admin_read()
+
+    st.markdown(
+        _dialog_card(
+            "Upload document",
+            '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
+            "Attach a file to this job. Supported: PDF, Word, Excel, CSV, and common images.</p>",
+        ),
+        unsafe_allow_html=True,
+    )
+    st.file_uploader(
+        "File",
+        type=_JOB_DOC_UPLOAD_TYPES,
+        key=f"{pk}_file",
+        label_visibility="collapsed",
+    )
+    st.text_input("Document title (optional)", key=f"{pk}_title", placeholder="Defaults to file name")
+    st.text_input("Document type / category", value="Job Document", key=f"{pk}_type")
+    st.text_area("Notes (optional)", key=f"{pk}_notes", height=80)
+    btn_upload, btn_cancel = st.columns(2, gap="small")
+    with btn_upload:
+        if st.button("Upload", type="primary", key=f"{pk}_save", use_container_width=True):
+            up = st.session_state.get(f"{pk}_file")
+            if up is None:
+                st.warning("Choose a file to upload.")
+            else:
+                data = up.getvalue()
+                if not data:
+                    st.warning("The selected file is empty.")
+                else:
+                    try:
+                        from app.services.asset_document_util import guess_document_content_type
+                        from app.services.job_documents import upload_job_document
+                    except ImportError:
+                        from services.asset_document_util import guess_document_content_type  # type: ignore
+                        from services.job_documents import upload_job_document  # type: ignore
+                    raw_name = str(getattr(up, "name", "") or "document")
+                    title = str(st.session_state.get(f"{pk}_title") or "").strip()
+                    file_name = title or raw_name
+                    ctype = guess_document_content_type(raw_name, str(getattr(up, "type", "") or ""))
+                    try:
+                        upload_job_document(
+                            job_id=jid,
+                            file_data=data,
+                            file_name=file_name,
+                            content_type=ctype,
+                            uploaded_by=_current_document_uploader_name(),
+                            doc_type=str(st.session_state.get(f"{pk}_type") or "Job Document"),
+                            notes=str(st.session_state.get(f"{pk}_notes") or ""),
+                            admin=admin,
+                        )
+                    except Exception as exc:
+                        st.error(str(exc))
+                    else:
+                        _set_job_doc_upload(jid, False)
+                        st.success("Document uploaded.")
+                        st.rerun()
+    with btn_cancel:
+        if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
+            _set_job_doc_upload(jid, False)
+            st.rerun()
+
+
 def _render_job_documents_tab(job: dict) -> None:
     """Job-linked documents from documents_hub and approved weekly timesheets."""
     jid = str(job.get("id") or "")
@@ -728,19 +821,32 @@ def _render_job_documents_tab(job: dict) -> None:
         _render_dialog_placeholder("Save this job before attaching documents.")
         return
     try:
-        from app.db import fetch_by_match_admin, fetch_table_admin
+        from app.services.job_documents import fetch_job_documents
         from app.services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet
     except ImportError:
-        from db import fetch_by_match_admin, fetch_table_admin  # type: ignore
+        from services.job_documents import fetch_job_documents  # type: ignore
         from services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet  # type: ignore
 
-    docs: list[dict] = []
-    try:
-        hub = fetch_table_admin("documents_hub", limit=500, order_by="upload_date")
-        docs = [d for d in hub if str(d.get("linked_record_id") or "") == jid]
-    except Exception:
-        docs = []
+    admin = _field_admin_read()
+    upload_active = _job_doc_upload_active(jid)
 
+    head_l, head_r = st.columns([3, 1], gap="small")
+    with head_l:
+        st.markdown("**Job documents**")
+    with head_r:
+        if not upload_active and st.button(
+            "+ Upload Document",
+            key=f"job_doc_upload_btn_{_job_session_key(job)}",
+            use_container_width=True,
+        ):
+            _set_job_doc_upload(jid, True)
+            st.rerun()
+
+    if upload_active:
+        _render_job_document_upload_form(job)
+        st.divider()
+
+    docs = fetch_job_documents(jid, admin=admin, limit=500)
     ts_rows = [
         r
         for r in list_timesheets_for_job(jid)
@@ -748,30 +854,32 @@ def _render_job_documents_tab(job: dict) -> None:
     ]
     task_labels = _job_subjob_label_map(jid)
 
-    if not docs and not ts_rows:
-        _render_dialog_placeholder(
-            "No documents yet. Approved weekly timesheets and uploaded job documents will appear here."
-        )
-        return
-
     if docs:
-        st.markdown("**Documents hub**")
-        for doc in sorted(docs, key=lambda d: str(d.get("upload_date") or ""), reverse=True):
+        for doc in docs:
             name = str(doc.get("file_name") or doc.get("name") or "Document")
             dtype = str(doc.get("doc_type") or "")
             path = str(doc.get("storage_path") or "")
             url = signed_url_for_timesheet(path) if path else ""
-            when = str(doc.get("upload_date") or "")[:10]
+            when = str(doc.get("upload_date") or doc.get("created_at") or "")[:10]
+            notes = str(doc.get("notes") or "").strip()
             subjob_tid = str(doc.get("task_id") or "").strip()
             subjob = task_labels.get(subjob_tid, "") if subjob_tid else ""
             line = f"- **{html.escape(name)}** · {html.escape(dtype)} · {when}"
             if subjob:
                 line += f" · Subjob: {html.escape(subjob)}"
+            if notes:
+                line += f" · {html.escape(notes[:120])}"
             if url:
                 line += f' · <a href="{html.escape(url)}" target="_blank">Open</a>'
             st.markdown(line, unsafe_allow_html=True)
+    elif not ts_rows and not upload_active:
+        _render_dialog_placeholder(
+            "No documents yet. Approved weekly timesheets and uploaded job documents will appear here."
+        )
 
     if ts_rows:
+        if docs:
+            st.divider()
         st.markdown("**Weekly timesheets**")
         for row in sorted(ts_rows, key=lambda r: str(r.get("week_start") or ""), reverse=True):
             ws = str(row.get("week_start") or "")[:10]
