@@ -619,18 +619,19 @@ def _render_daily_hrs_input(
             '<span class="timesheet-list-hour-box-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        return float(
-            st.number_input(
-                f"{day_label} hours",
-                value=float(value),
-                key=widget_key,
-                label_visibility="collapsed",
-                step=0.5,
-                min_value=0.0,
-                max_value=24.0,
-                format="%.1f",
+        with st.container(key=f"tk_list_hrs_{widget_key}"):
+            return float(
+                st.number_input(
+                    f"{day_label} hours",
+                    value=float(value),
+                    key=widget_key,
+                    label_visibility="collapsed",
+                    step=0.5,
+                    min_value=0.0,
+                    max_value=24.0,
+                    format="%.1f",
+                )
             )
-        )
 
     st.markdown(
         '<span class="ips-compact-hours-input-marker ips-day-hrs-row-marker hours-row" aria-hidden="true"></span>',
