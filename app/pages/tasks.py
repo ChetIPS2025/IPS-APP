@@ -39,6 +39,10 @@ try:
         set_view_mode,
         status_pill_html,
     )
+    from app.components.subjob_coupling_inspection import (
+        clear_job_subjob_coupling_state,
+        render_subjob_coupling_inspection_section,
+    )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import (
         load_employees,
@@ -106,6 +110,10 @@ except ImportError:
         safe_value,
         set_view_mode,
         status_pill_html,
+    )
+    from components.subjob_coupling_inspection import (  # type: ignore
+        clear_job_subjob_coupling_state,
+        render_subjob_coupling_inspection_section,
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import (  # type: ignore
@@ -193,6 +201,7 @@ SELECTED_JOB_SUBJOB_PARENT_KEY = "selected_job_subjob_parent_job_id"
 def clear_job_subjob_selection() -> None:
     st.session_state.pop(SELECTED_JOB_SUBJOB_KEY, None)
     st.session_state.pop(SELECTED_JOB_SUBJOB_PARENT_KEY, None)
+    clear_job_subjob_coupling_state()
 
 
 def on_job_detail_modal_open(job_id: str) -> None:
@@ -204,7 +213,11 @@ def on_job_detail_modal_open(job_id: str) -> None:
 
 
 def _set_job_subjob_selection(task_id: str, job_id: str) -> None:
-    st.session_state[SELECTED_JOB_SUBJOB_KEY] = str(task_id or "").strip()
+    prev = str(st.session_state.get(SELECTED_JOB_SUBJOB_KEY) or "").strip()
+    new_tid = str(task_id or "").strip()
+    if prev and prev != new_tid:
+        clear_job_subjob_coupling_state()
+    st.session_state[SELECTED_JOB_SUBJOB_KEY] = new_tid
     st.session_state[SELECTED_JOB_SUBJOB_PARENT_KEY] = str(job_id or "").strip()
 
 
@@ -1143,6 +1156,8 @@ def _render_job_linked_subjob_detail(
         f"</p>"
     )
     st.markdown(dialog_card_html("Description / Scope", desc_html), unsafe_allow_html=True)
+
+    render_subjob_coupling_inspection_section(task, job)
 
     if notes:
         notes_html = (

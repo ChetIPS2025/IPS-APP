@@ -58,6 +58,7 @@ except ImportError:
 
 TABLE = "coupling_inspections"
 JOB_TASKS_TABLE = "job_tasks"
+IPS_TASK_TABLES: tuple[str, ...] = ("todos", "tasks")
 TORQUE_TABLE = "coupling_torque_checks"
 PHOTOS_TABLE = "coupling_inspection_photos"
 SIGNATURES_TABLE = "coupling_inspection_signatures"
@@ -243,6 +244,15 @@ def build_header_context(
     return hdr
 
 
+def coupling_inspection_status_label(status: str) -> str:
+    s = str(status or "draft").strip().lower()
+    if s == "complete":
+        return "Completed"
+    if s == "exported":
+        return "Exported"
+    return "Draft"
+
+
 def task_link_snapshot(job_task: dict[str, Any] | None) -> dict[str, Any]:
     """Denormalized task/subjob fields for coupling_inspections."""
     if not job_task:
@@ -254,6 +264,17 @@ def task_link_snapshot(job_task: dict[str, Any] | None) -> dict[str, Any]:
             "linked_task_status": "",
         }
     tid = str(job_task.get("id") or "").strip() or None
+    title = str(job_task.get("title") or "").strip()
+    task_number = str(job_task.get("task_number") or job_task.get("hazard_number") or "").strip()
+    if title and not task_number and not str(job_task.get("issue") or "").strip():
+        status = str(job_task.get("status") or "Open").strip().lower()
+        return {
+            "task_id": tid,
+            "subjob_id": tid,
+            "subjob_name": title[:200],
+            "task_title": title[:500],
+            "linked_task_status": status,
+        }
     subjob_name = task_number_display(job_task)
     issue = str(job_task.get("issue") or "").strip()
     action = str(job_task.get("action_required") or "").strip()
@@ -275,7 +296,13 @@ def fetch_job_task(task_id: str | None) -> dict[str, Any] | None:
     if not tid:
         return None
     row = fetch_by_id(JOB_TASKS_TABLE, tid)
-    return row if isinstance(row, dict) else None
+    if isinstance(row, dict):
+        return row
+    for table in IPS_TASK_TABLES:
+        row = fetch_by_id(table, tid)
+        if isinstance(row, dict):
+            return row
+    return None
 
 
 def list_job_tasks_for_job(job_id: str | None, *, limit: int = 500) -> list[dict[str, Any]]:
@@ -370,6 +397,76 @@ def new_inspection_payload(
     return apply_task_link_to_payload(payload, job_task=job_task, job_id=job_id)
 
 
+def _inspection_is_unlinked(row: dict[str, Any]) -> bool:
+    return not str(row.get("task_id") or row.get("subjob_id") or "").strip()
+
+
+def list_unlinked_coupling_inspections_for_job(
+    job_id: str | None,
+    *,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Coupling inspections on this job with no subjob/task link."""
+    rows = list_coupling_inspections(job_id=job_id, limit=limit)
+    unlinked = [r for r in rows if _inspection_is_unlinked(r)]
+    unlinked.sort(key=lambda r: str(r.get("updated_at") or r.get("created_at") or ""), reverse=True)
+    return unlinked
+
+
+def link_coupling_inspection_to_task(
+    inspection_id: str,
+    task: dict[str, Any],
+    *,
+    job_id: str | None = None,
+) -> ServiceResult:
+    iid = str(inspection_id or "").strip()
+    if not iid:
+        return ServiceResult(ok=False, error="Missing inspection id")
+    existing = get_coupling_inspection(iid)
+    if not existing:
+        return ServiceResult(ok=False, error="Coupling inspection not found")
+    tid = str(task.get("id") or "").strip()
+    job_task = fetch_job_task(tid) if tid else None
+    if not job_task and isinstance(task, dict):
+        job_task = task
+    payload = apply_task_link_to_payload(
+        dict(existing),
+        job_task=job_task,
+        job_id=job_id or str(existing.get("job_id") or ""),
+    )
+    req_job = str(job_id or "").strip()
+    insp_job = str(payload.get("job_id") or "").strip()
+    if req_job and insp_job and insp_job != req_job:
+        return ServiceResult(ok=False, error="Inspection belongs to a different job")
+    hdr = dict(payload.get("header") or {})
+    snap = task_link_snapshot(job_task)
+    if snap.get("subjob_name"):
+        hdr["subjob_name"] = snap["subjob_name"]
+    if snap.get("task_title"):
+        hdr["task_title"] = snap["task_title"]
+    if snap.get("task_id"):
+        hdr["task_id"] = snap["task_id"]
+    payload["header"] = hdr
+    return save_coupling_inspection(payload, inspection_id=iid)
+
+
+def unlink_coupling_inspection_from_task(inspection_id: str) -> ServiceResult:
+    iid = str(inspection_id or "").strip()
+    if not iid:
+        return ServiceResult(ok=False, error="Missing inspection id")
+    existing = get_coupling_inspection(iid)
+    if not existing:
+        return ServiceResult(ok=False, error="Coupling inspection not found")
+    payload = dict(existing)
+    for key in ("task_id", "subjob_id", "subjob_name", "task_title", "linked_task_status"):
+        payload[key] = None
+    hdr = dict(payload.get("header") or {})
+    for key in ("task_id", "subjob_name", "task_title", "linked_task_status"):
+        hdr.pop(key, None)
+    payload["header"] = hdr
+    return save_coupling_inspection(payload, inspection_id=iid)
+
+
 def list_coupling_inspections(
     *,
     job_id: str | None = None,
@@ -385,7 +482,25 @@ def list_coupling_inspections(
         match["equipment_id"] = equipment_id
     tid = str(task_id or subjob_id or "").strip()
     if tid:
-        match["task_id"] = tid
+        try:
+            by_task = fetch_by_match_admin(TABLE, {**match, "task_id": tid}, limit=limit) or []
+            by_subjob = fetch_by_match_admin(TABLE, {**match, "subjob_id": tid}, limit=limit) or []
+        except Exception as exc:
+            _LOG.warning("list_coupling_inspections failed: %s", exc)
+            return []
+        seen: set[str] = set()
+        rows: list[dict[str, Any]] = []
+        for row in [*by_task, *by_subjob]:
+            if not isinstance(row, dict):
+                continue
+            rid = str(row.get("id") or "").strip()
+            if rid and rid in seen:
+                continue
+            if rid:
+                seen.add(rid)
+            rows.append(row)
+        rows.sort(key=lambda r: str(r.get("updated_at") or r.get("created_at") or ""), reverse=True)
+        return [normalize_coupling_inspection(r) for r in rows]
     try:
         rows = fetch_by_match_admin(TABLE, match, limit=limit) or []
     except Exception as exc:
