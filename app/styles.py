@@ -1258,6 +1258,23 @@ def inject_tasks_module_css() -> None:
   padding: 0 10px !important;
   font-size: 12px !important;
 }}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_title_"] .stButton > button {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 28px !important;
+  justify-content: flex-start !important;
+}}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_title_"] .stButton > button:hover {{
+  color: #2563eb !important;
+  text-decoration: underline !important;
+}}
 </style>
 """,
         unsafe_allow_html=True,

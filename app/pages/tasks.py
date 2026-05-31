@@ -186,6 +186,39 @@ TASK_VIEW_KEY = "task_view_filter"
 TASK_VIEW_OPTS = ["Open Tasks", "Closed Tasks", "All Tasks"]
 FIELD_TASK_VIEW_OPTS = ["Due Today", *TASK_VIEW_OPTS]
 JOB_TASK_VIEW_OPTS = ["Open", "Closed", "All"]
+SELECTED_JOB_SUBJOB_KEY = "selected_job_subjob_id"
+SELECTED_JOB_SUBJOB_PARENT_KEY = "selected_job_subjob_parent_job_id"
+
+
+def clear_job_subjob_selection() -> None:
+    st.session_state.pop(SELECTED_JOB_SUBJOB_KEY, None)
+    st.session_state.pop(SELECTED_JOB_SUBJOB_PARENT_KEY, None)
+
+
+def on_job_detail_modal_open(job_id: str) -> None:
+    """Clear subjob detail when opening a different job in Job Details."""
+    jid = str(job_id or "").strip()
+    parent = str(st.session_state.get(SELECTED_JOB_SUBJOB_PARENT_KEY) or "").strip()
+    if parent and parent != jid:
+        clear_job_subjob_selection()
+
+
+def _set_job_subjob_selection(task_id: str, job_id: str) -> None:
+    st.session_state[SELECTED_JOB_SUBJOB_KEY] = str(task_id or "").strip()
+    st.session_state[SELECTED_JOB_SUBJOB_PARENT_KEY] = str(job_id or "").strip()
+
+
+def _get_selected_job_subjob_id(job_id: str) -> str | None:
+    parent = str(st.session_state.get(SELECTED_JOB_SUBJOB_PARENT_KEY) or "").strip()
+    jid = str(job_id or "").strip()
+    if not jid:
+        return None
+    if parent != jid:
+        if parent:
+            clear_job_subjob_selection()
+        return None
+    tid = str(st.session_state.get(SELECTED_JOB_SUBJOB_KEY) or "").strip()
+    return tid or None
 
 
 def _build_assignee_lookup() -> dict[str, str]:
@@ -1070,9 +1103,60 @@ def _render_job_task_status_button(task: dict) -> None:
                 _save_task_field(tid, {"status": "Open"})
 
 
+def _render_job_linked_subjob_detail(
+    task: dict,
+    job: dict,
+    *,
+    assignee_lookup: dict[str, str],
+) -> None:
+    job_id = str(job.get("id") or "").strip()
+    title = safe_value(task.get("title"))
+    status = normalize_task_status(task.get("status"))
+    priority = normalize_task_priority(task.get("priority"))
+    assignee = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup)
+    if assignee == "—":
+        assignee = "Unassigned"
+    due = fmt_date(task.get("due_date"))
+    description = safe_value(task.get("description"), "No description.")
+    notes = str(task.get("notes") or "").strip()
+    job_number = str(job.get("job_number") or "").strip() or "—"
+
+    if st.button("← Back to Subjobs", key=f"job_subjob_back_{job_id}", type="secondary"):
+        clear_job_subjob_selection()
+        st.rerun()
+
+    overview_html = (
+        f'<div class="ips-detail-grid">'
+        f"{detail_field_html('Subjob', title)}"
+        f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
+        f"{detail_field_html('Priority', priority)}"
+        f"{detail_field_html('Assigned To', assignee)}"
+        f"{detail_field_html('Due Date', due)}"
+        f"{detail_field_html('Parent Job', job_number)}"
+        f"</div>"
+    )
+    st.markdown(dialog_card_html("Overview", overview_html), unsafe_allow_html=True)
+
+    desc_html = (
+        f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+        f"{html.escape(description)}"
+        f"</p>"
+    )
+    st.markdown(dialog_card_html("Description / Scope", desc_html), unsafe_allow_html=True)
+
+    if notes:
+        notes_html = (
+            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
+            f"{html.escape(notes)}"
+            f"</p>"
+        )
+        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
+
+
 def _render_job_linked_tasks_table(
     tasks: list[dict],
     *,
+    job_id: str,
     assignee_lookup: dict[str, str],
 ) -> None:
     cols = [4.8, 1.2, 1.2, 2.0, 1.2]
@@ -1096,10 +1180,11 @@ def _render_job_linked_tasks_table(
             due = fmt_date(task.get("due_date"))
             row_cols = st.columns(cols, gap="small", vertical_alignment="center")
             with row_cols[0]:
-                st.markdown(
-                    f'<div class="ips-job-tasks-row ips-task-title">{html.escape(str(task.get("title") or ""))}</div>',
-                    unsafe_allow_html=True,
-                )
+                title_text = str(task.get("title") or "").strip() or "Subjob"
+                with st.container(key=f"job_task_title_{tid}"):
+                    if st.button(title_text, key=f"job_task_open_{tid}", type="tertiary"):
+                        _set_job_subjob_selection(tid, job_id)
+                        st.rerun()
             with row_cols[1]:
                 _render_job_task_status_button(task)
             with row_cols[2]:
@@ -1212,6 +1297,21 @@ def render_job_linked_tasks_tab(job: dict) -> None:
                     st.session_state[form_key] = False
                     st.rerun()
 
+    selected_tid = _get_selected_job_subjob_id(job_id)
+    if selected_tid:
+        selected_task = next(
+            (t for t in all_for_job if str(t.get("id") or "").strip() == selected_tid),
+            None,
+        )
+        if selected_task:
+            _render_job_linked_subjob_detail(
+                selected_task,
+                job,
+                assignee_lookup=assignee_lookup,
+            )
+            return
+        clear_job_subjob_selection()
+
     if not linked:
         st.markdown(
             '<p class="ips-job-tasks-empty">No subjobs yet. Add a subjob to track work under this job.</p>',
@@ -1219,7 +1319,7 @@ def render_job_linked_tasks_tab(job: dict) -> None:
         )
         return
 
-    _render_job_linked_tasks_table(linked, assignee_lookup=assignee_lookup)
+    _render_job_linked_tasks_table(linked, job_id=job_id, assignee_lookup=assignee_lookup)
 
 
 def render() -> None:

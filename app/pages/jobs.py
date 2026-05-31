@@ -37,7 +37,11 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
-    from app.pages.tasks import render_job_linked_tasks_tab
+    from app.pages.tasks import (
+        clear_job_subjob_selection,
+        on_job_detail_modal_open,
+        render_job_linked_tasks_tab,
+    )
     from app.styles import inject_jobs_module_css, inject_tasks_module_css
     from app.utils.formatting import fmt_date
     from app.utils.phone_helpers import format_phone_display
@@ -79,7 +83,11 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
-    from pages.tasks import render_job_linked_tasks_tab  # type: ignore
+    from pages.tasks import (  # type: ignore
+        clear_job_subjob_selection,
+        on_job_detail_modal_open,
+        render_job_linked_tasks_tab,
+    )
     from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.field_context import (  # type: ignore
@@ -319,6 +327,7 @@ def _on_job_checkbox_change(job_id: str, all_job_ids: list[str]) -> None:
 def _clear_jobs_detail_modal() -> None:
     job_ids = st.session_state.get(_ALL_JOB_IDS_KEY) or []
     _clear_job_selection([str(jid) for jid in job_ids])
+    clear_job_subjob_selection()
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
@@ -585,6 +594,7 @@ def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
     jid = str(job_id or "").strip()
     if not jid:
         return
+    on_job_detail_modal_open(jid)
     st.session_state[SELECTED_JOB_KEY] = jid
     st.session_state[SHOW_MODAL_KEY] = True
     st.session_state[_SEL] = jid
