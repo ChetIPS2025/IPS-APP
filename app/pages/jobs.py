@@ -711,7 +711,9 @@ def _render_job_documents_tab(job: dict) -> None:
     ]
 
     if not docs and not ts_rows:
-        _render_dialog_placeholder("No job documents yet. Approved weekly timesheets will appear here.")
+        _render_dialog_placeholder(
+            "No documents yet. Approved weekly timesheets and uploaded job documents will appear here."
+        )
         return
 
     if docs:
@@ -748,6 +750,85 @@ def _render_job_documents_tab(job: dict) -> None:
                 f"- Week **{ws}** · **{html.escape(status)}**" + (f" · {link_html}" if link_html else ""),
                 unsafe_allow_html=True,
             )
+
+
+def _daily_update_entry_text(row: dict, *, source: str) -> str:
+    """Build display text from a job_daily_updates or supervisor_daily_reports row."""
+    if source == "supervisor":
+        keys = ("completed_today", "main_goal", "not_completed", "tomorrows_plan", "midday_reason")
+    else:
+        keys = ("work_performed", "notes", "summary", "delays", "safety_notes")
+    parts = [str(row.get(key) or "").strip() for key in keys]
+    parts = [p for p in parts if p]
+    if source != "supervisor":
+        weather = str(row.get("weather") or "").strip()
+        if weather:
+            parts.append(f"Weather: {weather}")
+    return "\n\n".join(parts)
+
+
+def _render_job_daily_updates_tab(job: dict) -> None:
+    """Read-only daily field updates for the current job."""
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        _render_dialog_placeholder("Save this job before adding daily updates.")
+        return
+
+    entries: list[tuple[str, str, str]] = []
+
+    try:
+        from app.services.job_updates_service import get_job_daily_updates
+    except ImportError:
+        from services.job_updates_service import get_job_daily_updates  # type: ignore
+
+    for row in get_job_daily_updates(jid):
+        if not isinstance(row, dict):
+            continue
+        text = _daily_update_entry_text(row, source="job").strip()
+        if not text:
+            continue
+        dt = str(row.get("update_date") or "")[:10]
+        author = str(row.get("supervisor_name") or row.get("employee_name") or "").strip()
+        entries.append((dt, author, text))
+
+    try:
+        from app.services.supervisor_daily_reports import fetch_reports_for_job
+    except ImportError:
+        from services.supervisor_daily_reports import fetch_reports_for_job  # type: ignore
+
+    for row in fetch_reports_for_job(jid, admin=_field_admin_read()):
+        if not isinstance(row, dict):
+            continue
+        text = _daily_update_entry_text(row, source="supervisor").strip()
+        if not text:
+            continue
+        dt = str(row.get("report_date") or "")[:10]
+        author = str(row.get("supervisor_name") or "").strip()
+        entries.append((dt, author, text))
+
+    entries.sort(key=lambda item: item[0], reverse=True)
+
+    if not entries:
+        _render_dialog_placeholder(
+            "No daily updates yet. Field updates added for this job will appear here."
+        )
+        return
+
+    blocks: list[str] = []
+    for dt, author, text in entries:
+        meta = html.escape(dt)
+        if author:
+            meta += f" · {html.escape(author)}"
+        blocks.append(
+            f'<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e2e8f0;">'
+            f'<div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;'
+            f'letter-spacing:0.04em;">{meta}</div>'
+            f'<p style="margin:0.35rem 0 0;font-size:0.875rem;color:#0f172a;line-height:1.5;'
+            f'white-space:pre-wrap;">{html.escape(text)}</p>'
+            f"</div>"
+        )
+    body = "".join(blocks)
+    st.markdown(_dialog_card("Daily updates", body), unsafe_allow_html=True)
 
 
 def _render_dialog_placeholder(message: str) -> None:
@@ -1134,7 +1215,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         _render_job_photos_tab(job)
 
     with tab_daily:
-        _render_dialog_placeholder("Daily field updates will appear here when connected to Supabase.")
+        _render_job_daily_updates_tab(job)
 
     with tab_notes:
         notes_text = _safe_value(job.get("notes") or job.get("description"), "No notes entered.")
