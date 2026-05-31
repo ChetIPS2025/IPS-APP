@@ -1,0 +1,125 @@
+"""Job documents via ``documents_hub`` with optional subjob/task linkage."""
+
+from __future__ import annotations
+
+import logging
+import re
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from services.field_ops_util import fetch_fn, table_exists, write_fn
+
+_LOG = logging.getLogger(__name__)
+
+TABLE = "documents_hub"
+JOB_MODULE = "jobs"
+
+
+def _upload_fn(*, admin: bool):
+    try:
+        from app.db import upload_bytes, upload_bytes_admin
+    except ImportError:
+        from db import upload_bytes, upload_bytes_admin  # type: ignore
+    return upload_bytes_admin if admin else upload_bytes
+
+
+def _is_user_job_document(row: dict[str, Any]) -> bool:
+    """Exclude auto-generated weekly timesheet hub rows."""
+    ref = str(row.get("linked_ref") or "")
+    if ref.startswith("weekly_timesheet:"):
+        return False
+    mod = str(row.get("linked_module") or "").strip().lower()
+    return mod in ("jobs", "job") or bool(row.get("linked_record_id"))
+
+
+def fetch_job_documents(
+    job_id: str,
+    *,
+    admin: bool = False,
+    task_id: str | None = None,
+    unlinked_only: bool = False,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    jid = str(job_id or "").strip()
+    if not jid or not table_exists(TABLE, admin=admin):
+        return []
+    fn = fetch_fn(admin=admin)
+    rows = fn(TABLE, {"linked_record_id": jid}, limit=limit)
+    out = [r for r in (rows or []) if isinstance(r, dict) and _is_user_job_document(r)]
+    tid = str(task_id or "").strip()
+    if tid:
+        out = [r for r in out if str(r.get("task_id") or "").strip() == tid]
+    elif unlinked_only:
+        out = [r for r in out if not str(r.get("task_id") or "").strip()]
+    out.sort(key=lambda r: str(r.get("upload_date") or r.get("created_at") or ""), reverse=True)
+    return out
+
+
+def upload_job_document(
+    *,
+    job_id: str,
+    file_data: bytes,
+    file_name: str,
+    content_type: str = "application/octet-stream",
+    uploaded_by: str = "",
+    doc_type: str = "Job Document",
+    notes: str = "",
+    task_id: str | None = None,
+    admin: bool = False,
+) -> dict[str, Any]:
+    jid = str(job_id or "").strip()
+    if not jid:
+        raise ValueError("job_id required")
+    if not file_data:
+        raise ValueError("Empty file")
+    if not table_exists(TABLE, admin=admin):
+        raise RuntimeError("documents_hub table not found — run sql/008_documents.sql")
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    bucket = getattr(settings, "storage_bucket", "ips-storage")
+    insert_fn, _, _ = write_fn(admin=admin)
+    upload = _upload_fn(admin=admin)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(file_name or "document").strip())[:160] or "document"
+    storage_path = f"job_documents/{jid}/{ts}_{safe}"
+    upload(storage_path, file_data, content_type=content_type or "application/octet-stream", bucket=bucket)
+    payload: dict[str, Any] = {
+        "file_name": str(file_name or Path(storage_path).name)[:200],
+        "doc_type": str(doc_type or "Job Document").strip()[:120],
+        "linked_module": JOB_MODULE,
+        "linked_ref": f"job:{jid}",
+        "linked_record_id": jid,
+        "upload_date": date.today().isoformat(),
+        "uploaded_by": str(uploaded_by or "").strip()[:200],
+        "storage_path": storage_path,
+        "notes": str(notes or "").strip()[:2000],
+    }
+    tid = str(task_id or "").strip()
+    if tid:
+        payload["task_id"] = tid
+    return insert_fn(TABLE, payload)
+
+
+def link_job_document_to_task(
+    document_id: str,
+    task_id: str,
+    *,
+    admin: bool = False,
+) -> None:
+    did = str(document_id or "").strip()
+    tid = str(task_id or "").strip()
+    if not did or not tid:
+        raise ValueError("document_id and task_id required")
+    _, update_fn, _ = write_fn(admin=admin)
+    update_fn(TABLE, {"task_id": tid}, {"id": did})
+
+
+def unlink_job_document_from_task(document_id: str, *, admin: bool = False) -> None:
+    did = str(document_id or "").strip()
+    if not did:
+        raise ValueError("document_id required")
+    _, update_fn, _ = write_fn(admin=admin)
+    update_fn(TABLE, {"task_id": None}, {"id": did})

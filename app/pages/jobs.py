@@ -686,6 +686,25 @@ def _schedule_summary(job: dict) -> str:
     return f"{start} – {end}"
 
 
+def _job_subjob_label_map(job_id: str) -> dict[str, str]:
+    """Map IPS subjob/task ids to display titles for job-level media tabs."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return {}
+    try:
+        from app.services.tasks_service import get_tasks_by_job
+    except ImportError:
+        from services.tasks_service import get_tasks_by_job  # type: ignore
+    try:
+        return {
+            str(t.get("id") or "").strip(): str(t.get("title") or "").strip()
+            for t in get_tasks_by_job(jid, include_closed=True)
+            if str(t.get("id") or "").strip()
+        }
+    except Exception:
+        return {}
+
+
 def _render_job_documents_tab(job: dict) -> None:
     """Job-linked documents from documents_hub and approved weekly timesheets."""
     jid = str(job.get("id") or "")
@@ -711,6 +730,7 @@ def _render_job_documents_tab(job: dict) -> None:
         for r in list_timesheets_for_job(jid)
         if str(r.get("status") or "") in {"Approved", "Signed", "Sent", "Generated"}
     ]
+    task_labels = _job_subjob_label_map(jid)
 
     if not docs and not ts_rows:
         _render_dialog_placeholder(
@@ -726,7 +746,11 @@ def _render_job_documents_tab(job: dict) -> None:
             path = str(doc.get("storage_path") or "")
             url = signed_url_for_timesheet(path) if path else ""
             when = str(doc.get("upload_date") or "")[:10]
+            subjob_tid = str(doc.get("task_id") or "").strip()
+            subjob = task_labels.get(subjob_tid, "") if subjob_tid else ""
             line = f"- **{html.escape(name)}** · {html.escape(dtype)} · {when}"
+            if subjob:
+                line += f" · Subjob: {html.escape(subjob)}"
             if url:
                 line += f' · <a href="{html.escape(url)}" target="_blank">Open</a>'
             st.markdown(line, unsafe_allow_html=True)
@@ -854,6 +878,7 @@ def _render_job_photos_tab(job: dict) -> None:
         job_id=jid,
         admin_read=_field_admin_read(),
         compact=True,
+        task_labels=_job_subjob_label_map(jid),
     )
 
 

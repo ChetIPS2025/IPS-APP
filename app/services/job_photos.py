@@ -59,6 +59,8 @@ def fetch_job_photos(
     *,
     admin: bool = False,
     category: str | None = None,
+    task_id: str | None = None,
+    unlinked_only: bool = False,
     limit: int = 100,
 ) -> list[dict[str, Any]]:
     jid = str(job_id or "").strip()
@@ -68,10 +70,36 @@ def fetch_job_photos(
     match: dict[str, Any] = {"job_id": jid}
     if category and str(category).strip() in PHOTO_CATEGORIES:
         match["category"] = str(category).strip()
+    if task_id:
+        match["task_id"] = str(task_id).strip()
     rows = fn("job_photos", match, limit=limit)
     out = list(rows or [])
+    if unlinked_only:
+        out = [r for r in out if not str(r.get("task_id") or "").strip()]
     out.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     return out
+
+
+def link_job_photo_to_task(
+    photo_id: str,
+    task_id: str,
+    *,
+    admin: bool = False,
+) -> None:
+    pid = str(photo_id or "").strip()
+    tid = str(task_id or "").strip()
+    if not pid or not tid:
+        raise ValueError("photo_id and task_id required")
+    _, update_fn, _ = write_fn(admin=admin)
+    update_fn("job_photos", {"task_id": tid}, {"id": pid})
+
+
+def unlink_job_photo_from_task(photo_id: str, *, admin: bool = False) -> None:
+    pid = str(photo_id or "").strip()
+    if not pid:
+        raise ValueError("photo_id required")
+    _, update_fn, _ = write_fn(admin=admin)
+    update_fn("job_photos", {"task_id": None}, {"id": pid})
 
 
 def upload_job_photos(

@@ -73,6 +73,7 @@ def render_job_photos_panel(
     admin_read: bool,
     uploaded_by: str = "",
     compact: bool = False,
+    task_labels: dict[str, str] | None = None,
 ) -> None:
     jid = str(job_id or "").strip()
     if not jid:
@@ -142,7 +143,18 @@ def render_job_photos_panel(
                 url = create_signed_url(pth, expires_in=3600, bucket=_photo_bucket()) if pth else ""
                 cap = str(ph.get("caption") or ph.get("file_name") or "photo")[:50]
                 cat_b = str(ph.get("category") or "")
+                subjob_tid = str(ph.get("task_id") or "").strip()
+                subjob_label = ""
+                if subjob_tid and task_labels:
+                    subjob_label = str(task_labels.get(subjob_tid) or "").strip()
+                caption_parts = []
+                if cat_b:
+                    caption_parts.append(cat_b)
+                if subjob_label:
+                    caption_parts.append(f"Subjob: {subjob_label[:40]}")
+                caption_parts.append(cap)
+                caption = " · ".join(caption_parts)
                 if url and (_IMG_EXT.search(pth.lower()) or _IMG_EXT.search(cap.lower())):
-                    st.image(url, caption=f"{cat_b}: {cap}" if cat_b else cap, use_container_width=True)
+                    st.image(url, caption=caption, use_container_width=True)
                 elif url:
                     st.link_button("Open", url, use_container_width=True)
