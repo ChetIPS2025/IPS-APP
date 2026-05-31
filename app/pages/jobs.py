@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
+    from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -57,6 +58,7 @@ try:
         toggle_field_expanded,
     )
 except ImportError:
+    from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
@@ -116,6 +118,7 @@ _JOB_TABS = [
     "Equipment",
     "Schedule",
     "Subjobs",
+    "IPS Forms",
     "Weekly Timesheets",
     "Documents",
     "Photos",
@@ -981,6 +984,11 @@ def _render_job_inventory_tab(job: dict) -> None:
     st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
 
 
+def _render_job_ips_forms_tab(job: dict) -> None:
+    """Dedicated IPS Forms tab in Job Details."""
+    render_job_ips_forms_tab(job)
+
+
 def _render_job_equipment_tab(job: dict) -> None:
     """Job equipment list and inspection form launchers."""
     jid = str(job.get("id") or "").strip()
@@ -1116,6 +1124,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_equipment,
         tab_schedule,
         tab_tasks,
+        tab_ips_forms,
         tab_weekly_ts,
         tab_documents,
         tab_photos,
@@ -1223,6 +1232,9 @@ def _render_job_detail_tabs(job: dict) -> None:
     with tab_tasks:
         inject_tasks_module_css()
         render_job_linked_tasks_tab(job)
+
+    with tab_ips_forms:
+        _render_job_ips_forms_tab(job)
 
     with tab_weekly_ts:
         jid = str(job.get("id") or "").strip()
