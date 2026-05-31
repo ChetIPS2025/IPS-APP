@@ -327,19 +327,24 @@ def render_section_desc_only(text: str) -> None:
 
 
 @contextmanager
-def render_card(*, title: str | None = None, bordered: bool = False) -> Iterator[None]:
+def render_card(
+    *,
+    title: str | None = None,
+    subtitle: str | None = None,
+    bordered: bool = False,
+) -> Iterator[None]:
     """Content section; default is flat (subtle divider), optional bordered card."""
     inject_ips_dashboard_layout()
     if bordered:
         with st.container(border=True):
             st.markdown('<span class="ips-content-card-anchor ips-surface-card"></span>', unsafe_allow_html=True)
             if title:
-                render_section_header(title)
+                render_section_header(title, description=subtitle)
             yield
     else:
         st.markdown('<span class="ips-content-card-anchor ips-surface-soft"></span>', unsafe_allow_html=True)
         if title:
-            render_section_header(title)
+            render_section_header(title, description=subtitle)
         yield
 
 

@@ -100,7 +100,6 @@ _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
 _JOB_TABS = [
     "Overview",
     "Scope",
-    "Financials",
     "Estimates",
     "Inventory",
     "Equipment",
@@ -111,7 +110,6 @@ _JOB_TABS = [
     "Photos",
     "Daily Updates",
     "Notes",
-    "Activity",
 ]
 _FIELD_JOB_TABS = ["Overview", "Tasks", "Photos", "Daily Report"]
 SELECTED_JOB_KEY = "selected_job_id"
@@ -675,15 +673,6 @@ def _schedule_summary(job: dict) -> str:
     return f"{start} – {end}"
 
 
-def _currency_value(value: object) -> str:
-    if value in (None, ""):
-        return "—"
-    try:
-        return f"${float(value):,.2f}"
-    except (TypeError, ValueError):
-        return _safe_value(value)
-
-
 def _render_job_documents_tab(job: dict) -> None:
     """Job-linked documents from documents_hub and approved weekly timesheets."""
     jid = str(job.get("id") or "")
@@ -1071,7 +1060,6 @@ def _render_job_detail_tabs(job: dict) -> None:
     (
         tab_overview,
         tab_scope,
-        tab_financials,
         tab_estimates,
         tab_inventory,
         tab_equipment,
@@ -1082,7 +1070,6 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_photos,
         tab_daily,
         tab_notes,
-        tab_activity,
     ) = st.tabs(_JOB_TABS)
 
     with tab_overview:
@@ -1108,17 +1095,6 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</p>"
         )
         st.markdown(_dialog_card("Scope of Work", scope_html), unsafe_allow_html=True)
-
-    with tab_financials:
-        fin_html = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Labor Total', _currency_value(job.get('labor_total')))}"
-            f"{_detail_field('Material Total', _currency_value(job.get('material_total')))}"
-            f"{_detail_field('Equipment Total', _currency_value(job.get('equipment_total')))}"
-            f"{_detail_field('Total', _currency_value(job.get('total') or job.get('awarded_amount')))}"
-            f"</div>"
-        )
-        st.markdown(_dialog_card("Financial Summary", fin_html), unsafe_allow_html=True)
 
     with tab_estimates:
         jid = str(job.get("id") or "")
@@ -1225,9 +1201,6 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</p>"
         )
         st.markdown(_dialog_card("Notes", notes_html), unsafe_allow_html=True)
-
-    with tab_activity:
-        _render_dialog_placeholder("Job activity history will appear here when connected to Supabase.")
 
 
 def _render_job_edit_form(job: dict) -> None:

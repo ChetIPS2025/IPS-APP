@@ -20,8 +20,13 @@ except ImportError:
 
 
 @contextmanager
-def render_card(*, title: str | None = None, bordered: bool = False) -> Iterator[None]:
-    with _render_card(title=title, bordered=bordered):
+def render_card(
+    *,
+    title: str | None = None,
+    subtitle: str | None = None,
+    bordered: bool = False,
+) -> Iterator[None]:
+    with _render_card(title=title, subtitle=subtitle, bordered=bordered):
         yield
 
 

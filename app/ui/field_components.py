@@ -41,7 +41,7 @@ def render_job_timeline_panel(*, job_id: str, admin_read: bool, limit: int = 40)
     jid = str(job_id or "").strip()
     if not jid:
         return
-    with render_card("Job timeline", subtitle="Field updates, reports, photos, and check-ins"):
+    with render_card(title="Job timeline", subtitle="Field updates, reports, photos, and check-ins"):
         rows = fetch_timeline_for_job(jid, admin=admin_read, limit=limit)
         if not rows:
             render_empty_state(
@@ -77,7 +77,7 @@ def render_job_photos_panel(
     if not jid:
         return
     title = "Photo timeline" if not compact else "Photos"
-    with render_card(title, subtitle="Newest first · Before / During / Completed / Safety…"):
+    with render_card(title=title, subtitle="Newest first · Before / During / Completed / Safety…"):
         cat_filter = st.selectbox(
             "Category",
             ["All"] + list(PHOTO_CATEGORIES),
