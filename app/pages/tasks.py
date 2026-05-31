@@ -1076,7 +1076,7 @@ def _render_job_linked_tasks_table(
     assignee_lookup: dict[str, str],
 ) -> None:
     cols = [4.8, 1.2, 1.2, 2.0, 1.2]
-    headers = ["TASK", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE"]
+    headers = ["SUBJOB", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE"]
     st.markdown('<div class="ips-job-tasks-table">', unsafe_allow_html=True)
     with st.container(key="job_tasks_table_wrap"):
         header_cols = st.columns(cols, gap="small", vertical_alignment="center")
@@ -1118,7 +1118,7 @@ def _render_job_linked_tasks_table(
 
 
 def render_job_linked_tasks_tab(job: dict) -> None:
-    """Tasks tab inside Job Details — linked IPS tasks for this job."""
+    """Subjobs tab inside Job Details — linked work items for this job (stored as IPS tasks)."""
     job_id = str(job.get("id") or "").strip()
     if not job_id:
         st.info("No job selected.")
@@ -1141,14 +1141,14 @@ def render_job_linked_tasks_tab(job: dict) -> None:
         )
         if hasattr(st, "segmented_control"):
             st.segmented_control(
-                "Job task view",
+                "Subjob view",
                 JOB_TASK_VIEW_OPTS,
                 key=view_key,
                 label_visibility="collapsed",
             )
         else:
             st.radio(
-                "Job task view",
+                "Subjob view",
                 JOB_TASK_VIEW_OPTS,
                 key=view_key,
                 horizontal=True,
@@ -1156,7 +1156,7 @@ def render_job_linked_tasks_tab(job: dict) -> None:
             )
         st.markdown("</div>", unsafe_allow_html=True)
     with head_r:
-        if st.button("+ Add Task", key=f"job_add_task_{job_id}", use_container_width=True):
+        if st.button("+ Add Subjob", key=f"job_add_task_{job_id}", use_container_width=True):
             st.session_state[form_key] = True
 
     all_for_job = _merge_task_overrides(get_tasks_by_job(job_id, include_closed=True))
@@ -1169,8 +1169,8 @@ def render_job_linked_tasks_tab(job: dict) -> None:
         linked = all_for_job
 
     if st.session_state.get(form_key):
-        with st.expander("New task", expanded=True):
-            st.text_input("Title", key=f"job_task_new_title_{job_id}")
+        with st.expander("New subjob", expanded=True):
+            st.text_input("Subjob title", key=f"job_task_new_title_{job_id}")
             nc1, nc2 = st.columns(2)
             with nc1:
                 st.selectbox("Status", _TASK_STATUS_OPTS, key=f"job_task_new_status_{job_id}")
@@ -1186,7 +1186,7 @@ def render_job_linked_tasks_tab(job: dict) -> None:
             st.text_area("Description", key=f"job_task_new_desc_{job_id}")
             btn_l, btn_r = st.columns(2)
             with btn_l:
-                if st.button("Create Task", key=f"job_task_create_{job_id}", type="primary"):
+                if st.button("Create Subjob", key=f"job_task_create_{job_id}", type="primary"):
                     assignee = st.session_state.get(f"job_task_new_assignee_{job_id}")
                     if assignee == "— Unassigned —":
                         assignee = ""
@@ -1202,6 +1202,8 @@ def render_job_linked_tasks_tab(job: dict) -> None:
                         "due_date": st.session_state.get(f"job_task_new_due_{job_id}"),
                     }
                     ok, msg = persist_task(ui)
+                    if ok:
+                        msg = "Subjob saved."
                     if apply_persist_feedback(ok, msg, clear_keys=(form_key,)):
                         clear_tasks_cache()
                         st.rerun()
@@ -1212,7 +1214,7 @@ def render_job_linked_tasks_tab(job: dict) -> None:
 
     if not linked:
         st.markdown(
-            '<p class="ips-job-tasks-empty">No tasks linked to this job.</p>',
+            '<p class="ips-job-tasks-empty">No subjobs yet. Add a subjob to track work under this job.</p>',
             unsafe_allow_html=True,
         )
         return

@@ -104,14 +104,14 @@ _JOB_TABS = [
     "Inventory",
     "Equipment",
     "Schedule",
-    "Tasks",
+    "Subjobs",
     "Weekly Timesheets",
     "Documents",
     "Photos",
     "Daily Updates",
     "Notes",
 ]
-_FIELD_JOB_TABS = ["Overview", "Tasks", "Photos", "Daily Report"]
+_FIELD_JOB_TABS = ["Overview", "Subjobs", "Photos", "Daily Report"]
 SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"

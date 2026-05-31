@@ -616,7 +616,7 @@ def _render_daily_hrs_input(
 
     if box_style:
         st.markdown(
-            '<span class="timesheet-list-hour-box-marker ips-compact-hours-input-marker" aria-hidden="true"></span>',
+            '<span class="timesheet-list-hour-box-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         return float(
