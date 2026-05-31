@@ -20,7 +20,6 @@ try:
     from app.services.coupling_inspection_service import (
         PHOTO_SLOTS,
         PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLES,
         apply_task_link_to_payload,
         build_header_context,
         completion_percentage,
@@ -60,7 +59,6 @@ except ImportError:
     from services.coupling_inspection_service import (  # type: ignore
         PHOTO_SLOTS,
         PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLES,
         apply_task_link_to_payload,
         build_header_context,
         completion_percentage,
@@ -91,10 +89,10 @@ except ImportError:
     from styles import inject_coupling_inspection_css  # type: ignore
 
 _DRAFT_KEY = "coupling_insp_draft"
+_FORM_SIGNATURE_ROLES: tuple[str, ...] = ("technician", "supervisor")
 _SIGNATURE_LABELS = {
     "technician": "Technician",
     "supervisor": "Supervisor",
-    "customer_representative": "Customer Representative",
 }
 
 
@@ -304,12 +302,6 @@ def _render_header_section(record: dict[str, Any], *, sk: str, locked: bool) -> 
             value=str(hdr.get("supervisor") or ""),
             disabled=locked,
             key=f"{sk}_hdr_sup",
-        ).strip()
-        hdr["customer_representative"] = st.text_input(
-            "Customer Representative",
-            value=str(hdr.get("customer_representative") or ""),
-            disabled=locked,
-            key=f"{sk}_hdr_custrep",
         ).strip()
     record["header"] = hdr
     return record
@@ -549,10 +541,10 @@ def _render_photos_section(record: dict[str, Any], *, sk: str, locked: bool) -> 
 def _render_signatures_section(record: dict[str, Any], *, sk: str, locked: bool) -> dict[str, Any]:
     st.markdown("## 6. Signatures")
     meta = dict(record.get("signatures_meta") or {})
-    updated: dict[str, Any] = {}
-    for role in SIGNATURE_ROLES:
+    updated: dict[str, Any] = dict(meta)
+    for role in _FORM_SIGNATURE_ROLES:
         label = _SIGNATURE_LABELS.get(role, role.replace("_", " ").title())
-        required = role in ("technician", "customer_representative")
+        required = role == "technician"
         updated[role] = render_signature_field(
             label=label,
             role_key=f"{sk}_{role}",
@@ -563,7 +555,8 @@ def _render_signatures_section(record: dict[str, Any], *, sk: str, locked: bool)
     record["signatures_meta"] = updated
     record["technician_signature"] = updated["technician"]["signature_image"]
     record["supervisor_signature"] = updated["supervisor"]["signature_image"]
-    record["customer_signature"] = updated["customer_representative"]["signature_image"]
+    cust = meta.get("customer_representative") if isinstance(meta.get("customer_representative"), dict) else {}
+    record["customer_signature"] = str(cust.get("signature_image") or record.get("customer_signature") or "")
     return record
 
 

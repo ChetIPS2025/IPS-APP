@@ -18,6 +18,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 try:
     from app.branding import get_header_logo_path
     from app.services.coupling_inspection_service import (
+        FORM_SIGNATURE_ROLES,
         PHOTO_SLOT_LABELS,
         normalize_inspection_results,
         normalize_signatures_meta,
@@ -36,6 +37,7 @@ try:
 except ImportError:
     from branding import get_header_logo_path  # type: ignore
     from services.coupling_inspection_service import (  # type: ignore
+        FORM_SIGNATURE_ROLES,
         PHOTO_SLOT_LABELS,
         normalize_inspection_results,
         normalize_signatures_meta,
@@ -216,7 +218,6 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         ["Date", str(hdr.get("inspection_date") or "—")],
         ["Technician", str(hdr.get("technician") or "—")],
         ["Supervisor", str(hdr.get("supervisor") or "—")],
-        ["Customer Representative", str(hdr.get("customer_representative") or "—")],
         ["Coupling Model", str(record.get("coupling_model") or "—")],
     ]
     meta_table = Table(meta, colWidths=[1.55 * inch, content_w - 1.55 * inch])
@@ -370,9 +371,9 @@ def build_coupling_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
     role_labels = {
         "technician": "Technician",
         "supervisor": "Supervisor",
-        "customer_representative": "Customer Representative",
     }
-    for role, label in role_labels.items():
+    for role in FORM_SIGNATURE_ROLES:
+        label = role_labels.get(role, role.replace("_", " ").title())
         entry = sig_meta.get(role) or {}
         name = str(entry.get("signer_name") or "").strip()
         signed_at = str(entry.get("signed_at") or "")[:19]

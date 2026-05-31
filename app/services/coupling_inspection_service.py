@@ -87,6 +87,7 @@ PHOTO_SLOT_LABELS: dict[str, str] = {
 }
 
 SIGNATURE_ROLES: tuple[str, ...] = ("technician", "supervisor", "customer_representative")
+FORM_SIGNATURE_ROLES: tuple[str, ...] = ("technician", "supervisor")
 SIGNATURE_ROLE_LABELS: dict[str, str] = {
     "technician": "Technician",
     "supervisor": "Supervisor",
@@ -684,8 +685,6 @@ def validate_for_complete(data: dict[str, Any]) -> list[str]:
     sig = normalize_signatures_meta(data)
     if not str(sig["technician"]["signature_image"] or "").strip():
         errors.append("Technician signature is required")
-    if not str(sig["customer_representative"]["signature_image"] or "").strip():
-        errors.append("Customer representative signature is required")
 
     results = normalize_inspection_results(data.get("inspection_fields"))
     for key, item in results.items():
@@ -700,7 +699,7 @@ def validate_for_complete(data: dict[str, Any]) -> list[str]:
 
 def completion_percentage(data: dict[str, Any]) -> float:
     """Weighted progress toward complete inspection (8-bolt pattern)."""
-    total = float(BOLT_COUNT * 3 + 3)  # final + witness + initial per bolt, + tech + customer + photo
+    total = float(BOLT_COUNT * 3 + 2)  # final + witness + initial per bolt, + tech signature + photo
     done = 0.0
     rows = normalize_torque_rows(
         _as_list(data.get("torque_rows")),
@@ -715,8 +714,6 @@ def completion_percentage(data: dict[str, Any]) -> float:
             done += 1
     sig = normalize_signatures_meta(data)
     if str(sig["technician"]["signature_image"] or "").strip():
-        done += 1
-    if str(sig["customer_representative"]["signature_image"] or "").strip():
         done += 1
     if _as_list(data.get("photo_attachments")):
         done += 1
