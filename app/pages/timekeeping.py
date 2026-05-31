@@ -134,6 +134,7 @@ _DAY_GRID_LABELS = [
     "Actions",
     "Notes",
 ]
+_LIST_VIEW_HOUR_STEP = 0.5
 
 
 def _default_timekeeping_view() -> str:
@@ -660,19 +661,49 @@ def _render_list_day_hour_stepper(
     widget_key: str,
     day_label: str,
 ) -> float:
-    """List view: − / value / + stepper under the day label."""
-    st.markdown(
-        '<span class="timesheet-list-hour-stepper-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    return _hour_stepper_input(
-        label=f"{day_label} hours",
-        value=float(value),
-        widget_key=widget_key,
-        down_label="−",
-        up_label="+",
-        compact=True,
-    )
+    """List view: hour input with explicit ▲/▼ stepper buttons."""
+    step = _LIST_VIEW_HOUR_STEP
+    down_key = f"{widget_key}_dn"
+    up_key = f"{widget_key}_up"
+    spin_key = f"tk_list_hour_spin_{widget_key}"
+
+    with st.container(key=spin_key):
+        st.markdown(
+            '<span class="timekeeping-list-hour-spinner-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        val_col, btn_col = st.columns([0.68, 0.32], gap="small")
+        with val_col:
+            hours = st.number_input(
+                f"{day_label} hours",
+                value=float(value),
+                key=widget_key,
+                label_visibility="collapsed",
+                step=step,
+                min_value=0.0,
+                max_value=24.0,
+                format="%.1f",
+            )
+        with btn_col:
+            if st.button(
+                "▲",
+                key=up_key,
+                use_container_width=True,
+                help=f"Increase {day_label} hours",
+            ):
+                cur = float(st.session_state.get(widget_key, value))
+                st.session_state[widget_key] = min(24.0, round(cur + step, 1))
+                st.rerun()
+            if st.button(
+                "▼",
+                key=down_key,
+                use_container_width=True,
+                help=f"Decrease {day_label} hours",
+            ):
+                cur = float(st.session_state.get(widget_key, value))
+                st.session_state[widget_key] = max(0.0, round(cur - step, 1))
+                st.rerun()
+    return max(0.0, float(hours))
 
 
 def _render_list_row_day_cell(
