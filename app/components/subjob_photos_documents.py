@@ -291,12 +291,17 @@ def render_subjob_photos_section(task: dict, job: dict) -> None:
 
 def _render_doc_upload_panel(*, job_id: str, task_id: str, key_prefix: str, admin: bool) -> None:
     st.markdown(
-        dialog_card_html("Documents", '<p style="margin:0;font-size:0.875rem;color:#64748b;">Upload a document for this subjob.</p>'),
+        dialog_card_html(
+            "Upload Documents",
+            '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
+            "Choose one or more documents to attach to this subjob.</p>",
+        ),
         unsafe_allow_html=True,
     )
     st.file_uploader(
-        "Document",
+        "Choose documents",
         type=["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg"],
+        accept_multiple_files=True,
         key=f"{key_prefix}_doc_file",
     )
     st.text_input("Document type", value="Job Document", key=f"{key_prefix}_doc_type")
@@ -304,15 +309,23 @@ def _render_doc_upload_panel(*, job_id: str, task_id: str, key_prefix: str, admi
     btn_l, btn_r = st.columns(2)
     with btn_l:
         if st.button("Upload", type="primary", key=f"{key_prefix}_doc_upload_go"):
-            up = st.session_state.get(f"{key_prefix}_doc_file")
-            if up is None:
-                st.warning("Choose a document first.")
+            raw = st.session_state.get(f"{key_prefix}_doc_file")
+            files = raw if isinstance(raw, list) else ([raw] if raw else [])
+            if not files:
+                st.warning("Choose at least one document to upload.")
             else:
-                data = up.getvalue()
-                if not data:
-                    st.warning("Empty file.")
-                else:
-                    name = str(getattr(up, "name", "") or "document")
+                doc_type = str(st.session_state.get(f"{key_prefix}_doc_type") or "Job Document")
+                notes = str(st.session_state.get(f"{key_prefix}_doc_notes") or "")
+                uploaded = 0
+                errors: list[str] = []
+                for i, up in enumerate(files):
+                    if up is None:
+                        continue
+                    data = up.getvalue()
+                    name = str(getattr(up, "name", "") or f"document_{i + 1}")
+                    if not data:
+                        errors.append(f"{name}: empty file")
+                        continue
                     ctype = guess_document_content_type(name, str(getattr(up, "type", "") or ""))
                     try:
                         upload_job_document(
@@ -321,16 +334,20 @@ def _render_doc_upload_panel(*, job_id: str, task_id: str, key_prefix: str, admi
                             file_name=name,
                             content_type=ctype,
                             uploaded_by=_current_uploader_name(),
-                            doc_type=str(st.session_state.get(f"{key_prefix}_doc_type") or "Job Document"),
-                            notes=str(st.session_state.get(f"{key_prefix}_doc_notes") or ""),
+                            doc_type=doc_type,
+                            notes=notes,
                             task_id=task_id,
                             admin=admin,
                         )
-                        _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, False)
-                        st.success("Document uploaded.")
-                        st.rerun()
+                        uploaded += 1
                     except Exception as exc:
-                        st.error(str(exc))
+                        errors.append(f"{name}: {exc}")
+                for err in errors:
+                    st.error(err)
+                if uploaded:
+                    _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, False)
+                    st.success(f"Uploaded {uploaded} document(s).")
+                    st.rerun()
     with btn_r:
         if st.button("Cancel", key=f"{key_prefix}_doc_upload_cancel"):
             _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, False)
@@ -444,7 +461,7 @@ def render_subjob_documents_section(task: dict, job: dict) -> None:
     st.markdown(dialog_card_html("Documents", empty_html), unsafe_allow_html=True)
     btn_l, btn_r = st.columns(2)
     with btn_l:
-        if st.button("+ Upload Document", type="primary", key=f"{key_prefix}_upload", use_container_width=True):
+        if st.button("+ Upload Documents", type="primary", key=f"{key_prefix}_upload", use_container_width=True):
             _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, True)
             st.rerun()
     with btn_r:

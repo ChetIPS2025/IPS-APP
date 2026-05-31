@@ -755,41 +755,54 @@ def _render_job_document_upload_form(job: dict) -> None:
 
     st.markdown(
         _dialog_card(
-            "Upload document",
+            "Upload Documents",
             '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
-            "Attach a file to this job. Supported: PDF, Word, Excel, CSV, and common images.</p>",
+            "Attach one or more files to this job. Supported: PDF, Word, Excel, CSV, and common images.</p>",
         ),
         unsafe_allow_html=True,
     )
     st.file_uploader(
-        "File",
+        "Choose documents",
         type=_JOB_DOC_UPLOAD_TYPES,
+        accept_multiple_files=True,
         key=f"{pk}_file",
         label_visibility="collapsed",
     )
-    st.text_input("Document title (optional)", key=f"{pk}_title", placeholder="Defaults to file name")
+    st.text_input(
+        "Document title (optional, single file only)",
+        key=f"{pk}_title",
+        placeholder="Defaults to file name when uploading one file",
+    )
     st.text_input("Document type / category", value="Job Document", key=f"{pk}_type")
     st.text_area("Notes (optional)", key=f"{pk}_notes", height=80)
     btn_upload, btn_cancel = st.columns(2, gap="small")
     with btn_upload:
         if st.button("Upload", type="primary", key=f"{pk}_save", use_container_width=True):
-            up = st.session_state.get(f"{pk}_file")
-            if up is None:
-                st.warning("Choose a file to upload.")
+            raw = st.session_state.get(f"{pk}_file")
+            files = raw if isinstance(raw, list) else ([raw] if raw else [])
+            if not files:
+                st.warning("Choose at least one document to upload.")
             else:
-                data = up.getvalue()
-                if not data:
-                    st.warning("The selected file is empty.")
-                else:
-                    try:
-                        from app.services.asset_document_util import guess_document_content_type
-                        from app.services.job_documents import upload_job_document
-                    except ImportError:
-                        from services.asset_document_util import guess_document_content_type  # type: ignore
-                        from services.job_documents import upload_job_document  # type: ignore
-                    raw_name = str(getattr(up, "name", "") or "document")
-                    title = str(st.session_state.get(f"{pk}_title") or "").strip()
-                    file_name = title or raw_name
+                try:
+                    from app.services.asset_document_util import guess_document_content_type
+                    from app.services.job_documents import upload_job_document
+                except ImportError:
+                    from services.asset_document_util import guess_document_content_type  # type: ignore
+                    from services.job_documents import upload_job_document  # type: ignore
+                title_override = str(st.session_state.get(f"{pk}_title") or "").strip()
+                doc_type = str(st.session_state.get(f"{pk}_type") or "Job Document")
+                notes = str(st.session_state.get(f"{pk}_notes") or "")
+                uploaded = 0
+                errors: list[str] = []
+                for i, up in enumerate(files):
+                    if up is None:
+                        continue
+                    data = up.getvalue()
+                    raw_name = str(getattr(up, "name", "") or f"document_{i + 1}")
+                    if not data:
+                        errors.append(f"{raw_name}: empty file")
+                        continue
+                    file_name = title_override if len(files) == 1 and title_override else raw_name
                     ctype = guess_document_content_type(raw_name, str(getattr(up, "type", "") or ""))
                     try:
                         upload_job_document(
@@ -798,16 +811,19 @@ def _render_job_document_upload_form(job: dict) -> None:
                             file_name=file_name,
                             content_type=ctype,
                             uploaded_by=_current_document_uploader_name(),
-                            doc_type=str(st.session_state.get(f"{pk}_type") or "Job Document"),
-                            notes=str(st.session_state.get(f"{pk}_notes") or ""),
+                            doc_type=doc_type,
+                            notes=notes,
                             admin=admin,
                         )
+                        uploaded += 1
                     except Exception as exc:
-                        st.error(str(exc))
-                    else:
-                        _set_job_doc_upload(jid, False)
-                        st.success("Document uploaded.")
-                        st.rerun()
+                        errors.append(f"{raw_name}: {exc}")
+                for err in errors:
+                    st.error(err)
+                if uploaded:
+                    _set_job_doc_upload(jid, False)
+                    st.success(f"Uploaded {uploaded} document(s).")
+                    st.rerun()
     with btn_cancel:
         if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
             _set_job_doc_upload(jid, False)
@@ -835,7 +851,7 @@ def _render_job_documents_tab(job: dict) -> None:
         st.markdown("**Job documents**")
     with head_r:
         if not upload_active and st.button(
-            "+ Upload Document",
+            "+ Upload Documents",
             key=f"job_doc_upload_btn_{_job_session_key(job)}",
             use_container_width=True,
         ):
