@@ -1275,6 +1275,45 @@ def inject_tasks_module_css() -> None:
   color: #2563eb !important;
   text-decoration: underline !important;
 }}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #dc2626 !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+}}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button:hover {{
+  color: #b91c1c !important;
+  background: #fef2f2 !important;
+  border-radius: 6px !important;
+}}
+.ips-subjob-delete-confirm-label {{
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.2;
+  margin: 0 0 4px 0;
+  white-space: nowrap;
+}}
+.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) {{
+  min-height: 72px !important;
+  align-items: center !important;
+}}
+.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) > [data-testid="column"]:last-child {{
+  min-width: 148px !important;
+}}
+.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) [data-testid="stButton"] > button {{
+  font-size: 11px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 8px !important;
+}}
 </style>
 """,
         unsafe_allow_html=True,

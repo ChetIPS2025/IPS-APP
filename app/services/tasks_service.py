@@ -26,6 +26,7 @@ from app.services.task_display_helpers import (
 
 __all__ = [
     "clear_tasks_cache",
+    "delete_job_subjob",
     "delete_task",
     "get_closed_tasks",
     "get_open_tasks",
@@ -98,6 +99,58 @@ def get_tasks_by_job(job_id: str, *, include_closed: bool = False) -> list[dict[
 def clear_tasks_cache() -> None:
     """Invalidate cached task reads after inline edits."""
     clear_all_data_caches()
+
+
+def delete_job_subjob(task_id: str, *, job_id: str | None = None) -> ServiceResult:
+    """Hard-delete an IPS subjob (todo) after unlinking optional child associations."""
+    tid = str(task_id or "").strip()
+    if not tid:
+        return ServiceResult(ok=False, error="Missing subjob id.")
+    jid = str(job_id or "").strip() or None
+
+    try:
+        from app.services.coupling_inspection_service import (
+            list_coupling_inspections,
+            unlink_coupling_inspection_from_task,
+        )
+    except ImportError:
+        from services.coupling_inspection_service import (  # type: ignore
+            list_coupling_inspections,
+            unlink_coupling_inspection_from_task,
+        )
+
+    for insp in list_coupling_inspections(job_id=jid, task_id=tid):
+        iid = str(insp.get("id") or "").strip()
+        if iid:
+            unlink_coupling_inspection_from_task(iid)
+
+    if jid:
+        try:
+            from app.services.job_photos import fetch_job_photos, unlink_job_photo_from_task
+            from app.services.job_documents import fetch_job_documents, unlink_job_document_from_task
+        except ImportError:
+            from services.job_photos import fetch_job_photos, unlink_job_photo_from_task  # type: ignore
+            from services.job_documents import fetch_job_documents, unlink_job_document_from_task  # type: ignore
+
+        for photo in fetch_job_photos(jid, task_id=tid, admin=True):
+            pid = str(photo.get("id") or "").strip()
+            if pid:
+                try:
+                    unlink_job_photo_from_task(pid, admin=True)
+                except Exception:
+                    pass
+        for doc in fetch_job_documents(jid, task_id=tid, admin=True):
+            did = str(doc.get("id") or "").strip()
+            if did:
+                try:
+                    unlink_job_document_from_task(did, admin=True)
+                except Exception:
+                    pass
+
+    result = delete_task(tid)
+    if result.ok:
+        clear_tasks_cache()
+    return result
 
 
 def update_task(task_id: str, update_data: dict[str, Any]) -> ServiceResult:

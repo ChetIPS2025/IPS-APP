@@ -68,6 +68,7 @@ try:
     )
     from app.services.tasks_service import (
         clear_tasks_cache,
+        delete_job_subjob,
         get_tasks,
         get_tasks_by_job,
         update_task,
@@ -145,6 +146,7 @@ except ImportError:
     )
     from services.tasks_service import (  # type: ignore
         clear_tasks_cache,
+        delete_job_subjob,
         get_tasks,
         get_tasks_by_job,
         update_task,
@@ -206,6 +208,13 @@ FIELD_TASK_VIEW_OPTS = ["Due Today", *TASK_VIEW_OPTS]
 JOB_TASK_VIEW_OPTS = ["Open", "Closed", "All"]
 SELECTED_JOB_SUBJOB_KEY = "selected_job_subjob_id"
 SELECTED_JOB_SUBJOB_PARENT_KEY = "selected_job_subjob_parent_job_id"
+PENDING_DELETE_SUBJOB_KEY = "pending_delete_subjob_id"
+PENDING_DELETE_SUBJOB_JOB_KEY = "pending_delete_subjob_job_id"
+
+
+def _clear_pending_subjob_delete() -> None:
+    st.session_state.pop(PENDING_DELETE_SUBJOB_KEY, None)
+    st.session_state.pop(PENDING_DELETE_SUBJOB_JOB_KEY, None)
 
 
 def clear_job_subjob_selection() -> None:
@@ -213,6 +222,7 @@ def clear_job_subjob_selection() -> None:
     st.session_state.pop(SELECTED_JOB_SUBJOB_PARENT_KEY, None)
     clear_job_subjob_coupling_state()
     clear_job_subjob_media_state()
+    _clear_pending_subjob_delete()
 
 
 def on_job_detail_modal_open(job_id: str) -> None:
@@ -1182,14 +1192,84 @@ def _render_job_linked_subjob_detail(
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
 
+def _handle_delete_job_subjob(task_id: str, job_id: str) -> None:
+    tid = str(task_id or "").strip()
+    jid = str(job_id or "").strip()
+    if not tid or not jid:
+        return
+    if _should_save_locally(tid):
+        st.warning("Demo subjobs cannot be deleted.")
+        _clear_pending_subjob_delete()
+        return
+    result = delete_job_subjob(tid, job_id=jid)
+    if result.ok:
+        if str(st.session_state.get(SELECTED_JOB_SUBJOB_KEY) or "").strip() == tid:
+            clear_job_subjob_selection()
+        else:
+            _clear_pending_subjob_delete()
+        clear_tasks_cache()
+        st.success("Subjob deleted.")
+        st.rerun()
+    st.error(str(result.error or "Could not delete subjob."))
+
+
+def _render_job_subjob_delete_cell(*, task_id: str, job_id: str) -> None:
+    tid = str(task_id or "").strip()
+    jid = str(job_id or "").strip()
+    if not tid:
+        return
+    pending_tid = str(st.session_state.get(PENDING_DELETE_SUBJOB_KEY) or "").strip()
+    pending_jid = str(st.session_state.get(PENDING_DELETE_SUBJOB_JOB_KEY) or "").strip()
+    is_pending = pending_tid == tid and pending_jid == jid
+
+    if is_pending:
+        st.markdown(
+            '<span class="ips-subjob-delete-pending-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="ips-subjob-delete-confirm-label">Delete this subjob?</div>',
+            unsafe_allow_html=True,
+        )
+        confirm_col, cancel_col = st.columns(2, gap="small")
+        with confirm_col:
+            if st.button(
+                "Delete",
+                key=f"confirm_delete_subjob_{jid}_{tid}",
+                type="primary",
+                use_container_width=True,
+            ):
+                _handle_delete_job_subjob(tid, jid)
+        with cancel_col:
+            if st.button(
+                "Cancel",
+                key=f"cancel_delete_subjob_{jid}_{tid}",
+                use_container_width=True,
+            ):
+                _clear_pending_subjob_delete()
+                st.rerun()
+        return
+
+    with st.container(key=f"job_task_delete_{tid}"):
+        if st.button(
+            "🗑️",
+            key=f"delete_subjob_{jid}_{tid}",
+            help="Delete subjob",
+            type="tertiary",
+        ):
+            st.session_state[PENDING_DELETE_SUBJOB_KEY] = tid
+            st.session_state[PENDING_DELETE_SUBJOB_JOB_KEY] = jid
+            st.rerun()
+
+
 def _render_job_linked_tasks_table(
     tasks: list[dict],
     *,
     job_id: str,
     assignee_lookup: dict[str, str],
 ) -> None:
-    cols = [4.8, 1.2, 1.2, 2.0, 1.2]
-    headers = ["SUBJOB", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE"]
+    cols = [4.4, 1.1, 1.1, 1.9, 1.1, 0.35]
+    headers = ["SUBJOB", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE", ""]
     st.markdown('<div class="ips-job-tasks-table">', unsafe_allow_html=True)
     with st.container(key="job_tasks_table_wrap"):
         header_cols = st.columns(cols, gap="small", vertical_alignment="center")
@@ -1228,6 +1308,8 @@ def _render_job_linked_tasks_table(
                     f'<div class="ips-job-tasks-row ips-task-cell ips-task-due">{html.escape(due)}</div>',
                     unsafe_allow_html=True,
                 )
+            with row_cols[5]:
+                _render_job_subjob_delete_cell(task_id=tid, job_id=job_id)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
