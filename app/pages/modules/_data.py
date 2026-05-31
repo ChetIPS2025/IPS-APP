@@ -594,9 +594,9 @@ def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
 
 
 def job_options_for_timekeeping() -> list[str]:
-    special_jobs = ("IPS Shop", "Administrator", "Vacation")
+    special_jobs = ("Shop", "Administrative", "Vacation")
     jobs = load_jobs()
-    opts = ["— No job —"]
+    opts = ["— Select assignment —"]
     seen = {opts[0].casefold()}
     for j in jobs:
         num = str(j.get("job_number") or "")
@@ -660,7 +660,7 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
         grid.append({
             "day": d.strftime("%A"),
             "date": d.isoformat(),
-            "job": default_job if i < 5 else "— No job —",
+            "job": default_job if i < 5 else "— Select assignment —",
             "st": 8.0 if i < 5 else 0.0,
             "ot": 0.0 if i < 4 else (4.0 if i == 4 else 0.0),
             "dt": 0.0,

@@ -626,9 +626,9 @@ def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
 
 
 def job_options_for_timekeeping() -> list[str]:
-    special_jobs = ("IPS Shop", "Administrator", "Vacation")
+    special_jobs = ("Shop", "Administrative", "Vacation")
     jobs = load_jobs()
-    opts = ["— No job —"]
+    opts = ["— Select assignment —"]
     seen = {opts[0].casefold()}
     for j in jobs:
         num = str(j.get("job_number") or "")
@@ -740,10 +740,24 @@ def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
     ]
 
 
+def _normalize_timekeeping_assignment(label: str) -> str:
+    raw = str(label or "").strip()
+    if not raw:
+        return raw
+    legacy = {
+        "ips shop": "Shop",
+        "administrator": "Administrative",
+        "admin": "Administrative",
+        "— no job —": "— Select assignment —",
+        "no job": "— Select assignment —",
+    }
+    return legacy.get(raw.casefold(), raw)
+
+
 def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
     days = week_dates(week_start)
     job_opts = job_options_for_timekeeping()
-    default_job = job_opts[0] if job_opts else "— No job —"
+    default_job = job_opts[0] if job_opts else "— Select assignment —"
     grid = []
     for i, d in enumerate(days):
         grid.append({
@@ -781,7 +795,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
     days = week_dates(week_start)
     by_date = {str(row.get("work_date") or "")[:10]: row for row in saved_rows}
     job_opts = job_options_for_timekeeping()
-    default_job = job_opts[0] if job_opts else "— No job —"
+    default_job = job_opts[0] if job_opts else "— Select assignment —"
     grid: list[dict[str, Any]] = []
     for i, day in enumerate(days):
         iso = day.isoformat()
@@ -791,7 +805,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
                 "day_id": str(saved.get("id") or ""),
                 "day": day.strftime("%A"),
                 "date": iso,
-                "job": str(saved.get("job_label") or default_job),
+                "job": _normalize_timekeeping_assignment(str(saved.get("job_label") or default_job)),
                 "st": float(saved.get("st_hours") or 0),
                 "ot": float(saved.get("ot_hours") or 0),
                 "dt": float(saved.get("dt_hours") or 0),

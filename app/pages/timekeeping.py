@@ -29,7 +29,7 @@ try:
     )
     from app.pages._core._data import (
         default_weekly_grid,
-        job_options_for_timekeeping,
+        load_jobs,
         load_timekeeping_grid,
         load_timekeeping_summaries,
         persist_timekeeping_approve,
@@ -67,7 +67,7 @@ except ImportError:
     )
     from pages._core._data import (  # type: ignore
         default_weekly_grid,
-        job_options_for_timekeeping,
+        load_jobs,
         load_timekeeping_grid,
         load_timekeeping_summaries,
         persist_timekeeping_approve,
@@ -126,15 +126,86 @@ _DAY_GRID_EDIT_COLS = [*_DAY_GRID_COLS, 0.3]
 _DAY_GRID_LABELS = [
     "Day",
     "Date",
-    "Job",
-    "ST (Hrs)",
-    "OT (Hrs)",
-    "Total (Hrs)",
+    "Assignment",
+    "ST Hours",
+    "OT Hours",
+    "Total",
     "Status",
     "Actions",
     "Notes",
 ]
 _LIST_VIEW_HOUR_STEP = 0.5
+_ASSIGNMENT_LEGACY_ALIASES = {
+    "ips shop": "Shop",
+    "administrator": "Administrative",
+    "admin": "Administrative",
+    "— no job —": "— Select assignment —",
+    "no job": "— Select assignment —",
+}
+
+
+def _normalize_assignment_label(label: str) -> str:
+    raw = str(label or "").strip()
+    if not raw:
+        return raw
+    return _ASSIGNMENT_LEGACY_ALIASES.get(raw.casefold(), raw)
+
+
+def _subjob_assignment_label(task: dict[str, Any], *, job_label: str) -> str:
+    title = str(task.get("title") or task.get("issue") or "").strip() or "Subjob"
+    task_no = str(task.get("task_number") or task.get("hazard_number") or "").strip()
+    suffix = f"{task_no}: {title}" if task_no else title
+    return f"{job_label} · {suffix}"
+
+
+def _assignment_options_for_timekeeping() -> list[str]:
+    """Jobs, linked subjobs, Shop, and Administrative choices for daily allocation."""
+    try:
+        from app.services.tasks_service import get_tasks_by_job
+    except ImportError:
+        from services.tasks_service import get_tasks_by_job  # type: ignore
+
+    opts: list[str] = ["— Select assignment —"]
+    seen: set[str] = {opts[0].casefold()}
+
+    def _add(label: str) -> None:
+        clean = _normalize_assignment_label(label)
+        if not clean:
+            return
+        key = clean.casefold()
+        if key in seen:
+            return
+        opts.append(clean)
+        seen.add(key)
+
+    for job in load_jobs():
+        num = str(job.get("job_number") or "").strip()
+        name = str(job.get("job_name") or job.get("name") or "").strip()
+        if not num and not name:
+            continue
+        job_label = f"{num} — {name}" if num else name
+        _add(job_label)
+        jid = str(job.get("id") or "").strip()
+        if jid:
+            for task in get_tasks_by_job(jid, include_closed=True):
+                _add(_subjob_assignment_label(task, job_label=job_label))
+
+    for special in ("Shop", "Administrative", "Vacation"):
+        _add(special)
+
+    if len(opts) == 1:
+        _add("J26047 — Maintenance Shop Bathroom Remodel")
+    return opts
+
+
+def _assignment_option_index(options: list[str], saved: str) -> int:
+    normalized = _normalize_assignment_label(saved)
+    if normalized in options:
+        return options.index(normalized)
+    raw = str(saved or "").strip()
+    if raw in options:
+        return options.index(raw)
+    return 0
 
 
 def _default_timekeeping_view() -> str:
@@ -214,7 +285,7 @@ def _render_horizontal_week_grid(
         return
 
     days = week_dates(week_start_d)
-    job_opts = job_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping()
     field_job = _active_field_job_label()
 
     toolbar_left, toolbar_right = st.columns([2.2, 1], gap="small")
@@ -535,12 +606,12 @@ def _day_hours_total(day_row: dict) -> float:
 
 
 def _day_has_job(day_row: dict) -> bool:
-    job = str(day_row.get("job") or "").strip().lower()
+    job = _normalize_assignment_label(str(day_row.get("job") or "")).strip().lower()
     if not job:
         return False
-    if job in {"—", "-", "— no job —", "no job"}:
+    if job in {"—", "-", "— no job —", "no job", "— select assignment —", "select assignment"}:
         return False
-    return "no job" not in job
+    return "no job" not in job and "select assignment" not in job
 
 
 def _day_entry_complete(day_row: dict) -> bool:
@@ -955,14 +1026,14 @@ def _render_weekly_timesheet_day_cell(
         unsafe_allow_html=True,
     )
     if editable:
-        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No job —"))
-        job_ix = job_opts.index(cur_job) if cur_job in job_opts else 0
+        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— Select assignment —"))
+        job_ix = _assignment_option_index(job_opts, cur_job)
         st.markdown(
             '<span class="weekly-timesheet-job-marker weekly-timesheet-job-select job-select" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         day_row["job"] = st.selectbox(
-            "Job",
+            "Assignment",
             job_opts,
             index=job_ix,
             key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
@@ -994,7 +1065,7 @@ def _hgrid_day_total_html(total: float) -> str:
 
 
 def _hgrid_locked_day_html(day_row: dict, *, status: str) -> str:
-    job = str(day_row.get("job") or "— No job —").strip()
+    job = _normalize_assignment_label(str(day_row.get("job") or "— Select assignment —")).strip()
     if len(job) > 28:
         job = job[:25] + "…"
     total = _day_hours_total(day_row)
@@ -1280,7 +1351,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     gk = _grid_key(eid)
     week_sig = week_start_d.isoformat()
     grid = _ensure_weekly_grid(emp, week_start_d)
-    job_opts = job_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
 
     st.markdown(
@@ -1320,9 +1391,9 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 unsafe_allow_html=True,
             )
             cur_job = str(live_row.get("job") or row.get("job") or job_opts[0])
-            idx = job_opts.index(cur_job) if cur_job in job_opts else 0
+            idx = _assignment_option_index(job_opts, cur_job)
             grid[i]["job"] = st.selectbox(
-                "Job",
+                "Assignment",
                 job_opts,
                 index=idx,
                 key=f"tk_job_{eid}_{week_sig}_{i}",
@@ -1394,7 +1465,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
             )
         with c[9]:
             if row_editable and st.button("🗑", key=f"tk_del_{eid}_{week_sig}_{i}", help="Clear row"):
-                grid[i]["job"] = job_opts[0] if job_opts else "— No job —"
+                grid[i]["job"] = job_opts[0] if job_opts else "— Select assignment —"
                 grid[i]["st"] = _default_st_for_day_index(i)
                 grid[i]["ot"] = 0.0
                 grid[i]["dt"] = 0.0
@@ -1841,11 +1912,13 @@ def _render_custom_timekeeping_table(
                     )
 
                 if expanded:
-                    st.markdown(
-                        '<div class="timesheet-employee-expand-detail ips-timekeeping-row-expand">',
-                        unsafe_allow_html=True,
-                    )
-                    _render_inline_daily_entries(row, week_start_d)
+                    with st.container(key=f"tk_expand_detail_{timecard_id}"):
+                        st.markdown(
+                            '<span class="timesheet-employee-expand-detail ips-timekeeping-row-expand" '
+                            'aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        _render_inline_daily_entries(row, week_start_d)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
