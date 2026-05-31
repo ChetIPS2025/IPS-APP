@@ -102,17 +102,18 @@ _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
 _TS_DAY = 112
 _TS_WEEK = 70
-_TS_LIST_EXPAND = 32
-_TS_LIST_EMPLOYEE = 140
-_TS_LIST_DAY = 72
-_TS_LIST_SUMMARY = 46
-_TS_LIST_STATUS = 64
+_TS_LIST_HANDLE = 24
+_TS_LIST_EMPLOYEE = 200
+_TS_LIST_DAY = 120
+_TS_LIST_TOTAL = 90
+_TS_LIST_OVERTIME = 110
+_TS_LIST_BILLED = 90
+_TS_LIST_STATUS = 110
 _HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _WEEKLY_TS_LIST_COLS = (
-    [_TS_LIST_EXPAND, _TS_LIST_EMPLOYEE]
+    [_TS_LIST_HANDLE, _TS_LIST_EMPLOYEE]
     + [_TS_LIST_DAY] * 7
-    + [_TS_LIST_SUMMARY] * 3
-    + [_TS_LIST_STATUS]
+    + [_TS_LIST_TOTAL, _TS_LIST_OVERTIME, _TS_LIST_BILLED, _TS_LIST_STATUS]
 )
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
@@ -593,17 +594,43 @@ def _render_daily_hrs_input(
     widget_key: str,
     day_label: str,
     editable: bool = True,
+    box_style: bool = False,
 ) -> float:
     """Compact daily hours control: HRS label left, spinner number_input right."""
     if not editable:
+        if box_style:
+            st.markdown(
+                f'<div class="timesheet-list-hour-box timesheet-list-hour-box-ro">'
+                f"{html.escape(_fmt_day_hours(value))}</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="hours-row ips-day-hrs-row ips-day-hrs-row-ro">'
+                f'<span class="hrs-label ips-day-hrs-label">HRS</span>'
+                f'<span class="ips-day-hrs-value">{html.escape(_fmt_day_hours(value))}</span>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        return float(value)
+
+    if box_style:
         st.markdown(
-            f'<div class="hours-row ips-day-hrs-row ips-day-hrs-row-ro">'
-            f'<span class="hrs-label ips-day-hrs-label">HRS</span>'
-            f'<span class="ips-day-hrs-value">{html.escape(_fmt_day_hours(value))}</span>'
-            f"</div>",
+            '<span class="timesheet-list-hour-box-marker ips-compact-hours-input-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        return float(value)
+        return float(
+            st.number_input(
+                f"{day_label} hours",
+                value=float(value),
+                key=widget_key,
+                label_visibility="collapsed",
+                step=0.5,
+                min_value=0.0,
+                max_value=24.0,
+                format="%.1f",
+            )
+        )
 
     st.markdown(
         '<span class="ips-compact-hours-input-marker ips-day-hrs-row-marker hours-row" aria-hidden="true"></span>',
@@ -653,6 +680,7 @@ def _render_list_row_day_cell(
             widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
             day_label=day_d.strftime("%a"),
             editable=True,
+            box_style=True,
         )
         _set_day_job_hours(day_row, hrs)
         return hrs
@@ -661,6 +689,7 @@ def _render_list_row_day_cell(
         widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
         day_label=day_d.strftime("%a"),
         editable=False,
+        box_style=True,
     )
     return total
 
@@ -1597,10 +1626,10 @@ def _render_custom_timekeeping_table(
         header_labels = [
             "",
             "EMPLOYEE",
-            *([""] * 7),
-            "ST",
-            "OT",
-            "TOTAL",
+            *[d.strftime("%a %m/%d").upper() for d in days],
+            "Total Hours",
+            "Overtime",
+            "Billed Hours",
             "STATUS",
         ]
         for col, (day_ix, label) in zip(header_cols, enumerate(header_labels)):
@@ -1650,29 +1679,29 @@ def _render_custom_timekeeping_table(
                 with row_cols[0]:
                     st.markdown(
                         '<span class="weekly-timesheet-row-marker timesheet-list-row-marker" '
+                        'aria-hidden="true"></span>'
+                        '<span class="timesheet-list-drag-handle" aria-hidden="true">⋮⋮</span>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand" '
                         'aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    expand_col, _ = st.columns([0.22, 0.78], gap="xxsmall")
-                    with expand_col:
-                        st.markdown(
-                            '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand" '
-                            'aria-hidden="true"></span>',
-                            unsafe_allow_html=True,
-                        )
-                        if st.button(
-                            "▾" if expanded else "▸",
-                            key=f"tk_expand_{timecard_id}",
-                            help="Expand ST/OT detail, notes, and daily submit",
-                        ):
-                            _toggle_expanded_timecard(timecard_id)
-                            st.rerun()
+                    if st.button(
+                        "▾" if expanded else "▸",
+                        key=f"tk_expand_{timecard_id}",
+                        help="Expand ST/OT detail, notes, and daily submit",
+                    ):
+                        _toggle_expanded_timecard(timecard_id)
+                        st.rerun()
 
                 with row_cols[1]:
                     st.markdown(
                         f'<div class="weekly-timesheet-employee weekly-employee-cell '
                         f'timesheet-list-employee-cell">'
-                        f'<div class="weekly-timesheet-employee-name employee-name ips-timekeeping-employee" '
+                        f'<div class="timesheet-list-name-input weekly-timesheet-employee-name '
+                        f'employee-name ips-timekeeping-employee" '
                         f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
                         f"</div>",
                         unsafe_allow_html=True,

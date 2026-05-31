@@ -127,7 +127,11 @@ def render_job_photos_panel(
                         st.error(str(exc))
 
         if not photos:
-            render_empty_state("No photos for this job yet.", icon="📷")
+            render_empty_state(
+                "No photos uploaded yet",
+                "Use Upload photos above to add images to this job.",
+                icon="📷",
+            )
             return
         cols = st.columns(min(4, max(1, len(photos[:8]))))
         for i, ph in enumerate(photos[:16]):

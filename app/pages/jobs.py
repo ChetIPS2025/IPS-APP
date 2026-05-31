@@ -757,6 +757,23 @@ def _render_dialog_placeholder(message: str) -> None:
     )
 
 
+def _render_job_photos_tab(job: dict) -> None:
+    """Photos tab: gallery + upload when job_photos is available; friendly empty state otherwise."""
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        _render_dialog_placeholder("Save this job before uploading photos.")
+        return
+    try:
+        from app.ui.field_components import render_job_photos_panel
+    except ImportError:
+        from ui.field_components import render_job_photos_panel  # type: ignore
+    render_job_photos_panel(
+        job_id=jid,
+        admin_read=_field_admin_read(),
+        compact=True,
+    )
+
+
 def _job_inventory_action_label(txn_type: str) -> str:
     labels = {
         "check_out": "Check Out",
@@ -946,7 +963,7 @@ def _render_field_job_detail_tabs(job: dict) -> None:
         render_job_linked_tasks_tab(job)
 
     with tab_photos:
-        _render_dialog_placeholder("Job photos will appear here when connected to Supabase.")
+        _render_job_photos_tab(job)
 
     with tab_daily:
         if jid:
@@ -1114,7 +1131,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         _render_job_documents_tab(job)
 
     with tab_photos:
-        _render_dialog_placeholder("Job photos will appear here when connected to Supabase.")
+        _render_job_photos_tab(job)
 
     with tab_daily:
         _render_dialog_placeholder("Daily field updates will appear here when connected to Supabase.")
