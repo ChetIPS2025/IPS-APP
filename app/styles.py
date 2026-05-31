@@ -3057,9 +3057,12 @@ def inject_assets_module_css() -> None:
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
+    tk_list_grid = (
+        "32px 32px 230px repeat(7, 118px) 120px 110px 120px 110px"
+    )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v27">
+<style id="ips-timekeeping-module-v28">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -4252,7 +4255,9 @@ def inject_timekeeping_module_css() -> None:
 .weekly-timesheet-expand-marker,
 .timesheet-list-row-marker,
 .timesheet-list-day-marker,
-.timesheet-list-days-marker {{
+.timesheet-list-days-marker,
+.timekeeping-list-header-marker,
+.timekeeping-list-row-marker {{
   display: none !important;
 }}
 .weekly-timesheet-employee {{
@@ -4332,47 +4337,37 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100%;
   overflow: hidden;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker),
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
   display: grid !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 14px !important;
+  column-gap: 14px !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
   overflow: visible !important;
-  min-width: 1540px !important;
+  min-width: 1580px !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
   min-width: 0 !important;
   overflow: hidden !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {{
-  grid-template-columns:
-    32px
-    230px
-    repeat(7, 118px)
-    110px 100px 120px 110px !important;
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
+  grid-template-columns: {tk_list_grid} !important;
   padding: 10px 12px !important;
-  gap: 12px !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  grid-template-columns:
-    32px
-    230px
-    repeat(7, 118px)
-    110px 100px 120px 110px !important;
-  min-width: 1540px !important;
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
   padding: 8px 12px !important;
-  gap: 12px !important;
   overflow: visible !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
@@ -4384,7 +4379,7 @@ def inject_timekeeping_module_css() -> None:
   padding: 8px 10px !important;
   gap: 6px !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"],
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"],
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"] {{
@@ -4392,7 +4387,7 @@ def inject_timekeeping_module_css() -> None:
   width: auto !important;
   box-sizing: border-box !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"] {{
   min-width: 0 !important;
   max-width: none !important;
@@ -4404,25 +4399,34 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100% !important;
   overflow: hidden !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"] {{
   align-self: center !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:first-child,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:first-child {{
   width: 32px !important;
   min-width: 32px !important;
   max-width: 32px !important;
   padding: 0 !important;
   overflow: visible !important;
   display: flex !important;
-  flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 2px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(2),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(2) {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(2) {{
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(3),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(3) {{
   width: 230px !important;
   min-width: 230px !important;
   max-width: 230px !important;
@@ -4436,8 +4440,8 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) > [data-testid="column"]:last-child {{
   min-width: 0 !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+3):nth-child(-n+9),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(n+3):nth-child(-n+9) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) {{
   width: 118px !important;
   min-width: 118px !important;
   max-width: 118px !important;
@@ -4446,37 +4450,38 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 2px !important;
   box-sizing: border-box !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(9),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(9) {{
-  padding-right: 0 !important;
-}}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(10),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(10) {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(10) {{
+  padding-right: 4px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(11),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(11) {{
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+  flex: 0 0 120px !important;
+  padding-left: 6px !important;
+  overflow: visible !important;
+  isolation: isolate !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(12),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(12) {{
   width: 110px !important;
   min-width: 110px !important;
   max-width: 110px !important;
   flex: 0 0 110px !important;
-  padding-left: 0 !important;
   overflow: visible !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(11),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(11) {{
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-  flex: 0 0 100px !important;
-  overflow: visible !important;
-}}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(12),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(12) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(13),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(13) {{
   width: 120px !important;
   min-width: 120px !important;
   max-width: 120px !important;
   flex: 0 0 120px !important;
   overflow: visible !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(13),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(13) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(14),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(14) {{
   width: 110px !important;
   min-width: 110px !important;
   max-width: 110px !important;
@@ -4570,8 +4575,8 @@ def inject_timekeeping_module_css() -> None:
   gap: 0 !important;
   margin: 0 auto !important;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(n+3):nth-child(-n+9) .ips-timekeeping-header-row,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(n+3):nth-child(-n+9) .ips-timekeeping-cell {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) .ips-timekeeping-header-row,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10) .ips-timekeeping-cell {{
   text-align: center !important;
   justify-content: center !important;
 }}
@@ -4591,7 +4596,7 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100%;
   min-height: 36px;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+10):nth-child(-n+13) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+11):nth-child(-n+14) {{
   align-self: center !important;
   justify-content: center !important;
   overflow: visible !important;
@@ -4895,15 +4900,15 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker):hover {{
   background: #f8fbff !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:first-child [data-testid="stButton"],
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child [data-testid="stButton"] {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(2) [data-testid="stButton"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(2) [data-testid="stButton"] {{
   width: 22px !important;
   min-width: 22px !important;
   max-width: 22px !important;
   margin: 0 !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:first-child [data-testid="stButton"] button,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child [data-testid="stButton"] button {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(2) [data-testid="stButton"] button,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(2) [data-testid="stButton"] button {{
   width: 22px !important;
   min-width: 22px !important;
   max-width: 22px !important;
@@ -4992,8 +4997,8 @@ def inject_timekeeping_module_css() -> None:
   white-space: nowrap;
   line-height: 1.1;
 }}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-timekeeping-header-row,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-timekeeping-header-row,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-table-header-filter-text {{
   white-space: nowrap;
 }}
 .st-key-timekeeping_table_wrap {{
@@ -5009,8 +5014,8 @@ def inject_timekeeping_module_css() -> None:
     overflow-x: auto;
   }}
   .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker),
-  .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-    min-width: 1400px !important;
+  .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
+    min-width: 1580px !important;
   }}
   .ips-time-hgrid-scroll {{
     overflow-x: auto;
