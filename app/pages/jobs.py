@@ -133,6 +133,8 @@ CACHE_KEY = "_ips_jobs_modal_by_id"
 JOB_DOC_UPLOAD_MODE_KEY = "job_detail_doc_upload_job_id"
 JOB_DOC_PENDING_DELETE_ID_KEY = "job_detail_doc_pending_delete_id"
 JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
+JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
+_DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
 _JOB_COLS = [0.35, 0.95, 2.35, 1.85, 1.85, 1.35, 1.25, 1.25]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
@@ -709,6 +711,146 @@ def _schedule_summary(job: dict) -> str:
     return f"{start} – {end}"
 
 
+def _job_subjob_select_options(job_id: str) -> tuple[list[str], dict[str, str]]:
+    """Return subjob labels and label→task id map for optional daily update linking."""
+    labels = ["— None —"]
+    label_to_id: dict[str, str] = {}
+    jid = str(job_id or "").strip()
+    if not jid:
+        return labels, label_to_id
+    try:
+        from app.services.tasks_service import get_tasks_by_job
+    except ImportError:
+        from services.tasks_service import get_tasks_by_job  # type: ignore
+    try:
+        for task in get_tasks_by_job(jid, include_closed=True):
+            tid = str(task.get("id") or "").strip()
+            if not tid:
+                continue
+            title = str(task.get("title") or "").strip() or "Subjob"
+            task_no = str(task.get("task_number") or task.get("hazard_number") or "").strip()
+            label = f"{task_no} — {title}" if task_no else title
+            if label in label_to_id:
+                continue
+            labels.append(label)
+            label_to_id[label] = tid
+    except Exception:
+        pass
+    return labels, label_to_id
+
+
+def _job_daily_update_add_active(job_id: str) -> bool:
+    return str(st.session_state.get(JOB_DAILY_UPDATE_ADD_MODE_KEY) or "") == str(job_id or "").strip()
+
+
+def _set_job_daily_update_add(job_id: str, active: bool) -> None:
+    jid = str(job_id or "").strip()
+    if active and jid:
+        st.session_state[JOB_DAILY_UPDATE_ADD_MODE_KEY] = jid
+    elif st.session_state.get(JOB_DAILY_UPDATE_ADD_MODE_KEY) == jid:
+        st.session_state.pop(JOB_DAILY_UPDATE_ADD_MODE_KEY, None)
+
+
+def _render_job_daily_update_add_form(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    job_key = _job_session_key(job)
+    pk = f"job_daily_upd_{job_key}"
+    subjob_labels, _ = _job_subjob_select_options(jid)
+    author_name = _current_document_uploader_name()
+
+    st.markdown(
+        _dialog_card(
+            "Add Daily Update",
+            '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
+            "Record field work performed for this job.</p>",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2, gap="medium")
+    with c1:
+        st.date_input("Date", value=date.today(), key=f"{pk}_date", format="MM/DD/YYYY")
+    with c2:
+        st.selectbox("Status", _DAILY_UPDATE_STATUS_OPTS, index=0, key=f"{pk}_status")
+
+    st.text_input("Summary", key=f"{pk}_summary", placeholder="Brief title for this update")
+    st.text_area(
+        "Daily Update",
+        key=f"{pk}_details",
+        height=140,
+        placeholder="Describe work performed, progress, issues, and next steps…",
+    )
+    st.selectbox("Linked Subjob", subjob_labels, key=f"{pk}_subjob")
+
+    if author_name:
+        st.caption(f"Created by: {author_name}")
+
+    btn_save, btn_cancel = st.columns(2, gap="small")
+    with btn_save:
+        if st.button("Save Daily Update", type="primary", key=f"{pk}_save", use_container_width=True):
+            summary = str(st.session_state.get(f"{pk}_summary") or "").strip()
+            details = str(st.session_state.get(f"{pk}_details") or "").strip()
+            if not summary and not details:
+                st.warning("Enter a summary or daily update details before saving.")
+            else:
+                try:
+                    from app.services.job_updates_service import (
+                        create_job_daily_update,
+                        daily_updates_table_available,
+                    )
+                except ImportError:
+                    from services.job_updates_service import (  # type: ignore
+                        create_job_daily_update,
+                        daily_updates_table_available,
+                    )
+                if not daily_updates_table_available(force=True):
+                    st.error(
+                        "Daily updates are not available yet. Run the job_daily_updates database migration."
+                    )
+                else:
+                    update_day = st.session_state.get(f"{pk}_date")
+                    if not isinstance(update_day, date):
+                        update_day = date.today()
+                    status = str(st.session_state.get(f"{pk}_status") or "Draft").strip()
+                    subjob = str(st.session_state.get(f"{pk}_subjob") or "").strip()
+                    note_lines: list[str] = []
+                    if status:
+                        note_lines.append(f"Status: {status}")
+                    if subjob and subjob != "— None —":
+                        note_lines.append(f"Linked subjob: {subjob}")
+                    try:
+                        from app.auth import current_profile
+                    except ImportError:
+                        from auth import current_profile  # type: ignore
+                    profile = current_profile() or {}
+                    payload: dict[str, object] = {
+                        "job_id": jid,
+                        "update_date": update_day.isoformat(),
+                        "summary": summary,
+                        "work_performed": details,
+                        "notes": "\n".join(note_lines),
+                        "supervisor_name": author_name or None,
+                        "employee_name": author_name or None,
+                        "created_by": profile.get("id"),
+                    }
+                    emp_id = str(profile.get("employee_id") or "").strip()
+                    if emp_id:
+                        payload["employee_id"] = emp_id
+                    try:
+                        create_job_daily_update(payload)
+                        _set_job_daily_update_add(jid, False)
+                        st.success("Daily update saved.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+    with btn_cancel:
+        if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
+            _set_job_daily_update_add(jid, False)
+            st.rerun()
+
+
 def _job_subjob_label_map(job_id: str) -> dict[str, str]:
     """Map IPS subjob/task ids to display titles for job-level media tabs."""
     jid = str(job_id or "").strip()
@@ -1045,13 +1187,30 @@ def _daily_update_entry_text(row: dict, *, source: str) -> str:
 
 
 def _render_job_daily_updates_tab(job: dict) -> None:
-    """Read-only daily field updates for the current job."""
+    """Daily field updates for the current job with add form and history."""
     jid = str(job.get("id") or "").strip()
     if not jid:
         _render_dialog_placeholder("Save this job before adding daily updates.")
         return
 
-    entries: list[tuple[str, str, str]] = []
+    add_active = _job_daily_update_add_active(jid)
+    head_l, head_r = st.columns([3, 1], gap="small")
+    with head_l:
+        st.markdown("**Daily updates**")
+    with head_r:
+        if not add_active and st.button(
+            "+ Add Daily Update",
+            key=f"job_daily_upd_btn_{_job_session_key(job)}",
+            use_container_width=True,
+        ):
+            _set_job_daily_update_add(jid, True)
+            st.rerun()
+
+    if add_active:
+        _render_job_daily_update_add_form(job)
+        st.divider()
+
+    entries: list[tuple[str, str, str, str]] = []
 
     try:
         from app.services.job_updates_service import get_job_daily_updates
@@ -1061,12 +1220,17 @@ def _render_job_daily_updates_tab(job: dict) -> None:
     for row in get_job_daily_updates(jid):
         if not isinstance(row, dict):
             continue
+        summary = str(row.get("summary") or "").strip()
         text = _daily_update_entry_text(row, source="job").strip()
-        if not text:
+        if not text and not summary:
             continue
         dt = str(row.get("update_date") or "")[:10]
         author = str(row.get("supervisor_name") or row.get("employee_name") or "").strip()
-        entries.append((dt, author, text))
+        headline = summary or (text.split("\n\n", 1)[0] if text else "")
+        body = text if not summary else text
+        if summary and body.startswith(summary):
+            body = body[len(summary) :].lstrip("\n").strip()
+        entries.append((dt, author, headline, body or text))
 
     try:
         from app.services.supervisor_daily_reports import fetch_reports_for_job
@@ -1081,7 +1245,9 @@ def _render_job_daily_updates_tab(job: dict) -> None:
             continue
         dt = str(row.get("report_date") or "")[:10]
         author = str(row.get("supervisor_name") or "").strip()
-        entries.append((dt, author, text))
+        headline = text.split("\n\n", 1)[0]
+        body = text.split("\n\n", 1)[1] if "\n\n" in text else ""
+        entries.append((dt, author, headline, body or text))
 
     entries.sort(key=lambda item: item[0], reverse=True)
 
@@ -1092,16 +1258,24 @@ def _render_job_daily_updates_tab(job: dict) -> None:
         return
 
     blocks: list[str] = []
-    for dt, author, text in entries:
+    for dt, author, headline, body in entries:
         meta = html.escape(dt)
         if author:
             meta += f" · {html.escape(author)}"
+        title_html = ""
+        if headline and headline != body:
+            title_html = (
+                f'<div style="font-size:0.9375rem;font-weight:700;color:#0f172a;'
+                f'margin:0.35rem 0 0.2rem;">{html.escape(headline)}</div>'
+            )
+        body_text = body or headline
         blocks.append(
             f'<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e2e8f0;">'
             f'<div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;'
             f'letter-spacing:0.04em;">{meta}</div>'
+            f"{title_html}"
             f'<p style="margin:0.35rem 0 0;font-size:0.875rem;color:#0f172a;line-height:1.5;'
-            f'white-space:pre-wrap;">{html.escape(text)}</p>'
+            f'white-space:pre-wrap;">{html.escape(body_text)}</p>'
             f"</div>"
         )
     body = "".join(blocks)
