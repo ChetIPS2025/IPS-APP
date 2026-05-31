@@ -13,6 +13,7 @@ try:
     from app.db import create_signed_url
     from app.services.asset_document_util import guess_document_content_type
     from app.services.job_documents import (
+        delete_job_document,
         fetch_job_documents,
         link_job_document_to_task,
         unlink_job_document_from_task,
@@ -31,6 +32,7 @@ except ImportError:
     from db import create_signed_url  # type: ignore
     from services.asset_document_util import guess_document_content_type  # type: ignore
     from services.job_documents import (  # type: ignore
+        delete_job_document,
         fetch_job_documents,
         link_job_document_to_task,
         unlink_job_document_from_task,
@@ -48,6 +50,7 @@ JOB_SUBJOB_PHOTO_LINK_MODE_KEY = "job_subjob_photo_link_mode"
 JOB_SUBJOB_PHOTO_UPLOAD_MODE_KEY = "job_subjob_photo_upload_mode"
 JOB_SUBJOB_DOC_LINK_MODE_KEY = "job_subjob_doc_link_mode"
 JOB_SUBJOB_DOC_UPLOAD_MODE_KEY = "job_subjob_doc_upload_mode"
+JOB_SUBJOB_DOC_PENDING_DELETE_KEY = "job_subjob_doc_pending_delete"
 
 _IMG_EXT = re.compile(r"\.(jpe?g|png|gif|webp)$", re.IGNORECASE)
 
@@ -58,6 +61,7 @@ def clear_job_subjob_media_state() -> None:
         JOB_SUBJOB_PHOTO_UPLOAD_MODE_KEY,
         JOB_SUBJOB_DOC_LINK_MODE_KEY,
         JOB_SUBJOB_DOC_UPLOAD_MODE_KEY,
+        JOB_SUBJOB_DOC_PENDING_DELETE_KEY,
     ):
         st.session_state.pop(key, None)
 
@@ -391,6 +395,83 @@ def _render_doc_link_panel(*, job_id: str, task_id: str, key_prefix: str, admin:
             st.rerun()
 
 
+def _pending_subjob_doc_delete_scope(*, job_id: str, task_id: str, doc_id: str) -> str:
+    return f"{job_id}:{task_id}:{doc_id}"
+
+
+def _clear_pending_subjob_doc_delete() -> None:
+    st.session_state.pop(JOB_SUBJOB_DOC_PENDING_DELETE_KEY, None)
+
+
+def _handle_delete_subjob_document(*, doc_id: str, job_id: str, admin: bool) -> None:
+    did = str(doc_id or "").strip()
+    jid = str(job_id or "").strip()
+    if not did or not jid:
+        return
+    try:
+        delete_job_document(did, job_id=jid, admin=admin)
+    except Exception as exc:
+        st.error(str(exc))
+        return
+    _clear_pending_subjob_doc_delete()
+    st.success("Document deleted.")
+    st.rerun()
+
+
+def _render_subjob_document_delete_confirm(
+    *,
+    doc: dict,
+    job_id: str,
+    task_id: str,
+    key_prefix: str,
+    admin: bool,
+) -> None:
+    did = str(doc.get("id") or "").strip()
+    name = str(doc.get("file_name") or doc.get("name") or "Document").strip() or "Document"
+    safe_name = html.escape(name)
+    with st.container(key=f"{key_prefix}_doc_delete_confirm_{did}"):
+        st.markdown(
+            '<span class="ips-job-doc-delete-confirm-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        msg_col, action_col = st.columns([5.5, 1.5], gap="small", vertical_alignment="center")
+        with msg_col:
+            st.markdown(
+                f'<div class="ips-job-doc-delete-confirm-message">Delete document “{safe_name}”?</div>',
+                unsafe_allow_html=True,
+            )
+        with action_col:
+            delete_col, cancel_col = st.columns(2, gap="small")
+            with delete_col:
+                if st.button(
+                    "Delete",
+                    key=f"{key_prefix}_confirm_delete_doc_{did}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_delete_subjob_document(doc_id=did, job_id=job_id, admin=admin)
+            with cancel_col:
+                if st.button(
+                    "Cancel",
+                    key=f"{key_prefix}_cancel_delete_doc_{did}",
+                    use_container_width=True,
+                ):
+                    _clear_pending_subjob_doc_delete()
+                    st.rerun()
+
+
+def _render_subjob_document_action_buttons(*, job_id: str, task_id: str, key_prefix: str) -> None:
+    btn_l, btn_r = st.columns(2)
+    with btn_l:
+        if st.button("+ Upload Documents", type="primary", key=f"{key_prefix}_upload", use_container_width=True):
+            _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, True)
+            st.rerun()
+    with btn_r:
+        if st.button("Link Existing Documents", key=f"{key_prefix}_link", use_container_width=True):
+            _set_mode(JOB_SUBJOB_DOC_LINK_MODE_KEY, job_id, task_id, True)
+            st.rerun()
+
+
 def _render_linked_documents(
     docs: list[dict],
     *,
@@ -409,13 +490,23 @@ def _render_linked_documents(
         note_html = f"<br><span style=\"color:#64748b;\">{notes}</span>" if notes else ""
         lines.append(f"<p style=\"margin:0 0 0.75rem;font-size:0.875rem;color:#0f172a;\"><strong>{name}</strong><br>{meta}{note_html}</p>")
     st.markdown(dialog_card_html("Documents", "".join(lines)), unsafe_allow_html=True)
+    pending_delete = str(st.session_state.get(JOB_SUBJOB_DOC_PENDING_DELETE_KEY) or "").strip()
     for doc in docs[:20]:
         did = str(doc.get("id") or "").strip()
         if not did:
             continue
+        if pending_delete == _pending_subjob_doc_delete_scope(job_id=job_id, task_id=task_id, doc_id=did):
+            _render_subjob_document_delete_confirm(
+                doc=doc,
+                job_id=job_id,
+                task_id=task_id,
+                key_prefix=key_prefix,
+                admin=admin,
+            )
+            continue
         path = str(doc.get("storage_path") or "").strip()
         url = _signed_url(path, bucket=_storage_bucket())
-        open_col, unlink_col = st.columns(2)
+        open_col, unlink_col, delete_col = st.columns([1, 1, 0.35], gap="small")
         with open_col:
             if url:
                 st.link_button(
@@ -432,6 +523,19 @@ def _render_linked_documents(
                     st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
+        with delete_col:
+            if st.button(
+                "🗑️",
+                key=f"{key_prefix}_doc_delete_{did}",
+                help="Delete document",
+                type="tertiary",
+            ):
+                st.session_state[JOB_SUBJOB_DOC_PENDING_DELETE_KEY] = _pending_subjob_doc_delete_scope(
+                    job_id=job_id,
+                    task_id=task_id,
+                    doc_id=did,
+                )
+                st.rerun()
 
 
 def render_subjob_documents_section(task: dict, job: dict) -> None:
@@ -452,19 +556,11 @@ def render_subjob_documents_section(task: dict, job: dict) -> None:
     linked = fetch_job_documents(job_id, admin=admin, task_id=task_id, limit=50)
     if linked:
         _render_linked_documents(linked, job_id=job_id, task_id=task_id, key_prefix=key_prefix, admin=admin)
-        return
+    else:
+        empty_html = (
+            '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
+            "No documents linked to this subjob yet.</p>"
+        )
+        st.markdown(dialog_card_html("Documents", empty_html), unsafe_allow_html=True)
 
-    empty_html = (
-        '<p style="margin:0;font-size:0.875rem;color:#64748b;">'
-        "No documents linked to this subjob yet.</p>"
-    )
-    st.markdown(dialog_card_html("Documents", empty_html), unsafe_allow_html=True)
-    btn_l, btn_r = st.columns(2)
-    with btn_l:
-        if st.button("+ Upload Documents", type="primary", key=f"{key_prefix}_upload", use_container_width=True):
-            _set_mode(JOB_SUBJOB_DOC_UPLOAD_MODE_KEY, job_id, task_id, True)
-            st.rerun()
-    with btn_r:
-        if st.button("Link Existing Document", key=f"{key_prefix}_link", use_container_width=True):
-            _set_mode(JOB_SUBJOB_DOC_LINK_MODE_KEY, job_id, task_id, True)
-            st.rerun()
+    _render_subjob_document_action_buttons(job_id=job_id, task_id=task_id, key_prefix=key_prefix)

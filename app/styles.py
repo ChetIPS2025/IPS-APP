@@ -3058,7 +3058,7 @@ def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v24">
+<style id="ips-timekeeping-module-v25">
 .ips-timekeeping-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -4580,13 +4580,20 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 auto !important;
   align-items: stretch !important;
 }}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  width: auto !important;
+  min-width: 0 !important;
+  flex: none !important;
+  overflow: hidden !important;
+}}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] {{
   width: 100% !important;
   min-width: 0 !important;
-  max-width: none !important;
+  max-width: 100% !important;
   margin: 0 !important;
   grid-column: 1 !important;
   align-self: stretch !important;
+  overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] > div {{
   border: none !important;
@@ -4595,25 +4602,30 @@ def inject_timekeeping_module_css() -> None:
   min-height: 36px !important;
   height: 36px !important;
   width: 100% !important;
+  max-width: 100% !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   padding: 0 !important;
+  overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input {{
   box-sizing: border-box !important;
   width: 100% !important;
   min-width: 0 !important;
-  text-align: center !important;
+  max-width: 100% !important;
+  text-align: left !important;
   border: none !important;
   font-size: 13px !important;
   font-weight: 700 !important;
-  padding: 0 2px !important;
+  padding: 0 4px 0 8px !important;
   min-height: 36px !important;
   height: 36px !important;
   background: #ffffff !important;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input::-webkit-outer-spin-button,
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input::-webkit-inner-spin-button {{
@@ -4630,7 +4642,11 @@ def inject_timekeeping_module_css() -> None:
   min-width: 22px !important;
   max-width: 22px !important;
   width: 22px !important;
+  flex: 0 0 22px !important;
   grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child [data-testid="stVerticalBlock"] {{
   display: flex !important;
@@ -4638,6 +4654,8 @@ def inject_timekeeping_module_css() -> None:
   height: 36px !important;
   gap: 0 !important;
   width: 22px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stButton"] {{
   width: 22px !important;
@@ -4673,6 +4691,11 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   margin: 0 !important;
   min-width: 0 !important;
+  max-width: calc(84px - 22px) !important;
+  width: auto !important;
+  flex: 1 1 0 !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
   overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] {{
@@ -5986,6 +6009,48 @@ div[data-testid="stDialog"] [data-testid="stWidgetLabel"] label {{
 }}
 div[data-testid="stDialog"] [data-testid="stSlider"] {{
   padding-top: 0.15rem !important;
+}}
+.ips-job-doc-delete-confirm-marker {{
+  display: none !important;
+}}
+.ips-job-doc-delete-confirm-message {{
+  font-size: 13px;
+  font-weight: 600;
+  color: #991b1b;
+  line-height: 1.35;
+  margin: 0;
+}}
+div[data-testid="stDialog"] [class*="st-key-job_doc_delete_confirm_"] [data-testid="stHorizontalBlock"],
+div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="doc_delete_confirm_"] [data-testid="stHorizontalBlock"] {{
+  border-bottom: none !important;
+  background: transparent !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+}}
+div[data-testid="stDialog"] [class*="st-key-confirm_delete_job_doc_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="confirm_delete_doc_"] .stButton > button {{
+  background: #dc2626 !important;
+  border: 1px solid #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+}}
+div[data-testid="stDialog"] [class*="st-key-confirm_delete_job_doc_"] .stButton > button:hover,
+div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="confirm_delete_doc_"] .stButton > button:hover {{
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+}}
+div[data-testid="stDialog"] [class*="st-key-cancel_delete_job_doc_"] .stButton > button,
+div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="cancel_delete_doc_"] .stButton > button {{
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
 }}
 </style>
 """,

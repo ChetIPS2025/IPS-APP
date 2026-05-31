@@ -673,7 +673,7 @@ def _render_list_day_hour_stepper(
             '<div class="timekeeping-hour-spinner">',
             unsafe_allow_html=True,
         )
-        inp_col, btns_col = st.columns([0.76, 0.24], gap="xxsmall", vertical_alignment="center")
+        inp_col, btns_col = st.columns([1, 1], gap="xxsmall", vertical_alignment="center")
         with inp_col:
             st.markdown(
                 '<span class="timekeeping-hour-input-marker" aria-hidden="true"></span>',

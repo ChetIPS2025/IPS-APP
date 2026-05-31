@@ -131,6 +131,8 @@ SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
 CACHE_KEY = "_ips_jobs_modal_by_id"
 JOB_DOC_UPLOAD_MODE_KEY = "job_detail_doc_upload_job_id"
+JOB_DOC_PENDING_DELETE_ID_KEY = "job_detail_doc_pending_delete_id"
+JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
 _JOB_COLS = [0.35, 0.95, 2.35, 1.85, 1.85, 1.35, 1.25, 1.25]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
@@ -353,6 +355,8 @@ def _clear_jobs_detail_modal() -> None:
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
     st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
+    st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
+    st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
 
 
 def _render_custom_jobs_table(
@@ -830,6 +834,122 @@ def _render_job_document_upload_form(job: dict) -> None:
             st.rerun()
 
 
+def _clear_job_doc_pending_delete() -> None:
+    st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
+    st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
+
+
+def _handle_delete_job_document(*, doc_id: str, job_id: str, admin: bool) -> None:
+    did = str(doc_id or "").strip()
+    jid = str(job_id or "").strip()
+    if not did or not jid:
+        return
+    try:
+        from app.services.job_documents import delete_job_document
+    except ImportError:
+        from services.job_documents import delete_job_document  # type: ignore
+    try:
+        delete_job_document(did, job_id=jid, admin=admin)
+    except Exception as exc:
+        st.error(str(exc))
+        return
+    _clear_job_doc_pending_delete()
+    st.success("Document deleted.")
+    st.rerun()
+
+
+def _render_job_document_delete_confirm(*, doc: dict, job_id: str, admin: bool) -> None:
+    did = str(doc.get("id") or "").strip()
+    name = str(doc.get("file_name") or doc.get("name") or "Document").strip() or "Document"
+    safe_name = html.escape(name)
+    with st.container(key=f"job_doc_delete_confirm_{job_id}_{did}"):
+        st.markdown(
+            '<span class="ips-job-doc-delete-confirm-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        msg_col, action_col = st.columns([5.5, 1.5], gap="small", vertical_alignment="center")
+        with msg_col:
+            st.markdown(
+                f'<div class="ips-job-doc-delete-confirm-message">Delete document “{safe_name}”?</div>',
+                unsafe_allow_html=True,
+            )
+        with action_col:
+            delete_col, cancel_col = st.columns(2, gap="small")
+            with delete_col:
+                if st.button(
+                    "Delete",
+                    key=f"confirm_delete_job_doc_{job_id}_{did}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_delete_job_document(doc_id=did, job_id=job_id, admin=admin)
+            with cancel_col:
+                if st.button(
+                    "Cancel",
+                    key=f"cancel_delete_job_doc_{job_id}_{did}",
+                    use_container_width=True,
+                ):
+                    _clear_job_doc_pending_delete()
+                    st.rerun()
+
+
+def _render_job_document_row(
+    doc: dict,
+    *,
+    job_id: str,
+    task_labels: dict[str, str],
+    admin: bool,
+    signed_url_for_timesheet,
+) -> None:
+    did = str(doc.get("id") or "").strip()
+    if not did:
+        return
+    pending_id = str(st.session_state.get(JOB_DOC_PENDING_DELETE_ID_KEY) or "").strip()
+    pending_jid = str(st.session_state.get(JOB_DOC_PENDING_DELETE_JOB_KEY) or "").strip()
+    if pending_id == did and pending_jid == job_id:
+        _render_job_document_delete_confirm(doc=doc, job_id=job_id, admin=admin)
+        return
+
+    name = str(doc.get("file_name") or doc.get("name") or "Document")
+    dtype = str(doc.get("doc_type") or "")
+    path = str(doc.get("storage_path") or "")
+    url = signed_url_for_timesheet(path) if path else ""
+    when = str(doc.get("upload_date") or doc.get("created_at") or "")[:10]
+    notes = str(doc.get("notes") or "").strip()
+    subjob_tid = str(doc.get("task_id") or "").strip()
+    subjob = task_labels.get(subjob_tid, "") if subjob_tid else ""
+
+    meta_parts = [f"**{html.escape(name)}**"]
+    if dtype:
+        meta_parts.append(html.escape(dtype))
+    if when:
+        meta_parts.append(when)
+    if subjob:
+        meta_parts.append(f"Subjob: {html.escape(subjob)}")
+    if notes:
+        meta_parts.append(html.escape(notes[:120]))
+    meta_line = " · ".join(meta_parts)
+
+    open_width = 0.9 if url else 0.0
+    meta_width = 6.0 - open_width
+    meta_col, open_col, del_col = st.columns([meta_width, open_width, 0.35], gap="small", vertical_alignment="center")
+    with meta_col:
+        st.markdown(meta_line, unsafe_allow_html=True)
+    with open_col:
+        if url:
+            st.link_button("Open", url, use_container_width=True, key=f"job_doc_open_{job_id}_{did}")
+    with del_col:
+        if st.button(
+            "🗑️",
+            key=f"delete_job_doc_{job_id}_{did}",
+            help="Delete document",
+            type="tertiary",
+        ):
+            st.session_state[JOB_DOC_PENDING_DELETE_ID_KEY] = did
+            st.session_state[JOB_DOC_PENDING_DELETE_JOB_KEY] = job_id
+            st.rerun()
+
+
 def _render_job_documents_tab(job: dict) -> None:
     """Job-linked documents from documents_hub and approved weekly timesheets."""
     jid = str(job.get("id") or "")
@@ -872,22 +992,13 @@ def _render_job_documents_tab(job: dict) -> None:
 
     if docs:
         for doc in docs:
-            name = str(doc.get("file_name") or doc.get("name") or "Document")
-            dtype = str(doc.get("doc_type") or "")
-            path = str(doc.get("storage_path") or "")
-            url = signed_url_for_timesheet(path) if path else ""
-            when = str(doc.get("upload_date") or doc.get("created_at") or "")[:10]
-            notes = str(doc.get("notes") or "").strip()
-            subjob_tid = str(doc.get("task_id") or "").strip()
-            subjob = task_labels.get(subjob_tid, "") if subjob_tid else ""
-            line = f"- **{html.escape(name)}** · {html.escape(dtype)} · {when}"
-            if subjob:
-                line += f" · Subjob: {html.escape(subjob)}"
-            if notes:
-                line += f" · {html.escape(notes[:120])}"
-            if url:
-                line += f' · <a href="{html.escape(url)}" target="_blank">Open</a>'
-            st.markdown(line, unsafe_allow_html=True)
+            _render_job_document_row(
+                doc,
+                job_id=jid,
+                task_labels=task_labels,
+                admin=admin,
+                signed_url_for_timesheet=signed_url_for_timesheet,
+            )
     elif not ts_rows and not upload_active:
         _render_dialog_placeholder(
             "No documents yet. Approved weekly timesheets and uploaded job documents will appear here."

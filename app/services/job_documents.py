@@ -123,3 +123,44 @@ def unlink_job_document_from_task(document_id: str, *, admin: bool = False) -> N
         raise ValueError("document_id required")
     _, update_fn, _ = write_fn(admin=admin)
     update_fn(TABLE, {"task_id": None}, {"id": did})
+
+
+def delete_job_document(
+    document_id: str,
+    *,
+    job_id: str | None = None,
+    admin: bool = False,
+) -> None:
+    did = str(document_id or "").strip()
+    if not did:
+        raise ValueError("document_id required")
+    if not table_exists(TABLE, admin=admin):
+        raise RuntimeError("documents_hub table not found — run sql/008_documents.sql")
+    fn = fetch_fn(admin=admin)
+    rows = fn(TABLE, {"id": did}, limit=1)
+    row = rows[0] if rows else None
+    if not isinstance(row, dict):
+        raise ValueError("Document not found")
+    if not _is_user_job_document(row):
+        raise ValueError("Cannot delete this document")
+    jid = str(job_id or "").strip()
+    linked_job = str(row.get("linked_record_id") or "").strip()
+    if jid and linked_job and linked_job != jid:
+        raise ValueError("Document does not belong to this job")
+    storage_path = str(row.get("storage_path") or "").strip()
+    if storage_path and admin:
+        try:
+            from app.config import settings
+        except ImportError:
+            from config import settings  # type: ignore
+        bucket = getattr(settings, "storage_bucket", "ips-storage")
+        try:
+            from app.db import delete_storage_object_admin
+        except ImportError:
+            from db import delete_storage_object_admin  # type: ignore
+        try:
+            delete_storage_object_admin(storage_path, bucket=bucket)
+        except Exception:
+            _LOG.warning("Storage delete failed for %s", storage_path, exc_info=True)
+    _, _, delete_fn = write_fn(admin=admin)
+    delete_fn(TABLE, {"id": did})
