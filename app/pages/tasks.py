@@ -1218,38 +1218,6 @@ def _render_job_subjob_delete_cell(*, task_id: str, job_id: str) -> None:
     jid = str(job_id or "").strip()
     if not tid:
         return
-    pending_tid = str(st.session_state.get(PENDING_DELETE_SUBJOB_KEY) or "").strip()
-    pending_jid = str(st.session_state.get(PENDING_DELETE_SUBJOB_JOB_KEY) or "").strip()
-    is_pending = pending_tid == tid and pending_jid == jid
-
-    if is_pending:
-        st.markdown(
-            '<span class="ips-subjob-delete-pending-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="ips-subjob-delete-confirm-label">Delete this subjob?</div>',
-            unsafe_allow_html=True,
-        )
-        confirm_col, cancel_col = st.columns(2, gap="small")
-        with confirm_col:
-            if st.button(
-                "Delete",
-                key=f"confirm_delete_subjob_{jid}_{tid}",
-                type="primary",
-                use_container_width=True,
-            ):
-                _handle_delete_job_subjob(tid, jid)
-        with cancel_col:
-            if st.button(
-                "Cancel",
-                key=f"cancel_delete_subjob_{jid}_{tid}",
-                use_container_width=True,
-            ):
-                _clear_pending_subjob_delete()
-                st.rerun()
-        return
-
     with st.container(key=f"job_task_delete_{tid}"):
         if st.button(
             "🗑️",
@@ -1262,14 +1230,51 @@ def _render_job_subjob_delete_cell(*, task_id: str, job_id: str) -> None:
             st.rerun()
 
 
+def _render_job_subjob_delete_confirm_row(*, task_id: str, job_id: str, title: str) -> None:
+    tid = str(task_id or "").strip()
+    jid = str(job_id or "").strip()
+    if not tid or not jid:
+        return
+    safe_title = html.escape(str(title or "").strip() or "Subjob")
+    with st.container(key=f"job_task_delete_confirm_{tid}"):
+        st.markdown(
+            '<span class="ips-subjob-delete-confirm-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        msg_col, action_col = st.columns([5.5, 1.5], gap="small", vertical_alignment="center")
+        with msg_col:
+            st.markdown(
+                f'<div class="ips-subjob-delete-confirm-message">Delete subjob “{safe_title}”?</div>',
+                unsafe_allow_html=True,
+            )
+        with action_col:
+            delete_col, cancel_col = st.columns(2, gap="small")
+            with delete_col:
+                if st.button(
+                    "Delete",
+                    key=f"confirm_delete_subjob_{jid}_{tid}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _handle_delete_job_subjob(tid, jid)
+            with cancel_col:
+                if st.button(
+                    "Cancel",
+                    key=f"cancel_delete_subjob_{jid}_{tid}",
+                    use_container_width=True,
+                ):
+                    _clear_pending_subjob_delete()
+                    st.rerun()
+
+
 def _render_job_linked_tasks_table(
     tasks: list[dict],
     *,
     job_id: str,
     assignee_lookup: dict[str, str],
 ) -> None:
-    cols = [4.4, 1.1, 1.1, 1.9, 1.1, 0.35]
-    headers = ["SUBJOB", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE", ""]
+    cols = [4.2, 1.0, 1.0, 1.8, 1.0, 0.45]
+    headers = ["SUBJOB", "STATUS", "PRIORITY", "ASSIGNED TO", "DUE", "ACTIONS"]
     st.markdown('<div class="ips-job-tasks-table">', unsafe_allow_html=True)
     with st.container(key="job_tasks_table_wrap"):
         header_cols = st.columns(cols, gap="small", vertical_alignment="center")
@@ -1287,9 +1292,9 @@ def _render_job_linked_tasks_table(
             priority = normalize_task_priority(task.get("priority"))
             assignee = _resolve_assignee_name(task.get("assigned_to"), assignee_lookup)
             due = fmt_date(task.get("due_date"))
+            title_text = str(task.get("title") or "").strip() or "Subjob"
             row_cols = st.columns(cols, gap="small", vertical_alignment="center")
             with row_cols[0]:
-                title_text = str(task.get("title") or "").strip() or "Subjob"
                 with st.container(key=f"job_task_title_{tid}"):
                     if st.button(title_text, key=f"job_task_open_{tid}", type="tertiary"):
                         _set_job_subjob_selection(tid, job_id)
@@ -1310,6 +1315,14 @@ def _render_job_linked_tasks_table(
                 )
             with row_cols[5]:
                 _render_job_subjob_delete_cell(task_id=tid, job_id=job_id)
+            pending_tid = str(st.session_state.get(PENDING_DELETE_SUBJOB_KEY) or "").strip()
+            pending_jid = str(st.session_state.get(PENDING_DELETE_SUBJOB_JOB_KEY) or "").strip()
+            if pending_tid == tid and pending_jid == job_id:
+                _render_job_subjob_delete_confirm_row(
+                    task_id=tid,
+                    job_id=job_id,
+                    title=title_text,
+                )
     st.markdown("</div>", unsafe_allow_html=True)
 
 

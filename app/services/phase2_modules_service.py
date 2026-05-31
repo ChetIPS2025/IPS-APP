@@ -231,19 +231,30 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
     if not customer:
         customer = "—"
     end = str(row.get("end_date") or row.get("target_completion_date") or "")[:10]
+    loc_id = str(row.get("customer_location_id") or row.get("location_id") or "").strip()
+    contact_id = str(row.get("customer_contact_id") or "").strip()
+    location_text = str(row.get("location") or "").strip()
+    notes = str(row.get("notes") or row.get("description") or row.get("scope_of_work") or "")
     return {
         "id": jid or num,
         "job_number": num,
         "job_name": str(row.get("job_name") or row.get("name") or row.get("description") or "—"),
         "customer": customer,
         "customer_id": str(row.get("customer_id") or "").strip(),
+        "customer_location_id": loc_id,
+        "location_id": loc_id,
+        "customer_contact_id": contact_id,
+        "location": location_text,
+        "location_name": location_text,
         "estimate_number": str(row.get("estimate_number") or row.get("quote_number") or "—"),
         "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
         "status": str(row.get("status") or "Draft"),
         "start_date": str(row.get("start_date") or "")[:10],
         "end_date": end,
         "progress": int(row.get("progress") or row.get("percent_complete") or 0),
-        "description": str(row.get("notes") or row.get("description") or ""),
+        "description": notes,
+        "notes": notes,
+        "scope": notes,
         "is_deleted": bool(row.get("is_deleted")),
         "completed_at": row.get("completed_at"),
         "cancelled_at": row.get("cancelled_at"),
@@ -797,7 +808,6 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         "status": ui.get("status"),
         "supervisor": ui.get("supervisor"),
         "project_manager": ui.get("project_manager"),
-        "location": ui.get("location"),
         "start_date": ui.get("start_date") or None,
         "target_completion_date": ui.get("end_date") or None,
         "notes": ui.get("description") or ui.get("notes") or "",
@@ -806,12 +816,30 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         payload["percent_complete"] = int(ui.get("progress") or 0)
     if customer_id:
         payload["customer_id"] = customer_id
-    loc_id = str(ui.get("customer_location_id") or "").strip()
-    if loc_id:
-        payload["customer_location_id"] = loc_id
+
+    cols = table_column_names("jobs")
+    loc_id = str(ui.get("customer_location_id") or ui.get("location_id") or "").strip()
     contact_id = str(ui.get("customer_contact_id") or "").strip()
-    if contact_id:
-        payload["customer_contact_id"] = contact_id
+    if not cols or "customer_location_id" in cols:
+        payload["customer_location_id"] = loc_id or None
+    if cols and "location_id" in cols:
+        payload["location_id"] = loc_id or None
+    elif not cols and loc_id:
+        payload["location_id"] = loc_id
+    if not cols or "customer_contact_id" in cols:
+        payload["customer_contact_id"] = contact_id or None
+
+    if not cols or "location" in cols:
+        if loc_id:
+            try:
+                from app.services.job_from_estimate import _location_text_from_customer_location
+            except ImportError:
+                from services.job_from_estimate import _location_text_from_customer_location  # type: ignore
+            loc_text = _location_text_from_customer_location(loc_id)
+            payload["location"] = loc_text or str(ui.get("location") or "").strip()
+        else:
+            payload["location"] = str(ui.get("location") or "").strip()
+
     if row_id:
         return update_row("jobs", payload, {"id": row_id})
     return insert_row("jobs", payload)

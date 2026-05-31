@@ -1275,6 +1275,30 @@ def inject_tasks_module_css() -> None:
   color: #2563eb !important;
   text-decoration: underline !important;
 }}
+.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:not(:has(.ips-subjob-delete-confirm-marker)) > [data-testid="column"]:last-child {{
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  min-width: 56px !important;
+  max-width: 72px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}}
+.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:last-child .ips-job-tasks-header-row {{
+  justify-content: center;
+  width: 100%;
+}}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] {{
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100%;
+}}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton {{
+  display: flex !important;
+  justify-content: center !important;
+  width: 100%;
+}}
 .st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button {{
   background: transparent !important;
   border: none !important;
@@ -1287,32 +1311,53 @@ def inject_tasks_module_css() -> None:
   height: 28px !important;
   width: 28px !important;
   min-width: 28px !important;
+  margin: 0 auto !important;
 }}
 .st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button:hover {{
   color: #b91c1c !important;
   background: #fef2f2 !important;
   border-radius: 6px !important;
 }}
-.ips-subjob-delete-confirm-label {{
-  font-size: 11px;
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_confirm_"] {{
+  background: #fef2f2 !important;
+  border-bottom: 1px solid #fecaca !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+}}
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_confirm_"] [data-testid="stHorizontalBlock"] {{
+  border-bottom: none !important;
+  background: transparent !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+}}
+.ips-subjob-delete-confirm-message {{
+  font-size: 13px;
   font-weight: 600;
-  color: #64748b;
-  line-height: 1.2;
-  margin: 0 0 4px 0;
-  white-space: nowrap;
+  color: #991b1b;
+  line-height: 1.35;
+  margin: 0;
 }}
-.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) {{
-  min-height: 72px !important;
-  align-items: center !important;
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_confirm_"] [class*="st-key-confirm_delete_subjob_"] .stButton > button {{
+  background: #dc2626 !important;
+  border: 1px solid #dc2626 !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
 }}
-.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) > [data-testid="column"]:last-child {{
-  min-width: 148px !important;
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_confirm_"] [class*="st-key-confirm_delete_subjob_"] .stButton > button:hover {{
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
 }}
-.st-key-job_tasks_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-subjob-delete-pending-marker) [data-testid="stButton"] > button {{
-  font-size: 11px !important;
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0 8px !important;
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_confirm_"] [class*="st-key-cancel_delete_subjob_"] .stButton > button {{
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
 }}
 </style>
 """,

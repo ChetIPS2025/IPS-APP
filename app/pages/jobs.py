@@ -205,11 +205,24 @@ def _job_supervisor(job: dict) -> str:
     return "—"
 
 
+def _job_customer_location_id(job: dict) -> str:
+    return str(job.get("customer_location_id") or job.get("location_id") or "").strip()
+
+
 def _job_location(job: dict) -> str:
     for key in ("location_name", "location"):
         val = str(job.get(key) or "").strip()
         if val:
             return val
+    loc_id = _job_customer_location_id(job)
+    if loc_id:
+        try:
+            from app.services.job_from_estimate import _location_text_from_customer_location
+        except ImportError:
+            from services.job_from_estimate import _location_text_from_customer_location  # type: ignore
+        label = _location_text_from_customer_location(loc_id)
+        if label:
+            return label
     return "—"
 
 
@@ -1052,7 +1065,7 @@ def _render_field_job_detail_tabs(job: dict) -> None:
             f"{_detail_field('Customer', customer)}"
             f'{_detail_field("Status", status, html_value=_status_pill(status))}'
             f"{_detail_field('Supervisor', supervisor)}"
-            f"{_detail_field('Location', job.get('location'))}"
+            f"{_detail_field('Location', _job_location(job))}"
             f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
             f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
             f"</div>"
@@ -1119,7 +1132,7 @@ def _render_job_detail_tabs(job: dict) -> None:
             f'{_detail_field("Status", status, html_value=_status_pill(status))}'
             f"{_detail_field('Supervisor', supervisor)}"
             f"{_detail_field('Project Manager', job.get('project_manager'))}"
-            f"{_detail_field('Location', job.get('location'))}"
+            f"{_detail_field('Location', _job_location(job))}"
             f"{_detail_field('Estimate #', estimate_no)}"
             f"</div>"
         )
@@ -1202,7 +1215,7 @@ def _render_job_detail_tabs(job: dict) -> None:
             f'<div class="ips-detail-grid">'
             f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
             f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
-            f"{_detail_field('Location', job.get('location'))}"
+            f"{_detail_field('Location', _job_location(job))}"
             f"</div>"
         )
         st.markdown(_dialog_card("Schedule", sched_html), unsafe_allow_html=True)
@@ -1269,7 +1282,7 @@ def _render_job_edit_form(job: dict) -> None:
             customer_name=cust_name,
             session_key=f"job_edit_location_{job_key}",
             prev_customer_key=f"job_edit_cust_prev_{job_key}",
-            initial_location_id=str(job.get("customer_location_id") or ""),
+            initial_location_id=_job_customer_location_id(job),
         )
         contact_id = _customer_contact_select(
             customer_name=cust_name,
