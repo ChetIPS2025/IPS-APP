@@ -654,6 +654,27 @@ def _render_daily_hrs_input(
     return float(hours)
 
 
+def _render_list_day_hour_stepper(
+    *,
+    value: float,
+    widget_key: str,
+    day_label: str,
+) -> float:
+    """List view: − / value / + stepper under the day label."""
+    st.markdown(
+        '<span class="timesheet-list-hour-stepper-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _hour_stepper_input(
+        label=f"{day_label} hours",
+        value=float(value),
+        widget_key=widget_key,
+        down_label="−",
+        up_label="+",
+        compact=True,
+    )
+
+
 def _render_list_row_day_cell(
     *,
     day_d: date,
@@ -663,36 +684,39 @@ def _render_list_row_day_cell(
     week_sig: str,
     editable: bool,
 ) -> float:
-    """List row: day label + compact HRS spinner (jobs live in expand detail)."""
+    """List row: centered day label stacked above hour stepper."""
+    day_label = day_d.strftime("%a %m/%d").upper()
+    widget_key = f"tk_hrs_{emp_id}_{week_sig}_{day_ix}"
     filled_marker = " ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
     grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
-    st.markdown(
-        f'<span class="timesheet-list-day-marker day-block-marker{grid_marker}{filled_marker}" aria-hidden="true"></span>'
-        f'<div class="day-card timesheet-list-day-card">'
-        f'<div class="day-date-line timesheet-list-day-heading">'
-        f'{html.escape(day_d.strftime("%a %m/%d").upper())}'
-        f"</div></div>",
-        unsafe_allow_html=True,
-    )
     total = _day_hours_total(day_row)
-    if editable:
-        hrs = _render_daily_hrs_input(
-            value=total,
-            widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
-            day_label=day_d.strftime("%a"),
-            editable=True,
-            box_style=True,
+
+    with st.container(key=f"tk_list_day_{emp_id}_{week_sig}_{day_ix}"):
+        st.markdown(
+            f'<span class="timesheet-list-day-marker day-block-marker{grid_marker}{filled_marker}" '
+            f'aria-hidden="true"></span>',
+            unsafe_allow_html=True,
         )
-        _set_day_job_hours(day_row, hrs)
-        return hrs
-    _render_daily_hrs_input(
-        value=total,
-        widget_key=f"tk_hrs_{emp_id}_{week_sig}_{day_ix}",
-        day_label=day_d.strftime("%a"),
-        editable=False,
-        box_style=True,
-    )
-    return total
+        st.markdown(
+            f'<div class="timekeeping-day-cell">'
+            f'<div class="timekeeping-day-label">{html.escape(day_label)}</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if editable:
+            hrs = _render_list_day_hour_stepper(
+                value=total,
+                widget_key=widget_key,
+                day_label=day_d.strftime("%a"),
+            )
+            _set_day_job_hours(day_row, hrs)
+            return hrs
+        st.markdown(
+            f'<div class="timekeeping-hour-input timekeeping-hour-input-ro">'
+            f"{html.escape(_fmt_day_hours(total))}</div>",
+            unsafe_allow_html=True,
+        )
+        return total
 
 
 def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
