@@ -100,7 +100,7 @@ _TK_VIEW_GRID = "Week grid"
 _TK_VIEW_LIST = "List"
 _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
-_TS_DAY = 112
+_TS_DAY = 140
 _TS_WEEK = 70
 _TS_LIST_HANDLE = 24
 _TS_LIST_EMPLOYEE = 200
@@ -792,10 +792,10 @@ def _hour_stepper_input(
     up_key = f"{widget_key}_up"
     if compact:
         st.markdown(
-            '<span class="weekly-timesheet-stepper-marker hours-control" aria-hidden="true"></span>',
+            '<span class="weekly-timesheet-stepper-marker hours-control timekeeping-hours-control" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-    dn_col, val_col, up_col = st.columns([0.5, 0.25, 0.25] if compact else [0.26, 0.48, 0.26], gap="small")
+    dn_col, val_col, up_col = st.columns([0.24, 0.52, 0.24] if compact else [0.26, 0.48, 0.26], gap="small")
     with dn_col:
         if st.button(
             down_label,
@@ -848,21 +848,18 @@ def _render_weekly_compact_hrs_control(
         return float(value)
 
     st.markdown(
-        '<span class="weekly-timesheet-hrs-marker hours-row" aria-hidden="true"></span>',
+        '<span class="weekly-timesheet-hrs-marker hours-row" aria-hidden="true"></span>'
+        '<div class="timekeeping-hours-control-label"><span class="hrs-label">HRS</span></div>',
         unsafe_allow_html=True,
     )
-    lbl_col, ctrl_col = st.columns([0.22, 1], gap="xxsmall", vertical_alignment="center")
-    with lbl_col:
-        st.markdown('<span class="hrs-label">HRS</span>', unsafe_allow_html=True)
-    with ctrl_col:
-        return _hour_stepper_input(
-            label="Hours",
-            value=float(value),
-            widget_key=widget_key,
-            down_label="−",
-            up_label="+",
-            compact=True,
-        )
+    return _hour_stepper_input(
+        label="Hours",
+        value=float(value),
+        widget_key=widget_key,
+        down_label="−",
+        up_label="+",
+        compact=True,
+    )
 
 
 def _render_weekly_timesheet_day_cell(

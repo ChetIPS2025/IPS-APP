@@ -3661,7 +3661,7 @@ def inject_timekeeping_module_css() -> None:
   font-size: 0.82rem;
 }}
 .ips-time-hgrid-scroll {{
-  overflow-x: visible;
+  overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   border: 1px solid #e2e8f0;
@@ -3905,7 +3905,7 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
   grid-template-columns:
     minmax(0, 180px)
-    repeat(7, minmax(0, 112px))
+    repeat(7, minmax(130px, 140px))
     minmax(0, 70px) !important;
   padding: 8px 10px !important;
   gap: 6px !important;
@@ -4302,15 +4302,15 @@ def inject_timekeeping_module_css() -> None:
     overflow-x: auto;
   }}
   .ips-time-hgrid-scroll .ips-time-hgrid-wrap {{
-    min-width: 1008px;
+    min-width: 1180px;
   }}
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-day-marker),
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker),
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker) {{
   width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
+  min-width: 130px !important;
+  max-width: 140px !important;
   padding: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-day-marker) [data-testid="stVerticalBlock"],
@@ -4338,22 +4338,22 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"],
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] {{
   width: 100% !important;
-  max-width: 104px !important;
+  max-width: 120px !important;
   margin-bottom: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] {{
   width: 100% !important;
-  max-width: 104px !important;
+  max-width: 120px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
   width: 100% !important;
-  max-width: 104px !important;
-  height: 28px !important;
-  min-height: 28px !important;
+  max-width: 120px !important;
+  height: 32px !important;
+  min-height: 32px !important;
   font-size: 10px !important;
   border-radius: 7px !important;
   padding: 2px 4px !important;
@@ -4363,69 +4363,48 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-job-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span {{
   font-size: 10px !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label,
-.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label,
-.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .hrs-label {{
+.timekeeping-hours-control-label {{
+  width: 100%;
+  text-align: center;
+  margin: 2px 0 4px 0;
+  line-height: 1;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .timekeeping-hours-control-label .hrs-label,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .timekeeping-hours-control-label .hrs-label,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) .timekeeping-hours-control-label .hrs-label {{
   font-size: 9px;
   font-weight: 800;
   color: #334155;
-  width: 20px;
+  letter-spacing: 0.04em;
   display: inline-block;
-}}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"],
-.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"],
-.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] {{
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 4px !important;
-  margin-top: 4px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  border-bottom: none !important;
-  padding: 0 !important;
-  background: transparent !important;
-}}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
-.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
-.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
-  flex: 0 0 20px !important;
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-}}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
-.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
-.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-hrs-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
-  flex: 1 1 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: 78px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"],
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"],
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: 38px 20px 20px !important;
-  width: 78px !important;
-  max-width: 78px !important;
-  height: 26px !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 7px !important;
+  grid-template-columns: 34px minmax(64px, 72px) 34px !important;
+  width: 100% !important;
+  max-width: 146px !important;
+  min-width: 130px !important;
+  height: 38px !important;
+  border: 1px solid #d8dee8 !important;
+  border-radius: 8px !important;
   overflow: hidden !important;
   background: #ffffff !important;
   gap: 0 !important;
   padding: 0 !important;
-  margin: 0 !important;
+  margin: 0 auto !important;
   border-bottom: none !important;
+  align-items: stretch !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"],
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"],
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] {{
-  width: 38px !important;
-  min-width: 38px !important;
-  max-width: 38px !important;
+  width: 100% !important;
+  min-width: 64px !important;
+  max-width: 72px !important;
   margin: 0 !important;
+  grid-column: 2 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] > div,
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] > div,
@@ -4433,21 +4412,30 @@ def inject_timekeeping_module_css() -> None:
   border: none !important;
   background: #ffffff !important;
   box-shadow: none !important;
-  min-height: 26px !important;
-  height: 26px !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input,
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInput"] input {{
-  width: 38px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 64px !important;
+  max-width: 72px !important;
   text-align: center !important;
   border: none !important;
-  font-size: 10px !important;
+  font-size: 12px !important;
   font-weight: 700 !important;
-  padding: 0 !important;
-  min-height: 26px !important;
-  height: 26px !important;
+  padding: 0 4px !important;
+  min-height: 38px !important;
+  height: 38px !important;
   background: #ffffff !important;
+  writing-mode: horizontal-tb !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepUp"],
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stNumberInputStepDown"],
@@ -4460,26 +4448,26 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"],
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"],
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] {{
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
   margin: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button,
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button,
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stButton"] button {{
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  height: 26px !important;
-  min-height: 26px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 38px !important;
+  min-height: 38px !important;
   padding: 0 !important;
   border: none !important;
-  border-left: 1px solid #cbd5e1 !important;
+  border-left: 1px solid #d8dee8 !important;
   border-radius: 0 !important;
   background: #f8fafc !important;
-  font-size: 11px !important;
-  font-weight: 900 !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
   line-height: 1 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"],
@@ -4488,18 +4476,36 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   margin: 0 !important;
   min-width: 0 !important;
+  overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
 .st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
 .st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
-  width: 38px !important;
-  max-width: 38px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  grid-column: 1 !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child),
-.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child),
-.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
-  width: 20px !important;
-  max-width: 20px !important;
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  width: auto !important;
+  min-width: 64px !important;
+  max-width: 72px !important;
+  grid-column: 2 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  grid-column: 3 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stButton"] button,
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stButton"] button,
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-stepper-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stButton"] button {{
+  border-left: none !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker):not(:has(.timesheet-list-row-marker)) {{
   background: #ffffff !important;
@@ -4606,7 +4612,7 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   grid-template-columns:
     minmax(0, 180px)
-    repeat(7, minmax(0, 112px))
+    repeat(7, minmax(130px, 140px))
     minmax(0, 70px) !important;
   display: grid !important;
   width: 100% !important;
@@ -4623,7 +4629,12 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child):not(:has(.weekly-timesheet-day-marker)),
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child):not(:has(.weekly-timesheet-day-marker)),
 .st-key-ftp_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child):not(:last-child) {{
-  min-width: 96px;
+  min-width: 130px;
+}}
+.st-key-tk_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="column"]:has(.weekly-timesheet-day-marker) {{
+  min-width: 130px !important;
+  max-width: 140px !important;
 }}
 .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:has(.weekly-timesheet-row-marker)) > [data-testid="column"]:last-child,
 .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:not(:has(.weekly-timesheet-row-marker)) > [data-testid="column"]:last-child {{
