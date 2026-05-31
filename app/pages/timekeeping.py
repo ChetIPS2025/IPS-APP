@@ -1147,19 +1147,29 @@ def _ensure_weekly_grid(emp: dict, week_start_d: date) -> list[dict]:
     return st.session_state[gk]
 
 
-def _render_day_grid_header() -> None:
-    header = st.columns(_DAY_GRID_COLS)
-    for col, lbl in zip(header, _DAY_GRID_LABELS):
+def _render_day_grid_header(*, edit_mode: bool = False) -> None:
+    header = st.columns(_DAY_GRID_EDIT_COLS if edit_mode else _DAY_GRID_COLS)
+    labels = ([*_DAY_GRID_LABELS, ""] if edit_mode else _DAY_GRID_LABELS)
+    for col_ix, (col, lbl) in enumerate(zip(header, labels)):
         with col:
+            marker = (
+                '<span class="timekeeping-detail-header-marker" aria-hidden="true"></span>'
+                if col_ix == 0
+                else ""
+            )
             st.markdown(
-                f'<div class="ips-time-day-head">{html.escape(lbl)}</div>',
+                f"{marker}<div class=\"ips-time-day-head timekeeping-detail-head\">{html.escape(lbl)}</div>",
                 unsafe_allow_html=True,
             )
 
 
 def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
     grid = _ensure_weekly_grid(emp, week_start_d)
-    _render_day_grid_header()
+    st.markdown(
+        '<span class="timekeeping-detail-grid-marker timekeeping-detail-grid-readonly" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    _render_day_grid_header(edit_mode=False)
     for row in grid:
         c = st.columns(_DAY_GRID_COLS)
         row_total = (
@@ -1169,42 +1179,45 @@ def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
         )
         with c[0]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(_short_day(str(row.get("day") or "")))}</div>',
+                f'<span class="timekeeping-detail-row-marker" aria-hidden="true"></span>'
+                f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                f"{html.escape(_short_day(str(row.get('day') or '')))}</div>",
                 unsafe_allow_html=True,
             )
         with c[1]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(fmt_date(row.get("date")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(fmt_date(row.get("date")))}</div>',
                 unsafe_allow_html=True,
             )
         with c[2]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(str(row.get("job") or "—"))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(str(row.get("job") or "—"))}</div>',
                 unsafe_allow_html=True,
             )
         with c[3]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(_fmt_table_hours(row.get("st")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(_fmt_table_hours(row.get("st")))}</div>',
                 unsafe_allow_html=True,
             )
         with c[4]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(_fmt_table_hours(row.get("ot")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(_fmt_table_hours(row.get("ot")))}</div>',
                 unsafe_allow_html=True,
             )
         with c[5]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(_fmt_table_hours(row_total))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(_fmt_table_hours(row_total))}</div>',
                 unsafe_allow_html=True,
             )
         with c[6]:
             day_status = _normalize_timecard_status(row.get("status"))
             st.markdown(_timecard_status_pill_html(day_status), unsafe_allow_html=True)
         with c[7]:
-            st.markdown('<div class="ips-time-day-row">—</div>', unsafe_allow_html=True)
+            st.markdown('<div class="ips-time-day-row timekeeping-detail-cell">—</div>', unsafe_allow_html=True)
         with c[8]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(str(row.get("notes") or "—"))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                f"{html.escape(str(row.get('notes') or '—'))}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1230,18 +1243,15 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     job_opts = job_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
 
-    st.markdown('<span class="ips-time-day-edit-marker"></span>', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="ips-time-day-edit-marker timekeeping-detail-grid-marker timekeeping-detail-grid-edit" '
+        'aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
 
     edit_cols = _DAY_GRID_EDIT_COLS
-    header = st.columns(edit_cols, gap="small")
-    labels = [* _DAY_GRID_LABELS, ""]
-    for col, lbl in zip(header, labels):
-        with col:
-            st.markdown(
-                f'<div class="ips-time-day-head">{html.escape(lbl)}</div>',
-                unsafe_allow_html=True,
-            )
+    _render_day_grid_header(edit_mode=True)
 
     for i, row in enumerate(grid):
         day_status = _normalize_timecard_status(row.get("status"))
@@ -1252,13 +1262,15 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
         with c[0]:
             row_marker = "ips-time-day-row-filled" if row_complete else ""
             st.markdown(
+                f'<span class="timekeeping-detail-row-marker" aria-hidden="true"></span>'
                 f'<span class="ips-time-day-row-marker {row_marker}" aria-hidden="true"></span>'
-                f'<div class="ips-time-day-row">{html.escape(_short_day(str(row.get("day") or "")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                f"{html.escape(_short_day(str(row.get('day') or '')))}</div>",
                 unsafe_allow_html=True,
             )
         with c[1]:
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(fmt_date(row.get("date")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(fmt_date(row.get("date")))}</div>',
                 unsafe_allow_html=True,
             )
         with c[2]:
@@ -1284,6 +1296,9 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 widget_key=f"tk_st_{eid}_{week_sig}_{i}",
                 step=0.5,
                 disabled=not row_editable,
+                down_label="−",
+                up_label="+",
+                compact=True,
             )
         with c[4]:
             grid[i]["ot"] = _hour_stepper_input(
@@ -1292,6 +1307,9 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 widget_key=f"tk_ot_{eid}_{week_sig}_{i}",
                 step=0.5,
                 disabled=not row_editable,
+                down_label="−",
+                up_label="+",
+                compact=True,
             )
         with c[5]:
             row_total = (
@@ -1300,7 +1318,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 + float(grid[i].get("dt") or 0)
             )
             st.markdown(
-                f'<div class="ips-time-day-row">{html.escape(_fmt_table_hours(row_total))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(_fmt_table_hours(row_total))}</div>',
                 unsafe_allow_html=True,
             )
         with c[6]:
@@ -1784,7 +1802,7 @@ def _render_custom_timekeeping_table(
 
                 if expanded:
                     st.markdown(
-                        '<div class="timesheet-employee-expand-detail">',
+                        '<div class="timesheet-employee-expand-detail ips-timekeeping-row-expand">',
                         unsafe_allow_html=True,
                     )
                     _render_inline_daily_entries(row, week_start_d)
