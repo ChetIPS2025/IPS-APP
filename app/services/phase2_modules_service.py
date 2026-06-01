@@ -808,8 +808,16 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     if customer_name and not customer_id:
         return ServiceResult(ok=False, error=f"Customer not found: {customer_name}")
 
+    job_number = str(ui.get("job_number") or "").strip()
+    if not row_id and not job_number:
+        try:
+            from app.services.job_service import next_job_number
+        except ImportError:
+            from services.job_service import next_job_number  # type: ignore
+        job_number = str(next_job_number()).strip()
+
     payload: dict[str, Any] = {
-        "job_number": ui.get("job_number"),
+        "job_number": job_number or ui.get("job_number"),
         "job_name": ui.get("job_name"),
         "status": ui.get("status"),
         "supervisor": ui.get("supervisor"),

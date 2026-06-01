@@ -242,7 +242,7 @@ def get_admin_client() -> Client:
 
 
 def allocate_next_shared_sequence_int() -> int:
-    """Call DB RPC ``ips_next_job_quote_seq`` (implementation in ``services.shared_sequence``)."""
+    """Call DB RPC ``ips_next_yearly_seq`` (implementation in ``services.shared_sequence``)."""
     try:
         from app.services.shared_sequence import get_next_sequence_number
     except ImportError:

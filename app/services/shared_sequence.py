@@ -15,7 +15,7 @@ Apply the Supabase SQL that defines ``public.ips_next_yearly_seq()`` before rely
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 import re
 from decimal import Decimal
@@ -159,26 +159,26 @@ def get_next_sequence_number() -> int:
     except ImportError:
         from db import get_admin_client  # type: ignore
 
-    try:
-        resp = get_admin_client().rpc(_RPC_NAME, {}).execute()
-    except Exception as exc:
-        raise RuntimeError(
-            "Could not allocate the next quote/job sequence number from the database. "
-            "Confirm SUPABASE_URL and the service-role key are set, that "
-            f"the SQL that defines RPC {_RPC_NAME!r} has been applied, and that the RPC exists. "
-            f"Request error: {exc!r}"
-        ) from exc
+    last_exc: Exception | None = None
+    for rpc_name in (_RPC_NAME, "ips_next_job_quote_seq"):
+        try:
+            resp = get_admin_client().rpc(rpc_name, {}).execute()
+            return _coerce_sequence_rpc_payload(resp.data)
+        except Exception as exc:
+            last_exc = exc
+            continue
 
-    try:
-        return _coerce_sequence_rpc_payload(resp.data)
-    except ValueError as exc:
-        raise RuntimeError(
-            f"Database RPC {_RPC_NAME!r} did not return a single usable integer. {exc}"
-        ) from exc
+    raise RuntimeError(
+        "Could not allocate the next quote/job sequence number from the database. "
+        "Confirm SUPABASE_URL and the service-role key are set, that "
+        f"the SQL that defines RPC {_RPC_NAME!r} (or legacy ips_next_job_quote_seq) "
+        "has been applied, and that the RPC exists. "
+        f"Request error: {last_exc!r}"
+    ) from last_exc
 
 
 def format_quote_number(n: int) -> str:
-    yy = datetime.utcnow().strftime("%y")
+    yy = datetime.now(timezone.utc).strftime("%y")
     seq = int(n)
     if not (0 <= seq <= 999):
         raise ValueError(f"Quote sequence out of range (expected 0..999): {seq}")
@@ -186,7 +186,7 @@ def format_quote_number(n: int) -> str:
 
 
 def format_job_number(n: int) -> str:
-    yy = datetime.utcnow().strftime("%y")
+    yy = datetime.now(timezone.utc).strftime("%y")
     seq = int(n)
     if not (0 <= seq <= 999):
         raise ValueError(f"Job sequence out of range (expected 0..999): {seq}")
@@ -201,3 +201,37 @@ def next_quote_number_string() -> str:
 def next_job_number_string() -> str:
     """Allocate the next job number string (``J`` + UTC year + 3-digit sequence)."""
     return format_job_number(get_next_sequence_number())
+
+
+def quote_number_to_job_number(quote_number: str) -> str:
+    """
+    Map a quote/estimate number to its linked job number without consuming a new sequence slot.
+
+    ``Q26208`` → ``J26208`` (same ``YY###`` tail). Used when creating a job from an estimate.
+    """
+    q = str(quote_number or "").strip()
+    if not q:
+        return ""
+    first = q[:1].upper()
+    if first == "Q":
+        return f"J{q[1:]}"[:120]
+    if first == "J":
+        return q[:120]
+    return f"J{q}"[:120]
+
+
+def job_number_to_quote_number(job_number: str) -> str:
+    """Inverse of :func:`quote_number_to_job_number` (``J26208`` → ``Q26208``)."""
+    j = str(job_number or "").strip()
+    if not j:
+        return ""
+    first = j[:1].upper()
+    if first == "J":
+        return f"Q{j[1:]}"[:120]
+    if first == "Q":
+        return j[:120]
+    return f"Q{j}"[:120]
+
+
+# Backward-compatible alias used across estimate/job workflow modules.
+estimate_quote_to_job_number = quote_number_to_job_number

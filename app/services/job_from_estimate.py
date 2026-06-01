@@ -5,8 +5,8 @@ Create a Job Database row from an approved / awarded estimate.
 the **costing / work** record (``jobs.id`` / ``job_number``); the estimate stays a quote and
 is linked via ``estimate_id``. Time, job costing, and PO expenses should key off ``job_id``.
 
-Quote numbers (``Q#####``) map to ``J#####`` when ``job_number`` exists; see
-:func:`estimate_quote_to_job_number`.
+Quote numbers (``QYY###``) map to ``JYY###`` when a job is linked; see
+:func:`quote_number_to_job_number`.
 """
 
 from __future__ import annotations
@@ -264,18 +264,16 @@ def approve_estimate_and_create_job(
 
 def estimate_quote_to_job_number(quote_number: str) -> str:
     """
-    Map an estimate **quote_number** (e.g. ``Q26025`` or ``26025``) to a related **job_number**
-    (``J26025``). Leading alphabetic prefix is replaced with ``J``; otherwise ``J`` is prepended.
+    Map an estimate **quote_number** (e.g. ``Q26208``) to a related **job_number** (``J26208``).
 
-    Used only for estimate-to-job conversion — standalone jobs keep ``next_job_number()``.
+    Does not consume a new sequence slot — only swaps the ``Q`` prefix for ``J``.
+    Standalone jobs use :func:`~app.services.job_service.next_job_number` instead.
     """
-    q = str(quote_number or "").strip()
-    if not q:
-        return ""
-    first = q[:1]
-    if first.isalpha():
-        return ("J" + q[1:])[:120]
-    return ("J" + q)[:120]
+    try:
+        from app.services.shared_sequence import quote_number_to_job_number
+    except ImportError:
+        from services.shared_sequence import quote_number_to_job_number  # type: ignore
+    return quote_number_to_job_number(quote_number)
 
 
 def get_estimate_description(est: dict[str, Any]) -> str:

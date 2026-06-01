@@ -12,20 +12,30 @@ _JOB_LEGACY = re.compile(r"^JOB-(\d+)$", re.IGNORECASE)
 
 
 def next_job_number() -> str:
-    """Next job id: ``J`` + five digits (same shared sequence as :func:`~app.db.next_quote_number`)."""
+    """Next job id: ``JYY###`` (same shared yearly sequence as :func:`~app.db.next_quote_number`)."""
     return next_job_number_string()
 
 
 def job_number_display(value: str | None) -> str:
     """
-    Format stored ``job_number`` for UI: legacy ``JOB-nnnn`` maps to ``J`` + five digits; else as stored.
+    Format stored ``job_number`` for UI.
+
+    Legacy ``JOB-nnnn`` maps to ``J`` + current UTC year + 3-digit sequence when possible;
+    otherwise returns the stored value (``JYYNNN``).
     """
     s = str(value or "").strip()
     if not s:
         return ""
     m = _JOB_LEGACY.match(s)
     if m:
-        return f"J{int(m.group(1)):05d}"
+        try:
+            from app.services.shared_sequence import format_job_number
+        except ImportError:
+            from services.shared_sequence import format_job_number  # type: ignore
+        try:
+            return format_job_number(int(m.group(1)))
+        except ValueError:
+            return f"J{int(m.group(1)):05d}"
     return s
 
 

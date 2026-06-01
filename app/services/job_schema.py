@@ -17,8 +17,8 @@ These match :data:`JOBS_JOB_DATABASE_COLUMNS` (minus optional ``job_number`` / `
 - ``customer_id`` (uuid, FK → customers)
 - ``customer_contact_id`` (uuid, nullable, FK → customer_contacts) — **optional** (migration 016)
 - ``customer_location_id`` (uuid, nullable, FK → customer_locations) — **optional** (migration 024)
-- ``job_number`` (text) — **optional** (migration 005); new rows use ``J#####`` via
-  :mod:`services.shared_sequence` (same counter as quote numbers ``Q#####``)
+- ``job_number`` (text) — **optional** (migration 005); new rows use ``JYY###`` via
+  :mod:`services.shared_sequence` (same yearly counter as quote numbers ``QYY###``)
 - ``job_name`` (text)
 - ``location`` (text)
 - ``status`` (text) — use for open/closed lifecycle (many schemas have no ``is_active`` on ``jobs``)
