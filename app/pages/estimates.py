@@ -207,9 +207,15 @@ def _estimate_number(row: dict) -> str:
 
 
 def _estimate_project(row: dict) -> str:
-    for key in ("project_name", "project_description", "description"):
+    for key in (
+        "project_name",
+        "estimate_description",
+        "project_description",
+        "job_name",
+        "description",
+    ):
         val = str(row.get(key) or "").strip()
-        if val:
+        if val and val != "—":
             return val
     return "—"
 
@@ -720,7 +726,8 @@ def _open_estimates_detail_modal(estimate_id: str, estimate: dict | None = None)
 def _seed_estimate_edit_form(est: dict) -> None:
     eid = str(est.get("id") or "")
     st.session_state[f"est_edit_num_{eid}"] = str(est.get("estimate_number") or "")
-    st.session_state[f"est_edit_proj_{eid}"] = str(est.get("project_name") or "")
+    proj = _estimate_project(est)
+    st.session_state[f"est_edit_proj_{eid}"] = "" if proj == "—" else proj
     st.session_state[f"est_edit_cust_{eid}"] = str(est.get("customer") or "")
     st.session_state[f"est_edit_status_{eid}"] = str(est.get("status") or "Draft")
     st.session_state[f"est_edit_desc_{eid}"] = str(est.get("description") or est.get("scope_of_work") or "")
@@ -818,7 +825,7 @@ def _render_estimate_edit_form(est: dict) -> None:
         ok, msg = persist_estimate(
             {
                 "estimate_number": st.session_state.get(f"est_edit_num_{eid}"),
-                "project_name": st.session_state.get(f"est_edit_proj_{eid}"),
+                "project_name": str(st.session_state.get(f"est_edit_proj_{eid}") or "").strip(),
                 "customer": cust_name,
                 "customer_id": customer_id_for_name(cust_name) or None,
                 "customer_location_id": location_id or None,
@@ -1033,7 +1040,7 @@ def _show_new_estimate_dialog() -> None:
             ok, msg = persist_estimate(
                 {
                     "estimate_number": st.session_state.get("est_new_num"),
-                    "project_name": st.session_state.get("est_new_proj"),
+                    "project_name": str(st.session_state.get("est_new_proj") or "").strip(),
                     "customer": new_cust,
                     "customer_id": customer_id_for_name(new_cust) or None,
                     "customer_location_id": new_location_id or None,

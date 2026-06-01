@@ -1488,6 +1488,11 @@ def load_customer_locations(customer_id: str) -> list[dict[str, Any]]:
     return rows
 
 
+def load_locations_for_customer(customer_id: str) -> list[dict[str, Any]]:
+    """Customer locations for estimate/job forms (same source as Customers module)."""
+    return load_customer_locations(customer_id)
+
+
 def load_customer_contacts(customer_id: str, location_id: str | None = None) -> list[dict[str, Any]]:
     try:
         from app.services.customers_service import get_customer_contacts
@@ -1529,13 +1534,15 @@ def customer_id_for_name(customer_name: str) -> str:
     if not needle:
         return ""
     for c in load_customers():
-        if str(c.get("customer_name") or "").strip().lower() == needle:
-            return str(c.get("id") or "").strip()
+        for key in ("customer_name", "company_name"):
+            val = str(c.get(key) or "").strip().lower()
+            if val and val == needle:
+                return str(c.get("id") or "").strip()
     return ""
 
 
 def customer_location_select_options(customer_id: str) -> list[tuple[str, str]]:
-    """Active customer locations as (label, location_id)."""
+    """Customer locations as (label, location_id), matching Customers contacts/locations tabs."""
     cid = str(customer_id or "").strip()
     if not cid:
         return []
@@ -1543,7 +1550,7 @@ def customer_location_select_options(customer_id: str) -> list[tuple[str, str]]:
         from app.services.customers_service import get_customer_location_options
     except ImportError:
         from services.customers_service import get_customer_location_options  # type: ignore
-    return get_customer_location_options(cid)
+    return get_customer_location_options(cid, active_only=False)
 
 
 def customer_contact_select_options(
@@ -1558,7 +1565,7 @@ def customer_contact_select_options(
         from app.services.customers_service import get_customer_contact_options
     except ImportError:
         from services.customers_service import get_customer_contact_options  # type: ignore
-    return get_customer_contact_options(cid, location_id)
+    return get_customer_contact_options(cid, location_id, active_only=False)
 
 
 def persist_customer(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:

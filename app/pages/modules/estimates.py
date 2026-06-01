@@ -259,7 +259,7 @@ def render() -> None:
                 ok, msg = persist_estimate(
                     {
                         "estimate_number": st.session_state.get("est_new_num"),
-                        "project_name": st.session_state.get("est_new_proj"),
+                        "project_name": str(st.session_state.get("est_new_proj") or "").strip(),
                         "customer": st.session_state.get("est_new_cust"),
                         "status": st.session_state.get("est_new_status"),
                         "total": st.session_state.get("est_new_total"),

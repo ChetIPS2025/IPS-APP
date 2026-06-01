@@ -135,10 +135,23 @@ def delete_customer_record(customer_id: str):
     return delete_customer(str(customer_id or "").strip())
 
 
+def load_locations_for_customer(customer_id: str) -> list[dict[str, Any]]:
+    """Customer locations for forms and filters (same source as Customers module)."""
+    return get_customer_locations(customer_id)
+
+
 def get_customer_locations(customer_id: str) -> list[dict[str, Any]]:
     cid = str(customer_id or "").strip()
     rows, _ = list_customer_locations(cid, demo=_demo_locations())
     return rows
+
+
+def customer_location_label(loc: dict[str, Any]) -> str:
+    name = str(loc.get("location_name") or loc.get("site_name") or "—").strip()
+    city = str(loc.get("city") or "").strip()
+    state = str(loc.get("state") or "").strip()
+    tail = ", ".join(part for part in (city, state) if part)
+    return f"{name} — {tail}" if tail else name
 
 
 def get_customer_location(location_id: str) -> dict[str, Any] | None:
@@ -221,22 +234,15 @@ def get_customer_options(*, active_only: bool = True) -> list[tuple[str, str]]:
     return sorted(out, key=lambda pair: pair[0].lower())
 
 
-def get_customer_location_options(customer_id: str, *, active_only: bool = True) -> list[tuple[str, str]]:
+def get_customer_location_options(customer_id: str, *, active_only: bool = False) -> list[tuple[str, str]]:
     cid = str(customer_id or "").strip()
     out: list[tuple[str, str]] = []
-    for loc in get_customer_locations(cid):
-        if active_only and str(loc.get("status") or "Active") != "Active":
+    for loc in load_locations_for_customer(cid):
+        if active_only and not bool(loc.get("is_active", True)):
             continue
         lid = str(loc.get("id") or "").strip()
-        name = str(loc.get("location_name") or loc.get("site_name") or "").strip()
-        city = str(loc.get("city") or "").strip()
-        state = str(loc.get("state") or "").strip()
-        label = name
-        tail = ", ".join(part for part in (city, state) if part)
-        if tail:
-            label = f"{name} — {tail}"
         if lid:
-            out.append((label, lid))
+            out.append((customer_location_label(loc), lid))
     return out
 
 
@@ -251,7 +257,7 @@ def get_customer_contact_options(
     locs = {str(loc.get("id") or ""): loc for loc in get_customer_locations(cid)}
     out: list[tuple[str, str]] = []
     for contact in get_customer_contacts(cid, location_id=loc_filter or None):
-        if active_only and str(contact.get("status") or "Active") != "Active":
+        if active_only and not bool(contact.get("is_active", True)):
             continue
         ct_id = str(contact.get("id") or "").strip()
         if not ct_id:
@@ -273,6 +279,7 @@ def get_customer_contact_options(
 __all__ = [
     "CONTACT_ROLE_TYPES",
     "LOCATION_TYPES",
+    "customer_location_label",
     "create_customer",
     "create_customer_contact",
     "create_customer_location",
@@ -291,6 +298,7 @@ __all__ = [
     "get_customer_locations",
     "get_customer_options",
     "get_customers",
+    "load_locations_for_customer",
     "list_customer_contacts",
     "list_customer_locations",
     "list_customers",

@@ -286,7 +286,13 @@ def normalize_estimate(
             customer = names.get(cid, "")
     if not customer:
         customer = "—"
-    project_name = str(row.get("project_name") or row.get("job_name") or row.get("title") or "").strip()
+    project_name = str(
+        row.get("project_name")
+        or row.get("estimate_description")
+        or row.get("job_name")
+        or row.get("title")
+        or ""
+    ).strip()
     if not project_name:
         project_name = _estimate_json_get(row, "estimate_description")
     if not project_name:
@@ -853,9 +859,13 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         except ImportError:
             from db import next_quote_number  # type: ignore
         quote_number = next_quote_number()
+    project_name = str(ui.get("project_name") or ui.get("estimate_description") or "").strip()
+    scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
     payload = {
         "quote_number": quote_number or None,
-        "project_name": ui.get("project_name"),
+        "project_name": project_name or None,
+        "job_name": project_name or None,
+        "estimate_description": project_name[:500] if project_name else None,
         "customer_name": ui.get("customer"),
         "customer_id": ui.get("customer_id") or None,
         "customer_location_id": ui.get("customer_location_id") or None,
@@ -865,8 +875,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "estimate_date": ui.get("estimate_date") or None,
         "expiration_date": ui.get("expiration_date") or None,
         "prepared_by_name": ui.get("created_by") or ui.get("prepared_by_name"),
-        "description": ui.get("description") or ui.get("scope_of_work") or "",
-        "notes": ui.get("notes") or ui.get("description") or "",
+        "description": scope_text or None,
+        "scope_of_work": scope_text or None,
+        "notes": ui.get("notes") or scope_text or "",
         "subtotal": ui.get("subtotal") or ui.get("total_cost") or 0,
         "total_cost": ui.get("total_cost") or ui.get("subtotal") or 0,
         "tax": ui.get("tax") or ui.get("tax_amount") or 0,
@@ -1524,17 +1535,39 @@ def _write_customer_location(
     return last_result
 
 
+def _fetch_rows_by_customer_id(
+    table: str,
+    customer_id: str,
+    *,
+    limit: int = 500,
+) -> tuple[list[dict[str, Any]], str | None]:
+    cid = str(customer_id or "").strip()
+    if not cid:
+        return [], None
+    try:
+        from app.db import fetch_by_match
+    except ImportError:
+        from db import fetch_by_match  # type: ignore
+    try:
+        rows = fetch_by_match(table, {"customer_id": cid}, limit=limit) or []
+        return rows, None
+    except Exception as exc:
+        return [], str(exc)
+
+
 def list_customer_locations(customer_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
     cid = str(customer_id or "").strip()
-    rows, err = fetch_rows("customer_locations", limit=200, order_by="site_name")
-    if err:
-        rows, err = fetch_rows("customer_locations", limit=200, order_by="location_name")
-    if err:
-        rows, err = fetch_rows("customer_locations", limit=200)
+    rows, err = _fetch_rows_by_customer_id("customer_locations", cid, limit=500)
     if err:
         demo_rows = [normalize_customer_location(r) for r in (demo or []) if str(r.get("customer_id")) == cid]
         return demo_rows, True
-    out = [normalize_customer_location(r) for r in rows if str(r.get("customer_id")) == cid]
+    out = [normalize_customer_location(r) for r in rows if r]
+    out.sort(
+        key=lambda r: (
+            str(r.get("location_name") or r.get("site_name") or "").lower(),
+            str(r.get("id") or ""),
+        )
+    )
     return out, False
 
 
