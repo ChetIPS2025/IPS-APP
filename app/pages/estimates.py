@@ -68,6 +68,11 @@ try:
         estimate_visible_in_rejected_view,
     )
     from app.auth import current_role
+    from app.components.quote_job_number_autofill import (
+        clear_new_estimate_number_state,
+        linked_job_number_preview,
+        sync_new_estimate_number,
+    )
     from app.styles import inject_estimates_module_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
@@ -131,6 +136,11 @@ except ImportError:
         estimate_visible_in_rejected_view,
     )
     from auth import current_role  # type: ignore
+    from components.quote_job_number_autofill import (  # type: ignore
+        clear_new_estimate_number_state,
+        linked_job_number_preview,
+        sync_new_estimate_number,
+    )
     from styles import inject_estimates_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
@@ -140,6 +150,12 @@ _TABLE_KEY = "estimates_list"
 _ESTIMATES_MODAL_KEY = "ips_estimates_detail_modal_id"
 _ESTIMATES_CACHE_KEY = "_ips_estimates_modal_by_id"
 _NEW_CUST_PREV = "est_new_cust_prev"
+
+
+def _est_new_num_edited() -> None:
+    st.session_state["est_new_num_manual"] = True
+
+
 _ESTIMATE_TABS = [
     "Overview",
     "Cost Builder",
@@ -1007,10 +1023,25 @@ def _show_estimates_detail_modal() -> None:
 
 @st.dialog("New Estimate", width="large")
 def _show_new_estimate_dialog() -> None:
+    if "est_new_est_date" not in st.session_state:
+        st.session_state["est_new_est_date"] = date.today()
+
     customers = customer_filter_options()
     nc1, nc2 = st.columns(2)
+    with nc2:
+        st.date_input("Estimate date", value=date.today(), key="est_new_est_date")
+        st.date_input("Expiration date", value=date.today() + timedelta(days=30), key="est_new_exp_date")
+        st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
+        st.caption("A linked job in **Estimate Pending** status is created automatically when you save.")
     with nc1:
-        st.text_input("Estimate # (auto if blank)", key="est_new_num")
+        sync_new_estimate_number()
+        st.text_input(
+            "Estimate #",
+            key="est_new_num",
+            on_change=_est_new_num_edited,
+        )
+        linked_job_no = linked_job_number_preview(str(st.session_state.get("est_new_num") or ""))
+        st.text_input("Linked Job #", value=linked_job_no, disabled=True)
         st.text_input("Project name", key="est_new_proj")
         st.selectbox("Customer", customers, key="est_new_cust")
         new_cust = str(st.session_state.get("est_new_cust") or "")
@@ -1026,20 +1057,16 @@ def _show_new_estimate_dialog() -> None:
             prev_customer_key=_NEW_CUST_PREV,
             prev_location_key="est_new_loc_prev",
         )
-    with nc2:
-        st.date_input("Estimate date", value=date.today(), key="est_new_est_date")
-        st.date_input("Expiration date", value=date.today() + timedelta(days=30), key="est_new_exp_date")
-        st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
-        st.caption("A linked job in **Estimate Pending** status is created automatically when you save.")
     st.text_area("Description / scope summary", key="est_new_desc", height=80)
     st.text_area("Notes", key="est_new_notes", height=60)
 
     sb1, sb2 = st.columns(2)
     with sb1:
         if st.button("Save Draft", key="est_save_new", type="primary", use_container_width=True):
+            quote_num = str(st.session_state.get("est_new_num") or "").strip()
             ok, msg = persist_estimate(
                 {
-                    "estimate_number": st.session_state.get("est_new_num"),
+                    "estimate_number": quote_num,
                     "project_name": str(st.session_state.get("est_new_proj") or "").strip(),
                     "customer": new_cust,
                     "customer_id": customer_id_for_name(new_cust) or None,
@@ -1054,12 +1081,14 @@ def _show_new_estimate_dialog() -> None:
             )
             if ok:
                 st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = False
+                clear_new_estimate_number_state()
                 st.success(msg or "Estimate saved.")
                 st.rerun()
             st.error(msg or "Could not save estimate.")
     with sb2:
         if st.button("Cancel", key="est_cancel_new", use_container_width=True):
             st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = False
+            clear_new_estimate_number_state()
             st.rerun()
 
 
@@ -1105,6 +1134,7 @@ def render() -> None:
 
     def _est_new() -> None:
         if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
+            clear_new_estimate_number_state()
             st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
 
     render_page_brand_header(

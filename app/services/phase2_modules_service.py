@@ -810,11 +810,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 
     job_number = str(ui.get("job_number") or "").strip()
     if not row_id and not job_number:
-        try:
-            from app.services.job_service import next_job_number
-        except ImportError:
-            from services.job_service import next_job_number  # type: ignore
-        job_number = str(next_job_number()).strip()
+        return ServiceResult(ok=False, error="Job number is required.")
 
     payload: dict[str, Any] = {
         "job_number": job_number or ui.get("job_number"),
@@ -862,11 +858,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     quote_number = str(ui.get("estimate_number") or ui.get("quote_number") or "").strip()
     if not quote_number and not row_id:
-        try:
-            from app.db import next_quote_number
-        except ImportError:
-            from db import next_quote_number  # type: ignore
-        quote_number = next_quote_number()
+        return ServiceResult(ok=False, error="Estimate number is required.")
     project_name = str(ui.get("project_name") or ui.get("estimate_description") or "").strip()
     scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
     payload = {

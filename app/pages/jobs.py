@@ -43,6 +43,10 @@ try:
         on_job_detail_modal_open,
         render_job_linked_tasks_tab,
     )
+    from app.components.quote_job_number_autofill import (
+        clear_new_job_number_state,
+        sync_new_job_number,
+    )
     from app.styles import inject_jobs_module_css, inject_tasks_module_css
     from app.utils.formatting import fmt_date
     from app.utils.phone_helpers import format_phone_display
@@ -93,6 +97,10 @@ except ImportError:
         on_job_detail_modal_open,
         render_job_linked_tasks_tab,
     )
+    from components.quote_job_number_autofill import (  # type: ignore
+        clear_new_job_number_state,
+        sync_new_job_number,
+    )
     from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.field_context import (  # type: ignore
@@ -110,6 +118,12 @@ except ImportError:
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
+
+
+def _job_new_num_edited() -> None:
+    st.session_state["job_new_num_manual"] = True
+
+
 _JOB_TABS = [
     "Overview",
     "Scope",
@@ -1861,6 +1875,7 @@ def render() -> None:
 
     def _jobs_new() -> None:
         if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+            clear_new_job_number_state()
             st.session_state["ips_job_form"] = True
 
     render_page_brand_header(
@@ -1881,8 +1896,17 @@ def render() -> None:
     if st.session_state.get("ips_job_form"):
         with st.expander("New Job", expanded=True):
             nc1, nc2 = st.columns(2)
+            with nc2:
+                st.text_input("Supervisor", key="job_new_sup")
+                st.date_input("Start date", key="job_new_start", value=date.today())
+                st.date_input("End date", key="job_new_end", value=None)
             with nc1:
-                st.text_input("Job number", key="job_new_num")
+                sync_new_job_number()
+                st.text_input(
+                    "Job number",
+                    key="job_new_num",
+                    on_change=_job_new_num_edited,
+                )
                 st.text_input("Job name", key="job_new_name")
                 st.selectbox("Customer", customer_filter_options(), key="job_new_cust")
                 new_cust = str(st.session_state.get("job_new_cust") or "")
@@ -1899,17 +1923,13 @@ def render() -> None:
                     prev_location_key="job_new_loc_prev",
                 )
                 st.selectbox("Status", lookup_options("job_statuses"), key="job_new_status")
-            with nc2:
-                st.text_input("Supervisor", key="job_new_sup")
-                st.date_input("Start date", key="job_new_start", value=None)
-                st.date_input("End date", key="job_new_end", value=None)
             st.text_area("Description", key="job_new_desc")
             sb1, sb2 = st.columns(2)
             with sb1:
                 if st.button("Save job", key="job_save_new", type="primary"):
                     ok, msg = persist_job(
                         {
-                            "job_number": st.session_state.get("job_new_num"),
+                            "job_number": str(st.session_state.get("job_new_num") or "").strip(),
                             "job_name": st.session_state.get("job_new_name"),
                             "customer": st.session_state.get("job_new_cust"),
                             "customer_id": customer_id_for_name(new_cust) or None,
@@ -1923,10 +1943,12 @@ def render() -> None:
                         }
                     )
                     if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
+                        clear_new_job_number_state()
                         st.rerun()
             with sb2:
                 if st.button("Cancel", key="job_cancel_new"):
                     st.session_state.pop("ips_job_form", None)
+                    clear_new_job_number_state()
                     st.rerun()
 
     def _filters() -> None:

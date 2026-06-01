@@ -47,13 +47,22 @@ class TestSharedSequenceFormatting(unittest.TestCase):
 class TestSharedSequenceAllocation(unittest.TestCase):
     @patch("app.db.get_admin_client")
     def test_prefers_yearly_rpc(self, mock_client_factory) -> None:
-        from app.services.shared_sequence import get_next_sequence_number
+        from app.services.shared_sequence import get_next_sequence_number_for_year
 
         mock_client = mock_client_factory.return_value
         mock_client.rpc.return_value.execute.return_value.data = 210
 
-        self.assertEqual(get_next_sequence_number(), 210)
-        mock_client.rpc.assert_called_once_with("ips_next_yearly_seq", {})
+        self.assertEqual(get_next_sequence_number_for_year(2026), 210)
+        mock_client.rpc.assert_called_with("ips_next_yearly_seq", {"p_year_yy": 26})
+
+
+class TestGenerateQuoteJobNumber(unittest.TestCase):
+    @patch("app.services.shared_sequence.get_next_sequence_number_for_year", return_value=209)
+    def test_generate_quote_number(self, _mock_seq) -> None:
+        from app.services.shared_sequence import generate_quote_job_number
+
+        self.assertEqual(generate_quote_job_number("Q", 2026), "Q26209")
+        self.assertEqual(generate_quote_job_number("J", 2026), "J26209")
 
 
 if __name__ == "__main__":

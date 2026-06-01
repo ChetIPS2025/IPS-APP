@@ -78,35 +78,38 @@ BEGIN
     ON CONFLICT (year_yy) DO NOTHING;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.ips_next_yearly_seq()
+CREATE OR REPLACE FUNCTION public.ips_next_yearly_seq(p_year_yy smallint DEFAULT NULL)
 RETURNS bigint
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    current_yy smallint := (EXTRACT(YEAR FROM NOW())::int % 100)::smallint;
+    target_yy smallint := COALESCE(
+        p_year_yy,
+        (EXTRACT(YEAR FROM NOW())::int % 100)::smallint
+    );
     n bigint;
 BEGIN
     INSERT INTO public.ips_yearly_sequence (year_yy, sequence_number)
-    VALUES (current_yy, 0)
+    VALUES (target_yy, 0)
     ON CONFLICT (year_yy) DO NOTHING;
 
     UPDATE public.ips_yearly_sequence
     SET sequence_number = sequence_number + 1
-    WHERE year_yy = current_yy
+    WHERE year_yy = target_yy
     RETURNING sequence_number INTO n;
 
     IF n IS NULL THEN
-        RAISE EXCEPTION 'ips_yearly_sequence row missing for year %', current_yy;
+        RAISE EXCEPTION 'ips_yearly_sequence row missing for year %', target_yy;
     END IF;
 
     RETURN n;
 END;
 $$;
 
-COMMENT ON FUNCTION public.ips_next_yearly_seq() IS
-    'Returns next 3-digit sequence integer for the current UTC year (thread-safe). Format QYY### / JYY### in app.';
+COMMENT ON FUNCTION public.ips_next_yearly_seq(smallint) IS
+    'Returns next 3-digit sequence integer for the given 2-digit year (or current UTC year). Format QYY### / JYY### in app.';
 
 -- Backward-compatible alias used by older deployments / scripts.
 CREATE OR REPLACE FUNCTION public.ips_next_job_quote_seq()
