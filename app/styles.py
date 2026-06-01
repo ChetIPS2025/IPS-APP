@@ -1303,9 +1303,6 @@ def inject_tasks_module_css() -> None:
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: #dc2626 !important;
-  font-size: 15px !important;
-  line-height: 1 !important;
   padding: 0 !important;
   min-height: 28px !important;
   height: 28px !important;
@@ -1314,7 +1311,6 @@ def inject_tasks_module_css() -> None:
   margin: 0 auto !important;
 }}
 .st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button:hover {{
-  color: #b91c1c !important;
   background: #fef2f2 !important;
   border-radius: 6px !important;
 }}
@@ -6344,7 +6340,108 @@ def inject_action_colors_css() -> None:
     """Shared destructive buttons and semantic status pill colors."""
     st.markdown(
         """
-<style id="ips-action-colors-v5">
+<style id="ips-action-colors-v6">
+/* ----- Small red trash-can delete icon buttons ----- */
+[class*="st-key-delete_subjob_"] [data-testid="stButton"] > button,
+[class*="st-key-delete_subjob_"] .stButton > button,
+[class*="st-key-delete_job_doc_"] [data-testid="stButton"] > button,
+[class*="st-key-delete_job_doc_"] .stButton > button,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) [data-testid="stButton"] > button,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) .stButton > button,
+[class*="st-key-tk_del_"] [data-testid="stButton"] > button,
+[class*="st-key-tk_del_"] .stButton > button,
+[class*="st-key-jrow_del_"] [data-testid="stButton"] > button,
+[class*="st-key-jrow_del_"] .stButton > button,
+[class*="st-key-est_row_del_"] [data-testid="stButton"] > button,
+[class*="st-key-est_row_del_"] .stButton > button,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] [data-testid="stButton"] > button,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  padding: 0 !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin: 0 auto !important;
+  position: relative !important;
+}
+[class*="st-key-delete_subjob_"] [data-testid="stButton"] > button p,
+[class*="st-key-delete_subjob_"] .stButton > button p,
+[class*="st-key-delete_job_doc_"] [data-testid="stButton"] > button p,
+[class*="st-key-delete_job_doc_"] .stButton > button p,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) [data-testid="stButton"] > button p,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) .stButton > button p,
+[class*="st-key-tk_del_"] [data-testid="stButton"] > button p,
+[class*="st-key-tk_del_"] .stButton > button p,
+[class*="st-key-jrow_del_"] [data-testid="stButton"] > button p,
+[class*="st-key-jrow_del_"] .stButton > button p,
+[class*="st-key-est_row_del_"] [data-testid="stButton"] > button p,
+[class*="st-key-est_row_del_"] .stButton > button p,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] [data-testid="stButton"] > button p,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button p {
+  display: none !important;
+}
+[class*="st-key-delete_subjob_"] [data-testid="stButton"] > button::after,
+[class*="st-key-delete_subjob_"] .stButton > button::after,
+[class*="st-key-delete_job_doc_"] [data-testid="stButton"] > button::after,
+[class*="st-key-delete_job_doc_"] .stButton > button::after,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) [data-testid="stButton"] > button::after,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) .stButton > button::after,
+[class*="st-key-tk_del_"] [data-testid="stButton"] > button::after,
+[class*="st-key-tk_del_"] .stButton > button::after,
+[class*="st-key-jrow_del_"] [data-testid="stButton"] > button::after,
+[class*="st-key-jrow_del_"] .stButton > button::after,
+[class*="st-key-est_row_del_"] [data-testid="stButton"] > button::after,
+[class*="st-key-est_row_del_"] .stButton > button::after,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] [data-testid="stButton"] > button::after,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button::after {
+  content: "" !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  background-color: #dc2626 !important;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z'/%3E%3C/svg%3E") center / contain no-repeat !important;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z'/%3E%3C/svg%3E") center / contain no-repeat !important;
+}
+[class*="st-key-delete_subjob_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-delete_subjob_"] .stButton > button:hover,
+[class*="st-key-delete_job_doc_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-delete_job_doc_"] .stButton > button:hover,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) [data-testid="stButton"] > button:hover,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) .stButton > button:hover,
+[class*="st-key-tk_del_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-tk_del_"] .stButton > button:hover,
+[class*="st-key-jrow_del_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-jrow_del_"] .stButton > button:hover,
+[class*="st-key-est_row_del_"] [data-testid="stButton"] > button:hover,
+[class*="st-key-est_row_del_"] .stButton > button:hover,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] [data-testid="stButton"] > button:hover,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button:hover {
+  background: #fef2f2 !important;
+  border-radius: 6px !important;
+}
+[class*="st-key-delete_subjob_"] [data-testid="stButton"] > button:hover::after,
+[class*="st-key-delete_subjob_"] .stButton > button:hover::after,
+[class*="st-key-delete_job_doc_"] [data-testid="stButton"] > button:hover::after,
+[class*="st-key-delete_job_doc_"] .stButton > button:hover::after,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) [data-testid="stButton"] > button:hover::after,
+[class*="st-key-job_subjob_doc_"][class*="_doc_delete_"]:not([class*="confirm"]):not([class*="cancel"]) .stButton > button:hover::after,
+[class*="st-key-tk_del_"] [data-testid="stButton"] > button:hover::after,
+[class*="st-key-tk_del_"] .stButton > button:hover::after,
+[class*="st-key-jrow_del_"] [data-testid="stButton"] > button:hover::after,
+[class*="st-key-jrow_del_"] .stButton > button:hover::after,
+[class*="st-key-est_row_del_"] [data-testid="stButton"] > button:hover::after,
+[class*="st-key-est_row_del_"] .stButton > button:hover::after,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] [data-testid="stButton"] > button:hover::after,
+.st-key-job_tasks_table_wrap [class*="st-key-job_task_delete_"] .stButton > button:hover::after {
+  background-color: #b91c1c !important;
+}
+
 /* ----- Destructive buttons (st-key on widget wrapper) ----- */
 [class*="st-key-ips_dng_o_"] [data-testid="stButton"] > button,
 [class*="st-key-ips_dng_o_"] .stButton > button,
