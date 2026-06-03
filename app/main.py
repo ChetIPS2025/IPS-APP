@@ -79,68 +79,83 @@ except ImportError:
 
 def _render_login() -> None:
     inject_unauthenticated_shell_css()
-    st.markdown('<div class="ips-login-wrap">', unsafe_allow_html=True)
     st.markdown(
-        """
+        '<span class="ips-login-page-marker login-page" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key="ips_login_card"):
+        st.markdown(
+            '<span class="ips-login-card-marker login-card" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
 <div class="ips-login-brand">
   <h1 class="ips-page-title">IPS Operations</h1>
   <p class="ips-page-subtitle">Sign in to Industrial Plant Solutions company management</p>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
-    st.session_state.setdefault("login_method", "Email login")
-    st.radio(
-        "Sign-in method",
-        ["Email login", "Phone login (OTP)"],
-        horizontal=True,
-        key="login_method",
-    )
-    remember_device = st.checkbox(
-        "Remember this device",
-        value=True,
-        help="Keeps you signed in on this browser after refresh.",
-    )
+        st.session_state.setdefault("login_method", "Email login")
+        st.radio(
+            "Sign-in method",
+            ["Email login", "Phone login (OTP)"],
+            horizontal=True,
+            key="login_method",
+        )
+        remember_device = st.checkbox(
+            "Remember this device",
+            value=True,
+            help="Keeps you signed in on this browser after refresh.",
+        )
 
-    if str(st.session_state.get("login_method") or "").startswith("Email"):
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_password")
-        if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
-            try:
-                sign_in(email, password, remember_device=remember_device)
-                log_auth_state("email_login_success")
-                st.rerun()
-            except Exception as exc:
-                show_auth_error(exc)
-    else:
-        phone = st.text_input("Phone number", placeholder="+1 555 123 4567", key="login_phone")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Send code", use_container_width=True, key="login_phone_send"):
+        if str(st.session_state.get("login_method") or "").startswith("Email"):
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
                 try:
-                    start_phone_otp(phone_number=phone)
-                    st.session_state["login_phone_otp_sent"] = True
-                    st.success("Code sent. Check your text messages.")
-                except Exception as exc:
-                    show_auth_error(exc)
-        with c2:
-            if st.button("Clear", use_container_width=True, key="login_phone_clear"):
-                st.session_state.pop("login_phone_otp_sent", None)
-                st.rerun()
-
-        if st.session_state.get("login_phone_otp_sent"):
-            code = st.text_input("Enter code", key="login_phone_code")
-            if st.button("Verify & login", type="primary", use_container_width=True, key="login_phone_verify"):
-                try:
-                    verify_phone_otp(phone_number=phone, code=code, remember_device=remember_device)
-                    st.session_state.pop("login_phone_otp_sent", None)
-                    log_auth_state("phone_login_success")
+                    sign_in(email, password, remember_device=remember_device)
+                    log_auth_state("email_login_success")
                     st.rerun()
                 except Exception as exc:
                     show_auth_error(exc)
+        else:
+            phone = st.text_input("Phone number", placeholder="+1 555 123 4567", key="login_phone")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Send code", use_container_width=True, key="login_phone_send"):
+                    try:
+                        start_phone_otp(phone_number=phone)
+                        st.session_state["login_phone_otp_sent"] = True
+                        st.success("Code sent. Check your text messages.")
+                    except Exception as exc:
+                        show_auth_error(exc)
+            with c2:
+                if st.button("Clear", use_container_width=True, key="login_phone_clear"):
+                    st.session_state.pop("login_phone_otp_sent", None)
+                    st.rerun()
 
-    st.markdown("</div>", unsafe_allow_html=True)
+            if st.session_state.get("login_phone_otp_sent"):
+                code = st.text_input("Enter code", key="login_phone_code")
+                if st.button(
+                    "Verify & login",
+                    type="primary",
+                    use_container_width=True,
+                    key="login_phone_verify",
+                ):
+                    try:
+                        verify_phone_otp(
+                            phone_number=phone,
+                            code=code,
+                            remember_device=remember_device,
+                        )
+                        st.session_state.pop("login_phone_otp_sent", None)
+                        log_auth_state("phone_login_success")
+                        st.rerun()
+                    except Exception as exc:
+                        show_auth_error(exc)
 
 
 def _render_password_reset() -> None:

@@ -605,6 +605,35 @@ def _short_day(value: str) -> str:
     return str(value or "")[:3]
 
 
+_DAY_ABBREV_TO_FULL: dict[str, str] = {
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "sun": "Sunday",
+}
+
+
+def _detail_day_label(row: dict) -> str:
+    """Full weekday name for expanded list detail rows."""
+    raw = str(row.get("day") or "").strip()
+    if len(raw) > 3:
+        return raw
+    if raw:
+        return _DAY_ABBREV_TO_FULL.get(raw.casefold()[:3], raw)
+    raw_date = row.get("date")
+    if raw_date:
+        try:
+            if isinstance(raw_date, date):
+                return raw_date.strftime("%A")
+            return date.fromisoformat(str(raw_date)[:10]).strftime("%A")
+        except (TypeError, ValueError):
+            pass
+    return "—"
+
+
 def _fmt_table_hours(val: object) -> str:
     try:
         return f"{float(val):.2f}"
@@ -1316,13 +1345,14 @@ def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
         with c[0]:
             st.markdown(
                 f'<span class="timekeeping-detail-row-marker" aria-hidden="true"></span>'
-                f'<div class="ips-time-day-row timekeeping-detail-cell">'
-                f"{html.escape(_short_day(str(row.get('day') or '')))}</div>",
+                f'<div class="ips-time-day-row timekeeping-detail-cell timekeeping-detail-day-cell">'
+                f"{html.escape(_detail_day_label(row))}</div>",
                 unsafe_allow_html=True,
             )
         with c[1]:
             st.markdown(
-                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(fmt_date(row.get("date")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell timekeeping-detail-date-cell">'
+                f"{html.escape(fmt_date(row.get('date')))}</div>",
                 unsafe_allow_html=True,
             )
         with c[2]:
@@ -1400,13 +1430,14 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
             st.markdown(
                 f'<span class="timekeeping-detail-row-marker" aria-hidden="true"></span>'
                 f'<span class="ips-time-day-row-marker {row_marker}" aria-hidden="true"></span>'
-                f'<div class="ips-time-day-row timekeeping-detail-cell">'
-                f"{html.escape(_short_day(str(row.get('day') or '')))}</div>",
+                f'<div class="ips-time-day-row timekeeping-detail-cell timekeeping-detail-day-cell">'
+                f"{html.escape(_detail_day_label(row))}</div>",
                 unsafe_allow_html=True,
             )
         with c[1]:
             st.markdown(
-                f'<div class="ips-time-day-row timekeeping-detail-cell">{html.escape(fmt_date(row.get("date")))}</div>',
+                f'<div class="ips-time-day-row timekeeping-detail-cell timekeeping-detail-date-cell">'
+                f"{html.escape(fmt_date(row.get('date')))}</div>",
                 unsafe_allow_html=True,
             )
         with c[2]:

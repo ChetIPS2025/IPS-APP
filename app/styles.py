@@ -3064,12 +3064,12 @@ def inject_timekeeping_module_css() -> None:
         f"{tk_row_expand} [data-testid=\"stHorizontalBlock\"]:has(.timekeeping-detail-row-marker)"
     )
     tk_detail_grid_readonly = (
-        "72px 108px minmax(380px, 3fr) minmax(108px, 118px) minmax(108px, 118px) "
-        "92px minmax(100px, 116px) minmax(132px, 150px) minmax(180px, 1.5fr)"
+        "minmax(112px, 120px) minmax(132px, 145px) minmax(360px, 3fr) minmax(108px, 118px) "
+        "minmax(108px, 118px) 92px minmax(100px, 116px) minmax(132px, 150px) minmax(180px, 1.5fr)"
     )
     tk_detail_grid_edit = (
-        "72px 108px minmax(380px, 3fr) minmax(108px, 118px) minmax(108px, 118px) "
-        "92px minmax(100px, 116px) minmax(132px, 150px) minmax(160px, 1.2fr) 48px"
+        "minmax(112px, 120px) minmax(132px, 145px) minmax(360px, 3fr) minmax(108px, 118px) "
+        "minmax(108px, 118px) 92px minmax(100px, 116px) minmax(132px, 150px) minmax(160px, 1.2fr) 48px"
     )
     tk_list_outer_grid = (
         "24px 32px 220px repeat(7, 106px) 24px 76px 68px 78px 104px"
@@ -3096,7 +3096,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v43">
+<style id="ips-timekeeping-module-v44">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -4411,12 +4411,12 @@ def inject_timekeeping_module_css() -> None:
 }}
 {tk_expand}:has(.timekeeping-detail-grid-readonly) {tk_detail_row} {{
   grid-template-columns: {tk_detail_grid_readonly} !important;
-  min-width: 1480px !important;
+  min-width: 1580px !important;
   width: max-content !important;
 }}
 {tk_expand}:has(.timekeeping-detail-grid-edit) {tk_detail_row} {{
   grid-template-columns: {tk_detail_grid_edit} !important;
-  min-width: 1520px !important;
+  min-width: 1620px !important;
   width: max-content !important;
 }}
 {tk_detail_row} > [data-testid="column"] {{
@@ -4442,6 +4442,28 @@ def inject_timekeeping_module_css() -> None:
   opacity: 1 !important;
   width: 100% !important;
   max-width: 100% !important;
+}}
+{tk_detail_row} > [data-testid="column"]:nth-child(1),
+{tk_detail_row} > [data-testid="column"]:nth-child(2) {{
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
+{tk_detail_row} > [data-testid="column"]:nth-child(1) {{
+  min-width: 112px !important;
+}}
+{tk_detail_row} > [data-testid="column"]:nth-child(2) {{
+  min-width: 132px !important;
+}}
+{tk_detail_row} .timekeeping-detail-day-cell,
+{tk_detail_row} .timekeeping-detail-date-cell,
+{tk_detail_row} > [data-testid="column"]:nth-child(1) .timekeeping-detail-head,
+{tk_detail_row} > [data-testid="column"]:nth-child(2) .timekeeping-detail-head {{
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}}
+{tk_detail_row} .timekeeping-detail-day-cell {{
+  font-weight: 600 !important;
 }}
 {tk_detail_row} > [data-testid="column"]:nth-child(3) {{
   min-width: 380px !important;
@@ -5755,7 +5777,7 @@ def inject_timekeeping_module_css() -> None:
 {tk_row_expand}:has(.timekeeping-detail-grid-edit) {tk_detail_row} {{
   display: grid !important;
   grid-template-columns: {tk_detail_grid_edit} !important;
-  min-width: 1520px !important;
+  min-width: 1620px !important;
   width: max-content !important;
   gap: 10px !important;
   align-items: center !important;
@@ -5763,7 +5785,7 @@ def inject_timekeeping_module_css() -> None:
 {tk_row_expand}:has(.timekeeping-detail-grid-readonly) {tk_detail_row} {{
   display: grid !important;
   grid-template-columns: {tk_detail_grid_readonly} !important;
-  min-width: 1480px !important;
+  min-width: 1580px !important;
   width: max-content !important;
   gap: 10px !important;
   align-items: center !important;
@@ -5975,7 +5997,93 @@ def inject_updates_module_css() -> None:
 def inject_unauthenticated_shell_css() -> None:
     """Login-only layout: centered card, no sidebar navigation."""
     st.markdown(
-        '<script>document.body.classList.add("ips-auth-login");</script>',
+        f"""
+<script>document.body.classList.add("ips-auth-login");</script>
+<style id="ips-login-layout-v1">
+body.ips-auth-login section[data-testid="stSidebar"],
+body.ips-auth-login [data-testid="stSidebarCollapsedControl"] {{
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+}}
+body.ips-auth-login [data-testid="stAppViewContainer"],
+body.ips-auth-login section[data-testid="stMain"] {{
+  background: {APP_BG} !important;
+}}
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) > div {{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+}}
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
+  max-width: min(520px, calc(100vw - 2rem)) !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 2rem 1.25rem 2.5rem !important;
+  box-sizing: border-box !important;
+}}
+body.ips-auth-login .st-key-ips_login_card {{
+  max-width: min(480px, 100%) !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 1.75rem 1.5rem 1.5rem !important;
+  background: #ffffff !important;
+  border: 1px solid {BORDER} !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08) !important;
+  box-sizing: border-box !important;
+}}
+body.ips-auth-login .st-key-ips_login_card [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 0.65rem !important;
+}}
+body.ips-auth-login .st-key-ips_login_card [data-testid="stElementContainer"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+body.ips-auth-login .st-key-ips_login_card .ips-login-brand {{
+  text-align: center !important;
+  margin-bottom: 0.35rem !important;
+}}
+body.ips-auth-login .st-key-ips_login_card .ips-page-title {{
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  margin: 0 0 0.35rem 0 !important;
+  color: {TEXT} !important;
+}}
+body.ips-auth-login .st-key-ips_login_card .ips-page-subtitle {{
+  font-size: 0.92rem !important;
+  color: {TEXT_MUTED} !important;
+  margin: 0 !important;
+  line-height: 1.45 !important;
+}}
+body.ips-auth-login .st-key-ips_login_card [data-testid="stTextInput"],
+body.ips-auth-login .st-key-ips_login_card [data-testid="stTextInput"] > div,
+body.ips-auth-login .st-key-ips_login_card [data-testid="stTextInput"] input,
+body.ips-auth-login .st-key-ips_login_card [data-testid="stButton"],
+body.ips-auth-login .st-key-ips_login_card [data-testid="stButton"] > button,
+body.ips-auth-login .st-key-ips_login_card [data-testid="stRadio"],
+body.ips-auth-login .st-key-ips_login_card [data-testid="stRadio"] > div,
+body.ips-auth-login .st-key-ips_login_card [data-testid="stCheckbox"],
+body.ips-auth-login .st-key-ips_login_card [data-testid="stCheckbox"] label {{
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}}
+body.ips-auth-login .st-key-ips_login_card [data-testid="stHorizontalBlock"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+body.ips-auth-login .st-key-ips_login_card [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}}
+</style>
+""",
         unsafe_allow_html=True,
     )
 
@@ -7742,28 +7850,16 @@ div[data-testid="stDialog"] .ips-detail-title {{
   margin: 0;
 }}
 
-/* Login — hide app chrome until authenticated */
-body.ips-auth-login section[data-testid="stSidebar"],
-body.ips-auth-login [data-testid="stSidebarCollapsedControl"] {{
-  display: none !important;
-  visibility: hidden !important;
-  width: 0 !important;
-  min-width: 0 !important;
-}}
-body.ips-auth-login section[data-testid="stMain"] .block-container {{
-  max-width: 440px !important;
+/* Login — centered narrow panel (see inject_unauthenticated_shell_css for full rules) */
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
+  max-width: min(520px, calc(100vw - 2rem)) !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  padding-top: 1.5rem !important;
 }}
-.ips-login-wrap {{
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 1.5rem;
-  background: #fff;
-  border: 1px solid {BORDER};
-  border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+body.ips-auth-login .st-key-ips_login_card {{
+  max-width: min(480px, 100%) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }}
 
 /* Module list pages (Customers, Jobs, …) */
