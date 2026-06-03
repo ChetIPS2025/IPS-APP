@@ -500,6 +500,14 @@ def rollback_estimate_if_job_link_failed(estimate_id: str) -> None:
         _LOG.warning("Could not rollback estimate %s after job failure: %s", eid, exc)
 
 
+def _linked_job_label(job: dict[str, Any]) -> str:
+    for key in ("job_name", "name", "project_name", "project_description", "description"):
+        val = str(job.get(key) or "").strip()
+        if val and val != "—":
+            return val
+    return str(job.get("notes") or "").strip()
+
+
 def enrich_estimates_with_job_numbers(
     rows: list[dict[str, Any]],
     jobs: list[dict[str, Any]] | None = None,
@@ -510,7 +518,7 @@ def enrich_estimates_with_job_numbers(
         except ImportError:
             from db import fetch_table_admin  # type: ignore
         try:
-            jobs = list(fetch_table_admin("jobs", columns="id,job_number,estimate_id", limit=10000) or [])
+            jobs = list(fetch_table_admin("jobs", limit=10000) or [])
         except Exception:
             jobs = []
 
@@ -534,6 +542,14 @@ def enrich_estimates_with_job_numbers(
             jn = job_number_display(job.get("job_number"))
             if jn:
                 r["job_number"] = jn
+                r["linked_job_number"] = jn
             r.setdefault("linked_job_status", str(job.get("status") or ""))
+            r["linked_job"] = job
+            job_label = _linked_job_label(job)
+            if job_label:
+                r["linked_job_name"] = job_label
+                desc = str(job.get("description") or job.get("notes") or "").strip()
+                if desc and desc != job_label:
+                    r["linked_job_description"] = desc
         out.append(r)
     return out

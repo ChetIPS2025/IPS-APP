@@ -288,13 +288,18 @@ def normalize_estimate(
         customer = "—"
     project_name = str(
         row.get("project_name")
+        or row.get("project_description")
         or row.get("estimate_description")
         or row.get("job_name")
         or row.get("title")
+        or row.get("description")
+        or row.get("scope_summary")
+        or row.get("scope_of_work")
+        or row.get("notes")
         or ""
     ).strip()
     if not project_name:
-        project_name = _estimate_json_get(row, "estimate_description")
+        project_name = str(_estimate_json_get(row, "estimate_description") or "").strip()
     if not project_name:
         project_name = "—"
     return {
@@ -855,10 +860,37 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     return insert_row("jobs", payload)
 
 
+def _estimate_year_from_ui(ui: dict[str, Any]) -> int:
+    raw = ui.get("estimate_date")
+    if isinstance(raw, datetime):
+        return raw.year
+    if hasattr(raw, "year"):
+        return int(raw.year)
+    if raw not in (None, ""):
+        try:
+            return date.fromisoformat(str(raw)[:10]).year
+        except ValueError:
+            pass
+    return date.today().year
+
+
 def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.shared_sequence import ensure_quote_number_for_save
+    except ImportError:
+        from services.shared_sequence import ensure_quote_number_for_save  # type: ignore
+
     quote_number = str(ui.get("estimate_number") or ui.get("quote_number") or "").strip()
     if not quote_number and not row_id:
         return ServiceResult(ok=False, error="Estimate number is required.")
+    try:
+        quote_number = ensure_quote_number_for_save(
+            quote_number,
+            year=_estimate_year_from_ui(ui),
+            exclude_estimate_id=row_id,
+        )
+    except ValueError as exc:
+        return ServiceResult(ok=False, error=str(exc))
     project_name = str(ui.get("project_name") or ui.get("estimate_description") or "").strip()
     scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
     payload = {

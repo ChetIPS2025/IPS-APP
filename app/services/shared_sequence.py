@@ -298,6 +298,55 @@ def peek_quote_job_number(prefix: str, year: int | date | datetime) -> str:
     return format_number(p, year, peek_next_sequence_number(year))
 
 
+def _quote_number_in_use(quote_number: str, *, exclude_estimate_id: str | None = None) -> bool:
+    try:
+        from app.db import quote_number_in_use
+    except ImportError:
+        from db import quote_number_in_use  # type: ignore
+    return quote_number_in_use(quote_number, exclude_estimate_id)
+
+
+def next_available_quote_number(
+    year: int | date | datetime | None = None,
+    *,
+    exclude_estimate_id: str | None = None,
+) -> str:
+    """
+    Next free ``QYY###`` for ``year`` using max sequence across estimates and jobs.
+
+    Does not call the yearly RPC; safe to use when a prefilled number is already taken.
+    """
+    y = year if year is not None else datetime.now(timezone.utc)
+    start = max_sequence_for_year(y) + 1
+    for seq in range(start, 1000):
+        candidate = format_number("Q", y, seq)
+        if not _quote_number_in_use(candidate, exclude_estimate_id=exclude_estimate_id):
+            return candidate
+    yy = year_yy(y)
+    raise ValueError(f"No available quote number for year {yy} (sequence exhausted).")
+
+
+def ensure_quote_number_for_save(
+    quote_number: str,
+    *,
+    year: int | date | datetime | None = None,
+    exclude_estimate_id: str | None = None,
+) -> str:
+    """
+    Return a quote number safe to insert/update on ``estimates``.
+
+    Keeps the requested value when it is unused; otherwise allocates the next
+    available shared ``QYY###`` from both estimates and jobs.
+    """
+    y = year if year is not None else datetime.now(timezone.utc)
+    qn = str(quote_number or "").strip()
+    if not qn:
+        return next_available_quote_number(y, exclude_estimate_id=exclude_estimate_id)
+    if not _quote_number_in_use(qn, exclude_estimate_id=exclude_estimate_id):
+        return qn
+    return next_available_quote_number(y, exclude_estimate_id=exclude_estimate_id)
+
+
 def next_quote_number_string(*, year: int | date | datetime | None = None) -> str:
     """Allocate the next quote number string (``QYY###``)."""
     y = year if year is not None else datetime.now(timezone.utc)

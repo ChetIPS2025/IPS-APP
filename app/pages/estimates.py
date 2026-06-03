@@ -222,17 +222,34 @@ def _estimate_number(row: dict) -> str:
     return val or "—"
 
 
+def _estimate_row_label(row: dict, key: str) -> str:
+    val = str(row.get(key) or "").strip()
+    return val if val and val != "—" else ""
+
+
 def _estimate_project(row: dict) -> str:
+    """Display project/description with estimate fields first, then linked job."""
     for key in (
         "project_name",
-        "estimate_description",
         "project_description",
-        "job_name",
+        "estimate_description",
         "description",
+        "scope_summary",
+        "scope_of_work",
+        "notes",
+        "job_name",
+        "linked_job_name",
+        "linked_job_description",
     ):
-        val = str(row.get(key) or "").strip()
-        if val and val != "—":
+        val = _estimate_row_label(row, key)
+        if val:
             return val
+    linked = row.get("linked_job")
+    if isinstance(linked, dict):
+        for key in ("job_name", "name", "project_name", "project_description", "description"):
+            val = _estimate_row_label(linked, key)
+            if val:
+                return val
     return "—"
 
 
@@ -250,8 +267,20 @@ def _estimate_created_by(row: dict) -> str:
 
 
 def _estimate_job(row: dict) -> str:
-    val = str(row.get("job_number") or row.get("linked_job") or "").strip()
-    return val if val and val != "—" else "—"
+    for key in ("job_number", "linked_job_number", "linked_job"):
+        val = _estimate_row_label(row, key)
+        if val:
+            return val
+    quote = _estimate_row_label(row, "estimate_number")
+    if quote.upper().startswith("Q"):
+        try:
+            from app.services.shared_sequence import quote_number_to_job_number
+        except ImportError:
+            from services.shared_sequence import quote_number_to_job_number  # type: ignore
+        linked = quote_number_to_job_number(quote)
+        if linked:
+            return linked
+    return "—"
 
 
 def _estimate_total_cost(row: dict) -> str:

@@ -851,6 +851,23 @@ def quote_number_in_use(quote_number: str, exclude_estimate_id: str | None = Non
     return False
 
 
+def job_number_in_use(job_number: str, exclude_job_id: str | None = None) -> bool:
+    jn = str(job_number or "").strip()
+    if not jn:
+        return False
+    query = get_admin_client().table("jobs").select("id").eq("job_number", jn).limit(20)
+    try:
+        resp = query.execute()
+    except Exception as exc:
+        raise RuntimeError(f"job_number_in_use query failed: {exc!r}") from exc
+    rows = resp.data or []
+    for row in rows:
+        if exclude_job_id and row.get("id") == exclude_job_id:
+            continue
+        return True
+    return False
+
+
 def create_auth_user(
     email: str,
     password: str,

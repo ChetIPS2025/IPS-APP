@@ -9,12 +9,12 @@ import streamlit as st
 
 try:
     from app.services.shared_sequence import (
-        generate_quote_job_number,
+        peek_quote_job_number,
         quote_number_to_job_number,
     )
 except ImportError:
     from services.shared_sequence import (  # type: ignore
-        generate_quote_job_number,
+        peek_quote_job_number,
         quote_number_to_job_number,
     )
 
@@ -66,7 +66,7 @@ def sync_new_estimate_number(*, date_key: str = "est_new_est_date") -> None:
     year = _year_from_value(st.session_state.get(date_key))
 
     if not st.session_state.get(seed_key):
-        st.session_state[number_key] = generate_quote_job_number("Q", year)
+        st.session_state[number_key] = peek_quote_job_number("Q", year)
         st.session_state[manual_key] = False
         st.session_state[year_key] = year
         st.session_state[seed_key] = True
@@ -76,7 +76,7 @@ def sync_new_estimate_number(*, date_key: str = "est_new_est_date") -> None:
         return
 
     if st.session_state.get(year_key) != year:
-        st.session_state[number_key] = generate_quote_job_number("Q", year)
+        st.session_state[number_key] = peek_quote_job_number("Q", year)
         st.session_state[year_key] = year
 
 
@@ -91,7 +91,7 @@ def sync_new_job_number(*, date_key: str = "job_new_start") -> None:
     year = _year_from_value(raw_date if raw_date not in (None, "") else date.today())
 
     if not st.session_state.get(seed_key):
-        st.session_state[number_key] = generate_quote_job_number("J", year)
+        st.session_state[number_key] = peek_quote_job_number("J", year)
         st.session_state[manual_key] = False
         st.session_state[year_key] = year
         st.session_state[seed_key] = True
@@ -101,7 +101,7 @@ def sync_new_job_number(*, date_key: str = "job_new_start") -> None:
         return
 
     if st.session_state.get(year_key) != year:
-        st.session_state[number_key] = generate_quote_job_number("J", year)
+        st.session_state[number_key] = peek_quote_job_number("J", year)
         st.session_state[year_key] = year
 
 
