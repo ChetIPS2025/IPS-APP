@@ -793,24 +793,45 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
         return default_weekly_grid(eid, week_start)
 
     days = week_dates(week_start)
-    by_date = {str(row.get("work_date") or "")[:10]: row for row in saved_rows}
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for row in saved_rows:
+        iso = str(row.get("work_date") or "")[:10]
+        if iso:
+            by_date.setdefault(iso, []).append(row)
     job_opts = job_options_for_timekeeping()
     default_job = job_opts[0] if job_opts else "— Select assignment —"
     grid: list[dict[str, Any]] = []
     for i, day in enumerate(days):
         iso = day.isoformat()
-        saved = by_date.get(iso)
-        if saved:
+        saved_list = by_date.get(iso) or []
+        if saved_list:
+            primary = saved_list[0]
+            for candidate in saved_list:
+                hrs = float(candidate.get("st_hours") or 0) + float(candidate.get("ot_hours") or 0)
+                if hrs > 0:
+                    primary = candidate
+                    break
+            st_total = sum(float(r.get("st_hours") or 0) for r in saved_list)
+            ot_total = sum(float(r.get("ot_hours") or 0) for r in saved_list)
+            dt_total = sum(float(r.get("dt_hours") or 0) for r in saved_list)
+            statuses = [str(r.get("status") or "Draft").strip().capitalize() for r in saved_list]
+            day_status = "Draft"
+            if statuses and all(s == "Approved" for s in statuses):
+                day_status = "Approved"
+            elif any(s == "Rejected" for s in statuses):
+                day_status = "Rejected"
+            elif any(s == "Pending" for s in statuses):
+                day_status = "Pending"
             grid.append({
-                "day_id": str(saved.get("id") or ""),
+                "day_id": str(primary.get("id") or ""),
                 "day": day.strftime("%A"),
                 "date": iso,
-                "job": _normalize_timekeeping_assignment(str(saved.get("job_label") or default_job)),
-                "st": float(saved.get("st_hours") or 0),
-                "ot": float(saved.get("ot_hours") or 0),
-                "dt": float(saved.get("dt_hours") or 0),
-                "notes": str(saved.get("notes") or ""),
-                "status": str(saved.get("status") or "Draft"),
+                "job": _normalize_timekeeping_assignment(str(primary.get("job_label") or default_job)),
+                "st": st_total,
+                "ot": ot_total,
+                "dt": dt_total,
+                "notes": str(primary.get("notes") or ""),
+                "status": day_status,
             })
         else:
             grid.append({

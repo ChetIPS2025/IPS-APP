@@ -576,6 +576,280 @@ def _invalidate_weekly_grid(emp: dict, week_start_d: date) -> None:
     gk = _grid_key(eid)
     st.session_state.pop(gk, None)
     st.session_state.pop(f"{gk}_week", None)
+    ak = _alloc_state_key(eid)
+    st.session_state.pop(ak, None)
+    st.session_state.pop(f"{ak}_week", None)
+
+
+def _alloc_state_key(emp_id: str) -> str:
+    return f"ips_time_alloc_{emp_id}"
+
+
+def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dict[str, list[dict[str, Any]]]:
+    try:
+        from app.services.timekeeping_service import list_timekeeping_days
+    except ImportError:
+        from services.timekeeping_service import list_timekeeping_days  # type: ignore
+
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for row in list_timekeeping_days(employee_id, week_start_d):
+        iso = str(row.get("work_date") or "")[:10]
+        if not iso:
+            continue
+        by_date.setdefault(iso, []).append(
+            {
+                "line_id": str(row.get("id") or ""),
+                "job": _normalize_assignment_label(str(row.get("job_label") or "")),
+                "hours": (
+                    float(row.get("st_hours") or 0)
+                    + float(row.get("ot_hours") or 0)
+                    + float(row.get("dt_hours") or 0)
+                ),
+                "notes": str(row.get("notes") or ""),
+                "status": _normalize_timecard_status(row.get("status")),
+            }
+        )
+    return by_date
+
+
+def _ensure_allocation_state(emp: dict, week_start_d: date) -> dict[str, list[dict[str, Any]]]:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    ak = _alloc_state_key(eid)
+    week_sig = week_start_d.isoformat()
+    if st.session_state.get(f"{ak}_week") != week_sig:
+        by_date = _load_saved_allocations_by_date(eid, week_start_d)
+        for day_d in week_dates(week_start_d):
+            by_date.setdefault(day_d.isoformat(), [])
+        st.session_state[ak] = by_date
+        st.session_state[f"{ak}_week"] = week_sig
+    return st.session_state[ak]
+
+
+def _daily_total_from_list_row(
+    *,
+    eid: str,
+    week_sig: str,
+    day_ix: int,
+    grid_row: dict,
+) -> float:
+    hrs_key = f"tk_hrs_{eid}_{week_sig}_{day_ix}"
+    if hrs_key in st.session_state:
+        return max(0.0, float(st.session_state[hrs_key] or 0))
+    return _day_hours_total(grid_row)
+
+
+def _allocated_hours_sum(lines: list[dict[str, Any]]) -> float:
+    return sum(max(0.0, float(line.get("hours") or 0)) for line in lines)
+
+
+def _default_allocation_job(grid_row: dict, job_opts: list[str]) -> str:
+    saved = _normalize_assignment_label(str(grid_row.get("job") or ""))
+    if saved and saved in job_opts:
+        return saved
+    return job_opts[0] if job_opts else "— No assignment —"
+
+
+def _ensure_day_allocation_lines(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    iso: str,
+    daily_total: float,
+    grid_row: dict,
+    job_opts: list[str],
+) -> list[dict[str, Any]]:
+    lines = list(by_date.get(iso) or [])
+    if daily_total > 0 and not lines:
+        lines.append(
+            {
+                "line_id": "",
+                "job": _default_allocation_job(grid_row, job_opts),
+                "hours": daily_total,
+                "notes": "",
+                "status": _normalize_timecard_status(grid_row.get("status")),
+            }
+        )
+    elif len(lines) == 1 and daily_total > 0 and not str(lines[0].get("line_id") or "").strip():
+        only = dict(lines[0])
+        if float(only.get("hours") or 0) <= 0:
+            only["hours"] = daily_total
+        lines = [only]
+    by_date[iso] = lines
+    return lines
+
+
+def _sync_allocation_from_widgets(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    eid: str,
+    week_sig: str,
+) -> None:
+    for iso, lines in by_date.items():
+        for lix, line in enumerate(lines):
+            job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
+            hrs_key = f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}"
+            notes_key = f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}"
+            if job_key in st.session_state:
+                line["job"] = st.session_state[job_key]
+            if hrs_key in st.session_state:
+                line["hours"] = float(st.session_state[hrs_key] or 0)
+            if notes_key in st.session_state:
+                line["notes"] = st.session_state[notes_key]
+
+
+def _allocation_lines_to_persist_grid(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    week_start_d: date,
+    eid: str,
+    week_sig: str,
+    source_grid: list[dict],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Flatten allocation lines for persist_timekeeping_days; auto-fill unassigned remainder."""
+    errors: list[str] = []
+    persist_rows: list[dict[str, Any]] = []
+    job_opts = _assignment_options_for_timekeeping()
+    no_job = job_opts[0] if job_opts else "— No assignment —"
+
+    for day_ix, day_d in enumerate(week_dates(week_start_d)):
+        iso = day_d.isoformat()
+        daily_total = _daily_total_from_list_row(
+            eid=eid,
+            week_sig=week_sig,
+            day_ix=day_ix,
+            grid_row=source_grid[day_ix] if day_ix < len(source_grid) else {},
+        )
+        lines = list(by_date.get(iso) or [])
+        if daily_total <= 0:
+            continue
+        if not lines:
+            errors.append(f"{day_d.strftime('%A')}: add at least one assignment row.")
+            continue
+        allocated = _allocated_hours_sum(lines)
+        if allocated > daily_total + 0.01:
+            errors.append(
+                f"{day_d.strftime('%A')}: allocated {_fmt_day_hours(allocated)} exceeds "
+                f"{_fmt_day_hours(daily_total)} entered in the row above."
+            )
+            continue
+        out_lines = [dict(line) for line in lines]
+        remainder = round(daily_total - allocated, 2)
+        if remainder > 0.01:
+            out_lines.append(
+                {
+                    "line_id": "",
+                    "job": no_job,
+                    "hours": remainder,
+                    "notes": "",
+                    "status": str(out_lines[0].get("status") or "Draft"),
+                }
+            )
+        for line in out_lines:
+            hrs = float(line.get("hours") or 0)
+            if hrs <= 0:
+                continue
+            persist_rows.append(
+                {
+                    "day_id": str(line.get("line_id") or ""),
+                    "day": day_d.strftime("%A"),
+                    "date": iso,
+                    "job": str(line.get("job") or no_job),
+                    "st": hrs,
+                    "ot": 0.0,
+                    "dt": 0.0,
+                    "notes": str(line.get("notes") or ""),
+                    "status": str(line.get("status") or "Draft"),
+                }
+            )
+    return persist_rows, errors
+
+
+def _save_allocation_week(emp: dict, week_start_d: date, *, show_message: bool = True) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    by_date = _ensure_allocation_state(emp, week_start_d)
+    _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
+    grid = _ensure_weekly_grid(emp, week_start_d)
+    _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+    persist_rows, errors = _allocation_lines_to_persist_grid(
+        by_date,
+        week_start_d=week_start_d,
+        eid=eid,
+        week_sig=week_sig,
+        source_grid=grid,
+    )
+    if errors:
+        for err in errors[:3]:
+            st.error(err)
+        return False
+    if not persist_rows:
+        if show_message:
+            st.info("Enter daily hours in the row above, then assign them here.")
+        return False
+    ok, msg = persist_timekeeping_days(eid, week_start_d, persist_rows)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.session_state[_grid_key(eid)] = load_timekeeping_grid(eid, week_start_d)
+        st.session_state[f"{_grid_key(eid)}_week"] = week_sig
+        if show_message:
+            st.success(msg or "Allocations saved.")
+        return True
+    if show_message:
+        st.warning(msg or "Could not save allocations.")
+    return False
+
+
+def _handle_alloc_line_submit(emp: dict, week_start_d: date, day_id: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    if not day_id:
+        st.error("Save allocations before submitting this day.")
+        return False
+    if not _save_allocation_week(emp, week_start_d, show_message=False):
+        return False
+    ok, msg = persist_timekeeping_day_submit(day_id, eid, week_start_d)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_alloc_line_approve(emp: dict, week_start_d: date, day_id: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    if not day_id:
+        st.error("Save allocations before approving this day.")
+        return False
+    ok, msg = persist_timekeeping_day_approve(day_id, eid, week_start_d, approved_by=approver)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_alloc_line_reject(emp: dict, week_start_d: date, day_id: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    if not day_id:
+        st.error("Save allocations before rejecting this day.")
+        return False
+    ok, msg = persist_timekeeping_day_reject(day_id, eid, week_start_d, approved_by=approver)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Rejected"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
 
 
 def _current_week_start() -> date:
@@ -1638,10 +1912,249 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
     return False
 
 
+def _render_allocation_line_header() -> None:
+    cols = st.columns([3.4, 0.75, 0.85, 1.15, 0.35])
+    labels = ["Assignment", "Allocated hrs", "Status", "Notes", ""]
+    for col, lbl in zip(cols, labels):
+        with col:
+            marker = (
+                '<span class="timekeeping-allocation-header-marker" aria-hidden="true"></span>'
+                if lbl == "Assignment"
+                else ""
+            )
+            st.markdown(
+                f"{marker}<div class=\"ips-time-day-head timekeeping-detail-head\">{html.escape(lbl)}</div>",
+                unsafe_allow_html=True,
+            )
+
+
+def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
+    """List expand: assign hours entered in the top row to jobs/tasks/shop/admin."""
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    week_status = _normalize_timecard_status(emp.get("status"))
+    week_locked = week_status == "Approved"
+    job_opts = _assignment_options_for_timekeeping()
+    can_approve = _can_approve_timekeeping()
+    grid = _ensure_weekly_grid(emp, week_start_d)
+    _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+    by_date = _ensure_allocation_state(emp, week_start_d)
+
+    st.markdown(
+        '<span class="timekeeping-allocation-panel-marker timekeeping-detail-grid-marker '
+        'timekeeping-detail-grid-edit" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="timekeeping-alloc-intro">'
+        "<strong>Daily hours are entered in the employee row above.</strong> "
+        "Use this section to split each day&rsquo;s total across jobs, subjobs, Shop, or Administrative."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    if week_locked:
+        st.info("This week is approved and locked.")
+    _render_allocation_line_header()
+
+    for day_ix, day_d in enumerate(week_dates(week_start_d)):
+        iso = day_d.isoformat()
+        grid_row = grid[day_ix] if day_ix < len(grid) else {}
+        daily_total = _daily_total_from_list_row(
+            eid=eid,
+            week_sig=week_sig,
+            day_ix=day_ix,
+            grid_row=grid_row,
+        )
+        lines = _ensure_day_allocation_lines(
+            by_date,
+            iso=iso,
+            daily_total=daily_total,
+            grid_row=grid_row,
+            job_opts=job_opts,
+        )
+        allocated = _allocated_hours_sum(lines)
+        day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
+        balance_cls = ""
+        if daily_total > 0 and abs(allocated - daily_total) > 0.01:
+            balance_cls = " timekeeping-alloc-day-unbalanced"
+
+        st.markdown(
+            f'<div class="timekeeping-alloc-day-block{balance_cls}">'
+            f'<div class="timekeeping-alloc-day-head">'
+            f'<span class="timekeeping-alloc-day-title">{html.escape(day_name)}</span>'
+            f'<span class="timekeeping-alloc-day-date">{html.escape(fmt_date(iso))}</span>'
+            f'<span class="timekeeping-alloc-day-total">'
+            f'{html.escape(_fmt_day_hours(daily_total))} hrs in row above'
+            f"</span>"
+            f'<span class="timekeeping-alloc-day-split">'
+            f"Allocated {_fmt_day_hours(allocated)} / {_fmt_day_hours(daily_total)}"
+            f"</span>"
+            f"</div></div>",
+            unsafe_allow_html=True,
+        )
+
+        if daily_total <= 0:
+            st.caption("Enter hours for this day in the row above before assigning.")
+            continue
+
+        for lix, line in enumerate(lines):
+            day_status = _normalize_timecard_status(line.get("status"))
+            row_editable = not week_locked and _day_is_editable(day_status)
+            live_job = str(line.get("job") or job_opts[0])
+            job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
+            if job_key in st.session_state:
+                live_job = str(st.session_state[job_key])
+
+            row_cols = st.columns([3.4, 0.75, 0.85, 1.15, 0.35], gap="small")
+            with row_cols[0]:
+                st.markdown(
+                    '<span class="timekeeping-allocation-line-marker '
+                    'timekeeping-detail-assignment-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if row_editable:
+                    line["job"] = st.selectbox(
+                        "Assignment",
+                        job_opts,
+                        index=_assignment_option_index(job_opts, live_job),
+                        key=job_key,
+                        label_visibility="collapsed",
+                    )
+                else:
+                    st.markdown(
+                        f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                        f"{html.escape(str(line.get('job') or '—'))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            with row_cols[1]:
+                if row_editable:
+                    line["hours"] = _hour_stepper_input(
+                        label="Allocated hrs",
+                        value=float(line.get("hours") or 0),
+                        widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
+                        step=0.5,
+                        disabled=False,
+                        down_label="−",
+                        up_label="+",
+                        compact=True,
+                        detail_grid=True,
+                    )
+                else:
+                    st.markdown(
+                        f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                        f"{html.escape(_fmt_table_hours(line.get('hours')))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            with row_cols[2]:
+                st.markdown(_timecard_status_pill_html(day_status), unsafe_allow_html=True)
+            with row_cols[3]:
+                if row_editable:
+                    line["notes"] = st.text_input(
+                        "Notes",
+                        value=str(line.get("notes") or ""),
+                        key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
+                        label_visibility="collapsed",
+                        placeholder="Notes…",
+                    )
+                else:
+                    st.markdown(
+                        f'<div class="ips-time-day-row timekeeping-detail-cell">'
+                        f"{html.escape(str(line.get('notes') or '—'))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            with row_cols[4]:
+                line_id = str(line.get("line_id") or "").strip()
+                if row_editable and len(lines) > 1 and st.button(
+                    "🗑",
+                    key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
+                    help="Remove assignment row",
+                ):
+                    by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
+                    st.session_state[_alloc_state_key(eid)] = by_date
+                    st.rerun()
+                elif row_editable and line_id and float(line.get("hours") or 0) > 0:
+                    action_taken = False
+                    if day_status in ("Draft", "Rejected") and st.button(
+                        "Submit",
+                        key=f"tk_alloc_submit_{eid}_{week_sig}_{iso}_{lix}",
+                        use_container_width=True,
+                    ):
+                        action_taken = _handle_alloc_line_submit(emp, week_start_d, line_id)
+                    elif day_status == "Pending" and can_approve:
+                        ok_col, no_col = st.columns(2)
+                        with ok_col:
+                            if st.button(
+                                "OK",
+                                key=f"tk_alloc_ok_{eid}_{week_sig}_{iso}_{lix}",
+                                use_container_width=True,
+                            ):
+                                action_taken = _handle_alloc_line_approve(emp, week_start_d, line_id)
+                        with no_col:
+                            if st.button(
+                                "No",
+                                key=f"tk_alloc_no_{eid}_{week_sig}_{iso}_{lix}",
+                                use_container_width=True,
+                            ):
+                                action_taken = _handle_alloc_line_reject(emp, week_start_d, line_id)
+                    if action_taken:
+                        st.rerun()
+
+        if not week_locked:
+            if st.button(
+                "+ Add assignment for this day",
+                key=f"tk_alloc_add_{eid}_{week_sig}_{iso}",
+                use_container_width=True,
+            ):
+                lines = list(by_date.get(iso) or [])
+                remaining = max(0.0, round(daily_total - _allocated_hours_sum(lines), 2))
+                lines.append(
+                    {
+                        "line_id": "",
+                        "job": job_opts[0] if job_opts else "— No assignment —",
+                        "hours": remaining,
+                        "notes": "",
+                        "status": "Draft",
+                    }
+                )
+                by_date[iso] = lines
+                st.session_state[_alloc_state_key(eid)] = by_date
+                st.rerun()
+
+        if day_ix < len(grid) and lines:
+            grid[day_ix]["job"] = str(lines[0].get("job") or grid[day_ix].get("job") or "")
+
+    st.session_state[_grid_key(eid)] = grid
+    st.session_state[_alloc_state_key(eid)] = by_date
+
+    if week_locked:
+        return
+
+    record_key = record_session_key(emp, "id")
+    action_left, action_right = st.columns([1, 1])
+    with action_left:
+        if st.button("Save allocations", key=f"tk_save_alloc_{record_key}", type="primary"):
+            if _save_allocation_week(emp, week_start_d):
+                st.rerun()
+    with action_right:
+        if week_status in ("Draft", "Rejected", "Pending") and st.button(
+            "Submit all for approval",
+            key=f"tk_submit_alloc_{record_key}",
+        ):
+            if _save_allocation_week(emp, week_start_d, show_message=False) and _submit_timekeeping_week(
+                emp, week_start_d
+            ):
+                st.rerun()
+    st.caption(
+        "Totals in the row above are the source of truth. Split them here, then save. "
+        "Unallocated time is saved to — No assignment — automatically."
+    )
+
+
 def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
     emp = _emp_from_timecard_row(row)
     timecard_id = str(row.get("timecard_id") or "").strip()
-    _render_daily_entries_tab(emp, week_start_d)
+    _render_list_allocation_detail(emp, week_start_d)
     detail_col, _ = st.columns([1, 3])
     with detail_col:
         if st.button(
@@ -1677,8 +2190,7 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
             if _submit_timekeeping_week(emp, week_start_d):
                 st.rerun()
     st.caption(
-        "Use expand for job/ST/OT detail. Submit each day from the Actions column, "
-        "or use Submit All for Approval."
+        "Enter hours on the grid, assign jobs per day, then submit each day or the full week."
     )
 
 
@@ -1888,7 +2400,6 @@ def _render_custom_timekeeping_table(
             total_hours = float(row.get("total_hours") or 0)
             if eid:
                 grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
-                _sync_row_hrs_from_grid(grid, eid=eid, week_sig=week_sig)
                 _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
                 _apply_active_field_job_to_grid(grid)
 
