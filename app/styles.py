@@ -3096,7 +3096,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v47">
+<style id="ips-timekeeping-module-v48">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6084,17 +6084,40 @@ def inject_timekeeping_module_css() -> None:
         """
 <script>
 (function () {
+  var IPS_TK_DAILY_HOUR_INPUT =
+    ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"column\\"]:has(.timekeeping-list-daily-hour-marker) input[type=\\"number\\"], "
+    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] input[type=\\"number\\"], "
+    + ".ips-time-week-inline input[type=\\"number\\"], "
+    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"stHorizontalBlock\\"]:has(.timesheet-days-grid-marker) input[type=\\"number\\"]";
+
   function bindSelectOnFocus(root) {
-    root.querySelectorAll(".ips-time-week-inline input[type=\\"number\\"], .st-key-tk_row_ [data-testid=\\"stHorizontalBlock\\"]:has(.timesheet-days-grid-marker) input[type=\\"number\\"]").forEach(function (el) {
+    root.querySelectorAll(IPS_TK_DAILY_HOUR_INPUT).forEach(function (el) {
       if (el.dataset.ipsSelectOnFocus) return;
       el.dataset.ipsSelectOnFocus = "1";
-      el.addEventListener("focus", function () { this.select(); });
-      el.addEventListener("click", function () { this.select(); });
+      el.classList.add("timekeeping-hour-input");
+      function selectAll() {
+        try {
+          this.select();
+        } catch (e) {}
+      }
+      el.addEventListener("focus", selectAll);
+      el.addEventListener("click", selectAll);
+      el.addEventListener("mouseup", function (ev) {
+        if (document.activeElement !== this) return;
+        var input = this;
+        window.setTimeout(function () {
+          try {
+            input.select();
+          } catch (e) {}
+        }, 0);
+      });
     });
   }
   bindSelectOnFocus(document);
   if (!window.__ipsTkDayBoxObserver) {
-    window.__ipsTkDayBoxObserver = new MutationObserver(function () { bindSelectOnFocus(document); });
+    window.__ipsTkDayBoxObserver = new MutationObserver(function () {
+      bindSelectOnFocus(document);
+    });
     window.__ipsTkDayBoxObserver.observe(document.body, { childList: true, subtree: true });
   }
 })();

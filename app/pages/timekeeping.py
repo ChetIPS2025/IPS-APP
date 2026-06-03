@@ -1143,7 +1143,8 @@ def _render_list_day_hour_stepper(
         inp_col, btns_col = st.columns([1, 1], gap="xxsmall", vertical_alignment="center")
         with inp_col:
             st.markdown(
-                '<span class="timekeeping-hour-input-marker" aria-hidden="true"></span>',
+                '<span class="timekeeping-hour-input-marker timekeeping-list-daily-hour-marker" '
+                'aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             hours = st.number_input(
