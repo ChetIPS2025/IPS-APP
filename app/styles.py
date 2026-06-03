@@ -3067,7 +3067,7 @@ def inject_timekeeping_module_css() -> None:
         "70px 110px minmax(220px, 1fr) 90px 90px 100px 110px 120px minmax(160px, 1fr) 40px"
     )
     tk_list_outer_grid = (
-        "24px 32px 220px repeat(7, 106px) 24px 76px 68px 78px 88px"
+        "24px 32px 220px repeat(7, 106px) 24px 76px 68px 78px 104px"
     )
     tk_list_outer_row = (
         f'.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker){tk_list_detail_excl}, '
@@ -3091,7 +3091,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v40">
+<style id="ips-timekeeping-module-v41">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -4373,7 +4373,7 @@ def inject_timekeeping_module_css() -> None:
   column-gap: 8px !important;
   grid-template-columns: {tk_list_outer_grid} !important;
   width: max-content !important;
-  min-width: 1310px !important;
+  min-width: 1340px !important;
   max-width: none !important;
   box-sizing: border-box !important;
   padding: 10px 12px !important;
@@ -4569,14 +4569,17 @@ def inject_timekeeping_module_css() -> None:
   box-sizing: border-box !important;
 }}
 {tk_list_outer_row} > [data-testid="column"]:nth-child(15) {{
-  width: 88px !important;
-  min-width: 88px !important;
-  max-width: 88px !important;
-  flex: 0 0 88px !important;
-  padding: 0 2px !important;
+  width: 104px !important;
+  min-width: 104px !important;
+  max-width: 104px !important;
+  flex: 0 0 104px !important;
+  padding: 0 4px !important;
   overflow: visible !important;
   position: static !important;
   box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }}
 {tk_list_summary_col} .ips-timekeeping-header-row,
 {tk_list_summary_col} .ips-table-header-filter-text {{
@@ -4805,22 +4808,39 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible !important;
   position: static !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-status-cell {{
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-status-cell,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-status-cell {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   min-height: 58px;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-status-cell .ips-timekeeping-status-pill {{
-  height: 26px;
-  padding: 0 8px;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 999px;
-  white-space: nowrap;
-  max-width: 100%;
-  box-sizing: border-box;
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-status-cell .ips-timekeeping-status-pill,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-status-cell .ips-timekeeping-status-pill {{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 26px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+  max-width: none !important;
+  width: auto !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}}
+{tk_list_outer_row} > [data-testid="column"]:nth-child(15) .ips-timekeeping-header-row,
+{tk_list_outer_row} > [data-testid="column"]:nth-child(15) .ips-table-header-filter-text {{
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
 }}
 {tk_list_day_col} {{
   display: flex !important;
@@ -5222,7 +5242,7 @@ def inject_timekeeping_module_css() -> None:
     overflow-x: auto;
   }}
   {tk_list_outer_row} {{
-    min-width: 1310px !important;
+    min-width: 1340px !important;
   }}
   .ips-time-hgrid-scroll {{
     overflow-x: auto;
