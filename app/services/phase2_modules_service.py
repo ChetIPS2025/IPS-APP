@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timezone
 from typing import Any
+
+_LOG = logging.getLogger(__name__)
 
 try:
     from app.services.repository import (
@@ -839,7 +842,6 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         return ServiceResult(ok=False, error="Job number is required.")
 
     payload: dict[str, Any] = {
-        "job_number": job_number or ui.get("job_number"),
         "job_name": ui.get("job_name"),
         "status": ui.get("status"),
         "supervisor": ui.get("supervisor"),
@@ -848,6 +850,10 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         "target_completion_date": ui.get("end_date") or None,
         "notes": ui.get("description") or ui.get("notes") or "",
     }
+    if not row_id:
+        payload["job_number"] = job_number
+    elif job_number:
+        payload["job_number"] = job_number
     if ui.get("progress") is not None:
         payload["percent_complete"] = int(ui.get("progress") or 0)
     if customer_id:
@@ -1009,11 +1015,17 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
                 from services.estimate_job_workflow_service import (  # type: ignore
                     sync_linked_job_project_from_estimate,
                 )
-            sync_linked_job_project_from_estimate(
+            sync_result = sync_linked_job_project_from_estimate(
                 estimate_id=saved_id,
                 job_id=str(ui.get("job_id") or (result.data or {}).get("job_id") or "").strip() or None,
                 project_name=project_name,
             )
+            if not sync_result.ok:
+                _LOG.warning(
+                    "Estimate %s saved; linked job title sync failed: %s",
+                    saved_id,
+                    sync_result.error,
+                )
     return result
 
 

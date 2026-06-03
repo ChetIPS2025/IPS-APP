@@ -27,7 +27,7 @@ try:
     )
     from app.services.job_schema import fetch_jobs_for_job_database
     from app.services.job_service import job_number_display, next_job_number
-    from app.services.repository import filter_payload_to_table
+    from app.services.repository import ServiceResult, filter_payload_to_table, update_row
 except ImportError:
     from services.job_from_estimate import (  # type: ignore
         CreateJobFromEstimateResult,
@@ -48,12 +48,18 @@ except ImportError:
     )
     from services.job_schema import fetch_jobs_for_job_database  # type: ignore
     from services.job_service import job_number_display, next_job_number  # type: ignore
-    from services.repository import filter_payload_to_table  # type: ignore
+    from services.repository import ServiceResult, filter_payload_to_table, update_row  # type: ignore
 
 try:
-    from db import delete_rows_admin, fetch_by_match_admin, insert_row_admin, update_rows_admin
+    from db import delete_rows_admin, fetch_by_match_admin, fetch_one, insert_row_admin, update_rows_admin
 except ImportError:
-    from app.db import delete_rows_admin, fetch_by_match_admin, insert_row_admin, update_rows_admin  # type: ignore
+    from app.db import (  # type: ignore
+        delete_rows_admin,
+        fetch_by_match_admin,
+        fetch_one,
+        insert_row_admin,
+        update_rows_admin,
+    )
 
 _LOG = logging.getLogger(__name__)
 
@@ -500,38 +506,72 @@ def rollback_estimate_if_job_link_failed(estimate_id: str) -> None:
         _LOG.warning("Could not rollback estimate %s after job failure: %s", eid, exc)
 
 
+def _linked_job_title_sync_payload(project_name: str) -> dict[str, Any]:
+    """Job update fields for estimate project renames — never touch job_number."""
+    name = str(project_name or "").strip()
+    if not name:
+        return {}
+    try:
+        from app.services.repository import table_column_names
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+
+    cols = table_column_names("jobs")
+    allowed = ("job_name", "project_name", "name")
+    raw: dict[str, Any] = {"job_name": name}
+    if not cols or "project_name" in cols:
+        raw["project_name"] = name
+    if not cols or "name" in cols:
+        raw["name"] = name
+    payload = {k: v for k, v in raw.items() if k in allowed}
+    payload = filter_payload_to_table("jobs", payload)
+    payload.pop("job_number", None)
+    return payload
+
+
+def _resolve_linked_job_id_for_estimate(
+    estimate_id: str,
+    *,
+    job_id: str | None = None,
+) -> str:
+    """Resolve the single job row to rename when an estimate project title changes."""
+    jid = str(job_id or "").strip()
+    if jid:
+        return jid
+    est = fetch_one("estimates", {"id": estimate_id}, columns="id,job_id") or {}
+    jid = str(est.get("job_id") or "").strip()
+    if jid:
+        return jid
+    job = _existing_job_for_estimate(estimate_id, est if isinstance(est, dict) else {})
+    return str((job or {}).get("id") or "").strip()
+
+
 def sync_linked_job_project_from_estimate(
     *,
     estimate_id: str,
     job_id: str | None = None,
     project_name: str,
-) -> None:
+) -> ServiceResult:
     """Keep linked job title in sync when estimate project name is edited."""
     eid = str(estimate_id or "").strip()
     name = str(project_name or "").strip()
     if not eid or not name:
-        return
-    jid = str(job_id or "").strip()
+        return ServiceResult(ok=True)
+    jid = _resolve_linked_job_id_for_estimate(eid, job_id=job_id)
     if not jid:
-        job = _existing_job_for_estimate(eid, {})
-        jid = str((job or {}).get("id") or "").strip()
-    if not jid:
-        return
-    payload: dict[str, Any] = {"job_name": name}
-    try:
-        from app.services.repository import table_column_names
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
-    cols = table_column_names("jobs")
-    if cols and "project_name" in cols:
-        payload["project_name"] = name
-    payload = filter_payload_to_table("jobs", payload)
+        return ServiceResult(ok=True)
+    payload = _linked_job_title_sync_payload(name)
     if not payload:
-        return
-    try:
-        update_rows_admin("jobs", payload, {"id": jid})
-    except Exception as exc:
-        _LOG.warning("sync_linked_job_project_from_estimate failed job=%s: %s", jid, exc)
+        return ServiceResult(ok=True)
+    result = update_row("jobs", payload, {"id": jid})
+    if not result.ok:
+        _LOG.warning(
+            "sync_linked_job_project_from_estimate failed estimate=%s job=%s: %s",
+            eid,
+            jid,
+            result.error,
+        )
+    return result
 
 
 def _linked_job_label(job: dict[str, Any]) -> str:
