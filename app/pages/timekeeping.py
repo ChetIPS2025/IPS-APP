@@ -138,7 +138,7 @@ _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("week_start", lambda r: fmt_date(r.get("week_start"))),
     ("status", lambda r: _normalize_timecard_status(r.get("status"))),
 ]
-_DAY_GRID_COLS = [0.38, 0.52, 1.28, 0.52, 0.52, 0.5, 0.68, 0.82, 0.88]
+_DAY_GRID_COLS = [0.34, 0.48, 2.4, 0.48, 0.48, 0.46, 0.62, 0.76, 0.34]
 _DAY_GRID_EDIT_COLS = [*_DAY_GRID_COLS, 0.3]
 _DAY_GRID_LABELS = [
     "Day",
@@ -156,8 +156,9 @@ _ASSIGNMENT_LEGACY_ALIASES = {
     "ips shop": "Shop",
     "administrator": "Administrative",
     "admin": "Administrative",
-    "— no job —": "— Select assignment —",
-    "no job": "— Select assignment —",
+    "— no job —": "— No assignment —",
+    "no job": "— No assignment —",
+    "— select assignment —": "— No assignment —",
 }
 
 
@@ -182,7 +183,7 @@ def _assignment_options_for_timekeeping() -> list[str]:
     except ImportError:
         from services.tasks_service import get_tasks_by_job  # type: ignore
 
-    opts: list[str] = ["— Select assignment —"]
+    opts: list[str] = ["— No assignment —"]
     seen: set[str] = {opts[0].casefold()}
 
     def _add(label: str) -> None:
@@ -222,6 +223,10 @@ def _assignment_option_index(options: list[str], saved: str) -> int:
     raw = str(saved or "").strip()
     if raw in options:
         return options.index(raw)
+    if raw.casefold() in {o.casefold() for o in options}:
+        for i, opt in enumerate(options):
+            if opt.casefold() == raw.casefold():
+                return i
     return 0
 
 
@@ -1043,7 +1048,7 @@ def _render_weekly_timesheet_day_cell(
         unsafe_allow_html=True,
     )
     if editable:
-        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— Select assignment —"))
+        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No assignment —"))
         job_ix = _assignment_option_index(job_opts, cur_job)
         st.markdown(
             '<span class="weekly-timesheet-job-marker weekly-timesheet-job-select job-select" aria-hidden="true"></span>',
@@ -1082,7 +1087,7 @@ def _hgrid_day_total_html(total: float) -> str:
 
 
 def _hgrid_locked_day_html(day_row: dict, *, status: str) -> str:
-    job = _normalize_assignment_label(str(day_row.get("job") or "— Select assignment —")).strip()
+    job = _normalize_assignment_label(str(day_row.get("job") or "— No assignment —")).strip()
     if len(job) > 28:
         job = job[:25] + "…"
     total = _day_hours_total(day_row)
@@ -1404,7 +1409,8 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
         with c[2]:
             marker_cls = "ips-time-day-job-filled" if row_complete else ""
             st.markdown(
-                f'<span class="ips-time-day-job-marker {marker_cls}" aria-hidden="true"></span>',
+                f'<span class="ips-time-day-job-marker timekeeping-detail-assignment-marker '
+                f'{marker_cls}" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             cur_job = str(live_row.get("job") or row.get("job") or job_opts[0])
@@ -1482,7 +1488,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
             )
         with c[9]:
             if row_editable and st.button("🗑", key=f"tk_del_{eid}_{week_sig}_{i}", help="Clear row"):
-                grid[i]["job"] = job_opts[0] if job_opts else "— Select assignment —"
+                grid[i]["job"] = job_opts[0] if job_opts else "— No assignment —"
                 grid[i]["st"] = _default_st_for_day_index(i)
                 grid[i]["ot"] = 0.0
                 grid[i]["dt"] = 0.0
