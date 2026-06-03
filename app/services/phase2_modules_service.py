@@ -54,19 +54,39 @@ def _estimate_json_get(row: dict[str, Any], key: str) -> str:
     return ""
 
 
+def _estimate_row_title(row: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        val = str(row.get(key) or "").strip()
+        if val and val != "—":
+            return val
+    return ""
+
+
+def estimate_project_title(row: dict[str, Any]) -> str:
+    """Short project title for lists and headers — never scope or proposal body."""
+    title = _estimate_row_title(row, "project_name", "name", "project", "title", "job_name")
+    if title:
+        return title
+    linked = row.get("linked_job")
+    if isinstance(linked, dict):
+        title = _estimate_row_title(linked, "job_name", "name", "project_name")
+        if title:
+            return title
+    title = _estimate_row_title(row, "linked_job_name")
+    return title or "—"
+
+
 def _estimate_project_payload(
     project_name: str,
     cols: frozenset[str],
 ) -> dict[str, Any]:
-    """Map UI project title onto every estimates column used for display."""
+    """Persist project title on name columns only (not description/scope fields)."""
     name = str(project_name or "").strip()
     out: dict[str, Any] = {}
     if not cols or "project_name" in cols:
         out["project_name"] = name
     if not cols or "job_name" in cols:
         out["job_name"] = name
-    if not cols or "estimate_description" in cols:
-        out["estimate_description"] = name[:500] if name else ""
     return out
 
 
@@ -302,21 +322,7 @@ def normalize_estimate(
             customer = names.get(cid, "")
     if not customer:
         customer = "—"
-    project_name = str(
-        row.get("project_name")
-        or row.get("project_description")
-        or row.get("estimate_description")
-        or row.get("job_name")
-        or row.get("title")
-        or row.get("description")
-        or row.get("scope_summary")
-        or row.get("scope_of_work")
-        or row.get("notes")
-        or ""
-    ).strip()
-    if not project_name:
-        project_name = str(_estimate_json_get(row, "estimate_description") or "").strip()
-    display_project = project_name or "—"
+    display_project = estimate_project_title(row)
     return {
         "id": eid or num,
         "estimate_number": num,
@@ -906,7 +912,7 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         )
     except ValueError as exc:
         return ServiceResult(ok=False, error=str(exc))
-    project_name = str(ui.get("project_name") or ui.get("estimate_description") or "").strip()
+    project_name = str(ui.get("project_name") or "").strip()
     scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
     cols = table_column_names("estimates")
     payload = {

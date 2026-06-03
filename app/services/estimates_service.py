@@ -47,6 +47,7 @@ from app.services.estimate_costing_service import (
 from app.services.phase2_modules_service import (
     delete_estimate,
     delete_estimate_line_item,
+    estimate_project_title,
     list_estimate_materials,
     list_estimates,
     normalize_estimate,
@@ -94,6 +95,7 @@ __all__ = [
     "estimate_visible_in_active_view",
     "estimate_visible_in_approved_view",
     "estimate_visible_in_rejected_view",
+    "estimate_project_title",
     "generate_estimate_proposal_pdf",
     "generate_estimate_proposal_pdf_by_id",
     "get_default_terms",

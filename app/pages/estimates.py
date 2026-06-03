@@ -228,29 +228,12 @@ def _estimate_row_label(row: dict, key: str) -> str:
 
 
 def _estimate_project(row: dict) -> str:
-    """Display project/description with estimate fields first, then linked job."""
-    for key in (
-        "project_name",
-        "project_description",
-        "estimate_description",
-        "description",
-        "scope_summary",
-        "scope_of_work",
-        "notes",
-        "job_name",
-        "linked_job_name",
-        "linked_job_description",
-    ):
-        val = _estimate_row_label(row, key)
-        if val:
-            return val
-    linked = row.get("linked_job")
-    if isinstance(linked, dict):
-        for key in ("job_name", "name", "project_name", "project_description", "description"):
-            val = _estimate_row_label(linked, key)
-            if val:
-                return val
-    return "—"
+    """Project name only for list/export (not scope, proposal, or notes)."""
+    try:
+        from app.services.phase2_modules_service import estimate_project_title
+    except ImportError:
+        from services.phase2_modules_service import estimate_project_title  # type: ignore
+    return estimate_project_title(row)
 
 
 def _estimate_customer(row: dict) -> str:
@@ -935,7 +918,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         overview_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Estimate #', en)}"
-            f"{detail_field_html('Project', est.get('project_name'))}"
+            f"{detail_field_html('Project', _estimate_project(est))}"
             f"{detail_field_html('Customer', customer)}"
             f"{detail_field_html('Contact', _contact_label_for_estimate(est))}"
             f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'

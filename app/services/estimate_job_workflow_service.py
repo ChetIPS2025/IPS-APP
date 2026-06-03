@@ -535,11 +535,11 @@ def sync_linked_job_project_from_estimate(
 
 
 def _linked_job_label(job: dict[str, Any]) -> str:
-    for key in ("job_name", "name", "project_name", "project_description", "description"):
+    for key in ("job_name", "name", "project_name"):
         val = str(job.get(key) or "").strip()
         if val and val != "—":
             return val
-    return str(job.get("notes") or "").strip()
+    return ""
 
 
 def enrich_estimates_with_job_numbers(
