@@ -144,7 +144,7 @@ _DAY_GRID_LABELS = [
     "Assignment",
     "ST Hours",
     "OT Hours",
-    "Total",
+    "Total Hours",
     "Status",
     "Actions",
     "Notes",
@@ -1948,14 +1948,14 @@ def _render_custom_timekeeping_table(
                         unsafe_allow_html=True,
                     )
 
-                if expanded:
-                    with st.container(key=f"tk_expand_detail_{timecard_id}"):
-                        st.markdown(
-                            '<span class="timesheet-employee-expand-detail ips-timekeeping-row-expand" '
-                            'aria-hidden="true"></span>',
-                            unsafe_allow_html=True,
-                        )
-                        _render_inline_daily_entries(row, week_start_d)
+            if expanded:
+                with st.container(key=f"tk_expand_detail_{timecard_id}"):
+                    st.markdown(
+                        '<span class="timekeeping-expand-detail-panel timesheet-employee-expand-detail '
+                        'ips-timekeeping-row-expand" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    _render_inline_daily_entries(row, week_start_d)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
