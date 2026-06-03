@@ -54,6 +54,22 @@ def _estimate_json_get(row: dict[str, Any], key: str) -> str:
     return ""
 
 
+def _estimate_project_payload(
+    project_name: str,
+    cols: frozenset[str],
+) -> dict[str, Any]:
+    """Map UI project title onto every estimates column used for display."""
+    name = str(project_name or "").strip()
+    out: dict[str, Any] = {}
+    if not cols or "project_name" in cols:
+        out["project_name"] = name
+    if not cols or "job_name" in cols:
+        out["job_name"] = name
+    if not cols or "estimate_description" in cols:
+        out["estimate_description"] = name[:500] if name else ""
+    return out
+
+
 def _normalize_estimate_status(raw: Any) -> str:
     s = str(raw or "").strip()
     if not s:
@@ -300,12 +316,11 @@ def normalize_estimate(
     ).strip()
     if not project_name:
         project_name = str(_estimate_json_get(row, "estimate_description") or "").strip()
-    if not project_name:
-        project_name = "—"
+    display_project = project_name or "—"
     return {
         "id": eid or num,
         "estimate_number": num,
-        "project_name": project_name,
+        "project_name": display_project,
         "customer": customer,
         "customer_id": str(row.get("customer_id") or ""),
         "customer_location_id": str(row.get("customer_location_id") or ""),
@@ -893,11 +908,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         return ServiceResult(ok=False, error=str(exc))
     project_name = str(ui.get("project_name") or ui.get("estimate_description") or "").strip()
     scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
+    cols = table_column_names("estimates")
     payload = {
         "quote_number": quote_number or None,
-        "project_name": project_name or None,
-        "job_name": project_name or None,
-        "estimate_description": project_name[:500] if project_name else None,
         "customer_name": ui.get("customer"),
         "customer_id": ui.get("customer_id") or None,
         "customer_location_id": ui.get("customer_location_id") or None,
@@ -942,8 +955,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "proposal_show_category_totals": ui.get("proposal_show_category_totals"),
         "proposal_show_final_price_only": ui.get("proposal_show_final_price_only"),
     }
+    project_fields = _estimate_project_payload(project_name, cols)
+    payload.update(project_fields)
     payload = {k: v for k, v in payload.items() if v is not None}
-    cols = table_column_names("estimates")
     if cols and "customer_name" not in cols:
         payload.pop("customer_name", None)
     if row_id:
@@ -977,6 +991,23 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
                         )
     if result.ok:
         clear_all_data_caches()
+        saved_id = str(
+            row_id or ((result.data or {}).get("id") if isinstance(result.data, dict) else "") or ""
+        ).strip()
+        if saved_id and project_name:
+            try:
+                from app.services.estimate_job_workflow_service import (
+                    sync_linked_job_project_from_estimate,
+                )
+            except ImportError:
+                from services.estimate_job_workflow_service import (  # type: ignore
+                    sync_linked_job_project_from_estimate,
+                )
+            sync_linked_job_project_from_estimate(
+                estimate_id=saved_id,
+                job_id=str(ui.get("job_id") or (result.data or {}).get("job_id") or "").strip() or None,
+                project_name=project_name,
+            )
     return result
 
 

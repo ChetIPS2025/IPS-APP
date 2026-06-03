@@ -768,6 +768,20 @@ def _open_estimates_detail_modal(estimate_id: str, estimate: dict | None = None)
         st.session_state[ACTIVE_ESTIMATE_KEY] = str(estimate.get("id") or "")
 
 
+def _refresh_estimate_modal_cache(estimate_id: str) -> None:
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return
+    fresh = get_estimate(eid)
+    if not fresh:
+        return
+    cache = st.session_state.get(_ESTIMATES_CACHE_KEY)
+    if isinstance(cache, dict):
+        cache = dict(cache)
+        cache[eid] = fresh
+        st.session_state[_ESTIMATES_CACHE_KEY] = cache
+
+
 def _seed_estimate_edit_form(est: dict) -> None:
     eid = str(est.get("id") or "")
     st.session_state[f"est_edit_num_{eid}"] = str(est.get("estimate_number") or "")
@@ -885,6 +899,7 @@ def _render_estimate_edit_form(est: dict) -> None:
             row_id=eid,
         )
         if ok:
+            _refresh_estimate_modal_cache(eid)
             set_view_mode(_MOD, rk)
             st.success(msg or "Estimate saved.")
             st.rerun()
@@ -997,8 +1012,11 @@ def _render_estimate_actions_panel(est: dict) -> None:
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
+    fresh = get_estimate(eid) if eid else None
+    if fresh:
+        est = fresh
     en = safe_value(est.get("estimate_number"))
-    project = safe_value(est.get("project_name"))
+    project = _estimate_project(est)
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
     total = fmt_currency(est.get("total"))
@@ -1035,14 +1053,14 @@ def render_estimate_detail_dialog(est: dict) -> None:
 
 @st.dialog("Estimate Details", width="large", on_dismiss=_clear_estimates_detail_modal)
 def _show_estimates_detail_modal() -> None:
-    est = get_modal_record(
-        cache_key=_ESTIMATES_CACHE_KEY,
-        modal_key=_ESTIMATES_MODAL_KEY,
-        session_select_key=_SEL,
-    )
+    sel = str(st.session_state.get(_ESTIMATES_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
+    est = get_estimate(sel) if sel else None
     if not est:
-        sel = str(st.session_state.get(_ESTIMATES_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
-        est = get_estimate(sel) if sel else None
+        est = get_modal_record(
+            cache_key=_ESTIMATES_CACHE_KEY,
+            modal_key=_ESTIMATES_MODAL_KEY,
+            session_select_key=_SEL,
+        )
     if not est:
         render_missing_record(_clear_estimates_detail_modal, close_key="estimates_modal_missing_close")
         return

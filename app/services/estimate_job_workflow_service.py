@@ -500,6 +500,40 @@ def rollback_estimate_if_job_link_failed(estimate_id: str) -> None:
         _LOG.warning("Could not rollback estimate %s after job failure: %s", eid, exc)
 
 
+def sync_linked_job_project_from_estimate(
+    *,
+    estimate_id: str,
+    job_id: str | None = None,
+    project_name: str,
+) -> None:
+    """Keep linked job title in sync when estimate project name is edited."""
+    eid = str(estimate_id or "").strip()
+    name = str(project_name or "").strip()
+    if not eid or not name:
+        return
+    jid = str(job_id or "").strip()
+    if not jid:
+        job = _existing_job_for_estimate(eid, {})
+        jid = str((job or {}).get("id") or "").strip()
+    if not jid:
+        return
+    payload: dict[str, Any] = {"job_name": name}
+    try:
+        from app.services.repository import table_column_names
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+    cols = table_column_names("jobs")
+    if cols and "project_name" in cols:
+        payload["project_name"] = name
+    payload = filter_payload_to_table("jobs", payload)
+    if not payload:
+        return
+    try:
+        update_rows_admin("jobs", payload, {"id": jid})
+    except Exception as exc:
+        _LOG.warning("sync_linked_job_project_from_estimate failed job=%s: %s", jid, exc)
+
+
 def _linked_job_label(job: dict[str, Any]) -> str:
     for key in ("job_name", "name", "project_name", "project_description", "description"):
         val = str(job.get(key) or "").strip()
