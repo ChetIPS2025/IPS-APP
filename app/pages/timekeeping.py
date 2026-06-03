@@ -152,7 +152,8 @@ _DAY_GRID_LABELS = [
     "Notes",
 ]
 _LIST_VIEW_HOUR_STEP = 0.5
-_ALLOC_LINE_COLS = [2.5, 1.15, 0.8, 1.35, 0.4]
+_ALLOC_HOUR_TYPE_OPTS = ["S/T", "O/T"]
+_ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
 _ASSIGNMENT_LEGACY_ALIASES = {
     "ips shop": "Shop",
     "administrator": "Administrative",
@@ -597,19 +598,45 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
         iso = str(row.get("work_date") or "")[:10]
         if not iso:
             continue
-        by_date.setdefault(iso, []).append(
-            {
-                "line_id": str(row.get("id") or ""),
-                "job": _normalize_assignment_label(str(row.get("job_label") or "")),
-                "hours": (
-                    float(row.get("st_hours") or 0)
-                    + float(row.get("ot_hours") or 0)
-                    + float(row.get("dt_hours") or 0)
-                ),
-                "notes": str(row.get("notes") or ""),
-                "status": _normalize_timecard_status(row.get("status")),
-            }
-        )
+        line_id = str(row.get("id") or "")
+        job = _normalize_assignment_label(str(row.get("job_label") or ""))
+        notes = str(row.get("notes") or "")
+        status = _normalize_timecard_status(row.get("status"))
+        st_h = float(row.get("st_hours") or 0)
+        ot_h = float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
+        if st_h > 0:
+            by_date.setdefault(iso, []).append(
+                {
+                    "line_id": line_id,
+                    "job": job,
+                    "hour_type": "ST",
+                    "hours": st_h,
+                    "notes": notes,
+                    "status": status,
+                }
+            )
+        if ot_h > 0:
+            by_date.setdefault(iso, []).append(
+                {
+                    "line_id": line_id,
+                    "job": job,
+                    "hour_type": "OT",
+                    "hours": ot_h,
+                    "notes": notes,
+                    "status": status,
+                }
+            )
+        if st_h <= 0 and ot_h <= 0:
+            by_date.setdefault(iso, []).append(
+                {
+                    "line_id": line_id,
+                    "job": job,
+                    "hour_type": "ST",
+                    "hours": 0.0,
+                    "notes": notes,
+                    "status": status,
+                }
+            )
     return by_date
 
 
@@ -639,8 +666,35 @@ def _daily_total_from_list_row(
     return _day_hours_total(grid_row)
 
 
+def _normalize_alloc_hour_type(raw: object) -> str:
+    s = str(raw or "ST").strip().upper().replace(".", "").replace(" ", "")
+    if s in {"OT", "OVERTIME"}:
+        return "OT"
+    return "ST"
+
+
+def _alloc_hour_type_label(hour_type: str) -> str:
+    return "O/T" if _normalize_alloc_hour_type(hour_type) == "OT" else "S/T"
+
+
+def _line_allocated_hours(line: dict[str, Any]) -> float:
+    return max(0.0, float(line.get("hours") or 0))
+
+
 def _allocated_hours_sum(lines: list[dict[str, Any]]) -> float:
-    return sum(max(0.0, float(line.get("hours") or 0)) for line in lines)
+    return sum(_line_allocated_hours(line) for line in lines)
+
+
+def _allocated_st_ot_sum(lines: list[dict[str, Any]]) -> tuple[float, float]:
+    st_total = 0.0
+    ot_total = 0.0
+    for line in lines:
+        hrs = _line_allocated_hours(line)
+        if _normalize_alloc_hour_type(line.get("hour_type")) == "OT":
+            ot_total += hrs
+        else:
+            st_total += hrs
+    return st_total, ot_total
 
 
 def _default_allocation_job(grid_row: dict, job_opts: list[str]) -> str:
@@ -664,6 +718,7 @@ def _ensure_day_allocation_lines(
             {
                 "line_id": "",
                 "job": _default_allocation_job(grid_row, job_opts),
+                "hour_type": "ST",
                 "hours": daily_total,
                 "notes": "",
                 "status": _normalize_timecard_status(grid_row.get("status")),
@@ -687,10 +742,13 @@ def _sync_allocation_from_widgets(
     for iso, lines in by_date.items():
         for lix, line in enumerate(lines):
             job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
+            type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
             hrs_key = f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}"
             notes_key = f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}"
             if job_key in st.session_state:
                 line["job"] = st.session_state[job_key]
+            if type_key in st.session_state:
+                line["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
             if hrs_key in st.session_state:
                 line["hours"] = float(st.session_state[hrs_key] or 0)
             if notes_key in st.session_state:
@@ -739,28 +797,40 @@ def _allocation_lines_to_persist_grid(
                 {
                     "line_id": "",
                     "job": no_job,
+                    "hour_type": "ST",
                     "hours": remainder,
                     "notes": "",
                     "status": str(out_lines[0].get("status") or "Draft"),
                 }
             )
+        merged: dict[tuple[str, str], dict[str, Any]] = {}
         for line in out_lines:
-            hrs = float(line.get("hours") or 0)
+            hrs = _line_allocated_hours(line)
             if hrs <= 0:
                 continue
-            persist_rows.append(
-                {
+            job_label = str(line.get("job") or no_job)
+            merge_key = (iso, job_label)
+            bucket = merged.get(merge_key)
+            if not bucket:
+                bucket = {
                     "day_id": str(line.get("line_id") or ""),
                     "day": day_d.strftime("%A"),
                     "date": iso,
-                    "job": str(line.get("job") or no_job),
-                    "st": hrs,
+                    "job": job_label,
+                    "st": 0.0,
                     "ot": 0.0,
                     "dt": 0.0,
                     "notes": str(line.get("notes") or ""),
                     "status": str(line.get("status") or "Draft"),
                 }
-            )
+                merged[merge_key] = bucket
+            elif not bucket["day_id"] and str(line.get("line_id") or "").strip():
+                bucket["day_id"] = str(line.get("line_id") or "")
+            if _normalize_alloc_hour_type(line.get("hour_type")) == "OT":
+                bucket["ot"] = float(bucket["ot"]) + hrs
+            else:
+                bucket["st"] = float(bucket["st"]) + hrs
+        persist_rows.extend(merged.values())
     return persist_rows, errors
 
 
@@ -1946,7 +2016,7 @@ def _render_allocation_hours_input(
 
 def _render_allocation_line_header() -> None:
     cols = st.columns(_ALLOC_LINE_COLS)
-    labels = ["Assignment", "Allocated hrs", "Status", "Notes", ""]
+    labels = ["Assignment", "Type", "Hours", "Remaining", "Status", "Notes", ""]
     for col, lbl in zip(cols, labels):
         with col:
             marker = (
@@ -1979,7 +2049,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
     st.markdown(
         '<div class="timekeeping-alloc-intro">'
         "<strong>Daily hours are entered in the employee row above.</strong> "
-        "Use this section to split each day&rsquo;s total across jobs, subjobs, Shop, or Administrative."
+        "Split each day&rsquo;s total across jobs, subjobs, Shop, or Administrative, "
+        "and mark each row as <strong>S/T</strong> (straight time) or <strong>O/T</strong> (overtime)."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -2005,10 +2076,18 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             job_opts=job_opts,
         )
         allocated = _allocated_hours_sum(lines)
+        st_part, ot_part = _allocated_st_ot_sum(lines)
+        remaining = max(0.0, round(daily_total - allocated, 2))
         day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
         balance_cls = ""
         if daily_total > 0 and abs(allocated - daily_total) > 0.01:
             balance_cls = " timekeeping-alloc-day-unbalanced"
+        type_bits = []
+        if st_part > 0:
+            type_bits.append(f"S/T {_fmt_day_hours(st_part)}")
+        if ot_part > 0:
+            type_bits.append(f"O/T {_fmt_day_hours(ot_part)}")
+        type_summary = f" ({' · '.join(type_bits)})" if type_bits else ""
 
         st.markdown(
             f'<div class="timekeeping-alloc-day-block{balance_cls}">'
@@ -2020,6 +2099,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             f"</span>"
             f'<span class="timekeeping-alloc-day-split">'
             f"Allocated {_fmt_day_hours(allocated)} / {_fmt_day_hours(daily_total)}"
+            f"{html.escape(type_summary)} · {_fmt_day_hours(remaining)} remaining"
             f"</span>"
             f"</div></div>",
             unsafe_allow_html=True,
@@ -2029,6 +2109,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             st.caption("Enter hours for this day in the row above before assigning.")
             continue
 
+        running_allocated = 0.0
         for lix, line in enumerate(lines):
             day_status = _normalize_timecard_status(line.get("status"))
             row_editable = not week_locked and _day_is_editable(day_status)
@@ -2036,6 +2117,12 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
             if job_key in st.session_state:
                 live_job = str(st.session_state[job_key])
+            hour_type = _normalize_alloc_hour_type(line.get("hour_type"))
+            type_labels = list(_ALLOC_HOUR_TYPE_OPTS)
+            type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+            if type_key in st.session_state:
+                hour_type = _normalize_alloc_hour_type(st.session_state[type_key])
+            row_remaining = max(0.0, round(daily_total - running_allocated, 2))
 
             with st.container(key=f"tk_alloc_row_{eid}_{week_sig}_{iso}_{lix}"):
                 st.markdown(
@@ -2063,18 +2150,45 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                             unsafe_allow_html=True,
                         )
                 with row_cols[1]:
+                    st.markdown(
+                        '<span class="timekeeping-allocation-type-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    if row_editable:
+                        type_lbl = _alloc_hour_type_label(hour_type)
+                        picked = st.selectbox(
+                            "Type",
+                            type_labels,
+                            index=type_labels.index(type_lbl) if type_lbl in type_labels else 0,
+                            key=type_key,
+                            label_visibility="collapsed",
+                        )
+                        line["hour_type"] = _normalize_alloc_hour_type(picked)
+                    else:
+                        st.markdown(
+                            f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell">'
+                            f"{html.escape(_alloc_hour_type_label(hour_type))}</div>",
+                            unsafe_allow_html=True,
+                        )
+                with row_cols[2]:
                     line["hours"] = _render_allocation_hours_input(
                         value=float(line.get("hours") or 0),
                         widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
                         disabled=not row_editable,
                     )
-                with row_cols[2]:
+                with row_cols[3]:
+                    st.markdown(
+                        f'<div class="timekeeping-alloc-remaining-cell">'
+                        f"{html.escape(_fmt_day_hours(row_remaining))}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with row_cols[4]:
                     st.markdown(
                         f'<div class="timekeeping-alloc-status-cell">'
                         f"{_timecard_status_pill_html(day_status)}</div>",
                         unsafe_allow_html=True,
                     )
-                with row_cols[3]:
+                with row_cols[5]:
                     if row_editable:
                         line["notes"] = st.text_input(
                             "Notes",
@@ -2089,7 +2203,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                             f"{html.escape(str(line.get('notes') or '—'))}</div>",
                             unsafe_allow_html=True,
                         )
-                with row_cols[4]:
+                with row_cols[6]:
                     line_id = str(line.get("line_id") or "").strip()
                     if row_editable and len(lines) > 1:
                         if st.button(
@@ -2132,6 +2246,9 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                 if action_taken:
                     st.rerun()
 
+            running_allocated += _line_allocated_hours(line)
+            line["hour_type"] = _normalize_alloc_hour_type(line.get("hour_type"))
+
         if not week_locked:
             if st.button(
                 "+ Add assignment for this day",
@@ -2144,6 +2261,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                     {
                         "line_id": "",
                         "job": job_opts[0] if job_opts else "— No assignment —",
+                        "hour_type": "ST",
                         "hours": remaining,
                         "notes": "",
                         "status": "Draft",
@@ -2178,8 +2296,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             ):
                 st.rerun()
     st.caption(
-        "Totals in the row above are the source of truth. Split them here, then save. "
-        "Unallocated time is saved to — No assignment — automatically."
+        "Totals in the row above are the source of truth. Choose S/T or O/T on each row, then save. "
+        "Unallocated time is saved to — No assignment — as S/T automatically."
     )
 
 
