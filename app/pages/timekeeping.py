@@ -138,8 +138,8 @@ _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("week_start", lambda r: fmt_date(r.get("week_start"))),
     ("status", lambda r: _normalize_timecard_status(r.get("status"))),
 ]
-_DAY_GRID_COLS = [0.34, 0.48, 2.4, 0.48, 0.48, 0.46, 0.62, 0.76, 0.34]
-_DAY_GRID_EDIT_COLS = [*_DAY_GRID_COLS, 0.3]
+_DAY_GRID_COLS = [0.32, 0.5, 3.2, 0.58, 0.58, 0.52, 0.68, 0.82, 1.1]
+_DAY_GRID_EDIT_COLS = [*_DAY_GRID_COLS, 0.28]
 _DAY_GRID_LABELS = [
     "Day",
     "Date",
@@ -937,6 +937,7 @@ def _hour_stepper_input(
     down_label: str = "▼",
     up_label: str = "▲",
     compact: bool = False,
+    detail_grid: bool = False,
 ) -> float:
     if disabled:
         st.markdown(
@@ -948,8 +949,10 @@ def _hour_stepper_input(
     down_key = f"{widget_key}_dn"
     up_key = f"{widget_key}_up"
     if compact:
+        detail_cls = " timekeeping-detail-hour-stepper" if detail_grid else ""
         st.markdown(
-            '<span class="weekly-timesheet-stepper-marker hours-control timekeeping-hours-control" aria-hidden="true"></span>',
+            f'<span class="weekly-timesheet-stepper-marker hours-control timekeeping-hours-control{detail_cls}" '
+            f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
     dn_col, val_col, up_col = st.columns([0.24, 0.52, 0.24] if compact else [0.26, 0.48, 0.26], gap="small")
@@ -1433,6 +1436,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 down_label="−",
                 up_label="+",
                 compact=True,
+                detail_grid=True,
             )
         with c[4]:
             grid[i]["ot"] = _hour_stepper_input(
@@ -1444,6 +1448,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 down_label="−",
                 up_label="+",
                 compact=True,
+                detail_grid=True,
             )
         with c[5]:
             row_total = (
@@ -1959,8 +1964,8 @@ def _render_custom_timekeeping_table(
             if expanded:
                 with st.container(key=f"tk_expand_detail_{timecard_id}"):
                     st.markdown(
-                        '<span class="timekeeping-expand-detail-panel timesheet-employee-expand-detail '
-                        'ips-timekeeping-row-expand" aria-hidden="true"></span>',
+                        '<span class="timekeeping-expand-detail-panel timekeeping-detail-expand-host '
+                        'timesheet-employee-expand-detail ips-timekeeping-row-expand" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
                     _render_inline_daily_entries(row, week_start_d)
