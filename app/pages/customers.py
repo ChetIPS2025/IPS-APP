@@ -546,11 +546,35 @@ def _contact_role_pill_html(role: str) -> str:
     return f'<span class="ips-contact-role-pill {cls}">{html.escape(role)}</span>'
 
 
-def _contact_select_key(contact_id: str) -> str:
+def _dedupe_contacts_by_id(contacts: list[dict]) -> list[dict]:
+    """One row per contact id so Streamlit checkbox keys stay unique."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for contact in contacts:
+        cid = str(contact.get("id") or "").strip()
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        out.append(contact)
+    return out
+
+
+def _contact_select_key(contact_id: str, *, scope: str = "") -> str:
+    scope_s = str(scope or "").strip()
+    if scope_s:
+        return f"contact_select_{scope_s}_{contact_id}"
     return f"contact_select_{contact_id}"
 
 
-def _customer_contact_select_key(customer_id: str, contact_id: str) -> str:
+def _customer_contact_select_key(
+    customer_id: str,
+    contact_id: str,
+    *,
+    scope: str = "",
+) -> str:
+    scope_s = str(scope or "").strip()
+    if scope_s:
+        return f"customer_{customer_id}_contact_select_{scope_s}_{contact_id}"
     return f"customer_{customer_id}_contact_select_{contact_id}"
 
 
@@ -589,12 +613,13 @@ def _on_customer_contact_checkbox_change(
     customer_id: str,
     contact_id: str,
     all_contact_ids: list[str],
+    checkbox_key: str,
 ) -> None:
-    key = _customer_contact_select_key(customer_id, contact_id)
-    if st.session_state.get(key):
-        for cid in all_contact_ids:
-            if cid != contact_id:
-                st.session_state[_customer_contact_select_key(customer_id, cid)] = False
+    prefix = f"customer_{customer_id}_contact_select_"
+    if st.session_state.get(checkbox_key):
+        for key in list(st.session_state.keys()):
+            if isinstance(key, str) and key.startswith(prefix):
+                st.session_state[key] = key == checkbox_key
         st.session_state[_selected_customer_contact_key(customer_id)] = contact_id
         st.session_state[_show_customer_contact_detail_key(customer_id)] = True
         st.session_state[_inline_contact_edit_key(contact_id)] = False
@@ -630,12 +655,15 @@ def _clear_contact_selection(contact_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _on_contact_checkbox_change(contact_id: str, all_contact_ids: list[str]) -> None:
-    key = _contact_select_key(contact_id)
-    if st.session_state.get(key):
-        for cid in all_contact_ids:
-            if cid != contact_id:
-                st.session_state[_contact_select_key(cid)] = False
+def _on_contact_checkbox_change(
+    contact_id: str,
+    all_contact_ids: list[str],
+    checkbox_key: str,
+) -> None:
+    if st.session_state.get(checkbox_key):
+        for key in list(st.session_state.keys()):
+            if isinstance(key, str) and key.startswith("contact_select_"):
+                st.session_state[key] = key == checkbox_key
         st.session_state[SELECTED_CONTACT_KEY] = contact_id
         st.session_state[SHOW_CONTACT_MODAL_KEY] = True
         cache = st.session_state.get(_CONTACTS_CACHE_KEY) or {}
@@ -666,6 +694,8 @@ def _render_custom_contacts_table(
         st.session_state[_ALL_CONTACT_IDS_KEY] = []
         return []
 
+    contacts = _dedupe_contacts_by_id(contacts)
+
     all_contact_ids = [
         str(c.get("id") or "").strip() for c in contacts if str(c.get("id") or "").strip()
     ]
@@ -675,6 +705,7 @@ def _render_custom_contacts_table(
         customer_id=str(customer_id or ""),
         location_id=str(location_id or ""),
     )
+    scope = wrap_key
     with st.container(key=wrap_key):
         st.markdown('<div class="ips-contacts-table-wrap">', unsafe_allow_html=True)
 
@@ -703,14 +734,14 @@ def _render_custom_contacts_table(
 
             with cols[0]:
                 checkbox_key = (
-                    _customer_contact_select_key(customer_id, ct_id)
+                    _customer_contact_select_key(customer_id, ct_id, scope=scope)
                     if inline and customer_id
-                    else _contact_select_key(ct_id)
+                    else _contact_select_key(ct_id, scope=scope)
                 )
                 checkbox_args = (
-                    (customer_id, ct_id, all_contact_ids)
+                    (customer_id, ct_id, all_contact_ids, checkbox_key)
                     if inline and customer_id
-                    else (ct_id, all_contact_ids)
+                    else (ct_id, all_contact_ids, checkbox_key)
                 )
                 checkbox_handler = (
                     _on_customer_contact_checkbox_change
@@ -1728,6 +1759,7 @@ def _render_customer_contacts_tab(customer: dict) -> None:
         contacts = [c for c in enriched if str(c.get("location_id") or c.get("customer_location_id") or "") == filter_loc]
     else:
         contacts = enriched
+    contacts = _dedupe_contacts_by_id(contacts)
 
     _render_add_contact_form(customer, locations=locations, demo=demo)
 
