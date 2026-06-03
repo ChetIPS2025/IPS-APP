@@ -106,7 +106,6 @@ _TS_LIST_HANDLE = 24
 _TS_LIST_EXPAND = 32
 _TS_LIST_EMPLOYEE = 220
 _TS_LIST_DAY = 106
-_TS_LIST_SPACER = 1
 _TS_LIST_TOTAL = 74
 _TS_LIST_OVERTIME = 68
 _TS_LIST_BILLED = 78
@@ -117,7 +116,6 @@ _WEEKLY_TS_LIST_ROW_COLS = [
     _TS_LIST_EXPAND,
     _TS_LIST_EMPLOYEE,
     *([_TS_LIST_DAY] * 7),
-    _TS_LIST_SPACER,
     _TS_LIST_TOTAL,
     _TS_LIST_OVERTIME,
     _TS_LIST_BILLED,
@@ -125,11 +123,6 @@ _WEEKLY_TS_LIST_ROW_COLS = [
 ]
 
 
-def _render_timekeeping_list_spacer_cell() -> None:
-    st.markdown(
-        '<span class="timekeeping-list-spacer-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
 _STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
@@ -1818,9 +1811,7 @@ def _render_custom_timekeeping_table(
                     label,
                     base_class="ips-timekeeping-header-row ips-timekeeping-cell",
                 )
-        with header_cols[10]:
-            _render_timekeeping_list_spacer_cell()
-        for col, label in zip(header_cols[11:15], summary_header_labels):
+        for col, label in zip(header_cols[10:14], summary_header_labels):
             with col:
                 render_table_header_cell(
                     label,
@@ -1919,29 +1910,27 @@ def _render_custom_timekeeping_table(
                             )
 
                 with row_cols[10]:
-                    _render_timekeeping_list_spacer_cell()
-                with row_cols[11]:
                     st.markdown(
                         f'<div class="timekeeping-total-cell ips-timekeeping-hours '
                         f'timesheet-list-summary-cell">'
                         f"{html.escape(_fmt_table_hours(st_total))}</div>",
                         unsafe_allow_html=True,
                     )
-                with row_cols[12]:
+                with row_cols[11]:
                     st.markdown(
                         f'<div class="timekeeping-overtime-cell ips-timekeeping-hours '
                         f'timesheet-list-summary-cell">'
                         f"{html.escape(_fmt_table_hours(ot_total))}</div>",
                         unsafe_allow_html=True,
                     )
-                with row_cols[13]:
+                with row_cols[12]:
                     st.markdown(
                         f'<div class="timekeeping-billed-cell ips-timekeeping-hours '
                         f'timesheet-list-summary-cell">'
                         f"{html.escape(_fmt_table_hours(total_hours))}</div>",
                         unsafe_allow_html=True,
                     )
-                with row_cols[14]:
+                with row_cols[13]:
                     st.markdown(
                         f'<div class="timekeeping-status-cell timesheet-list-status-cell">'
                         f"{_timecard_status_pill_html(status)}</div>",
