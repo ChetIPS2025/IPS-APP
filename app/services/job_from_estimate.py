@@ -12,7 +12,7 @@ Quote numbers (``QYY###``) map to ``JYY###`` when a job is linked; see
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, FrozenSet
 
 try:
@@ -320,14 +320,64 @@ _INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM: FrozenSet[str] = frozenset(
     {"archived", "deleted", "cancelled", "canceled", "closed", "completed"}
 )
 
+_JOB_COLLISION_COLUMNS = (
+    "id,job_number,job_name,estimate_id,customer_id,status,is_deleted,deleted_at"
+)
+
 
 def _norm_job_status(status: object) -> str:
     return str(status or "").strip().lower().replace("_", " ")
 
 
+def _normalize_job_number_key(job_number: object) -> str:
+    return str(job_number or "").strip().upper()
+
+
+def _job_row_is_soft_deleted(job: dict[str, Any]) -> bool:
+    if job.get("is_deleted") is True:
+        return True
+    if str(job.get("deleted_at") or "").strip():
+        return True
+    return _norm_job_status(job.get("status")) in {"deleted", "archived"}
+
+
+def _estimate_pending_job_is_orphan(blocking_job: dict[str, Any]) -> bool:
+    """Estimate-pending rows left behind after a failed link should not block new estimates."""
+    if _norm_job_status(blocking_job.get("status")) != "estimate pending":
+        return False
+    est_id = str(blocking_job.get("estimate_id") or "").strip()
+    if not est_id:
+        return True
+    est_rows = fetch_by_match_admin("estimates", {"id": est_id}, columns="id,job_id", limit=1)
+    if not est_rows:
+        return True
+    linked = str(est_rows[0].get("job_id") or "").strip()
+    job_id = str(blocking_job.get("id") or "").strip()
+    return linked != job_id
+
+
+def fetch_jobs_by_exact_job_number(job_number: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    """Exact ``job_number`` match only (no partial / ilike)."""
+    raw = str(job_number or "").strip()
+    if not raw:
+        return []
+    key = _normalize_job_number_key(raw)
+    hits = fetch_by_match_admin(
+        "jobs",
+        {"job_number": raw},
+        columns=_JOB_COLLISION_COLUMNS,
+        limit=limit,
+    )
+    return [h for h in hits if _normalize_job_number_key(h.get("job_number")) == key]
+
+
 def job_number_conflict_is_reclaimable(blocking_job: dict[str, Any], *, estimate_id: str) -> bool:
-    """Inactive, unlinked jobs should not block estimate conversion numbers."""
+    """Inactive, soft-deleted, or orphan estimate-pending jobs should not block numbering."""
     _ = estimate_id
+    if _job_row_is_soft_deleted(blocking_job):
+        return True
+    if _estimate_pending_job_is_orphan(blocking_job):
+        return True
     if str(blocking_job.get("estimate_id") or "").strip():
         return False
     return _norm_job_status(blocking_job.get("status")) in _INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM
@@ -352,19 +402,104 @@ def resolve_job_number_collision(
     *,
     estimate_id: str,
     proposed_jn: str,
+    linked_job_id: str | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """
     Resolve a proposed job number collision.
 
     Returns ``(outcome, job)`` where outcome is ``reuse``, ``released``, or ``blocked``.
     """
+    hid = str(hit.get("id") or "").strip()
+    lid = str(linked_job_id or "").strip()
+    if lid and hid == lid:
+        return "reuse", hit
     hest = str(hit.get("estimate_id") or "").strip()
-    if hest == estimate_id:
+    eid = str(estimate_id or "").strip()
+    if hest and eid and hest == eid:
         return "reuse", hit
     if job_number_conflict_is_reclaimable(hit, estimate_id=estimate_id):
         if reclaim_inactive_job_number(hit, proposed_jn):
             return "released", None
     return "blocked", hit
+
+
+def resolve_job_number_collisions(
+    hits: list[dict[str, Any]],
+    *,
+    estimate_id: str,
+    proposed_jn: str,
+    linked_job_id: str | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Evaluate all rows sharing ``proposed_jn``; prefer reuse, then release, else block."""
+    if not hits:
+        return "released", None
+    for hit in hits:
+        outcome, job = resolve_job_number_collision(
+            hit,
+            estimate_id=estimate_id,
+            proposed_jn=proposed_jn,
+            linked_job_id=linked_job_id,
+        )
+        if outcome == "reuse":
+            return "reuse", job
+    for hit in hits:
+        outcome, job = resolve_job_number_collision(
+            hit,
+            estimate_id=estimate_id,
+            proposed_jn=proposed_jn,
+            linked_job_id=linked_job_id,
+        )
+        if outcome == "released":
+            return "released", job
+    return "blocked", hits[0]
+
+
+def renumber_estimate_quote_for_job_collision(
+    estimate_id: str,
+    *,
+    quote_number: str | None = None,
+    exclude_job_id: str | None = None,
+) -> tuple[str, str] | None:
+    """
+    Allocate the next free Q/J pair and patch the estimate quote number.
+
+    Returns ``(quote_number, job_number)`` or None when allocation fails.
+    """
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return None
+    try:
+        from app.services.shared_sequence import next_available_quote_job_pair, parse_number_parts
+    except ImportError:
+        from services.shared_sequence import (  # type: ignore
+            next_available_quote_job_pair,
+            parse_number_parts,
+        )
+
+    qref = str(quote_number or "").strip()
+    parts = parse_number_parts(qref)
+    if parts:
+        yy = int(parts[1])
+        year_anchor = date(2000 + yy, 1, 1)
+    else:
+        year_anchor = datetime.utcnow()
+    try:
+        new_q, new_j = next_available_quote_job_pair(
+            year_anchor,
+            exclude_estimate_id=eid,
+            exclude_job_id=exclude_job_id,
+        )
+    except ValueError:
+        return None
+    patch: dict[str, Any] = {
+        "quote_number": new_q,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    try:
+        _patch_estimate_row(eid, patch)
+    except Exception:
+        return None
+    return new_q, new_j
 
 
 def _fallback_job_name(row: dict[str, Any], ej: dict[str, Any], customer_name: str) -> str:
@@ -550,32 +685,40 @@ def create_job_from_estimate(
             proposed_jn = str(next_job_number()).strip()
         payload["job_number"] = proposed_jn
 
-        hits = fetch_by_match_admin(
-            "jobs",
-            {"job_number": proposed_jn},
-            columns="id,job_number,job_name,estimate_id,customer_id,status",
-            limit=10,
-        )
+        hits = fetch_jobs_by_exact_job_number(proposed_jn)
         if hits:
-            hit0 = hits[0]
-            outcome, collision_job = resolve_job_number_collision(
-                hit0,
+            outcome, collision_job = resolve_job_number_collisions(
+                hits,
                 estimate_id=eid,
                 proposed_jn=proposed_jn,
+                linked_job_id=str(row.get("job_id") or "").strip() or None,
             )
             if outcome == "reuse":
-                inserted = dict(collision_job or hit0)
+                inserted = dict(collision_job or hits[0])
                 skip_insert = True
             elif outcome == "blocked":
-                return CreateJobFromEstimateResult(
-                    ok=False,
-                    message=(
-                        f"Job number {proposed_jn!r} is already in use by another job. "
-                        "Resolve the conflict or adjust the estimate quote number."
-                    ),
-                    error_code="job_number_taken",
-                    job=hit0,
+                pair = renumber_estimate_quote_for_job_collision(
+                    eid,
+                    quote_number=qraw,
+                    exclude_job_id=str((collision_job or hits[0]).get("id") or "").strip() or None,
                 )
+                if pair:
+                    new_q, new_j = pair
+                    proposed_jn = new_j
+                    payload["job_number"] = new_j
+                    row["quote_number"] = new_q
+                    ej["quote_number"] = new_q
+                else:
+                    hit0 = collision_job or hits[0]
+                    return CreateJobFromEstimateResult(
+                        ok=False,
+                        message=(
+                            f"Job number {proposed_jn!r} is already in use by another job. "
+                            "Resolve the conflict or adjust the estimate quote number."
+                        ),
+                        error_code="job_number_taken",
+                        job=hit0,
+                    )
 
     if not skip_insert:
         try:

@@ -23,7 +23,9 @@ try:
         _safe_location,
         estimate_quote_to_job_number,
         get_estimate_description,
-        resolve_job_number_collision,
+        fetch_jobs_by_exact_job_number,
+        renumber_estimate_quote_for_job_collision,
+        resolve_job_number_collisions,
     )
     from app.services.job_schema import fetch_jobs_for_job_database
     from app.services.job_service import job_number_display, next_job_number
@@ -44,7 +46,9 @@ except ImportError:
         _safe_location,
         estimate_quote_to_job_number,
         get_estimate_description,
-        resolve_job_number_collision,
+        fetch_jobs_by_exact_job_number,
+        renumber_estimate_quote_for_job_collision,
+        resolve_job_number_collisions,
     )
     from services.job_schema import fetch_jobs_for_job_database  # type: ignore
     from services.job_service import job_number_display, next_job_number  # type: ignore
@@ -271,28 +275,44 @@ def create_pending_job_from_estimate(
     if has_job_number_column:
         proposed_jn = _resolve_job_number(row, ej, has_job_number_column=True)
         if proposed_jn:
-            hits = fetch_by_match_admin(
-                "jobs",
-                {"job_number": proposed_jn},
-                columns="id,job_number,estimate_id,status",
-                limit=5,
-            )
+            hits = fetch_jobs_by_exact_job_number(proposed_jn)
+            linked_job_id = str(row.get("job_id") or "").strip() or None
             if hits:
-                hit = hits[0]
-                outcome, collision_job = resolve_job_number_collision(
-                    hit,
+                outcome, collision_job = resolve_job_number_collisions(
+                    hits,
                     estimate_id=eid,
                     proposed_jn=proposed_jn,
+                    linked_job_id=linked_job_id,
                 )
                 if outcome == "reuse":
-                    inserted = dict(collision_job or hit)
+                    inserted = dict(collision_job or hits[0])
                 elif outcome == "blocked":
-                    return CreateJobFromEstimateResult(
-                        ok=False,
-                        message=f"Job number {proposed_jn!r} is already in use.",
-                        error_code="job_number_taken",
-                        job=hit,
+                    pair = renumber_estimate_quote_for_job_collision(
+                        eid,
+                        quote_number=quote_number,
+                        exclude_job_id=str((collision_job or hits[0]).get("id") or "").strip() or None,
                     )
+                    if not pair:
+                        hit = collision_job or hits[0]
+                        return CreateJobFromEstimateResult(
+                            ok=False,
+                            message=f"Job number {proposed_jn!r} is already in use.",
+                            error_code="job_number_taken",
+                            job=hit,
+                        )
+                    quote_number, proposed_jn = pair
+                    payload["job_number"] = proposed_jn
+                    payload["source_estimate_number"] = quote_number[:120]
+                    row["quote_number"] = quote_number
+                    ej["quote_number"] = quote_number
+                    try:
+                        inserted = insert_row_admin("jobs", payload)
+                    except Exception as exc:
+                        return CreateJobFromEstimateResult(
+                            ok=False,
+                            message=f"Could not create linked job: {exc}",
+                            error_code="insert_failed",
+                        )
                 else:
                     payload["job_number"] = proposed_jn
                     try:

@@ -326,6 +326,36 @@ def next_available_quote_number(
     raise ValueError(f"No available quote number for year {yy} (sequence exhausted).")
 
 
+def next_available_quote_job_pair(
+    year: int | date | datetime | None = None,
+    *,
+    exclude_estimate_id: str | None = None,
+    exclude_job_id: str | None = None,
+) -> tuple[str, str]:
+    """
+    Next free ``(QYY###, JYY###)`` pair for ``year`` with the same sequence slot.
+
+    Checks both ``estimates.quote_number`` and ``jobs.job_number`` (exact match).
+    """
+    try:
+        from app.db import job_number_in_use, quote_number_in_use
+    except ImportError:
+        from db import job_number_in_use, quote_number_in_use  # type: ignore
+
+    y = year if year is not None else datetime.now(timezone.utc)
+    start = max_sequence_for_year(y) + 1
+    for seq in range(start, 1000):
+        candidate_q = format_number("Q", y, seq)
+        candidate_j = format_number("J", y, seq)
+        if quote_number_in_use(candidate_q, exclude_estimate_id) or job_number_in_use(
+            candidate_j, exclude_job_id
+        ):
+            continue
+        return candidate_q, candidate_j
+    yy = year_yy(y)
+    raise ValueError(f"No available quote/job number pair for year {yy} (sequence exhausted).")
+
+
 def ensure_quote_number_for_save(
     quote_number: str,
     *,
