@@ -347,10 +347,13 @@ def _set_estimate_build_mode(est: dict) -> None:
 
 def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
     est = get_estimate(row_id) or {}
+    proj = str(est.get("project_name") or "").strip()
+    if proj == "—":
+        proj = ""
     ok, msg = persist_estimate(
         {
             "estimate_number": est.get("estimate_number"),
-            "project_name": est.get("project_name"),
+            "project_name": proj,
             "customer": est.get("customer"),
             "customer_id": est.get("customer_id") or customer_id_for_name(str(est.get("customer") or "")),
             **data,

@@ -67,7 +67,15 @@ def _estimate_row_title(row: dict[str, Any], *keys: str) -> str:
 
 def estimate_project_title(row: dict[str, Any]) -> str:
     """Short project title for lists and headers — never scope or proposal body."""
-    title = _estimate_row_title(row, "project_name", "name", "project", "title", "job_name")
+    title = _estimate_row_title(row, "project_name", "name", "project", "title")
+    if not title:
+        title = _estimate_row_title(row, "estimate_description")
+    if not title:
+        title = _estimate_json_get(row, "project_name")
+    if not title:
+        title = _estimate_json_get(row, "estimate_description")
+    if not title:
+        title = _estimate_row_title(row, "job_name")
     if title:
         return title
     linked = row.get("linked_job")
@@ -83,14 +91,48 @@ def _estimate_project_payload(
     project_name: str,
     cols: frozenset[str],
 ) -> dict[str, Any]:
-    """Persist project title on name columns only (not description/scope fields)."""
+    """Persist project title on short name columns only (not description/scope fields)."""
     name = str(project_name or "").strip()
     out: dict[str, Any] = {}
     if not cols or "project_name" in cols:
         out["project_name"] = name
     if not cols or "job_name" in cols:
         out["job_name"] = name
+    if not cols or "estimate_description" in cols:
+        out["estimate_description"] = name[:500] if name else ""
     return out
+
+
+def _estimate_json_project_patch(
+    project_name: str,
+    cols: frozenset[str],
+    *,
+    row_id: str | None,
+) -> dict[str, Any]:
+    """Mirror project title into estimate_json for legacy readers (merge on update)."""
+    if cols and "estimate_json" not in cols:
+        return {}
+    name = str(project_name or "").strip()
+    ej: dict[str, Any] = {}
+    rid = str(row_id or "").strip()
+    if rid:
+        try:
+            from app.services.repository import fetch_by_id
+        except ImportError:
+            from services.repository import fetch_by_id  # type: ignore
+        existing = fetch_by_id("estimates", rid) or {}
+        raw = existing.get("estimate_json")
+        if isinstance(raw, dict):
+            ej = dict(raw)
+    if name:
+        ej["project_name"] = name
+        ej["estimate_description"] = name[:500]
+    else:
+        ej.pop("project_name", None)
+        ej.pop("estimate_description", None)
+    if not ej and not name:
+        return {}
+    return {"estimate_json": ej}
 
 
 def _normalize_estimate_status(raw: Any) -> str:
@@ -681,14 +723,14 @@ def list_estimates(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
             rows = []
     if not rows:
         return (demo if demo else []), True
-    cust_names = _customer_name_by_id()
-    out = [normalize_estimate(r, customer_names=cust_names) for r in rows]
     try:
         from app.services.estimate_job_workflow_service import enrich_estimates_with_job_numbers
 
-        out = enrich_estimates_with_job_numbers(out)
+        rows = enrich_estimates_with_job_numbers(rows)
     except Exception:
         pass
+    cust_names = _customer_name_by_id()
+    out = [normalize_estimate(r, customer_names=cust_names) for r in rows]
     out.sort(key=lambda r: str(r.get("estimate_number") or ""))
     return out, False
 
@@ -969,6 +1011,7 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     }
     project_fields = _estimate_project_payload(project_name, cols)
     payload.update(project_fields)
+    payload.update(_estimate_json_project_patch(project_name, cols, row_id=row_id))
     payload = {k: v for k, v in payload.items() if v is not None}
     if cols and "customer_name" not in cols:
         payload.pop("customer_name", None)
