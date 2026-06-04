@@ -108,7 +108,7 @@ _TS_WEEK = 70
 _TS_LIST_HANDLE = 24
 _TS_LIST_EXPAND = 32
 _TS_LIST_EMPLOYEE = 220
-_TS_LIST_DAY = 106
+_TS_LIST_DAY = 128
 _TS_LIST_SPACER = 24
 _TS_LIST_TOTAL = 76
 _TS_LIST_OVERTIME = 68
@@ -1442,7 +1442,7 @@ def _render_list_day_hour_stepper(
             '<div class="timekeeping-hour-spinner">',
             unsafe_allow_html=True,
         )
-        inp_col, btns_col = st.columns([3, 1], gap="xxsmall", vertical_alignment="center")
+        inp_col, btns_col = st.columns([90, 32], gap="xxsmall", vertical_alignment="center")
         bump_kwargs = {
             "widget_key": widget_key,
             "step": step,
