@@ -190,34 +190,99 @@ def parse_number_parts(value: str | None) -> tuple[str, str, int] | None:
     return prefix, m.group(1), int(m.group(2))
 
 
+def _strict_quote_job_number(value: str | None) -> str | None:
+    """Return normalized ``QYY###`` / ``JYY###`` when ``value`` matches the current format."""
+    parts = parse_number_parts(value)
+    if not parts:
+        return None
+    prefix, yy, seq = parts
+    return format_number(prefix, date(2000 + int(yy), 1, 1), seq)
+
+
+def _job_row_is_deleted(row: dict[str, Any]) -> bool:
+    if not row:
+        return False
+    if row.get("is_deleted") is True:
+        return True
+    if str(row.get("deleted_at") or "").strip():
+        return True
+    return False
+
+
+def _values_for_shared_max(values: list[str]) -> list[str]:
+    """
+    Quote numbers always count toward the shared max.
+
+    Job numbers count only when a saved estimate already has the paired
+    ``QYY###`` (same YY + sequence). Orphan ``J`` rows without a matching
+    quote — including preview-only linked numbers — are ignored.
+    """
+    quotes: list[str] = []
+    jobs: list[str] = []
+    for raw in values:
+        normalized = _strict_quote_job_number(raw)
+        if not normalized:
+            continue
+        if normalized[0] == "Q":
+            quotes.append(normalized)
+        else:
+            jobs.append(normalized)
+    quote_set = {q.upper() for q in quotes}
+    out = list(quotes)
+    for job_no in jobs:
+        paired_q = job_number_to_quote_number(job_no).upper()
+        if paired_q in quote_set:
+            out.append(job_no)
+    return out
+
+
 def _collect_stored_quote_job_numbers() -> list[str]:
-    values: list[str] = []
+    """Load ``QYY###`` / paired ``JYY###`` from estimates and jobs tables only."""
+    quotes: list[str] = []
+    jobs: list[dict[str, Any]] = []
     try:
         from app.db import fetch_table_admin
     except ImportError:
         from db import fetch_table_admin  # type: ignore
     try:
         for row in fetch_table_admin("estimates", columns="quote_number", limit=10000) or []:
-            val = str(row.get("quote_number") or "").strip()
-            if val:
-                values.append(val)
+            normalized = _strict_quote_job_number(str(row.get("quote_number") or ""))
+            if normalized:
+                quotes.append(normalized)
     except Exception:
         pass
+    job_columns = "job_number,estimate_id,is_deleted,deleted_at"
     try:
-        for row in fetch_table_admin("jobs", columns="job_number", limit=10000) or []:
-            val = str(row.get("job_number") or "").strip()
-            if val:
-                values.append(val)
+        job_rows = fetch_table_admin("jobs", columns=job_columns, limit=10000) or []
     except Exception:
-        pass
+        try:
+            job_rows = fetch_table_admin("jobs", columns="job_number,estimate_id", limit=10000) or []
+        except Exception:
+            job_rows = []
+    for row in job_rows or []:
+        if _job_row_is_deleted(row):
+            continue
+        normalized = _strict_quote_job_number(str(row.get("job_number") or ""))
+        if normalized:
+            jobs.append({"job_number": normalized, "estimate_id": row.get("estimate_id")})
+    quote_set = {q.upper() for q in quotes}
+    values = list(quotes)
+    for row in jobs:
+        job_no = str(row.get("job_number") or "")
+        paired_q = job_number_to_quote_number(job_no).upper()
+        if paired_q in quote_set:
+            values.append(job_no)
     return values
 
 
 def max_sequence_for_year(year: int | date | datetime, *, existing_values: list[str] | None = None) -> int:
-    """Highest 3-digit sequence slot used for ``year`` across quotes and jobs."""
+    """Highest 3-digit sequence slot used for ``year`` across quotes and paired jobs."""
     yy = year_yy(year)
+    raw_values = (
+        existing_values if existing_values is not None else _collect_stored_quote_job_numbers()
+    )
     max_seq = 0
-    for raw in existing_values if existing_values is not None else _collect_stored_quote_job_numbers():
+    for raw in _values_for_shared_max(raw_values):
         parts = parse_number_parts(raw)
         if parts and parts[1] == yy:
             max_seq = max(max_seq, parts[2])
@@ -230,37 +295,14 @@ def peek_next_sequence_number(year: int | date | datetime) -> int:
 
 
 def get_next_sequence_number_for_year(year: int | date | datetime | None = None) -> int:
-    """Atomically allocate the next shared sequence integer for a calendar year."""
-    yy = int(year_yy(year))
-    try:
-        from app.db import get_admin_client
-    except ImportError:
-        from db import get_admin_client  # type: ignore
+    """
+    Return the next shared sequence slot for ``year`` from saved quote/job rows.
 
-    last_exc: Exception | None = None
-    for args in ({"p_year_yy": yy}, {}):
-        try:
-            resp = get_admin_client().rpc(_RPC_NAME, args).execute()
-            return _coerce_sequence_rpc_payload(resp.data)
-        except Exception as exc:
-            last_exc = exc
-            if args:
-                continue
-            break
-
-    if yy == int(datetime.now(timezone.utc).strftime("%y")):
-        for rpc_name in ("ips_next_job_quote_seq",):
-            try:
-                resp = get_admin_client().rpc(rpc_name, {}).execute()
-                return _coerce_sequence_rpc_payload(resp.data)
-            except Exception as exc:
-                last_exc = exc
-
-    raise RuntimeError(
-        f"Could not allocate sequence number for year {yy}. "
-        f"Apply sql/012_ips_shared_sequence.sql (ips_next_yearly_seq with p_year_yy). "
-        f"Last error: {last_exc!r}"
-    ) from last_exc
+    Does not use the ``ips_yearly_sequence`` RPC counter (which can run ahead of
+    real ``estimates.quote_number`` / ``jobs.job_number`` values).
+    """
+    y = year if year is not None else datetime.now(timezone.utc)
+    return peek_next_sequence_number(y)
 
 
 def get_next_sequence_number() -> int:
@@ -276,18 +318,40 @@ def format_job_number(n: int, *, year: int | date | datetime | None = None) -> s
     return format_number("J", year if year is not None else datetime.now(timezone.utc), n)
 
 
+def next_available_job_number(
+    year: int | date | datetime | None = None,
+    *,
+    exclude_job_id: str | None = None,
+) -> str:
+    """Next free ``JYY###`` for ``year`` (paired quotes + in-use check)."""
+    try:
+        from app.db import job_number_in_use
+    except ImportError:
+        from db import job_number_in_use  # type: ignore
+
+    y = year if year is not None else datetime.now(timezone.utc)
+    start = max_sequence_for_year(y) + 1
+    for seq in range(start, 1000):
+        candidate = format_number("J", y, seq)
+        if not job_number_in_use(candidate, exclude_job_id):
+            return candidate
+    yy = year_yy(y)
+    raise ValueError(f"No available job number for year {yy} (sequence exhausted).")
+
+
 def generate_quote_job_number(prefix: str, year: int | date | datetime) -> str:
     """
-    Allocate and return the next shared ``QYY###`` or ``JYY###`` for ``year``.
+    Return the next shared ``QYY###`` or ``JYY###`` for ``year`` from saved rows.
 
-    Uses the same counter for quotes and jobs. Linked jobs should use
-    :func:`quote_number_to_job_number` instead of calling this again.
+    Linked jobs should use :func:`quote_number_to_job_number` instead of calling
+    this again for the same sequence slot.
     """
     p = str(prefix or "").strip().upper()
     if p not in ("Q", "J"):
         raise ValueError("prefix must be 'Q' or 'J'")
-    seq = get_next_sequence_number_for_year(year)
-    return format_number(p, year, seq)
+    if p == "Q":
+        return next_available_quote_number(year)
+    return next_available_job_number(year)
 
 
 def peek_quote_job_number(prefix: str, year: int | date | datetime) -> str:
@@ -378,15 +442,15 @@ def ensure_quote_number_for_save(
 
 
 def next_quote_number_string(*, year: int | date | datetime | None = None) -> str:
-    """Allocate the next quote number string (``QYY###``)."""
+    """Next quote number string (``QYY###``) from saved estimates and jobs."""
     y = year if year is not None else datetime.now(timezone.utc)
-    return generate_quote_job_number("Q", y)
+    return next_available_quote_number(y)
 
 
 def next_job_number_string(*, year: int | date | datetime | None = None) -> str:
-    """Allocate the next job number string (``JYY###``)."""
+    """Next job number string (``JYY###``) from saved estimates and jobs."""
     y = year if year is not None else datetime.now(timezone.utc)
-    return generate_quote_job_number("J", y)
+    return next_available_job_number(y)
 
 
 def quote_number_to_job_number(quote_number: str) -> str:

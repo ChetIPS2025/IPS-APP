@@ -48,29 +48,58 @@ class TestSharedSequenceFormatting(unittest.TestCase):
 
 
 class TestSharedSequenceAllocation(unittest.TestCase):
-    @patch("app.db.get_admin_client")
-    def test_prefers_yearly_rpc(self, mock_client_factory) -> None:
+    def test_next_slot_from_saved_rows_not_rpc(self) -> None:
         from app.services.shared_sequence import get_next_sequence_number_for_year
 
-        mock_client = mock_client_factory.return_value
-        mock_client.rpc.return_value.execute.return_value.data = 210
+        existing = ["Q26072", "J26072", "J26210"]
+        with patch(
+            "app.services.shared_sequence._collect_stored_quote_job_numbers",
+            return_value=existing,
+        ):
+            self.assertEqual(get_next_sequence_number_for_year(2026), 73)
 
-        self.assertEqual(get_next_sequence_number_for_year(2026), 210)
-        mock_client.rpc.assert_called_with("ips_next_yearly_seq", {"p_year_yy": 26})
+
+class TestOrphanJobNumbers(unittest.TestCase):
+    def test_orphan_job_does_not_inflate_max(self) -> None:
+        existing = ["Q26072", "J26210"]
+        self.assertEqual(max_sequence_for_year(2026, existing_values=existing), 72)
+
+    def test_paired_job_counts(self) -> None:
+        existing = ["Q26072", "J26072", "J26210"]
+        self.assertEqual(max_sequence_for_year(2026, existing_values=existing), 72)
+
+    def test_peek_after_q26072(self) -> None:
+        from app.services.shared_sequence import peek_quote_job_number
+
+        existing = ["Q26072", "J26072", "J26210"]
+        with patch(
+            "app.services.shared_sequence._collect_stored_quote_job_numbers",
+            return_value=existing,
+        ):
+            self.assertEqual(peek_quote_job_number("Q", 2026), "Q26073")
 
 
 class TestGenerateQuoteJobNumber(unittest.TestCase):
-    @patch("app.services.shared_sequence.get_next_sequence_number_for_year", return_value=209)
-    def test_generate_quote_number(self, _mock_seq) -> None:
+    @patch("app.services.shared_sequence.next_available_quote_number", return_value="Q26073")
+    def test_generate_quote_number(self, _mock_next) -> None:
         from app.services.shared_sequence import generate_quote_job_number
 
-        self.assertEqual(generate_quote_job_number("Q", 2026), "Q26209")
-        self.assertEqual(generate_quote_job_number("J", 2026), "J26209")
+        self.assertEqual(generate_quote_job_number("Q", 2026), "Q26073")
+
+    @patch("app.services.shared_sequence.next_available_job_number", return_value="J26073")
+    def test_generate_job_number(self, _mock_next) -> None:
+        from app.services.shared_sequence import generate_quote_job_number
+
+        self.assertEqual(generate_quote_job_number("J", 2026), "J26073")
 
 
 class TestNextAvailableQuoteNumber(unittest.TestCase):
-    def test_max_from_quotes_and_jobs(self) -> None:
+    def test_max_from_quotes_and_paired_jobs_only(self) -> None:
         existing = ["Q26208", "J26208", "J26209"]
+        self.assertEqual(max_sequence_for_year(2026, existing_values=existing), 208)
+
+    def test_max_includes_paired_job_slot(self) -> None:
+        existing = ["Q26208", "J26208", "Q26209", "J26209"]
         self.assertEqual(max_sequence_for_year(2026, existing_values=existing), 209)
 
     @patch("app.services.shared_sequence._quote_number_in_use", return_value=False)
@@ -80,7 +109,7 @@ class TestNextAvailableQuoteNumber(unittest.TestCase):
             "app.services.shared_sequence.max_sequence_for_year",
             return_value=max_sequence_for_year(2026, existing_values=existing),
         ):
-            self.assertEqual(next_available_quote_number(2026), "Q26210")
+            self.assertEqual(next_available_quote_number(2026), "Q26209")
 
     @patch("app.services.shared_sequence._quote_number_in_use")
     def test_ensure_keeps_unused_prefill(self, mock_in_use) -> None:

@@ -1156,6 +1156,7 @@ def _show_estimates_detail_modal() -> None:
 
 @st.dialog("New Estimate", width="large")
 def _show_new_estimate_dialog() -> None:
+    clear_new_estimate_number_state()
     if "est_new_est_date" not in st.session_state:
         st.session_state["est_new_est_date"] = date.today()
 
