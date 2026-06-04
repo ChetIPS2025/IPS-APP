@@ -704,7 +704,7 @@ def _render_add_equipment_form(
             pick = st.selectbox("Equipment / Asset", labels, key=k("asset"))
         else:
             pick = None
-            st.info("No assets available.")
+            st.info("No rentable assets available. Mark assets as Rentable on the Assets page.")
         dur_unit = st.selectbox("Duration unit", DURATION_UNITS, key=k("dunit"))
         asset = _sync_asset_pick_state(k, pick, asset_map, dur_unit) if pick else {}
         dur_last = k("last_dunit")

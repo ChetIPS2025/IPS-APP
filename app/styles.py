@@ -2898,6 +2898,19 @@ def inject_assets_module_css() -> None:
   line-height: 1.25;
   word-break: break-word;
 }}
+.ips-asset-rentable-badge {{
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: #ccfbf1;
+  vertical-align: middle;
+}}
 .ips-assets-muted {{
   font-size: 13px;
   color: #64748b;

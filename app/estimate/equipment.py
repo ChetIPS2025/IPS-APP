@@ -7,6 +7,12 @@ from db import fetch_table
 
 from app.estimate.calculations import _D0, _dec, money
 
+try:
+    from app.services.phase2_modules_service import asset_is_rentable
+except ImportError:
+    from services.phase2_modules_service import asset_is_rentable  # type: ignore
+
+
 def _truthy_rental(val) -> bool:
     if val is None:
         return False
@@ -50,7 +56,8 @@ def load_estimate_equipment_from_assets() -> list[dict]:
                 "daily_rate": _safe_rate(a.get("rental_daily_rate")),
                 "weekly_rate": _safe_rate(a.get("rental_weekly_rate")),
                 "monthly_rate": _safe_rate(a.get("rental_monthly_rate")),
-                "is_rental": _truthy_rental(a.get("is_rental")),
+                "is_rental": asset_is_rentable(a),
+                "is_rentable": asset_is_rentable(a),
                 "asset_id": aid,
                 "notes": notes,
                 "manufacturer": str(a.get("manufacturer") or "").strip(),
@@ -85,7 +92,7 @@ def _equipment_matches_search(r: dict, search_q: str) -> bool:
 
 def _format_equipment_picker_label(r: dict, *, duplicate_name: bool) -> str:
     name = r["equipment_item"]
-    rental_badge = " [RENTAL]" if r.get("is_rental") else ""
+    rental_badge = " [RENTAL]" if (r.get("is_rentable") or r.get("is_rental")) else ""
     d, w, m = r["daily_rate"], r["weekly_rate"], r["monthly_rate"]
     rates = f"D {money(d)} · W {money(w)} · M {money(m)}"
     mfg = str(r.get("manufacturer") or "").strip()
@@ -126,7 +133,7 @@ def build_equipment_picker_maps(
     filtered: list[dict] = []
     for r in pricing_rows:
         name = str(r.get("equipment_item") or "").strip()
-        passes_rental = (not rental_only) or bool(r.get("is_rental"))
+        passes_rental = (not rental_only) or bool(r.get("is_rentable") or r.get("is_rental"))
         keep_for_line = name in active_names
         if not passes_rental and not keep_for_line:
             continue

@@ -88,6 +88,7 @@ try:
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.services.phase2_modules_service import asset_is_rentable
     from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
     from app.utils.field_context import (
@@ -180,6 +181,7 @@ except ImportError:
         summary_card_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from services.phase2_modules_service import asset_is_rentable  # type: ignore
     from services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
     from utils.field_context import (  # type: ignore
@@ -287,6 +289,12 @@ def _asset_name(row: dict) -> str:
 
 def _asset_category(row: dict) -> str:
     return str(row.get("category") or "").strip() or "—"
+
+
+def _asset_rentable_badge_html(row: dict) -> str:
+    if not asset_is_rentable(row):
+        return ""
+    return '<span class="ips-asset-rentable-badge" title="Available on estimate equipment">Rentable</span>'
 
 
 def _is_small_tool_asset(row: dict) -> bool:
@@ -569,6 +577,7 @@ def _render_asset_expand_panel(asset: dict) -> None:
         f"{detail_field_html('Category', _asset_category(asset))}"
         f"{detail_field_html('Location', _asset_location(asset))}"
         f'{detail_field_html("Status", status, html_value=status_badge_html(status))}'
+        f"{detail_field_html('Rentable', 'Yes' if asset_is_rentable(asset) else 'No')}"
         f"{detail_field_html('Assigned To', _asset_assigned_to(asset))}"
         f"{detail_field_html('Next Service', _asset_next_service(asset))}"
         f"</div>"
@@ -651,8 +660,9 @@ def _render_custom_assets_table(
                 _render_asset_thumbnail(asset)
 
             with cols[2]:
+                rentable_badge = _asset_rentable_badge_html(asset)
                 st.markdown(
-                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
+                    f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -791,7 +801,7 @@ def _render_equipment_list(
     )
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.1, 1.1, 1.1, 1.1, 0.6])
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -828,6 +838,13 @@ def _render_equipment_list(
                 label_visibility="collapsed",
             )
         with c6:
+            st.selectbox(
+                "Rentable",
+                ["All", "Rentable only", "Not rentable"],
+                key="ast_bar_rentable",
+                label_visibility="collapsed",
+            )
+        with c7:
             if st.button("Clear", key="ast_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
@@ -838,12 +855,14 @@ def _render_equipment_list(
                         "ast_bar_location",
                         "ast_bar_status",
                         "ast_bar_department",
+                        "ast_bar_rentable",
                     ],
                 )
                 st.session_state["ast_bar_category"] = "All Categories"
                 st.session_state["ast_bar_location"] = "All Locations"
                 st.session_state["ast_bar_status"] = "All Statuses"
                 st.session_state["ast_bar_department"] = "All Departments"
+                st.session_state["ast_bar_rentable"] = "All"
                 reset_table_page(_TABLE_KEY)
                 _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
@@ -858,6 +877,7 @@ def _render_equipment_list(
         location=str(st.session_state.get("ast_bar_location") or "All Locations"),
         status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
         department=str(st.session_state.get("ast_bar_department") or "All Departments"),
+        rentable=str(st.session_state.get("ast_bar_rentable") or "All"),
     )
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
@@ -957,6 +977,7 @@ def _apply_assets_bar_filters(
     location: str,
     status: str,
     department: str,
+    rentable: str = "All",
 ) -> list[dict]:
     out = rows
     category_val = str(category or "All Categories").strip()
@@ -971,6 +992,11 @@ def _apply_assets_bar_filters(
     department_val = str(department or "All Departments").strip()
     if department_val and department_val != "All Departments":
         out = [r for r in out if _asset_department(r) == department_val]
+    rentable_val = str(rentable or "All").strip()
+    if rentable_val == "Rentable only":
+        out = [r for r in out if asset_is_rentable(r)]
+    elif rentable_val == "Not rentable":
+        out = [r for r in out if not asset_is_rentable(r)]
     return out
 
 
@@ -982,6 +1008,7 @@ def _filter_rows(
     location: str = "All Locations",
     status: str = "All Statuses",
     department: str = "All Departments",
+    rentable: str = "All",
 ) -> list[dict]:
     out = _apply_assets_search_filter(rows, q)
     out = _apply_assets_bar_filters(
@@ -990,6 +1017,7 @@ def _filter_rows(
         location=location,
         status=status,
         department=department,
+        rentable=rentable,
     )
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
@@ -1262,6 +1290,7 @@ def _seed_asset_edit_form(asset: dict) -> None:
     st.session_state[f"ast_edit_loc_{aid}"] = str(asset.get("location") or "")
     st.session_state[f"ast_edit_serial_{aid}"] = str(asset.get("serial_number") or "")
     st.session_state[f"ast_edit_pg_{aid}"] = bool(asset.get("include_in_pricing_guide"))
+    st.session_state[f"ast_edit_rentable_{aid}"] = asset_is_rentable(asset)
 
 
 def _set_asset_view_mode(asset: dict) -> None:
@@ -1302,6 +1331,11 @@ def _render_asset_edit_form(asset: dict) -> None:
         key=f"ast_edit_pg_{aid}",
         help="Turn off for fleet/shop assets that should stay in Assets only.",
     )
+    st.checkbox(
+        "Rentable (estimate equipment)",
+        key=f"ast_edit_rentable_{aid}",
+        help="When enabled, this asset appears when adding equipment on estimates.",
+    )
 
     st.markdown("**Item Photo**")
     _render_asset_photo_manager(asset)
@@ -1324,6 +1358,7 @@ def _render_asset_edit_form(asset: dict) -> None:
                 "location": st.session_state.get(f"ast_edit_loc_{aid}"),
                 "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
                 "include_in_pricing_guide": bool(st.session_state.get(f"ast_edit_pg_{aid}")),
+                "is_rentable": bool(st.session_state.get(f"ast_edit_rentable_{aid}")),
             },
             row_id=aid,
         )
@@ -1369,6 +1404,10 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                         ("Manufacturer", str(asset.get("manufacturer") or "—")),
                         ("Model", str(asset.get("model") or "—")),
                         ("Serial Number", str(asset.get("serial_number") or "—")),
+                        (
+                            "Rentable",
+                            "Yes" if asset_is_rentable(asset) else "No",
+                        ),
                         ("Description", str(asset.get("description") or "—")),
                     ],
                     html_value_keys=frozenset({"Status"}),
@@ -1633,6 +1672,11 @@ def render() -> None:
             st.text_input("Asset name", key="ast_new_name")
             st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
             st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
+            st.checkbox(
+                "Rentable (estimate equipment)",
+                key="ast_new_rentable",
+                help="When enabled, this asset appears when adding equipment on estimates.",
+            )
             st.file_uploader(
                 "Upload asset image",
                 type=list(ITEM_IMAGE_UPLOAD_TYPES),
@@ -1649,6 +1693,7 @@ def render() -> None:
                         "asset_name": st.session_state.get("ast_new_name"),
                         "category": st.session_state.get("ast_new_cat"),
                         "status": st.session_state.get("ast_new_status"),
+                        "is_rentable": bool(st.session_state.get("ast_new_rentable")),
                     }
                 )
                 if not result.ok:

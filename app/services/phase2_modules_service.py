@@ -492,6 +492,15 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def asset_is_rentable(row: dict[str, Any] | None) -> bool:
+    """True when asset may be used as rental equipment on estimates."""
+    if not row:
+        return False
+    if row.get("is_rentable") is not None:
+        return bool(row.get("is_rentable"))
+    return bool(row.get("is_rental"))
+
+
 def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
     aid = str(row.get("id") or "").strip()
     num = str(row.get("asset_number") or row.get("asset_id") or row.get("tag") or aid[:8])
@@ -529,6 +538,7 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "condition": str(row.get("condition") or "Good"),
         "next_service_due": str(row.get("next_service_due") or row.get("maintenance_due_date") or "")[:10],
         "is_rental": bool(row.get("is_rental")),
+        "is_rentable": asset_is_rentable(row),
         "rental_daily_rate": _money_field(row, "rental_daily_rate", "daily_rate"),
         "rental_weekly_rate": _money_field(row, "rental_weekly_rate", "weekly_rate"),
         "rental_monthly_rate": _money_field(row, "rental_monthly_rate"),
@@ -1152,6 +1162,7 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         "manufacturer": ui.get("manufacturer"),
         "model": ui.get("model"),
         "include_in_pricing_guide": bool(ui.get("include_in_pricing_guide")),
+        "is_rentable": bool(ui.get("is_rentable")),
         "notes": ui.get("description") or ui.get("notes"),
         "current_value": ui.get("value") or ui.get("current_value"),
         "acquired_date": ui.get("acquired_date") or None,

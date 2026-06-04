@@ -6,6 +6,7 @@ from typing import Any
 
 try:
     from app.pages._core._data import load_assets, load_inventory
+    from app.services.phase2_modules_service import asset_is_rentable
     from app.services.repository import fetch_rows
     from app.utils.estimate_calculations import (
         calc_equipment_line,
@@ -15,6 +16,7 @@ try:
     )
 except ImportError:
     from pages._core._data import load_assets, load_inventory  # type: ignore
+    from services.phase2_modules_service import asset_is_rentable  # type: ignore
     from services.repository import fetch_rows  # type: ignore
     from utils.estimate_calculations import (  # type: ignore
         calc_equipment_line,
@@ -204,13 +206,16 @@ def _asset_row_to_option(row: dict[str, Any]) -> dict[str, Any]:
         "rental_daily_rate": rental_daily,
         "rental_weekly_rate": rental_weekly,
         "cost_rate": cost_rate,
+        "is_rentable": asset_is_rentable(row),
     }
 
 
-def get_asset_options_for_estimate() -> list[dict[str, Any]]:
+def get_asset_options_for_estimate(*, rentable_only: bool = True) -> list[dict[str, Any]]:
     seen: dict[str, int] = {}
     out: list[dict[str, Any]] = []
     for row in load_assets():
+        if rentable_only and not asset_is_rentable(row):
+            continue
         opt = _asset_row_to_option(row)
         suffix = opt["category"] if opt["category"] and opt["category"] != "—" else "Equipment"
         label = _dedupe_label(opt["asset_name"], seen, suffix)

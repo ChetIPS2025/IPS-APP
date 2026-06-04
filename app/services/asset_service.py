@@ -189,6 +189,7 @@ def save_asset(
         "notes": clean_text(payload.get("notes")),
         "is_active": bool(payload.get("is_active", True)),
         "is_rental": bool(payload.get("is_rental", False)),
+        "is_rentable": bool(payload.get("is_rentable", payload.get("is_rental", False))),
         "rental_daily_rate": optional_numeric(payload.get("rental_daily_rate")),
         "rental_weekly_rate": optional_numeric(payload.get("rental_weekly_rate")),
         "rental_monthly_rate": optional_numeric(payload.get("rental_monthly_rate")),
