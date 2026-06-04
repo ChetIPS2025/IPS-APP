@@ -2915,7 +2915,7 @@ def inject_assets_module_css() -> None:
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     st.markdown(
         f"""
-<style id="ips-assets-module-v7">
+<style id="ips-assets-module-v8">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3148,6 +3148,35 @@ def inject_assets_module_css() -> None:
   border-radius: 9px !important;
   font-size: 14px !important;
   width: auto !important;
+}}
+.ips-asset-doc-upload-zone-marker + [data-testid="stFileUploader"] {{
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+}}
+.ips-asset-doc-table-head {{
+  display: grid;
+  grid-template-columns: 2.4fr 0.55fr 1fr 0.85fr 0.65fr 0.55fr;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}}
+.ips-asset-doc-name,
+.ips-asset-doc-cell {{
+  margin: 0;
+  font-size: 0.84rem;
+  color: #334155;
+}}
+.ips-asset-doc-name {{
+  font-weight: 600;
 }}
 </style>
 """,

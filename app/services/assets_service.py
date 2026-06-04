@@ -48,6 +48,7 @@ from app.services.phase2_modules_service import (
 
 )
 
+from app.services.asset_document_util import ASSET_DOCUMENTS_BUCKET
 from app.services.repository import ServiceResult, clear_all_data_caches, fetch_rows, insert_row, update_row
 
 
@@ -719,32 +720,51 @@ def upload_asset_image(
 
 
 
-def _normalize_doc_row(row: dict[str, Any]) -> dict[str, Any]:
+def _profile_display_names(profile_ids: set[str]) -> dict[str, str]:
+    if not profile_ids:
+        return {}
+    try:
+        from app.db import fetch_table_admin
+    except ImportError:
+        from db import fetch_table_admin  # type: ignore
+    try:
+        rows = fetch_table_admin("profiles", limit=5000) or []
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for row in rows:
+        pid = str(row.get("id") or "").strip()
+        if pid not in profile_ids:
+            continue
+        out[pid] = (
+            str(row.get("full_name") or row.get("name") or row.get("email") or "").strip() or pid
+        )
+    return out
 
+
+def _normalize_doc_row(row: dict[str, Any], *, profile_names: dict[str, str] | None = None) -> dict[str, Any]:
+    path = str(row.get("file_path") or row.get("storage_path") or "").strip()
+    uid = str(row.get("uploaded_by") or "").strip()
+    names = profile_names or {}
+    fname = str(row.get("file_name") or row.get("original_filename") or row.get("name") or "")
+    ctype = str(row.get("content_type") or "")
     return {
-
         "id": str(row.get("id") or ""),
-
-        "file_name": str(row.get("file_name") or row.get("name") or ""),
-
-        "doc_type": str(row.get("doc_type") or row.get("document_type") or ""),
-
+        "asset_id": str(row.get("asset_id") or ""),
+        "file_name": fname,
+        "doc_type": str(row.get("doc_type") or row.get("document_type") or "Document"),
         "linked_module": str(row.get("linked_module") or ""),
-
         "linked_record_id": str(row.get("linked_record_id") or ""),
-
         "linked_ref": str(row.get("linked_ref") or ""),
-
-        "storage_path": str(row.get("storage_path") or ""),
-
+        "storage_path": path,
+        "file_path": path,
         "file_url": str(row.get("file_url") or row.get("attachment_url") or ""),
-
+        "content_type": ctype,
         "is_restricted": bool(row.get("is_restricted")),
-
-        "uploaded_by": str(row.get("uploaded_by") or ""),
-
+        "uploaded_by": uid,
+        "uploaded_by_name": names.get(uid) or ("—" if not uid else uid[:8]),
         "created_at": str(row.get("created_at") or row.get("upload_date") or "")[:19],
-
+        "notes": str(row.get("notes") or ""),
     }
 
 
@@ -759,7 +779,7 @@ def get_asset_document_view_url(doc: dict[str, Any], *, expires_in: int = 3600) 
 
         return public
 
-    path = str(doc.get("storage_path") or "").strip()
+    path = str(doc.get("storage_path") or doc.get("file_path") or "").strip()
 
     if not path:
 
@@ -775,9 +795,15 @@ def get_asset_document_view_url(doc: dict[str, Any], *, expires_in: int = 3600) 
 
     try:
 
-        signed = create_signed_url(path, expires_in=expires_in)
-
-        return str(signed or "").strip() or None
+        for bucket in (ASSET_DOCUMENTS_BUCKET, None):
+            try:
+                signed = create_signed_url(path, expires_in=expires_in, bucket=bucket)
+                url = str(signed or "").strip()
+                if url:
+                    return url
+            except Exception:
+                continue
+        return None
 
     except Exception:
 
@@ -788,56 +814,43 @@ def get_asset_document_view_url(doc: dict[str, Any], *, expires_in: int = 3600) 
 
 
 def get_asset_documents(asset_id: str, *, include_restricted: bool = False) -> list[dict[str, Any]]:
-
-    """Documents linked to an asset via documents_hub."""
-
+    """Documents linked to an asset via ``asset_documents``."""
     aid = str(asset_id or "").strip()
-
     if not aid:
-
         return []
-
-    asset = get_asset(aid) or {}
-
-    asset_num = str(asset.get("asset_number") or "").strip()
-
-    rows, _ = fetch_rows(_DOCS_TABLE, limit=5000, order_by="upload_date", alt_tables=("documents",))
-
+    try:
+        from app.db import fetch_by_match_admin
+    except ImportError:
+        from db import fetch_by_match_admin  # type: ignore
+    try:
+        rows = fetch_by_match_admin("asset_documents", {"asset_id": aid}, limit=500) or []
+    except Exception:
+        rows = []
+    profile_ids = {
+        str(r.get("uploaded_by") or "").strip()
+        for r in rows
+        if str(r.get("uploaded_by") or "").strip()
+    }
+    names = _profile_display_names(profile_ids)
     out: list[dict[str, Any]] = []
-
     for row in rows:
-
-        mod = str(row.get("linked_module") or "").strip().lower()
-
-        if mod not in {"assets", "asset"}:
-
-            continue
-
-        linked_id = str(row.get("linked_record_id") or "").strip()
-
-        linked_ref = str(row.get("linked_ref") or "").strip()
-
-        if linked_id and linked_id != aid:
-
-            continue
-
-        if not linked_id and linked_ref and asset_num and linked_ref != asset_num:
-
-            continue
-
-        doc = _normalize_doc_row(row)
-
+        doc = _normalize_doc_row(row, profile_names=names)
         if doc["is_restricted"] and not include_restricted:
-
             continue
-
         doc["view_url"] = get_asset_document_view_url(doc)
-
         out.append(doc)
-
     out.sort(key=lambda d: str(d.get("created_at") or ""), reverse=True)
-
     return out
+
+
+def delete_asset_document(doc: dict[str, Any]) -> None:
+    """Delete one asset document row and its storage object."""
+    try:
+        from app.services.asset_document_util import delete_asset_document_record
+    except ImportError:
+        from services.asset_document_util import delete_asset_document_record  # type: ignore
+    delete_asset_document_record(doc)
+    clear_assets_cache()
 
 
 

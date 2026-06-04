@@ -23,6 +23,7 @@ try:
         render_asset_pricing_guide_actions,
         render_asset_pricing_guide_confirm_panel,
     )
+    from app.components.asset_documents_tab import asset_documents_count, render_asset_documents_tab
     from app.components.item_photo_manager import render_item_photo_manager
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -75,8 +76,6 @@ try:
     from app.services.assets_service import (
         clear_assets_cache,
         generate_asset_qr_value,
-        get_asset_document_view_url,
-        get_asset_documents,
         rebuild_asset_qr,
         get_asset_image_url,
         get_asset_inspections,
@@ -122,6 +121,7 @@ except ImportError:
         render_asset_pricing_guide_actions,
         render_asset_pricing_guide_confirm_panel,
     )
+    from components.asset_documents_tab import asset_documents_count, render_asset_documents_tab  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -174,8 +174,6 @@ except ImportError:
     from services.assets_service import (  # type: ignore
         clear_assets_cache,
         generate_asset_qr_value,
-        get_asset_document_view_url,
-        get_asset_documents,
         get_asset_image_url,
         get_asset_inspections,
         get_asset_issues,
@@ -1314,7 +1312,6 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
 
 
 def _render_asset_documents_tab(asset: dict) -> None:
-    aid = str(asset.get("id") or "")
     try:
         from app.auth import current_role, is_authenticated
     except ImportError:
@@ -1324,23 +1321,12 @@ def _render_asset_documents_tab(asset: dict) -> None:
         "supervisor",
         "manager",
     }
-    docs = get_asset_documents(aid, include_restricted=include_restricted)
-    if not docs:
-        placeholder_html("No documents attached to this asset.")
-        return
-    for doc in docs:
-        fname = str(doc.get("file_name") or "Document")
-        dtype = str(doc.get("doc_type") or "Document")
-        view_url = doc.get("view_url") or get_asset_document_view_url(doc)
-        label = f"{dtype} — {fname}" if dtype else fname
-        key = f"ast_doc_tab_{doc.get('id') or fname}"
-        if doc.get("is_restricted") and not include_restricted:
-            st.caption(f"Restricted: {html.escape(fname)}")
-            continue
-        if view_url:
-            st.link_button(f"View {label}", view_url, use_container_width=True, key=key)
-        else:
-            st.caption(f"{label} (no preview URL)")
+    rk = record_session_key(asset, "id", "asset_number")
+    render_asset_documents_tab(
+        asset,
+        key_prefix=f"ast_doc_{rk}",
+        include_restricted=include_restricted,
+    )
 
 
 def _render_asset_maintenance_tab(asset: dict) -> None:
@@ -1681,6 +1667,12 @@ def _render_asset_detail_tabs(asset: dict) -> None:
     asset_name = safe_value(asset.get("asset_name"))
     status = safe_value(asset.get("status"))
 
+    aid = str(asset.get("id") or "")
+    doc_count = asset_documents_count(aid) if aid else 0
+    tab_labels = [
+        f"Documents ({doc_count})" if name == "Documents" and doc_count else name
+        for name in _ASSET_TABS
+    ]
     (
         tab_overview,
         tab_kit,
@@ -1690,7 +1682,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         tab_depreciation,
         tab_notes,
         tab_activity,
-    ) = st.tabs(_ASSET_TABS)
+    ) = st.tabs(tab_labels)
 
     with tab_overview:
         c1, c2 = st.columns([1.2, 1])
