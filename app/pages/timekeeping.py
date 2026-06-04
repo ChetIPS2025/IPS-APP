@@ -108,7 +108,7 @@ _TS_WEEK = 70
 _TS_LIST_HANDLE = 24
 _TS_LIST_EXPAND = 32
 _TS_LIST_EMPLOYEE = 220
-_TS_LIST_DAY = 128
+_TS_LIST_DAY = 110
 _TS_LIST_SPACER = 24
 _TS_LIST_TOTAL = 76
 _TS_LIST_OVERTIME = 68
@@ -1441,7 +1441,7 @@ def _render_list_day_hour_stepper(
             f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        inp_col, btns_col = st.columns([90, 32], gap="xxsmall", vertical_alignment="center")
+        inp_col, btns_col = st.columns([76, 26], gap="xxsmall", vertical_alignment="center")
         bump_kwargs = {
             "widget_key": widget_key,
             "step": step,
@@ -1473,7 +1473,7 @@ def _render_list_day_hour_stepper(
             st.button(
                 "▲",
                 key=up_key,
-                use_container_width=True,
+                use_container_width=False,
                 help=f"Increase {day_label} hours",
                 on_click=_bump_streamlit_hours,
                 kwargs={**bump_kwargs, "direction": 1},
@@ -1481,7 +1481,7 @@ def _render_list_day_hour_stepper(
             st.button(
                 "▼",
                 key=down_key,
-                use_container_width=True,
+                use_container_width=False,
                 help=f"Decrease {day_label} hours",
                 on_click=_bump_streamlit_hours,
                 kwargs={**bump_kwargs, "direction": -1},
@@ -2613,11 +2613,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                         with row_cols[0]:
                             st.markdown(
                                 '<span class="timekeeping-allocation-control-row-marker '
-                                'timekeeping-allocation-row-marker" aria-hidden="true"></span>',
-                                unsafe_allow_html=True,
-                            )
-                            st.markdown(
-                                '<span class="timekeeping-allocation-assignment-marker" aria-hidden="true"></span>',
+                                'timekeeping-allocation-assignment-marker" aria-hidden="true"></span>',
                                 unsafe_allow_html=True,
                             )
                             if row_editable:
