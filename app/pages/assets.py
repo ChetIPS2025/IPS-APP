@@ -976,7 +976,6 @@ def _render_equipment_list(
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    build_modal_cache(filtered, cache_key=_ASSETS_CACHE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
@@ -1126,10 +1125,25 @@ def _clear_assets_detail_modal() -> None:
     )
 
 
+def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
+    """Keep modal lookup working for Small Tools and other non-equipment rows."""
+    aid = str(asset_id or "").strip()
+    if not aid or not isinstance(asset, dict):
+        return
+    cache = st.session_state.get(_ASSETS_CACHE_KEY)
+    if not isinstance(cache, dict):
+        cache = {}
+    else:
+        cache = dict(cache)
+    cache[aid] = asset
+    st.session_state[_ASSETS_CACHE_KEY] = cache
+
+
 def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:
     aid = str(asset_id or "").strip()
     if not aid:
         return
+    _put_asset_in_modal_cache(aid, asset)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
     open_record_modal(

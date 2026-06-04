@@ -2465,7 +2465,7 @@ def _render_list_allocation_detail(
         '<span class="timekeeping-allocation-actions-footer-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    if week_status in ("Draft", "Rejected", "Pending") and st.button(
+    if week_status in ("Draft", "Rejected") and st.button(
         "Submit all for approval",
         key=f"tk_submit_alloc_{record_key}",
     ):
@@ -2473,6 +2473,33 @@ def _render_list_allocation_detail(
             emp, week_start_d
         ):
             st.rerun()
+    if week_status == "Pending" and can_approve:
+        reject_notes = st.text_input(
+            "Rejection notes (optional)",
+            key=f"tk_list_reject_notes_{record_key}",
+            placeholder="Rejection notes (optional)",
+            label_visibility="collapsed",
+        )
+        approve_col, reject_col = st.columns(2)
+        with approve_col:
+            if st.button(
+                "Approve time",
+                key=f"tk_approve_week_{record_key}",
+                type="primary",
+                use_container_width=True,
+            ):
+                if _approve_timekeeping_week(emp, week_start_d):
+                    st.rerun()
+        with reject_col:
+            if st.button(
+                "Reject",
+                key=f"tk_reject_week_{record_key}",
+                use_container_width=True,
+            ):
+                if _reject_timekeeping_week(emp, week_start_d, reject_notes):
+                    st.rerun()
+    elif week_status == "Pending":
+        st.caption("This timecard is pending approval.")
     st.caption(
         "Totals in the row above are the source of truth. Choose S/T or O/T on each row, then save. "
         "Unallocated time is saved to — No assignment — automatically."

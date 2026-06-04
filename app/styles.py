@@ -3405,7 +3405,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v86">
+<style id="ips-timekeeping-module-v87">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6396,31 +6396,6 @@ def inject_timekeeping_module_css() -> None:
   font-weight: 600 !important;
   white-space: nowrap !important;
 }}
-.timekeeping-alloc-hours-meta {{
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 2px !important;
-  margin-top: 4px !important;
-  width: 100% !important;
-}}
-.timekeeping-alloc-meta-row {{
-  display: block !important;
-  font-size: 0.68rem !important;
-  line-height: 1.25 !important;
-  color: #64748b !important;
-  white-space: nowrap !important;
-}}
-.timekeeping-alloc-meta-label {{
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.03em !important;
-  color: #667085 !important;
-}}
-.timekeeping-alloc-meta-value {{
-  font-weight: 600 !important;
-  color: #334155 !important;
-  text-transform: uppercase !important;
-}}
 .timekeeping-allocation-header-row {{
   display: grid !important;
   grid-template-columns: {tk_alloc_grid_cols} !important;
@@ -6900,7 +6875,7 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100% !important;
   margin: 0 !important;
   box-sizing: border-box !important;
-  min-height: 72px !important;
+  min-height: 58px !important;
   height: auto !important;
   max-height: none !important;
   padding: 0 !important;

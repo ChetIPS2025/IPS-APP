@@ -315,7 +315,6 @@ def render_allocation_control_row(
     ctx: DayAllocationCardContext,
     line: dict[str, Any],
     lix: int,
-    remaining: float,
     normalize_timecard_status: Callable[[object], str],
 ) -> None:
     """Single allocation line: one st.columns grid inside a dedicated row container."""
@@ -409,32 +408,11 @@ def render_allocation_control_row(
                     unsafe_allow_html=True,
                 )
         with row_cols[2]:
-            st.markdown(
-                '<span class="timekeeping-allocation-hours-marker '
-                'timekeeping-allocation-remaining-marker '
-                'timekeeping-allocation-status-field-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
             line["hours"] = _render_allocation_hours_input(
                 value=float(line.get("hours") or 0),
                 widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
                 disabled=not row_editable,
                 deps=deps,
-            )
-            st.markdown(
-                f'<div class="timekeeping-alloc-hours-meta">'
-                f'<div class="timekeeping-alloc-meta-row">'
-                f'<span class="timekeeping-alloc-meta-label">Remaining</span> '
-                f'<span class="timekeeping-alloc-meta-value">'
-                f"{html.escape(deps.fmt_day_hours(remaining))}</span>"
-                f"</div>"
-                f'<div class="timekeeping-alloc-meta-row">'
-                f'<span class="timekeeping-alloc-meta-label">Status</span> '
-                f'<span class="timekeeping-alloc-meta-value">'
-                f"{html.escape(day_status)}</span>"
-                f"</div>"
-                f"</div>",
-                unsafe_allow_html=True,
             )
         with row_cols[3]:
             if row_editable:
@@ -533,7 +511,6 @@ def render_day_allocation_card(
                     ctx=ctx,
                     line=line,
                     lix=lix,
-                    remaining=ctx.remaining,
                     normalize_timecard_status=normalize_timecard_status,
                 )
         with rail_col:
