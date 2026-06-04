@@ -3265,7 +3265,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v61">
+<style id="ips-timekeeping-module-v62">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -4749,8 +4749,8 @@ def inject_timekeeping_module_css() -> None:
   box-sizing: border-box !important;
 }}
 {tk_list_sun_col} [class*="st-key-tk_list_hour_spin_"] {{
-  width: 80px !important;
-  max-width: 80px !important;
+  width: 96px !important;
+  max-width: 96px !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }}
@@ -5237,21 +5237,21 @@ def inject_timekeeping_module_css() -> None:
   display: none !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] {{
-  width: 80px !important;
-  max-width: 80px !important;
-  min-width: 80px !important;
+  width: 96px !important;
+  max-width: 96px !important;
+  min-width: 96px !important;
   margin: 0 auto !important;
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] {{
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 20px !important;
-  width: 80px !important;
-  max-width: 80px !important;
-  min-width: 80px !important;
+  grid-template-columns: minmax(68px, 1fr) 22px !important;
+  width: 96px !important;
+  max-width: 96px !important;
+  min-width: 96px !important;
   height: 36px !important;
   border: 1px solid #d8dee8 !important;
   border-radius: 8px !important;
@@ -5275,7 +5275,7 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 !important;
   grid-column: 1 !important;
   align-self: stretch !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] > div {{
   border: none !important;
@@ -5287,27 +5287,27 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100% !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
+  justify-content: center !important;
   padding: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input {{
   box-sizing: border-box !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  text-align: left !important;
+  text-align: center !important;
   border: none !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   font-weight: 700 !important;
-  padding: 0 4px 0 8px !important;
+  padding: 0 6px !important;
   min-height: 36px !important;
   height: 36px !important;
   background: #ffffff !important;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input::-webkit-outer-spin-button,
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stNumberInput"] input::-webkit-inner-spin-button {{
@@ -5321,10 +5321,10 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
   padding: 0 !important;
   margin: 0 !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  width: 20px !important;
-  flex: 0 0 20px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
+  width: 22px !important;
+  flex: 0 0 22px !important;
   grid-column: 2 !important;
   grid-row: 1 !important;
   align-self: stretch !important;
@@ -5335,21 +5335,21 @@ def inject_timekeeping_module_css() -> None:
   flex-direction: column !important;
   height: 36px !important;
   gap: 0 !important;
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stButton"] {{
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
   margin: 0 !important;
   flex: 1 1 50% !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stButton"] button {{
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
   height: 18px !important;
   min-height: 18px !important;
   padding: 0 !important;
@@ -5372,13 +5372,13 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   padding: 0 !important;
   margin: 0 !important;
-  min-width: 0 !important;
-  max-width: calc(80px - 20px) !important;
+  min-width: 68px !important;
+  max-width: calc(96px - 22px) !important;
   width: auto !important;
   flex: 1 1 0 !important;
   grid-column: 1 !important;
   grid-row: 1 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] {{
   min-width: 0;

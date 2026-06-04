@@ -1441,7 +1441,7 @@ def _render_list_day_hour_stepper(
             '<div class="timekeeping-hour-spinner">',
             unsafe_allow_html=True,
         )
-        btns_col, inp_col = st.columns([1, 1], gap="xxsmall", vertical_alignment="center")
+        inp_col, btns_col = st.columns([3, 1], gap="xxsmall", vertical_alignment="center")
         bump_kwargs = {
             "widget_key": widget_key,
             "step": step,
@@ -1449,6 +1449,22 @@ def _render_list_day_hour_stepper(
             "max_value": 24.0,
             "decimals": 1,
         }
+        with inp_col:
+            st.markdown(
+                '<span class="timekeeping-hour-input-marker timekeeping-list-daily-hour-marker" '
+                'aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            hours = st.number_input(
+                f"{day_label} hours",
+                value=float(value),
+                key=widget_key,
+                label_visibility="collapsed",
+                step=step,
+                min_value=0.0,
+                max_value=24.0,
+                format="%.1f",
+            )
         with btns_col:
             st.markdown(
                 '<span class="timekeeping-spinner-buttons-marker" aria-hidden="true"></span>',
@@ -1469,22 +1485,6 @@ def _render_list_day_hour_stepper(
                 help=f"Decrease {day_label} hours",
                 on_click=_bump_streamlit_hours,
                 kwargs={**bump_kwargs, "direction": -1},
-            )
-        with inp_col:
-            st.markdown(
-                '<span class="timekeeping-hour-input-marker timekeeping-list-daily-hour-marker" '
-                'aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            hours = st.number_input(
-                f"{day_label} hours",
-                value=float(value),
-                key=widget_key,
-                label_visibility="collapsed",
-                step=step,
-                min_value=0.0,
-                max_value=24.0,
-                format="%.1f",
             )
     return max(0.0, float(hours))
 
