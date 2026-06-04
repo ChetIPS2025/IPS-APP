@@ -594,27 +594,14 @@ def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
 
 
 def job_options_for_timekeeping() -> list[str]:
-    special_jobs = ("Shop", "Administrative", "Vacation")
-    jobs = load_jobs()
-    opts = ["— Select assignment —"]
-    seen = {opts[0].casefold()}
-    for j in jobs:
-        num = str(j.get("job_number") or "")
-        name = str(j.get("job_name") or "")
-        if num:
-            label = f"{num} — {name}"
-            key = label.casefold()
-            if key not in seen:
-                opts.append(label)
-                seen.add(key)
-    for label in special_jobs:
-        key = label.casefold()
-        if key not in seen:
-            opts.append(label)
-            seen.add(key)
-    if len(opts) == 1:
-        opts.append("J26047 — Maintenance Shop Bathroom Remodel")
-    return opts
+    try:
+        from app.pages.timekeeping import _assignment_options_for_timekeeping
+
+        return _assignment_options_for_timekeeping()
+    except ImportError:
+        from pages.timekeeping import _assignment_options_for_timekeeping  # type: ignore
+
+        return _assignment_options_for_timekeeping()
 
 
 def load_tasks() -> list[dict[str, Any]]:

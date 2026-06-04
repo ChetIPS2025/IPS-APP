@@ -157,8 +157,8 @@ _DAY_GRID_LABELS = [
 _LIST_VIEW_HOUR_STEP = 0.5
 _LIST_VIEW_SUMMARY_LABELS = ("Total Hours", "Overtime", "Billed Hours", "Status")
 _ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
-_ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
-_ALLOC_LINE_COLS_PRIMARY = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 1.75]
+_ALLOC_LINE_COLS = [2.15, 0.72, 0.72, 0.58, 0.65, 1.0, 0.38]
+_ALLOC_LINE_COLS_PRIMARY = [2.15, 0.72, 0.72, 0.58, 0.65, 1.0, 1.75]
 _ALLOC_LINE_LABELS = ("Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions")
 _ALLOC_TOLERANCE = 0.01
 _ASSIGNMENT_LEGACY_ALIASES = {
@@ -185,8 +185,58 @@ def _subjob_assignment_label(task: dict[str, Any], *, job_label: str) -> str:
     return f"{job_label} · {suffix}"
 
 
+_ASSIGNMENT_EXCLUDED_JOB_STATUSES = frozenset(
+    {"Deleted", "Archived", "Completed", "Closed", "Cancelled"}
+)
+
+
+def _normalize_assignable_job_status(raw: object) -> str:
+    s = str(raw or "").strip().lower().replace("_", " ")
+    mapping = {
+        "": "Draft",
+        "draft": "Draft",
+        "planning": "Planning",
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "awarded": "Awarded",
+        "on hold": "On Hold",
+        "completed": "Completed",
+        "closed": "Closed",
+        "cancelled": "Cancelled",
+        "canceled": "Cancelled",
+        "archived": "Archived",
+        "deleted": "Deleted",
+        "estimate pending": "Estimate Pending",
+    }
+    if s in mapping:
+        return mapping[s]
+    label = str(raw or "").strip()
+    return label if label else "Draft"
+
+
+def _job_row_assignable_for_timekeeping(job: dict[str, Any]) -> bool:
+    """Match Jobs list Active view: real rows only, not deleted/archived/closed-out."""
+    if bool(job.get("is_deleted")):
+        return False
+    status = _normalize_assignable_job_status(job.get("status"))
+    if status in _ASSIGNMENT_EXCLUDED_JOB_STATUSES:
+        return False
+    num = str(job.get("job_number") or "").strip()
+    if not num or num in {"—", "-"}:
+        return False
+    return True
+
+
+def _job_assignment_label(job: dict[str, Any]) -> str:
+    num = str(job.get("job_number") or "").strip()
+    name = str(job.get("job_name") or job.get("name") or "").strip()
+    if num and name:
+        return f"{num} — {name}"
+    return num or name
+
+
 def _assignment_options_for_timekeeping() -> list[str]:
-    """Jobs, linked subjobs, Shop, and Administrative choices for daily allocation."""
+    """Assignable jobs from the jobs table, their subjobs, Shop, and Administrative."""
     try:
         from app.services.tasks_service import get_tasks_by_job
     except ImportError:
@@ -206,23 +256,43 @@ def _assignment_options_for_timekeeping() -> list[str]:
         seen.add(key)
 
     for job in load_jobs():
-        num = str(job.get("job_number") or "").strip()
-        name = str(job.get("job_name") or job.get("name") or "").strip()
-        if not num and not name:
+        if not _job_row_assignable_for_timekeeping(job):
             continue
-        job_label = f"{num} — {name}" if num else name
+        job_label = _job_assignment_label(job)
+        if not job_label:
+            continue
         _add(job_label)
         jid = str(job.get("id") or "").strip()
         if jid:
             for task in get_tasks_by_job(jid, include_closed=True):
                 _add(_subjob_assignment_label(task, job_label=job_label))
 
-    for special in ("Shop", "Administrative", "Vacation"):
+    for special in ("Shop", "Administrative"):
         _add(special)
 
-    if len(opts) == 1:
-        _add("J26047 — Maintenance Shop Bathroom Remodel")
     return opts
+
+
+def _coerce_assignment_label(saved: str, job_opts: list[str]) -> str:
+    """Map stale/invalid saved labels to a valid dropdown option."""
+    normalized = _normalize_assignment_label(saved)
+    if normalized in job_opts:
+        return normalized
+    raw = str(saved or "").strip()
+    if raw in job_opts:
+        return raw
+    for opt in job_opts:
+        if opt.casefold() == raw.casefold():
+            return opt
+    return job_opts[0] if job_opts else "— No assignment —"
+
+
+def _sync_assignment_job_widget(job_key: str, job_opts: list[str], saved: str) -> str:
+    """Keep assignment select state on allowed options only (before widget render)."""
+    coerced = _coerce_assignment_label(saved, job_opts)
+    if job_key in st.session_state and st.session_state[job_key] not in job_opts:
+        st.session_state[job_key] = coerced
+    return coerced
 
 
 def _assignment_option_index(options: list[str], saved: str) -> int:
@@ -1002,7 +1072,8 @@ def _allocation_lines_to_persist_grid(
             hrs = _line_allocated_hours(line)
             if hrs <= 0:
                 continue
-            job_label = str(line.get("job") or no_job)
+            job_label = _coerce_assignment_label(str(line.get("job") or no_job), job_opts)
+            line["job"] = job_label
             merge_key = (iso, job_label)
             bucket = merged.get(merge_key)
             if not bucket:
@@ -1701,7 +1772,12 @@ def _render_weekly_timesheet_day_cell(
         unsafe_allow_html=True,
     )
     if editable:
-        cur_job = str(day_row.get("job") or (job_opts[0] if job_opts else "— No assignment —"))
+        job_key = f"tk_job_{emp_id}_{week_sig}_{day_ix}"
+        cur_job = _sync_assignment_job_widget(
+            job_key,
+            job_opts,
+            str(day_row.get("job") or (job_opts[0] if job_opts else "— No assignment —")),
+        )
         job_ix = _assignment_option_index(job_opts, cur_job)
         st.markdown(
             '<span class="weekly-timesheet-job-marker weekly-timesheet-job-select job-select" aria-hidden="true"></span>',
@@ -1711,7 +1787,7 @@ def _render_weekly_timesheet_day_cell(
             "Assignment",
             job_opts,
             index=job_ix,
-            key=f"tk_job_{emp_id}_{week_sig}_{day_ix}",
+            key=job_key,
             label_visibility="collapsed",
         )
         hrs = _render_weekly_compact_hrs_control(
@@ -2068,7 +2144,12 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 f'{marker_cls}" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            cur_job = str(live_row.get("job") or row.get("job") or job_opts[0])
+            job_key = f"tk_job_{eid}_{week_sig}_{i}"
+            cur_job = _sync_assignment_job_widget(
+                job_key,
+                job_opts,
+                str(live_row.get("job") or row.get("job") or job_opts[0]),
+            )
             idx = _assignment_option_index(job_opts, cur_job)
             grid[i]["job"] = st.selectbox(
                 "Assignment",
@@ -2485,20 +2566,25 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             if daily_total <= 0:
                 st.caption("Enter hours for this day in the row above before assigning.")
             else:
-                running_allocated = 0.0
                 for lix, line in enumerate(lines):
                     day_status = _normalize_timecard_status(line.get("status"))
                     row_editable = not week_locked and _day_is_editable(day_status)
-                    live_job = str(line.get("job") or job_opts[0])
                     job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
+                    live_job = _sync_assignment_job_widget(
+                        job_key,
+                        job_opts,
+                        str(line.get("job") or job_opts[0]),
+                    )
                     if job_key in st.session_state:
-                        live_job = str(st.session_state[job_key])
+                        live_job = _coerce_assignment_label(
+                            str(st.session_state[job_key]),
+                            job_opts,
+                        )
                     hour_type = _normalize_alloc_hour_type(line.get("hour_type"))
                     type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
                     _ensure_alloc_type_widget_label(type_key, hour_type)
                     if type_key in st.session_state:
                         hour_type = _normalize_alloc_hour_type(st.session_state[type_key])
-                    row_remaining = max(0.0, round(daily_total - running_allocated, 2))
                     is_primary_row = lix == 0
 
                     with st.container(key=f"tk_alloc_row_{eid}_{week_sig}_{iso}_{lix}"):
@@ -2537,7 +2623,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                             else:
                                 st.markdown(
                                     f'<div class="timekeeping-alloc-cell">'
-                                    f"{html.escape(str(line.get('job') or '—'))}</div>",
+                                    f"{html.escape(_coerce_assignment_label(str(line.get('job') or '—'), job_opts))}</div>",
                                     unsafe_allow_html=True,
                                 )
                         with row_cols[1]:
@@ -2571,7 +2657,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                         with row_cols[3]:
                             st.markdown(
                                 f'<div class="timekeeping-alloc-remaining-cell">'
-                                f"{html.escape(_fmt_day_hours(row_remaining))}</div>",
+                                f"{html.escape(_fmt_day_hours(remaining))}</div>",
                                 unsafe_allow_html=True,
                             )
                         with row_cols[4]:
@@ -2668,7 +2754,6 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                             if action_taken:
                                 st.rerun()
 
-                    running_allocated += _line_allocated_hours(line)
             line["hour_type"] = _normalize_alloc_hour_type(line.get("hour_type"))
 
         if day_ix < len(grid) and lines:
