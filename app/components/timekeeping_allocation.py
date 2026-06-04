@@ -101,7 +101,7 @@ def render_allocation_panel_intro() -> None:
     st.markdown(
         '<div class="timekeeping-alloc-intro">'
         "<strong>Daily hours are entered in the employee row above.</strong> "
-        "Split each day&rsquo;s total across jobs, subjobs, Shop, or Administrative, "
+        "Split each day&rsquo;s total across jobs, subjobs, Shop, Administrative, or Vacation, "
         "and mark each row as <strong>S/T</strong> (straight time) or <strong>O/T</strong> (overtime)."
         "</div>",
         unsafe_allow_html=True,

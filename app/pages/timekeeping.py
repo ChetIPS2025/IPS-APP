@@ -247,7 +247,7 @@ def _job_assignment_label(job: dict[str, Any]) -> str:
 
 
 def _assignment_options_for_timekeeping() -> list[str]:
-    """Assignable jobs from the jobs table, their subjobs, Shop, and Administrative."""
+    """Assignable jobs from the jobs table, their subjobs, Shop, Administrative, and Vacation."""
     try:
         from app.services.tasks_service import get_tasks_by_job
     except ImportError:
@@ -278,7 +278,7 @@ def _assignment_options_for_timekeeping() -> list[str]:
             for task in get_tasks_by_job(jid, include_closed=True):
                 _add(_subjob_assignment_label(task, job_label=job_label))
 
-    for special in ("Shop", "Administrative"):
+    for special in ("Shop", "Administrative", "Vacation"):
         _add(special)
 
     return opts
@@ -807,7 +807,7 @@ def _allocated_st_ot_sum(lines: list[dict[str, Any]]) -> tuple[float, float]:
 
 
 def _allocation_line_has_valid_assignment(line: dict[str, Any]) -> bool:
-    """True when hours are tied to a job, subjob, Shop, or Administrative."""
+    """True when hours are tied to a job, subjob, Shop, Administrative, or Vacation."""
     return _day_has_job({"job": line.get("job")})
 
 
