@@ -326,6 +326,75 @@ def convert_asset_to_kit(asset_id: str, kit_type: str | None = None) -> ServiceR
     return result
 
 
+def _kit_serial_taken(parent_asset_id: str, serial: str, *, exclude_item_id: str | None = None) -> bool:
+    sn = str(serial or "").strip().lower()
+    if not sn:
+        return False
+    for it in get_asset_kit_items(parent_asset_id):
+        if exclude_item_id and str(it.get("id") or "") == exclude_item_id:
+            continue
+        if str(it.get("serial_number") or "").strip().lower() == sn:
+            return True
+    return False
+
+
+def create_asset_kit_items_multi(parent_asset_id: str, data: dict[str, Any]) -> ServiceResult:
+    """
+    Create one or more kit item rows. When quantity > 1, creates one row per physical unit
+    (qty 1 each) with a distinct serial number per unit.
+    """
+    pid = str(parent_asset_id or "").strip()
+    if not pid:
+        return ServiceResult(ok=False, error="Missing parent asset id.")
+    qty = int(max(1, round(_f(data.get("quantity_expected") or data.get("quantity") or 1))))
+    serials_raw = data.get("unit_serials")
+    if isinstance(serials_raw, list) and (qty > 1 or len(serials_raw) > 0):
+        serials = [str(s or "").strip() for s in serials_raw]
+    else:
+        serials = [str(data.get("serial_number") or "").strip()]
+
+    if qty > 1:
+        if len(serials) != qty:
+            return ServiceResult(
+                ok=False,
+                error=f"Enter a serial number for each of the {qty} units.",
+            )
+        for idx, serial in enumerate(serials, start=1):
+            if not serial:
+                return ServiceResult(ok=False, error=f"Serial number is required for unit {idx}.")
+        lowered = [s.lower() for s in serials]
+        if len(set(lowered)) != len(lowered):
+            return ServiceResult(ok=False, error="Serial numbers must be unique for each unit.")
+        for serial in serials:
+            if _kit_serial_taken(pid, serial):
+                return ServiceResult(
+                    ok=False,
+                    error=f"Serial {serial!r} is already on this kit.",
+                )
+        created: list[Any] = []
+        for serial in serials:
+            unit_data = {
+                **data,
+                "quantity_expected": 1.0,
+                "quantity_actual": 1.0,
+                "quantity": 1.0,
+                "serial_number": serial,
+            }
+            unit_data.pop("unit_serials", None)
+            result = create_asset_kit_item(pid, unit_data)
+            if not result.ok:
+                return result
+            created.append(result.data)
+        return ServiceResult(ok=True, data={"created": created, "count": len(created)})
+
+    serial = serials[0] if serials else str(data.get("serial_number") or "").strip()
+    if serial and _kit_serial_taken(pid, serial):
+        return ServiceResult(ok=False, error=f"Serial {serial!r} is already on this kit.")
+    single = {**data, "quantity_expected": float(qty), "quantity_actual": float(qty), "serial_number": serial}
+    single.pop("unit_serials", None)
+    return create_asset_kit_item(pid, single)
+
+
 def create_asset_kit_item(parent_asset_id: str, data: dict[str, Any]) -> ServiceResult:
     pid = str(parent_asset_id or "").strip()
     if not pid:
@@ -411,6 +480,9 @@ def update_asset_kit_item(item_id: str, data: dict[str, Any]) -> ServiceResult:
         "notes": str(data.get("notes") or existing.get("notes") or ""),
         "updated_at": _now_iso(),
     }
+    serial = str(payload.get("serial_number") or "").strip()
+    if serial and pid and _kit_serial_taken(pid, serial, exclude_item_id=iid):
+        return ServiceResult(ok=False, error=f"Serial {serial!r} is already on this kit.")
     prev_status = str(existing.get("status") or "")
     result = update_row(_KIT_ITEMS, payload, {"id": iid})
     if result.ok and pid:

@@ -23,6 +23,7 @@ try:
         convert_asset_to_kit,
         create_asset_kit_audit,
         create_asset_kit_item,
+        create_asset_kit_items_multi,
         delete_asset_kit_item,
         get_asset_kit_audits,
         get_asset_kit_items,
@@ -48,6 +49,7 @@ except ImportError:
         convert_asset_to_kit,
         create_asset_kit_audit,
         create_asset_kit_item,
+        create_asset_kit_items_multi,
         delete_asset_kit_item,
         get_asset_kit_audits,
         get_asset_kit_items,
@@ -76,6 +78,20 @@ _KIT_STATUS_CLASS = {
 
 def _sk(aid: str, suffix: str) -> str:
     return f"kit_{suffix}_{aid}"
+
+
+def _kit_item_row_label(item: dict[str, Any], items: list[dict[str, Any]]) -> str:
+    """Disambiguate duplicate item names when multiple units exist."""
+    name = str(item.get("item_name") or "—").strip() or "—"
+    serial = str(item.get("serial_number") or "").strip()
+    same_name = [i for i in items if str(i.get("item_name") or "").strip() == name]
+    if len(same_name) <= 1:
+        return name
+    if serial:
+        return name
+    ordered = sorted(same_name, key=lambda r: str(r.get("id") or ""))
+    unit_no = ordered.index(item) + 1 if item in ordered else 1
+    return f"{name} (#{unit_no})"
 
 
 def kit_item_status_pill_html(status: str) -> str:
@@ -330,13 +346,14 @@ def _print_checklist_text(asset: dict, items: list[dict]) -> str:
         f"KIT CHECKLIST — {asset.get('asset_name') or ''} ({asset.get('asset_number') or ''})",
         f"Supervisor: {asset.get('assigned_to_name') or asset.get('operator') or '—'}",
         "",
-        "Item | Exp | Act | Status | Condition",
-        "-" * 60,
+        "Item | Serial | Exp | Act | Status | Condition",
+        "-" * 72,
     ]
     for it in items:
         lines.append(
-            f"{it.get('item_name')} | {it.get('quantity_expected')} | "
-            f"{it.get('quantity_actual')} | {it.get('status')} | {it.get('condition')}"
+            f"{_kit_item_row_label(it, items)} | {it.get('serial_number') or '—'} | "
+            f"{it.get('quantity_expected')} | {it.get('quantity_actual')} | "
+            f"{it.get('status')} | {it.get('condition')}"
         )
     return "\n".join(lines)
 
@@ -375,37 +392,39 @@ def _render_kit_items_table(asset: dict, aid: str, items: list[dict]) -> None:
 
     filtered = _filter_kit_items(items, type_f=type_f, cond_f=cond_f, stat_f=stat_f, assign_f=assign_f)
 
-    hdr = st.columns([0.4, 2.2, 1.0, 0.7, 0.7, 1.0, 1.0, 0.9, 0.9, 1.0])
-    labels = ["", "Item", "Type", "Exp", "Act", "Condition", "Status", "Unit $", "Total $", "Assigned"]
+    hdr = st.columns([0.35, 1.8, 1.1, 0.85, 0.55, 0.55, 0.95, 0.95, 0.8, 0.8, 0.9])
+    labels = ["", "Item", "Serial", "Type", "Exp", "Act", "Condition", "Status", "Unit $", "Total $", "Assigned"]
     for col, lbl in zip(hdr, labels):
         with col:
             st.markdown(f"**{lbl}**" if lbl else "")
 
     for it in filtered:
         iid = str(it.get("id") or "")
-        cols = st.columns([0.4, 2.2, 1.0, 0.7, 0.7, 1.0, 1.0, 0.9, 0.9, 1.0])
+        cols = st.columns([0.35, 1.8, 1.1, 0.85, 0.55, 0.55, 0.95, 0.95, 0.8, 0.8, 0.9])
         with cols[0]:
             picked = st.checkbox("", key=f"kit_chk_{aid}_{iid}", label_visibility="collapsed")
             if picked:
                 st.session_state[sel_key] = iid
                 st.session_state[view_key] = "detail"
         with cols[1]:
-            st.markdown(html.escape(str(it.get("item_name") or "—")))
+            st.markdown(html.escape(_kit_item_row_label(it, items)))
         with cols[2]:
-            st.caption(str(it.get("item_type") or "—"))
+            st.caption(str(it.get("serial_number") or "—"))
         with cols[3]:
-            st.caption(str(it.get("quantity_expected") or 0))
+            st.caption(str(it.get("item_type") or "—"))
         with cols[4]:
-            st.caption(str(it.get("quantity_actual") or 0))
+            st.caption(str(it.get("quantity_expected") or 0))
         with cols[5]:
-            st.markdown(kit_item_status_pill_html(str(it.get("condition") or "—")), unsafe_allow_html=True)
+            st.caption(str(it.get("quantity_actual") or 0))
         with cols[6]:
-            st.markdown(kit_item_status_pill_html(str(it.get("status") or "—")), unsafe_allow_html=True)
+            st.markdown(kit_item_status_pill_html(str(it.get("condition") or "—")), unsafe_allow_html=True)
         with cols[7]:
-            st.caption(fmt_currency(it.get("unit_value")))
+            st.markdown(kit_item_status_pill_html(str(it.get("status") or "—")), unsafe_allow_html=True)
         with cols[8]:
-            st.caption(fmt_currency(it.get("total_value")))
+            st.caption(fmt_currency(it.get("unit_value")))
         with cols[9]:
+            st.caption(fmt_currency(it.get("total_value")))
+        with cols[10]:
             st.caption(str(it.get("assigned_to_name") or "—"))
 
     if selected_id and st.session_state.get(view_key) == "detail":
@@ -422,7 +441,7 @@ def _render_kit_item_detail_inline(asset: dict, aid: str, item: dict) -> None:
     st.markdown('<div class="ips-kit-detail-panel">', unsafe_allow_html=True)
     h1, h2, h3 = st.columns([2, 1, 1])
     with h1:
-        st.markdown(f"**{html.escape(str(item.get('item_name') or '—'))}**")
+        st.markdown(f"**{html.escape(_kit_item_row_label(item, get_asset_kit_items(aid)))}**")
     with h2:
         if not editing and st.button("Edit", key=f"kit_edit_btn_{aid}_{iid}"):
             st.session_state[edit_key] = True
@@ -483,6 +502,9 @@ def _render_kit_item_edit_form(asset: dict, aid: str, item: dict) -> None:
             qty_act = st.number_input("Actual qty", min_value=0.0, value=float(item.get("quantity_actual") or 1), step=1.0)
         with c3:
             unit_val = st.number_input("Unit value", min_value=0.0, value=float(item.get("unit_value") or 0), step=1.0)
+        st.caption(
+            "One row = one physical unit. To add more of the same item with different serials, use **Add Kit Item** and set quantity."
+        )
         condition = st.selectbox("Condition", CONDITIONS, index=CONDITIONS.index(str(item.get("condition") or "Good")) if str(item.get("condition") or "Good") in CONDITIONS else 1)
         status = st.selectbox("Status", ITEM_STATUSES, index=ITEM_STATUSES.index(str(item.get("status") or "Present")) if str(item.get("status") or "Present") in ITEM_STATUSES else 0)
         serial = st.text_input("Serial number", value=str(item.get("serial_number") or ""))
@@ -536,44 +558,64 @@ def _render_add_kit_item_form(asset: dict, aid: str) -> None:
         st.session_state[_sk(aid, "view")] = "list"
         st.rerun()
     st.markdown("##### Add Kit Item")
+    st.caption(
+        "For multiple physical units of the same item, enter the quantity and a serial number for each unit. "
+        "Each unit is tracked as its own row in the kit."
+    )
     with st.form(f"kit_add_item_{aid}"):
         name = st.text_input("Item name *")
         item_type = st.selectbox("Item type", ITEM_TYPES)
         category = st.text_input("Category")
         c1, c2, c3 = st.columns(3)
         with c1:
-            qty = st.number_input("Quantity expected", min_value=0.0, value=1.0, step=1.0)
+            qty = st.number_input("Quantity expected", min_value=1.0, value=1.0, step=1.0)
         with c2:
             unit = st.text_input("Unit", value="EA")
         with c3:
             unit_val = st.number_input("Unit value", min_value=0.0, value=0.0, step=1.0)
         condition = st.selectbox("Condition", CONDITIONS, index=1)
         status = st.selectbox("Status", ITEM_STATUSES, index=0)
-        serial = st.text_input("Serial number (optional)")
+        unit_count = max(1, int(round(float(qty or 1))))
+        unit_serials: list[str] = []
+        if unit_count > 1:
+            st.markdown("**Serial number per unit**")
+            for idx in range(unit_count):
+                unit_serials.append(
+                    st.text_input(
+                        f"Unit {idx + 1} serial *",
+                        key=f"kit_add_serial_{aid}_{idx}",
+                        placeholder=f"e.g. DG-{1001 + idx}",
+                    )
+                )
+        else:
+            unit_serials.append(
+                st.text_input("Serial number (optional)", key=f"kit_add_serial_{aid}_0")
+            )
         notes = st.text_area("Notes", height=50)
         if st.form_submit_button("Save Kit Item", type="primary"):
             if not str(name or "").strip():
                 st.error("Item name is required.")
             else:
-                result = create_asset_kit_item(
+                result = create_asset_kit_items_multi(
                     aid,
                     {
                         "item_name": name,
                         "item_type": item_type,
                         "category": category,
-                        "quantity_expected": qty,
-                        "quantity_actual": qty,
+                        "quantity_expected": unit_count,
+                        "quantity_actual": unit_count,
                         "unit": unit,
                         "unit_value": unit_val,
                         "condition": condition,
                         "status": status,
-                        "serial_number": serial,
                         "notes": notes,
+                        "unit_serials": unit_serials,
                     },
                 )
                 if result.ok:
                     st.session_state[_sk(aid, "view")] = "list"
-                    st.success("Kit item added.")
+                    n = int((result.data or {}).get("count") or 1) if isinstance(result.data, dict) else 1
+                    st.success(f"Added {n} kit item(s).")
                     st.rerun()
                 else:
                     st.error(result.error or "Could not add item.")
@@ -588,30 +630,43 @@ def _render_import_inventory_form(asset: dict, aid: str) -> None:
     labels = [x[0] for x in inv_opts]
     with st.form(f"kit_import_inv_{aid}"):
         pick = st.selectbox("Inventory item", labels, index=0)
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=1.0)
+        qty = st.number_input("Quantity", min_value=1.0, value=1.0, step=1.0)
+        unit_count = max(1, int(round(float(qty or 1))))
+        import_serials: list[str] = []
+        if unit_count > 1:
+            st.markdown("**Serial number per unit**")
+            for idx in range(unit_count):
+                import_serials.append(
+                    st.text_input(
+                        f"Unit {idx + 1} serial *",
+                        key=f"kit_imp_serial_{aid}_{idx}",
+                    )
+                )
         if st.form_submit_button("Import", type="primary"):
             row = next((r for lbl, r in inv_opts if lbl == pick), {})
             if not row:
                 st.error("Select an inventory item.")
             else:
                 unit_cost = float(row.get("unit_cost") or row.get("purchase_cost") or 0)
-                result = create_asset_kit_item(
+                result = create_asset_kit_items_multi(
                     aid,
                     {
                         "item_name": row.get("item_name") or row.get("name"),
                         "item_type": "Consumable" if str(row.get("category") or "").lower() == "materials" else "Material",
                         "category": row.get("category"),
                         "description": row.get("description"),
-                        "quantity_expected": qty,
-                        "quantity_actual": qty,
+                        "quantity_expected": unit_count,
+                        "quantity_actual": unit_count,
                         "unit": row.get("unit") or "EA",
                         "unit_value": unit_cost,
                         "inventory_item_id": row.get("id"),
+                        "unit_serials": import_serials if unit_count > 1 else [],
                     },
                 )
                 if result.ok:
                     st.session_state[_sk(aid, "view")] = "list"
-                    st.success("Imported from inventory.")
+                    n = int((result.data or {}).get("count") or 1) if isinstance(result.data, dict) else 1
+                    st.success(f"Imported {n} kit item(s) from inventory.")
                     st.rerun()
                 else:
                     st.error(result.error or "Import failed.")
@@ -676,7 +731,11 @@ def _render_audit_form(asset: dict, aid: str, items: list[dict]) -> None:
         lines: list[dict[str, Any]] = []
         for it in items:
             iid = str(it.get("id") or "")
-            st.markdown(f"**{it.get('item_name')}**")
+            serial = str(it.get("serial_number") or "").strip()
+            title = _kit_item_row_label(it, items)
+            if serial:
+                title = f"{title} · S/N {serial}"
+            st.markdown(f"**{title}**")
             lc1, lc2, lc3, lc4 = st.columns([1, 1, 1.2, 1.2])
             with lc1:
                 exp_q = st.number_input("Expected", min_value=0.0, value=float(it.get("quantity_expected") or 1), key=f"aud_exp_{aid}_{iid}")
@@ -849,8 +908,10 @@ def render_mobile_kit_scan(asset: dict) -> None:
     if view == "tools":
         st.markdown("#### Tool List")
         for it in items[:100]:
+            serial = str(it.get("serial_number") or "").strip()
+            sn = f" · S/N {html.escape(serial)}" if serial else ""
             st.markdown(
-                f"**{html.escape(str(it.get('item_name') or '—'))}** · "
+                f"**{html.escape(_kit_item_row_label(it, items))}**{sn} · "
                 f"Exp {it.get('quantity_expected')} / Act {it.get('quantity_actual')} · "
                 f"{kit_item_status_pill_html(str(it.get('status') or ''))}",
                 unsafe_allow_html=True,
