@@ -755,7 +755,6 @@ def _render_small_tools_table(
             _SMALL_TOOL_COLS,
             gap="small",
             vertical_alignment="center",
-            key="assets_small_tools_header_cols",
         )
         for col, (label, field) in zip(header_cols, _SMALL_TOOL_HEADER_SPECS):
             with col:
@@ -787,7 +786,6 @@ def _render_small_tools_table(
                 _SMALL_TOOL_COLS,
                 gap="small",
                 vertical_alignment="center",
-                key=f"assets_small_tools_row_{rid}",
             )
             image_asset = _small_tool_image_asset(row, assets_by_id)
             with cols[0]:

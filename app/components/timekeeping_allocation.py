@@ -352,11 +352,9 @@ def render_allocation_control_row(
     if type_key in st.session_state:
         hour_type = deps.normalize_alloc_hour_type(st.session_state[type_key])
     is_primary_row = lix == 0
-    row_scope = allocation_panel_scope_key(ctx.panel_scope)
     row_cols = st.columns(
         _allocation_row_col_weights(is_primary_row=is_primary_row),
         gap="small",
-        key=f"tk_alloc_cols_{row_scope}_{iso}_{lix}",
     )
     marker_classes = (
         "timekeeping-allocation-line-marker "
