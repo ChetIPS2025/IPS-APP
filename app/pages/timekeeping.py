@@ -227,15 +227,11 @@ def _normalize_assignable_job_status(raw: object) -> str:
 
 def _job_row_assignable_for_timekeeping(job: dict[str, Any]) -> bool:
     """Match Jobs list Active view: real rows only, not deleted/archived/closed-out."""
-    if bool(job.get("is_deleted")):
-        return False
-    status = _normalize_assignable_job_status(job.get("status"))
-    if status in _ASSIGNMENT_EXCLUDED_JOB_STATUSES:
-        return False
-    num = str(job.get("job_number") or "").strip()
-    if not num or num in {"—", "-"}:
-        return False
-    return True
+    try:
+        from app.services.job_service import is_job_assignable_for_field_picker
+    except ImportError:
+        from services.job_service import is_job_assignable_for_field_picker  # type: ignore
+    return is_job_assignable_for_field_picker(job)
 
 
 def _job_assignment_label(job: dict[str, Any]) -> str:

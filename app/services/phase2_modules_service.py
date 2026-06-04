@@ -728,7 +728,13 @@ def normalize_timekeeping_summary(row: dict[str, Any], week_start: date) -> dict
 
 
 def list_jobs(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
-    rows, used = fetch_list("jobs", order_by="job_number", normalize=normalize_job, demo=demo)
+    rows, used = fetch_list(
+        "jobs",
+        order_by="job_number",
+        limit=5000,
+        normalize=normalize_job,
+        demo=demo,
+    )
     return rows if rows or not used else demo, used
 
 

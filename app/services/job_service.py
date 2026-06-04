@@ -3,6 +3,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
+# Archived / estimate sub-rows (e.g. J26070-A42493B) — not primary field jobs.
+_SUBJOB_STYLE_NUMBER_RE = re.compile(r"^J\d{5}-[A-Z0-9]", re.IGNORECASE)
+
+_EXCLUDED_FIELD_JOB_STATUSES = frozenset(
+    {"Deleted", "Archived", "Completed", "Closed", "Cancelled"}
+)
+
 try:
     from app.services.shared_sequence import next_job_number_string
 except ImportError:
@@ -129,3 +136,112 @@ def sort_jobs_by_name(jobs: list[dict]) -> list[dict]:
             str(j.get("id") or ""),
         ),
     )
+
+
+def normalize_job_status_for_filter(raw: object) -> str:
+    """Canonical job status labels (aligned with Jobs page filters)."""
+    s = str(raw or "").strip().lower().replace("_", " ")
+    mapping = {
+        "": "Draft",
+        "draft": "Draft",
+        "planning": "Planning",
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "awarded": "Awarded",
+        "on hold": "On Hold",
+        "completed": "Completed",
+        "closed": "Closed",
+        "cancelled": "Cancelled",
+        "canceled": "Cancelled",
+        "archived": "Archived",
+        "deleted": "Deleted",
+        "estimate pending": "Estimate Pending",
+    }
+    if s in mapping:
+        return mapping[s]
+    label = str(raw or "").strip()
+    return label if label else "Draft"
+
+
+def is_primary_job_number(job_number: object) -> bool:
+    """Exclude archived/subjob-style numbers (e.g. J26070-A42493B)."""
+    num = job_number_display(job_number)
+    if not num or num in {"—", "-"}:
+        return False
+    return _SUBJOB_STYLE_NUMBER_RE.match(num) is None
+
+
+def is_job_assignable_for_field_picker(job: dict[str, Any]) -> bool:
+    """Open jobs suitable for timekeeping / weekly timesheet pickers."""
+    if bool(job.get("is_deleted")):
+        return False
+    status = normalize_job_status_for_filter(job.get("status"))
+    if status in _EXCLUDED_FIELD_JOB_STATUSES:
+        return False
+    if not is_primary_job_number(job.get("job_number")):
+        return False
+    return True
+
+
+def is_job_eligible_for_weekly_timesheet(job: dict[str, Any]) -> bool:
+    """Customer weekly timesheets: active field jobs, not estimate-pending shells."""
+    if not is_job_assignable_for_field_picker(job):
+        return False
+    if normalize_job_status_for_filter(job.get("status")) == "Estimate Pending":
+        return False
+    return True
+
+
+def load_jobs_for_select(*, limit: int = 5000, use_admin: bool | None = None) -> list[dict[str, Any]]:
+    """Load jobs from Supabase with admin fallback (matches Jobs / time tracking reads)."""
+    if use_admin is None:
+        try:
+            from app.auth import current_role
+        except ImportError:
+            from auth import current_role  # type: ignore
+        role = str(current_role() or "").strip().lower()
+        use_admin = role in {"admin", "manager", "supervisor", "project manager", "pm"}
+    try:
+        from app.db import fetch_jobs_with_order_fallback
+    except ImportError:
+        from db import fetch_jobs_with_order_fallback  # type: ignore
+    try:
+        rows = list(fetch_jobs_with_order_fallback(limit=limit, use_admin=bool(use_admin)) or [])
+        if rows:
+            return sort_jobs_by_number_then_name(rows)
+    except Exception:
+        pass
+    try:
+        from app.pages._core._data import load_jobs
+    except ImportError:
+        from pages._core._data import load_jobs  # type: ignore
+    return sort_jobs_by_number_then_name(load_jobs())
+
+
+def weekly_timesheet_job_options(*, include_customer: bool = True) -> dict[str, str]:
+    """
+    Label → job id map for the weekly timesheet Job selectbox.
+
+    Uses the same open primary jobs as Timekeeping, sorted by job number.
+    """
+    jobs = load_jobs_for_select()
+    eligible = [j for j in jobs if is_job_eligible_for_weekly_timesheet(j)]
+    if not eligible:
+        eligible = [j for j in jobs if is_job_assignable_for_field_picker(j)]
+    if not eligible:
+        eligible = jobs
+    _, label_to_id, labels = build_job_dropdown_label_maps(eligible)
+    by_id = {str(j.get("id") or "").strip(): j for j in eligible}
+    opts: dict[str, str] = {"": ""}
+    for label in labels:
+        jid = label_to_id.get(label) or ""
+        if not jid:
+            continue
+        job = by_id.get(jid, {})
+        if include_customer:
+            cust = str(job.get("customer") or "").strip()
+            key = f"{label} | {cust}" if cust and cust != "—" else label
+        else:
+            key = label
+        opts[key] = jid
+    return opts
