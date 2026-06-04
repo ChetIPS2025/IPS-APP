@@ -51,10 +51,16 @@ class AllocationRenderDeps:
     handle_alloc_line_reject: Callable[[dict, date, str], bool]
 
 
+def allocation_panel_scope_key(scope: str) -> str:
+    """Sanitize timecard/employee scope for Streamlit container keys."""
+    return "".join(ch if ch.isalnum() else "_" for ch in str(scope or "").strip()) or "alloc"
+
+
 @dataclass
 class DayAllocationCardContext:
     eid: str
     week_sig: str
+    panel_scope: str
     iso: str
     day_name: str
     daily_total: float
@@ -125,6 +131,7 @@ def render_day_summary_inline(
     st.markdown(
         (
             f'<div class="timekeeping-day-summary-inline timekeeping-day-summary-inline-marker '
+            f"timekeeping-allocation-day-card-marker timekeeping-day-allocation-card-marker "
             f'timekeeping-alloc-day-summary {html.escape(card_cls)}\">'
             f"<strong>{html.escape(day_name)}</strong>"
             f'<span class="timekeeping-alloc-day-date">{html.escape(fmt_date(iso))}</span>'
@@ -476,7 +483,8 @@ def render_day_allocation_card(
         balance_cls += " timekeeping-alloc-day-unbalanced"
     card_cls = allocation_card_state_class(state)
 
-    with st.container(key=f"tk_alloc_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}"):
+    scope = allocation_panel_scope_key(ctx.panel_scope)
+    with st.container(key=f"tk_alloc_day_{scope}_{ctx.iso}", border=True):
         unbalanced_cls = (
             " timekeeping-alloc-day-unbalanced" if state == "overallocated" else ""
         )
@@ -512,3 +520,13 @@ def render_day_allocation_card(
                 remaining=ctx.remaining,
                 normalize_timecard_status=normalize_timecard_status,
             )
+
+
+def render_allocation_days_panel(*, panel_scope: str) -> Any:
+    """Wrapper container for all day cards in one expanded employee row."""
+    scope = allocation_panel_scope_key(panel_scope)
+    st.markdown(
+        '<span class="timekeeping-allocation-days-panel-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return st.container(key=f"tk_alloc_panel_{scope}")

@@ -18,6 +18,7 @@ try:
     from app.components.timekeeping_allocation import (
         AllocationRenderDeps,
         DayAllocationCardContext,
+        render_allocation_days_panel,
         render_allocation_panel_intro,
         render_day_allocation_card,
     )
@@ -59,6 +60,7 @@ except ImportError:
     from components.timekeeping_allocation import (  # type: ignore
         AllocationRenderDeps,
         DayAllocationCardContext,
+        render_allocation_days_panel,
         render_allocation_panel_intro,
         render_day_allocation_card,
     )
@@ -2336,10 +2338,16 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
     return False
 
 
-def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
+def _render_list_allocation_detail(
+    emp: dict,
+    week_start_d: date,
+    *,
+    panel_scope: str = "",
+) -> None:
     """List expand: assign hours entered in the top row to jobs/tasks/shop/admin."""
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
+    scope = str(panel_scope or eid or week_sig).strip()
     week_status = _normalize_timecard_status(emp.get("status"))
     week_locked = week_status == "Approved"
     job_opts = _assignment_options_for_timekeeping()
@@ -2370,65 +2378,78 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
     if week_locked:
         st.info("This week is approved and locked.")
 
-    for day_ix, day_d in enumerate(week_dates(week_start_d)):
-        iso = day_d.isoformat()
-        grid_row = grid[day_ix] if day_ix < len(grid) else {}
-        daily_total = _daily_total_from_list_row(
-            eid=eid,
-            week_sig=week_sig,
-            day_ix=day_ix,
-            grid_row=grid_row,
-        )
-        lines = _ensure_day_allocation_lines(
-            by_date,
-            iso=iso,
-            daily_total=daily_total,
-            grid_row=grid_row,
-            job_opts=job_opts,
-            eid=eid,
-            week_sig=week_sig,
-        )
-        live_lines = _live_allocation_lines_for_day(
-            lines, eid=eid, week_sig=week_sig, iso=iso
-        )
-        alloc_state = _get_day_allocation_state(daily_total, live_lines)
-        allocated = alloc_state["allocated_total"]
-        st_part = alloc_state["allocated_st"]
-        ot_part = alloc_state["allocated_ot"]
-        remaining = max(0.0, round(float(alloc_state["remaining"]), 2))
-        day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
-        type_bits = []
-        if st_part > 0:
-            type_bits.append(f"S/T {_fmt_day_hours(st_part)}")
-        if ot_part > 0:
-            type_bits.append(f"O/T {_fmt_day_hours(ot_part)}")
-        type_summary = f" ({' · '.join(type_bits)})" if type_bits else ""
+    if not eid:
+        st.warning("Employee id is missing for this row; daily allocations cannot be edited.")
+        return
 
-        render_day_allocation_card(
-            deps=alloc_deps,
-            ctx=DayAllocationCardContext(
+    days_with_hours = 0
+    with render_allocation_days_panel(panel_scope=scope):
+        for day_ix, day_d in enumerate(week_dates(week_start_d)):
+            iso = day_d.isoformat()
+            grid_row = grid[day_ix] if day_ix < len(grid) else {}
+            daily_total = _daily_total_from_list_row(
                 eid=eid,
                 week_sig=week_sig,
+                day_ix=day_ix,
+                grid_row=grid_row,
+            )
+            if daily_total <= _ALLOC_TOLERANCE:
+                continue
+            days_with_hours += 1
+            lines = _ensure_day_allocation_lines(
+                by_date,
                 iso=iso,
-                day_name=day_name,
                 daily_total=daily_total,
-                allocated=allocated,
-                remaining=remaining,
-                type_summary=type_summary,
-                alloc_state=str(alloc_state["state"]),
-                lines=lines,
-                week_locked=week_locked,
+                grid_row=grid_row,
                 job_opts=job_opts,
-                can_approve=can_approve,
-                emp=emp,
-                week_start_d=week_start_d,
-                by_date=by_date,
-            ),
-            normalize_timecard_status=_normalize_timecard_status,
-        )
+                eid=eid,
+                week_sig=week_sig,
+            )
+            live_lines = _live_allocation_lines_for_day(
+                lines, eid=eid, week_sig=week_sig, iso=iso
+            )
+            alloc_state = _get_day_allocation_state(daily_total, live_lines)
+            allocated = alloc_state["allocated_total"]
+            st_part = alloc_state["allocated_st"]
+            ot_part = alloc_state["allocated_ot"]
+            remaining = max(0.0, round(float(alloc_state["remaining"]), 2))
+            day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
+            type_bits = []
+            if st_part > 0:
+                type_bits.append(f"S/T {_fmt_day_hours(st_part)}")
+            if ot_part > 0:
+                type_bits.append(f"O/T {_fmt_day_hours(ot_part)}")
+            type_summary = f" ({' · '.join(type_bits)})" if type_bits else ""
 
-        if day_ix < len(grid) and lines:
-            grid[day_ix]["job"] = str(lines[0].get("job") or grid[day_ix].get("job") or "")
+            render_day_allocation_card(
+                deps=alloc_deps,
+                ctx=DayAllocationCardContext(
+                    eid=eid,
+                    week_sig=week_sig,
+                    panel_scope=scope,
+                    iso=iso,
+                    day_name=day_name,
+                    daily_total=daily_total,
+                    allocated=allocated,
+                    remaining=remaining,
+                    type_summary=type_summary,
+                    alloc_state=str(alloc_state["state"]),
+                    lines=lines,
+                    week_locked=week_locked,
+                    job_opts=job_opts,
+                    can_approve=can_approve,
+                    emp=emp,
+                    week_start_d=week_start_d,
+                    by_date=by_date,
+                ),
+                normalize_timecard_status=_normalize_timecard_status,
+            )
+
+            if day_ix < len(grid) and lines:
+                grid[day_ix]["job"] = str(lines[0].get("job") or grid[day_ix].get("job") or "")
+
+    if days_with_hours == 0:
+        st.caption("Enter hours for each day in the employee row above to assign jobs.")
 
     st.session_state[_grid_key(eid)] = grid
     st.session_state[_alloc_state_key(eid)] = by_date
@@ -2437,7 +2458,11 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
         return
 
     record_key = record_session_key(emp, "id")
-    action_left, action_right = st.columns([1, 1])
+    st.markdown(
+        '<span class="timekeeping-allocation-actions-footer-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    action_left, action_right, _ = st.columns([1, 1, 3], gap="small")
     with action_left:
         if st.button("Save allocations", key=f"tk_save_alloc_{record_key}", type="primary"):
             if _save_allocation_week(emp, week_start_d):
@@ -2460,7 +2485,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
 def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
     emp = _emp_from_timecard_row(row)
     timecard_id = str(row.get("timecard_id") or "").strip()
-    _render_list_allocation_detail(emp, week_start_d)
+    _render_list_allocation_detail(emp, week_start_d, panel_scope=timecard_id)
     detail_col, _ = st.columns([1, 3])
     with detail_col:
         if st.button(

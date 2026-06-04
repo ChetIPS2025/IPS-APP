@@ -3275,11 +3275,14 @@ def inject_timekeeping_module_css() -> None:
     88px
     minmax(120px, 1fr)
     minmax(240px, 1.35fr)"""
+    tk_alloc_panel = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_panel_"]'
+    )
     tk_alloc_day = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
-        f'[class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker), '
-        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
-        f'[class*="st-key-tk_alloc_day_"]:has(.timekeeping-day-allocation-card-marker)'
+        f'[class*="st-key-tk_alloc_day_"], '
+        f'{tk_alloc_panel} [class*="st-key-tk_alloc_day_"]'
     )
     tk_alloc_ctrl_row = (
         f'{tk_alloc_day} [class*="st-key-tk_alloc_row_"] '
@@ -3300,7 +3303,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v74">
+<style id="ips-timekeeping-module-v75">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6308,10 +6311,26 @@ def inject_timekeeping_module_css() -> None:
   overflow-x: hidden !important;
   overflow-y: visible !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_day_"] {{
+{tk_alloc_panel} {{
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  display: block !important;
+}}
+{tk_alloc_panel} > [data-testid="stVerticalBlock"] {{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  gap: 0.5rem !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_day_"],
+{tk_alloc_panel} [class*="st-key-tk_alloc_day_"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: block !important;
+  visibility: visible !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker) [data-testid="stVerticalBlock"] {{
   gap: 0.35rem !important;
@@ -6336,23 +6355,52 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100% !important;
   width: 100% !important;
   margin: 0 0 8px 0 !important;
-  padding: 8px 10px 6px !important;
-  background: #ffffff !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}}
+{tk_alloc_day} [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day} > [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  max-width: 100% !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
+  background: #ffffff !important;
+  padding: 8px 10px 6px !important;
   box-sizing: border-box !important;
-  overflow-x: hidden !important;
-  overflow-y: visible !important;
+  overflow: visible !important;
 }}
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) {{
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) > [data-testid="stVerticalBlock"] {{
   border-color: #86efac !important;
 }}
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-incomplete),
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-needs_assignment) {{
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-incomplete) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-needs_assignment) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-incomplete) > [data-testid="stVerticalBlock"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-needs_assignment) > [data-testid="stVerticalBlock"] {{
   border-color: #fcd34d !important;
 }}
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-overallocated) {{
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-overallocated) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-overallocated) > [data-testid="stVerticalBlock"] {{
   border-color: #fca5a5 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker) {{
+  width: auto !important;
+  max-width: 100% !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker)
+  > [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
 }}
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) .timekeeping-day-summary-inline {{
   background: #f0fdf4 !important;
