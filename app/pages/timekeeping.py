@@ -42,7 +42,10 @@ try:
         persist_timekeeping_week,
     )
     from app.pages._core._session import select_key
-    from app.styles import inject_timekeeping_module_css
+    from app.styles import (
+        _inject_timekeeping_daily_hour_focus_script,
+        inject_timekeeping_module_css,
+    )
     from app.utils.dates import week_dates, week_end, week_start
     from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
     from app.utils.formatting import fmt_date
@@ -80,7 +83,10 @@ except ImportError:
         persist_timekeeping_week,
     )
     from pages._core._session import select_key  # type: ignore
-    from styles import inject_timekeeping_module_css  # type: ignore
+    from styles import (  # type: ignore
+        _inject_timekeeping_daily_hour_focus_script,
+        inject_timekeeping_module_css,
+    )
     from utils.dates import week_dates, week_end, week_start  # type: ignore
     from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -2664,6 +2670,8 @@ def _render_custom_timekeeping_table(
                     _render_inline_daily_entries(row, week_start_d)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    _inject_timekeeping_daily_hour_focus_script()
 
     return all_timecard_ids
 

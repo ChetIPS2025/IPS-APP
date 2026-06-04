@@ -3065,32 +3065,39 @@ def inject_assets_module_css() -> None:
 
 
 def _inject_timekeeping_daily_hour_focus_script() -> None:
-    """Select-all on focus for List view daily hour boxes (top employee row)."""
-    sk = "ips_tk_daily_hour_focus_v2"
-    if st.session_state.get(sk):
-        return
-    st.session_state[sk] = True
-    components.html(
-        """
+    """Select-all on focus for List view top-row daily hour inputs only."""
+    html_doc = """
 <script>
 (function () {
   var w = window.parent || window;
   var doc = w.document;
+  var WRAP = ".st-key-timekeeping_table_wrap";
   var SELECTOR =
-    ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] [data-testid=\\"stNumberInput\\"] input, "
-    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] input[type=\\"number\\"], "
-    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"column\\"]:has(.timekeeping-list-daily-hour-marker) [data-testid=\\"stNumberInput\\"] input, "
-    + ".ips-time-week-inline input[type=\\"number\\"], "
-    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"stHorizontalBlock\\"]:has(.timesheet-days-grid-marker) input[type=\\"number\\"]";
+    WRAP + " [class*=\\"st-key-tk_list_hour_spin_\\"] [data-testid=\\"stNumberInput\\"] input, "
+    + WRAP + " [class*=\\"st-key-tk_row_\\"] [data-testid=\\"column\\"]:has(.timekeeping-list-daily-hour-marker) "
+    + "[data-testid=\\"stNumberInput\\"] input";
+
+  function isListTopRowHourInput(el) {
+    if (!el || el.tagName !== "INPUT") return false;
+    if (!el.closest(WRAP)) return false;
+    if (!el.closest('[class*="st-key-tk_row_"]')) return false;
+    if (el.closest('[class*="st-key-tk_expand_detail_"]')) return false;
+    if (el.closest(".timekeeping-detail-row-marker, .timekeeping-detail-header-marker")) {
+      return false;
+    }
+    if (el.closest('[class*="st-key-tk_list_hour_spin_"]')) return true;
+    var col = el.closest('[data-testid="column"]');
+    return !!(col && col.querySelector(".timekeeping-list-daily-hour-marker"));
+  }
 
   function isDigitKey(e) {
     return e.key && e.key.length === 1 && /^[0-9.]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey;
   }
 
   function bindInput(el) {
+    if (!isListTopRowHourInput(el)) return;
     if (el.dataset.ipsSelectOnFocus) return;
     el.dataset.ipsSelectOnFocus = "1";
-    el.classList.add("timekeeping-hour-input");
 
     function rememberPrev() {
       el.dataset.ipsPrevHour = el.value;
@@ -3109,10 +3116,28 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
       return start === 0 && end >= val.length;
     }
 
+    function formatOneDecimal() {
+      var raw = String(el.value == null ? "" : el.value).trim();
+      if (raw === "") return;
+      var n = parseFloat(raw);
+      if (isNaN(n)) return;
+      var fmt = n.toFixed(1);
+      if (el.value !== fmt) {
+        el.value = fmt;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+
     el.addEventListener("focus", function () {
       rememberPrev();
       delete el.dataset.ipsReplaceTyping;
       w.requestAnimationFrame(selectAll);
+    });
+
+    el.addEventListener("click", function () {
+      if (doc.activeElement === el) {
+        w.requestAnimationFrame(selectAll);
+      }
     });
 
     el.addEventListener("mousedown", function (e) {
@@ -3146,6 +3171,8 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
       if (raw === "" && prev != null && prev !== "") {
         el.value = prev;
         el.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        formatOneDecimal();
       }
     });
   }
@@ -3154,23 +3181,39 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
     root.querySelectorAll(SELECTOR).forEach(bindInput);
   }
 
+  function onFocusIn(e) {
+    var el = e.target;
+    if (!isListTopRowHourInput(el)) return;
+    bindInput(el);
+    w.requestAnimationFrame(function () {
+      try {
+        el.select();
+      } catch (err) {}
+    });
+  }
+
   bindAll(doc);
-  if (!w.__ipsTkDayBoxObserver) {
-    w.__ipsTkDayBoxObserver = new MutationObserver(function () {
+  if (!w.__ipsTkListHourFocusIn) {
+    w.__ipsTkListHourFocusIn = true;
+    doc.addEventListener("focusin", onFocusIn, true);
+  }
+  if (!w.__ipsTkListHourObserver) {
+    w.__ipsTkListHourObserver = new MutationObserver(function () {
       bindAll(doc);
     });
-    w.__ipsTkDayBoxObserver.observe(doc.body, { childList: true, subtree: true });
+    w.__ipsTkListHourObserver.observe(doc.body, { childList: true, subtree: true });
   }
 })();
 </script>
-        """,
-        height=0,
-    )
+"""
+    try:
+        components.html(html_doc, height=0, key="ips_tk_list_daily_hour_focus_v3")
+    except TypeError:
+        components.html(html_doc, height=0)
 
 
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
-    _inject_timekeeping_daily_hour_focus_script()
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_detail_excl = (
         ":not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker))"
