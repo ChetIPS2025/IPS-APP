@@ -16,9 +16,9 @@ except ImportError:
 
 ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
 # Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
-# Match reference screenshot: wide assignment, compact type/hours/remaining/status, notes flex.
-ALLOC_LINE_COLS = [3.2, 0.52, 0.46, 0.44, 0.44, 1.45]
-ALLOC_DAY_BODY_COLS = [8.35, 1.2]
+# Reference layout: Assignment | Type | Hours (+ Remaining/Status below) | Notes
+ALLOC_LINE_COLS = [3.55, 0.58, 0.78, 1.55]
+ALLOC_DAY_BODY_COLS = [8.2, 1.25]
 
 
 @dataclass(frozen=True)
@@ -409,44 +409,34 @@ def render_allocation_control_row(
                     unsafe_allow_html=True,
                 )
         with row_cols[2]:
+            st.markdown(
+                '<span class="timekeeping-allocation-hours-marker '
+                'timekeeping-allocation-remaining-marker '
+                'timekeeping-allocation-status-field-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             line["hours"] = _render_allocation_hours_input(
                 value=float(line.get("hours") or 0),
                 widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
                 disabled=not row_editable,
                 deps=deps,
             )
+            st.markdown(
+                f'<div class="timekeeping-alloc-hours-meta">'
+                f'<div class="timekeeping-alloc-meta-row">'
+                f'<span class="timekeeping-alloc-meta-label">Remaining</span> '
+                f'<span class="timekeeping-alloc-meta-value">'
+                f"{html.escape(deps.fmt_day_hours(remaining))}</span>"
+                f"</div>"
+                f'<div class="timekeeping-alloc-meta-row">'
+                f'<span class="timekeeping-alloc-meta-label">Status</span> '
+                f'<span class="timekeeping-alloc-meta-value">'
+                f"{html.escape(day_status)}</span>"
+                f"</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
         with row_cols[3]:
-            st.markdown(
-                '<span class="timekeeping-allocation-remaining-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
-                "Remaining</div>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="timekeeping-alloc-remaining-cell">'
-                f"{html.escape(deps.fmt_day_hours(remaining))}</div>",
-                unsafe_allow_html=True,
-            )
-        with row_cols[4]:
-            st.markdown(
-                '<span class="timekeeping-allocation-status-field-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
-                "Status</div>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="timekeeping-alloc-status-cell">'
-                f'<span class="timekeeping-alloc-status-plain">'
-                f"{html.escape(day_status)}</span></div>",
-                unsafe_allow_html=True,
-            )
-        with row_cols[5]:
             if row_editable:
                 line["notes"] = st.text_input(
                     "Notes",
@@ -519,6 +509,10 @@ def render_day_allocation_card(
             st.caption("Enter hours for this day in the row above before assigning.")
             return
 
+        st.markdown(
+            '<span class="timekeeping-alloc-day-form-body-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         grid_col, rail_col = st.columns(ALLOC_DAY_BODY_COLS, gap="small")
         pending_line: dict[str, Any] | None = None
         pending_lix = 0
