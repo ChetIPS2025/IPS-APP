@@ -1246,13 +1246,16 @@ def _day_row_with_widget_values(
 
 
 def _sync_row_hrs_from_grid(grid: list[dict], *, eid: str, week_sig: str) -> None:
-    """Keep inline row hour widgets aligned when ST/OT is edited in the expanded grid."""
+    """Merge ST/OT widget edits into the grid without writing tk_hrs widget keys."""
     for i, row in enumerate(grid):
         st_key = f"tk_st_{eid}_{week_sig}_{i}"
         ot_key = f"tk_ot_{eid}_{week_sig}_{i}"
-        hrs_key = f"tk_hrs_{eid}_{week_sig}_{i}"
         if st_key in st.session_state or ot_key in st.session_state:
-            st.session_state[hrs_key] = _day_hours_total(row)
+            if st_key in st.session_state:
+                row["st"] = float(st.session_state[st_key] or 0)
+            if ot_key in st.session_state:
+                row["ot"] = float(st.session_state[ot_key] or 0)
+            _set_day_job_hours(row, _day_hours_total(row))
 
 
 def _apply_row_hrs_to_grid(grid: list[dict], *, eid: str, week_sig: str) -> None:
@@ -1329,6 +1332,23 @@ def _render_daily_hrs_input(
     return float(hours)
 
 
+def _bump_streamlit_hours(
+    widget_key: str,
+    *,
+    step: float,
+    direction: int,
+    fallback: float,
+    max_value: float = 24.0,
+    decimals: int = 1,
+) -> None:
+    """Button callback: adjust a number_input key before the widget renders."""
+    cur = float(st.session_state.get(widget_key, fallback))
+    if direction > 0:
+        st.session_state[widget_key] = min(max_value, round(cur + step, decimals))
+    else:
+        st.session_state[widget_key] = max(0.0, round(cur - step, decimals))
+
+
 def _render_list_day_hour_stepper(
     *,
     value: float,
@@ -1350,7 +1370,35 @@ def _render_list_day_hour_stepper(
             '<div class="timekeeping-hour-spinner">',
             unsafe_allow_html=True,
         )
-        inp_col, btns_col = st.columns([1, 1], gap="xxsmall", vertical_alignment="center")
+        btns_col, inp_col = st.columns([1, 1], gap="xxsmall", vertical_alignment="center")
+        bump_kwargs = {
+            "widget_key": widget_key,
+            "step": step,
+            "fallback": float(value),
+            "max_value": 24.0,
+            "decimals": 1,
+        }
+        with btns_col:
+            st.markdown(
+                '<span class="timekeeping-spinner-buttons-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            st.button(
+                "▲",
+                key=up_key,
+                use_container_width=True,
+                help=f"Increase {day_label} hours",
+                on_click=_bump_streamlit_hours,
+                kwargs={**bump_kwargs, "direction": 1},
+            )
+            st.button(
+                "▼",
+                key=down_key,
+                use_container_width=True,
+                help=f"Decrease {day_label} hours",
+                on_click=_bump_streamlit_hours,
+                kwargs={**bump_kwargs, "direction": -1},
+            )
         with inp_col:
             st.markdown(
                 '<span class="timekeeping-hour-input-marker timekeeping-list-daily-hour-marker" '
@@ -1367,29 +1415,6 @@ def _render_list_day_hour_stepper(
                 max_value=24.0,
                 format="%.1f",
             )
-        with btns_col:
-            st.markdown(
-                '<span class="timekeeping-spinner-buttons-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "▲",
-                key=up_key,
-                use_container_width=True,
-                help=f"Increase {day_label} hours",
-            ):
-                cur = float(st.session_state.get(widget_key, value))
-                st.session_state[widget_key] = min(24.0, round(cur + step, 1))
-                st.rerun()
-            if st.button(
-                "▼",
-                key=down_key,
-                use_container_width=True,
-                help=f"Decrease {day_label} hours",
-            ):
-                cur = float(st.session_state.get(widget_key, value))
-                st.session_state[widget_key] = max(0.0, round(cur - step, 1))
-                st.rerun()
     return max(0.0, float(hours))
 
 
@@ -1576,16 +1601,22 @@ def _hour_stepper_input(
             unsafe_allow_html=True,
         )
     dn_col, val_col, up_col = st.columns([0.24, 0.52, 0.24] if compact else [0.26, 0.48, 0.26], gap="small")
+    bump_kwargs = {
+        "widget_key": widget_key,
+        "step": step,
+        "fallback": float(value),
+        "max_value": max_value,
+        "decimals": 2,
+    }
     with dn_col:
-        if st.button(
+        st.button(
             down_label,
             key=down_key,
             use_container_width=True,
             help=f"Decrease {label}",
-        ):
-            cur = float(st.session_state.get(widget_key, value))
-            st.session_state[widget_key] = max(0.0, round(cur - step, 2))
-            st.rerun()
+            on_click=_bump_streamlit_hours,
+            kwargs={**bump_kwargs, "direction": -1},
+        )
     with val_col:
         hours = st.number_input(
             label,
@@ -1598,15 +1629,14 @@ def _hour_stepper_input(
             format=fmt,
         )
     with up_col:
-        if st.button(
+        st.button(
             up_label,
             key=up_key,
             use_container_width=True,
             help=f"Increase {label}",
-        ):
-            cur = float(st.session_state.get(widget_key, value))
-            st.session_state[widget_key] = min(max_value, round(cur + step, 2))
-            st.rerun()
+            on_click=_bump_streamlit_hours,
+            kwargs={**bump_kwargs, "direction": 1},
+        )
     return float(hours)
 
 
