@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v53">
+<style id="ips-timekeeping-module-v54">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6143,22 +6143,36 @@ def inject_timekeeping_module_css() -> None:
   border-radius: 10px !important;
   box-sizing: border-box !important;
 }}
+.timekeeping-alloc-field-label {{
+  display: block !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin: 0 0 4px 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}}
+.timekeeping-alloc-col-head {{
+  margin: 0 0 6px 0 !important;
+}}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker),
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-line-marker) {{
+  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker) {{
   display: grid !important;
   grid-template-columns:
-    minmax(220px, 360px)
-    80px
-    80px
+    minmax(260px, 340px)
     90px
     90px
-    minmax(120px, 200px)
-    minmax(300px, 360px) !important;
+    90px
+    90px
+    minmax(150px, 220px)
+    360px !important;
   column-gap: 12px !important;
   row-gap: 0 !important;
-  align-items: center !important;
+  align-items: end !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -6175,7 +6189,7 @@ def inject_timekeeping_module_css() -> None:
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker)
   > [data-testid="column"],
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-line-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker)
   > [data-testid="column"] {{
   width: auto !important;
   min-width: 0 !important;
@@ -6189,22 +6203,32 @@ def inject_timekeeping_module_css() -> None:
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker)
   > [data-testid="column"]:nth-child(7),
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-line-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker)
   > [data-testid="column"]:nth-child(7) {{
-  min-width: 300px !important;
+  min-width: 360px !important;
+  width: 360px !important;
+  max-width: 360px !important;
   justify-self: end !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker))
-  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-line-marker) {{
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker) {{
   grid-template-columns:
-    minmax(220px, 360px)
-    80px
-    80px
+    minmax(260px, 340px)
     90px
     90px
-    minmax(120px, 200px)
-    88px !important;
+    90px
+    90px
+    minmax(150px, 220px)
+    100px !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker))
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker)
+  > [data-testid="column"]:nth-child(7) {{
+  min-width: 100px !important;
+  width: 100px !important;
+  max-width: 100px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"],
@@ -6214,7 +6238,7 @@ def inject_timekeeping_module_css() -> None:
   [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
   width: 100% !important;
   min-width: 0 !important;
-  max-width: 72px !important;
+  max-width: 90px !important;
   min-height: 38px !important;
 }}
 .timekeeping-alloc-type-cell,
@@ -6316,55 +6340,52 @@ def inject_timekeeping_module_css() -> None:
   [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button {{
   min-height: 34px !important;
   font-size: 0.78rem !important;
-  padding: 0 10px !important;
+  padding: 0 12px !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  overflow: visible !important;
+  width: auto !important;
+  min-width: max-content !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-actions-marker) {{
-  min-width: 300px !important;
-  width: 100% !important;
+  min-width: 360px !important;
+  width: 360px !important;
+  max-width: 360px !important;
   overflow: visible !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
   > [data-testid="stVerticalBlock"] {{
-  width: 100% !important;
-  min-width: 0 !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stHorizontalBlock"] {{
   display: flex !important;
+  flex-direction: row !important;
   flex-wrap: nowrap !important;
   justify-content: flex-end !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   gap: 8px !important;
   width: 100% !important;
   min-width: 0 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
-  flex: 0 0 auto !important;
+  > [data-testid="stVerticalBlock"] > div {{
   width: auto !important;
+  flex: 0 0 auto !important;
   min-width: max-content !important;
-  max-width: none !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
   [data-testid="stButton"] {{
   width: auto !important;
-  min-width: 0 !important;
+  min-width: max-content !important;
   margin: 0 !important;
+  flex: 0 0 auto !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
   [data-testid="stButton"] > button {{
-  width: 100% !important;
-  min-width: 118px !important;
+  width: auto !important;
+  min-width: max-content !important;
   max-width: none !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
@@ -6379,6 +6400,8 @@ def inject_timekeeping_module_css() -> None:
   white-space: nowrap !important;
   writing-mode: horizontal-tb !important;
   word-break: keep-all !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }}
 </style>
 """,

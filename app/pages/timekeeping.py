@@ -2163,6 +2163,13 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
     return False
 
 
+def _render_allocation_field_label(label: str) -> None:
+    st.markdown(
+        f'<div class="timekeeping-alloc-field-label">{html.escape(label)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_allocation_hours_input(
     *,
     value: float,
@@ -2170,6 +2177,7 @@ def _render_allocation_hours_input(
     disabled: bool = False,
 ) -> float:
     """Single compact hours field for allocation rows (no nested stepper columns)."""
+    _render_allocation_field_label("Hours")
     st.markdown(
         '<span class="timekeeping-allocation-hours-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2182,7 +2190,7 @@ def _render_allocation_hours_input(
         return float(value)
     return float(
         st.number_input(
-            "Allocated hrs",
+            "Hours",
             value=float(value),
             key=widget_key,
             label_visibility="collapsed",
@@ -2212,6 +2220,7 @@ def _render_allocation_primary_row_actions(
     job_opts: list[str],
 ) -> None:
     """Submit / add-assignment controls on the right of the first allocation row."""
+    _render_allocation_field_label("Actions")
     st.markdown(
         '<span class="timekeeping-allocation-actions-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2221,91 +2230,78 @@ def _render_allocation_primary_row_actions(
     action_taken = False
 
     if row_editable and day_status == "Pending" and can_approve and line_id and line_hours > 0:
-        btn_cols = st.columns(2, gap="small")
-        with btn_cols[0]:
-            if st.button(
-                "Approve",
-                key=f"tk_alloc_ok_{eid}_{week_sig}_{iso}_{lix}",
-                use_container_width=True,
-            ):
-                action_taken = _handle_alloc_line_approve(emp, week_start_d, line_id)
-        with btn_cols[1]:
-            if st.button(
-                "Reject",
-                key=f"tk_alloc_no_{eid}_{week_sig}_{iso}_{lix}",
-                use_container_width=True,
-            ):
-                action_taken = _handle_alloc_line_reject(emp, week_start_d, line_id)
+        if st.button(
+            "Approve",
+            key=f"tk_alloc_ok_{eid}_{week_sig}_{iso}_{lix}",
+            use_container_width=False,
+        ):
+            action_taken = _handle_alloc_line_approve(emp, week_start_d, line_id)
+        if st.button(
+            "Reject",
+            key=f"tk_alloc_no_{eid}_{week_sig}_{iso}_{lix}",
+            use_container_width=False,
+        ):
+            action_taken = _handle_alloc_line_reject(emp, week_start_d, line_id)
     else:
-        show_remove = row_editable and len(lines) > 1
-        btn_cols = (
-            st.columns([1.35, 1.15, 0.75], gap="small")
-            if show_remove
-            else st.columns([1.45, 1.25], gap="small")
-        )
-        with btn_cols[0]:
-            if (
-                row_editable
-                and line_id
-                and line_hours > 0
-                and day_status in ("Draft", "Rejected")
-                and st.button(
-                    "Submit day line",
-                    key=f"tk_alloc_submit_{eid}_{week_sig}_{iso}_{lix}",
-                    use_container_width=True,
-                )
-            ):
-                action_taken = _handle_alloc_line_submit(emp, week_start_d, line_id)
-        with btn_cols[1]:
-            if row_editable and st.button(
-                "+ Add assignment",
-                key=f"tk_alloc_add_{eid}_{week_sig}_{iso}",
-                use_container_width=True,
-                help="Add another assignment row for this day",
-            ):
-                day_lines = list(by_date.get(iso) or [])
-                remaining = max(0.0, round(daily_total - _allocated_hours_sum(day_lines), 2))
-                day_lines.append(
-                    {
-                        "line_id": "",
-                        "job": job_opts[0] if job_opts else "— No assignment —",
-                        "hour_type": "ST",
-                        "hours": remaining,
-                        "notes": "",
-                        "status": "Draft",
-                    }
-                )
-                by_date[iso] = day_lines
-                st.session_state[_alloc_state_key(eid)] = by_date
-                st.rerun()
-        if show_remove:
-            with btn_cols[2]:
-                if st.button(
-                    "Remove",
-                    key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
-                    use_container_width=True,
-                    help="Remove this assignment row",
-                ):
-                    by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
-                    st.session_state[_alloc_state_key(eid)] = by_date
-                    st.rerun()
+        if (
+            row_editable
+            and line_id
+            and line_hours > 0
+            and day_status in ("Draft", "Rejected")
+            and st.button(
+                "Submit day line",
+                key=f"tk_alloc_submit_{eid}_{week_sig}_{iso}_{lix}",
+                use_container_width=False,
+            )
+        ):
+            action_taken = _handle_alloc_line_submit(emp, week_start_d, line_id)
+        if row_editable and st.button(
+            "+ Add assignment",
+            key=f"tk_alloc_add_{eid}_{week_sig}_{iso}",
+            use_container_width=False,
+            help="Add another assignment row for this day",
+        ):
+            day_lines = list(by_date.get(iso) or [])
+            remaining = max(0.0, round(daily_total - _allocated_hours_sum(day_lines), 2))
+            day_lines.append(
+                {
+                    "line_id": "",
+                    "job": job_opts[0] if job_opts else "— No assignment —",
+                    "hour_type": "ST",
+                    "hours": remaining,
+                    "notes": "",
+                    "status": "Draft",
+                }
+            )
+            by_date[iso] = day_lines
+            st.session_state[_alloc_state_key(eid)] = by_date
+            st.rerun()
+        if row_editable and len(lines) > 1 and st.button(
+            "Remove",
+            key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
+            use_container_width=False,
+            help="Remove this assignment row",
+        ):
+            by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
+            st.session_state[_alloc_state_key(eid)] = by_date
+            st.rerun()
 
     if action_taken:
         st.rerun()
 
 
 def _render_allocation_line_header() -> None:
+    st.markdown(
+        '<span class="timekeeping-allocation-header-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     cols = st.columns(_ALLOC_LINE_COLS_PRIMARY)
     labels = ["Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions"]
     for col, lbl in zip(cols, labels):
         with col:
-            marker = (
-                '<span class="timekeeping-allocation-header-marker" aria-hidden="true"></span>'
-                if lbl == "Assignment"
-                else ""
-            )
             st.markdown(
-                f"{marker}<div class=\"ips-time-day-head timekeeping-detail-head\">{html.escape(lbl)}</div>",
+                f'<div class="ips-time-day-head timekeeping-detail-head timekeeping-alloc-col-head">'
+                f"{html.escape(lbl)}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -2419,7 +2415,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                         unsafe_allow_html=True,
                     )
                 st.markdown(
-                    '<span class="timekeeping-allocation-line-marker" aria-hidden="true"></span>',
+                    '<span class="timekeeping-allocation-line-marker timekeeping-allocation-row-marker" '
+                    'aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 row_cols = st.columns(
@@ -2427,6 +2424,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                     gap="small",
                 )
                 with row_cols[0]:
+                    _render_allocation_field_label("Assignment")
                     st.markdown(
                         '<span class="timekeeping-allocation-assignment-marker" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
@@ -2446,6 +2444,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                             unsafe_allow_html=True,
                         )
                 with row_cols[1]:
+                    _render_allocation_field_label("Type")
                     st.markdown(
                         '<span class="timekeeping-allocation-type-marker" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
@@ -2473,18 +2472,21 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                         disabled=not row_editable,
                     )
                 with row_cols[3]:
+                    _render_allocation_field_label("Remaining")
                     st.markdown(
                         f'<div class="timekeeping-alloc-remaining-cell">'
                         f"{html.escape(_fmt_day_hours(row_remaining))}</div>",
                         unsafe_allow_html=True,
                     )
                 with row_cols[4]:
+                    _render_allocation_field_label("Status")
                     st.markdown(
                         f'<div class="timekeeping-alloc-status-cell">'
                         f"{_timecard_status_pill_html(day_status)}</div>",
                         unsafe_allow_html=True,
                     )
                 with row_cols[5]:
+                    _render_allocation_field_label("Notes")
                     if row_editable:
                         line["notes"] = st.text_input(
                             "Notes",
@@ -2519,11 +2521,13 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                         )
                 else:
                     with row_cols[6]:
+                        _render_allocation_field_label("Actions")
                         line_id = str(line.get("line_id") or "").strip()
                         if row_editable and len(lines) > 1:
                             if st.button(
                                 "Remove",
                                 key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
+                                use_container_width=False,
                                 help="Remove this assignment row",
                             ):
                                 by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
