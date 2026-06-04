@@ -205,8 +205,9 @@ def _sync_asset_pick_state(
         st.session_state[k("name")] = str(asset.get("asset_name") or "")
         st.session_state[k("type")] = str(asset.get("category") or "")
         asset_unit = str(asset.get("rental_rate_unit") or "Days")
-        if asset_unit in ("Hours", "Days", "Weeks"):
+        if asset_unit in DURATION_UNITS:
             st.session_state[k("dunit")] = asset_unit
+            st.session_state[k("last_dunit")] = asset_unit
             dur_unit = asset_unit
         st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
         asset_mk = float(asset.get("rental_default_markup_percent") or 0)
@@ -712,12 +713,22 @@ def _render_add_equipment_form(
         else:
             pick = None
             st.info("No rentable assets available. Mark assets as Rentable on the Assets page.")
+
+        dur_unit_seed = str(st.session_state.get(k("dunit")) or "Days")
+        if dur_unit_seed not in DURATION_UNITS:
+            dur_unit_seed = "Days"
+        asset: dict[str, Any] = {}
+        if pick:
+            asset = _sync_asset_pick_state(k, pick, asset_map, dur_unit_seed)
+
         dur_unit = st.selectbox("Duration unit", DURATION_UNITS, key=k("dunit"))
-        asset = _sync_asset_pick_state(k, pick, asset_map, dur_unit) if pick else {}
-        dur_last = k("last_dunit")
-        if pick and st.session_state.get(dur_last) != dur_unit:
-            st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
-            st.session_state[dur_last] = dur_unit
+
+        if pick:
+            asset = asset_map.get(pick, asset)
+            dur_last = k("last_dunit")
+            if st.session_state.get(dur_last) != dur_unit:
+                st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
+                st.session_state[dur_last] = dur_unit
         duration = st.number_input("Duration", min_value=0.0, value=1.0, key=k("dur"), step=0.5)
         qty = st.number_input("Quantity", min_value=0.0, value=1.0, key=k("qty"), step=1.0)
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))

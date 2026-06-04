@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v54">
+<style id="ips-timekeeping-module-v55">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6164,7 +6164,7 @@ def inject_timekeeping_module_css() -> None:
   display: grid !important;
   grid-template-columns:
     minmax(260px, 340px)
-    90px
+    100px
     90px
     90px
     90px
@@ -6215,7 +6215,7 @@ def inject_timekeeping_module_css() -> None:
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker) {{
   grid-template-columns:
     minmax(260px, 340px)
-    90px
+    100px
     90px
     90px
     90px
@@ -6231,15 +6231,51 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"],
+  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker)
+  > [data-testid="column"]:nth-child(2) {{
+  min-width: 100px !important;
+  width: 100px !important;
+  max-width: 100px !important;
+  overflow: visible !important;
+}}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] {{
   width: 100% !important;
-  min-width: 0 !important;
-  max-width: 90px !important;
+  min-width: 88px !important;
+  max-width: 100px !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  width: 100% !important;
+  min-width: 88px !important;
+  max-width: 100px !important;
   min-height: 38px !important;
+  height: 38px !important;
+  padding-left: 10px !important;
+  padding-right: 26px !important;
+  box-sizing: border-box !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {{
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  word-break: keep-all !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+}}
+.timekeeping-alloc-type-cell {{
+  min-width: 88px !important;
+  max-width: 100px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
 }}
 .timekeeping-alloc-type-cell,
 .timekeeping-alloc-remaining-cell {{
