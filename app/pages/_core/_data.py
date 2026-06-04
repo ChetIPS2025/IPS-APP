@@ -685,6 +685,9 @@ _DEMO_TIMEKEEPING_BY_EMP: dict[str, dict[str, Any]] = {
     "emp-leland": {"st_total": 40.0, "ot_total": 0.0, "dt_total": 0.0, "status": "Approved"},
 }
 
+# Default weekly ST hours (Mon=0 … Sun=6) when a day has no saved timekeeping row.
+AMANDA_ROBICHEAUX_EMPLOYEE_NUMBER = "IPS5320"
+
 
 def _timekeeping_summary_for_employee(
     emp: dict[str, Any],
@@ -754,17 +757,56 @@ def _normalize_timekeeping_assignment(label: str) -> str:
     return legacy.get(raw.casefold(), raw)
 
 
+def _employee_for_timekeeping(employee_id: str) -> dict[str, Any]:
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return {}
+    for emp in _active_employees():
+        if str(emp.get("id") or "").strip() == eid:
+            return emp
+    return {}
+
+
+def _is_amanda_robicheaux(employee: dict[str, Any]) -> bool:
+    num = str(employee.get("employee_number") or "").strip().upper()
+    if num == AMANDA_ROBICHEAUX_EMPLOYEE_NUMBER:
+        return True
+    name = (
+        employee.get("name")
+        or employee.get("full_name")
+        or employee.get("display_name")
+        or ""
+    ).strip().lower()
+    return name == "amanda m. robicheaux"
+
+
+def _default_hours_for_employee_day(employee: dict[str, Any], day_index: int) -> float:
+    """
+    Default ST hours when no saved row exists for that date.
+
+    day_index: 0=Monday … 6=Sunday.
+    Amanda M. Robicheaux: 8.0 Mon–Fri, 0.0 Sat–Sun (40.0/wk).
+    All other employees: 10.0 Mon–Thu, 0.0 Fri–Sun (40.0/wk).
+    """
+    if day_index < 0 or day_index > 6:
+        return 0.0
+    if _is_amanda_robicheaux(employee):
+        return 8.0 if day_index in {0, 1, 2, 3, 4} else 0.0
+    return 10.0 if day_index in {0, 1, 2, 3} else 0.0
+
+
 def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
     days = week_dates(week_start)
     job_opts = job_options_for_timekeeping()
     default_job = job_opts[0] if job_opts else "— Select assignment —"
+    emp = _employee_for_timekeeping(employee_id)
     grid = []
     for i, d in enumerate(days):
         grid.append({
             "day": d.strftime("%A"),
             "date": d.isoformat(),
             "job": default_job,
-            "st": _default_st_hours_for_day_index(i),
+            "st": _default_hours_for_employee_day(emp, i),
             "ot": 0.0,
             "dt": 0.0,
             "notes": "",
@@ -775,13 +817,8 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
     return grid
 
 
-def _default_st_hours_for_day_index(day_index: int) -> float:
-    """New days start at 0 hours."""
-    return 0.0
-
-
 def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
-    """Build the weekly grid from saved day rows, or an empty week template."""
+    """Build the weekly grid from saved day rows, or schedule defaults for missing days."""
     eid = str(employee_id or "").strip()
     try:
         from app.services.timekeeping_service import list_timekeeping_days
@@ -792,6 +829,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
     if not saved_rows:
         return default_weekly_grid(eid, week_start)
 
+    emp = _employee_for_timekeeping(eid)
     days = week_dates(week_start)
     by_date: dict[str, list[dict[str, Any]]] = {}
     for row in saved_rows:
@@ -804,6 +842,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
     for i, day in enumerate(days):
         iso = day.isoformat()
         saved_list = by_date.get(iso) or []
+        # Any saved row for this date (including 0.0 hours) — do not apply schedule defaults.
         if saved_list:
             primary = saved_list[0]
             for candidate in saved_list:
@@ -838,7 +877,7 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
                 "day": day.strftime("%A"),
                 "date": iso,
                 "job": default_job,
-                "st": _default_st_hours_for_day_index(i),
+                "st": _default_hours_for_employee_day(emp, i),
                 "ot": 0.0,
                 "dt": 0.0,
                 "notes": "",
