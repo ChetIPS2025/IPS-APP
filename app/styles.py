@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v56">
+<style id="ips-timekeeping-module-v57">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -5975,10 +5975,7 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 0 0.45rem 0;
   max-width: 720px;
 }}
-.timekeeping-alloc-day-block {{
-  margin: 0.4rem 0 0.15rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid #e2e8f0;
+.timekeeping-alloc-day-card {{
   max-width: 920px;
 }}
 .timekeeping-alloc-day-head {{
@@ -5987,8 +5984,9 @@ def inject_timekeeping_module_css() -> None:
   align-items: center;
   gap: 0.25rem 0.75rem;
   min-height: 34px;
-  margin-bottom: 0.35rem;
-  padding: 0;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px 8px 0 0;
 }}
 .timekeeping-alloc-day-title {{
   font-size: 0.88rem;
@@ -6022,9 +6020,6 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-complete {{
   background: #f0fdf4;
   border: 1px solid #86efac;
-  border-radius: 8px;
-  padding: 0.3rem 0.45rem 0.25rem;
-  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-complete .timekeeping-alloc-day-title {{
   color: #166534;
@@ -6042,9 +6037,6 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-needs-assignment {{
   background: #fffbeb;
   border: 1px solid #fcd34d;
-  border-radius: 8px;
-  padding: 0.3rem 0.45rem 0.25rem;
-  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-incomplete .timekeeping-alloc-day-split,
 .timekeeping-alloc-day-needs-assignment .timekeeping-alloc-day-split {{
@@ -6054,9 +6046,6 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-overallocated {{
   background: #fef2f2;
   border: 1px solid #fca5a5;
-  border-radius: 8px;
-  padding: 0.3rem 0.45rem 0.25rem;
-  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-overallocated .timekeeping-alloc-day-split,
 .timekeeping-alloc-day-overallocated .timekeeping-alloc-day-total {{
@@ -6158,15 +6147,46 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1.2 !important;
   margin: 0 !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] {{
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker) {{
   max-width: 100% !important;
   width: 100% !important;
-  margin: 0 0 4px 0 !important;
-  padding: 4px 8px !important;
+  margin: 0.4rem 0 6px 0 !important;
+  padding: 0 !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker)
+  [data-testid="stElementContainer"]:has(.timekeeping-alloc-day-card) {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker)
+  [data-testid="stCaptionContainer"] {{
+  margin: 0 !important;
+  padding: 0.25rem 0.5rem 0.35rem !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] {{
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  border-top: 1px solid #e2e8f0 !important;
+  box-sizing: border-box !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker)
+  > [data-testid="stVerticalBlock"]
+  > [data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-tk_alloc_row_"]):first-of-type
+  [class*="st-key-tk_alloc_row_"] {{
+  border-top: none !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
