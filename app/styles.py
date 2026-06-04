@@ -25,11 +25,13 @@ SELECTED_BORDER = "#2563eb"
 
 def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
-    users_grid = "52px 260px 280px 150px 180px 130px 110px"
-    users_table_width = "1162px"
+    users_grid = (
+        "52px minmax(140px, 1.1fr) minmax(200px, 1.5fr) minmax(120px, 0.9fr) "
+        "minmax(140px, 1fr) minmax(110px, 0.85fr) minmax(100px, 0.75fr)"
+    )
     st.markdown(
         f"""
-<style id="ips-users-module-v16">
+<style id="ips-users-module-v17">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -37,7 +39,7 @@ def inject_users_module_css() -> None:
   overflow: hidden;
   margin-bottom: 0.35rem;
   margin-top: 0 !important;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }}
 .ips-users-header-row {{
@@ -159,14 +161,14 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   margin-top: 0 !important;
 }}
 .st-key-users_table_wrap {{
-  overflow-x: auto;
+  overflow-x: hidden;
   max-width: 100%;
-  width: fit-content;
+  width: 100%;
   margin-top: 0 !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
@@ -181,9 +183,9 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   padding: 0 !important;
   margin: 0 !important;
   min-height: 46px;
-  width: {users_table_width} !important;
-  min-width: {users_table_width} !important;
-  max-width: {users_table_width} !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   box-sizing: border-box !important;
   justify-content: start !important;
   justify-items: stretch !important;
@@ -2642,6 +2644,168 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
     )
 
 
+def inject_table_viewport_fit() -> None:
+    """Scale wide list tables to fit the main content area; full width when there is room."""
+    st.markdown(
+        """
+<style id="ips-table-viewport-fit-v1">
+section[data-testid="stMain"] [class*="_table_wrap"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+section[data-testid="stMain"] .ips-data-table-scroll {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+section[data-testid="stMain"] div[data-testid="stDataFrame"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+[class*="_table_wrap"].ips-table-fit-host,
+.ips-data-table-scroll.ips-table-fit-host,
+div[data-testid="stDataFrame"].ips-table-fit-host {
+  overflow-x: hidden !important;
+}
+[class*="_table_wrap"].ips-table-fit-scaled [data-testid="stHorizontalBlock"] > [data-testid="column"],
+[class*="_table_wrap"].ips-table-fit-scaled .ips-users-ellipsis,
+[class*="_table_wrap"].ips-table-fit-scaled [class*="-ellipsis"] {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+    html_doc = r"""
+<script>
+(function () {
+  var w = window.parent || window;
+  var doc = w.document;
+  if (w.__ipsTableViewportFitBound) return;
+  w.__ipsTableViewportFitBound = true;
+
+  var WRAP_SEL =
+    'section[data-testid="stMain"] [class*="_table_wrap"]:not(.ips-table-fit-opt-out)';
+  var DATAFRAME_SEL =
+    'section[data-testid="stMain"] div[data-testid="stDataFrame"]:not(.ips-table-fit-opt-out)';
+  var SCROLL_SEL =
+    'section[data-testid="stMain"] .ips-data-table-scroll:not(.ips-table-fit-opt-out)';
+  var MIN_SCALE = 0.52;
+  var SHELL_PAD = 56;
+
+  function getAvailable(wrap) {
+    var shell = wrap.closest('section[data-testid="stMain"]');
+    if (shell && shell.clientWidth > 0) {
+      return Math.max(240, shell.clientWidth - SHELL_PAD);
+    }
+    var p = wrap.parentElement;
+    while (p) {
+      if (p.clientWidth > 0) return p.clientWidth;
+      p = p.parentElement;
+    }
+    return w.innerWidth || 1200;
+  }
+
+  function measureNeeded(scaler) {
+    var max = 0;
+    var blocks = scaler.querySelectorAll('[data-testid="stHorizontalBlock"]');
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (b.closest('[class*="st-key-tk_expand_detail_"]')) continue;
+      var sw = b.scrollWidth || b.offsetWidth;
+      if (sw > max) max = sw;
+    }
+    var root = scaler.scrollWidth || scaler.offsetWidth;
+    return Math.max(max, root);
+  }
+
+  function getScaler(wrap) {
+    if (wrap.getAttribute && wrap.getAttribute('data-testid') === 'stDataFrame') {
+      return (
+        wrap.querySelector('[data-testid="stDataFrameResizable"]') ||
+        wrap.querySelector('.dvn-scroller') ||
+        wrap.firstElementChild ||
+        wrap
+      );
+    }
+    if (wrap.classList && wrap.classList.contains('ips-data-table-scroll')) {
+      var inner = wrap.querySelector('.ips-data-table-stable, .ips-data-table-wrap, table');
+      return inner || wrap;
+    }
+    return wrap.querySelector('[data-testid="stVerticalBlock"]') || wrap;
+  }
+
+  function resetWrap(wrap, scaler) {
+    scaler.style.transform = '';
+    scaler.style.transformOrigin = '';
+    scaler.style.width = '';
+    wrap.style.minHeight = '';
+    wrap.classList.remove('ips-table-fit-host', 'ips-table-fit-scaled');
+    wrap.dataset.ipsTableFitScale = '1';
+  }
+
+  function applyOne(wrap) {
+    if (!wrap || wrap.closest('.ips-proposal-preview-root, .ips-login-page-marker')) return;
+    if (wrap.closest('.st-key-timekeeping_table_wrap')) return;
+    var scaler = getScaler(wrap);
+    if (!scaler) return;
+    resetWrap(wrap, scaler);
+    var available = getAvailable(wrap);
+    var needed = measureNeeded(scaler);
+    if (!available || !needed || needed <= available + 2) return;
+    var scale = Math.max(MIN_SCALE, available / needed);
+    if (scale >= 0.995) return;
+    wrap.classList.add('ips-table-fit-host', 'ips-table-fit-scaled');
+    scaler.style.transformOrigin = 'top left';
+    scaler.style.transform = 'scale(' + scale + ')';
+    scaler.style.width = needed + 'px';
+    var h = (scaler.offsetHeight || scaler.scrollHeight) * scale;
+    wrap.style.minHeight = Math.ceil(h + 6) + 'px';
+    wrap.dataset.ipsTableFitScale = String(scale);
+  }
+
+  function runAll() {
+    var seen = new Set();
+    function each(sel) {
+      doc.querySelectorAll(sel).forEach(function (node) {
+        if (seen.has(node)) return;
+        seen.add(node);
+        applyOne(node);
+      });
+    }
+    each(WRAP_SEL);
+    each(SCROLL_SEL);
+    each(DATAFRAME_SEL);
+  }
+
+  var scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    w.requestAnimationFrame(function () {
+      scheduled = false;
+      runAll();
+    });
+  }
+
+  schedule();
+  w.addEventListener('resize', schedule);
+  if (!w.__ipsTableViewportFitObserver) {
+    w.__ipsTableViewportFitObserver = new MutationObserver(schedule);
+    w.__ipsTableViewportFitObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+"""
+    try:
+        components.html(html_doc, height=0, key="ips_table_viewport_fit_v1")
+    except TypeError:
+        components.html(html_doc, height=0)
+
+
 def inject_asset_qr_scan_css() -> None:
     """Mobile asset QR scan page."""
     st.markdown(
@@ -3212,10 +3376,12 @@ def inject_timekeeping_module_css() -> None:
         f'[class*="st-key-tk_alloc_day_"], '
         f'{tk_alloc_panel} [class*="st-key-tk_alloc_day_"]'
     )
+    tk_alloc_line_host = f'{tk_alloc_day} [class*="st-key-tk_alloc_line_"]'
     tk_alloc_line_key = (
-        f'{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
+        f'{tk_alloc_line_host} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
     )
     tk_alloc_ctrl_row = tk_alloc_line_key
+    tk_alloc_grid_min_w = "980px"
     tk_alloc_ctrl_row_alt = (
         f'{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
         f':not(:has(.timekeeping-allocation-primary-row-marker))'
@@ -3231,7 +3397,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v78">
+<style id="ips-timekeeping-module-v79">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6105,7 +6271,7 @@ def inject_timekeeping_module_css() -> None:
   column-gap: 10px !important;
   align-items: end !important;
   width: 100% !important;
-  min-width: 0 !important;
+  min-width: {tk_alloc_grid_min_w} !important;
   max-width: 100% !important;
   margin: 0 0 4px 0 !important;
   padding: 0 2px !important;
@@ -6236,8 +6402,9 @@ def inject_timekeeping_module_css() -> None:
 {tk_expand}:has(.timekeeping-allocation-panel-marker) {{
   max-width: 100% !important;
   width: 100% !important;
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
 }}
 {tk_alloc_panel} {{
   width: 100% !important;
@@ -6317,10 +6484,19 @@ def inject_timekeeping_module_css() -> None:
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker) {{
-  width: auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
   max-width: 100% !important;
   justify-content: flex-start !important;
+  align-items: center !important;
   gap: 10px !important;
+  margin-top: 10px !important;
+  padding-top: 8px !important;
+  border-top: 1px solid #e2e8f0 !important;
+  position: relative !important;
+  z-index: 2 !important;
+  clear: both !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker)
@@ -6368,10 +6544,19 @@ def inject_timekeeping_module_css() -> None:
   max-width: 100% !important;
   overflow-x: auto !important;
 }}
+{tk_alloc_line_host} {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}}
 {tk_alloc_line_key} {{
   max-width: 100% !important;
   width: 100% !important;
-  min-width: 0 !important;
+  min-width: {tk_alloc_grid_min_w} !important;
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
@@ -6380,7 +6565,7 @@ def inject_timekeeping_module_css() -> None:
   box-sizing: border-box !important;
   overflow: visible !important;
 }}
-{tk_alloc_line_key} + {tk_alloc_line_key} {{
+{tk_alloc_line_host} + {tk_alloc_line_host} {{
   margin-top: 2px !important;
   padding-top: 2px !important;
   border-top: 1px solid #f1f5f9 !important;
@@ -6425,7 +6610,7 @@ def inject_timekeeping_module_css() -> None:
   row-gap: 0 !important;
   align-items: center !important;
   width: 100% !important;
-  min-width: 0 !important;
+  min-width: {tk_alloc_grid_min_w} !important;
   max-width: 100% !important;
   margin: 0 !important;
   box-sizing: border-box !important;
@@ -9919,6 +10104,7 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
         from ui.clean_table import inject_clean_table_css  # type: ignore
     inject_clean_table_css()
     inject_table_header_filter_css()
+    inject_table_viewport_fit()
     inject_ips_dialog_styles()
     inject_action_colors_css()
 

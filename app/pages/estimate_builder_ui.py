@@ -1597,35 +1597,19 @@ def render_summary_tab(est: dict[str, Any]) -> None:
 
 
 def render_proposal_preview_tab(est: dict[str, Any]) -> None:
+    """Customer quote preview and exports (single view aligned with Word/PDF)."""
     eid = str(est.get("id") or "")
-    totals = calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
+
+    if is_demo_id(eid):
+        st.info("Save estimate to Supabase to preview and download the customer quote.")
+        return
+
+    totals = calculate_estimate_totals(eid) if eid else {}
     try:
         from app.services.proposal_pdf_service import merge_proposal_totals
     except ImportError:
         from services.proposal_pdf_service import merge_proposal_totals  # type: ignore
     totals = merge_proposal_totals(totals, est)
-
-    preview_fields = [
-        detail_field_html("Estimate #", est.get("estimate_number")),
-        detail_field_html("Customer", est.get("customer")),
-        detail_field_html("Project", est.get("project_name")),
-        detail_field_html("Valid through", fmt_date(est.get("expiration_date"))),
-    ]
-    travel_price = float(totals.get("travel_price") or 0)
-    if travel_price > 0:
-        preview_fields.append(detail_field_html("Travel (customer)", fmt_currency(travel_price)))
-    preview_fields.append(detail_field_html("Proposal total", fmt_currency(totals.get("proposal_total"))))
-    st.markdown(
-        dialog_card_html(
-            "Customer Quote",
-            f'<div class="ips-detail-grid">{"".join(preview_fields)}</div>',
-        ),
-        unsafe_allow_html=True,
-    )
-
-    if is_demo_id(eid):
-        st.info("Save estimate to Supabase to preview and download the customer quote.")
-        return
 
     try:
         docx_bytes, pdf_bytes, page_html, word_err, pdf_note = build_customer_quote_bundle(eid, est, totals=totals)
