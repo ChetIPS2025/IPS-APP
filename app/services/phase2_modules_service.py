@@ -1063,11 +1063,14 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
                         data=result.data,
                     )
                 else:
+                    msg = link_result.message or "Linked job could not be created."
                     _LOG.warning(
                         "Estimate %s saved; linked job ensure failed: %s",
                         saved_id,
-                        link_result.message,
+                        msg,
                     )
+                    if isinstance(result.data, dict):
+                        result.data["linked_job_error"] = msg
             elif isinstance(result.data, dict) and link_result.job:
                 result.data["job_id"] = str(link_result.job.get("id") or result.data.get("job_id") or "")
         if saved_id and project_name:

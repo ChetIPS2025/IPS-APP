@@ -298,6 +298,39 @@ def get_estimate_description(est: dict[str, Any]) -> str:
 _JOB_COLLISION_COLUMNS = "id,job_number,job_name,estimate_id,customer_id,status,is_deleted,deleted_at"
 
 
+def _job_has_stale_estimate_link(job: dict[str, Any]) -> bool:
+    """Job points at an estimate that does not reference this job (failed or replaced link)."""
+    est_id = str(job.get("estimate_id") or "").strip()
+    if not est_id:
+        return False
+    est_rows = fetch_by_match_admin("estimates", {"id": est_id}, columns="id,job_id", limit=1)
+    if not est_rows:
+        return True
+    linked = str(est_rows[0].get("job_id") or "").strip()
+    job_id = str(job.get("id") or "").strip()
+    return linked != job_id
+
+
+def _estimate_quote_number(row: dict[str, Any]) -> str:
+    ej = _as_json_dict(row.get("estimate_json"))
+    return str(
+        row.get("quote_number") or row.get("estimate_number") or ej.get("quote_number") or ""
+    ).strip()
+
+
+def _job_matches_estimate_quote(job: dict[str, Any], quote_number: str) -> bool:
+    q = str(quote_number or "").strip().upper()
+    if not q:
+        return False
+    src = str(job.get("source_estimate_number") or "").strip().upper()
+    if src == q:
+        return True
+    proposed = estimate_quote_to_job_number(q)
+    if not proposed:
+        return False
+    return _normalize_job_number_key(job.get("job_number")) == _normalize_job_number_key(proposed)
+
+
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
     by_ref = fetch_by_match_admin(
         "jobs",
@@ -317,6 +350,15 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
         )
         if got:
             return got[0]
+    quote_number = _estimate_quote_number(row)
+    proposed = estimate_quote_to_job_number(quote_number) if quote_number else ""
+    if proposed:
+        for hit in fetch_jobs_by_exact_job_number(proposed):
+            if _job_matches_estimate_quote(hit, quote_number) and (
+                _job_has_stale_estimate_link(hit)
+                or str(hit.get("estimate_id") or "").strip() in {"", estimate_id}
+            ):
+                return hit
     return None
 
 
@@ -345,15 +387,9 @@ def _estimate_pending_job_is_orphan(blocking_job: dict[str, Any]) -> bool:
     """Estimate-pending rows left behind after a failed link should not block new estimates."""
     if _norm_job_status(blocking_job.get("status")) != "estimate pending":
         return False
-    est_id = str(blocking_job.get("estimate_id") or "").strip()
-    if not est_id:
+    if not str(blocking_job.get("estimate_id") or "").strip():
         return True
-    est_rows = fetch_by_match_admin("estimates", {"id": est_id}, columns="id,job_id", limit=1)
-    if not est_rows:
-        return True
-    linked = str(est_rows[0].get("job_id") or "").strip()
-    job_id = str(blocking_job.get("id") or "").strip()
-    return linked != job_id
+    return _job_has_stale_estimate_link(blocking_job)
 
 
 def fetch_jobs_by_exact_job_number(job_number: str, *, limit: int = 20) -> list[dict[str, Any]]:
@@ -377,6 +413,8 @@ def job_number_conflict_is_reclaimable(blocking_job: dict[str, Any], *, estimate
     if _job_row_is_soft_deleted(blocking_job):
         return True
     if _estimate_pending_job_is_orphan(blocking_job):
+        return True
+    if _job_has_stale_estimate_link(blocking_job):
         return True
     if str(blocking_job.get("estimate_id") or "").strip():
         return False
@@ -416,6 +454,8 @@ def resolve_job_number_collision(
     hest = str(hit.get("estimate_id") or "").strip()
     eid = str(estimate_id or "").strip()
     if hest and eid and hest == eid:
+        return "reuse", hit
+    if _job_has_stale_estimate_link(hit):
         return "reuse", hit
     if job_number_conflict_is_reclaimable(hit, estimate_id=estimate_id):
         if reclaim_inactive_job_number(hit, proposed_jn):

@@ -708,6 +708,34 @@ def _linked_job_label(job: dict[str, Any]) -> str:
     return ""
 
 
+def backfill_estimate_missing_linked_job(row: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Create or re-link a pending job when an estimate has a customer but no job_id.
+
+    Safe for list-load repair of rows saved before auto-link ran or blocked by stale J numbers.
+    """
+    eid = str(row.get("id") or "").strip()
+    if not eid or str(row.get("job_id") or "").strip():
+        return None
+    if not str(row.get("customer_id") or "").strip():
+        return None
+    if not estimate_status_approvable(row.get("status")):
+        return None
+    quote = str(row.get("quote_number") or row.get("estimate_number") or "").strip()
+    if not quote:
+        return None
+    result = ensure_linked_pending_job_for_estimate(eid, estimate_row=row)
+    if not result.ok or not result.job:
+        _LOG.info(
+            "Linked job backfill skipped for estimate %s (%s): %s",
+            eid,
+            quote,
+            result.message,
+        )
+        return None
+    return result.job
+
+
 def enrich_estimates_with_job_numbers(
     rows: list[dict[str, Any]],
     jobs: list[dict[str, Any]] | None = None,
@@ -738,6 +766,15 @@ def enrich_estimates_with_job_numbers(
         job = by_id.get(jid) if jid else None
         if not job:
             job = by_est.get(str(r.get("id") or ""))
+        if not job:
+            repaired = backfill_estimate_missing_linked_job(r)
+            if repaired:
+                job = repaired
+                jid = str(repaired.get("id") or "").strip()
+                if jid:
+                    by_id[jid] = repaired
+                    by_est[str(r.get("id") or "")] = repaired
+                    r["job_id"] = jid
         if job:
             jn = job_number_display(job.get("job_number"))
             if jn:
