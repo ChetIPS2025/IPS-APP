@@ -55,7 +55,12 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.config import settings
-    from app.db import invite_auth_user, resend_invite_by_email
+    from app.db import (
+        create_auth_user,
+        invite_auth_user,
+        resend_invite_by_email,
+        set_auth_user_password_admin,
+    )
     from app.services.repository import clear_all_data_caches
     from app.services.users_service import can_manage_user_actions, get_user_delete_context
     from app.styles import inject_users_module_css
@@ -109,7 +114,12 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from config import settings  # type: ignore
-    from db import invite_auth_user, resend_invite_by_email  # type: ignore
+    from db import (  # type: ignore
+        create_auth_user,
+        invite_auth_user,
+        resend_invite_by_email,
+        set_auth_user_password_admin,
+    )
     from services.repository import clear_all_data_caches  # type: ignore
     from services.users_service import can_manage_user_actions, get_user_delete_context  # type: ignore
     from styles import inject_users_module_css  # type: ignore
@@ -679,6 +689,36 @@ def _employee_invite_email(emp: dict) -> str:
     return email
 
 
+def _create_employee_login_with_password(emp: dict, password: str) -> str:
+    eid = str(emp.get("id") or "").strip()
+    email = _employee_invite_email(emp)
+    if not email or "@" not in email:
+        raise RuntimeError("Add a valid work email before creating a login.")
+    if "indfustrial" in email:
+        raise RuntimeError("Check spelling of company domain (found 'indfustrial').")
+    if not _email_domain_allowed(email):
+        raise RuntimeError("Email domain is not allowed for app login.")
+
+    ctx = get_user_delete_context(eid)
+    if ctx.get("has_login"):
+        prof_id = str(ctx.get("profile_id") or "").strip()
+        if not prof_id:
+            raise RuntimeError("Login exists but profile id is missing.")
+        set_auth_user_password_admin(user_id=prof_id, password=password)
+        clear_all_data_caches()
+        return email
+
+    create_auth_user(
+        email=email,
+        password=password,
+        role=_invite_role_from_employee(emp),
+        full_name=str(emp.get("name") or "").strip(),
+        employee_id=eid or None,
+    )
+    clear_all_data_caches()
+    return email
+
+
 def _send_employee_invite(emp: dict) -> str:
     eid = str(emp.get("id") or "").strip()
     email = _employee_invite_email(emp)
@@ -711,8 +751,8 @@ def _resend_employee_invite(emp: dict) -> str:
     return email
 
 
-def _render_user_login_invite_panel(emp: dict, rk: str) -> None:
-    """Send or resend Supabase magic-link invites from the user detail modal."""
+def _render_user_login_panel(emp: dict, rk: str) -> None:
+    """Create or update app login (email + password) from the user detail modal."""
     if not can_manage_user_actions():
         return
     eid = str(emp.get("id") or "").strip()
@@ -728,41 +768,66 @@ def _render_user_login_invite_panel(emp: dict, rk: str) -> None:
         unsafe_allow_html=True,
     )
     if not email or "@" not in email:
-        st.caption("Add a valid work email on this user, then send an invite.")
+        st.caption("Add a work email on this user, then set a password below.")
         return
 
-    if has_login:
-        st.caption(f"Login linked · {email} · resend sends a password setup link")
+    if not has_login:
+        st.caption(f"Sign in with email {email} and the password you set below.")
+    else:
+        st.caption(f"Login active for {email}. Enter a new password to change it.")
+    pw_key = f"emp_login_pw_{rk}"
+    pw = st.text_input(
+        "Password",
+        type="password",
+        key=pw_key,
+        placeholder="At least 6 characters",
+        help="Share this password with the user. They sign in on the app login screen with their email.",
+    )
+    btn_label = "Update password" if has_login else "Create login"
+    if st.button(btn_label, type="primary", key=f"emp_set_login_pw_{rk}", use_container_width=True):
+        if len(str(pw or "").strip()) < 6:
+            st.error("Enter a password of at least 6 characters.")
+        else:
+            try:
+                _create_employee_login_with_password(emp, str(pw))
+                st.session_state["users_action_flash"] = (
+                    "success",
+                    f"{'Password updated' if has_login else 'Login created'} for {email}.",
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not {btn_label.lower()}.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+
+    if not has_login:
         if st.button(
-            "Resend invite",
+            "Send invite email instead",
+            key=f"emp_send_invite_{rk}",
+            use_container_width=True,
+        ):
+            try:
+                sent_to = _send_employee_invite(emp)
+                st.session_state["users_action_flash"] = ("success", f"Invite sent to {sent_to}.")
+                st.rerun()
+            except Exception as exc:
+                st.error("Could not send invite.")
+                with st.expander("Technical details"):
+                    st.code(repr(exc), language="text")
+    else:
+        if st.button(
+            "Email password reset link",
             key=f"emp_resend_invite_{rk}",
             use_container_width=True,
         ):
             try:
                 sent_to = _resend_employee_invite(emp)
-                st.session_state["users_action_flash"] = ("success", f"Invite resent to {sent_to}.")
+                st.session_state["users_action_flash"] = ("success", f"Reset link sent to {sent_to}.")
                 st.rerun()
             except Exception as exc:
-                st.error("Could not resend invite.")
+                st.error("Could not send reset email.")
                 with st.expander("Technical details"):
                     st.code(repr(exc), language="text")
-        return
-
-    st.caption(f"No login yet · invite will go to {email}")
-    if st.button(
-        "Send invite",
-        type="primary",
-        key=f"emp_send_invite_{rk}",
-        use_container_width=True,
-    ):
-        try:
-            sent_to = _send_employee_invite(emp)
-            st.session_state["users_action_flash"] = ("success", f"Invite sent to {sent_to}.")
-            st.rerun()
-        except Exception as exc:
-            st.error("Could not send invite.")
-            with st.expander("Technical details"):
-                st.code(repr(exc), language="text")
 
 
 def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
@@ -845,7 +910,7 @@ def render_employee_detail_dialog(emp: dict) -> None:
                 ("Status", status),
             ]
         )
-        _render_user_login_invite_panel(emp, rk)
+        _render_user_login_panel(emp, rk)
         _render_user_actions_panel(emp, rk)
 
     if is_edit_mode(MODULE, rk):
@@ -921,14 +986,22 @@ def render() -> None:
                 )
                 st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
             if can_manage_user_actions():
+                st.text_input(
+                    "Login password",
+                    type="password",
+                    key="emp_new_login_password",
+                    placeholder="Optional — creates app login when saved",
+                    help="User signs in with their email and this password. Leave blank to set login later.",
+                )
                 st.checkbox(
-                    "Send invite email after save",
-                    value=True,
+                    "Send invite email instead of setting a password",
+                    value=False,
                     key="emp_new_send_invite",
-                    help="Emails a magic link so they can set a password and log in.",
+                    help="Only used when Login password is left blank.",
                 )
             if st.button("Save User", key="emp_save_new", type="primary"):
                 new_email = str(st.session_state.get("emp_new_email") or "").strip()
+                new_pw = str(st.session_state.get("emp_new_login_password") or "").strip()
                 ok, msg = persist_employee(
                     {
                         "name": st.session_state.get("emp_new_name"),
@@ -944,7 +1017,7 @@ def render() -> None:
                     st.session_state.pop("ips_emp_form", None)
                     flash_kind = "success"
                     flash_msg = msg or "Employee saved."
-                    if can_manage_user_actions() and st.session_state.get("emp_new_send_invite"):
+                    if can_manage_user_actions() and new_email:
                         fresh = next(
                             (
                                 e
@@ -954,15 +1027,20 @@ def render() -> None:
                             None,
                         )
                         if fresh:
-                            try:
-                                sent_to = _send_employee_invite(fresh)
-                                flash_msg = f"Employee saved. Invite sent to {sent_to}."
-                            except Exception as exc:
-                                flash_kind = "warning"
-                                flash_msg = f"Employee saved. Invite failed: {exc}"
-                        elif new_email:
-                            flash_kind = "warning"
-                            flash_msg = "Employee saved, but could not send invite."
+                            if len(new_pw) >= 6:
+                                try:
+                                    _create_employee_login_with_password(fresh, new_pw)
+                                    flash_msg = f"User saved. They can sign in as {new_email} with the password you set."
+                                except Exception as exc:
+                                    flash_kind = "warning"
+                                    flash_msg = f"User saved, but login could not be created: {exc}"
+                            elif st.session_state.get("emp_new_send_invite"):
+                                try:
+                                    sent_to = _send_employee_invite(fresh)
+                                    flash_msg = f"User saved. Invite sent to {sent_to}."
+                                except Exception as exc:
+                                    flash_kind = "warning"
+                                    flash_msg = f"User saved. Invite failed: {exc}"
                     st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 

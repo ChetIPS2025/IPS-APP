@@ -930,6 +930,8 @@ def create_auth_user(
     password: str,
     role: str = "viewer",
     full_name: str = "",
+    *,
+    employee_id: str | None = None,
 ) -> dict[str, Any]:
     em_norm = str(email or "").strip().lower()
     if not em_norm:
@@ -947,14 +949,31 @@ def create_auth_user(
         if dom != allowed_domain:
             raise RuntimeError("Email domain not allowed.")
 
+    pw = str(password or "").strip()
+    if len(pw) < 6:
+        raise RuntimeError("Password must be at least 6 characters.")
+
+    try:
+        existing_email = fetch_by_match_admin("profiles", {"email": em_norm}, columns="id,email", limit=2)  # type: ignore[name-defined]
+    except Exception:
+        existing_email = []
+    if existing_email:
+        raise RuntimeError("A login already exists for this email.")
+
+    role_norm = str(role or "viewer").strip().lower() or "viewer"
+    if role_norm in {"pm", "estimator"}:
+        role_norm = "manager"
+    if role_norm not in {"admin", "manager", "employee", "viewer"}:
+        role_norm = "employee"
+
     admin = get_admin_client()
     try:
         result = admin.auth.admin.create_user(
             {
                 "email": em_norm,
-                "password": password,
+                "password": pw,
                 "email_confirm": True,
-                "user_metadata": {"full_name": full_name, "role": role},
+                "user_metadata": {"full_name": full_name, "role": role_norm},
             }
         )
     except Exception as exc:
@@ -969,13 +988,17 @@ def create_auth_user(
     user_id = getattr(user, "id", None) or user.get("id")
     user_email = getattr(user, "email", None) or user.get("email") or em_norm
 
-    profile_payload = {
+    eid_link = str(employee_id or "").strip() or None
+    profile_payload: dict[str, Any] = {
         "id": user_id,
         "email": str(user_email or "").strip().lower() or em_norm,
         "full_name": full_name,
-        "role": role,
+        "role": role_norm,
         "is_active": True,
+        "must_reset_password": False,
     }
+    if eid_link:
+        profile_payload["employee_id"] = eid_link
 
     existing = fetch_one("profiles", {"id": user_id})
     try:
@@ -988,35 +1011,66 @@ def create_auth_user(
             f"profiles upsert failed after auth user creation (user_id={user_id!r}): {exc!r}"
         ) from exc
 
-    # Best-effort: auto-link employee by email when possible (prevents "unlinked" accounts)
+    # Link employee by id or matching email.
     try:
         emp_rows = fetch_table_admin("employees", columns="id,email,profile_id,auth_user_id,name", limit=5000, order_by="name")
     except Exception:
         emp_rows = []
-    try:
-        matches = [e for e in (emp_rows or []) if str(e.get("email") or "").strip().lower() == str(profile_payload.get("email") or "").strip().lower()]
-        if len(matches) == 1:
-            eid = str(matches[0].get("id") or "").strip()
-            if eid:
-                try:
-                    update_rows_admin("profiles", {"employee_id": eid}, {"id": user_id})
-                except Exception:
-                    pass
-                for col in ("auth_user_id", "profile_id"):
-                    try:
-                        update_rows_admin("employees", {col: str(user_id)}, {"id": eid})
-                        break
-                    except Exception:
-                        continue
-    except Exception:
-        pass
+    link_eid = eid_link
+    if not link_eid:
+        try:
+            matches = [
+                e
+                for e in (emp_rows or [])
+                if str(e.get("email") or "").strip().lower() == str(profile_payload.get("email") or "").strip().lower()
+            ]
+            if len(matches) == 1:
+                link_eid = str(matches[0].get("id") or "").strip() or None
+        except Exception:
+            link_eid = None
+    if link_eid:
+        try:
+            update_rows_admin("profiles", {"employee_id": link_eid}, {"id": user_id})
+        except Exception:
+            pass
+        for col in ("auth_user_id", "profile_id"):
+            try:
+                update_rows_admin("employees", {col: str(user_id)}, {"id": link_eid})
+                break
+            except Exception:
+                continue
 
     return {
         "id": user_id,
         "email": user_email,
-        "role": role,
+        "role": role_norm,
         "full_name": full_name,
     }
+
+
+def set_auth_user_password_admin(*, user_id: str, password: str) -> None:
+    """Set password for an existing Supabase Auth user (admin API)."""
+    uid = str(user_id or "").strip()
+    pw = str(password or "").strip()
+    if not uid:
+        raise RuntimeError("Auth user id is required.")
+    if len(pw) < 6:
+        raise RuntimeError("Password must be at least 6 characters.")
+    admin = get_admin_client()
+    try:
+        fn = getattr(admin.auth.admin, "update_user_by_id", None)
+        if fn is None:
+            raise AttributeError("auth.admin.update_user_by_id is not available in this Supabase client.")
+        try:
+            fn(uid, {"password": pw})
+        except TypeError:
+            fn({"uid": uid, "attributes": {"password": pw}})
+    except Exception as exc:
+        raise RuntimeError(f"Could not update password for user_id={uid!r}: {exc!r}") from exc
+    try:
+        update_profile_admin(uid, {"must_reset_password": False})
+    except Exception:
+        pass
 
 
 def invite_auth_user(
