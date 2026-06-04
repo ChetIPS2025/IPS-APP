@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from app.services.repository import (
@@ -520,28 +520,55 @@ def calculate_estimate_totals(
     )
 
 
+def _estimate_totals_persist_payload(totals: dict[str, float]) -> dict[str, Any]:
+    """Map Cost Builder rollup fields onto estimates table columns (legacy + 067)."""
+    customer_price = float(totals.get("customer_price") or 0)
+    total_cost = float(totals.get("total_cost") or 0)
+    tax_amount = float(totals.get("tax_amount") or 0)
+    return {
+        "material_cost": totals.get("material_cost"),
+        "labor_cost": totals.get("labor_cost"),
+        "equipment_cost": totals.get("equipment_cost"),
+        "travel_cost": totals.get("travel_cost"),
+        "subcontractor_cost": totals.get("subcontractor_cost"),
+        "other_cost": totals.get("other_cost"),
+        "total_cost": total_cost,
+        "material_markup": totals.get("material_markup"),
+        "labor_markup": totals.get("labor_markup"),
+        "equipment_markup": totals.get("equipment_markup"),
+        "travel_markup": totals.get("travel_markup"),
+        "subcontractor_markup": totals.get("subcontractor_markup"),
+        "other_markup": totals.get("other_markup"),
+        "travel_price": totals.get("travel_price"),
+        "total_markup": totals.get("total_markup"),
+        "subtotal_before_tax": totals.get("subtotal_before_tax"),
+        "taxable_subtotal": totals.get("taxable_subtotal"),
+        "tax_amount": tax_amount,
+        "tax_rate": totals.get("tax_rate"),
+        "customer_price": customer_price,
+        "gross_profit": totals.get("gross_profit"),
+        "gross_margin_percent": totals.get("gross_margin_percent"),
+        "subtotal": total_cost,
+        "material_total": totals.get("material_cost"),
+        "labor_total": totals.get("labor_cost"),
+        "equipment_total": totals.get("equipment_cost"),
+        "markup": totals.get("total_markup"),
+        "tax": tax_amount,
+        "total": customer_price,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def recalculate_and_save_estimate_totals(estimate_id: str) -> ServiceResult:
     eid = _str(estimate_id)
     if not eid:
         return ServiceResult(ok=False, error="Estimate id is required.")
     totals = calculate_estimate_totals(eid)
-    payload = {
-        **totals,
-        "subtotal": totals["total_cost"],
-        "material_total": totals["material_cost"],
-        "labor_total": totals["labor_cost"],
-        "equipment_total": totals["equipment_cost"],
-        "travel_cost": totals["travel_cost"],
-        "travel_markup": totals["travel_markup"],
-        "travel_price": totals["travel_price"],
-        "markup": totals["total_markup"],
-        "tax": totals["tax_amount"],
-        "total": totals["customer_price"],
-        "updated_at": date.today().isoformat(),
-    }
+    payload = _estimate_totals_persist_payload(totals)
     result = update_row("estimates", payload, {"id": eid})
     if result.ok:
         clear_all_data_caches()
+        return ServiceResult(ok=True, data={**totals, **payload})
     return result
 
 

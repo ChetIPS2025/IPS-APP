@@ -351,14 +351,15 @@ def normalize_estimate(
     eid = str(row.get("id") or "").strip()
     num = str(row.get("quote_number") or row.get("estimate_number") or eid[:8] or "—")
     total_cost = _money_field(row, "total_cost", "subtotal", "material_sell_basis")
-    customer_price = _money_field(
-        row,
-        "customer_price",
-        "total",
-        "grand_total",
-        "proposal_total",
-        "final_bid",
-    )
+    customer_price = _money_field(row, "customer_price")
+    if customer_price <= 0:
+        customer_price = _money_field(
+            row,
+            "total",
+            "grand_total",
+            "proposal_total",
+            "final_bid",
+        )
     customer = str(row.get("customer_name") or row.get("customer") or "").strip()
     if not customer:
         cid = str(row.get("customer_id") or "").strip()

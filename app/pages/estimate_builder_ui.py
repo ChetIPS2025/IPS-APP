@@ -389,6 +389,13 @@ def render_cost_builder_tab(
         return
 
     totals = calculate_estimate_totals(eid)
+    stored_price = float(est.get("customer_price") or est.get("total") or 0)
+    calc_price = float(totals.get("customer_price") or 0)
+    if calc_price > 0 and abs(stored_price - calc_price) > 0.01:
+        ok, _ = _service_ok(recalculate_and_save_estimate_totals(eid))
+        if ok and on_saved:
+            on_saved()
+        totals = calculate_estimate_totals(eid)
     render_cost_summary_cards(est, totals)
 
     st.markdown('<div class="ips-estimate-builder-actions">', unsafe_allow_html=True)

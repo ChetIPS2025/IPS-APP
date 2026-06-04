@@ -273,19 +273,99 @@ def _estimate_total_cost(row: dict) -> str:
     val = row.get("total_cost")
     if val in (None, ""):
         val = row.get("subtotal")
-    return fmt_currency(val)
+    if val not in (None, ""):
+        try:
+            if float(val) != 0:
+                return fmt_currency(val)
+        except (TypeError, ValueError):
+            pass
+    return _estimate_customer_price_from_builder(row, field="total_cost")
+
+
+def _estimate_stored_customer_price(row: dict) -> float:
+    for key in ("customer_price", "total", "grand_total", "proposal_total", "final_bid"):
+        val = row.get(key)
+        if val in (None, ""):
+            continue
+        try:
+            amount = float(val)
+        except (TypeError, ValueError):
+            continue
+        if amount != 0 or key in ("customer_price", "proposal_total", "final_bid"):
+            return amount
+    return 0.0
+
+
+def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_price") -> str:
+    """Use live Cost Builder totals when the estimate row rollup is still zero."""
+    eid = str(row.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        return fmt_currency(0)
+    try:
+        from app.services.estimate_costing_service import calculate_estimate_totals
+    except ImportError:
+        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    try:
+        totals = calculate_estimate_totals(eid)
+        amount = float(totals.get(field) or totals.get("customer_price") or 0)
+        if amount > 0:
+            return fmt_currency(amount)
+    except Exception:
+        pass
+    return fmt_currency(0)
 
 
 def _estimate_customer_price(row: dict) -> str:
-    for key in ("customer_price", "total", "proposal_total", "final_bid"):
-        val = row.get(key)
-        if val not in (None, ""):
-            try:
-                if float(val) != 0 or key in ("customer_price", "proposal_total", "final_bid"):
-                    return fmt_currency(val)
-            except (TypeError, ValueError):
-                continue
-    return fmt_currency(0)
+    stored = _estimate_stored_customer_price(row)
+    if stored > 0:
+        return fmt_currency(stored)
+    return _estimate_customer_price_from_builder(row)
+
+
+def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
+    """Persist Cost Builder totals when list/modal row is out of date."""
+    eid = str(estimate_id or "").strip()
+    if not eid or is_demo_id(eid):
+        return
+    sync_key = f"_est_rollups_synced_{eid}"
+    if st.session_state.get(sync_key):
+        return
+    try:
+        from app.services.estimate_costing_service import (
+            calculate_estimate_totals,
+            recalculate_and_save_estimate_totals,
+        )
+    except ImportError:
+        from services.estimate_costing_service import (  # type: ignore
+            calculate_estimate_totals,
+            recalculate_and_save_estimate_totals,
+        )
+    try:
+        stored = _estimate_stored_customer_price(get_estimate(eid) or {})
+        calc = float(calculate_estimate_totals(eid).get("customer_price") or 0)
+        if calc > 0 and abs(stored - calc) > 0.01:
+            if recalculate_and_save_estimate_totals(eid).ok:
+                st.session_state[sync_key] = True
+                try:
+                    from app.services.phase2_modules_service import clear_all_data_caches
+                except ImportError:
+                    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                clear_all_data_caches()
+    except Exception:
+        pass
+
+
+def _on_estimate_cost_builder_saved(estimate_id: str) -> None:
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return
+    st.session_state.pop(f"_est_rollups_synced_{eid}", None)
+    _refresh_estimate_modal_cache(eid)
+    try:
+        from app.services.phase2_modules_service import clear_all_data_caches
+    except ImportError:
+        from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+    clear_all_data_caches()
 
 
 def _inventory_options() -> list[tuple[str, dict]]:
@@ -464,6 +544,11 @@ def _render_custom_estimates_table(
             status = _normalize_estimate_status(est.get("status"))
             est_date = fmt_date(est.get("estimate_date"))
             job_no = _estimate_job(est)
+            if _estimate_stored_customer_price(est) <= 0:
+                _sync_estimate_rollups_if_stale(eid)
+                fresh_row = get_estimate(eid)
+                if fresh_row:
+                    est = fresh_row
             total = _estimate_customer_price(est)
 
             cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
@@ -935,13 +1020,20 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         )
         st.markdown(dialog_card_html("Estimate Summary", overview_html), unsafe_allow_html=True)
 
-        margin_pct = f"{float(est.get('gross_margin_percent') or 0):.1f}%"
+        try:
+            from app.services.estimate_costing_service import calculate_estimate_totals
+        except ImportError:
+            from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+        overview_totals = (
+            calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
+        )
+        margin_pct = f"{float(overview_totals.get('gross_margin_percent') or est.get('gross_margin_percent') or 0):.1f}%"
         fin_html = (
             f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Total cost', _estimate_total_cost(est))}"
-            f"{detail_field_html('Customer price', _estimate_customer_price(est))}"
-            f"{detail_field_html('Tax', fmt_currency(est.get('tax')))}"
-            f"{detail_field_html('Gross profit', fmt_currency(est.get('gross_profit')))}"
+            f"{detail_field_html('Total cost', fmt_currency(overview_totals.get('total_cost') or est.get('total_cost') or est.get('subtotal')))}"
+            f"{detail_field_html('Customer price', fmt_currency(overview_totals.get('customer_price') or _estimate_stored_customer_price(est)))}"
+            f"{detail_field_html('Tax', fmt_currency(overview_totals.get('tax_amount') or est.get('tax')))}"
+            f"{detail_field_html('Gross profit', fmt_currency(overview_totals.get('gross_profit') or est.get('gross_profit')))}"
             f"{detail_field_html('Margin %', margin_pct)}"
             f"</div>"
         )
@@ -950,13 +1042,18 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         st.markdown(dialog_card_html("Scope", f"<p style='margin:0;font-size:0.875rem;'>{html.escape(scope)}</p>"), unsafe_allow_html=True)
 
     with tab_cost_builder:
+        if eid and not is_demo_id(eid):
+            _sync_estimate_rollups_if_stale(eid)
+            fresh = get_estimate(eid)
+            if fresh:
+                est = fresh
         render_cost_builder_tab(
             est,
             pricing_guide_options=pg_opts,
             inventory_options=inv_opts,
             asset_options=asset_opts,
             vendor_options=vendor_opts,
-            on_saved=lambda: None,
+            on_saved=lambda: _on_estimate_cost_builder_saved(eid),
         )
 
     with tab_markups:
