@@ -156,7 +156,7 @@ _DAY_GRID_LABELS = [
 ]
 _LIST_VIEW_HOUR_STEP = 0.5
 _LIST_VIEW_SUMMARY_LABELS = ("Total Hours", "Overtime", "Billed Hours", "Status")
-_ALLOC_HOUR_TYPE_OPTS = ["S/T", "O/T"]
+_ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
 _ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
 _ALLOC_LINE_COLS_PRIMARY = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 1.75]
 _ALLOC_LINE_LABELS = ("Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions")
@@ -688,6 +688,21 @@ def _user_picked_allocation_overtime(
 
 def _alloc_hour_type_label(hour_type: str) -> str:
     return "O/T" if _normalize_alloc_hour_type(hour_type) == "OT" else "S/T"
+
+
+def _alloc_hour_type_select_index(hour_type: str) -> int:
+    return 1 if _normalize_alloc_hour_type(hour_type) == "OT" else 0
+
+
+def _ensure_alloc_type_widget_label(type_key: str, hour_type: str) -> None:
+    """Keep Streamlit select state on S/T and O/T (not legacy ST/OT tokens)."""
+    if type_key not in st.session_state:
+        return
+    raw = str(st.session_state[type_key] or "").strip()
+    if raw in {"ST", "OT"}:
+        st.session_state[type_key] = _alloc_hour_type_label(raw)
+    elif raw and raw not in _ALLOC_HOUR_TYPE_OPTS:
+        st.session_state[type_key] = _alloc_hour_type_label(raw)
 
 
 def _line_allocated_hours(line: dict[str, Any]) -> float:
@@ -2449,8 +2464,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                     if job_key in st.session_state:
                         live_job = str(st.session_state[job_key])
                     hour_type = _normalize_alloc_hour_type(line.get("hour_type"))
-                    type_labels = list(_ALLOC_HOUR_TYPE_OPTS)
                     type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+                    _ensure_alloc_type_widget_label(type_key, hour_type)
                     if type_key in st.session_state:
                         hour_type = _normalize_alloc_hour_type(st.session_state[type_key])
                     row_remaining = max(0.0, round(daily_total - running_allocated, 2))
@@ -2497,22 +2512,23 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                 )
                         with row_cols[1]:
                             st.markdown(
-                                '<span class="timekeeping-allocation-type-marker" aria-hidden="true"></span>',
+                                '<span class="timekeeping-allocation-type-marker timekeeping-hour-type-cell" '
+                                'aria-hidden="true"></span>',
                                 unsafe_allow_html=True,
                             )
                             if row_editable:
-                                type_lbl = _alloc_hour_type_label(hour_type)
                                 picked = st.selectbox(
                                     "Type",
-                                    type_labels,
-                                    index=type_labels.index(type_lbl) if type_lbl in type_labels else 0,
+                                    options=_ALLOC_HOUR_TYPE_OPTS,
+                                    index=_alloc_hour_type_select_index(hour_type),
                                     key=type_key,
                                     label_visibility="collapsed",
                                 )
                                 line["hour_type"] = _normalize_alloc_hour_type(picked)
                             else:
                                 st.markdown(
-                                    f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell">'
+                                    f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell '
+                                    f'timekeeping-hour-type-cell">'
                                     f"{html.escape(_alloc_hour_type_label(hour_type))}</div>",
                                     unsafe_allow_html=True,
                                 )

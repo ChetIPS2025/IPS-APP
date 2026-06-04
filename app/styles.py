@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v59">
+<style id="ips-timekeeping-module-v60">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6254,7 +6254,7 @@ def inject_timekeeping_module_css() -> None:
   display: grid !important;
   grid-template-columns:
     minmax(260px, 340px)
-    90px
+    108px
     90px
     90px
     90px
@@ -6311,7 +6311,7 @@ def inject_timekeeping_module_css() -> None:
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker) {{
   grid-template-columns:
     minmax(260px, 340px)
-    90px
+    108px
     90px
     90px
     90px
@@ -6329,49 +6329,84 @@ def inject_timekeeping_module_css() -> None:
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
   > [data-testid="column"]:nth-child(2) {{
-  min-width: 90px !important;
-  width: 90px !important;
-  max-width: 90px !important;
+  min-width: 108px !important;
+  width: 108px !important;
+  max-width: 108px !important;
   overflow: visible !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"],
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] {{
-  width: 100% !important;
-  min-width: 82px !important;
-  max-width: 90px !important;
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
+  flex: 0 0 108px !important;
+  overflow: visible !important;
 }}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"] > div,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] > div {{
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
+  overflow: visible !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"] div[data-baseweb="select"],
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
-  width: 100% !important;
-  min-width: 82px !important;
-  max-width: 90px !important;
+  width: 108px !important;
+  min-width: 108px !important;
+  max-width: 108px !important;
   min-height: 32px !important;
   height: 32px !important;
-  padding-left: 8px !important;
-  padding-right: 24px !important;
+  padding-left: 10px !important;
+  padding-right: 28px !important;
   box-sizing: border-box !important;
+  overflow: visible !important;
 }}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-hour-type-cell) [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {{
+  display: inline-block !important;
   white-space: nowrap !important;
   writing-mode: horizontal-tb !important;
   word-break: keep-all !important;
   overflow: visible !important;
   text-overflow: clip !important;
-  font-size: 0.8rem !important;
+  font-size: 0.82rem !important;
   font-weight: 700 !important;
-  line-height: 1.15 !important;
+  line-height: 1.2 !important;
   letter-spacing: 0 !important;
 }}
-.timekeeping-alloc-type-cell {{
-  min-width: 82px !important;
-  max-width: 90px !important;
+body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li,
+body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li span,
+body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li div {{
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  word-break: keep-all !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}}
+.timekeeping-alloc-type-cell,
+.timekeeping-hour-type-cell {{
+  min-width: 108px !important;
+  max-width: 108px !important;
   text-align: center !important;
   white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
 }}
 .timekeeping-alloc-type-cell,
 .timekeeping-alloc-remaining-cell {{
