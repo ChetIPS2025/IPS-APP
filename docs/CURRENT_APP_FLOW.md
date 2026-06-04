@@ -893,4 +893,16 @@ Per product direction (not implemented in this doc):
 
 ---
 
+## 12. Data-flow repair tracking (follow-up)
+
+After this as-built audit, tracked repair artifacts live here (documentation only; no code changes until approved):
+
+| Document | Purpose |
+|----------|---------|
+| [`KNOWN_DATA_BUGS.md`](KNOWN_DATA_BUGS.md) | Registry of broken links, state bugs, and pollution risks (IDs: DL, NP, XP, SP, SV, SS, CD, OR, PP) |
+| [`FIX_ORDER.md`](FIX_ORDER.md) | Phased fix sequence (Phases 0–7) before layout/CSS work |
+| [`DATA_FLOW_REPAIR_PLAN.md`](DATA_FLOW_REPAIR_PLAN.md) | Strategy, acceptance tests, approval gates, workstreams |
+
+---
+
 *This document is descriptive only. It does not change application behavior.*
