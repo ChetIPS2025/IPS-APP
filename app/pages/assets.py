@@ -88,6 +88,11 @@ try:
         summary_card_html,
     )
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.services.asset_rental_service import (
+        RENTAL_RATE_UNITS,
+        normalize_rental_rate_unit,
+        primary_rental_rate_from_asset,
+    )
     from app.services.phase2_modules_service import asset_is_rentable
     from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
@@ -181,6 +186,11 @@ except ImportError:
         summary_card_html,
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from services.asset_rental_service import (  # type: ignore
+        RENTAL_RATE_UNITS,
+        normalize_rental_rate_unit,
+        primary_rental_rate_from_asset,
+    )
     from services.phase2_modules_service import asset_is_rentable  # type: ignore
     from services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
@@ -578,6 +588,19 @@ def _render_asset_expand_panel(asset: dict) -> None:
         f"{detail_field_html('Location', _asset_location(asset))}"
         f'{detail_field_html("Status", status, html_value=status_badge_html(status))}'
         f"{detail_field_html('Rentable', 'Yes' if asset_is_rentable(asset) else 'No')}"
+    )
+    if asset_is_rentable(asset):
+        rate_unit = normalize_rental_rate_unit(asset.get("rental_rate_unit"))
+        rate_amt = primary_rental_rate_from_asset(asset)
+        details_html += (
+            f"{detail_field_html('Rental rate', fmt_currency(rate_amt) if rate_amt else '—')}"
+            f"{detail_field_html('Rate unit', rate_unit)}"
+            f"{detail_field_html('Default markup %', asset.get('rental_default_markup_percent') or '0')}"
+        )
+        notes_rn = str(asset.get("rental_notes") or "").strip()
+        if notes_rn:
+            details_html += detail_field_html("Rental notes", notes_rn)
+    details_html += (
         f"{detail_field_html('Assigned To', _asset_assigned_to(asset))}"
         f"{detail_field_html('Next Service', _asset_next_service(asset))}"
         f"</div>"
@@ -1281,6 +1304,89 @@ def _render_asset_maintenance_tab(asset: dict) -> None:
     )
 
 
+def _asset_rental_session_keys(aid: str = "", *, new_asset: bool = False) -> dict[str, str]:
+    if new_asset:
+        return {
+            "rentable": "ast_new_rentable",
+            "rate": "ast_new_rental_rate",
+            "unit": "ast_new_rental_unit",
+            "mk": "ast_new_rental_mk",
+            "notes": "ast_new_rental_notes",
+        }
+    return {
+        "rentable": f"ast_edit_rentable_{aid}",
+        "rate": f"ast_edit_rental_rate_{aid}",
+        "unit": f"ast_edit_rental_unit_{aid}",
+        "mk": f"ast_edit_rental_mk_{aid}",
+        "notes": f"ast_edit_rental_notes_{aid}",
+    }
+
+
+def _rental_fields_from_session(keys: dict[str, str]) -> dict[str, Any]:
+    return {
+        "is_rentable": bool(st.session_state.get(keys["rentable"])),
+        "rental_rate": float(st.session_state.get(keys["rate"]) or 0),
+        "rental_rate_unit": st.session_state.get(keys["unit"]),
+        "rental_default_markup_percent": float(st.session_state.get(keys["mk"]) or 0),
+        "rental_notes": str(st.session_state.get(keys["notes"]) or "").strip(),
+    }
+
+
+def _render_asset_rental_pricing_fields(
+    asset: dict | None = None,
+    *,
+    aid: str = "",
+    new_asset: bool = False,
+) -> None:
+    keys = _asset_rental_session_keys(aid, new_asset=new_asset)
+    if asset is not None and not new_asset:
+        st.session_state.setdefault(keys["rentable"], asset_is_rentable(asset))
+        st.session_state.setdefault(keys["rate"], primary_rental_rate_from_asset(asset))
+        st.session_state.setdefault(
+            keys["unit"],
+            normalize_rental_rate_unit(asset.get("rental_rate_unit")),
+        )
+        st.session_state.setdefault(
+            keys["mk"],
+            float(asset.get("rental_default_markup_percent") or 0),
+        )
+        st.session_state.setdefault(keys["notes"], str(asset.get("rental_notes") or ""))
+    if new_asset:
+        st.session_state.setdefault(keys["rate"], 0.0)
+        st.session_state.setdefault(keys["unit"], "Days")
+        st.session_state.setdefault(keys["mk"], 0.0)
+        st.session_state.setdefault(keys["notes"], "")
+
+    st.checkbox(
+        "Rentable (estimate equipment)",
+        key=keys["rentable"],
+        help="When enabled, this asset appears when adding equipment on estimates.",
+    )
+    if st.session_state.get(keys["rentable"]):
+        st.markdown("**Rental pricing**")
+        rc1, rc2 = st.columns(2)
+        with rc1:
+            st.number_input(
+                "Rental rate",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=keys["rate"],
+                help="Cost rate for the unit selected below (used on estimates).",
+            )
+        with rc2:
+            st.selectbox("Rental rate unit", RENTAL_RATE_UNITS, key=keys["unit"])
+        st.number_input(
+            "Default markup %",
+            min_value=0.0,
+            step=0.5,
+            format="%.1f",
+            key=keys["mk"],
+            help="Pre-fills markup when this asset is added to an estimate.",
+        )
+        st.text_area("Rental notes", key=keys["notes"], height=72)
+
+
 def _seed_asset_edit_form(asset: dict) -> None:
     aid = str(asset.get("id") or "")
     st.session_state[f"ast_edit_num_{aid}"] = str(asset.get("asset_number") or "")
@@ -1290,7 +1396,12 @@ def _seed_asset_edit_form(asset: dict) -> None:
     st.session_state[f"ast_edit_loc_{aid}"] = str(asset.get("location") or "")
     st.session_state[f"ast_edit_serial_{aid}"] = str(asset.get("serial_number") or "")
     st.session_state[f"ast_edit_pg_{aid}"] = bool(asset.get("include_in_pricing_guide"))
-    st.session_state[f"ast_edit_rentable_{aid}"] = asset_is_rentable(asset)
+    rk = _asset_rental_session_keys(aid)
+    st.session_state[rk["rentable"]] = asset_is_rentable(asset)
+    st.session_state[rk["rate"]] = primary_rental_rate_from_asset(asset)
+    st.session_state[rk["unit"]] = normalize_rental_rate_unit(asset.get("rental_rate_unit"))
+    st.session_state[rk["mk"]] = float(asset.get("rental_default_markup_percent") or 0)
+    st.session_state[rk["notes"]] = str(asset.get("rental_notes") or "")
 
 
 def _set_asset_view_mode(asset: dict) -> None:
@@ -1331,11 +1442,7 @@ def _render_asset_edit_form(asset: dict) -> None:
         key=f"ast_edit_pg_{aid}",
         help="Turn off for fleet/shop assets that should stay in Assets only.",
     )
-    st.checkbox(
-        "Rentable (estimate equipment)",
-        key=f"ast_edit_rentable_{aid}",
-        help="When enabled, this asset appears when adding equipment on estimates.",
-    )
+    _render_asset_rental_pricing_fields(asset, aid=aid)
 
     st.markdown("**Item Photo**")
     _render_asset_photo_manager(asset)
@@ -1358,7 +1465,7 @@ def _render_asset_edit_form(asset: dict) -> None:
                 "location": st.session_state.get(f"ast_edit_loc_{aid}"),
                 "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
                 "include_in_pricing_guide": bool(st.session_state.get(f"ast_edit_pg_{aid}")),
-                "is_rentable": bool(st.session_state.get(f"ast_edit_rentable_{aid}")),
+                **_rental_fields_from_session(_asset_rental_session_keys(aid)),
             },
             row_id=aid,
         )
@@ -1407,6 +1514,27 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                         (
                             "Rentable",
                             "Yes" if asset_is_rentable(asset) else "No",
+                        ),
+                        *(
+                            [
+                                (
+                                    "Rental rate",
+                                    fmt_currency(primary_rental_rate_from_asset(asset))
+                                    if primary_rental_rate_from_asset(asset)
+                                    else "—",
+                                ),
+                                (
+                                    "Rental rate unit",
+                                    normalize_rental_rate_unit(asset.get("rental_rate_unit")),
+                                ),
+                                (
+                                    "Default markup %",
+                                    str(asset.get("rental_default_markup_percent") or "0"),
+                                ),
+                                ("Rental notes", str(asset.get("rental_notes") or "—")),
+                            ]
+                            if asset_is_rentable(asset)
+                            else []
                         ),
                         ("Description", str(asset.get("description") or "—")),
                     ],
@@ -1672,11 +1800,7 @@ def render() -> None:
             st.text_input("Asset name", key="ast_new_name")
             st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
             st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
-            st.checkbox(
-                "Rentable (estimate equipment)",
-                key="ast_new_rentable",
-                help="When enabled, this asset appears when adding equipment on estimates.",
-            )
+            _render_asset_rental_pricing_fields(new_asset=True)
             st.file_uploader(
                 "Upload asset image",
                 type=list(ITEM_IMAGE_UPLOAD_TYPES),
@@ -1693,7 +1817,7 @@ def render() -> None:
                         "asset_name": st.session_state.get("ast_new_name"),
                         "category": st.session_state.get("ast_new_cat"),
                         "status": st.session_state.get("ast_new_status"),
-                        "is_rentable": bool(st.session_state.get("ast_new_rentable")),
+                        **_rental_fields_from_session(_asset_rental_session_keys(new_asset=True)),
                     }
                 )
                 if not result.ok:

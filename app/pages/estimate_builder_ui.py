@@ -204,7 +204,14 @@ def _sync_asset_pick_state(
         asset = asset_map.get(pick, {})
         st.session_state[k("name")] = str(asset.get("asset_name") or "")
         st.session_state[k("type")] = str(asset.get("category") or "")
+        asset_unit = str(asset.get("rental_rate_unit") or "Days")
+        if asset_unit in ("Hours", "Days", "Weeks"):
+            st.session_state[k("dunit")] = asset_unit
+            dur_unit = asset_unit
         st.session_state[k("rate")] = resolve_equipment_cost_rate(asset, dur_unit)
+        asset_mk = float(asset.get("rental_default_markup_percent") or 0)
+        if asset_mk > 0:
+            st.session_state[k("mk")] = asset_mk
         st.session_state[last_key] = pick
         return asset
     return asset_map.get(pick or "", {})

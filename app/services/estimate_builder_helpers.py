@@ -6,6 +6,10 @@ from typing import Any
 
 try:
     from app.pages._core._data import load_assets, load_inventory
+    from app.services.asset_rental_service import (
+        normalize_rental_rate_unit,
+        primary_rental_rate_from_asset,
+    )
     from app.services.phase2_modules_service import asset_is_rentable
     from app.services.repository import fetch_rows
     from app.utils.estimate_calculations import (
@@ -16,6 +20,10 @@ try:
     )
 except ImportError:
     from pages._core._data import load_assets, load_inventory  # type: ignore
+    from services.asset_rental_service import (  # type: ignore
+        normalize_rental_rate_unit,
+        primary_rental_rate_from_asset,
+    )
     from services.phase2_modules_service import asset_is_rentable  # type: ignore
     from services.repository import fetch_rows  # type: ignore
     from utils.estimate_calculations import (  # type: ignore
@@ -205,6 +213,9 @@ def _asset_row_to_option(row: dict[str, Any]) -> dict[str, Any]:
         "weekly_rate": weekly,
         "rental_daily_rate": rental_daily,
         "rental_weekly_rate": rental_weekly,
+        "rental_rate_unit": normalize_rental_rate_unit(row.get("rental_rate_unit")),
+        "rental_default_markup_percent": float(row.get("rental_default_markup_percent") or 0),
+        "rental_notes": str(row.get("rental_notes") or "").strip(),
         "cost_rate": cost_rate,
         "is_rentable": asset_is_rentable(row),
     }

@@ -542,6 +542,9 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "rental_daily_rate": _money_field(row, "rental_daily_rate", "daily_rate"),
         "rental_weekly_rate": _money_field(row, "rental_weekly_rate", "weekly_rate"),
         "rental_monthly_rate": _money_field(row, "rental_monthly_rate"),
+        "rental_rate_unit": str(row.get("rental_rate_unit") or "Days").strip() or "Days",
+        "rental_default_markup_percent": float(row.get("rental_default_markup_percent") or 0),
+        "rental_notes": str(row.get("rental_notes") or "").strip(),
         "hourly_rate": _money_field(row, "hourly_rate"),
         "daily_rate": _money_field(row, "daily_rate", "rental_daily_rate"),
         "weekly_rate": _money_field(row, "weekly_rate", "rental_weekly_rate"),
@@ -1151,6 +1154,11 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
 
 
 def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.asset_rental_service import apply_rental_ui_to_payload
+    except ImportError:
+        from services.asset_rental_service import apply_rental_ui_to_payload  # type: ignore
+
     payload = {
         "asset_id": ui.get("asset_number") or ui.get("asset_id"),
         "asset_name": ui.get("asset_name"),
@@ -1167,6 +1175,7 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         "current_value": ui.get("value") or ui.get("current_value"),
         "acquired_date": ui.get("acquired_date") or None,
     }
+    apply_rental_ui_to_payload(payload, ui)
     if row_id:
         return update_row("assets", payload, {"id": row_id})
     return insert_row("assets", payload)
