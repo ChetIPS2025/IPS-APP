@@ -3277,7 +3277,9 @@ def inject_timekeeping_module_css() -> None:
     minmax(280px, 1.35fr)"""
     tk_alloc_day = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
-        f'[class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker)'
+        f'[class*="st-key-tk_alloc_day_"]:has(.timekeeping-allocation-day-card-marker), '
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_day_"]:has(.timekeeping-day-allocation-card-marker)'
     )
     tk_alloc_ctrl_row = (
         f'{tk_alloc_day} [class*="st-key-tk_alloc_row_"] '
@@ -3298,7 +3300,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v72">
+<style id="ips-timekeeping-module-v73">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6124,7 +6126,8 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 0 0.5rem 0;
   max-width: 100%;
 }}
-.timekeeping-allocation-card {{
+.timekeeping-allocation-card,
+.timekeeping-day-allocation-card {{
   width: 100% !important;
   box-sizing: border-box !important;
 }}
