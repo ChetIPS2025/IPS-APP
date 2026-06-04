@@ -3277,21 +3277,21 @@ def inject_timekeeping_module_css() -> None:
     minmax(300px, 360px)"""
     tk_alloc_header_row = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
-        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-col-head)'
+        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker)'
     )
     tk_alloc_ctrl_row = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
-        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
+        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-assignment-marker)'
     )
     tk_alloc_header_row_alt = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
         f'[class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker)) '
-        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-col-head)'
+        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker)'
     )
     tk_alloc_ctrl_row_alt = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
         f'[class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker)) '
-        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
+        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-assignment-marker)'
     )
     tk_alloc_type_col = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
@@ -3304,7 +3304,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v70">
+<style id="ips-timekeeping-module-v71">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -3663,7 +3663,8 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-employee-expand-detail [data-testid="stHorizontalBlock"] {{
   min-height: unset !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-employee-expand-detail [data-testid="stHorizontalBlock"]:not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker)) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_expand_detail_"]:has(.timesheet-employee-expand-detail)
+  [data-testid="stHorizontalBlock"]:not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-allocation-assignment-marker)):not(:has(.timekeeping-allocation-header-row-marker)) {{
   min-width: 0 !important;
   width: 100% !important;
   display: flex !important;
@@ -6827,6 +6828,41 @@ body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li di
   word-break: keep-all !important;
   overflow: visible !important;
   text-overflow: clip !important;
+  display: inline !important;
+  line-height: 1.2 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button p,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button span,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button div,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  .timekeeping-alloc-col-head,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  .timekeeping-alloc-field-label,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="stSelectbox"] div[data-baseweb="select"] span {{
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: max-content !important;
+  min-width: 280px !important;
+  max-width: none !important;
 }}
 </style>
 """,

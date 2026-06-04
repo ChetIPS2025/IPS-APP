@@ -2435,7 +2435,7 @@ def _render_allocation_primary_row_actions(
             ):
                 action_taken = _handle_alloc_line_reject(emp, week_start_d, line_id)
     else:
-        submit_col, add_col, remove_col = st.columns([1.15, 1.2, 0.75], gap="small")
+        submit_col, add_col, remove_col = st.columns([1.4, 1.55, 0.9], gap="small")
         with submit_col:
             if (
                 row_editable
