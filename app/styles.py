@@ -3256,16 +3256,37 @@ def inject_timekeeping_module_css() -> None:
         f'{tk_list_outer_row} > [data-testid="column"]:nth-child(14), '
         f'{tk_list_outer_row} > [data-testid="column"]:nth-child(15)'
     )
-    tk_alloc_type_col_w = "128px"
+    tk_alloc_type_col_w = "88px"
+    tk_alloc_header_row = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-col-head)'
+    )
+    tk_alloc_ctrl_row = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-assignment-marker)'
+    )
+    tk_alloc_header_row_alt = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker)) '
+        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-col-head)'
+    )
+    tk_alloc_ctrl_row_alt = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker)) '
+        f'[data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-assignment-marker)'
+    )
     tk_alloc_type_col = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
         f'[data-testid="column"]:has(.timekeeping-hour-type-cell), '
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
         f'[data-testid="column"]:has(.timekeeping-allocation-type-marker)'
     )
+    tk_alloc_type_widget = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_type_"]'
+    )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v62">
+<style id="ips-timekeeping-module-v63">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6228,8 +6249,7 @@ def inject_timekeeping_module_css() -> None:
 {tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] [data-testid="stVerticalBlock"] {{
   gap: 0.2rem !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
+{tk_alloc_ctrl_row}
   [data-testid="column"] [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
@@ -6254,10 +6274,8 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1.2 !important;
   padding: 0 !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker),
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker) {{
+{tk_alloc_header_row},
+{tk_alloc_ctrl_row} {{
   display: grid !important;
   grid-template-columns:
     minmax(260px, 340px)
@@ -6275,23 +6293,19 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 !important;
   box-sizing: border-box !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker) {{
+{tk_alloc_header_row} {{
   align-items: start !important;
   min-height: 0 !important;
   padding: 2px 0 0 !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker) {{
+{tk_alloc_ctrl_row} {{
   align-items: center !important;
   min-height: 40px !important;
   padding: 0 0 4px !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker)
+{tk_alloc_header_row}
   > [data-testid="column"],
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
+{tk_alloc_ctrl_row}
   > [data-testid="column"] {{
   width: auto !important;
   min-width: 0 !important;
@@ -6302,20 +6316,15 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible !important;
   align-self: stretch !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
+{tk_alloc_ctrl_row}
   > [data-testid="column"]:nth-child(7) {{
   min-width: 360px !important;
   width: 360px !important;
   max-width: 360px !important;
   justify-self: end !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker))
-  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-row-marker),
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker))
-  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker) {{
+{tk_alloc_header_row_alt},
+{tk_alloc_ctrl_row_alt} {{
   grid-template-columns:
     minmax(260px, 340px)
     {tk_alloc_type_col_w}
@@ -6325,16 +6334,13 @@ def inject_timekeeping_module_css() -> None:
     minmax(150px, 220px)
     100px !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"]:not(:has(.timekeeping-allocation-primary-row-marker))
-  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
+{tk_alloc_ctrl_row_alt}
   > [data-testid="column"]:nth-child(7) {{
   min-width: 100px !important;
   width: 100px !important;
   max-width: 100px !important;
 }}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)
+{tk_alloc_ctrl_row}
   > [data-testid="column"]:nth-child(2) {{
   min-width: {tk_alloc_type_col_w} !important;
   width: {tk_alloc_type_col_w} !important;
@@ -6373,15 +6379,24 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible !important;
 }}
 {tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] [data-baseweb="select-value"],
-{tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] [data-baseweb="select-value"] > div {{
+{tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] [data-baseweb="select-value"] > div,
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"] [data-baseweb="select-value"],
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"] [data-baseweb="select-value"] > div {{
+  flex: 1 1 auto !important;
+  min-width: 2.75rem !important;
   overflow: visible !important;
-  max-width: none !important;
+  max-width: calc(100% - 1.75rem) !important;
 }}
 {tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] span,
-{tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {{
+{tk_alloc_type_col} [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {{
   display: inline-block !important;
+  width: auto !important;
+  max-width: 100% !important;
   white-space: nowrap !important;
   writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
   word-break: keep-all !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -6389,6 +6404,15 @@ def inject_timekeeping_module_css() -> None:
   font-weight: 700 !important;
   line-height: 1.25 !important;
   letter-spacing: 0 !important;
+}}
+{tk_alloc_type_widget} [data-testid="stSelectbox"],
+{tk_alloc_type_widget} [data-testid="stSelectbox"] > div,
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"],
+{tk_alloc_type_widget} [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+  width: {tk_alloc_type_col_w} !important;
+  min-width: {tk_alloc_type_col_w} !important;
+  max-width: {tk_alloc_type_col_w} !important;
+  overflow: visible !important;
 }}
 body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] {{
   min-width: {tk_alloc_type_col_w} !important;

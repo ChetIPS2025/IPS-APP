@@ -2633,10 +2633,18 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                 unsafe_allow_html=True,
                             )
                             if row_editable:
+                                hour_type_options = list(_ALLOC_HOUR_TYPE_OPTS)
+                                type_label = _alloc_hour_type_label(hour_type)
+                                _ensure_alloc_type_widget_label(type_key, hour_type)
+                                type_index = (
+                                    hour_type_options.index(type_label)
+                                    if type_label in hour_type_options
+                                    else 0
+                                )
                                 picked = st.selectbox(
                                     "Type",
-                                    options=_ALLOC_HOUR_TYPE_OPTS,
-                                    index=_alloc_hour_type_select_index(hour_type),
+                                    options=hour_type_options,
+                                    index=type_index,
                                     key=type_key,
                                     label_visibility="collapsed",
                                 )
