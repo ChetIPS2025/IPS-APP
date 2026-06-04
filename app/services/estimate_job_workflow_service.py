@@ -10,6 +10,7 @@ from typing import Any, FrozenSet
 try:
     from app.services.job_from_estimate import (
         CreateJobFromEstimateResult,
+        _JOB_COLLISION_COLUMNS,
         _as_json_dict,
         _build_job_notes,
         _existing_job_for_estimate,
@@ -18,12 +19,14 @@ try:
         _jobs_has_customer_contact_column,
         _jobs_has_customer_location_column,
         _location_text_from_customer_location,
+        _normalize_job_number_key,
         _patch_estimate_row,
         _resolve_customer_id_for_estimate,
         _safe_location,
         estimate_quote_to_job_number,
         get_estimate_description,
         fetch_jobs_by_exact_job_number,
+        job_number_conflict_is_reclaimable,
         renumber_estimate_quote_for_job_collision,
         resolve_job_number_collisions,
     )
@@ -47,8 +50,11 @@ except ImportError:
         estimate_quote_to_job_number,
         get_estimate_description,
         fetch_jobs_by_exact_job_number,
+        job_number_conflict_is_reclaimable,
         renumber_estimate_quote_for_job_collision,
         resolve_job_number_collisions,
+        _JOB_COLLISION_COLUMNS,
+        _normalize_job_number_key,
     )
     from services.job_schema import fetch_jobs_for_job_database  # type: ignore
     from services.job_service import job_number_display, next_job_number  # type: ignore
@@ -181,6 +187,89 @@ def _job_name_from_estimate(row: dict[str, Any], ej: dict[str, Any], customer_na
     return _fallback_job_name(row, ej, customer_name).strip() or "Estimate job"
 
 
+def _fetch_job_row(job_id: str) -> dict[str, Any] | None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return None
+    rows = fetch_by_match_admin(
+        "jobs",
+        {"id": jid},
+        columns=_JOB_COLLISION_COLUMNS,
+        limit=1,
+    )
+    return rows[0] if rows else None
+
+
+def _sync_linked_job_row(
+    *,
+    estimate_id: str,
+    estimate_row: dict[str, Any],
+    job: dict[str, Any],
+    proposed_jn: str = "",
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Ensure an existing/reused job is linked to the estimate and shows as Estimate Pending
+    until the estimate is approved.
+    """
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return job
+    updates: dict[str, Any] = {}
+    if str(job.get("estimate_id") or "").strip() != estimate_id:
+        updates["estimate_id"] = estimate_id
+    if not estimate_status_already_approved(estimate_row.get("status")):
+        if _norm_status(job.get("status")) != _norm_status(JOB_STATUS_ESTIMATE_PENDING):
+            updates["status"] = JOB_STATUS_ESTIMATE_PENDING
+    proposed = str(proposed_jn or "").strip()
+    if proposed:
+        cur_key = _normalize_job_number_key(job.get("job_number"))
+        new_key = _normalize_job_number_key(proposed)
+        if cur_key != new_key and (
+            not cur_key
+            or job_number_conflict_is_reclaimable(job, estimate_id=estimate_id)
+            or str(job.get("estimate_id") or "").strip() == estimate_id
+        ):
+            updates["job_number"] = proposed
+    src = payload or {}
+    quote_number = str(
+        estimate_row.get("quote_number")
+        or estimate_row.get("estimate_number")
+        or src.get("source_estimate_number")
+        or ""
+    ).strip()
+    if quote_number:
+        updates.setdefault("source_estimate_number", quote_number[:120])
+    for key in ("job_name", "location", "notes"):
+        val = src.get(key)
+        if val not in (None, ""):
+            updates[key] = val
+    if src.get("awarded_amount") is not None:
+        updates["awarded_amount"] = src.get("awarded_amount")
+    if updates:
+        try:
+            update_rows_admin("jobs", updates, {"id": jid})
+            job = {**job, **updates}
+        except Exception as exc:
+            _LOG.warning("Could not sync linked job %s for estimate %s: %s", jid, estimate_id, exc)
+    refreshed = _fetch_job_row(jid)
+    return refreshed or job
+
+
+def _link_estimate_to_job(estimate_id: str, job: dict[str, Any], row: dict[str, Any]) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    ej = _as_json_dict(row.get("estimate_json"))
+    ej["job_id"] = jid
+    patch: dict[str, Any] = {
+        "job_id": jid,
+        "estimate_json": ej,
+        "updated_at": _utc_now_iso(),
+    }
+    _patch_estimate_row(estimate_id, patch)
+
+
 def _resolve_job_number(row: dict[str, Any], ej: dict[str, Any], *, has_job_number_column: bool) -> str:
     if not has_job_number_column:
         return ""
@@ -214,16 +303,29 @@ def create_pending_job_from_estimate(
     if not row:
         return CreateJobFromEstimateResult(ok=False, message="Estimate not found.", error_code="not_found")
 
+    _, has_job_number_column = fetch_jobs_for_job_database(limit=1, admin_read=True)
+    ej = _as_json_dict(row.get("estimate_json"))
+    proposed_jn = (
+        _resolve_job_number(row, ej, has_job_number_column=has_job_number_column)
+        if has_job_number_column
+        else ""
+    )
+
     existing = _existing_job_for_estimate(eid, row)
     if existing:
-        jid = str(existing.get("id") or "")
-        if jid and not str(row.get("job_id") or "").strip():
-            _patch_estimate_row(eid, {"job_id": jid})
-        jn = job_number_display(existing.get("job_number"))
+        synced = _sync_linked_job_row(
+            estimate_id=eid,
+            estimate_row=row,
+            job=existing,
+            proposed_jn=proposed_jn,
+        )
+        _link_estimate_to_job(eid, synced, row)
+        jn = job_number_display(synced.get("job_number"))
+        jid = str(synced.get("id") or "")
         return CreateJobFromEstimateResult(
             ok=True,
             message=f"Linked to existing job {jn or jid}.",
-            job=existing,
+            job=synced,
             error_code="duplicate",
         )
 
@@ -238,7 +340,6 @@ def create_pending_job_from_estimate(
     if not str(row.get("customer_id") or "").strip():
         _patch_estimate_row(eid, {"customer_id": customer_id})
 
-    ej = _as_json_dict(row.get("estimate_json"))
     customer_location_id = str(row.get("customer_location_id") or ej.get("customer_location_id") or "").strip()
     site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
     merged_location = site_loc or _safe_location(ej)
@@ -246,7 +347,6 @@ def create_pending_job_from_estimate(
     cust_row = fetch_by_match_admin("customers", {"id": customer_id}, columns="customer_name", limit=1)
     customer_name = str((cust_row[0] if cust_row else {}).get("customer_name") or row.get("customer_name") or "").strip()
 
-    _, has_job_number_column = fetch_jobs_for_job_database(limit=1, admin_read=True)
     quote_number = str(row.get("quote_number") or row.get("estimate_number") or ej.get("quote_number") or "").strip()
 
     inserted: dict[str, Any] | None = None
@@ -273,7 +373,6 @@ def create_pending_job_from_estimate(
         payload["customer_location_id"] = customer_location_id or None
 
     if has_job_number_column:
-        proposed_jn = _resolve_job_number(row, ej, has_job_number_column=True)
         if proposed_jn:
             hits = fetch_jobs_by_exact_job_number(proposed_jn)
             linked_job_id = str(row.get("job_id") or "").strip() or None
@@ -285,7 +384,13 @@ def create_pending_job_from_estimate(
                     linked_job_id=linked_job_id,
                 )
                 if outcome == "reuse":
-                    inserted = dict(collision_job or hits[0])
+                    inserted = _sync_linked_job_row(
+                        estimate_id=eid,
+                        estimate_row=row,
+                        job=dict(collision_job or hits[0]),
+                        proposed_jn=proposed_jn,
+                        payload=payload,
+                    )
                 elif outcome == "blocked":
                     pair = renumber_estimate_quote_for_job_collision(
                         eid,
@@ -359,15 +464,8 @@ def create_pending_job_from_estimate(
     if not new_id:
         return CreateJobFromEstimateResult(ok=False, message="Job insert returned no id.", error_code="insert_failed")
 
-    ej2 = dict(ej)
-    ej2["job_id"] = new_id
-    est_update: dict[str, Any] = {
-        "job_id": new_id,
-        "estimate_json": ej2,
-        "updated_at": _utc_now_iso(),
-    }
     try:
-        _patch_estimate_row(eid, est_update)
+        _link_estimate_to_job(eid, inserted, row)
     except Exception as exc:
         return CreateJobFromEstimateResult(
             ok=False,
@@ -385,18 +483,26 @@ def create_pending_job_from_estimate(
     return CreateJobFromEstimateResult(ok=True, message=msg, job=inserted)
 
 
+def ensure_linked_pending_job_for_estimate(
+    estimate_id: str,
+    *,
+    estimate_row: dict[str, Any] | None = None,
+) -> CreateJobFromEstimateResult:
+    """
+    Ensure the estimate has a linked job in Estimate Pending status (create or sync).
+
+    Safe to call after insert or update when the estimate has a customer.
+    """
+    return create_pending_job_from_estimate(estimate_id, estimate_row=estimate_row)
+
+
 def auto_create_linked_job_after_estimate_insert(
     estimate_id: str,
     *,
     estimate_row: dict[str, Any] | None = None,
 ) -> CreateJobFromEstimateResult:
     """Called after a new estimate row is inserted."""
-    row = estimate_row
-    if row is None:
-        row = _fetch_estimate_row_for_create(estimate_id)
-    if row and str(row.get("job_id") or "").strip():
-        return CreateJobFromEstimateResult(ok=True, message="Estimate already has a linked job.")
-    return create_pending_job_from_estimate(estimate_id, estimate_row=row)
+    return ensure_linked_pending_job_for_estimate(estimate_id, estimate_row=estimate_row)
 
 
 def approve_estimate_and_job(

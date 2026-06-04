@@ -294,11 +294,15 @@ def get_estimate_description(est: dict[str, Any]) -> str:
     return str(v).strip()
 
 
+# Base jobs schema (002_jobs.sql); lifecycle cols (084) are optional — see db._execute_jobs_query.
+_JOB_COLLISION_COLUMNS = "id,job_number,job_name,estimate_id,customer_id,status,is_deleted,deleted_at"
+
+
 def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[str, Any] | None:
     by_ref = fetch_by_match_admin(
         "jobs",
         {"estimate_id": estimate_id},
-        columns="id,job_number,job_name",
+        columns=_JOB_COLLISION_COLUMNS,
         limit=5,
     )
     if by_ref:
@@ -308,7 +312,7 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
         got = fetch_by_match_admin(
             "jobs",
             {"id": jid},
-            columns="id,job_number,job_name",
+            columns=_JOB_COLLISION_COLUMNS,
             limit=1,
         )
         if got:
@@ -319,9 +323,6 @@ def _existing_job_for_estimate(estimate_id: str, row: dict[str, Any]) -> dict[st
 _INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM: FrozenSet[str] = frozenset(
     {"archived", "deleted", "cancelled", "canceled", "closed", "completed"}
 )
-
-# Base jobs schema (002_jobs.sql); lifecycle cols (084) are optional — see db._execute_jobs_query.
-_JOB_COLLISION_COLUMNS = "id,job_number,job_name,estimate_id,customer_id,status"
 
 
 def _norm_job_status(status: object) -> str:

@@ -250,19 +250,22 @@ def _estimate_created_by(row: dict) -> str:
 
 
 def _estimate_job(row: dict) -> str:
-    for key in ("job_number", "linked_job_number", "linked_job"):
+    """Linked job label only when a real job row is linked (not a Q→J preview)."""
+    for key in ("job_number", "linked_job_number"):
         val = _estimate_row_label(row, key)
-        if val:
+        if val and val not in {"—", "-", "— None —"}:
             return val
-    quote = _estimate_row_label(row, "estimate_number")
-    if quote.upper().startswith("Q"):
+    linked = row.get("linked_job")
+    if isinstance(linked, dict):
         try:
-            from app.services.shared_sequence import quote_number_to_job_number
+            from app.utils.formatters import job_display_label
         except ImportError:
-            from services.shared_sequence import quote_number_to_job_number  # type: ignore
-        linked = quote_number_to_job_number(quote)
-        if linked:
-            return linked
+            from utils.formatters import job_display_label  # type: ignore
+        label = job_display_label(linked.get("job_number"), linked.get("job_name"))
+        if label:
+            return label
+    if str(row.get("job_id") or "").strip():
+        return _estimate_row_label(row, "job_number") or "—"
     return "—"
 
 

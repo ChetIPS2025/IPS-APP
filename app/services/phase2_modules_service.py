@@ -1032,36 +1032,44 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         result = update_row("estimates", payload, {"id": row_id})
     else:
         result = insert_row("estimates", payload)
-        if result.ok:
-            eid = str((result.data or {}).get("id") or "").strip()
-            if eid:
-                try:
-                    from app.services.estimate_job_workflow_service import (
-                        auto_create_linked_job_after_estimate_insert,
-                    )
-                except ImportError:
-                    from services.estimate_job_workflow_service import (  # type: ignore
-                        auto_create_linked_job_after_estimate_insert,
-                    )
-                link_result = auto_create_linked_job_after_estimate_insert(eid, estimate_row=result.data)
-                if not link_result.ok and link_result.error_code not in ("duplicate",):
-                    if link_result.error_code == "no_customer":
-                        result = ServiceResult(
-                            ok=True,
-                            data=result.data,
-                            error=None,
-                        )
-                    else:
-                        return ServiceResult(
-                            ok=False,
-                            error=link_result.message or "Estimate saved but linked job could not be created.",
-                            data=result.data,
-                        )
     if result.ok:
         clear_all_data_caches()
         saved_id = str(
             row_id or ((result.data or {}).get("id") if isinstance(result.data, dict) else "") or ""
         ).strip()
+        if saved_id:
+            est_row_for_link: dict[str, Any] | None = (
+                result.data if isinstance(result.data, dict) else None
+            )
+            try:
+                from app.services.estimate_job_workflow_service import (
+                    ensure_linked_pending_job_for_estimate,
+                )
+            except ImportError:
+                from services.estimate_job_workflow_service import (  # type: ignore
+                    ensure_linked_pending_job_for_estimate,
+                )
+            link_result = ensure_linked_pending_job_for_estimate(
+                saved_id,
+                estimate_row=est_row_for_link,
+            )
+            if not link_result.ok and link_result.error_code not in ("duplicate",):
+                if link_result.error_code == "no_customer":
+                    pass
+                elif not row_id:
+                    return ServiceResult(
+                        ok=False,
+                        error=link_result.message or "Estimate saved but linked job could not be created.",
+                        data=result.data,
+                    )
+                else:
+                    _LOG.warning(
+                        "Estimate %s saved; linked job ensure failed: %s",
+                        saved_id,
+                        link_result.message,
+                    )
+            elif isinstance(result.data, dict) and link_result.job:
+                result.data["job_id"] = str(link_result.job.get("id") or result.data.get("job_id") or "")
         if saved_id and project_name:
             try:
                 from app.services.estimate_job_workflow_service import (
