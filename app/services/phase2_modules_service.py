@@ -386,8 +386,9 @@ def normalize_estimate(
         "status": _normalize_estimate_status(row.get("status")),
         "created_by": str(row.get("created_by") or row.get("prepared_by_name") or row.get("prepared_by") or "—"),
         "job_number": str(row.get("job_number") or "—"),
-        "description": str(row.get("description") or row.get("scope_of_work") or row.get("notes") or ""),
-        "scope_of_work": str(row.get("scope_of_work") or row.get("description") or ""),
+        "description": str(row.get("description") or ""),
+        "scope_of_work": str(row.get("scope_of_work") or ""),
+        "customer_responsibilities": str(row.get("customer_responsibilities") or ""),
         "notes": str(row.get("notes") or ""),
         "subtotal": _money_field(row, "subtotal", "total_cost", "total", "grand_total"),
         "tax": float(row.get("tax_amount") or row.get("tax") or 0),
@@ -982,8 +983,43 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     except ValueError as exc:
         return ServiceResult(ok=False, error=str(exc))
     project_name = str(ui.get("project_name") or "").strip()
-    scope_text = str(ui.get("description") or ui.get("scope_of_work") or "").strip()
     cols = table_column_names("estimates")
+    existing: dict[str, Any] = {}
+    if row_id:
+        try:
+            rows = fetch_rows("estimates", match={"id": row_id}, limit=1, use_admin=True)
+            existing = rows[0] if rows else {}
+        except Exception:
+            existing = {}
+
+    if "scope_of_work" in ui:
+        scope_text = str(ui.get("scope_of_work") or "").strip()
+    elif row_id:
+        scope_text = str(existing.get("scope_of_work") or "").strip()
+    else:
+        scope_text = str(ui.get("scope_of_work") or "").strip()
+
+    if "description" in ui:
+        desc_text = str(ui.get("description") or "").strip()
+    elif row_id:
+        desc_text = str(existing.get("description") or "").strip()
+    else:
+        desc_text = str(ui.get("description") or "").strip()
+
+    if "notes" in ui:
+        notes_text = str(ui.get("notes") or "").strip()
+    elif row_id:
+        notes_text = str(existing.get("notes") or "").strip()
+    else:
+        notes_text = str(ui.get("notes") or "").strip()
+
+    if "customer_responsibilities" in ui:
+        cust_resp = str(ui.get("customer_responsibilities") or "").strip()
+    elif row_id:
+        cust_resp = str(existing.get("customer_responsibilities") or "").strip()
+    else:
+        cust_resp = str(ui.get("customer_responsibilities") or "").strip()
+
     payload = {
         "quote_number": quote_number or None,
         "customer_name": ui.get("customer"),
@@ -995,9 +1031,10 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "estimate_date": ui.get("estimate_date") or None,
         "expiration_date": ui.get("expiration_date") or None,
         "prepared_by_name": ui.get("created_by") or ui.get("prepared_by_name"),
-        "description": scope_text or None,
+        "description": desc_text or None,
         "scope_of_work": scope_text or None,
-        "notes": ui.get("notes") or scope_text or "",
+        "customer_responsibilities": cust_resp or None,
+        "notes": notes_text or None,
         "subtotal": ui.get("subtotal") or ui.get("total_cost") or 0,
         "total_cost": ui.get("total_cost") or ui.get("subtotal") or 0,
         "tax": ui.get("tax") or ui.get("tax_amount") or 0,

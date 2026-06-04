@@ -34,6 +34,7 @@ try:
         render_cost_builder_tab,
         render_markups_tab,
         render_proposal_preview_tab,
+        render_scope_of_work_tab,
         render_summary_tab,
     )
     from app.pages._core._data import (
@@ -102,6 +103,7 @@ except ImportError:
         render_cost_builder_tab,
         render_markups_tab,
         render_proposal_preview_tab,
+        render_scope_of_work_tab,
         render_summary_tab,
     )
     from pages._core._data import (  # type: ignore
@@ -158,6 +160,7 @@ def _est_new_num_edited() -> None:
 
 _ESTIMATE_TABS = [
     "Overview",
+    "Scope of Work",
     "Cost Builder",
     "Markups",
     "Summary",
@@ -428,7 +431,8 @@ def _set_estimate_build_mode(est: dict) -> None:
     set_view_mode(_MOD, rk)
 
 
-def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
+def _persist_estimate_partial(data: dict, row_id: str) -> tuple[bool, str]:
+    """Merge tab saves without clearing scope, notes, or project fields."""
     est = get_estimate(row_id) or {}
     proj = str(est.get("project_name") or "").strip()
     if proj == "—":
@@ -444,6 +448,19 @@ def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
         row_id=row_id,
     )
     return ok, msg
+
+
+def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
+    return _persist_estimate_partial(data, row_id)
+
+
+def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
+    return _persist_estimate_partial(data, row_id)
+
+
+def _on_estimate_scope_saved(eid: str) -> None:
+    _refresh_estimate_modal_cache(eid)
+    st.session_state.pop(f"est_sow_seeded_{eid}", None)
 
 
 def _estimate_status_pill_html(status: str) -> str:
@@ -863,8 +880,8 @@ def _seed_estimate_edit_form(est: dict) -> None:
     st.session_state[f"est_edit_proj_{eid}"] = "" if proj == "—" else proj
     st.session_state[f"est_edit_cust_{eid}"] = str(est.get("customer") or "")
     st.session_state[f"est_edit_status_{eid}"] = str(est.get("status") or "Draft")
-    st.session_state[f"est_edit_desc_{eid}"] = str(est.get("description") or est.get("scope_of_work") or "")
     st.session_state[f"est_edit_notes_{eid}"] = str(est.get("notes") or "")
+    st.session_state.pop(f"est_sow_seeded_{eid}", None)
     st.session_state[f"est_edit_est_date_{eid}"] = _as_date(est.get("estimate_date")) or date.today()
     st.session_state[f"est_edit_exp_date_{eid}"] = _as_date(est.get("expiration_date")) or (date.today() + timedelta(days=30))
     st.session_state.pop(f"est_edit_contact_{eid}", None)
@@ -939,7 +956,7 @@ def _render_estimate_edit_form(est: dict) -> None:
             format_func=lambda i: job_labels[i],
             key=f"est_edit_job_{eid}",
         )
-    st.text_area("Description / scope summary", key=f"est_edit_desc_{eid}", height=90)
+    st.caption("Use the **Scope of Work** tab for long-form scope text.")
     st.text_area("Notes", key=f"est_edit_notes_{eid}", height=70)
 
     cancelled, saved = render_save_cancel_actions(
@@ -967,7 +984,6 @@ def _render_estimate_edit_form(est: dict) -> None:
                 "status": st.session_state.get(f"est_edit_status_{eid}"),
                 "estimate_date": str(st.session_state.get(f"est_edit_est_date_{eid}")),
                 "expiration_date": str(st.session_state.get(f"est_edit_exp_date_{eid}")),
-                "description": st.session_state.get(f"est_edit_desc_{eid}"),
                 "notes": st.session_state.get(f"est_edit_notes_{eid}"),
             },
             row_id=eid,
@@ -996,6 +1012,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
     (
         tab_overview,
+        tab_scope,
         tab_cost_builder,
         tab_markups,
         tab_summary,
@@ -1038,8 +1055,17 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             f"</div>"
         )
         st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
-        scope = safe_value(est.get("description") or est.get("scope_of_work"), "No scope entered.")
-        st.markdown(dialog_card_html("Scope", f"<p style='margin:0;font-size:0.875rem;'>{html.escape(scope)}</p>"), unsafe_allow_html=True)
+        st.caption("Open the **Scope of Work** tab to view or edit the full project scope.")
+
+    with tab_scope:
+        if eid and not is_demo_id(eid):
+            render_scope_of_work_tab(
+                est,
+                persist_fn=_persist_scope_of_work,
+                on_saved=lambda: _on_estimate_scope_saved(eid),
+            )
+        else:
+            placeholder_html("Save this estimate to edit scope of work.")
 
     with tab_cost_builder:
         if eid and not is_demo_id(eid):
@@ -1069,7 +1095,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         placeholder_html("Estimate attachments will appear here when connected to document storage.")
 
     with tab_notes:
-        notes_text = safe_value(est.get("notes") or est.get("description"), "No notes entered.")
+        notes_text = safe_value(est.get("notes"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
             f"{html.escape(notes_text)}"
@@ -1191,7 +1217,12 @@ def _show_new_estimate_dialog() -> None:
             prev_customer_key=_NEW_CUST_PREV,
             prev_location_key="est_new_loc_prev",
         )
-    st.text_area("Description / scope summary", key="est_new_desc", height=80)
+    st.text_area(
+        "Scope of Work",
+        key="est_new_sow",
+        height=120,
+        placeholder="Full scope for this estimate (optional — can edit later in Scope of Work tab).",
+    )
     st.text_area("Notes", key="est_new_notes", height=60)
 
     sb1, sb2 = st.columns(2)
@@ -1209,7 +1240,7 @@ def _show_new_estimate_dialog() -> None:
                     "status": st.session_state.get("est_new_status") or "Draft",
                     "estimate_date": str(st.session_state.get("est_new_est_date")),
                     "expiration_date": str(st.session_state.get("est_new_exp_date")),
-                    "description": st.session_state.get("est_new_desc"),
+                    "scope_of_work": st.session_state.get("est_new_sow"),
                     "notes": st.session_state.get("est_new_notes"),
                 }
             )

@@ -1434,6 +1434,74 @@ def render_other_costs_tab(est: dict[str, Any]) -> None:
         )
 
 
+def _estimate_scope_display_text(est: dict[str, Any]) -> str:
+    """Long-form scope for the Scope of Work tab (not project title)."""
+    sow = str(est.get("scope_of_work") or "").strip()
+    if sow:
+        return sow
+    desc = str(est.get("description") or "").strip()
+    proj = str(est.get("project_name") or "").strip()
+    if desc and desc != proj and desc != "—":
+        return desc
+    return ""
+
+
+def render_scope_of_work_tab(
+    est: dict[str, Any],
+    *,
+    persist_fn: Callable[[dict[str, Any], str], tuple[bool, str]],
+    on_saved: Callable[[], None] | None = None,
+) -> None:
+    eid = str(est.get("id") or "")
+    if is_demo_id(eid):
+        st.info("Save this estimate to Supabase before editing scope of work.")
+        return
+
+    scope_text = _estimate_scope_display_text(est)
+    cust_resp = str(est.get("customer_responsibilities") or "").strip()
+    seed_key = f"est_sow_seeded_{eid}"
+    if not st.session_state.get(seed_key):
+        st.session_state[f"est_sow_text_{eid}"] = scope_text
+        st.session_state[f"est_sow_cr_{eid}"] = cust_resp
+        st.session_state[seed_key] = True
+
+    st.caption(
+        "Enter the full scope of work for proposals and field teams. "
+        "Keep the **Project** name short on Overview (for example, Orange Turnaround Extra Work)."
+    )
+    st.text_area(
+        "Scope of Work",
+        height=320,
+        key=f"est_sow_text_{eid}",
+        placeholder=(
+            "Describe work to be performed, exclusions, assumptions, "
+            "schedule constraints, and deliverables…"
+        ),
+    )
+    st.text_area(
+        "Customer responsibilities (optional)",
+        height=160,
+        key=f"est_sow_cr_{eid}",
+        placeholder="Customer-furnished items, access, permits, utilities, etc.",
+    )
+
+    if st.button("Save scope", key=f"est_sow_save_{eid}", type="primary"):
+        ok, msg = persist_fn(
+            {
+                "scope_of_work": st.session_state.get(f"est_sow_text_{eid}", ""),
+                "customer_responsibilities": st.session_state.get(f"est_sow_cr_{eid}", ""),
+            },
+            eid,
+        )
+        if ok:
+            st.success(msg or "Scope of work saved.")
+            if on_saved:
+                on_saved()
+            st.rerun()
+        else:
+            st.error(msg or "Could not save scope of work.")
+
+
 def render_markups_tab(est: dict[str, Any], *, persist_fn: Callable[[dict[str, Any], str], tuple[bool, str]]) -> None:
     eid = str(est.get("id") or "")
     st.markdown("##### Default markups for new lines")
