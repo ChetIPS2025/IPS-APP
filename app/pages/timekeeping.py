@@ -1437,9 +1437,8 @@ def _render_list_day_hour_stepper(
 
     with st.container(key=spin_key):
         st.markdown(
-            f'<span class="timekeeping-list-hour-spinner-marker{spin_marker_cls}" '
-            f'aria-hidden="true"></span>'
-            '<div class="timekeeping-hour-spinner">',
+            f'<span class="timekeeping-list-hour-spinner-marker timekeeping-hour-spinner-marker{spin_marker_cls}" '
+            f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         inp_col, btns_col = st.columns([90, 32], gap="xxsmall", vertical_alignment="center")
