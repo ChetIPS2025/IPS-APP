@@ -160,6 +160,7 @@ _DAY_GRID_LABELS = [
 _LIST_VIEW_HOUR_STEP = 0.5
 _ALLOC_HOUR_TYPE_OPTS = ["S/T", "O/T"]
 _ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
+_ALLOC_TOLERANCE = 0.01
 _ASSIGNMENT_LEGACY_ALIASES = {
     "ips shop": "Shop",
     "administrator": "Administrative",
@@ -703,6 +704,136 @@ def _allocated_st_ot_sum(lines: list[dict[str, Any]]) -> tuple[float, float]:
     return st_total, ot_total
 
 
+def _allocation_line_has_valid_assignment(line: dict[str, Any]) -> bool:
+    """True when hours are tied to a job, subjob, Shop, or Administrative."""
+    return _day_has_job({"job": line.get("job")})
+
+
+def _allocation_line_hour_type_valid(line: dict[str, Any], hours: float) -> bool:
+    if hours <= _ALLOC_TOLERANCE:
+        return True
+    raw = str(line.get("hour_type") or "").strip()
+    if not raw:
+        return False
+    norm = _normalize_alloc_hour_type(raw)
+    return norm in {"ST", "OT"}
+
+
+def _live_allocation_lines_for_day(
+    lines: list[dict[str, Any]],
+    *,
+    eid: str,
+    week_sig: str,
+    iso: str,
+) -> list[dict[str, Any]]:
+    """Merge allocation widget values for completion checks before rerun."""
+    out: list[dict[str, Any]] = []
+    for lix, line in enumerate(lines):
+        live = dict(line)
+        job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
+        type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+        hrs_key = f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}"
+        if job_key in st.session_state:
+            live["job"] = st.session_state[job_key]
+        if type_key in st.session_state:
+            live["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+        if hrs_key in st.session_state:
+            live["hours"] = float(st.session_state[hrs_key] or 0)
+        out.append(live)
+    return out
+
+
+def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]]) -> dict[str, Any]:
+    allocated_total = 0.0
+    allocated_st = 0.0
+    allocated_ot = 0.0
+    has_invalid_assignment = False
+
+    for row in allocations or []:
+        hours = _line_allocated_hours(row)
+        if hours <= _ALLOC_TOLERANCE:
+            continue
+        allocated_total += hours
+        if not _allocation_line_hour_type_valid(row, hours):
+            has_invalid_assignment = True
+        elif _normalize_alloc_hour_type(row.get("hour_type")) == "OT":
+            allocated_ot += hours
+        else:
+            allocated_st += hours
+        if not _allocation_line_has_valid_assignment(row):
+            has_invalid_assignment = True
+
+    remaining = float(day_total or 0) - allocated_total
+    if day_total <= _ALLOC_TOLERANCE:
+        state = "no_hours"
+    elif allocated_total - day_total > _ALLOC_TOLERANCE:
+        state = "overallocated"
+    elif abs(remaining) <= _ALLOC_TOLERANCE and not has_invalid_assignment:
+        state = "complete"
+    elif has_invalid_assignment and allocated_total > _ALLOC_TOLERANCE:
+        state = "needs_assignment"
+    else:
+        state = "incomplete"
+
+    return {
+        "state": state,
+        "allocated_total": allocated_total,
+        "allocated_st": allocated_st,
+        "allocated_ot": allocated_ot,
+        "remaining": remaining,
+        "has_invalid_assignment": has_invalid_assignment,
+    }
+
+
+def _allocation_day_block_class(state: str) -> str:
+    if state == "complete":
+        return " timekeeping-alloc-day-complete"
+    if state == "overallocated":
+        return " timekeeping-alloc-day-overallocated"
+    if state == "needs_assignment":
+        return " timekeeping-alloc-day-needs-assignment"
+    if state == "incomplete":
+        return " timekeeping-alloc-day-incomplete"
+    return ""
+
+
+def _list_day_allocation_marker_class(
+    *,
+    eid: str,
+    week_sig: str,
+    day_ix: int,
+    day_d: date,
+    grid_row: dict,
+    alloc_by_date: dict[str, list[dict[str, Any]]] | None,
+) -> str:
+    """CSS marker classes for top-row day cells from allocation completeness."""
+    daily_total = _daily_total_from_list_row(
+        eid=eid,
+        week_sig=week_sig,
+        day_ix=day_ix,
+        grid_row=grid_row,
+    )
+    if daily_total <= _ALLOC_TOLERANCE:
+        return ""
+    if not isinstance(alloc_by_date, dict):
+        return ""
+    iso = day_d.isoformat()
+    lines = _live_allocation_lines_for_day(
+        list(alloc_by_date.get(iso) or []),
+        eid=eid,
+        week_sig=week_sig,
+        iso=iso,
+    )
+    state = _get_day_allocation_state(daily_total, lines)["state"]
+    if state == "complete":
+        return " ips-time-week-day-filled ips-time-week-day-alloc-complete"
+    if state == "overallocated":
+        return " ips-time-week-day-alloc-over"
+    if state in {"incomplete", "needs_assignment"}:
+        return " ips-time-week-day-alloc-warn"
+    return ""
+
+
 def _default_allocation_job(grid_row: dict, job_opts: list[str]) -> str:
     saved = _normalize_assignment_label(str(grid_row.get("job") or ""))
     if saved and saved in job_opts:
@@ -1011,13 +1142,26 @@ def _day_has_job(day_row: dict) -> bool:
     job = _normalize_assignment_label(str(day_row.get("job") or "")).strip().lower()
     if not job:
         return False
-    if job in {"—", "-", "— no job —", "no job", "— select assignment —", "select assignment"}:
+    if job in {
+        "—",
+        "-",
+        "— no job —",
+        "no job",
+        "— no assignment —",
+        "no assignment",
+        "— select assignment —",
+        "select assignment",
+    }:
         return False
-    return "no job" not in job and "select assignment" not in job
+    return (
+        "no job" not in job
+        and "no assignment" not in job
+        and "select assignment" not in job
+    )
 
 
 def _day_entry_complete(day_row: dict) -> bool:
-    """Green day box when a job is selected and hours are entered."""
+    """Legacy single-row check (grid view / detail grid without allocation panel)."""
     return _day_has_job(day_row) and _day_hours_total(day_row) > 0
 
 
@@ -1197,11 +1341,19 @@ def _render_list_row_day_cell(
     emp_id: str,
     week_sig: str,
     editable: bool,
+    alloc_by_date: dict[str, list[dict[str, Any]]] | None = None,
 ) -> float:
     """List row: centered day label stacked above hour stepper."""
     day_label = day_d.strftime("%a %m/%d").upper()
     widget_key = f"tk_hrs_{emp_id}_{week_sig}_{day_ix}"
-    filled_marker = " ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
+    filled_marker = _list_day_allocation_marker_class(
+        eid=emp_id,
+        week_sig=week_sig,
+        day_ix=day_ix,
+        day_d=day_d,
+        grid_row=day_row,
+        alloc_by_date=alloc_by_date,
+    )
     grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
     total = _day_hours_total(day_row)
 
@@ -2082,13 +2234,18 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             grid_row=grid_row,
             job_opts=job_opts,
         )
-        allocated = _allocated_hours_sum(lines)
-        st_part, ot_part = _allocated_st_ot_sum(lines)
-        remaining = max(0.0, round(daily_total - allocated, 2))
+        live_lines = _live_allocation_lines_for_day(
+            lines, eid=eid, week_sig=week_sig, iso=iso
+        )
+        alloc_state = _get_day_allocation_state(daily_total, live_lines)
+        allocated = alloc_state["allocated_total"]
+        st_part = alloc_state["allocated_st"]
+        ot_part = alloc_state["allocated_ot"]
+        remaining = max(0.0, round(float(alloc_state["remaining"]), 2))
         day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
-        balance_cls = ""
-        if daily_total > 0 and abs(allocated - daily_total) > 0.01:
-            balance_cls = " timekeeping-alloc-day-unbalanced"
+        balance_cls = _allocation_day_block_class(str(alloc_state["state"]))
+        if str(alloc_state["state"]) == "overallocated":
+            balance_cls += " timekeeping-alloc-day-unbalanced"
         type_bits = []
         if st_part > 0:
             type_bits.append(f"S/T {_fmt_day_hours(st_part)}")
@@ -2097,6 +2254,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
         type_summary = f" ({' · '.join(type_bits)})" if type_bits else ""
 
         st.markdown(
+            f'<span class="timekeeping-alloc-day-state-marker timekeeping-alloc-day-state-'
+            f'{html.escape(str(alloc_state["state"]))}" aria-hidden="true"></span>'
             f'<div class="timekeeping-alloc-day-block{balance_cls}">'
             f'<div class="timekeeping-alloc-day-head">'
             f'<span class="timekeeping-alloc-day-title">{html.escape(day_name)}</span>'
@@ -2601,6 +2760,7 @@ def _render_custom_timekeeping_table(
                     )
 
                 if eid:
+                    alloc_by_date = _ensure_allocation_state(emp, week_start_d)
                     for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
                         day_row = grid[day_ix] if day_ix < len(grid) else {}
                         day_row = _day_row_with_widget_values(
@@ -2619,6 +2779,7 @@ def _render_custom_timekeeping_table(
                                 emp_id=eid,
                                 week_sig=week_sig,
                                 editable=editable,
+                                alloc_by_date=alloc_by_date,
                             )
                     st.session_state[_grid_key(eid)] = grid
                     st_total, ot_total, total_hours = _row_totals_from_grid(grid)

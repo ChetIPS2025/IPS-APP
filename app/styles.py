@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v49">
+<style id="ips-timekeeping-module-v50">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6012,6 +6012,66 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-unbalanced .timekeeping-alloc-day-split {{
   color: #b45309;
   font-weight: 700;
+}}
+.timekeeping-alloc-day-complete {{
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem 0.35rem;
+  margin: 0.5rem 0 0.15rem;
+}}
+.timekeeping-alloc-day-complete .timekeeping-alloc-day-title {{
+  color: #166534;
+}}
+.timekeeping-alloc-day-complete .timekeeping-alloc-day-total {{
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}}
+.timekeeping-alloc-day-complete .timekeeping-alloc-day-split {{
+  color: #15803d;
+  font-weight: 700;
+}}
+.timekeeping-alloc-day-incomplete,
+.timekeeping-alloc-day-needs-assignment {{
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem 0.35rem;
+  margin: 0.5rem 0 0.15rem;
+}}
+.timekeeping-alloc-day-incomplete .timekeeping-alloc-day-split,
+.timekeeping-alloc-day-needs-assignment .timekeeping-alloc-day-split {{
+  color: #b45309;
+  font-weight: 700;
+}}
+.timekeeping-alloc-day-overallocated {{
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem 0.35rem;
+  margin: 0.5rem 0 0.15rem;
+}}
+.timekeeping-alloc-day-overallocated .timekeeping-alloc-day-split,
+.timekeeping-alloc-day-overallocated .timekeeping-alloc-day-total {{
+  color: #b91c1c;
+  font-weight: 700;
+}}
+.timekeeping-alloc-day-overallocated .timekeeping-alloc-day-total {{
+  background: #fee2e2;
+  border-color: #fca5a5;
+}}
+{tk_list_day_col}:has(.ips-time-week-day-alloc-complete) {{
+  background: #f0fdf4 !important;
+  border-radius: 8px !important;
+}}
+{tk_list_day_col}:has(.ips-time-week-day-alloc-warn) {{
+  background: #fffbeb !important;
+  border-radius: 8px !important;
+}}
+{tk_list_day_col}:has(.ips-time-week-day-alloc-over) {{
+  background: #fef2f2 !important;
+  border-radius: 8px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker) {{
   max-width: 100% !important;
