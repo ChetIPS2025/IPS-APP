@@ -7,6 +7,7 @@ Call inject_global_css() on every Streamlit render (no session guard).
 from __future__ import annotations
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Design tokens
 APP_BG = "#f4f6f9"
@@ -3050,8 +3051,113 @@ def inject_assets_module_css() -> None:
     )
 
 
+def _inject_timekeeping_daily_hour_focus_script() -> None:
+    """Select-all on focus for List view daily hour boxes (top employee row)."""
+    sk = "ips_tk_daily_hour_focus_v2"
+    if st.session_state.get(sk):
+        return
+    st.session_state[sk] = True
+    components.html(
+        """
+<script>
+(function () {
+  var w = window.parent || window;
+  var doc = w.document;
+  var SELECTOR =
+    ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] [data-testid=\\"stNumberInput\\"] input, "
+    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] input[type=\\"number\\"], "
+    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"column\\"]:has(.timekeeping-list-daily-hour-marker) [data-testid=\\"stNumberInput\\"] input, "
+    + ".ips-time-week-inline input[type=\\"number\\"], "
+    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"stHorizontalBlock\\"]:has(.timesheet-days-grid-marker) input[type=\\"number\\"]";
+
+  function isDigitKey(e) {
+    return e.key && e.key.length === 1 && /^[0-9.]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey;
+  }
+
+  function bindInput(el) {
+    if (el.dataset.ipsSelectOnFocus) return;
+    el.dataset.ipsSelectOnFocus = "1";
+    el.classList.add("timekeeping-hour-input");
+
+    function rememberPrev() {
+      el.dataset.ipsPrevHour = el.value;
+    }
+
+    function selectAll() {
+      try {
+        el.select();
+      } catch (err) {}
+    }
+
+    function isFullySelected() {
+      var val = String(el.value || "");
+      var start = el.selectionStart == null ? 0 : el.selectionStart;
+      var end = el.selectionEnd == null ? val.length : el.selectionEnd;
+      return start === 0 && end >= val.length;
+    }
+
+    el.addEventListener("focus", function () {
+      rememberPrev();
+      delete el.dataset.ipsReplaceTyping;
+      w.requestAnimationFrame(selectAll);
+    });
+
+    el.addEventListener("mousedown", function (e) {
+      if (doc.activeElement === el) return;
+      e.preventDefault();
+      rememberPrev();
+      delete el.dataset.ipsReplaceTyping;
+      w.requestAnimationFrame(function () {
+        el.focus({ preventScroll: true });
+        selectAll();
+      });
+    });
+
+    el.addEventListener("keydown", function (e) {
+      if (!isDigitKey(e)) return;
+      if (isFullySelected()) return;
+      if (el.dataset.ipsReplaceTyping === "1") return;
+      e.preventDefault();
+      el.dataset.ipsReplaceTyping = "1";
+      el.value = e.key;
+      try {
+        el.setSelectionRange(el.value.length, el.value.length);
+      } catch (err2) {}
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    el.addEventListener("blur", function () {
+      delete el.dataset.ipsReplaceTyping;
+      var prev = el.dataset.ipsPrevHour;
+      var raw = String(el.value == null ? "" : el.value).trim();
+      if (raw === "" && prev != null && prev !== "") {
+        el.value = prev;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+  }
+
+  function bindAll(root) {
+    root.querySelectorAll(SELECTOR).forEach(bindInput);
+  }
+
+  bindAll(doc);
+  if (!w.__ipsTkDayBoxObserver) {
+    w.__ipsTkDayBoxObserver = new MutationObserver(function () {
+      bindAll(doc);
+    });
+    w.__ipsTkDayBoxObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        height=0,
+    )
+
+
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
+    _inject_timekeeping_daily_hour_focus_script()
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_detail_excl = (
         ":not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker))"
@@ -3096,7 +3202,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v48">
+<style id="ips-timekeeping-module-v49">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6077,51 +6183,6 @@ def inject_timekeeping_module_css() -> None:
   white-space: nowrap !important;
 }}
 </style>
-""",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-<script>
-(function () {
-  var IPS_TK_DAILY_HOUR_INPUT =
-    ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"column\\"]:has(.timekeeping-list-daily-hour-marker) input[type=\\"number\\"], "
-    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_list_hour_spin_\\"] input[type=\\"number\\"], "
-    + ".ips-time-week-inline input[type=\\"number\\"], "
-    + ".st-key-timekeeping_table_wrap [class*=\\"st-key-tk_row_\\"] [data-testid=\\"stHorizontalBlock\\"]:has(.timesheet-days-grid-marker) input[type=\\"number\\"]";
-
-  function bindSelectOnFocus(root) {
-    root.querySelectorAll(IPS_TK_DAILY_HOUR_INPUT).forEach(function (el) {
-      if (el.dataset.ipsSelectOnFocus) return;
-      el.dataset.ipsSelectOnFocus = "1";
-      el.classList.add("timekeeping-hour-input");
-      function selectAll() {
-        try {
-          this.select();
-        } catch (e) {}
-      }
-      el.addEventListener("focus", selectAll);
-      el.addEventListener("click", selectAll);
-      el.addEventListener("mouseup", function (ev) {
-        if (document.activeElement !== this) return;
-        var input = this;
-        window.setTimeout(function () {
-          try {
-            input.select();
-          } catch (e) {}
-        }, 0);
-      });
-    });
-  }
-  bindSelectOnFocus(document);
-  if (!window.__ipsTkDayBoxObserver) {
-    window.__ipsTkDayBoxObserver = new MutationObserver(function () {
-      bindSelectOnFocus(document);
-    });
-    window.__ipsTkDayBoxObserver.observe(document.body, { childList: true, subtree: true });
-  }
-})();
-</script>
 """,
         unsafe_allow_html=True,
     )
