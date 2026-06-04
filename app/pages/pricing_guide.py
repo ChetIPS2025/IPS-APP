@@ -202,6 +202,28 @@ def _normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
     return normalize_pricing_row(raw)
 
 
+def _fitting_detail_fields_html(row: dict[str, Any]) -> str:
+    """Extra spec lines for fittings (unions, adapters) when catalog columns are set."""
+    if not str(row.get("connection_type") or row.get("dash_size") or "").strip():
+        return ""
+    parts: list[str] = []
+    for label, key in (
+        ("Product type", "product_type"),
+        ("Connection", "connection_type"),
+        ("Pipe size", "pipe_size"),
+        ("Dash size", "dash_size"),
+        ("Pressure class", "pressure_class"),
+        ("Body shape", "body_shape"),
+        ("Material", "material_grade"),
+        ("Max pressure", "max_pressure_temp"),
+        ("Max steam pressure", "max_steam_pressure_temp"),
+    ):
+        val = str(row.get(key) or "").strip()
+        if val:
+            parts.append(detail_field_html(label, val))
+    return "".join(parts)
+
+
 def _load_rows() -> list[dict[str, Any]]:
     return cached_pricing_guide_rows(include_inactive=True)
 
@@ -799,6 +821,7 @@ def _render_item_tabs(row: dict[str, Any]) -> None:
                     f"{detail_field_html('Image status', row.get('image_status') or 'missing')}"
                     f"{detail_field_html('Category', row.get('category'))}"
                     f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
+                    f"{_fitting_detail_fields_html(row)}"
                     f"{detail_field_html('Unit', row.get('unit'))}"
                     f'{detail_field_html("Status", row.get("status"), html_value=modal_status_pill_html(str(row.get("status") or "")))}',
                 ),

@@ -36,6 +36,21 @@ CSV_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "markup_percent": ("markup_percent", "markup", "default_markup_percent"),
     "taxable": ("taxable",),
     "notes": ("notes",),
+    "item_code": ("item_code", "item_key"),
+    "item_type": ("item_type", "estimate_line_type"),
+    "product_type": ("product_type",),
+    "connection_type": ("connection_type",),
+    "pipe_size": ("pipe_size",),
+    "dash_size": ("dash_size",),
+    "pressure_class": ("pressure_class",),
+    "body_shape": ("body_shape",),
+    "material_grade": ("material_grade", "material"),
+    "max_pressure_temp": ("max_pressure_temp", "max_pressure @ temp.", "max_pressure"),
+    "max_steam_pressure_temp": (
+        "max_steam_pressure_temp",
+        "max_steam_pressure @ temp.",
+        "max_steam_pressure",
+    ),
 }
 
 
@@ -142,28 +157,43 @@ def parse_catalog_csv(text: str) -> list[dict[str, Any]]:
         asset_rec = _bool(_row_get(raw, "asset_recommended"))
         if asset_rec and item_class == "Non-Inventory":
             item_class = "Asset"
-        out.append(
-            {
-                "description": description,
-                "category": _str(_row_get(raw, "category")),
-                "subcategory": _str(_row_get(raw, "subcategory")),
-                "unit": _str(_row_get(raw, "unit")) or "EA",
-                "qty_on_hand": _num(_row_get(raw, "qty_on_hand")),
-                "unit_cost": _num(_row_get(raw, "unit_cost")),
-                "total_cost": _num(_row_get(raw, "total_cost")),
-                "item_number": _str(_row_get(raw, "item_number")),
-                "model_number": _str(_row_get(raw, "model_number")),
-                "sku": _str(_row_get(raw, "sku")),
-                "item_class": item_class,
-                "asset_recommended": asset_rec,
-                "include_in_pricing_guide": _bool(_row_get(raw, "include_in_pricing_guide")),
-                "vendor": _str(_row_get(raw, "vendor")),
-                "markup_percent": _num(_row_get(raw, "markup_percent")),
-                "taxable": _bool(_row_get(raw, "taxable"), True),
-                "notes": _str(_row_get(raw, "notes")),
-                "item_type": infer_estimate_item_type(item_class, description=description),
-            }
-        )
+        row_out: dict[str, Any] = {
+            "description": description,
+            "category": _str(_row_get(raw, "category")),
+            "subcategory": _str(_row_get(raw, "subcategory")),
+            "unit": _str(_row_get(raw, "unit")) or "EA",
+            "qty_on_hand": _num(_row_get(raw, "qty_on_hand")),
+            "unit_cost": _num(_row_get(raw, "unit_cost")),
+            "total_cost": _num(_row_get(raw, "total_cost")),
+            "item_number": _str(_row_get(raw, "item_number")),
+            "model_number": _str(_row_get(raw, "model_number")),
+            "sku": _str(_row_get(raw, "sku")),
+            "item_class": item_class,
+            "asset_recommended": asset_rec,
+            "include_in_pricing_guide": _bool(_row_get(raw, "include_in_pricing_guide")),
+            "vendor": _str(_row_get(raw, "vendor")),
+            "markup_percent": _num(_row_get(raw, "markup_percent")),
+            "taxable": _bool(_row_get(raw, "taxable"), True),
+            "notes": _str(_row_get(raw, "notes")),
+            "item_type": _str(_row_get(raw, "item_type"))
+            or infer_estimate_item_type(item_class, description=description),
+            "item_code": _str(_row_get(raw, "item_code")),
+        }
+        for fitting_key in (
+            "product_type",
+            "connection_type",
+            "pipe_size",
+            "dash_size",
+            "pressure_class",
+            "body_shape",
+            "material_grade",
+            "max_pressure_temp",
+            "max_steam_pressure_temp",
+        ):
+            val = _str(_row_get(raw, fitting_key))
+            if val:
+                row_out[fitting_key] = val
+        out.append(row_out)
     return out
 
 
@@ -193,6 +223,7 @@ def find_matching_pricing_item(
         row,
         existing,
         field_map=(
+            ("item_code", "item_code"),
             ("model_number", "model_number"),
             ("item_number", "item_number"),
             ("description", "description"),
@@ -336,7 +367,8 @@ def _upsert_pricing_guide(
         markup = _default_catalog_markup_percent(item_class=item_class)
     sell = calc_sell_price(cost, markup)
     item_code = (
-        _str(row.get("sku") or row.get("model_number") or row.get("item_number"))
+        _str(row.get("item_code"))
+        or _str(row.get("sku") or row.get("model_number") or row.get("item_number"))
         or slug_item_code(row.get("description") or "ITEM")
     )
     payload: dict[str, Any] = {
@@ -361,6 +393,13 @@ def _upsert_pricing_guide(
         "asset_recommended": _bool(row.get("asset_recommended")),
         "is_active": True,
     }
+    try:
+        from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
+    except ImportError:
+        from data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES  # type: ignore
+    for key in FITTING_CATALOG_FIELD_NAMES:
+        if key in row and row.get(key) not in (None, ""):
+            payload[key] = _str(row.get(key))
     row_id = str(existing.get("id") or "") if existing else None
     ok, msg = save_pricing_item(payload, row_id=row_id, changed_by=changed_by)
     if not ok:

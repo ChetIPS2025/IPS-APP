@@ -654,6 +654,13 @@ def save_pricing_item(
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
+        from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
+    except ImportError:
+        from data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES  # type: ignore
+    for key in FITTING_CATALOG_FIELD_NAMES:
+        if key in data:
+            payload[key] = str(data.get(key) or "").strip()[:200]
+    try:
         from app.services.catalog_stock_policy_service import normalize_stock_policy
     except ImportError:
         from services.catalog_stock_policy_service import normalize_stock_policy  # type: ignore
@@ -1032,6 +1039,16 @@ def search_pricing_rows(rows: list[dict[str, Any]], query: str) -> list[dict[str
                 "inventory_label",
                 "asset_label",
                 "status",
+                "notes",
+                "product_type",
+                "connection_type",
+                "pipe_size",
+                "dash_size",
+                "pressure_class",
+                "body_shape",
+                "material_grade",
+                "max_pressure_temp",
+                "max_steam_pressure_temp",
             )
         ).lower()
         if q in haystack:
