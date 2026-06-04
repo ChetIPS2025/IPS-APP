@@ -2475,7 +2475,7 @@ def _render_list_allocation_detail(
             st.rerun()
     st.caption(
         "Totals in the row above are the source of truth. Choose S/T or O/T on each row, then save. "
-        "Unallocated time is saved to — No assignment — as S/T automatically."
+        "Unallocated time is saved to — No assignment — automatically."
     )
 
 
@@ -2726,113 +2726,114 @@ def _render_custom_timekeeping_table(
                 _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
                 _apply_active_field_job_to_grid(grid)
 
-            with st.container(key=f"tk_row_{timecard_id}"):
+            with st.container(key=f"tk_card_{timecard_id}"):
                 st.markdown(
                     '<span class="timesheet-employee-card-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                row_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
+                with st.container(key=f"tk_row_{timecard_id}"):
+                    row_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
 
-                with row_cols[0]:
-                    st.markdown(
-                        '<span class="weekly-timesheet-row-marker timesheet-list-row-marker '
-                        'timekeeping-list-row-marker" aria-hidden="true"></span>'
-                        '<span class="timekeeping-drag-cell timesheet-list-drag-handle" '
-                        'aria-hidden="true">⋮⋮</span>',
-                        unsafe_allow_html=True,
-                    )
-                with row_cols[1]:
-                    st.markdown(
-                        '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand '
-                        'timekeeping-expand-cell" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(
-                        "▾" if expanded else "▸",
-                        key=f"tk_expand_{timecard_id}",
-                        help="Expand ST/OT detail, notes, and daily submit",
-                    ):
-                        _toggle_expanded_timecard(timecard_id)
-                        st.rerun()
-
-                with row_cols[2]:
-                    st.markdown(
-                        f'<div class="timekeeping-employee-cell weekly-timesheet-employee '
-                        f'weekly-employee-cell timesheet-list-employee-cell">'
-                        f'<div class="timesheet-list-name-input weekly-timesheet-employee-name '
-                        f'employee-name ips-timekeeping-employee" '
-                        f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                if eid:
-                    alloc_by_date = _ensure_allocation_state(emp, week_start_d)
-                    for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                        day_row = grid[day_ix] if day_ix < len(grid) else {}
-                        day_row = _day_row_with_widget_values(
-                            day_row, eid=eid, week_sig=week_sig, index=day_ix
+                    with row_cols[0]:
+                        st.markdown(
+                            '<span class="weekly-timesheet-row-marker timesheet-list-row-marker '
+                            'timekeeping-list-row-marker" aria-hidden="true"></span>'
+                            '<span class="timekeeping-drag-cell timesheet-list-drag-handle" '
+                            'aria-hidden="true">⋮⋮</span>',
+                            unsafe_allow_html=True,
                         )
-                        day_status = _normalize_timecard_status(day_row.get("status"))
-                        week_status = _normalize_timecard_status(emp.get("status"))
-                        editable = (
-                            week_status != "Approved" and _day_is_editable(day_status)
+                    with row_cols[1]:
+                        st.markdown(
+                            '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand '
+                            'timekeeping-expand-cell" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
                         )
-                        with col:
-                            _render_list_row_day_cell(
-                                day_d=day_d,
-                                day_ix=day_ix,
-                                day_row=day_row,
-                                emp_id=eid,
-                                week_sig=week_sig,
-                                editable=editable,
-                                alloc_by_date=alloc_by_date,
-                            )
-                    st.session_state[_grid_key(eid)] = grid
-                    st_total, ot_total, total_hours = _row_totals_from_grid(grid)
-                else:
-                    for col in row_cols[3:10]:
-                        with col:
-                            st.markdown(
-                                '<div class="timekeeping-day-cell ips-timekeeping-hours">—</div>',
-                                unsafe_allow_html=True,
-                            )
+                        if st.button(
+                            "▾" if expanded else "▸",
+                            key=f"tk_expand_{timecard_id}",
+                            help="Expand ST/OT detail, notes, and daily submit",
+                        ):
+                            _toggle_expanded_timecard(timecard_id)
+                            st.rerun()
 
-                with row_cols[10]:
-                    _render_timekeeping_list_spacer_cell()
-                with row_cols[11]:
-                    _render_list_row_summary_cell(
-                        label=_LIST_VIEW_SUMMARY_LABELS[0],
-                        value_html=html.escape(_fmt_table_hours(st_total)),
-                        value_class="timekeeping-total-cell ips-timekeeping-hours",
-                    )
-                with row_cols[12]:
-                    _render_list_row_summary_cell(
-                        label=_LIST_VIEW_SUMMARY_LABELS[1],
-                        value_html=html.escape(_fmt_table_hours(ot_total)),
-                        value_class="timekeeping-overtime-cell ips-timekeeping-hours",
-                    )
-                with row_cols[13]:
-                    _render_list_row_summary_cell(
-                        label=_LIST_VIEW_SUMMARY_LABELS[2],
-                        value_html=html.escape(_fmt_table_hours(total_hours)),
-                        value_class="timekeeping-billed-cell ips-timekeeping-hours",
-                    )
-                with row_cols[14]:
-                    _render_list_row_summary_cell(
-                        label=_LIST_VIEW_SUMMARY_LABELS[3],
-                        value_html=_timecard_status_pill_html(status),
-                        value_class="timekeeping-status-cell timesheet-list-status-cell",
-                    )
+                    with row_cols[2]:
+                        st.markdown(
+                            f'<div class="timekeeping-employee-cell weekly-timesheet-employee '
+                            f'weekly-employee-cell timesheet-list-employee-cell">'
+                            f'<div class="timesheet-list-name-input weekly-timesheet-employee-name '
+                            f'employee-name ips-timekeeping-employee" '
+                            f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
 
-            if expanded:
-                with st.container(key=f"tk_expand_detail_{timecard_id}"):
-                    st.markdown(
-                        '<span class="timekeeping-expand-detail-panel timekeeping-detail-expand-host '
-                        'timesheet-employee-expand-detail ips-timekeeping-row-expand" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    _render_inline_daily_entries(row, week_start_d)
+                    if eid:
+                        alloc_by_date = _ensure_allocation_state(emp, week_start_d)
+                        for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+                            day_row = grid[day_ix] if day_ix < len(grid) else {}
+                            day_row = _day_row_with_widget_values(
+                                day_row, eid=eid, week_sig=week_sig, index=day_ix
+                            )
+                            day_status = _normalize_timecard_status(day_row.get("status"))
+                            week_status = _normalize_timecard_status(emp.get("status"))
+                            editable = (
+                                week_status != "Approved" and _day_is_editable(day_status)
+                            )
+                            with col:
+                                _render_list_row_day_cell(
+                                    day_d=day_d,
+                                    day_ix=day_ix,
+                                    day_row=day_row,
+                                    emp_id=eid,
+                                    week_sig=week_sig,
+                                    editable=editable,
+                                    alloc_by_date=alloc_by_date,
+                                )
+                        st.session_state[_grid_key(eid)] = grid
+                        st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+                    else:
+                        for col in row_cols[3:10]:
+                            with col:
+                                st.markdown(
+                                    '<div class="timekeeping-day-cell ips-timekeeping-hours">—</div>',
+                                    unsafe_allow_html=True,
+                                )
+
+                    with row_cols[10]:
+                        _render_timekeeping_list_spacer_cell()
+                    with row_cols[11]:
+                        _render_list_row_summary_cell(
+                            label=_LIST_VIEW_SUMMARY_LABELS[0],
+                            value_html=html.escape(_fmt_table_hours(st_total)),
+                            value_class="timekeeping-total-cell ips-timekeeping-hours",
+                        )
+                    with row_cols[12]:
+                        _render_list_row_summary_cell(
+                            label=_LIST_VIEW_SUMMARY_LABELS[1],
+                            value_html=html.escape(_fmt_table_hours(ot_total)),
+                            value_class="timekeeping-overtime-cell ips-timekeeping-hours",
+                        )
+                    with row_cols[13]:
+                        _render_list_row_summary_cell(
+                            label=_LIST_VIEW_SUMMARY_LABELS[2],
+                            value_html=html.escape(_fmt_table_hours(total_hours)),
+                            value_class="timekeeping-billed-cell ips-timekeeping-hours",
+                        )
+                    with row_cols[14]:
+                        _render_list_row_summary_cell(
+                            label=_LIST_VIEW_SUMMARY_LABELS[3],
+                            value_html=_timecard_status_pill_html(status),
+                            value_class="timekeeping-status-cell timesheet-list-status-cell",
+                        )
+
+                if expanded:
+                    with st.container(key=f"tk_expand_detail_{timecard_id}"):
+                        st.markdown(
+                            '<span class="timekeeping-expand-detail-panel timekeeping-detail-expand-host '
+                            'timesheet-employee-expand-detail ips-timekeeping-row-expand" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        _render_inline_daily_entries(row, week_start_d)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
