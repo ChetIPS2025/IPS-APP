@@ -159,6 +159,7 @@ _LIST_VIEW_SUMMARY_LABELS = ("Total Hours", "Overtime", "Billed Hours", "Status"
 _ALLOC_HOUR_TYPE_OPTS = ["S/T", "O/T"]
 _ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
 _ALLOC_LINE_COLS_PRIMARY = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 1.75]
+_ALLOC_LINE_LABELS = ("Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions")
 _ALLOC_TOLERANCE = 0.01
 _ASSIGNMENT_LEGACY_ALIASES = {
     "ips shop": "Shop",
@@ -2213,11 +2214,24 @@ def _reject_timekeeping_week(emp: dict, week_start_d: date, notes: str) -> bool:
     return False
 
 
-def _render_allocation_field_label(label: str) -> None:
+def _allocation_row_col_weights(*, is_primary_row: bool) -> list[float]:
+    return _ALLOC_LINE_COLS_PRIMARY if is_primary_row else _ALLOC_LINE_COLS
+
+
+def _render_allocation_row_label_band(*, is_primary_row: bool) -> None:
+    """Label row stacked above controls (no widgets in this band)."""
     st.markdown(
-        f'<div class="timekeeping-alloc-field-label">{html.escape(label)}</div>',
+        '<span class="timekeeping-allocation-header-row-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    label_cols = st.columns(_allocation_row_col_weights(is_primary_row=is_primary_row), gap="xxsmall")
+    for col, lbl in zip(label_cols, _ALLOC_LINE_LABELS):
+        with col:
+            st.markdown(
+                f'<div class="timekeeping-alloc-field-label timekeeping-alloc-col-head">'
+                f"{html.escape(lbl)}</div>",
+                unsafe_allow_html=True,
+            )
 
 
 def _render_allocation_hours_input(
@@ -2227,7 +2241,6 @@ def _render_allocation_hours_input(
     disabled: bool = False,
 ) -> float:
     """Single compact hours field for allocation rows (no nested stepper columns)."""
-    _render_allocation_field_label("Hours")
     st.markdown(
         '<span class="timekeeping-allocation-hours-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2270,7 +2283,6 @@ def _render_allocation_primary_row_actions(
     job_opts: list[str],
 ) -> None:
     """Submit / add-assignment controls on the right of the first allocation row."""
-    _render_allocation_field_label("Actions")
     st.markdown(
         '<span class="timekeeping-allocation-actions-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2340,22 +2352,6 @@ def _render_allocation_primary_row_actions(
         st.rerun()
 
 
-def _render_allocation_line_header() -> None:
-    st.markdown(
-        '<span class="timekeeping-allocation-header-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    cols = st.columns(_ALLOC_LINE_COLS_PRIMARY)
-    labels = ["Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions"]
-    for col, lbl in zip(cols, labels):
-        with col:
-            st.markdown(
-                f'<div class="ips-time-day-head timekeeping-detail-head timekeeping-alloc-col-head">'
-                f"{html.escape(lbl)}</div>",
-                unsafe_allow_html=True,
-            )
-
-
 def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
     """List expand: assign hours entered in the top row to jobs/tasks/shop/admin."""
     eid = str(emp.get("id") or emp.get("employee_id") or "")
@@ -2383,7 +2379,6 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
 
     if week_locked:
         st.info("This week is approved and locked.")
-    _render_allocation_line_header()
 
     for day_ix, day_d in enumerate(week_dates(week_start_d)):
         iso = day_d.isoformat()
@@ -2468,16 +2463,20 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                 unsafe_allow_html=True,
                             )
                         st.markdown(
-                            '<span class="timekeeping-allocation-line-marker timekeeping-allocation-row-marker" '
-                            'aria-hidden="true"></span>',
+                            '<span class="timekeeping-allocation-line-marker" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        _render_allocation_row_label_band(is_primary_row=is_primary_row)
+                        st.markdown(
+                            '<span class="timekeeping-allocation-control-row-marker '
+                            'timekeeping-allocation-row-marker" aria-hidden="true"></span>',
                             unsafe_allow_html=True,
                         )
                         row_cols = st.columns(
-                            _ALLOC_LINE_COLS_PRIMARY if is_primary_row else _ALLOC_LINE_COLS,
+                            _allocation_row_col_weights(is_primary_row=is_primary_row),
                             gap="xxsmall",
                         )
                         with row_cols[0]:
-                            _render_allocation_field_label("Assignment")
                             st.markdown(
                                 '<span class="timekeeping-allocation-assignment-marker" aria-hidden="true"></span>',
                                 unsafe_allow_html=True,
@@ -2497,7 +2496,6 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                     unsafe_allow_html=True,
                                 )
                         with row_cols[1]:
-                            _render_allocation_field_label("Type")
                             st.markdown(
                                 '<span class="timekeeping-allocation-type-marker" aria-hidden="true"></span>',
                                 unsafe_allow_html=True,
@@ -2525,21 +2523,18 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                 disabled=not row_editable,
                             )
                         with row_cols[3]:
-                            _render_allocation_field_label("Remaining")
                             st.markdown(
                                 f'<div class="timekeeping-alloc-remaining-cell">'
                                 f"{html.escape(_fmt_day_hours(row_remaining))}</div>",
                                 unsafe_allow_html=True,
                             )
                         with row_cols[4]:
-                            _render_allocation_field_label("Status")
                             st.markdown(
                                 f'<div class="timekeeping-alloc-status-cell">'
                                 f"{_timecard_status_pill_html(day_status)}</div>",
                                 unsafe_allow_html=True,
                             )
                         with row_cols[5]:
-                            _render_allocation_field_label("Notes")
                             if row_editable:
                                 line["notes"] = st.text_input(
                                     "Notes",
@@ -2574,7 +2569,11 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                                 )
                         else:
                             with row_cols[6]:
-                                _render_allocation_field_label("Actions")
+                                st.markdown(
+                                    '<span class="timekeeping-allocation-actions-marker" '
+                                    'aria-hidden="true"></span>',
+                                    unsafe_allow_html=True,
+                                )
                                 line_id = str(line.get("line_id") or "").strip()
                                 if row_editable and len(lines) > 1:
                                     if st.button(
