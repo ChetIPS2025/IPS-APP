@@ -3195,9 +3195,6 @@ def inject_timekeeping_module_css() -> None:
     tk_alloc_type_col_w = "96px"
     tk_alloc_assign_col_min_w = "220px"
     tk_alloc_actions_col_min_w = "260px"
-    tk_alloc_line_key = (
-        f'{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
-    )
     tk_alloc_grid_cols = """
     minmax(220px, 2fr)
     96px
@@ -3215,6 +3212,9 @@ def inject_timekeeping_module_css() -> None:
         f'[class*="st-key-tk_alloc_day_"], '
         f'{tk_alloc_panel} [class*="st-key-tk_alloc_day_"]'
     )
+    tk_alloc_line_key = (
+        f'{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
+    )
     tk_alloc_ctrl_row = tk_alloc_line_key
     tk_alloc_ctrl_row_alt = (
         f'{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-control-row-marker)'
@@ -3231,7 +3231,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v77">
+<style id="ips-timekeeping-module-v78">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
