@@ -15,8 +15,9 @@ except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
 ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
-ALLOC_LINE_COLS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-ALLOC_LINE_COLS_PRIMARY = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+# Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
+ALLOC_LINE_COLS = [2.2, 0.55, 0.5, 0.45, 0.5, 0.95, 1.35]
+ALLOC_LINE_COLS_PRIMARY = [2.2, 0.55, 0.5, 0.45, 0.5, 0.95, 1.35]
 
 ALLOCATION_HEADER_ROW_HTML = """
 <div class="timekeeping-allocation-header-row timekeeping-allocation-header-row-component" aria-hidden="true">
@@ -351,121 +352,121 @@ def render_allocation_control_row(
     if type_key in st.session_state:
         hour_type = deps.normalize_alloc_hour_type(st.session_state[type_key])
     is_primary_row = lix == 0
-
-    with st.container(key=f"tk_alloc_row_{eid}_{week_sig}_{iso}_{lix}"):
-        row_cols = st.columns(
-            _allocation_row_col_weights(is_primary_row=is_primary_row),
-            gap="small",
+    row_scope = allocation_panel_scope_key(ctx.panel_scope)
+    row_cols = st.columns(
+        _allocation_row_col_weights(is_primary_row=is_primary_row),
+        gap="small",
+        key=f"tk_alloc_cols_{row_scope}_{iso}_{lix}",
+    )
+    marker_classes = (
+        "timekeeping-allocation-line-marker "
+        "timekeeping-allocation-control-row-marker "
+        "timekeeping-allocation-assignment-marker"
+    )
+    if is_primary_row:
+        marker_classes += " timekeeping-allocation-primary-row-marker"
+    with row_cols[0]:
+        st.markdown(
+            f'<span class="{marker_classes}" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
         )
-        marker_classes = (
-            "timekeeping-allocation-line-marker "
-            "timekeeping-allocation-control-row-marker "
-            "timekeeping-allocation-assignment-marker"
+        if row_editable:
+            line["job"] = st.selectbox(
+                "Assignment",
+                job_opts,
+                index=deps.assignment_option_index(job_opts, live_job),
+                key=job_key,
+                label_visibility="collapsed",
+            )
+        else:
+            st.markdown(
+                f'<div class="timekeeping-alloc-cell">'
+                f"{html.escape(deps.coerce_assignment_label(str(line.get('job') or '—'), job_opts))}</div>",
+                unsafe_allow_html=True,
+            )
+    with row_cols[1]:
+        st.markdown(
+            '<span class="timekeeping-allocation-type-marker timekeeping-hour-type-cell" '
+            'aria-hidden="true"></span>',
+            unsafe_allow_html=True,
         )
-        if is_primary_row:
-            marker_classes += " timekeeping-allocation-primary-row-marker"
-        with row_cols[0]:
+        if row_editable:
+            hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
+            type_label = deps.alloc_hour_type_label(hour_type)
+            deps.ensure_alloc_type_widget_label(type_key, hour_type)
+            type_index = (
+                hour_type_options.index(type_label)
+                if type_label in hour_type_options
+                else 0
+            )
+            picked = st.selectbox(
+                "Type",
+                options=hour_type_options,
+                index=type_index,
+                key=type_key,
+                label_visibility="collapsed",
+            )
+            line["hour_type"] = deps.normalize_alloc_hour_type(picked)
+        else:
             st.markdown(
-                f'<span class="{marker_classes}" aria-hidden="true"></span>',
+                f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell '
+                f'timekeeping-hour-type-cell">'
+                f"{html.escape(deps.alloc_hour_type_label(hour_type))}</div>",
                 unsafe_allow_html=True,
             )
-            if row_editable:
-                line["job"] = st.selectbox(
-                    "Assignment",
-                    job_opts,
-                    index=deps.assignment_option_index(job_opts, live_job),
-                    key=job_key,
-                    label_visibility="collapsed",
-                )
-            else:
-                st.markdown(
-                    f'<div class="timekeeping-alloc-cell">'
-                    f"{html.escape(deps.coerce_assignment_label(str(line.get('job') or '—'), job_opts))}</div>",
-                    unsafe_allow_html=True,
-                )
-        with row_cols[1]:
+    with row_cols[2]:
+        line["hours"] = _render_allocation_hours_input(
+            value=float(line.get("hours") or 0),
+            widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
+            disabled=not row_editable,
+            deps=deps,
+        )
+    with row_cols[3]:
+        st.markdown(
+            f'<div class="timekeeping-alloc-remaining-cell">'
+            f"{html.escape(deps.fmt_day_hours(remaining))}</div>",
+            unsafe_allow_html=True,
+        )
+    with row_cols[4]:
+        st.markdown(
+            f'<div class="timekeeping-alloc-status-cell">'
+            f"{deps.timecard_status_pill_html(day_status)}</div>",
+            unsafe_allow_html=True,
+        )
+    with row_cols[5]:
+        if row_editable:
+            line["notes"] = st.text_input(
+                "Notes",
+                value=str(line.get("notes") or ""),
+                key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
+                label_visibility="collapsed",
+                placeholder="Notes…",
+            )
+        else:
             st.markdown(
-                '<span class="timekeeping-allocation-type-marker timekeeping-hour-type-cell" '
-                'aria-hidden="true"></span>',
+                f'<div class="timekeeping-alloc-cell">'
+                f"{html.escape(str(line.get('notes') or '—'))}</div>",
                 unsafe_allow_html=True,
             )
-            if row_editable:
-                hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
-                type_label = deps.alloc_hour_type_label(hour_type)
-                deps.ensure_alloc_type_widget_label(type_key, hour_type)
-                type_index = (
-                    hour_type_options.index(type_label)
-                    if type_label in hour_type_options
-                    else 0
-                )
-                picked = st.selectbox(
-                    "Type",
-                    options=hour_type_options,
-                    index=type_index,
-                    key=type_key,
-                    label_visibility="collapsed",
-                )
-                line["hour_type"] = deps.normalize_alloc_hour_type(picked)
-            else:
-                st.markdown(
-                    f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell '
-                    f'timekeeping-hour-type-cell">'
-                    f"{html.escape(deps.alloc_hour_type_label(hour_type))}</div>",
-                    unsafe_allow_html=True,
-                )
-        with row_cols[2]:
-            line["hours"] = _render_allocation_hours_input(
-                value=float(line.get("hours") or 0),
-                widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
-                disabled=not row_editable,
-                deps=deps,
-            )
-        with row_cols[3]:
-            st.markdown(
-                f'<div class="timekeeping-alloc-remaining-cell">'
-                f"{html.escape(deps.fmt_day_hours(remaining))}</div>",
-                unsafe_allow_html=True,
-            )
-        with row_cols[4]:
-            st.markdown(
-                f'<div class="timekeeping-alloc-status-cell">'
-                f"{deps.timecard_status_pill_html(day_status)}</div>",
-                unsafe_allow_html=True,
-            )
-        with row_cols[5]:
-            if row_editable:
-                line["notes"] = st.text_input(
-                    "Notes",
-                    value=str(line.get("notes") or ""),
-                    key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
-                    label_visibility="collapsed",
-                    placeholder="Notes…",
-                )
-            else:
-                st.markdown(
-                    f'<div class="timekeeping-alloc-cell">'
-                    f"{html.escape(str(line.get('notes') or '—'))}</div>",
-                    unsafe_allow_html=True,
-                )
-        with row_cols[6]:
-            _render_allocation_row_actions(
-                deps=deps,
-                emp=ctx.emp,
-                week_start_d=ctx.week_start_d,
-                eid=eid,
-                week_sig=week_sig,
-                iso=iso,
-                lines=lines,
-                line=line,
-                lix=lix,
-                day_status=day_status,
-                row_editable=row_editable,
-                can_approve=ctx.can_approve,
-                by_date=by_date,
-                daily_total=daily_total,
-                job_opts=job_opts,
-                is_primary_row=is_primary_row,
-            )
+    with row_cols[6]:
+        _render_allocation_row_actions(
+            deps=deps,
+            emp=ctx.emp,
+            week_start_d=ctx.week_start_d,
+            eid=eid,
+            week_sig=week_sig,
+            iso=iso,
+            lines=lines,
+            line=line,
+            lix=lix,
+            day_status=day_status,
+            row_editable=row_editable,
+            can_approve=ctx.can_approve,
+            by_date=by_date,
+            daily_total=daily_total,
+            job_opts=job_opts,
+            is_primary_row=is_primary_row,
+        )
 
     line["hour_type"] = deps.normalize_alloc_hour_type(line.get("hour_type"))
 
