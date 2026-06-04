@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import html
+from datetime import date
+from typing import Any
 
 import streamlit as st
 
@@ -1387,6 +1389,68 @@ def _render_asset_rental_pricing_fields(
         st.text_area("Rental notes", key=keys["notes"], height=72)
 
 
+_ASSET_CONDITION_OPTS = ("Good", "Fair", "Poor", "Needs Repair", "Out of Service")
+
+
+def _parse_asset_date_for_input(raw: object) -> date | None:
+    s = str(raw or "").strip()[:10]
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def _asset_edit_payload_from_session(aid: str) -> dict[str, Any]:
+    desc = str(st.session_state.get(f"ast_edit_desc_{aid}") or "").strip()
+    hours_raw = st.session_state.get(f"ast_edit_hours_{aid}")
+    try:
+        hours_miles = float(hours_raw) if hours_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        hours_miles = None
+    last_used = st.session_state.get(f"ast_edit_last_used_{aid}")
+    acquired = st.session_state.get(f"ast_edit_acquired_{aid}")
+    next_svc = st.session_state.get(f"ast_edit_next_svc_{aid}")
+
+    def _money(key: str) -> float | None:
+        raw = st.session_state.get(key)
+        if raw in (None, ""):
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "asset_number": st.session_state.get(f"ast_edit_num_{aid}"),
+        "asset_name": st.session_state.get(f"ast_edit_name_{aid}"),
+        "category": st.session_state.get(f"ast_edit_cat_{aid}"),
+        "status": st.session_state.get(f"ast_edit_status_{aid}"),
+        "location": st.session_state.get(f"ast_edit_loc_{aid}"),
+        "department": st.session_state.get(f"ast_edit_dept_{aid}"),
+        "manufacturer": st.session_state.get(f"ast_edit_mfr_{aid}"),
+        "model": st.session_state.get(f"ast_edit_model_{aid}"),
+        "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
+        "description": desc,
+        "operator": st.session_state.get(f"ast_edit_operator_{aid}"),
+        "primary_use": st.session_state.get(f"ast_edit_primary_use_{aid}"),
+        "hours_miles": hours_miles,
+        "last_used": last_used.isoformat() if hasattr(last_used, "isoformat") else last_used,
+        "condition": st.session_state.get(f"ast_edit_condition_{aid}"),
+        "next_service_due": next_svc.isoformat() if hasattr(next_svc, "isoformat") else next_svc,
+        "acquired_date": acquired.isoformat() if hasattr(acquired, "isoformat") else acquired,
+        "purchase_price": _money(f"ast_edit_purchase_{aid}"),
+        "value": _money(f"ast_edit_value_{aid}"),
+        "salvage_value": _money(f"ast_edit_salvage_{aid}"),
+        "depreciation_method": st.session_state.get(f"ast_edit_depr_method_{aid}"),
+        "useful_life": st.session_state.get(f"ast_edit_useful_life_{aid}"),
+        "annual_depreciation": _money(f"ast_edit_annual_depr_{aid}"),
+        "include_in_pricing_guide": bool(st.session_state.get(f"ast_edit_pg_{aid}")),
+        **_rental_fields_from_session(_asset_rental_session_keys(aid)),
+    }
+
+
 def _seed_asset_edit_form(asset: dict) -> None:
     aid = str(asset.get("id") or "")
     st.session_state[f"ast_edit_num_{aid}"] = str(asset.get("asset_number") or "")
@@ -1394,7 +1458,36 @@ def _seed_asset_edit_form(asset: dict) -> None:
     st.session_state[f"ast_edit_cat_{aid}"] = str(asset.get("category") or lookup_options("asset_categories")[0])
     st.session_state[f"ast_edit_status_{aid}"] = str(asset.get("status") or lookup_options("asset_statuses")[0])
     st.session_state[f"ast_edit_loc_{aid}"] = str(asset.get("location") or "")
+    st.session_state[f"ast_edit_dept_{aid}"] = str(asset.get("department") or "")
+    st.session_state[f"ast_edit_mfr_{aid}"] = str(asset.get("manufacturer") or "")
+    st.session_state[f"ast_edit_model_{aid}"] = str(asset.get("model") or "")
     st.session_state[f"ast_edit_serial_{aid}"] = str(asset.get("serial_number") or "")
+    st.session_state[f"ast_edit_desc_{aid}"] = str(asset.get("description") or asset.get("notes") or "")
+    st.session_state[f"ast_edit_operator_{aid}"] = str(asset.get("operator") or "")
+    st.session_state[f"ast_edit_primary_use_{aid}"] = str(
+        asset.get("primary_use") or asset.get("description") or ""
+    )
+    hm = asset.get("hours_miles")
+    st.session_state[f"ast_edit_hours_{aid}"] = float(hm) if hm not in (None, "") else 0.0
+    st.session_state[f"ast_edit_last_used_{aid}"] = _parse_asset_date_for_input(asset.get("last_used"))
+    cond = str(asset.get("condition") or "Good").strip()
+    st.session_state[f"ast_edit_condition_{aid}"] = (
+        cond if cond in _ASSET_CONDITION_OPTS else _ASSET_CONDITION_OPTS[0]
+    )
+    st.session_state[f"ast_edit_next_svc_{aid}"] = _parse_asset_date_for_input(
+        asset.get("next_service_due") or asset.get("service_due")
+    )
+    st.session_state[f"ast_edit_acquired_{aid}"] = _parse_asset_date_for_input(asset.get("acquired_date"))
+    st.session_state[f"ast_edit_purchase_{aid}"] = float(
+        asset.get("purchase_price") or asset.get("purchase_cost") or 0
+    )
+    st.session_state[f"ast_edit_value_{aid}"] = float(asset.get("value") or asset.get("current_value") or 0)
+    st.session_state[f"ast_edit_salvage_{aid}"] = float(asset.get("salvage_value") or 0)
+    st.session_state[f"ast_edit_depr_method_{aid}"] = str(
+        asset.get("depreciation_method") or "Straight Line"
+    )
+    st.session_state[f"ast_edit_useful_life_{aid}"] = str(asset.get("useful_life") or "7 years")
+    st.session_state[f"ast_edit_annual_depr_{aid}"] = float(asset.get("annual_depreciation") or 0)
     st.session_state[f"ast_edit_pg_{aid}"] = bool(asset.get("include_in_pricing_guide"))
     rk = _asset_rental_session_keys(aid)
     st.session_state[rk["rentable"]] = asset_is_rentable(asset)
@@ -1427,15 +1520,20 @@ def _render_asset_edit_form(asset: dict) -> None:
         st.caption("Demo records cannot be edited until saved to Supabase.")
         return
 
+    st.markdown("##### Asset details")
     ac1, ac2 = st.columns(2)
     with ac1:
-        st.text_input("Asset #", key=f"ast_edit_num_{aid}")
-        st.text_input("Name", key=f"ast_edit_name_{aid}")
+        st.text_input("Asset Number", key=f"ast_edit_num_{aid}")
+        st.text_input("Asset Name", key=f"ast_edit_name_{aid}")
         st.selectbox("Category", lookup_options("asset_categories"), key=f"ast_edit_cat_{aid}")
         st.selectbox("Status", lookup_options("asset_statuses"), key=f"ast_edit_status_{aid}")
-    with ac2:
         st.text_input("Location", key=f"ast_edit_loc_{aid}")
-        st.text_input("Serial", key=f"ast_edit_serial_{aid}")
+        st.text_input("Department", key=f"ast_edit_dept_{aid}")
+    with ac2:
+        st.text_input("Manufacturer", key=f"ast_edit_mfr_{aid}")
+        st.text_input("Model", key=f"ast_edit_model_{aid}")
+        st.text_input("Serial Number", key=f"ast_edit_serial_{aid}")
+        st.text_area("Description", key=f"ast_edit_desc_{aid}", height=100)
 
     st.checkbox(
         "Include on Pricing Guide (billable on estimates)",
@@ -1444,7 +1542,36 @@ def _render_asset_edit_form(asset: dict) -> None:
     )
     _render_asset_rental_pricing_fields(asset, aid=aid)
 
-    st.markdown("**Item Photo**")
+    st.markdown("##### Usage")
+    u1, u2 = st.columns(2)
+    with u1:
+        st.text_input("Current Operator", key=f"ast_edit_operator_{aid}")
+        st.text_input("Primary Use", key=f"ast_edit_primary_use_{aid}")
+        st.number_input("Hours/Miles", min_value=0.0, step=0.1, key=f"ast_edit_hours_{aid}")
+    with u2:
+        st.date_input("Last Used", key=f"ast_edit_last_used_{aid}")
+        st.selectbox("Condition", _ASSET_CONDITION_OPTS, key=f"ast_edit_condition_{aid}")
+        st.date_input("Next Service Due", key=f"ast_edit_next_svc_{aid}")
+
+    st.markdown("##### Financial")
+    f1, f2 = st.columns(2)
+    with f1:
+        st.date_input("Acquired Date", key=f"ast_edit_acquired_{aid}")
+        st.number_input("Purchase Price", min_value=0.0, step=1.0, format="%.2f", key=f"ast_edit_purchase_{aid}")
+        st.number_input("Current Value", min_value=0.0, step=1.0, format="%.2f", key=f"ast_edit_value_{aid}")
+    with f2:
+        st.number_input("Salvage Value", min_value=0.0, step=1.0, format="%.2f", key=f"ast_edit_salvage_{aid}")
+        st.text_input("Depreciation Method", key=f"ast_edit_depr_method_{aid}")
+        st.text_input("Useful Life", key=f"ast_edit_useful_life_{aid}")
+        st.number_input(
+            "Annual Depreciation",
+            min_value=0.0,
+            step=1.0,
+            format="%.2f",
+            key=f"ast_edit_annual_depr_{aid}",
+        )
+
+    st.markdown("##### Image")
     _render_asset_photo_manager(asset)
 
     cancelled, saved = render_save_cancel_actions(
@@ -1452,23 +1579,12 @@ def _render_asset_edit_form(asset: dict) -> None:
         record_key=rk,
         cancel_key=f"ast_edit_cancel_{aid}",
         save_key=f"ast_edit_save_{aid}",
+        save_label="Save Asset",
     )
     if cancelled:
         st.rerun()
     if saved:
-        ok, msg = persist_asset(
-            {
-                "asset_number": st.session_state.get(f"ast_edit_num_{aid}"),
-                "asset_name": st.session_state.get(f"ast_edit_name_{aid}"),
-                "category": st.session_state.get(f"ast_edit_cat_{aid}"),
-                "status": st.session_state.get(f"ast_edit_status_{aid}"),
-                "location": st.session_state.get(f"ast_edit_loc_{aid}"),
-                "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
-                "include_in_pricing_guide": bool(st.session_state.get(f"ast_edit_pg_{aid}")),
-                **_rental_fields_from_session(_asset_rental_session_keys(aid)),
-            },
-            row_id=aid,
-        )
+        ok, msg = persist_asset(_asset_edit_payload_from_session(aid), row_id=aid)
         if ok:
             clear_assets_cache()
             set_view_mode(_MOD, rk)

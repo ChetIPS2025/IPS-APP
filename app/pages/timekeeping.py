@@ -101,9 +101,6 @@ SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
 _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
-_TK_VIEW_KEY = "ips_timekeeping_view_mode"
-_TK_VIEW_GRID = "Week grid"
-_TK_VIEW_LIST = "List"
 _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
 _TS_DAY = 140
@@ -240,10 +237,6 @@ def _assignment_option_index(options: list[str], saved: str) -> int:
     return 0
 
 
-def _default_timekeeping_view() -> str:
-    return _TK_VIEW_GRID
-
-
 def _active_field_job_label() -> str | None:
     jid = get_field_job_id()
     if not jid:
@@ -266,25 +259,6 @@ def _apply_active_field_job_to_grid(grid: list[dict[str, Any]]) -> None:
     for row in grid:
         if _day_is_editable(_normalize_timecard_status(row.get("status"))):
             row["job"] = job_label
-
-
-def _render_timekeeping_view_toggle() -> str:
-    opts = [_TK_VIEW_GRID, _TK_VIEW_LIST]
-    default = _default_timekeeping_view()
-    current = str(st.session_state.get(_TK_VIEW_KEY) or default)
-    if current not in opts:
-        current = default
-        st.session_state[_TK_VIEW_KEY] = current
-    picked = st.radio(
-        "Timekeeping view",
-        opts,
-        index=opts.index(current),
-        horizontal=True,
-        key="tk_view_mode_radio",
-        label_visibility="collapsed",
-    )
-    st.session_state[_TK_VIEW_KEY] = picked
-    return str(picked)
 
 
 def _save_all_timekeeping_grids(rows: list[dict], week_start_d: date) -> None:
@@ -3066,37 +3040,11 @@ def render() -> None:
         )
 
     filtered = _filter_timecards(summaries, ws)
-    view_mode = _render_timekeeping_view_toggle()
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
 
-    if view_mode == _TK_VIEW_GRID:
-        filter_col, _ = st.columns([1.4, 2.6], gap="small")
-        with filter_col:
-            name_q = str(st.session_state.get("tk_hgrid_name_filter") or "").strip().lower()
-            st.text_input(
-                "Filter employees",
-                key="tk_hgrid_name_filter",
-                placeholder="Search by name…",
-                label_visibility="collapsed",
-            )
-        grid_rows = filtered
-        if name_q:
-            grid_rows = [
-                r
-                for r in filtered
-                if name_q in str(r.get("employee_name") or "").strip().lower()
-            ]
-        st.caption(
-            f"{len(grid_rows)} of {len(filtered)} employee(s) · job + hours per day · **Save all hours** at top right."
-        )
-        if not grid_rows:
-            st.info("No employees match that filter.")
-        else:
-            _render_horizontal_week_grid(grid_rows, week_start_d=ws, key_prefix="tk_page")
-    else:
-        st.caption(f"{len(filtered)} timecard(s) · Day boxes stay visible on each row. Expand for job/ST/OT detail.")
-        _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
+    st.caption(f"{len(filtered)} timecard(s) · Day boxes stay visible on each row. Expand for job/ST/OT detail.")
+    _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()

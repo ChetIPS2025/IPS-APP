@@ -532,6 +532,13 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "pricing_guide_id": pricing_guide_id,
         "pricing_item_id": pricing_guide_id,
         "description": str(row.get("description") or row.get("notes") or ""),
+        "primary_use": str(row.get("primary_use") or ""),
+        "hours_miles": row.get("hours_miles"),
+        "last_used": str(row.get("last_used") or row.get("last_used_at") or "")[:19],
+        "salvage_value": float(row.get("salvage_value") or 0),
+        "depreciation_method": str(row.get("depreciation_method") or ""),
+        "useful_life": str(row.get("useful_life") or ""),
+        "annual_depreciation": float(row.get("annual_depreciation") or 0),
         "qr_code_value": str(row.get("qr_code_value") or "").strip(),
         "qr_token": str(row.get("qr_token") or ""),
         "qr_value": str(row.get("qr_value") or ""),
@@ -1164,13 +1171,32 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
     return result
 
 
+def _asset_save_date(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    if hasattr(value, "isoformat"):
+        return str(value.isoformat())[:10]
+    s = str(value).strip()
+    return s[:10] if s else None
+
+
+def _asset_save_number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
         from app.services.asset_rental_service import apply_rental_ui_to_payload
     except ImportError:
         from services.asset_rental_service import apply_rental_ui_to_payload  # type: ignore
 
-    payload = {
+    description = str(ui.get("description") or ui.get("notes") or "").strip()
+    payload: dict[str, Any] = {
         "asset_id": ui.get("asset_number") or ui.get("asset_id"),
         "asset_name": ui.get("asset_name"),
         "category": ui.get("category"),
@@ -1182,11 +1208,24 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         "model": ui.get("model"),
         "include_in_pricing_guide": bool(ui.get("include_in_pricing_guide")),
         "is_rentable": bool(ui.get("is_rentable")),
-        "notes": ui.get("description") or ui.get("notes"),
-        "current_value": ui.get("value") or ui.get("current_value"),
-        "acquired_date": ui.get("acquired_date") or None,
+        "description": description,
+        "notes": description,
+        "assigned_employee": str(ui.get("operator") or ui.get("assigned_employee") or "").strip(),
+        "primary_use": str(ui.get("primary_use") or "").strip(),
+        "hours_miles": _asset_save_number(ui.get("hours_miles")),
+        "last_used_at": _asset_save_date(ui.get("last_used_at") or ui.get("last_used")),
+        "condition": str(ui.get("condition") or "").strip(),
+        "next_service_due": _asset_save_date(ui.get("next_service_due")),
+        "acquired_date": _asset_save_date(ui.get("acquired_date")),
+        "purchase_cost": _asset_save_number(ui.get("purchase_price") or ui.get("purchase_cost")),
+        "current_value": _asset_save_number(ui.get("value") or ui.get("current_value")),
+        "salvage_value": _asset_save_number(ui.get("salvage_value")),
+        "depreciation_method": str(ui.get("depreciation_method") or "").strip() or None,
+        "useful_life": str(ui.get("useful_life") or "").strip() or None,
+        "annual_depreciation": _asset_save_number(ui.get("annual_depreciation")),
     }
     apply_rental_ui_to_payload(payload, ui)
+    payload = {k: v for k, v in payload.items() if v is not None}
     if row_id:
         return update_row("assets", payload, {"id": row_id})
     return insert_row("assets", payload)

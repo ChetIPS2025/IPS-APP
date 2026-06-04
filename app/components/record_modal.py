@@ -398,6 +398,7 @@ def render_save_cancel_actions(
     record_key: str,
     cancel_key: str,
     save_key: str,
+    save_label: str = "Save Changes",
     on_cancel: Callable[[], None] | None = None,
 ) -> tuple[bool, bool]:
     btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
@@ -411,7 +412,7 @@ def render_save_cancel_actions(
                 set_view_mode(module, record_key)
             cancelled = True
     with btn_save:
-        saved = st.button("Save Changes", key=save_key, type="primary")
+        saved = st.button(save_label, key=save_key, type="primary")
     return cancelled, saved
 
 
