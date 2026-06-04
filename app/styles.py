@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v57">
+<style id="ips-timekeeping-module-v58">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -4765,6 +4765,15 @@ def inject_timekeeping_module_css() -> None:
   padding: 0 !important;
   margin: 0 !important;
 }}
+{tk_list_summary_col} {{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: visible !important;
+  position: static !important;
+  box-sizing: border-box !important;
+}}
 {tk_list_outer_row} > [data-testid="column"]:nth-child(12) {{
   width: 76px !important;
   min-width: 76px !important;
@@ -4806,9 +4815,35 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible !important;
   position: static !important;
   box-sizing: border-box !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-list-summary-wrap {{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}}
+.timekeeping-summary-label {{
+  font-size: 9px;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.1;
+  margin: 0 0 4px 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-list-summary-wrap .timekeeping-status-cell,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-list-summary-wrap .timesheet-list-status-cell {{
+  min-height: 36px !important;
 }}
 {tk_list_summary_col} .ips-timekeeping-header-row,
 {tk_list_summary_col} .ips-table-header-filter-text {{
@@ -5025,11 +5060,6 @@ def inject_timekeeping_module_css() -> None:
   padding-left: 0 !important;
   margin-left: 0 !important;
 }}
-{tk_list_summary_col} {{
-  align-self: center !important;
-  justify-content: center !important;
-  overflow: visible !important;
-}}
 {tk_list_summary_col} [data-testid="stVerticalBlock"],
 {tk_list_summary_col} [data-testid="stElementContainer"] {{
   width: 100% !important;
@@ -5042,7 +5072,7 @@ def inject_timekeeping_module_css() -> None:
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 58px;
+  min-height: 36px;
   width: 100% !important;
   max-width: 100% !important;
   overflow: visible !important;

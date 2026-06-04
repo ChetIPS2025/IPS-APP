@@ -155,6 +155,7 @@ _DAY_GRID_LABELS = [
     "Notes",
 ]
 _LIST_VIEW_HOUR_STEP = 0.5
+_LIST_VIEW_SUMMARY_LABELS = ("Total Hours", "Overtime", "Billed Hours", "Status")
 _ALLOC_HOUR_TYPE_OPTS = ["S/T", "O/T"]
 _ALLOC_LINE_COLS = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 0.38]
 _ALLOC_LINE_COLS_PRIMARY = [2.15, 0.52, 0.72, 0.58, 0.65, 1.0, 1.75]
@@ -1435,6 +1436,24 @@ def _render_list_row_day_cell(
             unsafe_allow_html=True,
         )
         return total
+
+
+def _render_list_row_summary_cell(
+    *,
+    label: str,
+    value_html: str,
+    value_class: str,
+) -> None:
+    """List row: summary label stacked above value (matches day column layout)."""
+    st.markdown(
+        f'<div class="timekeeping-day-cell timekeeping-list-summary-wrap">'
+        f'<div class="timekeeping-day-label timekeeping-summary-label">'
+        f"{html.escape(label.upper())}</div>"
+        f'<div class="{value_class} timesheet-list-summary-cell">'
+        f"{value_html}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
@@ -2835,12 +2854,7 @@ def _render_custom_timekeeping_table(
 
         header_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
         day_header_labels = [d.strftime("%a %m/%d").upper() for d in days]
-        summary_header_labels = [
-            "Total Hours",
-            "Overtime",
-            "Billed Hours",
-            "STATUS",
-        ]
+        summary_header_labels = list(_LIST_VIEW_SUMMARY_LABELS)
         with header_cols[0]:
             st.markdown(
                 '<span class="timekeeping-list-header-marker" aria-hidden="true"></span>',
@@ -2964,31 +2978,28 @@ def _render_custom_timekeeping_table(
                 with row_cols[10]:
                     _render_timekeeping_list_spacer_cell()
                 with row_cols[11]:
-                    st.markdown(
-                        f'<div class="timekeeping-total-cell ips-timekeeping-hours '
-                        f'timesheet-list-summary-cell">'
-                        f"{html.escape(_fmt_table_hours(st_total))}</div>",
-                        unsafe_allow_html=True,
+                    _render_list_row_summary_cell(
+                        label=_LIST_VIEW_SUMMARY_LABELS[0],
+                        value_html=html.escape(_fmt_table_hours(st_total)),
+                        value_class="timekeeping-total-cell ips-timekeeping-hours",
                     )
                 with row_cols[12]:
-                    st.markdown(
-                        f'<div class="timekeeping-overtime-cell ips-timekeeping-hours '
-                        f'timesheet-list-summary-cell">'
-                        f"{html.escape(_fmt_table_hours(ot_total))}</div>",
-                        unsafe_allow_html=True,
+                    _render_list_row_summary_cell(
+                        label=_LIST_VIEW_SUMMARY_LABELS[1],
+                        value_html=html.escape(_fmt_table_hours(ot_total)),
+                        value_class="timekeeping-overtime-cell ips-timekeeping-hours",
                     )
                 with row_cols[13]:
-                    st.markdown(
-                        f'<div class="timekeeping-billed-cell ips-timekeeping-hours '
-                        f'timesheet-list-summary-cell">'
-                        f"{html.escape(_fmt_table_hours(total_hours))}</div>",
-                        unsafe_allow_html=True,
+                    _render_list_row_summary_cell(
+                        label=_LIST_VIEW_SUMMARY_LABELS[2],
+                        value_html=html.escape(_fmt_table_hours(total_hours)),
+                        value_class="timekeeping-billed-cell ips-timekeeping-hours",
                     )
                 with row_cols[14]:
-                    st.markdown(
-                        f'<div class="timekeeping-status-cell timesheet-list-status-cell">'
-                        f"{_timecard_status_pill_html(status)}</div>",
-                        unsafe_allow_html=True,
+                    _render_list_row_summary_cell(
+                        label=_LIST_VIEW_SUMMARY_LABELS[3],
+                        value_html=_timecard_status_pill_html(status),
+                        value_class="timekeeping-status-cell timesheet-list-status-cell",
                     )
 
             if expanded:
