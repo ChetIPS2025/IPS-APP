@@ -1010,7 +1010,14 @@ def _render_add_travel_form(
         elif travel_type == "Per Diem":
             st.number_input("Per diem days", min_value=0.0, value=0.0, key=k("pdays"), step=1.0)
             st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
-            _display_field("Per diem rate", fmt_currency(st.session_state.get(k("prate"), defaults["per_diem_rate"])))
+            st.number_input(
+                "Per diem rate",
+                min_value=0.0,
+                value=float(st.session_state.get(k("prate"), defaults["per_diem_rate"])),
+                key=k("prate"),
+                step=1.0,
+                format="%.2f",
+            )
         elif travel_type == "Airfare":
             st.number_input("Airfare cost", min_value=0.0, value=0.0, key=k("air"))
             st.number_input("People", min_value=0.0, value=1.0, key=k("people"), step=1.0)
