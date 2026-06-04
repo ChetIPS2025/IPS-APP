@@ -2373,6 +2373,7 @@ def _render_list_allocation_detail(
         handle_alloc_line_submit=_handle_alloc_line_submit,
         handle_alloc_line_approve=_handle_alloc_line_approve,
         handle_alloc_line_reject=_handle_alloc_line_reject,
+        save_allocation_week=lambda: _save_allocation_week(emp, week_start_d),
     )
 
     if week_locked:
@@ -2441,6 +2442,8 @@ def _render_list_allocation_detail(
                     emp=emp,
                     week_start_d=week_start_d,
                     by_date=by_date,
+                    record_key=record_session_key(emp, "id"),
+                    week_status=week_status,
                 ),
                 normalize_timecard_status=_normalize_timecard_status,
             )
@@ -2462,20 +2465,14 @@ def _render_list_allocation_detail(
         '<span class="timekeeping-allocation-actions-footer-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    action_left, action_right, _ = st.columns([1, 1, 3], gap="small")
-    with action_left:
-        if st.button("Save allocations", key=f"tk_save_alloc_{record_key}", type="primary"):
-            if _save_allocation_week(emp, week_start_d):
-                st.rerun()
-    with action_right:
-        if week_status in ("Draft", "Rejected", "Pending") and st.button(
-            "Submit all for approval",
-            key=f"tk_submit_alloc_{record_key}",
+    if week_status in ("Draft", "Rejected", "Pending") and st.button(
+        "Submit all for approval",
+        key=f"tk_submit_alloc_{record_key}",
+    ):
+        if _save_allocation_week(emp, week_start_d, show_message=False) and _submit_timekeeping_week(
+            emp, week_start_d
         ):
-            if _save_allocation_week(emp, week_start_d, show_message=False) and _submit_timekeeping_week(
-                emp, week_start_d
-            ):
-                st.rerun()
+            st.rerun()
     st.caption(
         "Totals in the row above are the source of truth. Choose S/T or O/T on each row, then save. "
         "Unallocated time is saved to — No assignment — as S/T automatically."
