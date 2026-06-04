@@ -124,9 +124,8 @@ def render_day_summary_inline(
     """DayAllocationCard → DaySummaryInline."""
     st.markdown(
         (
-            f'<div class="timekeeping-day-allocation-card timekeeping-allocation-card '
-            f"timekeeping-alloc-day-card {html.escape(card_cls)}\">"
-            f'<div class="timekeeping-day-summary-inline{balance_cls}">'
+            f'<div class="timekeeping-day-summary-inline timekeeping-day-summary-inline-marker '
+            f'timekeeping-alloc-day-summary {html.escape(card_cls)}\">'
             f"<strong>{html.escape(day_name)}</strong>"
             f'<span class="timekeeping-alloc-day-date">{html.escape(fmt_date(iso))}</span>'
             f'<span class="timekeeping-hours-badge timekeeping-alloc-day-total">'
@@ -347,27 +346,20 @@ def render_allocation_control_row(
     is_primary_row = lix == 0
 
     with st.container(key=f"tk_alloc_row_{eid}_{week_sig}_{iso}_{lix}"):
-        st.markdown(
-            '<span class="timekeeping-allocation-control-row-wrapper-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        if is_primary_row:
-            st.markdown(
-                '<span class="timekeeping-allocation-primary-row-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            '<span class="timekeeping-allocation-line-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
         row_cols = st.columns(
             _allocation_row_col_weights(is_primary_row=is_primary_row),
             gap="small",
         )
+        marker_classes = (
+            "timekeeping-allocation-line-marker "
+            "timekeeping-allocation-control-row-marker "
+            "timekeeping-allocation-assignment-marker"
+        )
+        if is_primary_row:
+            marker_classes += " timekeeping-allocation-primary-row-marker"
         with row_cols[0]:
             st.markdown(
-                '<span class="timekeeping-allocation-control-row-marker '
-                'timekeeping-allocation-assignment-marker" aria-hidden="true"></span>',
+                f'<span class="{marker_classes}" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             if row_editable:
@@ -485,10 +477,14 @@ def render_day_allocation_card(
     card_cls = allocation_card_state_class(state)
 
     with st.container(key=f"tk_alloc_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}"):
+        unbalanced_cls = (
+            " timekeeping-alloc-day-unbalanced" if state == "overallocated" else ""
+        )
         st.markdown(
             f'<span class="timekeeping-day-allocation-card-marker timekeeping-alloc-day-state-marker '
-            f"timekeeping-alloc-day-state-{html.escape(state)} timekeeping-allocation-day-card-marker "
-            f'timekeeping-allocation-day-group-marker" aria-hidden="true"></span>',
+            f"timekeeping-alloc-day-state-{html.escape(state)}{unbalanced_cls} "
+            f'timekeeping-allocation-day-card-marker timekeeping-allocation-day-group-marker" '
+            f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         render_day_summary_inline(
