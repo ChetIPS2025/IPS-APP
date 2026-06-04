@@ -2747,9 +2747,11 @@ div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) button[kind
 def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
+    checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
+    ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     st.markdown(
         f"""
-<style id="ips-assets-module-v6">
+<style id="ips-assets-module-v7">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2757,124 +2759,78 @@ def inject_assets_module_css() -> None:
   overflow: hidden;
   margin-bottom: 0.5rem;
 }}
-.ips-small-tools-table-wrap {{
-  width: 100%;
-  max-width: 100%;
-}}
-.st-key-assets_small_tools_table_wrap {{
-  overflow-x: auto;
-  max-width: 100%;
-  width: 100%;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] {{
-  display: grid !important;
-  grid-template-columns: 52px minmax(180px, 1fr) 88px minmax(100px, 160px) 84px 92px !important;
-  column-gap: 10px !important;
-  row-gap: 0 !important;
-  align-items: center !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  justify-content: stretch !important;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  min-height: 44px;
-  border-bottom: 1px solid #e2e8f0;
-  box-sizing: border-box !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 38px;
-  border-bottom: 1px solid #e2e8f0;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #eef5ff;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  flex: unset !important;
-  overflow: hidden !important;
-  align-self: center !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
-  width: 100% !important;
-  min-width: 0 !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
-  overflow: visible !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) .ips-assets-number {{
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}}
-.st-key-assets_small_tools_table_wrap .stMarkdown p:has(.ips-asset-thumb-cell) {{
-  line-height: 0 !important;
-}}
-.st-key-assets_small_tools_table_wrap .stButton > button {{
-  height: 28px !important;
-  min-height: 28px !important;
-  padding: 0 8px !important;
-  font-size: 12px !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) {{
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) [data-testid="stButton"] {{
-  width: 100% !important;
-  min-width: 0 !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button {{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  color: #0f172a !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  justify-content: flex-start !important;
-  text-align: left !important;
-  padding: 0 !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  line-height: 1.25 !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button:hover {{
-  background: transparent !important;
-  color: #2563eb !important;
-  text-decoration: underline !important;
-}}
-.st-key-assets_small_tools_table_wrap .ips-assets-hours {{
+.ips-assets-value {{
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }}
-.st-key-assets_small_tools_table_wrap .ips-assets-muted {{
+{ast_list_wrap} [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100%;
+  justify-content: center !important;
+}}
+{ast_list_wrap} [data-testid="stMarkdownContainer"],
+{ast_list_wrap} .stMarkdown,
+{ast_list_wrap} .stMarkdown p {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+{ast_list_wrap} .stMarkdown p:has(.ips-asset-thumb-cell) {{
+  line-height: 0 !important;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"] {{
+  gap: 0.35rem !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  min-height: 58px;
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc;
+  min-height: 40px;
+  padding: 8px 10px !important;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
+  background: #eaf2ff !important;
+}}
+{ast_list_wrap} [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}}
+{ast_list_wrap} [data-testid="stCheckbox"] {{
+  margin: 0 !important;
+}}
+{checkbox_css_small}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) .ips-assets-number {{
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }}
-.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"] {{
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) .ips-assets-title {{
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }}
-.ips-small-tool-name-btn-marker,
-.ips-small-tools-table-row-marker,
-.ips-small-tools-table-header-marker {{
-  display: none !important;
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .ips-assets-muted {{
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }}
 .ips-assets-header-row {{
   background: #f8fafc;
@@ -2979,27 +2935,6 @@ def inject_assets_module_css() -> None:
   background: #fee2e2;
   color: #991b1b;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
-}}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
-  display: flex !important;
-  align-items: center !important;
-  align-self: stretch !important;
-}}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
-  width: 100%;
-  justify-content: center !important;
-}}
-.st-key-assets_table_wrap [data-testid="stMarkdownContainer"],
-.st-key-assets_table_wrap .stMarkdown,
-.st-key-assets_table_wrap .stMarkdown p {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-assets_table_wrap .stMarkdown p:has(.ips-asset-thumb-cell) {{
-  line-height: 0 !important;
-}}
 .ips-asset-thumb-cell {{
   display: inline-flex;
   align-items: center;
@@ -3041,36 +2976,8 @@ def inject_assets_module_css() -> None:
   background: #ffffff;
   padding: 4px;
 }}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
-  align-items: center !important;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  min-height: 58px;
-}}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 40px;
-  padding: 8px 10px !important;
-}}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #eef5ff;
-}}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
-.st-key-assets_table_wrap [data-testid="stElementContainer"] {{
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}}
-.st-key-assets_table_wrap [data-testid="stCheckbox"] {{
-  margin: 0 !important;
-}}
 {checkbox_css}
-.st-key-assets_table_wrap .stButton > button {{
+{ast_list_wrap} .stButton > button {{
   height: 32px !important;
   min-height: 32px !important;
   padding: 0 12px !important;

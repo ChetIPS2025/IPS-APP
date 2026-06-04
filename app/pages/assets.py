@@ -214,11 +214,13 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
+_ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
-_SMALL_TOOL_COLS = [0.9, 3.0, 0.85, 1.55, 0.82, 0.88]
+_SMALL_TOOL_COLS = [0.42, 0.9, 3.0, 0.85, 1.55, 0.82, 0.88]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
     ("IMAGE", None),
     ("TOOL", None),
     ("ASSET #", None),
@@ -416,6 +418,51 @@ def _filter_small_tool_rows(
     if parent_val and parent_val != "All Kits":
         out = [r for r in out if _small_tool_parent_kit(r) == parent_val]
     return apply_column_filters(out, _SMALL_TOOLS_TABLE_KEY, _SMALL_TOOL_FILTER_SPECS)
+
+
+def _small_tool_select_key(row_id: str) -> str:
+    return f"small_tool_select_{row_id}"
+
+
+def _small_tool_modal_asset_id(row: dict) -> str:
+    if str(row.get("row_type") or "") == "kit_item":
+        return str(row.get("parent_asset_id") or "").strip()
+    return str(row.get("id") or "").strip()
+
+
+def _clear_small_tool_selection(row_ids: list[str] | None = None) -> None:
+    for rid in list(row_ids or []):
+        st.session_state[_small_tool_select_key(rid)] = False
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith("small_tool_select_"):
+            st.session_state[key] = False
+
+
+def _on_small_tool_checkbox_change(
+    row_id: str,
+    all_row_ids: list[str],
+    row_by_id: dict[str, dict],
+    assets_by_id: dict[str, dict],
+) -> None:
+    key = _small_tool_select_key(row_id)
+    row = row_by_id.get(row_id)
+    if st.session_state.get(key):
+        for other_id in all_row_ids:
+            if other_id != row_id:
+                st.session_state[_small_tool_select_key(other_id)] = False
+        if row:
+            _open_small_tool_row(row, assets_by_id)
+    elif row:
+        modal_aid = _small_tool_modal_asset_id(row)
+        if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
+            st.session_state[SELECTED_ASSET_KEY] = None
+            st.session_state[SHOW_ASSET_MODAL_KEY] = False
+            clear_record_modal(
+                table_key=_SMALL_TOOLS_TABLE_KEY,
+                session_select_key=_SEL,
+                modal_key=_ASSETS_MODAL_KEY,
+                module=_MOD,
+            )
 
 
 def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
@@ -742,15 +789,20 @@ def _render_small_tools_table(
 ) -> None:
     if not filtered:
         st.info("No small tools match your filters.")
+        st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = []
         return
 
-    with st.container(key="assets_small_tools_table_wrap"):
-        st.markdown('<div class="ips-assets-table-wrap ips-small-tools-table-wrap">', unsafe_allow_html=True)
+    all_row_ids = [
+        _small_tool_row_id(row) for row in filtered if _small_tool_row_id(row)
+    ]
+    st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = all_row_ids
+    row_by_id = {
+        _small_tool_row_id(row): row for row in filtered if _small_tool_row_id(row)
+    }
 
-        st.markdown(
-            '<span class="ips-small-tools-table-header-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
+    with st.container(key="assets_small_tools_table_wrap"):
+        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+
         header_cols = st.columns(
             _SMALL_TOOL_COLS,
             gap="small",
@@ -789,34 +841,35 @@ def _render_small_tools_table(
             )
             image_asset = _small_tool_image_asset(row, assets_by_id)
             with cols[0]:
-                st.markdown(
-                    '<span class="ips-small-tools-table-row-marker" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
+                st.checkbox(
+                    "",
+                    key=_small_tool_select_key(rid),
+                    label_visibility="collapsed",
+                    on_change=_on_small_tool_checkbox_change,
+                    args=(rid, all_row_ids, row_by_id, assets_by_id),
                 )
-                _render_asset_thumbnail(image_asset)
             with cols[1]:
-                st.markdown(
-                    '<span class="ips-small-tool-name-btn-marker" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(name, key=f"st_open_{rid}", use_container_width=True):
-                    _open_small_tool_row(row, assets_by_id)
-                    st.rerun()
+                _render_asset_thumbnail(image_asset)
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(asset_number)}</div>',
+                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(parent_kit)}</div>',
+                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(asset_number)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[4]:
-                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
-            with cols[5]:
                 st.markdown(
-                    f'<div class="ips-assets-cell ips-assets-hours">{html.escape(value)}</div>',
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(parent_kit)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[5]:
+                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+            with cols[6]:
+                st.markdown(
+                    f'<div class="ips-assets-cell ips-assets-value">{html.escape(value)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -976,11 +1029,9 @@ def _render_small_tools_list(rows: list[dict]) -> None:
                 st.session_state["ast_st_parent_kit"] = "All Kits"
                 st.session_state["ast_st_status"] = "All Statuses"
                 reset_table_page(_SMALL_TOOLS_TABLE_KEY)
+                _clear_small_tool_selection(st.session_state.get(_ALL_SMALL_TOOL_IDS_KEY))
                 st.rerun()
 
-    st.caption(
-        "Hand tools and kit inventory — standalone Tool assets plus items stored in tool trailers and kits."
-    )
     layout_filter_bar(_filters)
 
     filtered = _filter_small_tool_rows(
