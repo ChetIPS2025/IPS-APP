@@ -3258,7 +3258,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v55">
+<style id="ips-timekeeping-module-v56">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -5969,45 +5969,51 @@ def inject_timekeeping_module_css() -> None:
   max-width: none !important;
 }}
 .timekeeping-alloc-intro {{
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: #475569;
-  line-height: 1.45;
-  margin: 0 0 0.85rem 0;
+  line-height: 1.3;
+  margin: 0 0 0.45rem 0;
   max-width: 720px;
 }}
 .timekeeping-alloc-day-block {{
-  margin: 0.75rem 0 0.25rem;
-  padding-top: 0.55rem;
+  margin: 0.4rem 0 0.15rem;
+  padding-top: 0.35rem;
   border-top: 1px solid #e2e8f0;
   max-width: 920px;
 }}
 .timekeeping-alloc-day-head {{
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 1.1rem;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  min-height: 34px;
   margin-bottom: 0.35rem;
+  padding: 0;
 }}
 .timekeeping-alloc-day-title {{
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.15;
 }}
 .timekeeping-alloc-day-date {{
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   color: #64748b;
+  line-height: 1.15;
 }}
 .timekeeping-alloc-day-total {{
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #1d4ed8;
   background: #eff6ff;
   border-radius: 6px;
-  padding: 2px 8px;
+  padding: 1px 7px;
+  line-height: 1.25;
 }}
 .timekeeping-alloc-day-split {{
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: #64748b;
+  line-height: 1.2;
 }}
 .timekeeping-alloc-day-unbalanced .timekeeping-alloc-day-split {{
   color: #b45309;
@@ -6016,9 +6022,9 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-complete {{
   background: #f0fdf4;
   border: 1px solid #86efac;
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem 0.35rem;
-  margin: 0.5rem 0 0.15rem;
+  border-radius: 8px;
+  padding: 0.3rem 0.45rem 0.25rem;
+  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-complete .timekeeping-alloc-day-title {{
   color: #166534;
@@ -6036,9 +6042,9 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-needs-assignment {{
   background: #fffbeb;
   border: 1px solid #fcd34d;
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem 0.35rem;
-  margin: 0.5rem 0 0.15rem;
+  border-radius: 8px;
+  padding: 0.3rem 0.45rem 0.25rem;
+  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-incomplete .timekeeping-alloc-day-split,
 .timekeeping-alloc-day-needs-assignment .timekeeping-alloc-day-split {{
@@ -6048,9 +6054,9 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-day-overallocated {{
   background: #fef2f2;
   border: 1px solid #fca5a5;
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem 0.35rem;
-  margin: 0.5rem 0 0.15rem;
+  border-radius: 8px;
+  padding: 0.3rem 0.45rem 0.25rem;
+  margin: 0.35rem 0 0.1rem;
 }}
 .timekeeping-alloc-day-overallocated .timekeeping-alloc-day-split,
 .timekeeping-alloc-day-overallocated .timekeeping-alloc-day-total {{
@@ -6133,29 +6139,58 @@ def inject_timekeeping_module_css() -> None:
 {tk_expand}:has(.timekeeping-allocation-panel-marker) {{
   max-width: 100% !important;
 }}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [data-testid="stVerticalBlock"] {{
+  gap: 0.35rem !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [data-testid="stElementContainer"] {{
+  margin-bottom: 0.2rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [data-testid="stCaptionContainer"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0.15rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [data-testid="stCaptionContainer"] p {{
+  font-size: 0.76rem !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}}
 {tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] {{
   max-width: 100% !important;
   width: 100% !important;
-  margin: 0 0 6px 0 !important;
-  padding: 6px 10px !important;
+  margin: 0 0 4px 0 !important;
+  padding: 4px 8px !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   box-sizing: border-box !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_row_"] [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="column"] [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
 }}
 .timekeeping-alloc-field-label {{
   display: block !important;
-  font-size: 0.68rem !important;
+  font-size: 10px !important;
   font-weight: 700 !important;
-  color: #64748b !important;
+  color: #667085 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  margin: 0 0 4px 0 !important;
-  line-height: 1.2 !important;
+  letter-spacing: 0.04em !important;
+  margin: 0 0 3px 0 !important;
+  line-height: 1.1 !important;
   white-space: nowrap !important;
 }}
 .timekeeping-alloc-col-head {{
-  margin: 0 0 6px 0 !important;
+  margin: 0 0 3px 0 !important;
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  padding: 0 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker),
@@ -6164,26 +6199,29 @@ def inject_timekeeping_module_css() -> None:
   display: grid !important;
   grid-template-columns:
     minmax(260px, 340px)
-    100px
+    90px
     90px
     90px
     90px
     minmax(150px, 220px)
     360px !important;
-  column-gap: 12px !important;
+  column-gap: 10px !important;
   row-gap: 0 !important;
   align-items: end !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  min-height: 52px !important;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 4px 0 !important;
   box-sizing: border-box !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker) {{
   max-width: 100% !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 2px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-header-marker)
@@ -6215,7 +6253,7 @@ def inject_timekeeping_module_css() -> None:
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker) {{
   grid-template-columns:
     minmax(260px, 340px)
-    100px
+    90px
     90px
     90px
     90px
@@ -6233,28 +6271,28 @@ def inject_timekeeping_module_css() -> None:
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-row-marker)
   > [data-testid="column"]:nth-child(2) {{
-  min-width: 100px !important;
-  width: 100px !important;
-  max-width: 100px !important;
+  min-width: 90px !important;
+  width: 90px !important;
+  max-width: 90px !important;
   overflow: visible !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] {{
   width: 100% !important;
-  min-width: 88px !important;
-  max-width: 100px !important;
+  min-width: 82px !important;
+  max-width: 90px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"],
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="column"]:has(.timekeeping-allocation-type-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
   width: 100% !important;
-  min-width: 88px !important;
-  max-width: 100px !important;
-  min-height: 38px !important;
-  height: 38px !important;
-  padding-left: 10px !important;
-  padding-right: 26px !important;
+  min-width: 82px !important;
+  max-width: 90px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding-left: 8px !important;
+  padding-right: 24px !important;
   box-sizing: border-box !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
@@ -6266,14 +6304,14 @@ def inject_timekeeping_module_css() -> None:
   word-break: keep-all !important;
   overflow: visible !important;
   text-overflow: clip !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
-  line-height: 1.25 !important;
+  line-height: 1.15 !important;
   letter-spacing: 0 !important;
 }}
 .timekeeping-alloc-type-cell {{
-  min-width: 88px !important;
-  max-width: 100px !important;
+  min-width: 82px !important;
+  max-width: 90px !important;
   text-align: center !important;
   white-space: nowrap !important;
 }}
@@ -6283,15 +6321,15 @@ def inject_timekeeping_module_css() -> None:
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  min-height: 38px !important;
-  font-size: 0.86rem !important;
+  min-height: 32px !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
   color: #0f172a !important;
 }}
 .timekeeping-alloc-remaining-cell {{
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   color: #475569 !important;
   font-weight: 600 !important;
 }}
@@ -6309,7 +6347,8 @@ def inject_timekeeping_module_css() -> None:
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  min-height: 38px !important;
+  min-height: 32px !important;
+  height: 32px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-assignment-marker) [data-testid="stSelectbox"] div[data-baseweb="select"] span {{
@@ -6325,19 +6364,40 @@ def inject_timekeeping_module_css() -> None:
   min-width: 0 !important;
   max-width: 108px !important;
   border: 1px solid #d8dee8 !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   background: #ffffff !important;
-  min-height: 38px !important;
+  min-height: 32px !important;
+  height: 32px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-hours-marker) [data-testid="stNumberInput"] input {{
   width: 100% !important;
   min-width: 0 !important;
   text-align: center !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
-  min-height: 36px !important;
-  height: 36px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-assignment-marker) ~ [data-testid="column"]
+  [data-testid="stTextInput"],
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stTextInput"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stTextInput"] > div,
+{tk_expand}:has(.timekeeping-allocation-panel-marker)
+  [class*="st-key-tk_alloc_row_"] [data-testid="stTextInput"] input {{
+  min-height: 30px !important;
+  height: 30px !important;
+  font-size: 0.8rem !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="column"]:has(.timekeeping-allocation-hours-marker) [data-testid="stNumberInputStepUp"],
@@ -6350,33 +6410,41 @@ def inject_timekeeping_module_css() -> None:
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
+  min-height: 32px !important;
 }}
 .timekeeping-alloc-status-cell .ips-timekeeping-status-pill {{
   margin: 0 auto !important;
+  font-size: 0.68rem !important;
+  padding: 2px 8px !important;
+  line-height: 1.1 !important;
 }}
 .timekeeping-alloc-hours-readonly {{
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  min-height: 38px !important;
+  min-height: 32px !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   background: #f8fafc !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   color: #0f172a !important;
 }}
 .timekeeping-alloc-cell {{
-  font-size: 0.86rem !important;
+  font-size: 0.8rem !important;
   color: #0f172a !important;
-  line-height: 1.35 !important;
+  line-height: 1.2 !important;
+  min-height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [class*="st-key-tk_alloc_row_"] [data-testid="stButton"] > button {{
-  min-height: 34px !important;
-  font-size: 0.78rem !important;
-  padding: 0 12px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  font-size: 0.74rem !important;
+  padding: 0 10px !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow: visible !important;
@@ -6398,7 +6466,7 @@ def inject_timekeeping_module_css() -> None:
   flex-wrap: nowrap !important;
   justify-content: flex-end !important;
   align-items: flex-end !important;
-  gap: 8px !important;
+  gap: 6px !important;
   width: 100% !important;
   min-width: 0 !important;
 }}

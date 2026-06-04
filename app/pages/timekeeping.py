@@ -586,7 +586,9 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
         status = _normalize_timecard_status(row.get("status"))
         st_h = float(row.get("st_hours") or 0)
         ot_h = float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
-        if st_h > 0:
+        # Only split ST/OT when both buckets have hours (explicit user split).
+        # Hours stored only as OT default to S/T in the allocation UI.
+        if st_h > 0 and ot_h > 0:
             by_date.setdefault(iso, []).append(
                 {
                     "line_id": line_id,
@@ -597,13 +599,23 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
                     "status": status,
                 }
             )
-        if ot_h > 0:
             by_date.setdefault(iso, []).append(
                 {
                     "line_id": line_id,
                     "job": job,
                     "hour_type": "OT",
                     "hours": ot_h,
+                    "notes": notes,
+                    "status": status,
+                }
+            )
+        elif st_h > 0 or ot_h > 0:
+            by_date.setdefault(iso, []).append(
+                {
+                    "line_id": line_id,
+                    "job": job,
+                    "hour_type": "ST",
+                    "hours": st_h + ot_h,
                     "notes": notes,
                     "status": status,
                 }
@@ -649,10 +661,27 @@ def _daily_total_from_list_row(
 
 
 def _normalize_alloc_hour_type(raw: object) -> str:
-    s = str(raw or "ST").strip().upper().replace(".", "").replace(" ", "")
-    if s in {"OT", "OVERTIME"}:
+    s = str(raw or "ST").strip()
+    if not s:
+        return "ST"
+    compact = s.upper().replace(".", "").replace(" ", "").replace("/", "")
+    if compact in {"OT", "OVERTIME"}:
         return "OT"
     return "ST"
+
+
+def _user_picked_allocation_overtime(
+    *,
+    eid: str,
+    week_sig: str,
+    iso: str,
+    lix: int,
+) -> bool:
+    """True only when the Type widget is set to O/T for this row."""
+    type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+    if type_key not in st.session_state:
+        return False
+    return _normalize_alloc_hour_type(st.session_state[type_key]) == "OT"
 
 
 def _alloc_hour_type_label(hour_type: str) -> str:
@@ -687,11 +716,7 @@ def _allocation_line_has_valid_assignment(line: dict[str, Any]) -> bool:
 def _allocation_line_hour_type_valid(line: dict[str, Any], hours: float) -> bool:
     if hours <= _ALLOC_TOLERANCE:
         return True
-    raw = str(line.get("hour_type") or "").strip()
-    if not raw:
-        return False
-    norm = _normalize_alloc_hour_type(raw)
-    return norm in {"ST", "OT"}
+    return _normalize_alloc_hour_type(line.get("hour_type")) in {"ST", "OT"}
 
 
 def _live_allocation_lines_for_day(
@@ -857,6 +882,8 @@ def _ensure_day_allocation_lines(
     daily_total: float,
     grid_row: dict,
     job_opts: list[str],
+    eid: str = "",
+    week_sig: str = "",
 ) -> list[dict[str, Any]]:
     lines = list(by_date.get(iso) or [])
     if daily_total > 0 and not lines:
@@ -870,10 +897,14 @@ def _ensure_day_allocation_lines(
                 "status": _normalize_timecard_status(grid_row.get("status")),
             }
         )
-    elif len(lines) == 1 and daily_total > 0 and not str(lines[0].get("line_id") or "").strip():
+    elif len(lines) == 1 and daily_total > 0:
         only = dict(lines[0])
         if float(only.get("hours") or 0) <= 0:
             only["hours"] = daily_total
+        if not _user_picked_allocation_overtime(
+            eid=eid, week_sig=week_sig, iso=iso, lix=0
+        ):
+            only["hour_type"] = "ST"
         lines = [only]
     by_date[iso] = lines
     return lines
@@ -2350,6 +2381,8 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
             daily_total=daily_total,
             grid_row=grid_row,
             job_opts=job_opts,
+            eid=eid,
+            week_sig=week_sig,
         )
         live_lines = _live_allocation_lines_for_day(
             lines, eid=eid, week_sig=week_sig, iso=iso
@@ -2421,7 +2454,7 @@ def _render_list_allocation_detail(emp: dict, week_start_d: date) -> None:
                 )
                 row_cols = st.columns(
                     _ALLOC_LINE_COLS_PRIMARY if is_primary_row else _ALLOC_LINE_COLS,
-                    gap="small",
+                    gap="xxsmall",
                 )
                 with row_cols[0]:
                     _render_allocation_field_label("Assignment")
