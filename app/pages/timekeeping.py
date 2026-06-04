@@ -2263,7 +2263,12 @@ def _render_allocation_primary_row_actions(
             ):
                 action_taken = _handle_alloc_line_reject(emp, week_start_d, line_id)
     else:
-        btn_cols = st.columns(3, gap="small")
+        show_remove = row_editable and len(lines) > 1
+        btn_cols = (
+            st.columns([1.35, 1.15, 0.75], gap="small")
+            if show_remove
+            else st.columns([1.45, 1.25], gap="small")
+        )
         with btn_cols[0]:
             if (
                 row_editable
@@ -2299,16 +2304,17 @@ def _render_allocation_primary_row_actions(
                 by_date[iso] = day_lines
                 st.session_state[_alloc_state_key(eid)] = by_date
                 st.rerun()
-        with btn_cols[2]:
-            if row_editable and len(lines) > 1 and st.button(
-                "Remove",
-                key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
-                use_container_width=True,
-                help="Remove this assignment row",
-            ):
-                by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
-                st.session_state[_alloc_state_key(eid)] = by_date
-                st.rerun()
+        if show_remove:
+            with btn_cols[2]:
+                if st.button(
+                    "Remove",
+                    key=f"tk_alloc_del_{eid}_{week_sig}_{iso}_{lix}",
+                    use_container_width=True,
+                    help="Remove this assignment row",
+                ):
+                    by_date[iso] = [ln for j, ln in enumerate(lines) if j != lix]
+                    st.session_state[_alloc_state_key(eid)] = by_date
+                    st.rerun()
 
     if action_taken:
         st.rerun()
@@ -2316,7 +2322,7 @@ def _render_allocation_primary_row_actions(
 
 def _render_allocation_line_header() -> None:
     cols = st.columns(_ALLOC_LINE_COLS_PRIMARY)
-    labels = ["Assignment", "Type", "Hours", "Remaining", "Status", "Notes", ""]
+    labels = ["Assignment", "Type", "Hours", "Remaining", "Status", "Notes", "Actions"]
     for col, lbl in zip(cols, labels):
         with col:
             marker = (
