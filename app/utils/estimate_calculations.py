@@ -67,10 +67,9 @@ def calc_labor_line(
     dt_rate: Any,
     markup_percent: Any,
 ) -> dict[str, float]:
+    _ = (dt_hours, dt_rate)  # DT not used in estimate builder labor costing
     cost_total = _q2(
-        _dec(st_hours) * _dec(st_rate)
-        + _dec(ot_hours) * _dec(ot_rate)
-        + _dec(dt_hours) * _dec(dt_rate)
+        _dec(st_hours) * _dec(st_rate) + _dec(ot_hours) * _dec(ot_rate)
     )
     markup_amount = calc_markup(cost_total, markup_percent)
     price_total = _q2(cost_total + markup_amount)

@@ -314,13 +314,11 @@ def material_line_totals(qty: float, unit_cost: float, markup_percent: float) ->
 def labor_line_totals(
     st_hours: float,
     ot_hours: float,
-    dt_hours: float,
     st_rate: float,
     ot_rate: float,
-    dt_rate: float,
     markup_percent: float,
 ) -> dict[str, float]:
-    return calc_labor_line(st_hours, ot_hours, dt_hours, st_rate, ot_rate, dt_rate, markup_percent)
+    return calc_labor_line(st_hours, ot_hours, 0, st_rate, ot_rate, 0, markup_percent)
 
 
 def equipment_line_totals(

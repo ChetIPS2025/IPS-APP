@@ -188,7 +188,6 @@ def _sync_labor_role_state(
         opt = lab_map.get(role, {})
         st.session_state[k("str")] = float(opt.get("st_rate") or 0)
         st.session_state[k("otr")] = float(opt.get("ot_rate") or 0)
-        st.session_state[k("dtr")] = float(opt.get("dt_rate") or 0)
         st.session_state[last_key] = role
         return opt
     return lab_map.get(role, {})
@@ -632,7 +631,6 @@ def _render_add_labor_form(
         opt = _sync_labor_role_state(k, role, lab_map)
         st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=k("sth"), step=0.5)
         ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=k("oth"), step=0.5)
-        dt_h = st.number_input("DT hours", min_value=0.0, value=0.0, key=k("dth"), step=0.5)
         markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
 
     with c2:
@@ -640,16 +638,13 @@ def _render_add_labor_form(
         if override:
             st_r = st.number_input("ST rate", min_value=0.0, value=float(opt.get("st_rate") or 0), key=k("str"))
             ot_r = st.number_input("OT rate", min_value=0.0, value=float(opt.get("ot_rate") or 0), key=k("otr"))
-            dt_r = st.number_input("DT rate", min_value=0.0, value=float(opt.get("dt_rate") or 0), key=k("dtr"))
         else:
             st_r = float(opt.get("st_rate") or st.session_state.get(k("str")) or 0)
             ot_r = float(opt.get("ot_rate") or st.session_state.get(k("otr")) or 0)
-            dt_r = float(opt.get("dt_rate") or st.session_state.get(k("dtr")) or 0)
             _display_field("ST Rate", fmt_currency(st_r))
             _display_field("OT Rate", fmt_currency(ot_r))
-            _display_field("DT Rate", fmt_currency(dt_r))
 
-        totals = labor_line_totals(st_h, ot_h, dt_h, st_r, ot_r, dt_r, markup)
+        totals = labor_line_totals(st_h, ot_h, st_r, ot_r, markup)
         _live_totals_card(
             [
                 ("Cost Total", fmt_currency(totals["cost_total"])),
@@ -670,10 +665,8 @@ def _render_add_labor_form(
                     "description": description,
                     "st_hours": st_h,
                     "ot_hours": ot_h,
-                    "dt_hours": dt_h,
                     "st_rate": st_r,
                     "ot_rate": ot_r,
-                    "dt_rate": dt_r,
                     "markup_percent": markup,
                     "notes": notes,
                 },
@@ -1072,11 +1065,11 @@ def _render_cost_builder_line_sections(est: dict[str, Any]) -> None:
     st.markdown("#### Labor")
     _render_deletable_lines(
         eid,
-        ["Role", "ST/OT/DT", "Cost", "Price"],
+        ["Role", "ST/OT", "Cost", "Price"],
         bundle["labor"],
         row_cells=lambda r: [
             html.escape(str(r.get("role_name") or "—")),
-            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}/{r.get('dt_hours',0)}"),
+            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}"),
             html.escape(fmt_currency(r.get("cost_total"))),
             html.escape(fmt_currency(r.get("price_total"))),
         ],
@@ -1307,11 +1300,11 @@ def render_labor_tab(est: dict[str, Any]) -> None:
     bundle = get_estimate_bundle(eid)
     _render_deletable_lines(
         eid,
-        ["Role", "ST/OT/DT", "Cost", "Price"],
+        ["Role", "ST/OT", "Cost", "Price"],
         bundle["labor"],
         row_cells=lambda r: [
             html.escape(str(r.get("role_name") or "—")),
-            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}/{r.get('dt_hours',0)}"),
+            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}"),
             html.escape(fmt_currency(r.get("cost_total"))),
             html.escape(fmt_currency(r.get("price_total"))),
         ],

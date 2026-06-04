@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
 
@@ -46,10 +47,161 @@ _LABOR_LINES_MISSING_MSG = (
     "then refresh the app."
 )
 
+_EQUIPMENT_TABLE = "estimate_equipment"
+_EQUIPMENT_LINE_CATEGORY = "__ips_equipment__"
+_EQUIPMENT_META_PREFIX = "__ips_equipment__:"
+_EQUIPMENT_MISSING_MSG = (
+    "Equipment lines cannot be saved yet — run sql/090_create_estimate_equipment.sql "
+    "(or sql/067_estimate_costing.sql) in Supabase, then refresh the app."
+)
+_equipment_uses_line_items: bool | None = None
+
 
 def _is_missing_table_error(exc: BaseException) -> bool:
     text = str(exc).lower()
     return "pgrst205" in text or "could not find the table" in text or "schema cache" in text
+
+
+def _is_missing_table_message(msg: str | None) -> bool:
+    return bool(msg) and _is_missing_table_error(Exception(msg))
+
+
+def _reset_equipment_storage_cache() -> None:
+    global _equipment_uses_line_items
+    _equipment_uses_line_items = None
+
+
+def _mark_equipment_uses_line_items() -> None:
+    global _equipment_uses_line_items
+    _equipment_uses_line_items = True
+
+
+def _equipment_storage_is_line_items() -> bool:
+    global _equipment_uses_line_items
+    if _equipment_uses_line_items is not None:
+        return _equipment_uses_line_items
+    _, err = fetch_rows(_EQUIPMENT_TABLE, limit=1)
+    _equipment_uses_line_items = bool(err and _is_missing_table_message(err))
+    return _equipment_uses_line_items
+
+
+def _is_equipment_line_item_row(row: dict[str, Any]) -> bool:
+    if _str(row.get("category")) == _EQUIPMENT_LINE_CATEGORY:
+        return True
+    notes = _str(row.get("notes"))
+    return notes.startswith(_EQUIPMENT_META_PREFIX)
+
+
+def _equipment_meta_blob(
+    *,
+    asset_id: object,
+    equipment_type: str,
+    quantity: float,
+    duration: float,
+    duration_unit: str,
+    cost_rate: float,
+) -> str:
+    meta = {
+        "line_kind": "equipment",
+        "asset_id": _str(asset_id) or None,
+        "equipment_type": equipment_type,
+        "quantity": quantity,
+        "duration": duration,
+        "duration_unit": duration_unit,
+        "cost_rate": cost_rate,
+    }
+    return _EQUIPMENT_META_PREFIX + json.dumps(meta, separators=(",", ":"), default=str)
+
+
+def _parse_equipment_meta(notes: object) -> dict[str, Any]:
+    text = _str(notes)
+    if not text.startswith(_EQUIPMENT_META_PREFIX):
+        return {}
+    blob = text[len(_EQUIPMENT_META_PREFIX) :].split("\n", 1)[0].strip()
+    if not blob:
+        return {}
+    try:
+        parsed = json.loads(blob)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _equipment_notes_with_meta(*, user_notes: str, meta_blob: str) -> str:
+    user_notes = _str(user_notes)
+    if user_notes and meta_blob not in user_notes:
+        return f"{user_notes}\n{meta_blob}".strip()
+    return meta_blob if meta_blob else user_notes
+
+
+def _equipment_from_line_item(row: dict[str, Any], estimate_id: str = "") -> dict[str, Any]:
+    meta = _parse_equipment_meta(row.get("notes"))
+    qty = _num(meta.get("quantity") if meta else row.get("qty"), 1.0)
+    duration = _num(meta.get("duration") if meta else 0)
+    cost_rate = _num(meta.get("cost_rate") if meta else row.get("unit_cost"))
+    markup_percent = _num(row.get("markup_percent"))
+    calc = calc_equipment_line(qty, duration, cost_rate, markup_percent)
+    return normalize_equipment_line(
+        {
+            "id": row.get("id"),
+            "estimate_id": row.get("estimate_id") or estimate_id,
+            "asset_id": meta.get("asset_id"),
+            "equipment_name": row.get("description"),
+            "equipment_type": meta.get("equipment_type") or row.get("category"),
+            "quantity": qty,
+            "duration": duration,
+            "duration_unit": meta.get("duration_unit") or row.get("unit") or "Hours",
+            "cost_rate": cost_rate,
+            "cost_total": row.get("cost_total") or row.get("total_cost"),
+            "markup_percent": markup_percent,
+            "markup_amount": row.get("markup_amount"),
+            "price_total": row.get("price_total"),
+            "notes": (
+                _str(row.get("notes")).split(_EQUIPMENT_META_PREFIX, 1)[0].strip()
+                if _EQUIPMENT_META_PREFIX in _str(row.get("notes"))
+                else _str(row.get("notes"))
+            ),
+            "sort_order": row.get("sort_order"),
+        },
+        estimate_id,
+    )
+
+
+def _equipment_line_item_payload(
+    estimate_id: str,
+    data: dict[str, Any],
+    *,
+    calc: dict[str, float],
+    sort_order: int,
+) -> dict[str, Any]:
+    qty = _num(data.get("quantity"), 1.0)
+    duration = _num(data.get("duration"))
+    cost_rate = _num(data.get("cost_rate"))
+    dur_unit = _str(data.get("duration_unit") or "Hours")
+    effective_unit = duration * cost_rate if duration else cost_rate
+    meta_blob = _equipment_meta_blob(
+        asset_id=data.get("asset_id"),
+        equipment_type=_str(data.get("equipment_type")),
+        quantity=qty,
+        duration=duration,
+        duration_unit=dur_unit,
+        cost_rate=cost_rate,
+    )
+    return {
+        "estimate_id": _str(estimate_id),
+        "description": _str(data.get("equipment_name")),
+        "category": _EQUIPMENT_LINE_CATEGORY,
+        "qty": qty,
+        "unit": dur_unit,
+        "unit_cost": effective_unit,
+        "total_cost": calc["cost_total"],
+        "cost_total": calc["cost_total"],
+        "markup_percent": _num(data.get("markup_percent")),
+        "markup_amount": calc["markup_amount"],
+        "price_total": calc["price_total"],
+        "notes": _equipment_notes_with_meta(user_notes=_str(data.get("notes")), meta_blob=meta_blob),
+        "sort_order": sort_order,
+    }
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -110,7 +262,7 @@ def normalize_labor_line(row: dict[str, Any], estimate_id: str = "") -> dict[str
     ot_r = _num(row.get("ot_rate"))
     dt_r = _num(row.get("dt_rate"))
     markup_percent = _num(row.get("markup_percent"))
-    calc = calc_labor_line(st_h, ot_h, dt_h, st_r, ot_r, dt_r, markup_percent)
+    calc = calc_labor_line(st_h, ot_h, 0, st_r, ot_r, 0, markup_percent)
     role = _str(row.get("role_name") or row.get("labor_type") or row.get("description"))
     return {
         "id": _str(row.get("id")),
@@ -261,7 +413,12 @@ def get_estimate_materials(estimate_id: str, *, demo: list[dict[str, Any]] | Non
     if err:
         demo_rows = [normalize_material_line(r, eid) for r in (demo or []) if _str(r.get("estimate_id")) == eid]
         return demo_rows, True
-    return [normalize_material_line(r, eid) for r in _filter_estimate_rows(rows, eid)], False
+    filtered = [
+        r
+        for r in _filter_estimate_rows(rows, eid)
+        if not _is_equipment_line_item_row(r)
+    ]
+    return [normalize_material_line(r, eid) for r in filtered], False
 
 
 def get_estimate_labor(estimate_id: str, *, demo: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], bool]:
@@ -275,10 +432,18 @@ def get_estimate_labor(estimate_id: str, *, demo: list[dict[str, Any]] | None = 
 
 def get_estimate_equipment(estimate_id: str) -> tuple[list[dict[str, Any]], bool]:
     eid = _str(estimate_id)
-    rows, err = fetch_rows("estimate_equipment", limit=500, order_by="sort_order")
+    if not _equipment_storage_is_line_items():
+        rows, err = fetch_rows(_EQUIPMENT_TABLE, limit=500, order_by="sort_order")
+        if not err:
+            return [normalize_equipment_line(r, eid) for r in _filter_estimate_rows(rows, eid)], False
+        if not _is_missing_table_message(err):
+            return [], True
+        _reset_equipment_storage_cache()
+    rows, err = fetch_rows("estimate_line_items", limit=500, order_by="sort_order")
     if err:
         return [], True
-    return [normalize_equipment_line(r, eid) for r in _filter_estimate_rows(rows, eid)], False
+    eq_rows = [r for r in _filter_estimate_rows(rows, eid) if _is_equipment_line_item_row(r)]
+    return [_equipment_from_line_item(r, eid) for r in eq_rows], False
 
 
 def get_estimate_subcontractors(estimate_id: str) -> tuple[list[dict[str, Any]], bool]:
@@ -306,6 +471,7 @@ def get_estimate_travel(estimate_id: str) -> tuple[list[dict[str, Any]], bool]:
 
 
 def clear_estimate_cache() -> None:
+    _reset_equipment_storage_cache()
     clear_all_data_caches()
 
 
@@ -467,10 +633,10 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
     calc = calc_labor_line(
         data.get("st_hours"),
         data.get("ot_hours"),
-        data.get("dt_hours"),
+        0,
         data.get("st_rate"),
         data.get("ot_rate"),
-        data.get("dt_rate"),
+        0,
         data.get("markup_percent"),
     )
     role = _str(data.get("role_name") or data.get("labor_type"))
@@ -482,10 +648,10 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
         "description": _str(data.get("description") or role),
         "st_hours": _num(data.get("st_hours")),
         "ot_hours": _num(data.get("ot_hours")),
-        "dt_hours": _num(data.get("dt_hours")),
+        "dt_hours": 0.0,
         "st_rate": _num(data.get("st_rate")),
         "ot_rate": _num(data.get("ot_rate")),
-        "dt_rate": _num(data.get("dt_rate")),
+        "dt_rate": 0.0,
         "hours": _num(data.get("st_hours")),
         "rate": _num(data.get("st_rate")),
         "total": calc["cost_total"],
@@ -508,10 +674,10 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
     calc = calc_labor_line(
         data.get("st_hours"),
         data.get("ot_hours"),
-        data.get("dt_hours"),
+        0,
         data.get("st_rate"),
         data.get("ot_rate"),
-        data.get("dt_rate"),
+        0,
         data.get("markup_percent"),
     )
     role = _str(data.get("role_name") or data.get("labor_type"))
@@ -522,10 +688,10 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
         "description": _str(data.get("description") or role),
         "st_hours": _num(data.get("st_hours")),
         "ot_hours": _num(data.get("ot_hours")),
-        "dt_hours": _num(data.get("dt_hours")),
+        "dt_hours": 0.0,
         "st_rate": _num(data.get("st_rate")),
         "ot_rate": _num(data.get("ot_rate")),
-        "dt_rate": _num(data.get("dt_rate")),
+        "dt_rate": 0.0,
         "hours": _num(data.get("st_hours")),
         "rate": _num(data.get("st_rate")),
         "total": calc["cost_total"],
@@ -576,8 +742,24 @@ def _delete_line(table: str, line_id: str, *, estimate_id: str = "") -> ServiceR
 
 
 def add_estimate_equipment(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
-    existing, _ = get_estimate_equipment(estimate_id)
-    calc = calc_equipment_line(data.get("quantity"), data.get("duration"), data.get("cost_rate"), data.get("markup_percent"))
+    eid = _str(estimate_id)
+    existing, _ = get_estimate_equipment(eid)
+    calc = calc_equipment_line(
+        data.get("quantity"),
+        data.get("duration"),
+        data.get("cost_rate"),
+        data.get("markup_percent"),
+    )
+    sort_order = _next_sort_order(existing)
+    if _equipment_storage_is_line_items():
+        result = insert_row(
+            "estimate_line_items",
+            _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
+        )
+        if result.ok:
+            recalculate_and_save_estimate_totals(eid)
+        return result
+
     payload = {
         "asset_id": data.get("asset_id") or None,
         "equipment_name": _str(data.get("equipment_name")),
@@ -591,13 +773,49 @@ def add_estimate_equipment(estimate_id: str, data: dict[str, Any]) -> ServiceRes
         "markup_amount": calc["markup_amount"],
         "price_total": calc["price_total"],
         "notes": _str(data.get("notes")),
-        "sort_order": _next_sort_order(existing),
+        "sort_order": sort_order,
     }
-    return _add_line("estimate_equipment", estimate_id, payload)
+    result = _add_line(_EQUIPMENT_TABLE, eid, payload)
+    if result.ok:
+        return result
+    if result.error and _is_missing_table_message(result.error):
+        _mark_equipment_uses_line_items()
+        retry = insert_row(
+            "estimate_line_items",
+            _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
+        )
+        if retry.ok:
+            recalculate_and_save_estimate_totals(eid)
+            return retry
+        return ServiceResult(ok=False, error=_EQUIPMENT_MISSING_MSG)
+    return result
 
 
 def update_estimate_equipment(line_id: str, data: dict[str, Any]) -> ServiceResult:
-    calc = calc_equipment_line(data.get("quantity"), data.get("duration"), data.get("cost_rate"), data.get("markup_percent"))
+    rid = _str(line_id)
+    eid = _str(data.get("estimate_id"))
+    calc = calc_equipment_line(
+        data.get("quantity"),
+        data.get("duration"),
+        data.get("cost_rate"),
+        data.get("markup_percent"),
+    )
+    if _equipment_storage_is_line_items():
+        existing_rows, _ = fetch_rows("estimate_line_items", limit=500, order_by="sort_order")
+        sort_order = 0
+        for row in existing_rows:
+            if _str(row.get("id")) == rid:
+                sort_order = int(row.get("sort_order") or 0)
+                break
+        result = update_row(
+            "estimate_line_items",
+            _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
+            {"id": rid},
+        )
+        if result.ok and eid:
+            recalculate_and_save_estimate_totals(eid)
+        return result
+
     payload = {
         "asset_id": data.get("asset_id") or None,
         "equipment_name": _str(data.get("equipment_name")),
@@ -612,11 +830,41 @@ def update_estimate_equipment(line_id: str, data: dict[str, Any]) -> ServiceResu
         "price_total": calc["price_total"],
         "notes": _str(data.get("notes")),
     }
-    return _update_line("estimate_equipment", line_id, payload, estimate_id=_str(data.get("estimate_id")))
+    result = _update_line(_EQUIPMENT_TABLE, rid, payload, estimate_id=eid)
+    if result.ok:
+        return result
+    if result.error and _is_missing_table_message(result.error):
+        _mark_equipment_uses_line_items()
+        retry = update_row(
+            "estimate_line_items",
+            _equipment_line_item_payload(eid, data, calc=calc, sort_order=0),
+            {"id": rid},
+        )
+        if retry.ok and eid:
+            recalculate_and_save_estimate_totals(eid)
+        return retry
+    return result
 
 
 def delete_estimate_equipment(line_id: str, *, estimate_id: str = "") -> ServiceResult:
-    return _delete_line("estimate_equipment", line_id, estimate_id=estimate_id)
+    rid = _str(line_id)
+    eid = _str(estimate_id)
+    if _equipment_storage_is_line_items():
+        result = delete_row("estimate_line_items", {"id": rid})
+        if result.ok and eid:
+            recalculate_and_save_estimate_totals(eid)
+        return result
+
+    result = _delete_line(_EQUIPMENT_TABLE, rid, estimate_id=eid)
+    if result.ok:
+        return result
+    if result.error and _is_missing_table_message(result.error):
+        _mark_equipment_uses_line_items()
+        retry = delete_row("estimate_line_items", {"id": rid})
+        if retry.ok and eid:
+            recalculate_and_save_estimate_totals(eid)
+        return retry
+    return result
 
 
 def add_estimate_subcontractor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
