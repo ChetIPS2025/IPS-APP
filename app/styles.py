@@ -6698,7 +6698,7 @@ def inject_unauthenticated_shell_css() -> None:
     st.markdown(
         f"""
 <script>document.body.classList.add("ips-auth-login");</script>
-<style id="ips-login-layout-v1">
+<style id="ips-login-layout-v2">
 body.ips-auth-login section[data-testid="stSidebar"],
 body.ips-auth-login [data-testid="stSidebarCollapsedControl"] {{
   display: none !important;
@@ -6717,17 +6717,37 @@ body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) > 
   width: 100% !important;
 }}
 body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
-  max-width: min(520px, calc(100vw - 2rem)) !important;
+  max-width: 100% !important;
   width: 100% !important;
   margin-left: auto !important;
   margin-right: auto !important;
   padding: 2rem 1.25rem 2.5rem !important;
   box-sizing: border-box !important;
 }}
-body.ips-auth-login .st-key-ips_login_card {{
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) [data-testid="stVerticalBlock"] {{
+  align-items: center !important;
+  width: 100% !important;
+}}
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) [data-testid="stHorizontalBlock"]:has(.ips-login-center-marker) {{
+  width: 100% !important;
+  max-width: min(480px, calc(100vw - 2rem)) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}}
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) [data-testid="column"]:has(.ips-login-center-marker) {{
+  flex: 0 1 480px !important;
+  width: 100% !important;
+  max-width: min(480px, calc(100vw - 2rem)) !important;
+  min-width: 0 !important;
+}}
+body.ips-auth-login .st-key-ips_login_card,
+body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_login_card {{
   max-width: min(480px, 100%) !important;
   width: 100% !important;
   margin: 0 auto !important;
+  align-self: center !important;
   padding: 1.75rem 1.5rem 1.5rem !important;
   background: #ffffff !important;
   border: 1px solid {BORDER} !important;
@@ -7929,7 +7949,14 @@ section[data-testid="stMain"] > div,
 .block-container {{
   background: {APP_BG} !important;
 }}
-section[data-testid="stMain"] .block-container {{
+section[data-testid="stMain"]:not(:has(.ips-login-page-marker)) .block-container {{
+  max-width: 100% !important;
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 2rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
   max-width: 100% !important;
   padding-top: 0 !important;
   padding-left: 0 !important;
@@ -8550,12 +8577,13 @@ div[data-testid="stDialog"] .ips-detail-title {{
 }}
 
 /* Login — centered narrow panel (see inject_unauthenticated_shell_css for full rules) */
-body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
-  max-width: min(520px, calc(100vw - 2rem)) !important;
+body.ips-auth-login section[data-testid="stMain"]:has(.ips-login-page-marker) [data-testid="column"]:has(.ips-login-center-marker) {{
+  max-width: min(480px, calc(100vw - 2rem)) !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }}
-body.ips-auth-login .st-key-ips_login_card {{
+body.ips-auth-login .st-key-ips_login_card,
+body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_login_card {{
   max-width: min(480px, 100%) !important;
   margin-left: auto !important;
   margin-right: auto !important;
