@@ -519,10 +519,6 @@ def render_day_allocation_card(
             st.caption("Enter hours for this day in the row above before assigning.")
             return
 
-        st.markdown(
-            '<span class="timekeeping-alloc-day-body-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
         grid_col, rail_col = st.columns(ALLOC_DAY_BODY_COLS, gap="small")
         pending_line: dict[str, Any] | None = None
         pending_lix = 0
@@ -533,7 +529,8 @@ def render_day_allocation_card(
                 break
         with grid_col:
             st.markdown(
-                '<span class="timekeeping-alloc-day-grid-marker" aria-hidden="true"></span>',
+                '<span class="timekeeping-alloc-day-body-marker timekeeping-alloc-day-grid-marker" '
+                'aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             for lix, line in enumerate(ctx.lines):
