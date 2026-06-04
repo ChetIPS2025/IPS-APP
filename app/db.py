@@ -113,6 +113,39 @@ _patch_supabase_publishable_keys()
 
 _JOBS_STALE_COLUMN_DESCRIPTION = "description"
 _JOBS_ORDER_BY_FOR_STALE_DESCRIPTION = "job_name"
+def _jobs_columns_after_missing_column(columns: str, exc: BaseException) -> str | None:
+    """Drop a missing ``jobs.*`` column from an explicit SELECT list (Postgres 42703)."""
+    import re
+
+    msg = str(exc).lower()
+    if "does not exist" not in msg and "42703" not in msg:
+        return None
+    m = re.search(r"column\s+jobs\.(\w+)\s+does not exist", str(exc), re.I)
+    if not m:
+        return None
+    bad = m.group(1).lower()
+    raw = (columns or "*").strip()
+    if not raw or raw == "*":
+        return None
+    kept = [p.strip() for p in raw.split(",") if p.strip() and p.strip().lower() != bad]
+    if not kept:
+        return "id"
+    return ", ".join(kept)
+
+
+def _jobs_match_after_missing_column(match: dict[str, Any], exc: BaseException) -> dict[str, Any] | None:
+    import re
+
+    msg = str(exc).lower()
+    if "does not exist" not in msg and "42703" not in msg:
+        return None
+    m = re.search(r"column\s+jobs\.(\w+)\s+does not exist", str(exc), re.I)
+    if not m:
+        return None
+    bad = m.group(1).lower()
+    if not any(str(k).lower() == bad for k in match):
+        return None
+    return {k: v for k, v in match.items() if str(k).lower() != bad}
 
 
 def _normalize_jobs_query(*, columns: str, order_by: str | None) -> tuple[str, str | None]:
@@ -282,15 +315,23 @@ def _fetch_table_query(
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
     client = get_admin_client() if use_admin else get_client()
-    query = client.table(table_name).select(columns).limit(limit)
-    if order_by:
-        query = query.order(order_by)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        tag = "fetch_table_admin" if use_admin else "fetch_table"
-        raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    tag = "fetch_table_admin" if use_admin else "fetch_table"
+    cols = columns
+    for _ in range(8):
+        query = client.table(table_name).select(cols).limit(limit)
+        if order_by:
+            query = query.order(order_by)
+        try:
+            resp = query.execute()
+            return resp.data or []
+        except Exception as exc:
+            if table_name != "jobs":
+                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+            next_cols = _jobs_columns_after_missing_column(cols, exc)
+            if not next_cols or next_cols == cols:
+                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+            cols = next_cols
+    return []
 
 
 def _fetch_by_match_query(
@@ -304,15 +345,31 @@ def _fetch_by_match_query(
     if table_name == "jobs":
         columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
     client = get_admin_client() if use_admin else get_client()
-    query = client.table(table_name).select(columns).limit(limit)
-    for key, value in match.items():
-        query = query.eq(key, value)
-    try:
-        resp = query.execute()
-    except Exception as exc:
-        tag = "fetch_by_match_admin" if use_admin else "fetch_by_match"
-        raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
-    return resp.data or []
+    tag = "fetch_by_match_admin" if use_admin else "fetch_by_match"
+    cols = columns
+    match_cur = dict(match)
+    for _ in range(8):
+        query = client.table(table_name).select(cols).limit(limit)
+        for key, value in match_cur.items():
+            query = query.eq(key, value)
+        try:
+            resp = query.execute()
+            return resp.data or []
+        except Exception as exc:
+            if table_name != "jobs":
+                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+            next_cols = _jobs_columns_after_missing_column(cols, exc)
+            next_match = _jobs_match_after_missing_column(match_cur, exc)
+            changed = False
+            if next_cols and next_cols != cols:
+                cols = next_cols
+                changed = True
+            if next_match is not None and next_match != match_cur:
+                match_cur = next_match
+                changed = True
+            if not changed:
+                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
+    return []
 
 
 if _st_for_cache is not None:

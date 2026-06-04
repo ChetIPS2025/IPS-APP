@@ -320,9 +320,8 @@ _INACTIVE_JOB_STATUSES_FOR_NUMBER_RECLAIM: FrozenSet[str] = frozenset(
     {"archived", "deleted", "cancelled", "canceled", "closed", "completed"}
 )
 
-_JOB_COLLISION_COLUMNS = (
-    "id,job_number,job_name,estimate_id,customer_id,status,is_deleted,deleted_at"
-)
+# Base jobs schema (002_jobs.sql); lifecycle cols (084) are optional — see db._execute_jobs_query.
+_JOB_COLLISION_COLUMNS = "id,job_number,job_name,estimate_id,customer_id,status"
 
 
 def _norm_job_status(status: object) -> str:
