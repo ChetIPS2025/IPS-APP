@@ -2749,7 +2749,7 @@ def inject_assets_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     st.markdown(
         f"""
-<style id="ips-assets-module-v5">
+<style id="ips-assets-module-v6">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2758,66 +2758,62 @@ def inject_assets_module_css() -> None:
   margin-bottom: 0.5rem;
 }}
 .ips-small-tools-table-wrap {{
-  width: max-content;
+  width: 100%;
   max-width: 100%;
 }}
 .st-key-assets_small_tools_table_wrap {{
   overflow-x: auto;
   max-width: 100%;
+  width: 100%;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
-  width: max-content;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.45rem !important;
+  display: grid !important;
+  grid-template-columns: 52px minmax(180px, 1fr) 88px minmax(100px, 160px) 84px 92px !important;
+  column-gap: 10px !important;
+  row-gap: 0 !important;
   align-items: center !important;
-  width: max-content;
-  max-width: 100%;
-  justify-content: flex-start !important;
-  padding: 6px 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  justify-content: stretch !important;
+  padding: 6px 10px !important;
+  margin: 0 !important;
   min-height: 44px;
+  border-bottom: 1px solid #e2e8f0;
+  box-sizing: border-box !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 38px;
+  border-bottom: 1px solid #e2e8f0;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+  background: #eef5ff;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: unset !important;
+  overflow: hidden !important;
+  align-self: center !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  min-width: 0 !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
-  flex: 0 0 52px !important;
-  width: 52px !important;
-  min-width: 52px !important;
-  max-width: 52px !important;
+  overflow: visible !important;
 }}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
-  flex: 0 1 360px !important;
-  width: 360px !important;
-  min-width: 220px !important;
-  max-width: 420px !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
-  flex: 0 0 72px !important;
-  width: 72px !important;
-  min-width: 72px !important;
-  max-width: 72px !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
-  flex: 0 1 180px !important;
-  width: 180px !important;
-  min-width: 110px !important;
-  max-width: 220px !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) {{
-  flex: 0 0 78px !important;
-  width: 78px !important;
-  min-width: 78px !important;
-  max-width: 78px !important;
-}}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) {{
-  flex: 0 0 88px !important;
-  width: 88px !important;
-  min-width: 88px !important;
-  max-width: 88px !important;
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) .ips-assets-number {{
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }}
 .st-key-assets_small_tools_table_wrap .stMarkdown p:has(.ips-asset-thumb-cell) {{
   line-height: 0 !important;
@@ -2827,6 +2823,15 @@ def inject_assets_module_css() -> None:
   min-height: 28px !important;
   padding: 0 8px !important;
   font-size: 12px !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) {{
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) [data-testid="stButton"] {{
+  width: 100% !important;
+  min-width: 0 !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button {{
   background: transparent !important;
@@ -2838,10 +2843,14 @@ def inject_assets_module_css() -> None:
   justify-content: flex-start !important;
   text-align: left !important;
   padding: 0 !important;
-  min-height: 36px !important;
-  height: auto !important;
-  white-space: normal !important;
-  line-height: 1.35 !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.25 !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"]:has(.ips-small-tool-name-btn-marker) .stButton > button:hover {{
   background: transparent !important;
@@ -2853,7 +2862,18 @@ def inject_assets_module_css() -> None:
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }}
-.ips-small-tool-name-btn-marker {{
+.st-key-assets_small_tools_table_wrap .ips-assets-muted {{
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}}
+.ips-small-tool-name-btn-marker,
+.ips-small-tools-table-row-marker,
+.ips-small-tools-table-header-marker {{
   display: none !important;
 }}
 .ips-assets-header-row {{

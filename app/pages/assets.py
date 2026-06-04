@@ -747,7 +747,16 @@ def _render_small_tools_table(
     with st.container(key="assets_small_tools_table_wrap"):
         st.markdown('<div class="ips-assets-table-wrap ips-small-tools-table-wrap">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_SMALL_TOOL_COLS, gap="small", vertical_alignment="center")
+        st.markdown(
+            '<span class="ips-small-tools-table-header-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        header_cols = st.columns(
+            _SMALL_TOOL_COLS,
+            gap="small",
+            vertical_alignment="center",
+            key="assets_small_tools_header_cols",
+        )
         for col, (label, field) in zip(header_cols, _SMALL_TOOL_HEADER_SPECS):
             with col:
                 if field:
@@ -774,9 +783,18 @@ def _render_small_tools_table(
             status = _small_tool_status(row)
             value = _small_tool_value(row)
 
-            cols = st.columns(_SMALL_TOOL_COLS, gap="small", vertical_alignment="center")
+            cols = st.columns(
+                _SMALL_TOOL_COLS,
+                gap="small",
+                vertical_alignment="center",
+                key=f"assets_small_tools_row_{rid}",
+            )
             image_asset = _small_tool_image_asset(row, assets_by_id)
             with cols[0]:
+                st.markdown(
+                    '<span class="ips-small-tools-table-row-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 _render_asset_thumbnail(image_asset)
             with cols[1]:
                 st.markdown(
