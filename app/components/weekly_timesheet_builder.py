@@ -79,7 +79,7 @@ except ImportError:
     st_canvas = None  # type: ignore[misc, assignment]
 
 _DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-_LABOR_COLS = ["employee_equipment", "class_name"] + _DAY_KEYS + ["st_hours", "ot_hours", "dt_hours"]
+_LABOR_COLS = ["employee_equipment", "class_name"] + _DAY_KEYS + ["st_hours", "ot_hours"]
 _MAT_COLS = ["description", "qty", "cost"]
 
 
@@ -170,8 +170,7 @@ def _lines_to_labor_df(lines: list[TimesheetLine]) -> pd.DataFrame:
                 "sat": ln.sat,
                 "sun": ln.sun,
                 "st_hours": ln.st_hours,
-                "ot_hours": ln.ot_hours,
-                "dt_hours": ln.dt_hours,
+                "ot_hours": ln.ot_hours + ln.dt_hours,
             }
         )
     if not rows:
@@ -195,14 +194,13 @@ def _labor_df_to_lines(df: pd.DataFrame) -> list[TimesheetLine]:
     for rec in df.to_dict("records"):
         emp = str(rec.get("employee_equipment") or "").strip()
         cls = str(rec.get("class_name") or "").strip()
-        if not emp and not cls and all(float(rec.get(k) or 0) == 0 for k in _DAY_KEYS + ["st_hours", "ot_hours", "dt_hours"]):
+        if not emp and not cls and all(float(rec.get(k) or 0) == 0 for k in _DAY_KEYS + ["st_hours", "ot_hours"]):
             continue
         ln = TimesheetLine(line_type="labor", description=emp, class_name=cls)
         for k in _DAY_KEYS:
             setattr(ln, k, float(rec.get(k) or 0))
         ln.st_hours = float(rec.get("st_hours") or 0)
         ln.ot_hours = float(rec.get("ot_hours") or 0)
-        ln.dt_hours = float(rec.get("dt_hours") or 0)
         lines.append(ln)
     return lines or [TimesheetLine(line_type="labor")]
 
@@ -604,7 +602,6 @@ def render_weekly_timesheet_builder(
             **{k: st.column_config.NumberColumn(k.upper(), format="%.2f", step=0.25) for k in _DAY_KEYS},
             "st_hours": st.column_config.NumberColumn("ST", format="%.2f"),
             "ot_hours": st.column_config.NumberColumn("OT", format="%.2f"),
-            "dt_hours": st.column_config.NumberColumn("DT", format="%.2f"),
         },
     )
     st.session_state[f"{sk}_labor"] = labor_edited

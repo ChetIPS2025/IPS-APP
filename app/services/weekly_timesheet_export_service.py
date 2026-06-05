@@ -175,7 +175,6 @@ def ensure_excel_template() -> Path:
         "SUN",
         "ST",
         "OT",
-        "DT",
         "TOTAL",
     ]
     for col_idx, hdr in enumerate(labor_headers, start=1):
@@ -186,7 +185,7 @@ def ensure_excel_template() -> Path:
         cell.alignment = _center()
 
     for r in range(_FIRST_LABOR_ROW, _FIRST_LABOR_ROW + _LABOR_ROW_COUNT):
-        for c in range(1, 14):
+        for c in range(1, 13):
             cell = ws.cell(row=r, column=c)
             cell.border = _thin_border()
             cell.alignment = _center() if c > 2 else _left_wrap()
@@ -274,8 +273,7 @@ def _fill_labor_row(ws, row: int, ln: Any) -> None:
         ln.sat,
         ln.sun,
         ln.st_hours,
-        ln.ot_hours,
-        ln.dt_hours,
+        ln.ot_hours + ln.dt_hours,
         ln.total_hours,
     ]
     for col_idx, val in enumerate(values, start=1):
@@ -459,7 +457,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
         min_rows=TIMESHEET_LABOR_MIN_ROWS,
     )
-    header = ["Employee / Equipment", "Class"] + [lbl.replace("<br>", "\n") for lbl in labels] + ["ST", "OT", "DT", "Total"]
+    header = ["Employee / Equipment", "Class"] + [lbl.replace("<br>", "\n") for lbl in labels] + ["ST", "OT", "Total"]
     grid: list[list[str]] = [header]
     for ln in labor:
         grid.append(
@@ -474,8 +472,7 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
                 _fmt_hours(ln.sat),
                 _fmt_hours(ln.sun),
                 _fmt_hours(ln.st_hours),
-                _fmt_hours(ln.ot_hours),
-                _fmt_hours(ln.dt_hours),
+                _fmt_hours(ln.ot_hours + ln.dt_hours),
                 _fmt_hours(ln.total_hours),
             ]
         )
@@ -483,10 +480,9 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         content_w * 0.20,
         content_w * 0.08,
         *[content_w * 0.07] * 7,
-        content_w * 0.04,
-        content_w * 0.04,
-        content_w * 0.04,
-        content_w * 0.07,
+        content_w * 0.05,
+        content_w * 0.05,
+        content_w * 0.08,
     ]
     labor_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * len(labor)
     labor_tbl = Table(grid, colWidths=col_w, rowHeights=labor_heights, repeatRows=1)

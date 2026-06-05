@@ -262,8 +262,7 @@ def _labor_row_html(ln: TimesheetLine) -> str:
         f'<td class="left">{html.escape(ln.class_name)}</td>'
         f"{cells}"
         f'<td class="num">{html.escape(_fmt_hours(ln.st_hours))}</td>'
-        f'<td class="num">{html.escape(_fmt_hours(ln.ot_hours))}</td>'
-        f'<td class="num">{html.escape(_fmt_hours(ln.dt_hours))}</td>'
+        f'<td class="num">{html.escape(_fmt_hours(ln.ot_hours + ln.dt_hours))}</td>'
         f'<td class="num">{html.escape(_fmt_hours(ln.total_hours))}</td>'
         f"</tr>"
     )
