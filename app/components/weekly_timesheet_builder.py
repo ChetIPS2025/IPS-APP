@@ -746,7 +746,7 @@ def render_weekly_timesheet_builder(
         st.session_state[f"{kp}_show_preview"] = True
         html_doc = render_timesheet_html(data, week_start=week_start, embed=True)
         st.markdown('<span class="ips-wt-preview-frame-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-        components.html(html_doc, height=1240, scrolling=False)
+        components.html(html_doc, height=1140, scrolling=True)
         st.download_button(
             "Download HTML preview",
             data=html_doc,

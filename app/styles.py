@@ -10414,10 +10414,17 @@ section[data-testid="stMain"]:has(.ips-weekly-timesheets-page) [data-testid="stS
   margin-top: 0 !important;
   margin-bottom: 0.25rem !important;
 }}
+section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="stHtml"] {{
+  display: flex !important;
+  justify-content: center !important;
+}}
 section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="stHtml"] iframe {{
   width: 100% !important;
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  max-width: 9in !important;
+  margin: 0 auto !important;
+  display: block !important;
+  background: #ececec !important;
+  border: 1px solid #cbd5e1 !important;
   border-radius: 8px !important;
 }}
 .ips-time-week-range {{
