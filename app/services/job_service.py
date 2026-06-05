@@ -167,7 +167,7 @@ def is_primary_job_number(job_number: object) -> bool:
     """Exclude archived/subjob-style numbers (e.g. J26070-A42493B)."""
     num = job_number_display(job_number)
     if not num or num in {"—", "-"}:
-        return False
+        return True
     return _SUBJOB_STYLE_NUMBER_RE.match(num) is None
 
 
@@ -184,10 +184,23 @@ def is_job_assignable_for_field_picker(job: dict[str, Any]) -> bool:
 
 
 def is_job_eligible_for_weekly_timesheet(job: dict[str, Any]) -> bool:
-    """Customer weekly timesheets: active field jobs, not estimate-pending shells."""
-    if not is_job_assignable_for_field_picker(job):
+    """
+    Jobs that may appear on the Weekly Timesheets picker.
+
+    Matches the Jobs page breadth (includes completed/closed jobs for past weeks),
+    but drops deleted/archived rows, estimate shells, and subjob-style numbers.
+    """
+    if bool(job.get("is_deleted")):
         return False
-    if normalize_job_status_for_filter(job.get("status")) == "Estimate Pending":
+    if not str(job.get("id") or "").strip():
+        return False
+    status = normalize_job_status_for_filter(job.get("status"))
+    if status in {"Deleted", "Archived", "Estimate Pending"}:
+        return False
+    num = job_number_display(job.get("job_number"))
+    if num and _SUBJOB_STYLE_NUMBER_RE.match(num):
+        return False
+    if not num and not str(job.get("job_name") or "").strip():
         return False
     return True
 
@@ -218,30 +231,22 @@ def load_jobs_for_select(*, limit: int = 5000, use_admin: bool | None = None) ->
     return sort_jobs_by_number_then_name(load_jobs())
 
 
-def weekly_timesheet_job_options(*, include_customer: bool = True) -> dict[str, str]:
+def weekly_timesheet_job_options(*, include_customer: bool = False) -> dict[str, str]:
     """
     Label → job id map for the weekly timesheet Job selectbox.
 
-    Uses the same open primary jobs as Timekeeping, sorted by job number.
+    Loads all live jobs (service-role read), sorted by job number. Labels are kept
+    unique per job id so rows are never dropped by duplicate dict keys.
     """
-    jobs = load_jobs_for_select()
+    _ = include_customer  # legacy kwarg; customer suffixes caused duplicate-key collisions
+    jobs = load_jobs_for_select(use_admin=True)
     eligible = [j for j in jobs if is_job_eligible_for_weekly_timesheet(j)]
     if not eligible:
-        eligible = [j for j in jobs if is_job_assignable_for_field_picker(j)]
-    if not eligible:
-        eligible = jobs
+        eligible = [j for j in jobs if not bool(j.get("is_deleted")) and str(j.get("id") or "").strip()]
     _, label_to_id, labels = build_job_dropdown_label_maps(eligible)
-    by_id = {str(j.get("id") or "").strip(): j for j in eligible}
     opts: dict[str, str] = {"": ""}
     for label in labels:
         jid = label_to_id.get(label) or ""
-        if not jid:
-            continue
-        job = by_id.get(jid, {})
-        if include_customer:
-            cust = str(job.get("customer") or "").strip()
-            key = f"{label} | {cust}" if cust and cust != "—" else label
-        else:
-            key = label
-        opts[key] = jid
+        if jid:
+            opts[label] = jid
     return opts

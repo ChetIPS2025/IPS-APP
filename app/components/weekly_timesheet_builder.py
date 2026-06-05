@@ -502,7 +502,8 @@ def render_weekly_timesheet_builder(
     _, we = week_bounds(week_start)
 
     if not job_id:
-        labels = [""] + sorted(k for k in jobs if k)
+        job_labels = sorted(k for k in jobs if k, key=str.casefold)
+        labels = [""] + job_labels
         default_label = ""
         for lab, jid in jobs.items():
             if str(jid) == str(default_job_id):
@@ -513,6 +514,7 @@ def render_weekly_timesheet_builder(
             labels,
             index=labels.index(default_label) if default_label in labels else 0,
             key=f"{kp}_job",
+            help=f"{len(job_labels)} job(s) available",
         )
         job_id = str(jobs.get(pick) or "").strip()
 
