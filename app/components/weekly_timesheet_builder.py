@@ -502,7 +502,7 @@ def render_weekly_timesheet_builder(
     _, we = week_bounds(week_start)
 
     if not job_id:
-        job_labels = sorted(k for k in jobs if k, key=str.casefold)
+        job_labels = sorted((k for k in jobs if k), key=str.casefold)
         labels = [""] + job_labels
         default_label = ""
         for lab, jid in jobs.items():
