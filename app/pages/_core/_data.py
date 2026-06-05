@@ -1871,10 +1871,22 @@ def persist_timekeeping_days(
         from app.services.jobs_service import resolve_job_id_from_label
     except ImportError:
         from services.jobs_service import resolve_job_id_from_label  # type: ignore
+    try:
+        from app.services.timekeeping_service import clear_timekeeping_day_rows
+    except ImportError:
+        from services.timekeeping_service import clear_timekeeping_day_rows  # type: ignore
     for row in grid:
         work_date = str(row.get("date") or "")[:10]
         if not work_date:
             continue
+        day_total = (
+            float(row.get("st") or 0)
+            + float(row.get("ot") or 0)
+            + float(row.get("dt") or 0)
+        )
+        day_id = str(row.get("day_id") or "").strip() or None
+        if day_total <= 0.001:
+            clear_timekeeping_day_rows(employee_id, work_date, keep_day_id=day_id)
         job_label = str(row.get("job") or "")
         ui = {
             "employee_id": employee_id,
@@ -1888,7 +1900,7 @@ def persist_timekeeping_days(
             "notes": row.get("notes") or "",
             "status": str(row.get("status") or "Draft"),
         }
-        res = save_timekeeping_day(ui, row_id=str(row.get("day_id") or "") or None)
+        res = save_timekeeping_day(ui, row_id=day_id)
         err = _persist_result(res, success="")
         if err[0] is False and err[1]:
             errors.append(err[1])
@@ -1935,6 +1947,71 @@ def persist_timekeeping_day_approve(
     if ok:
         sync_timekeeping_week_from_days(employee_id, week_start)
     return ok, msg
+
+
+def persist_timekeeping_day_submit_for_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import submit_timekeeping_days_for_work_date
+    except ImportError:
+        from services.timekeeping_service import submit_timekeeping_days_for_work_date  # type: ignore
+    return _persist_result(
+        submit_timekeeping_days_for_work_date(employee_id, week_start, work_date),
+        success="Day submitted for approval.",
+    )
+
+
+def persist_timekeeping_day_approve_for_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+    *,
+    approved_by: str,
+) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import approve_timekeeping_days_for_work_date
+    except ImportError:
+        from services.timekeeping_service import approve_timekeeping_days_for_work_date  # type: ignore
+    return _persist_result(
+        approve_timekeeping_days_for_work_date(
+            employee_id,
+            week_start,
+            work_date,
+            approved_by=approved_by,
+        ),
+        success="Day approved.",
+    )
+
+
+def persist_timekeeping_day_reject_for_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+    *,
+    approved_by: str,
+) -> tuple[bool, str]:
+    if _demo_blocked(employee_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.timekeeping_service import reject_timekeeping_days_for_work_date
+    except ImportError:
+        from services.timekeeping_service import reject_timekeeping_days_for_work_date  # type: ignore
+    return _persist_result(
+        reject_timekeeping_days_for_work_date(
+            employee_id,
+            week_start,
+            work_date,
+            approved_by=approved_by,
+        ),
+        success="Day rejected.",
+    )
 
 
 def persist_timekeeping_day_reject(

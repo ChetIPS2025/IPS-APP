@@ -36,9 +36,13 @@ class AllocationRenderDeps:
     allocated_hours_sum: Callable[[list[dict[str, Any]]], float]
     alloc_state_key: Callable[[str], str]
     day_is_editable: Callable[[str], bool]
+    day_hours_editable: Callable[[str, str], bool]
     handle_alloc_line_submit: Callable[[dict, date, str], bool]
     handle_alloc_line_approve: Callable[[dict, date, str], bool]
     handle_alloc_line_reject: Callable[[dict, date, str], bool]
+    handle_day_submit_for_date: Callable[[dict, date, str], bool]
+    handle_day_approve_for_date: Callable[[dict, date, str], bool]
+    handle_day_reject_for_date: Callable[[dict, date, str], bool]
     save_allocation_week: Callable[[], bool]
 
 
@@ -68,6 +72,7 @@ class DayAllocationCardContext:
     by_date: dict[str, list[dict[str, Any]]]
     record_key: str = ""
     week_status: str = ""
+    day_status: str = "Draft"
 
 
 def allocation_day_block_class(state: str) -> str:
@@ -215,17 +220,27 @@ def _render_day_actions_rail(
     ctx: DayAllocationCardContext,
     pending_line: dict[str, Any] | None = None,
     pending_lix: int = 0,
+    normalize_timecard_status: Callable[[object], str] | None = None,
 ) -> None:
-    """Right rail: Save allocations + Add assignment (reference layout)."""
+    """Right rail: day status, save, submit, and per-day approval."""
+    _ = pending_line
+    _ = pending_lix
     st.markdown(
         '<span class="timekeeping-allocation-day-rail-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    if ctx.week_locked:
-        return
+    norm = normalize_timecard_status or (lambda raw: str(raw or "Draft"))
+    day_status = norm(ctx.day_status)
+    st.markdown(
+        f'<div class="timekeeping-alloc-day-status">'
+        f"{deps.timecard_status_pill_html(day_status)}</div>",
+        unsafe_allow_html=True,
+    )
 
+    hours_editable = deps.day_hours_editable(day_status, ctx.week_status)
     record_key = str(ctx.record_key or ctx.eid or ctx.panel_scope).strip()
-    if deps.save_allocation_week and st.button(
+
+    if hours_editable and deps.save_allocation_week and st.button(
         "Save allocations",
         key=f"tk_save_alloc_day_{record_key}_{ctx.iso}",
         type="primary",
@@ -234,7 +249,7 @@ def _render_day_actions_rail(
         if deps.save_allocation_week():
             st.rerun()
 
-    if st.button(
+    if hours_editable and st.button(
         "+ Add assignment",
         key=f"tk_alloc_add_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
         type="secondary",
@@ -243,27 +258,36 @@ def _render_day_actions_rail(
     ):
         _append_assignment_line(deps=deps, ctx=ctx)
 
-    if pending_line and ctx.can_approve:
-        line_id = str(pending_line.get("line_id") or "").strip()
-        line_hours = float(pending_line.get("hours") or 0)
-        if line_id and line_hours > 0:
-            a1, a2 = st.columns(2, gap="small")
-            with a1:
-                if st.button(
-                    "Approve",
-                    key=f"tk_alloc_ok_{ctx.eid}_{ctx.week_sig}_{ctx.iso}_{pending_lix}",
-                    use_container_width=True,
-                ):
-                    if deps.handle_alloc_line_approve(ctx.emp, ctx.week_start_d, line_id):
-                        st.rerun()
-            with a2:
-                if st.button(
-                    "Reject",
-                    key=f"tk_alloc_no_{ctx.eid}_{ctx.week_sig}_{ctx.iso}_{pending_lix}",
-                    use_container_width=True,
-                ):
-                    if deps.handle_alloc_line_reject(ctx.emp, ctx.week_start_d, line_id):
-                        st.rerun()
+    if hours_editable and ctx.daily_total > 0 and day_status in ("Draft", "Rejected"):
+        if st.button(
+            "Submit day",
+            key=f"tk_submit_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
+            use_container_width=True,
+        ):
+            if deps.handle_day_submit_for_date(ctx.emp, ctx.week_start_d, ctx.iso):
+                st.rerun()
+
+    if ctx.can_approve and day_status == "Pending" and ctx.daily_total > 0:
+        a1, a2 = st.columns(2, gap="small")
+        with a1:
+            if st.button(
+                "Approve day",
+                key=f"tk_approve_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
+                type="primary",
+                use_container_width=True,
+            ):
+                if deps.handle_day_approve_for_date(ctx.emp, ctx.week_start_d, ctx.iso):
+                    st.rerun()
+        with a2:
+            if st.button(
+                "Reject day",
+                key=f"tk_reject_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
+                use_container_width=True,
+            ):
+                if deps.handle_day_reject_for_date(ctx.emp, ctx.week_start_d, ctx.iso):
+                    st.rerun()
+    elif day_status == "Approved":
+        st.caption("This day is approved.")
 
 
 def _render_allocation_row_secondary_actions(
@@ -325,7 +349,10 @@ def render_allocation_control_row(
     job_opts = ctx.job_opts
 
     day_status = normalize_timecard_status(line.get("status"))
-    row_editable = not ctx.week_locked and deps.day_is_editable(day_status)
+    row_editable = deps.day_hours_editable(
+        str(ctx.day_status or day_status),
+        ctx.week_status,
+    )
     job_key = f"tk_alloc_job_{eid}_{week_sig}_{iso}_{lix}"
     live_job = deps.sync_assignment_job_widget(
         job_key,
@@ -519,6 +546,7 @@ def render_day_allocation_card(
                 ctx=ctx,
                 pending_line=pending_line,
                 pending_lix=pending_lix,
+                normalize_timecard_status=normalize_timecard_status,
             )
 
 

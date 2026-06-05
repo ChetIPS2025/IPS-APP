@@ -42,8 +42,11 @@ try:
         persist_timekeeping_approve,
         persist_timekeeping_days,
         persist_timekeeping_day_approve,
+        persist_timekeeping_day_approve_for_date,
         persist_timekeeping_day_reject,
+        persist_timekeeping_day_reject_for_date,
         persist_timekeeping_day_submit,
+        persist_timekeeping_day_submit_for_date,
         persist_timekeeping_reject,
         persist_timekeeping_submit,
         persist_timekeeping_week,
@@ -90,8 +93,11 @@ except ImportError:
         persist_timekeeping_approve,
         persist_timekeeping_days,
         persist_timekeeping_day_approve,
+        persist_timekeeping_day_approve_for_date,
         persist_timekeeping_day_reject,
+        persist_timekeeping_day_reject_for_date,
         persist_timekeeping_day_submit,
+        persist_timekeeping_day_submit_for_date,
         persist_timekeeping_reject,
         persist_timekeeping_submit,
         persist_timekeeping_week,
@@ -434,7 +440,8 @@ def _render_horizontal_week_grid(
             row_total = 0.0
             for day_ix, (day_d, col) in enumerate(zip(days, cols[1:8])):
                 day_status = _normalize_timecard_status(grid[day_ix].get("status"))
-                editable = _day_is_editable(day_status)
+                week_status = _normalize_timecard_status(emp.get("status"))
+                editable = _day_hours_editable(day_status, week_status)
                 with col:
                     _render_hgrid_day_cell(
                         day_d=day_d,
@@ -508,6 +515,29 @@ def _timecard_is_editable(status: str) -> bool:
 
 def _day_is_editable(status: str) -> bool:
     return _normalize_timecard_status(status) in ("Draft", "Pending", "Rejected")
+
+
+def _can_admin_edit_approved_timekeeping() -> bool:
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import can_admin_edit_approved_timekeeping
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import can_admin_edit_approved_timekeeping  # type: ignore
+    return can_admin_edit_approved_timekeeping(current_role())
+
+
+def _day_hours_editable(day_status: str, week_status: str) -> bool:
+    """Whether list-row / allocation hours may be edited for this day."""
+    if _can_admin_edit_approved_timekeeping():
+        return True
+    day_norm = _normalize_timecard_status(day_status)
+    week_norm = _normalize_timecard_status(week_status)
+    if day_norm == "Approved":
+        return False
+    if week_norm == "Approved":
+        return False
+    return _day_is_editable(day_norm)
 
 
 def _default_st_for_day_index(day_index: int) -> float:
@@ -621,6 +651,59 @@ def _can_approve_timekeeping() -> bool:
         from auth import current_role  # type: ignore
         from utils.permissions import can_approve_timekeeping  # type: ignore
     return can_approve_timekeeping(current_role())
+
+
+def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    if not _save_allocation_week(emp, week_start_d, show_message=False):
+        if not _save_timekeeping_week(emp, week_start_d, show_message=False):
+            st.error("Save hours for this day before submitting.")
+            return False
+    ok, msg = persist_timekeeping_day_submit_for_date(eid, week_start_d, work_date)
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_day_approve_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    if not _save_allocation_week(emp, week_start_d, show_message=False):
+        _save_timekeeping_week(emp, week_start_d, show_message=False)
+    ok, msg = persist_timekeeping_day_approve_for_date(
+        eid, week_start_d, work_date, approved_by=approver
+    )
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
+
+
+def _handle_day_reject_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    approver = _current_user_id()
+    if not approver:
+        st.error("Your profile is missing an approver id.")
+        return False
+    ok, msg = persist_timekeeping_day_reject_for_date(
+        eid, week_start_d, work_date, approved_by=approver
+    )
+    if ok:
+        _invalidate_weekly_grid(emp, week_start_d)
+        _patch_timecard_cache(emp, week_start_d, {"status": "Rejected"})
+        st.success(msg)
+        return True
+    st.error(msg)
+    return False
 
 
 def _patch_timecard_cache(emp: dict, week_start_d: date, updates: dict[str, Any]) -> None:
@@ -1037,7 +1120,29 @@ def _allocation_lines_to_persist_grid(
             grid_row=source_grid[day_ix] if day_ix < len(source_grid) else {},
         )
         lines = list(by_date.get(iso) or [])
+        grid_row = source_grid[day_ix] if day_ix < len(source_grid) else {}
         if daily_total <= 0:
+            day_id = str(grid_row.get("day_id") or "").strip()
+            if not day_id:
+                for line in lines:
+                    lid = str(line.get("line_id") or "").strip()
+                    if lid:
+                        day_id = lid
+                        break
+            persist_rows.append(
+                {
+                    "day_id": day_id,
+                    "day": day_d.strftime("%A"),
+                    "date": iso,
+                    "job": str(grid_row.get("job") or no_job),
+                    "st": 0.0,
+                    "ot": 0.0,
+                    "dt": 0.0,
+                    "notes": str(grid_row.get("notes") or ""),
+                    "status": str(grid_row.get("status") or "Draft"),
+                }
+            )
+            by_date[iso] = []
             continue
         if not lines:
             errors.append(f"{day_d.strftime('%A')}: add at least one assignment row.")
@@ -1585,7 +1690,7 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
         day_row = grid[i] if i < len(grid) else {}
         day_row = _day_row_with_widget_values(day_row, eid=eid, week_sig=week_sig, index=i)
         day_status = _normalize_timecard_status(day_row.get("status"))
-        editable = week_status != "Approved" and _day_is_editable(day_status)
+        editable = _day_hours_editable(day_status, week_status)
         total = _day_hours_total(day_row)
         filled_marker = "ips-time-week-day-filled" if _day_entry_complete(day_row) else ""
         grid_marker = " timesheet-days-grid-marker" if i == 0 else ""
@@ -1626,12 +1731,18 @@ def _row_totals_from_grid(grid: list[dict]) -> tuple[float, float, float]:
 
 
 def _sync_grid_from_widget_keys(grid: list[dict], *, eid: str, week_sig: str) -> list[dict]:
-    """Apply in-flight ST/OT widget values so the day summary bar updates immediately."""
+    """Apply in-flight list-row hour widgets before save or summary totals."""
     for i, row in enumerate(grid):
-        for field, prefix in (("st", "tk_st"), ("ot", "tk_ot")):
-            key = f"{prefix}_{eid}_{week_sig}_{i}"
-            if key in st.session_state:
-                row[field] = float(st.session_state[key] or 0)
+        hrs_key = f"tk_hrs_{eid}_{week_sig}_{i}"
+        if hrs_key in st.session_state:
+            _set_day_job_hours(row, float(st.session_state[hrs_key] or 0))
+            continue
+        st_key = f"tk_st_{eid}_{week_sig}_{i}"
+        ot_key = f"tk_ot_{eid}_{week_sig}_{i}"
+        if st_key in st.session_state:
+            row["st"] = float(st.session_state[st_key] or 0)
+        if ot_key in st.session_state:
+            row["ot"] = float(st.session_state[ot_key] or 0)
     return grid
 
 
@@ -2112,7 +2223,8 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
 
     for i, row in enumerate(grid):
         day_status = _normalize_timecard_status(row.get("status"))
-        row_editable = _day_is_editable(day_status)
+        week_status = _normalize_timecard_status(emp.get("status"))
+        row_editable = _day_hours_editable(day_status, week_status)
         live_row = _day_row_with_widget_values(row, eid=eid, week_sig=week_sig, index=i)
         row_complete = _day_entry_complete(live_row)
         c = st.columns(edit_cols, gap="small")
@@ -2239,7 +2351,10 @@ def _save_timekeeping_week(
     show_message: bool = True,
 ) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
     grid = _ensure_weekly_grid(emp, week_start_d)
+    grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
+    st.session_state[_grid_key(eid)] = grid
     for row in grid:
         if not str(row.get("status") or "").strip():
             row["status"] = "Draft"
@@ -2345,7 +2460,8 @@ def _render_list_allocation_detail(
     week_sig = week_start_d.isoformat()
     scope = str(panel_scope or eid or week_sig).strip()
     week_status = _normalize_timecard_status(emp.get("status"))
-    week_locked = week_status == "Approved"
+    admin_edit = _can_admin_edit_approved_timekeeping()
+    week_locked = week_status == "Approved" and not admin_edit
     job_opts = _assignment_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
     grid = _ensure_weekly_grid(emp, week_start_d)
@@ -2366,13 +2482,19 @@ def _render_list_allocation_detail(
         allocated_hours_sum=_allocated_hours_sum,
         alloc_state_key=_alloc_state_key,
         day_is_editable=_day_is_editable,
+        day_hours_editable=_day_hours_editable,
         handle_alloc_line_submit=_handle_alloc_line_submit,
         handle_alloc_line_approve=_handle_alloc_line_approve,
         handle_alloc_line_reject=_handle_alloc_line_reject,
+        handle_day_submit_for_date=_handle_day_submit_for_date,
+        handle_day_approve_for_date=_handle_day_approve_for_date,
+        handle_day_reject_for_date=_handle_day_reject_for_date,
         save_allocation_week=lambda: _save_allocation_week(emp, week_start_d),
     )
 
-    if week_locked:
+    if admin_edit and week_status == "Approved":
+        st.warning("Administrator edit mode — you can change approved hours. Save after edits.")
+    elif week_locked:
         st.info("This week is approved and locked.")
 
     if not eid:
@@ -2384,6 +2506,7 @@ def _render_list_allocation_detail(
         for day_ix, day_d in enumerate(week_dates(week_start_d)):
             iso = day_d.isoformat()
             grid_row = grid[day_ix] if day_ix < len(grid) else {}
+            day_status = _normalize_timecard_status(grid_row.get("status"))
             daily_total = _daily_total_from_list_row(
                 eid=eid,
                 week_sig=week_sig,
@@ -2440,6 +2563,7 @@ def _render_list_allocation_detail(
                     by_date=by_date,
                     record_key=record_session_key(emp, "id"),
                     week_status=week_status,
+                    day_status=day_status,
                 ),
                 normalize_timecard_status=_normalize_timecard_status,
             )
@@ -2497,8 +2621,8 @@ def _render_list_allocation_detail(
     elif week_status == "Pending":
         st.caption("This timecard is pending approval.")
     st.caption(
-        "Totals in the row above are the source of truth. Choose S/T or O/T on each row, then save. "
-        "Unallocated time is saved to — No assignment — automatically."
+        "Totals in the row above are the source of truth. Use Submit day / Approve day on each day card, "
+        "or approve the full week below. Unallocated time is saved to — No assignment — automatically."
     )
 
 
@@ -2521,11 +2645,14 @@ def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
 
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
     week_status = _normalize_timecard_status(emp.get("status"))
-    if week_status == "Approved":
+    admin_edit = _can_admin_edit_approved_timekeeping()
+    if week_status == "Approved" and not admin_edit:
         _render_weekly_grid_readonly(emp, week_start_d)
         st.info("This week is approved and locked.")
         return
 
+    if week_status == "Approved" and admin_edit:
+        st.warning("Administrator edit mode — approved days can be corrected here.")
     _render_weekly_grid_edit(emp, week_start_d)
     action_left, action_right = st.columns([1, 1])
     record_key = record_session_key(emp, "id")
@@ -2580,7 +2707,7 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
                 if _reject_timekeeping_week(emp, week_start_d, reject_notes):
                     st.rerun()
     elif status == "Pending":
-        st.caption("Approve individual days on the Daily Entries tab, or approve the full week below.")
+        st.caption("Approve each day from the expanded list row (Approve day), or approve the full week below.")
     elif status == "Draft":
         st.caption("Enter hours on the Daily Entries tab, then submit each day or the full week for approval.")
     elif status == "Rejected":
@@ -2799,9 +2926,7 @@ def _render_custom_timekeeping_table(
                             )
                             day_status = _normalize_timecard_status(day_row.get("status"))
                             week_status = _normalize_timecard_status(emp.get("status"))
-                            editable = (
-                                week_status != "Approved" and _day_is_editable(day_status)
-                            )
+                            editable = _day_hours_editable(day_status, week_status)
                             with col:
                                 _render_list_row_day_cell(
                                     day_d=day_d,

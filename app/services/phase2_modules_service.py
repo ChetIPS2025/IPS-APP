@@ -884,6 +884,39 @@ def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, 
     ]
 
 
+def clear_timekeeping_day_rows(
+    employee_id: str,
+    work_date: str,
+    *,
+    keep_day_id: str | None = None,
+) -> ServiceResult:
+    """Delete extra day rows for one calendar date (e.g. after clearing hours to zero)."""
+    eid = str(employee_id or "").strip()
+    wd = str(work_date or "")[:10]
+    if not eid or not wd:
+        return ServiceResult(ok=False, error="Missing employee or work date.")
+    keep = str(keep_day_id or "").strip()
+    rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
+    if err:
+        return ServiceResult(ok=False, error=err)
+    removed = 0
+    for row in rows or []:
+        if str(row.get("employee_id") or "") != eid:
+            continue
+        if str(row.get("work_date") or "")[:10] != wd:
+            continue
+        rid = str(row.get("id") or "").strip()
+        if not rid or rid == keep:
+            continue
+        result = delete_row("employee_timekeeping_days", {"id": rid})
+        if not result.ok:
+            return result
+        removed += 1
+    if removed:
+        clear_all_data_caches()
+    return ServiceResult(ok=True, data={"removed": removed})
+
+
 def _find_timekeeping_week(employee_id: str, week_start: date) -> dict[str, Any] | None:
     eid = str(employee_id or "").strip()
     if not eid:
@@ -1676,6 +1709,99 @@ def reject_timekeeping_day(day_id: str, *, approved_by: str) -> ServiceResult:
     if not approver:
         return ServiceResult(ok=False, error="Missing approver profile.")
     return update_timekeeping_day_status(day_id, status="Rejected", approved_by=approver)
+
+
+def _day_rows_for_work_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+) -> list[dict[str, Any]]:
+    wd = str(work_date or "")[:10]
+    if not wd:
+        return []
+    return [
+        row
+        for row in list_timekeeping_days(employee_id, week_start)
+        if str(row.get("work_date") or "")[:10] == wd
+    ]
+
+
+def submit_timekeeping_days_for_work_date(employee_id: str, week_start: date, work_date: str) -> ServiceResult:
+    """Submit every draft/rejected row for one calendar day."""
+    rows = _day_rows_for_work_date(employee_id, week_start, work_date)
+    submitted = 0
+    for row in rows:
+        hours = float(row.get("st_hours") or 0) + float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
+        if hours <= 0:
+            continue
+        if str(row.get("status") or "Draft") not in ("Draft", "Rejected"):
+            continue
+        day_id = str(row.get("id") or "").strip()
+        if not day_id:
+            continue
+        result = submit_timekeeping_day(day_id)
+        if not result.ok:
+            return result
+        submitted += 1
+    if submitted == 0:
+        return ServiceResult(ok=False, error="Save hours for this day before submitting.")
+    return sync_timekeeping_week_from_days(employee_id, week_start)
+
+
+def approve_timekeeping_days_for_work_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+    *,
+    approved_by: str,
+) -> ServiceResult:
+    """Approve every pending row for one calendar day."""
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    rows = _day_rows_for_work_date(employee_id, week_start, work_date)
+    approved = 0
+    for row in rows:
+        if str(row.get("status") or "") != "Pending":
+            continue
+        day_id = str(row.get("id") or "").strip()
+        if not day_id:
+            continue
+        result = update_timekeeping_day_status(day_id, status="Approved", approved_by=approver)
+        if not result.ok:
+            return result
+        approved += 1
+    if approved == 0:
+        return ServiceResult(ok=False, error="No pending hours to approve for this day.")
+    return sync_timekeeping_week_from_days(employee_id, week_start)
+
+
+def reject_timekeeping_days_for_work_date(
+    employee_id: str,
+    week_start: date,
+    work_date: str,
+    *,
+    approved_by: str,
+) -> ServiceResult:
+    """Reject every pending row for one calendar day."""
+    approver = str(approved_by or "").strip()
+    if not approver:
+        return ServiceResult(ok=False, error="Missing approver profile.")
+    rows = _day_rows_for_work_date(employee_id, week_start, work_date)
+    rejected = 0
+    for row in rows:
+        if str(row.get("status") or "") != "Pending":
+            continue
+        day_id = str(row.get("id") or "").strip()
+        if not day_id:
+            continue
+        result = update_timekeeping_day_status(day_id, status="Rejected", approved_by=approver)
+        if not result.ok:
+            return result
+        rejected += 1
+    if rejected == 0:
+        return ServiceResult(ok=False, error="No pending hours to reject for this day.")
+    return sync_timekeeping_week_from_days(employee_id, week_start)
 
 
 def delete_estimate_line_item(row_id: str) -> ServiceResult:

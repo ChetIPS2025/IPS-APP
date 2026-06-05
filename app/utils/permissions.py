@@ -155,6 +155,11 @@ def can_approve_timekeeping(role: str) -> bool:
     return can_manage_weekly_timesheets(role)
 
 
+def can_admin_edit_approved_timekeeping(role: str) -> bool:
+    """Administrators may correct hours after a day or week is approved."""
+    return normalize_role(role) == "admin"
+
+
 def filter_field_nav_for_role(nav: Iterable[tuple[str, str]], role: str) -> list[tuple[str, str]]:
     """Field-mode sidebar items, including scan shortcuts gated by underlying module access."""
     scan_targets = {"scan_inventory": "inventory", "scan_asset": "assets"}
