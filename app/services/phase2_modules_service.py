@@ -584,6 +584,11 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        from app.services.employee_role_service import resolve_employee_roles
+    except ImportError:
+        from services.employee_role_service import resolve_employee_roles  # type: ignore
+
     eid = str(row.get("id") or "").strip()
     active = row.get("is_active", row.get("status") == "Active")
     status = "Active" if active in (True, "true", "Active", 1) else "Inactive"
@@ -597,14 +602,17 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
         if val and val not in {"—", "None", "-"}:
             phone = val
             break
+    permission_role, billing_class = resolve_employee_roles(row)
     return {
         "id": eid,
         "name": str(row.get("name") or row.get("full_name") or "—"),
         "full_name": str(row.get("name") or row.get("full_name") or "—"),
         "email": str(row.get("email") or "—"),
-        "role": str(row.get("role") or row.get("position") or "Employee"),
-        "position": str(row.get("position") or row.get("role") or "—"),
-        "trade": str(row.get("trade") or "—"),
+        "role": permission_role,
+        "permission_role": permission_role,
+        "position": str(row.get("position") or "—"),
+        "trade": billing_class,
+        "billing_class": billing_class,
         "employee_number": str(row.get("employee_number") or "—"),
         "hire_date": str(row.get("hire_date") or "")[:10] or "—",
         "department": str(row.get("department") or "—"),
@@ -1309,16 +1317,31 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
 
 
 def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.employee_role_service import (
+            canonical_permission_label,
+            sync_linked_profile_permission_role,
+        )
+    except ImportError:
+        from services.employee_role_service import (  # type: ignore
+            canonical_permission_label,
+            sync_linked_profile_permission_role,
+        )
+
     active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
+    permission_role = canonical_permission_label(
+        str(ui.get("permission_role") or ui.get("role") or "Employee")
+    ) or "Employee"
+    billing_class = str(ui.get("trade") or ui.get("billing_class") or "").strip()
     payload = {
         "name": ui.get("name"),
         "email": ui.get("email"),
-        "role": ui.get("role"),
+        "role": permission_role,
         "phone": ui.get("phone"),
         "username": ui.get("username"),
         "crew": ui.get("crew") or "",
-        "position": ui.get("position") or ui.get("role") or "",
-        "trade": ui.get("trade") or "",
+        "position": ui.get("position") or billing_class or "",
+        "trade": billing_class,
         "hire_date": ui.get("hire_date") or None,
         "employee_number": ui.get("employee_number") or None,
         "status": ui.get("status") or ("Active" if active else "Inactive"),
@@ -1330,8 +1353,23 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     if "is_employee" in ui:
         payload["is_employee"] = bool(ui.get("is_employee"))
     if row_id:
-        return update_row("employees", payload, {"id": row_id})
-    return insert_row("employees", payload)
+        result = update_row("employees", payload, {"id": row_id})
+        saved_id = row_id
+    else:
+        result = insert_row("employees", payload)
+        saved_id = str((result.data or {}).get("id") or "").strip()
+
+    if result.ok and saved_id:
+        warning = sync_linked_profile_permission_role(
+            saved_id,
+            permission_role,
+            email=str(ui.get("email") or ""),
+        )
+        if warning:
+            data = dict(result.data or {})
+            data["warning"] = warning
+            return ServiceResult(ok=True, data=data)
+    return result
 
 
 def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:

@@ -61,6 +61,12 @@ try:
         resend_invite_by_email,
         set_auth_user_password_admin,
     )
+    from app.services.employee_role_service import (
+        auth_role_from_permission_label,
+        billing_classification_options,
+        options_with_current,
+        permission_role_options,
+    )
     from app.services.repository import clear_all_data_caches
     from app.services.users_service import can_manage_user_actions, get_user_delete_context
     from app.styles import inject_users_module_css
@@ -120,6 +126,12 @@ except ImportError:
         resend_invite_by_email,
         set_auth_user_password_admin,
     )
+    from services.employee_role_service import (  # type: ignore
+        auth_role_from_permission_label,
+        billing_classification_options,
+        options_with_current,
+        permission_role_options,
+    )
     from services.repository import clear_all_data_caches  # type: ignore
     from services.users_service import can_manage_user_actions, get_user_delete_context  # type: ignore
     from styles import inject_users_module_css  # type: ignore
@@ -135,13 +147,14 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.52, 2.6, 2.8, 1.5, 1.8, 1.3, 1.1]
+_USER_COLS = [0.52, 2.3, 2.5, 1.35, 1.55, 1.35, 1.15, 1.05]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("NAME", None),
     ("EMAIL", None),
     ("PHONE", None),
-    ("ROLE", "role"),
+    ("BILLING CLASS", "billing_class"),
+    ("PERMISSION", "permission_role"),
     ("EMPLOYEE", "employee_type"),
     ("STATUS", "status"),
 ]
@@ -182,9 +195,14 @@ def _user_display_name(user: dict) -> str:
     return "Unnamed User"
 
 
-def _user_display_role(user: dict) -> str:
-    role = str(user.get("role") or user.get("role_name") or "").strip()
-    return role or "—"
+def _user_display_billing_class(user: dict) -> str:
+    billing = str(user.get("billing_class") or user.get("trade") or "").strip()
+    return billing if billing and billing not in {"—", "None", "-"} else "—"
+
+
+def _user_display_permission_role(user: dict) -> str:
+    role = str(user.get("permission_role") or user.get("role") or user.get("role_name") or "").strip()
+    return role if role else "—"
 
 
 def _user_display_email(user: dict) -> str:
@@ -367,7 +385,8 @@ def _render_custom_users_table(
             name = _user_display_name(user)
             email = _user_display_email(user)
             phone = _user_display_phone(user)
-            role = _user_display_role(user)
+            billing_class = _user_display_billing_class(user)
+            permission_role = _user_display_permission_role(user)
             status = _normalize_user_status(user.get("status"))
 
             cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
@@ -402,17 +421,29 @@ def _render_custom_users_table(
 
             with cols[4]:
                 st.markdown(
-                    _users_cell_html(role, "ips-users-cell ips-users-role ips-users-ellipsis"),
+                    _users_cell_html(
+                        billing_class,
+                        "ips-users-cell ips-users-billing ips-users-ellipsis",
+                    ),
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
                 st.markdown(
-                    f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
+                    _users_cell_html(
+                        permission_role,
+                        "ips-users-cell ips-users-role ips-users-ellipsis",
+                    ),
                     unsafe_allow_html=True,
                 )
 
             with cols[6]:
+                st.markdown(
+                    f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-users-pill-col">{_user_status_pill_html(status)}</div>',
                     unsafe_allow_html=True,
@@ -479,9 +510,18 @@ def _seed_employee_edit_form(emp: dict) -> None:
     st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
     st.session_state[f"emp_edit_phone_{rk}"] = _user_phone_raw(emp)
     st.session_state[f"emp_edit_empnum_{rk}"] = str(emp.get("employee_number") or "")
-    role_opts = lookup_options("user_roles")
-    role = str(emp.get("role") or "")
-    st.session_state[f"emp_edit_role_{rk}"] = role if role in role_opts else (role_opts[0] if role_opts else role)
+    perm_opts = permission_role_options()
+    billing_opts = billing_classification_options()
+    permission = str(emp.get("permission_role") or emp.get("role") or "")
+    billing = str(emp.get("billing_class") or emp.get("trade") or "")
+    st.session_state[f"emp_edit_permission_{rk}"] = (
+        permission if permission in perm_opts else (perm_opts[0] if perm_opts else "Employee")
+    )
+    st.session_state[f"emp_edit_billing_{rk}"] = (
+        billing
+        if billing in billing_opts or not billing
+        else options_with_current(billing_opts, billing)[0]
+    )
     status = str(emp.get("status") or "Active")
     st.session_state[f"emp_edit_status_{rk}"] = status if status in ("Active", "Inactive") else "Active"
     st.session_state[f"emp_edit_is_employee_{rk}"] = bool(emp.get("is_employee", False))
@@ -492,7 +532,8 @@ def _render_employee_detail_tabs(emp: dict) -> None:
     role_norm = normalize_role(current_role())
     name = safe_value(emp.get("name"))
     email = safe_value(emp.get("email"))
-    role = safe_value(emp.get("role"))
+    billing_class = safe_value(emp.get("billing_class") or emp.get("trade"))
+    permission_role = safe_value(emp.get("permission_role") or emp.get("role"))
     dept = safe_value(emp.get("department"))
     status = safe_value(emp.get("status"))
 
@@ -537,7 +578,8 @@ def _render_employee_detail_tabs(emp: dict) -> None:
     with tab_role:
         role_html = (
             f'<div class="ips-detail-grid">'
-            f"{detail_field_html('System Role', role)}"
+            f"{detail_field_html('Billing classification', billing_class)}"
+            f"{detail_field_html('Permission role', permission_role)}"
             f"{detail_field_html('Department', dept)}"
             f"</div>"
             f'<p style="margin:0.75rem 0 0;font-size:0.8125rem;color:#64748b;">'
@@ -621,7 +663,21 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.text_input("Email", key=f"emp_edit_email_{rk}")
         st.text_input("Phone", key=f"emp_edit_phone_{rk}", placeholder="(337) 555-0100")
     with ec2:
-        st.selectbox("Role", lookup_options("user_roles"), key=f"emp_edit_role_{rk}")
+        st.selectbox(
+            "Billing classification",
+            options_with_current(
+                billing_classification_options(),
+                st.session_state.get(f"emp_edit_billing_{rk}"),
+            ),
+            key=f"emp_edit_billing_{rk}",
+            help="Labor class used for billing and weekly timesheets.",
+        )
+        st.selectbox(
+            "Permission role",
+            permission_role_options(),
+            key=f"emp_edit_permission_{rk}",
+            help="Controls which pages and actions this user can access in the app.",
+        )
         st.selectbox("Status", ["Active", "Inactive"], key=f"emp_edit_status_{rk}")
         st.checkbox("This user is an employee", key=f"emp_edit_is_employee_{rk}")
 
@@ -640,7 +696,10 @@ def _render_employee_edit_form(emp: dict) -> None:
                 "employee_number": st.session_state.get(f"emp_edit_empnum_{rk}"),
                 "email": st.session_state.get(f"emp_edit_email_{rk}"),
                 "phone": st.session_state.get(f"emp_edit_phone_{rk}"),
-                "role": st.session_state.get(f"emp_edit_role_{rk}"),
+                "permission_role": st.session_state.get(f"emp_edit_permission_{rk}"),
+                "role": st.session_state.get(f"emp_edit_permission_{rk}"),
+                "trade": st.session_state.get(f"emp_edit_billing_{rk}"),
+                "billing_class": st.session_state.get(f"emp_edit_billing_{rk}"),
                 "status": st.session_state.get(f"emp_edit_status_{rk}"),
                 "is_employee": bool(st.session_state.get(f"emp_edit_is_employee_{rk}")),
             },
@@ -673,12 +732,8 @@ def _email_domain_allowed(email: str) -> bool:
 
 
 def _invite_role_from_employee(emp: dict) -> str:
-    role_norm = normalize_role(str(emp.get("role") or "employee"))
-    if role_norm in {"pm", "estimator", "project manager", "supervisor"}:
-        return "manager"
-    if role_norm in {"admin", "viewer", "employee", "manager"}:
-        return role_norm
-    return "employee"
+    perm = str(emp.get("permission_role") or emp.get("role") or "Employee")
+    return auth_role_from_permission_label(perm)
 
 
 def _employee_invite_email(emp: dict) -> str:
@@ -871,7 +926,8 @@ def _employee_type_label(emp: dict) -> str:
 
 
 _USER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("role", _user_display_role),
+    ("billing_class", _user_display_billing_class),
+    ("permission_role", _user_display_permission_role),
     ("employee_type", _employee_type_label),
     ("status", lambda u: _normalize_user_status(u.get("status"))),
 ]
@@ -881,9 +937,11 @@ def render_employee_detail_dialog(emp: dict) -> None:
     rk = record_session_key(emp, "id", "email")
     name = safe_value(emp.get("name"))
     email = safe_value(emp.get("email"))
-    role = safe_value(emp.get("role"))
+    billing_class = safe_value(emp.get("billing_class") or emp.get("trade"))
+    permission_role = safe_value(emp.get("permission_role") or emp.get("role"))
     status = safe_value(emp.get("status"))
-    subtitle = f"{role} · {email}" if role != "—" and email != "—" else (role if role != "—" else email)
+    subtitle_parts = [p for p in (permission_role, billing_class, email) if p and p != "—"]
+    subtitle = " · ".join(subtitle_parts) if subtitle_parts else email
 
     render_modal_shell(compact=True)
     if not is_edit_mode(MODULE, rk):
@@ -903,7 +961,8 @@ def render_employee_detail_dialog(emp: dict) -> None:
         render_compact_modal_meta_grid(
             [
                 ("Employee #", _user_display_employee_number(emp)),
-                ("Role", role),
+                ("Billing class", billing_class),
+                ("Permission", permission_role),
                 ("Email", email),
                 ("Phone", _user_display_phone(emp)),
                 ("Employee", _employee_type_label(emp)),
@@ -984,7 +1043,18 @@ def render() -> None:
                     placeholder="(337) 555-0100",
                     help="Mobile or office number for this user.",
                 )
-                st.selectbox("Role", lookup_options("user_roles"), key="emp_new_role")
+                st.selectbox(
+                    "Billing classification",
+                    billing_classification_options(),
+                    key="emp_new_billing",
+                    help="Labor class used for billing and weekly timesheets.",
+                )
+                st.selectbox(
+                    "Permission role",
+                    permission_role_options(),
+                    key="emp_new_permission",
+                    help="Controls which pages and actions this user can access in the app.",
+                )
             if can_manage_user_actions():
                 st.text_input(
                     "Login password",
@@ -1007,7 +1077,10 @@ def render() -> None:
                         "name": st.session_state.get("emp_new_name"),
                         "email": new_email,
                         "phone": st.session_state.get("emp_new_phone"),
-                        "role": st.session_state.get("emp_new_role"),
+                        "permission_role": st.session_state.get("emp_new_permission"),
+                        "role": st.session_state.get("emp_new_permission"),
+                        "trade": st.session_state.get("emp_new_billing"),
+                        "billing_class": st.session_state.get("emp_new_billing"),
                         "status": "Active",
                     }
                 )
