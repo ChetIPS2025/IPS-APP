@@ -230,9 +230,16 @@ def _format_phone(value: object) -> str:
     return raw
 
 
-def _user_display_employee_number(user: dict) -> str:
+def _employee_number_edit_value(user: dict) -> str:
     num = str(user.get("employee_number") or "").strip()
-    return num if num and num != "—" else "—"
+    if not num or num.casefold() in {"—", "-", "none", "null"}:
+        return ""
+    return num
+
+
+def _user_display_employee_number(user: dict) -> str:
+    num = _employee_number_edit_value(user)
+    return num if num else "—"
 
 
 def _user_display_phone(user: dict) -> str:
@@ -509,7 +516,7 @@ def _seed_employee_edit_form(emp: dict) -> None:
     st.session_state[f"emp_edit_name_{rk}"] = str(emp.get("name") or "")
     st.session_state[f"emp_edit_email_{rk}"] = str(emp.get("email") or "")
     st.session_state[f"emp_edit_phone_{rk}"] = _user_phone_raw(emp)
-    st.session_state[f"emp_edit_empnum_{rk}"] = str(emp.get("employee_number") or "")
+    st.session_state[f"emp_edit_empnum_{rk}"] = _employee_number_edit_value(emp)
     perm_opts = permission_role_options()
     billing_opts = billing_classification_options()
     permission = str(emp.get("permission_role") or emp.get("role") or "")

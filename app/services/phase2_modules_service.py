@@ -1316,6 +1316,13 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
     return insert_row("assets", payload)
 
 
+def _clean_employee_number(raw: object) -> str | None:
+    num = str(raw or "").strip()
+    if not num or num.casefold() in {"—", "-", "none", "null"}:
+        return None
+    return num
+
+
 def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
         from app.services.employee_role_service import (
@@ -1343,7 +1350,7 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "position": ui.get("position") or billing_class or "",
         "trade": billing_class,
         "hire_date": ui.get("hire_date") or None,
-        "employee_number": ui.get("employee_number") or None,
+        "employee_number": _clean_employee_number(ui.get("employee_number")),
         "status": ui.get("status") or ("Active" if active else "Inactive"),
         "is_active": active,
         "notes": ui.get("notes") or "",
