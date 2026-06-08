@@ -62,6 +62,7 @@ MILWAUKEE_TOOL_TYPES = (
 )
 
 _PLACEHOLDER_VALUES = frozenset({"—", "-", "none", "null", ""})
+DUPLICATE_SERIAL_CODE = "duplicate_serial"
 
 
 def _now_iso() -> str:
@@ -248,14 +249,104 @@ def _sync_kit_item_for_tool(
     )
 
 
+def find_serialized_tool_by_serial(serial: str) -> dict[str, Any] | None:
+    """Return active serialized asset with the same serial number (case-insensitive), if any."""
+    serial_key = _clean_serial(serial).casefold()
+    if not serial_key:
+        return None
+    rows, _ = fetch_rows(_ASSETS, limit=5000, order_by="asset_id")
+    for row in rows:
+        if not bool(row.get("is_serialized_tool")):
+            continue
+        if row.get("is_active") is False:
+            continue
+        if _clean_serial(row.get("serial_number")).casefold() == serial_key:
+            return row
+    return None
+
+
+def _duplicate_serial_result(existing: dict[str, Any], serial: str) -> ServiceResult:
+    asset_no = _clean_text(existing.get("asset_number") or existing.get("asset_id"))
+    asset_name = _clean_text(existing.get("asset_name") or existing.get("name") or "Existing tool")
+    label = f"{asset_no} · {asset_name}" if asset_no else asset_name
+    return ServiceResult(
+        ok=False,
+        error=(
+            f"Existing asset found for serial {serial}: {label}. "
+            "Use View, Add photo, or Update missing info — or change the serial to create a new tool."
+        ),
+        data={
+            "code": DUPLICATE_SERIAL_CODE,
+            "duplicate": True,
+            "existing_asset": existing,
+            "serial_number": serial,
+        },
+    )
+
+
+def merge_serialized_tool_fields(asset_id: str, data: dict[str, Any]) -> ServiceResult:
+    """Fill empty fields on an existing serialized tool from Quick Add intake data."""
+    aid = _clean_text(asset_id)
+    if not aid:
+        return ServiceResult(ok=False, error="Asset id is required.")
+    try:
+        from app.services.repository import fetch_by_id
+    except ImportError:
+        from services.repository import fetch_by_id  # type: ignore
+
+    existing = fetch_by_id(_ASSETS, aid) or {}
+    if not existing:
+        return ServiceResult(ok=False, error="Existing tool not found.")
+
+    updates: dict[str, Any] = {}
+    incoming_name = _clean_text(data.get("asset_name") or data.get("tool_name") or data.get("name"))
+    if not _clean_text(existing.get("asset_name")) and incoming_name:
+        updates["asset_name"] = incoming_name
+    for field, incoming_key in (
+        ("manufacturer", "manufacturer"),
+        ("model", "model"),
+        ("asset_type", "asset_type"),
+        ("category", "category"),
+        ("condition", "condition"),
+        ("location", "location"),
+    ):
+        if not _clean_text(existing.get(field)) and _clean_text(data.get(incoming_key)):
+            updates[field] = _clean_text(data.get(incoming_key))
+    incoming_notes = _clean_text(data.get("notes") or data.get("description"))
+    if incoming_notes:
+        prior = _clean_text(existing.get("notes"))
+        if not prior:
+            updates["notes"] = incoming_notes
+        elif incoming_notes.casefold() not in prior.casefold():
+            updates["notes"] = f"{prior}\n{incoming_notes}".strip()
+
+    if not updates:
+        return ServiceResult(ok=True, data={"updated": False, "asset": existing})
+
+    result = update_row(_ASSETS, updates, {"id": aid})
+    if not result.ok:
+        return result
+    clear_all_data_caches()
+    merged = {**existing, **updates}
+    return ServiceResult(ok=True, data={"updated": True, "asset": merged})
+
+
 def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
     """Create a Milwaukee-style serialized tool asset; optionally link to a Tool Trailer."""
+    serial_unknown = bool(data.get("serial_unknown") or data.get("serial_needs_review"))
     serial = _clean_serial(data.get("serial_number"))
-    name = _clean_text(data.get("asset_name") or data.get("name"))
+    name = _clean_text(data.get("asset_name") or data.get("name") or data.get("tool_name"))
     if not name:
         return ServiceResult(ok=False, error="Tool name is required.")
     if not serial:
-        return ServiceResult(ok=False, error="Serial number is required for serialized tools.")
+        if serial_unknown:
+            serial = ""
+        else:
+            return ServiceResult(ok=False, error="Serial number is required for serialized tools.")
+    elif not serial_unknown:
+        existing = find_serialized_tool_by_serial(serial)
+        if existing:
+            return _duplicate_serial_result(existing, serial)
 
     trailer_id = _clean_text(data.get("current_container_asset_id") or data.get("trailer_id"))
     if trailer_id:
@@ -287,8 +378,8 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
         "status": _clean_text(data.get("status") or "Available"),
         "condition": _clean_text(data.get("condition") or "Good"),
         "location": _clean_text(data.get("current_location") or data.get("location") or "Tool Trailer"),
-        "notes": _clean_text(data.get("notes") or ""),
-        "description": _clean_text(data.get("notes") or ""),
+        "notes": _clean_text(data.get("notes") or "") or ("Serial needs review." if serial_unknown and not serial else ""),
+        "description": _clean_text(data.get("notes") or "") or ("Serial needs review." if serial_unknown and not serial else ""),
         "is_serialized_tool": True,
         "is_checkout_item": True,
         "tracking_type": "serialized",
@@ -300,7 +391,20 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
     payload = {k: v for k, v in payload.items() if v is not None}
     result = insert_row(_ASSETS, payload)
     if not result.ok:
-        return result
+        err = str(result.error or "")
+        if "uq_assets_serialized_serial" in err or (
+            "duplicate key" in err.casefold() and "serial" in err.casefold()
+        ):
+            existing = find_serialized_tool_by_serial(serial)
+            if existing:
+                return _duplicate_serial_result(existing, serial or "—")
+        return ServiceResult(
+            ok=False,
+            error=(
+                "Could not save tool. "
+                + (err if err else "Please check the serial number and try again.")
+            ),
+        )
 
     tool_id = str((result.data or {}).get("id") or "")
     if tool_id:
@@ -607,6 +711,7 @@ def import_serialized_tools(rows: list[dict[str, Any]], *, trailer_id: str = "")
 
 
 __all__ = [
+    "DUPLICATE_SERIAL_CODE",
     "MILWAUKEE_TOOL_TYPES",
     "SERIALIZED_TOOL_STATUSES",
     "assign_tool_to_trailer",
@@ -614,6 +719,8 @@ __all__ = [
     "checkin_serialized_tool",
     "checkout_serialized_tool",
     "create_serialized_tool",
+    "find_serialized_tool_by_serial",
+    "merge_serialized_tool_fields",
     "dispatch_trailer_to_job",
     "import_serialized_tools",
     "is_serialized_tool_asset",

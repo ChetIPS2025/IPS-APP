@@ -131,6 +131,68 @@ def _resolve_trailer_id(asset_number: str) -> str:
     return ""
 
 
+EXISTING_ASSET_FOUND_CODE = "existing_asset_found"
+
+
+def lookup_existing_serialized_by_serial(serial: str) -> dict[str, Any] | None:
+    """Return existing serialized asset metadata when serial is already in use."""
+    try:
+        from app.services.serialized_tool_service import find_serialized_tool_by_serial
+    except ImportError:
+        from services.serialized_tool_service import find_serialized_tool_by_serial  # type: ignore
+
+    cleaned = _clean(serial)
+    if not cleaned:
+        return None
+    existing = find_serialized_tool_by_serial(cleaned)
+    if not existing:
+        return None
+    return {
+        "code": EXISTING_ASSET_FOUND_CODE,
+        "existing_asset": existing,
+        "serial_number": cleaned,
+    }
+
+
+def is_duplicate_serial_result(result: ServiceResult) -> bool:
+    data = result.data if isinstance(result.data, dict) else {}
+    return bool(data.get("duplicate")) or str(data.get("code") or "") in {
+        "duplicate_serial",
+        EXISTING_ASSET_FOUND_CODE,
+    }
+
+
+def check_serialized_serial_duplicate(serial: str) -> ServiceResult:
+    """Pre-save guard when a serialized tool with this serial already exists."""
+    found = lookup_existing_serialized_by_serial(serial)
+    if not found:
+        return ServiceResult(ok=True)
+    existing = found.get("existing_asset") or {}
+    cleaned = _clean(serial)
+    asset_no = _clean(existing.get("asset_number") or existing.get("asset_id"))
+    asset_name = _clean(existing.get("asset_name") or existing.get("name") or "Existing tool")
+    label = f"{asset_no} · {asset_name}" if asset_no else asset_name
+    return ServiceResult(
+        ok=False,
+        error=(
+            f"Existing asset found for serial {cleaned}: {label}. "
+            "Use View, Add photo, or Update missing info — or change the serial to create a new tool."
+        ),
+        data={**found, "duplicate": True},
+    )
+
+
+def merge_serialized_tool_from_intake(asset_id: str, data: dict[str, Any]) -> ServiceResult:
+    try:
+        from app.services.serialized_tool_service import merge_serialized_tool_fields
+    except ImportError:
+        from services.serialized_tool_service import merge_serialized_tool_fields  # type: ignore
+    result = merge_serialized_tool_fields(asset_id, data)
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
 def quick_add_tool(
     kind: str,
     data: dict[str, Any],
@@ -350,6 +412,11 @@ __all__ = [
     "attach_tool_photos_bundle",
     "attach_tool_receipt",
     "bulk_import_tools",
+    "EXISTING_ASSET_FOUND_CODE",
+    "check_serialized_serial_duplicate",
+    "is_duplicate_serial_result",
+    "lookup_existing_serialized_by_serial",
+    "merge_serialized_tool_from_intake",
     "parse_bulk_import_file",
     "quick_add_tool",
 ]

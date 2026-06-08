@@ -16,6 +16,9 @@ try:
         attach_tool_photos_bundle,
         attach_tool_receipt,
         bulk_import_tools,
+        is_duplicate_serial_result,
+        lookup_existing_serialized_by_serial,
+        merge_serialized_tool_from_intake,
         parse_bulk_import_file,
         quick_add_tool,
     )
@@ -39,6 +42,9 @@ except ImportError:
         attach_tool_photos_bundle,
         attach_tool_receipt,
         bulk_import_tools,
+        is_duplicate_serial_result,
+        lookup_existing_serialized_by_serial,
+        merge_serialized_tool_from_intake,
         parse_bulk_import_file,
         quick_add_tool,
     )
@@ -68,6 +74,11 @@ _QAT_PHOTO_ANALYSIS_KEY = "qat_p_analysis"
 _QAT_PHOTO_UPLOAD_META_KEY = "qat_p_upload_meta"
 _QAT_PHOTO_PRIMARY_CHOICE_KEY = "qat_p_primary_choice"
 _PRIMARY_UPLOAD_CHOICE = "upload"
+_QAT_EXISTING_ASSET_KEY = "qat_existing_asset_match"
+_ASSET_DETAIL_ID_KEY = "selected_asset_id"
+_ASSET_DETAIL_SHOW_KEY = "show_asset_detail_modal"
+_ASSET_DETAIL_MODAL_KEY = "ips_assets_detail_modal_id"
+_ASSET_SELECT_KEY = "assets_selected"
 
 
 class _CachedUpload:
@@ -88,6 +99,226 @@ def open_quick_add_tool_dialog() -> None:
 
 def close_quick_add_tool_dialog() -> None:
     st.session_state.pop(QUICK_ADD_OPEN_KEY, None)
+    st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+
+
+def _clean_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _clear_assets_cache_and_rerun() -> None:
+    try:
+        from app.services.assets_service import clear_assets_cache
+    except ImportError:
+        from services.assets_service import clear_assets_cache  # type: ignore
+    clear_assets_cache()
+    st.rerun()
+
+
+def _clear_photo_session(prefix: str) -> None:
+    st.session_state.pop(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}", None)
+    st.session_state.pop(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}", None)
+    st.session_state.pop(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}", None)
+
+
+def _open_existing_asset(existing: dict[str, Any]) -> None:
+    aid = _clean_text(existing.get("id"))
+    if not aid:
+        return
+    st.session_state[_ASSET_DETAIL_ID_KEY] = aid
+    st.session_state[_ASSET_DETAIL_SHOW_KEY] = True
+    st.session_state[_ASSET_DETAIL_MODAL_KEY] = aid
+    st.session_state[_ASSET_SELECT_KEY] = aid
+    st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+    close_quick_add_tool_dialog()
+    _clear_assets_cache_and_rerun()
+
+
+def _sync_existing_asset_for_serial(serial: str) -> dict[str, Any] | None:
+    """Look up existing serialized asset whenever OCR/user supplies a serial number."""
+    cleaned = _clean_text(serial)
+    if not cleaned:
+        st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+        return None
+    found = lookup_existing_serialized_by_serial(cleaned)
+    if found:
+        st.session_state[_QAT_EXISTING_ASSET_KEY] = found
+        return found
+    st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+    return None
+
+
+def _existing_asset_match() -> dict[str, Any] | None:
+    data = st.session_state.get(_QAT_EXISTING_ASSET_KEY)
+    if isinstance(data, dict) and data.get("existing_asset"):
+        return data
+    return None
+
+
+def _existing_asset_summary(existing: dict[str, Any]) -> str:
+    asset_no = _clean_text(existing.get("asset_number") or existing.get("asset_id"))
+    name = _clean_text(existing.get("asset_name") or existing.get("name") or "Tool")
+    serial = _clean_text(existing.get("serial_number"))
+    model = _clean_text(existing.get("model"))
+    mfr = _clean_text(existing.get("manufacturer"))
+    bits = [bit for bit in (asset_no, name) if bit]
+    headline = " · ".join(bits) if bits else name
+    details = [f"Serial: {serial or '—'}", f"Model: {model or '—'}", f"Mfr: {mfr or '—'}"]
+    return f"{headline} ({'; '.join(details)})"
+
+
+def _resolve_photo_primary(prefix: str, uploads: list[Any]) -> tuple[bytes | None, str]:
+    analysis_data = st.session_state.get(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}") or {}
+    choice_id = str(st.session_state.get(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}") or _PRIMARY_UPLOAD_CHOICE)
+    preview_bytes, preview_filename, _ = _resolve_primary_from_analysis(analysis_data, choice_id)
+    if not preview_bytes and uploads:
+        try:
+            from app.services.tool_preview_image_service import pick_best_upload_preview
+        except ImportError:
+            from services.tool_preview_image_service import pick_best_upload_preview  # type: ignore
+        try:
+            batch = [(u.getvalue(), u.name) for u in uploads]
+            preview = pick_best_upload_preview(batch)
+            preview_bytes = preview.preview_bytes
+            preview_filename = preview.preview_filename
+        except Exception:
+            preview_bytes = None
+    return preview_bytes, preview_filename
+
+
+def _attach_photos_to_asset(
+    asset_id: str,
+    *,
+    prefix: str,
+    uploads: list[Any],
+    uploaded_by: str | None,
+):
+    preview_bytes, preview_filename = _resolve_photo_primary(prefix, uploads)
+    return attach_tool_photos_bundle(
+        asset_id,
+        uploads,
+        primary_preview_bytes=preview_bytes,
+        primary_preview_filename=preview_filename,
+        uploaded_by=uploaded_by,
+    )
+
+
+def _render_existing_asset_panel(
+    *,
+    prefix: str,
+    match_data: dict[str, Any],
+    payload: dict[str, Any],
+    uploads: list[Any] | None = None,
+    uploaded_by: str | None = None,
+    has_photos: bool = False,
+) -> None:
+    existing = match_data.get("existing_asset") or {}
+    existing_id = _clean_text(existing.get("id"))
+
+    with st.container(border=True):
+        st.markdown("##### Existing asset found")
+        st.info(
+            f"This serial number matches a tool already in Assets.\n\n"
+            f"**{_existing_asset_summary(existing)}**"
+        )
+        st.caption(
+            "Add your photo or update missing info on the existing record. "
+            "To create a separate new tool, change the serial number or check **Needs serial** below."
+        )
+
+        action_view, action_photo, action_update = st.columns(3)
+        with action_view:
+            if st.button("View", key=f"{prefix}_exist_view", use_container_width=True):
+                _open_existing_asset(existing)
+        with action_photo:
+            if st.button(
+                "Add photo",
+                key=f"{prefix}_exist_photo",
+                use_container_width=True,
+                disabled=not has_photos or not existing_id,
+            ):
+                photo_result = _attach_photos_to_asset(
+                    existing_id,
+                    prefix=prefix,
+                    uploads=list(uploads or []),
+                    uploaded_by=uploaded_by,
+                )
+                if photo_result.ok:
+                    st.success("Photos added to the existing asset.")
+                    _clear_photo_session(prefix)
+                    st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+                    close_quick_add_tool_dialog()
+                    _clear_assets_cache_and_rerun()
+                else:
+                    st.error(photo_result.error or "Could not attach photos.")
+        with action_update:
+            if st.button(
+                "Update missing info",
+                key=f"{prefix}_exist_update",
+                use_container_width=True,
+                disabled=not existing_id,
+            ):
+                merge_result = merge_serialized_tool_from_intake(existing_id, payload)
+                if merge_result.ok:
+                    updated = bool((merge_result.data or {}).get("updated"))
+                    st.success(
+                        "Updated existing asset." if updated else "No empty fields needed updating."
+                    )
+                    st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+                    close_quick_add_tool_dialog()
+                    _clear_assets_cache_and_rerun()
+                else:
+                    st.error(merge_result.error or "Could not update existing asset.")
+
+
+def _render_needs_serial_new_tool_options(
+    *,
+    prefix: str,
+    payload: dict[str, Any],
+    uploads: list[Any] | None = None,
+    uploaded_by: str | None = None,
+    has_photos: bool = False,
+) -> bool:
+    """Optional path to create a new tool without a serial. Returns True when checked."""
+    needs_serial = st.checkbox(
+        "Needs serial — create a new tool without a serial number",
+        key=f"{prefix}_needs_serial",
+        help="Use only when this upload is a different physical tool and the serial is not known yet.",
+    )
+    if needs_serial and st.button(
+        "Create new tool (needs serial)",
+        key=f"{prefix}_create_needs_serial",
+        use_container_width=True,
+    ):
+        result = quick_add_tool(
+            "serialized",
+            {
+                **payload,
+                "serial_number": "",
+                "serial_unknown": True,
+                "notes": _clean_text(payload.get("notes")) or "Serial needs review.",
+            },
+            trailer_id=_clean_text(payload.get("trailer_id")),
+        )
+        if result.ok:
+            tool_id = _clean_text((result.data or {}).get("id"))
+            if tool_id and has_photos and uploads:
+                photo_result = _attach_photos_to_asset(
+                    tool_id,
+                    prefix=prefix,
+                    uploads=list(uploads),
+                    uploaded_by=uploaded_by,
+                )
+                if not photo_result.ok:
+                    st.warning(photo_result.error or "Tool saved; photo upload failed.")
+            st.success("Created new tool — serial needs review.")
+            _clear_photo_session(prefix)
+            st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+            close_quick_add_tool_dialog()
+            _clear_assets_cache_and_rerun()
+        else:
+            st.error(result.error or "Could not create tool.")
+    return needs_serial
 
 
 def _trailer_options() -> tuple[list[str], dict[str, str]]:
@@ -123,6 +354,15 @@ def _apply_scan_to_photo_fields(prefix: str, parsed: dict[str, Any], *, kind: st
             st.session_state[f"{prefix}_photo_serial"] = parsed["serial_number"]
         if parsed.get("model"):
             st.session_state[f"{prefix}_photo_model"] = parsed["model"]
+
+
+def _apply_scan_and_lookup(prefix: str, parsed: dict[str, Any], *, kind: str) -> None:
+    """Apply OCR/vision fields, then proactively look up an existing asset by serial."""
+    _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
+    if kind == "serialized":
+        serial = _clean_text(parsed.get("serial_number") or st.session_state.get(f"{prefix}_photo_serial"))
+        if serial:
+            _sync_existing_asset_for_serial(serial)
 
 
 def _photo_upload_tuples(photos: list[Any] | None) -> list[tuple[bytes, str]]:
@@ -334,17 +574,53 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
             "storage_location": location,
         }
 
-    if st.button("Save tool", type="primary", key=f"{prefix}_save", use_container_width=True):
+    if kind == "serialized":
+        _sync_existing_asset_for_serial(st.session_state.get(f"{prefix}_serial", ""))
+        match = _existing_asset_match()
+        intake_payload = {**payload, "trailer_id": trailer_id}
+        if match:
+            _render_existing_asset_panel(
+                prefix=prefix,
+                match_data=match,
+                payload=intake_payload,
+                has_photos=False,
+            )
+            _render_needs_serial_new_tool_options(
+                prefix=prefix,
+                payload=intake_payload,
+                has_photos=False,
+            )
+        else:
+            needs_serial = st.checkbox(
+                "Needs serial — create without a serial number",
+                key=f"{prefix}_needs_serial",
+            )
+            if st.button("Save tool", type="primary", key=f"{prefix}_save", use_container_width=True):
+                save_payload = dict(payload)
+                if needs_serial:
+                    save_payload.update(
+                        {
+                            "serial_number": "",
+                            "serial_unknown": True,
+                            "notes": _clean_text(payload.get("notes")) or "Serial needs review.",
+                        }
+                    )
+                result = quick_add_tool(kind, save_payload, trailer_id=trailer_id)
+                if is_duplicate_serial_result(result):
+                    st.session_state[_QAT_EXISTING_ASSET_KEY] = result.data or {}
+                    st.rerun()
+                elif result.ok:
+                    st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
+                    close_quick_add_tool_dialog()
+                    _clear_assets_cache_and_rerun()
+                else:
+                    st.error(result.error or "Could not save tool.")
+    elif st.button("Save tool", type="primary", key=f"{prefix}_save", use_container_width=True):
         result = quick_add_tool(kind, payload, trailer_id=trailer_id)
         if result.ok:
             st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
             close_quick_add_tool_dialog()
-            try:
-                from app.services.assets_service import clear_assets_cache
-            except ImportError:
-                from services.assets_service import clear_assets_cache  # type: ignore
-            clear_assets_cache()
-            st.rerun()
+            _clear_assets_cache_and_rerun()
         else:
             st.error(result.error or "Could not save tool.")
 
@@ -370,9 +646,8 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         )
     with clear_col:
         if st.button("Clear analysis", key=f"{prefix}_clear_analysis", use_container_width=True):
-            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}", None)
-            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}", None)
-            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}", None)
+            _clear_photo_session(prefix)
+            st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
             st.rerun()
 
     if not photos:
@@ -393,10 +668,12 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
                     {"file_name": name, "file_bytes": data} for data, name in batch
                 ]
                 st.session_state[f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}"] = _PRIMARY_UPLOAD_CHOICE
-                _apply_scan_to_photo_fields(prefix, (result.data or {}).get("extracted") or {}, kind=kind)
+                _apply_scan_and_lookup(prefix, (result.data or {}).get("extracted") or {}, kind=kind)
                 n_suggest = len((result.data or {}).get("product_suggestions") or [])
                 hint = f" {n_suggest} product suggestion(s) found." if n_suggest else ""
-                st.success(f"Analysis complete — review fields and choose a primary image.{hint}")
+                found = _existing_asset_match()
+                exist_hint = " Existing asset found for this serial." if found else ""
+                st.success(f"Analysis complete — review fields and choose a primary image.{hint}{exist_hint}")
                 st.rerun()
         except Exception as exc:
             st.error(str(exc))
@@ -416,8 +693,10 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         ):
             try:
                 parsed = extract_tool_from_photo(first_photo.getvalue(), first_photo.name, kind_hint=kind)
-                _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
-                st.success(f"First file scanned ({float(parsed.get('confidence') or 0):.0%} confidence).")
+                _apply_scan_and_lookup(prefix, parsed, kind=kind)
+                found = _existing_asset_match()
+                extra = " Existing asset found for this serial." if found else ""
+                st.success(f"First file scanned ({float(parsed.get('confidence') or 0):.0%} confidence).{extra}")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
@@ -430,8 +709,10 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         ):
             try:
                 parsed = search_tool_by_image(first_photo.getvalue(), first_photo.name)
-                _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
-                st.success("Image match applied to fields.")
+                _apply_scan_and_lookup(prefix, parsed, kind=kind)
+                found = _existing_asset_match()
+                extra = " Existing asset found for this serial." if found else ""
+                st.success(f"Image match applied to fields.{extra}")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
@@ -439,6 +720,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
     name = st.text_input("Tool name *", key=f"{prefix}_photo_name")
     if kind == "serialized":
         serial = st.text_input("Serial number *", key=f"{prefix}_photo_serial")
+        _sync_existing_asset_for_serial(serial)
         c1, c2 = st.columns(2)
         with c1:
             model = st.text_input("Model", key=f"{prefix}_photo_model")
@@ -452,78 +734,97 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         mfr = ""
         st.caption("Photos are stored on Serialized Tool assets. Small Tools and Inventory save without a photo for now.")
 
-    if st.button("Save with photo", type="primary", key=f"{prefix}_photo_save", use_container_width=True):
-        uploads = _cached_photo_uploads(prefix) or [p for p in (photos or []) if p is not None]
-        if not uploads:
-            st.error("Upload and analyze at least one photo before saving.")
-            return
-        if kind == "serialized":
-            if not serial:
-                st.error("Serial number is required for Serialized Tools.")
-                return
-            result = quick_add_tool(
-                kind,
-                {
+    uploads = _cached_photo_uploads(prefix) or [p for p in (photos or []) if p is not None]
+
+    if kind == "serialized":
+        match = _existing_asset_match()
+        photo_payload = {
+            "tool_name": name,
+            "serial_number": serial,
+            "model": model,
+            "manufacturer": mfr,
+            "category": "Tool",
+            "trailer_id": trailer_id,
+        }
+        if match:
+            _render_existing_asset_panel(
+                prefix=prefix,
+                match_data=match,
+                payload=photo_payload,
+                uploads=uploads,
+                uploaded_by=uploaded_by,
+                has_photos=bool(uploads),
+            )
+            _render_needs_serial_new_tool_options(
+                prefix=prefix,
+                payload=photo_payload,
+                uploads=uploads,
+                uploaded_by=uploaded_by,
+                has_photos=bool(uploads),
+            )
+        else:
+            needs_serial = st.checkbox(
+                "Needs serial — create without a serial number",
+                key=f"{prefix}_needs_serial",
+            )
+            if st.button("Save with photo", type="primary", key=f"{prefix}_photo_save", use_container_width=True):
+                if not uploads:
+                    st.error("Upload at least one photo before saving.")
+                    return
+                if not serial and not needs_serial:
+                    st.error("Enter a serial number, or check Needs serial to create without one.")
+                    return
+                save_payload: dict[str, Any] = {
                     "tool_name": name,
-                    "serial_number": serial,
+                    "serial_number": "" if needs_serial else serial,
                     "model": model,
                     "manufacturer": mfr,
                     "category": "Tool",
-                },
-                trailer_id=trailer_id,
-            )
+                }
+                if needs_serial:
+                    save_payload["serial_unknown"] = True
+                    save_payload["notes"] = "Serial needs review."
+                result = quick_add_tool(kind, save_payload, trailer_id=trailer_id)
+                if is_duplicate_serial_result(result):
+                    st.session_state[_QAT_EXISTING_ASSET_KEY] = result.data or {}
+                    st.rerun()
+                if not result.ok:
+                    st.error(result.error or "Could not save tool.")
+                    return
+                tool_id = str((result.data or {}).get("id") or "")
+                if tool_id:
+                    photo_result = _attach_photos_to_asset(
+                        tool_id,
+                        prefix=prefix,
+                        uploads=uploads,
+                        uploaded_by=uploaded_by,
+                    )
+                    if not photo_result.ok:
+                        st.warning(photo_result.error or "Tool saved; photo upload failed.")
+                    elif (photo_result.data or {}).get("source_errors"):
+                        for err in (photo_result.data or {}).get("source_errors") or []:
+                            st.warning(str(err))
+                st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
+                _clear_photo_session(prefix)
+                st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+                close_quick_add_tool_dialog()
+                _clear_assets_cache_and_rerun()
+    elif st.button("Save with photo", type="primary", key=f"{prefix}_photo_save", use_container_width=True):
+        if not uploads:
+            st.error("Upload at least one photo before saving.")
+            return
+        payload = {"tool_name": name, "quantity": 1}
+        if kind == "small":
+            payload["category"] = "Other"
         else:
-            payload: dict[str, Any] = {"tool_name": name, "quantity": 1}
-            if kind == "small":
-                payload["category"] = "Other"
-            else:
-                payload["category"] = "Consumables"
-            result = quick_add_tool(kind, payload, trailer_id=trailer_id)
+            payload["category"] = "Consumables"
+        result = quick_add_tool(kind, payload, trailer_id=trailer_id)
         if not result.ok:
             st.error(result.error or "Could not save tool.")
             return
-        tool_id = str((result.data or {}).get("id") or "")
-        if tool_id and kind == "serialized":
-            analysis_data = st.session_state.get(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}") or {}
-            choice_id = str(
-                st.session_state.get(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}") or _PRIMARY_UPLOAD_CHOICE
-            )
-            preview_bytes, preview_filename, _ = _resolve_primary_from_analysis(analysis_data, choice_id)
-            if not preview_bytes:
-                try:
-                    from app.services.tool_preview_image_service import pick_best_upload_preview
-                except ImportError:
-                    from services.tool_preview_image_service import pick_best_upload_preview  # type: ignore
-                try:
-                    batch = [(u.getvalue(), u.name) for u in uploads]
-                    preview = pick_best_upload_preview(batch)
-                    preview_bytes = preview.preview_bytes
-                    preview_filename = preview.preview_filename
-                except Exception:
-                    preview_bytes = None
-            photo_result = attach_tool_photos_bundle(
-                tool_id,
-                uploads,
-                primary_preview_bytes=preview_bytes,
-                primary_preview_filename=preview_filename,
-                uploaded_by=uploaded_by,
-            )
-            if not photo_result.ok:
-                st.warning(photo_result.error or "Tool saved; photo upload failed.")
-            elif (photo_result.data or {}).get("source_errors"):
-                for err in (photo_result.data or {}).get("source_errors") or []:
-                    st.warning(str(err))
         st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
-        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}", None)
-        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}", None)
-        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}", None)
         close_quick_add_tool_dialog()
-        try:
-            from app.services.assets_service import clear_assets_cache
-        except ImportError:
-            from services.assets_service import clear_assets_cache  # type: ignore
-        clear_assets_cache()
-        st.rerun()
+        _clear_assets_cache_and_rerun()
 
 
 def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
@@ -542,7 +843,13 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
         try:
             parsed = ocr_tool_receipt(receipt.getvalue(), receipt.name)
             _apply_scan_to_receipt_fields(prefix, parsed)
-            st.success("Receipt read. Review fields below.")
+            if kind == "serialized":
+                serial_val = _clean_text(parsed.get("serial_number") or st.session_state.get(f"{prefix}_rcpt_serial"))
+                if serial_val:
+                    _sync_existing_asset_for_serial(serial_val)
+            found = _existing_asset_match()
+            extra = " Existing asset found for this serial." if found else ""
+            st.success(f"Receipt read. Review fields below.{extra}")
             if parsed.get("notes"):
                 st.caption(parsed["notes"])
         except Exception as exc:
@@ -553,11 +860,68 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
     name = st.text_input("Tool / item name *", key=f"{prefix}_rcpt_name")
     if kind == "serialized":
         serial = st.text_input("Serial number *", key=f"{prefix}_rcpt_serial")
+        _sync_existing_asset_for_serial(serial)
     else:
         serial = ""
     cost = st.number_input("Purchase amount (optional)", min_value=0.0, value=0.0, step=0.01, key=f"{prefix}_rcpt_cost")
-    if st.button("Save with receipt", type="primary", key=f"{prefix}_rcpt_save", use_container_width=True):
-        payload: dict[str, Any] = {
+    if kind == "serialized":
+        match = _existing_asset_match()
+        intake_payload = {
+            "tool_name": name,
+            "serial_number": serial,
+            "unit_cost": cost,
+            "notes": f"Receipt on file — ${cost:.2f}" if cost else "Receipt on file",
+            "trailer_id": trailer_id,
+        }
+        if match:
+            _render_existing_asset_panel(
+                prefix=prefix,
+                match_data=match,
+                payload=intake_payload,
+                has_photos=False,
+            )
+            _render_needs_serial_new_tool_options(
+                prefix=prefix,
+                payload=intake_payload,
+                has_photos=False,
+            )
+        else:
+            needs_serial = st.checkbox(
+                "Needs serial — create without a serial number",
+                key=f"{prefix}_needs_serial",
+            )
+            if st.button("Save with receipt", type="primary", key=f"{prefix}_rcpt_save", use_container_width=True):
+                payload: dict[str, Any] = {
+                    "tool_name": name,
+                    "serial_number": "" if needs_serial else serial,
+                    "unit_cost": cost,
+                    "notes": f"Receipt on file — ${cost:.2f}" if cost else "Receipt on file",
+                }
+                if needs_serial:
+                    payload["serial_unknown"] = True
+                    if not payload["notes"].endswith("Serial needs review."):
+                        payload["notes"] = f"{payload['notes']} Serial needs review.".strip()
+                if kind == "small":
+                    payload["category"] = st.session_state.get(f"{prefix}_cat", "Other")
+                    payload["quantity"] = st.session_state.get(f"{prefix}_qty", 1)
+                result = quick_add_tool(kind, payload, trailer_id=trailer_id)
+                if is_duplicate_serial_result(result):
+                    st.session_state[_QAT_EXISTING_ASSET_KEY] = result.data or {}
+                    st.rerun()
+                if not result.ok:
+                    st.error(result.error or "Could not save.")
+                    return
+                receipt_file = st.session_state.get(f"{prefix}_receipt")
+                if receipt_file is not None and isinstance(result.data, dict):
+                    rcpt_result = attach_tool_receipt(result.data, receipt_file, uploaded_by=uploaded_by)
+                    if not rcpt_result.ok:
+                        st.warning(rcpt_result.error or "Saved; receipt upload failed.")
+                st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
+                st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
+                close_quick_add_tool_dialog()
+                _clear_assets_cache_and_rerun()
+    elif st.button("Save with receipt", type="primary", key=f"{prefix}_rcpt_save", use_container_width=True):
+        payload = {
             "tool_name": name,
             "serial_number": serial,
             "unit_cost": cost,
@@ -573,19 +937,9 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
         if not result.ok:
             st.error(result.error or "Could not save.")
             return
-        receipt = st.session_state.get(f"{prefix}_receipt")
-        if receipt is not None and kind == "serialized" and isinstance(result.data, dict):
-            rcpt_result = attach_tool_receipt(result.data, receipt, uploaded_by=uploaded_by)
-            if not rcpt_result.ok:
-                st.warning(rcpt_result.error or "Saved; receipt upload failed.")
         st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
         close_quick_add_tool_dialog()
-        try:
-            from app.services.assets_service import clear_assets_cache
-        except ImportError:
-            from services.assets_service import clear_assets_cache  # type: ignore
-        clear_assets_cache()
-        st.rerun()
+        _clear_assets_cache_and_rerun()
 
 
 def _bulk_form(kind: str, *, prefix: str, trailer_id: str) -> None:
