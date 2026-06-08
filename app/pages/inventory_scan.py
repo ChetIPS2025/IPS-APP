@@ -101,6 +101,11 @@ except ImportError:
         inventory_action_label,
     )
 
+try:
+    from app.utils.formatting import fmt_money
+except ImportError:
+    from utils.formatting import fmt_money  # type: ignore
+
 _ISSUE_TYPES = (INVENTORY_USE_ON_JOB_LABEL, INVENTORY_ADJUST_LABEL, INVENTORY_USE_IN_SHOP_LABEL)
 _TXN_MAP = {
     INVENTORY_USE_ON_JOB_LABEL: "TO_JOB",
@@ -1001,7 +1006,7 @@ def _render_inventory_scan_inner() -> None:
                         f'<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={enc}" width="160" height="160" alt="QR"/>',
                         unsafe_allow_html=True,
                     )
-            st.markdown(f"**Unit cost:** {_fmt_money(unit_cost)}")
+            st.markdown(f"**Unit cost:** {fmt_money(unit_cost, empty='—', zero_as_empty=True)}")
             st.caption(f"Location: {html.escape(loc)} · Vendor: {html.escape(vendor)}")
 
     st.subheader("Record use")
@@ -1174,12 +1179,6 @@ def _render_inventory_scan_inner() -> None:
     st.session_state.pop("inv_scan_loaded", None)
     st.success("Material consumed.")
     st.rerun()
-
-
-def _fmt_money(v: float) -> str:
-    if v is None or v == 0:
-        return "—"
-    return f"${float(v):,.2f}"
 
 
 # ---------------------------------------------------------------------------

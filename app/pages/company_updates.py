@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-from datetime import datetime
 
 import streamlit as st
 
@@ -42,7 +41,7 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_updates_module_css
-    from app.utils.formatting import fmt_date
+    from app.utils.formatting import fmt_date, fmt_datetime
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -78,7 +77,7 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_updates_module_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
+    from utils.formatting import fmt_date, fmt_datetime  # type: ignore
 
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
@@ -211,14 +210,8 @@ def _fmt_event_date(row: dict) -> str:
     if not raw:
         return "—"
     text = str(raw).strip()
-    if not text:
-        return "—"
     if "T" in text or " " in text:
-        try:
-            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
-            return dt.strftime("%b %d, %Y %I:%M %p").lstrip("0").replace(" 0", " ")
-        except ValueError:
-            pass
+        return fmt_datetime(text)
     return fmt_date(text)
 
 

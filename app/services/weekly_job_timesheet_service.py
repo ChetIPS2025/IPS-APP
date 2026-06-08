@@ -12,6 +12,7 @@ from typing import Any
 
 try:
     from app.branding import get_header_logo_path, header_logo_html
+    from app.utils.formatting import fmt_hours, fmt_money
     from app.db import (
         create_signed_url,
         delete_rows_admin,
@@ -24,6 +25,7 @@ try:
     from app.services.job_weekly_timesheets import monday_of_week, week_bounds
 except ImportError:
     from branding import get_header_logo_path, header_logo_html  # type: ignore
+    from utils.formatting import fmt_hours, fmt_money  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
         delete_rows_admin,
@@ -119,19 +121,6 @@ def _num(v: Any, default: float = 0.0) -> float:
         return float(v)
     except (TypeError, ValueError):
         return default
-
-
-def _fmt_hours(v: float) -> str:
-    if not v:
-        return ""
-    r = round(v, 2)
-    return f"{r:g}"
-
-
-def _fmt_money(v: float) -> str:
-    if not v:
-        return ""
-    return f"${v:,.2f}"
 
 
 @dataclass
@@ -255,15 +244,15 @@ def _day_labels(week_start: date) -> list[str]:
 
 def _labor_row_html(ln: TimesheetLine) -> str:
     days = [ln.mon, ln.tue, ln.wed, ln.thu, ln.fri, ln.sat, ln.sun]
-    cells = "".join(f'<td class="num">{html.escape(_fmt_hours(d))}</td>' for d in days)
+    cells = "".join(f'<td class="num">{html.escape(fmt_hours(d, empty_zero=True))}</td>' for d in days)
     return (
         f"<tr>"
         f'<td class="left">{html.escape(ln.description)}</td>'
         f'<td class="left">{html.escape(ln.class_name)}</td>'
         f"{cells}"
-        f'<td class="num">{html.escape(_fmt_hours(ln.st_hours))}</td>'
-        f'<td class="num">{html.escape(_fmt_hours(ln.ot_hours + ln.dt_hours))}</td>'
-        f'<td class="num">{html.escape(_fmt_hours(ln.total_hours))}</td>'
+        f'<td class="num">{html.escape(fmt_hours(ln.st_hours, empty_zero=True))}</td>'
+        f'<td class="num">{html.escape(fmt_hours(ln.ot_hours + ln.dt_hours, empty_zero=True))}</td>'
+        f'<td class="num">{html.escape(fmt_hours(ln.total_hours, empty_zero=True))}</td>'
         f"</tr>"
     )
 
@@ -272,8 +261,8 @@ def _material_row_html(ln: TimesheetLine) -> str:
     return (
         f"<tr>"
         f'<td class="left">{html.escape(ln.description)}</td>'
-        f'<td class="num">{html.escape(_fmt_hours(ln.qty) if ln.qty else "")}</td>'
-        f'<td class="num">{html.escape(_fmt_money(ln.cost))}</td>'
+        f'<td class="num">{html.escape(fmt_hours(ln.qty, empty_zero=True))}</td>'
+        f'<td class="num">{html.escape(fmt_money(ln.cost, empty="", zero_as_empty=True))}</td>'
         f"</tr>"
     )
 

@@ -155,7 +155,8 @@ except ImportError:
         passes_inventory_view_filter,
     )
     from styles import inject_inventory_module_css  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
+    from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from utils.phone_helpers import format_phone_display  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_INVENTORY_KEY,
         clear_field_expanded,

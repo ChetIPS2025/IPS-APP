@@ -47,8 +47,10 @@ except ImportError:
 
 try:
     from app.services.task_display import task_number_display
+    from app.utils.formatting import fmt_datetime
 except ImportError:
     from services.task_display import task_number_display  # type: ignore
+    from utils.formatting import fmt_datetime  # type: ignore
 
 _CSS_KEY = "ips_job_reference_attachments_css_v3"
 IPS_JRA_FS_SESSION_KEY = "ips_jra_fullscreen_preview"
@@ -204,18 +206,6 @@ def _icon_for_filename(name: str) -> str:
     if ext == "xlsx":
         return "📊"
     return "📎"
-
-
-def _fmt_dt(val: Any) -> str:
-    s = str(val or "").strip()
-    if not s:
-        return "—"
-    try:
-        if "T" in s:
-            return s[:16].replace("T", " ")
-        return s[:16]
-    except Exception:
-        return s[:32]
 
 
 def _task_label(t: dict[str, Any]) -> str:
@@ -388,7 +378,7 @@ def _render_attachment_card(
         st.markdown(
             f"<p class='ips-jra-meta' style='font-weight:700;font-size:1rem;margin:0 0 0.25rem 0;'>{html.escape(fname)}</p>"
             f"<p class='ips-jra-meta' style='font-size:0.875rem;color:#1f2937;font-weight:500;margin:0.15rem 0;'>"
-            f"{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>",
+            f"{html.escape(ftype)} · {fmt_datetime(r.get('created_at'), compact=True)}</p>",
             unsafe_allow_html=True,
         )
         st.markdown(
@@ -501,7 +491,7 @@ def _render_task_details_attachment_row(
             f"<p class='ips-jra-meta' style='font-weight:700;font-size:0.95rem;margin:0 0 0.25rem 0;color:#111827;'>"
             f"{html.escape(fname)}</p>"
             f"<p class='ips-jra-meta' style='font-size:0.8rem;color:#4b5563;margin:0;'>"
-            f"{html.escape(ftype)} · {_fmt_dt(r.get('created_at'))}</p>",
+            f"{html.escape(ftype)} · {fmt_datetime(r.get('created_at'), compact=True)}</p>",
             unsafe_allow_html=True,
         )
 

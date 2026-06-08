@@ -9,15 +9,10 @@ import streamlit as st
 
 try:
     from app.ui.page_shell import inject_ips_dashboard_layout
+    from app.utils.formatting import fmt_datetime
 except ImportError:
     from ui.page_shell import inject_ips_dashboard_layout  # type: ignore
-
-
-def _fmt_ts(val: Any) -> str:
-    s = str(val or "").strip()
-    if not s:
-        return "—"
-    return s[:19].replace("T", " ")
+    from utils.formatting import fmt_datetime  # type: ignore
 
 
 def render_activity_panel(
@@ -36,11 +31,11 @@ def render_activity_panel(
     if status is not None and str(status).strip():
         lines.append(("Status", str(status).strip()))
     if created_at is not None:
-        lines.append(("Created", _fmt_ts(created_at)))
+        lines.append(("Created", fmt_datetime(created_at, compact=True, include_seconds=True)))
     if created_by is not None and str(created_by).strip():
         lines.append(("Created by", str(created_by).strip()))
     if updated_at is not None:
-        lines.append(("Updated", _fmt_ts(updated_at)))
+        lines.append(("Updated", fmt_datetime(updated_at, compact=True, include_seconds=True)))
     if updated_by is not None and str(updated_by).strip():
         lines.append(("Updated by", str(updated_by).strip()))
     if extra_lines:

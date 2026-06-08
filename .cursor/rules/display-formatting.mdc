@@ -1,0 +1,35 @@
+---
+description: Shared display formatting helpers — dates, money, qty, percent
+globs:
+  - app/**/*.py
+---
+
+# Display formatting
+
+Use `app/utils/formatting.py` for all user-facing dates, timestamps, money, quantities, and percentages.
+
+## Helpers
+
+| Helper | Use for |
+|--------|---------|
+| `fmt_date` | Calendar dates (`May 30, 2026`) |
+| `fmt_datetime` | Timestamps with time |
+| `fmt_money` / `fmt_currency` | Dollar amounts |
+| `fmt_qty` | Quantities with optional unit (`12 EA`) |
+| `fmt_percent` | Percentages (`12.5%`) |
+| `fmt_hours` | Timekeeping hour totals |
+
+## Rules
+
+- Do **not** add local `_fmt_date`, `_fmt_money`, `_fmt_ts`, or similar one-off formatters in pages or components.
+- Domain-specific formatters stay in their service (`format_job_number`, `format_phone_display`, etc.) — not display formatting.
+- Empty/null dates and qty render as `—`; money defaults to `$0.00` unless a field needs `empty="—"` or `zero_as_empty=True`.
+- `try` / `except ImportError` blocks must import the **same** formatting symbols from `utils.formatting` as the `try` block imports from `app.utils.formatting`.
+
+```python
+# Good
+from app.utils.formatting import fmt_date, fmt_money
+
+# Bad — local duplicate
+def _fmt_date(val): ...
+```

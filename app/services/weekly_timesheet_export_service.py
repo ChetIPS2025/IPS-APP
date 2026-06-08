@@ -28,14 +28,13 @@ except ImportError:  # pragma: no cover
 try:
     from app.branding import get_header_logo_path
     from app.services.job_weekly_timesheets import monday_of_week
+    from app.utils.formatting import fmt_hours, fmt_money
     from app.services.weekly_job_timesheet_service import (
         TimesheetLine,
         WeeklyJobTimesheetData,
         TIMESHEET_LABOR_MIN_ROWS,
         TIMESHEET_MATERIAL_MIN_ROWS,
         _day_labels,
-        _fmt_hours,
-        _fmt_money,
         _pad_labor_rows,
         _pad_material_rows,
         _parse_date,
@@ -45,6 +44,7 @@ try:
     )
 except ImportError:
     from branding import get_header_logo_path  # type: ignore
+    from utils.formatting import fmt_hours, fmt_money  # type: ignore
     from services.job_weekly_timesheets import monday_of_week  # type: ignore
     from services.weekly_job_timesheet_service import (  # type: ignore
         TimesheetLine,
@@ -52,8 +52,6 @@ except ImportError:
         TIMESHEET_LABOR_MIN_ROWS,
         TIMESHEET_MATERIAL_MIN_ROWS,
         _day_labels,
-        _fmt_hours,
-        _fmt_money,
         _pad_labor_rows,
         _pad_material_rows,
         _parse_date,
@@ -464,16 +462,16 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
             [
                 ln.description,
                 ln.class_name,
-                _fmt_hours(ln.mon),
-                _fmt_hours(ln.tue),
-                _fmt_hours(ln.wed),
-                _fmt_hours(ln.thu),
-                _fmt_hours(ln.fri),
-                _fmt_hours(ln.sat),
-                _fmt_hours(ln.sun),
-                _fmt_hours(ln.st_hours),
-                _fmt_hours(ln.ot_hours + ln.dt_hours),
-                _fmt_hours(ln.total_hours),
+                fmt_hours(ln.mon, empty_zero=True),
+                fmt_hours(ln.tue, empty_zero=True),
+                fmt_hours(ln.wed, empty_zero=True),
+                fmt_hours(ln.thu, empty_zero=True),
+                fmt_hours(ln.fri, empty_zero=True),
+                fmt_hours(ln.sat, empty_zero=True),
+                fmt_hours(ln.sun, empty_zero=True),
+                fmt_hours(ln.st_hours, empty_zero=True),
+                fmt_hours(ln.ot_hours + ln.dt_hours, empty_zero=True),
+                fmt_hours(ln.total_hours, empty_zero=True),
             ]
         )
     col_w = [
@@ -511,11 +509,11 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         mat_grid.append(
             [
                 l.description,
-                _fmt_hours(l.qty),
-                _fmt_money(l.cost),
+                fmt_hours(l.qty, empty_zero=True),
+                fmt_money(l.cost, empty="", zero_as_empty=True),
                 r.description,
-                _fmt_hours(r.qty),
-                _fmt_money(r.cost),
+                fmt_hours(r.qty, empty_zero=True),
+                fmt_money(r.cost, empty="", zero_as_empty=True),
             ]
         )
     half_w = content_w / 2.0
