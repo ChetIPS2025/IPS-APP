@@ -575,6 +575,15 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "assigned_to_name": str(row.get("assigned_to_name") or ""),
         "assigned_to_phone": str(row.get("assigned_to_phone") or ""),
         "assigned_job_id": str(row.get("assigned_job_id") or "").strip() or None,
+        "asset_type": str(row.get("asset_type") or row.get("category") or ""),
+        "is_serialized_tool": bool(row.get("is_serialized_tool")),
+        "is_checkout_item": bool(row.get("is_checkout_item")),
+        "current_container_asset_id": str(row.get("current_container_asset_id") or "").strip() or None,
+        "current_holder_employee_id": str(row.get("current_holder_employee_id") or "").strip() or None,
+        "last_seen_at": str(row.get("last_seen_at") or "")[:19],
+        "last_audited_at": str(row.get("last_audited_at") or "")[:19],
+        "last_checkout_at": str(row.get("last_checkout_at") or "")[:19],
+        "last_checkin_at": str(row.get("last_checkin_at") or "")[:19],
         "include_in_pricing_guide": (
             bool(row.get("include_in_pricing_guide"))
             if "include_in_pricing_guide" in row
@@ -1310,6 +1319,23 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         "annual_depreciation": _asset_save_number(ui.get("annual_depreciation")),
     }
     apply_rental_ui_to_payload(payload, ui)
+    if "asset_type" in ui:
+        payload["asset_type"] = str(ui.get("asset_type") or "").strip() or None
+    if "is_serialized_tool" in ui:
+        payload["is_serialized_tool"] = bool(ui.get("is_serialized_tool"))
+    if "is_checkout_item" in ui:
+        payload["is_checkout_item"] = bool(ui.get("is_checkout_item"))
+    if "current_container_asset_id" in ui:
+        cid = str(ui.get("current_container_asset_id") or "").strip()
+        payload["current_container_asset_id"] = cid or None
+        if cid:
+            payload["assigned_trailer_id"] = cid
+    if "assigned_job_id" in ui:
+        jid = str(ui.get("assigned_job_id") or "").strip()
+        payload["assigned_job_id"] = jid or None
+    if "current_holder_employee_id" in ui:
+        eid = str(ui.get("current_holder_employee_id") or "").strip()
+        payload["current_holder_employee_id"] = eid or None
     payload = {k: v for k, v in payload.items() if v is not None}
     if row_id:
         return update_row("assets", payload, {"id": row_id})

@@ -18,10 +18,8 @@ try:
         ITEM_STATUSES,
         ITEM_TYPES,
         KIT_TYPES,
-        assign_asset_kit,
         asset_is_kit,
         convert_asset_to_kit,
-        create_asset_kit_audit,
         create_asset_kit_item,
         create_asset_kit_items_multi,
         delete_asset_kit_item,
@@ -34,6 +32,7 @@ try:
         get_tool_trailers,
         update_asset_kit_item,
     )
+    from app.services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from components.action_styles import danger_outline  # type: ignore
@@ -44,10 +43,8 @@ except ImportError:
         ITEM_STATUSES,
         ITEM_TYPES,
         KIT_TYPES,
-        assign_asset_kit,
         asset_is_kit,
         convert_asset_to_kit,
-        create_asset_kit_audit,
         create_asset_kit_item,
         create_asset_kit_items_multi,
         delete_asset_kit_item,
@@ -60,6 +57,7 @@ except ImportError:
         get_tool_trailers,
         update_asset_kit_item,
     )
+    from services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
 _KIT_STATUS_CLASS = {
@@ -289,15 +287,12 @@ def _render_assignment_section(asset: dict, aid: str) -> None:
         if st.form_submit_button("Save Assignment", type="primary"):
             emp = next((e for lbl, e in emp_opts if lbl == sup_label), {})
             jid = next((j for lbl, j in job_opts if lbl == job_label), "")
-            result = assign_asset_kit(
+            result = dispatch_trailer_to_job(
                 aid,
-                {
-                    "assigned_to_employee_id": emp.get("id"),
-                    "assigned_to_name": sup_label if sup_label != "— None —" else "",
-                    "assigned_to_phone": emp.get("phone"),
-                    "job_id": jid or None,
-                    "notes": notes,
-                },
+                job_id=jid or None,
+                employee_id=str(emp.get("id") or "") or None,
+                employee_name=sup_label if sup_label != "— None —" else "",
+                notes=notes,
             )
             if result.ok:
                 st.success("Assignment saved.")
@@ -764,7 +759,7 @@ def _render_audit_form(asset: dict, aid: str, items: list[dict]) -> None:
             return
         emp = next((e for lbl, e in emp_opts if lbl == sup), {})
         jid = next((j for lbl, j in job_opts if lbl == job_label), "")
-        result = create_asset_kit_audit(
+        result = audit_trailer_tools(
             aid,
             {
                 "performed_by_name": performer,

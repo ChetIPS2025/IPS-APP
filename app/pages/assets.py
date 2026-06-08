@@ -96,7 +96,12 @@ try:
     )
     from app.services.phase2_modules_service import asset_is_rentable
     from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
+    from app.components.serialized_tools_ui import (
+        render_serialized_tool_tracking_panel,
+        render_serialized_tools_toolbar,
+    )
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
+    from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
     from app.utils.field_context import (
         FIELD_EXPANDED_ASSET_KEY,
         clear_field_expanded,
@@ -193,7 +198,12 @@ except ImportError:
     )
     from services.phase2_modules_service import asset_is_rentable  # type: ignore
     from services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched  # type: ignore
+    from components.serialized_tools_ui import (  # type: ignore
+        render_serialized_tool_tracking_panel,
+        render_serialized_tools_toolbar,
+    )
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
+    from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_ASSET_KEY,
         clear_field_expanded,
@@ -216,19 +226,24 @@ _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
-_SMALL_TOOL_COLS = [0.42, 0.9, 3.0, 0.85, 1.55, 0.82, 0.88]
+_SMALL_TOOL_COLS = [0.4, 0.8, 2.0, 1.0, 1.35, 1.15, 1.0, 0.75, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
     ("TOOL", None),
-    ("ASSET #", None),
-    ("PARENT KIT", "parent_kit"),
+    ("SERIAL", None),
+    ("TRAILER", "trailer"),
+    ("JOB", "job"),
+    ("CHECKED OUT", "operator"),
     ("STATUS", "status"),
-    ("VALUE", None),
+    ("CONDITION", "condition"),
 ]
 _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
-    ("parent_kit", lambda r: _small_tool_parent_kit(r)),
+    ("trailer", lambda r: _small_tool_trailer_label(r)),
+    ("job", lambda r: _small_tool_job_label(r)),
+    ("operator", lambda r: _small_tool_operator_label(r)),
     ("status", lambda r: _small_tool_status(r)),
+    ("condition", lambda r: _small_tool_condition_label(r)),
 ]
 _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -310,11 +325,71 @@ def _asset_rentable_badge_html(row: dict) -> str:
 
 
 def _is_small_tool_asset(row: dict) -> bool:
-    """Standalone assets tracked as small tools (not kit/trailer containers)."""
-    if asset_is_kit(row):
-        return False
-    cat = str(row.get("category") or row.get("asset_type") or "").strip().lower()
-    return cat == "tool"
+    """Standalone serialized tools (not kit/trailer containers)."""
+    return is_serialized_tool_asset(row)
+
+
+def _small_tool_context_maps(rows: list[dict]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
+    assets_by_id = {
+        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
+    }
+    try:
+        from app.pages._core._data import load_employees, load_jobs
+    except ImportError:
+        from pages._core._data import load_employees, load_jobs  # type: ignore
+    employees_by_id = {
+        str(e.get("id") or "").strip(): e for e in load_employees() if str(e.get("id") or "").strip()
+    }
+    jobs_by_id = {str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()}
+    return assets_by_id, employees_by_id, jobs_by_id
+
+
+def _small_tool_tracking_view(
+    row: dict,
+    *,
+    assets_by_id: dict[str, dict],
+    employees_by_id: dict[str, dict],
+    jobs_by_id: dict[str, dict],
+) -> dict:
+    return serialized_tool_view(
+        row,
+        assets_by_id=assets_by_id,
+        employees_by_id=employees_by_id,
+        jobs_by_id=jobs_by_id,
+    )
+
+
+def _small_tool_serial(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    serial = str(v.get("serial_number") or "").strip()
+    if serial:
+        return serial
+    if str(row.get("row_type") or "") == "kit_item":
+        return _small_tool_asset_number(row)
+    return _asset_serial(row)
+
+
+def _small_tool_trailer_label(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    label = str(v.get("current_container_label") or "").strip()
+    if label:
+        return label
+    return _small_tool_parent_kit(row)
+
+
+def _small_tool_job_label(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    return str(v.get("current_job_label") or "").strip() or "—"
+
+
+def _small_tool_operator_label(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    return str(v.get("current_operator") or "").strip() or "—"
+
+
+def _small_tool_condition_label(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    return str(v.get("condition") or row.get("condition") or "Good").strip() or "Good"
 
 
 def _small_tool_row_id(row: dict) -> str:
@@ -397,8 +472,14 @@ def _filter_small_tool_rows(
     *,
     q: str = "",
     status: str = "All Statuses",
-    parent_kit: str = "All Kits",
+    parent_kit: str = "All Trailers",
+    assets_by_id: dict[str, dict] | None = None,
+    employees_by_id: dict[str, dict] | None = None,
+    jobs_by_id: dict[str, dict] | None = None,
 ) -> list[dict]:
+    assets_by_id = assets_by_id or {}
+    employees_by_id = employees_by_id or {}
+    jobs_by_id = jobs_by_id or {}
     out = list(rows)
     if q:
         ql = q.lower()
@@ -406,15 +487,44 @@ def _filter_small_tool_rows(
             r
             for r in out
             if ql in _small_tool_name(r).lower()
-            or ql in _small_tool_asset_number(r).lower()
-            or ql in _small_tool_parent_kit(r).lower()
+            or ql in _small_tool_serial(
+                r,
+                view=_small_tool_tracking_view(
+                    r,
+                    assets_by_id=assets_by_id,
+                    employees_by_id=employees_by_id,
+                    jobs_by_id=jobs_by_id,
+                ),
+            ).lower()
+            or ql in _small_tool_trailer_label(
+                r,
+                view=_small_tool_tracking_view(
+                    r,
+                    assets_by_id=assets_by_id,
+                    employees_by_id=employees_by_id,
+                    jobs_by_id=jobs_by_id,
+                ),
+            ).lower()
         ]
     status_val = str(status or "All Statuses").strip()
     if status_val and status_val != "All Statuses":
         out = [r for r in out if _small_tool_status(r) == status_val]
-    parent_val = str(parent_kit or "All Kits").strip()
-    if parent_val and parent_val != "All Kits":
-        out = [r for r in out if _small_tool_parent_kit(r) == parent_val]
+    parent_val = str(parent_kit or "All Trailers").strip()
+    if parent_val and parent_val not in {"All Trailers", "All Kits"}:
+        out = [
+            r
+            for r in out
+            if _small_tool_trailer_label(
+                r,
+                view=_small_tool_tracking_view(
+                    r,
+                    assets_by_id=assets_by_id,
+                    employees_by_id=employees_by_id,
+                    jobs_by_id=jobs_by_id,
+                ),
+            )
+            == parent_val
+        ]
     return apply_column_filters(out, _SMALL_TOOLS_TABLE_KEY, _SMALL_TOOL_FILTER_SPECS)
 
 
@@ -784,9 +894,11 @@ def _render_small_tools_table(
     *,
     filter_options: dict[str, list[str]],
     assets_by_id: dict[str, dict],
+    employees_by_id: dict[str, dict],
+    jobs_by_id: dict[str, dict],
 ) -> None:
     if not filtered:
-        st.info("No small tools match your filters.")
+        st.info("No serialized tools match your filters.")
         st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = []
         return
 
@@ -827,10 +939,18 @@ def _render_small_tools_table(
             if not rid:
                 continue
             name = _small_tool_name(row)
-            asset_number = _small_tool_asset_number(row)
-            parent_kit = _small_tool_parent_kit(row)
+            view = _small_tool_tracking_view(
+                row,
+                assets_by_id=assets_by_id,
+                employees_by_id=employees_by_id,
+                jobs_by_id=jobs_by_id,
+            )
+            serial = _small_tool_serial(row, view=view)
+            trailer = _small_tool_trailer_label(row, view=view)
+            job_label = _small_tool_job_label(row, view=view)
+            operator = _small_tool_operator_label(row, view=view)
             status = _small_tool_status(row)
-            value = _small_tool_value(row)
+            condition = _small_tool_condition_label(row, view=view)
 
             cols = st.columns(
                 _SMALL_TOOL_COLS,
@@ -855,19 +975,29 @@ def _render_small_tools_table(
                 )
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(asset_number)}</div>',
+                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(serial)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(parent_kit)}</div>',
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(trailer)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[5]:
-                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(job_label)}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-assets-cell ips-assets-value">{html.escape(value)}</div>',
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(operator)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[7]:
+                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+            with cols[8]:
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(condition)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -979,16 +1109,26 @@ def _render_equipment_list(
 
 
 def _render_small_tools_list(rows: list[dict]) -> None:
-    assets_by_id = {
-        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
-    }
+    assets_by_id, employees_by_id, jobs_by_id = _small_tool_context_maps(rows)
     small_tool_rows = _build_small_tool_list(rows)
-    filter_options = build_filter_options(small_tool_rows, _SMALL_TOOL_FILTER_SPECS)
+    enriched_rows = [
+        {
+            **r,
+            **_small_tool_tracking_view(
+                r,
+                assets_by_id=assets_by_id,
+                employees_by_id=employees_by_id,
+                jobs_by_id=jobs_by_id,
+            ),
+        }
+        for r in small_tool_rows
+    ]
+    filter_options = build_filter_options(enriched_rows, _SMALL_TOOL_FILTER_SPECS)
     parent_kits = sorted(
         {
-            _small_tool_parent_kit(r)
-            for r in small_tool_rows
-            if _small_tool_parent_kit(r) and _small_tool_parent_kit(r) != "—"
+            _small_tool_trailer_label(r)
+            for r in enriched_rows
+            if _small_tool_trailer_label(r) and _small_tool_trailer_label(r) != "—"
         }
     )
     status_options = sorted({_small_tool_status(r) for r in small_tool_rows if _small_tool_status(r)})
@@ -1004,8 +1144,8 @@ def _render_small_tools_list(rows: list[dict]) -> None:
             )
         with c2:
             st.selectbox(
-                "Parent kit",
-                ["All Kits", *parent_kits],
+                "Tool Trailer",
+                ["All Trailers", *parent_kits],
                 key="ast_st_parent_kit",
                 label_visibility="collapsed",
             )
@@ -1020,10 +1160,10 @@ def _render_small_tools_list(rows: list[dict]) -> None:
             if st.button("Clear", key="ast_st_clear", use_container_width=True):
                 clear_table_filters(
                     _SMALL_TOOLS_TABLE_KEY,
-                    ["parent_kit", "status"],
+                    ["trailer", "job", "operator", "status", "condition"],
                     extra_keys=["ast_st_search", "ast_st_parent_kit", "ast_st_status"],
                 )
-                st.session_state["ast_st_parent_kit"] = "All Kits"
+                st.session_state["ast_st_parent_kit"] = "All Trailers"
                 st.session_state["ast_st_status"] = "All Statuses"
                 reset_table_page(_SMALL_TOOLS_TABLE_KEY)
                 _clear_small_tool_selection(st.session_state.get(_ALL_SMALL_TOOL_IDS_KEY))
@@ -1035,12 +1175,22 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         small_tool_rows,
         q=str(st.session_state.get("ast_st_search") or "").strip(),
         status=str(st.session_state.get("ast_st_status") or "All Statuses"),
-        parent_kit=str(st.session_state.get("ast_st_parent_kit") or "All Kits"),
+        parent_kit=str(st.session_state.get("ast_st_parent_kit") or "All Trailers"),
+        assets_by_id=assets_by_id,
+        employees_by_id=employees_by_id,
+        jobs_by_id=jobs_by_id,
     )
 
+    render_serialized_tools_toolbar()
     render_table_pagination_header(len(filtered), _SMALL_TOOLS_TABLE_KEY, item_label="tool")
     page_rows, _, _, _ = paginate_rows(filtered, _SMALL_TOOLS_TABLE_KEY)
-    _render_small_tools_table(page_rows, filter_options=filter_options, assets_by_id=assets_by_id)
+    _render_small_tools_table(
+        page_rows,
+        filter_options=filter_options,
+        assets_by_id=assets_by_id,
+        employees_by_id=employees_by_id,
+        jobs_by_id=jobs_by_id,
+    )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
 
 
@@ -1747,6 +1897,9 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                 unsafe_allow_html=True,
             )
 
+        if is_serialized_tool_asset(asset):
+            render_serialized_tool_tracking_panel(asset)
+
         c3, c4 = st.columns([1, 1])
         with c3:
             st.markdown(
@@ -2037,7 +2190,7 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    tab_equipment, tab_small_tools = st.tabs(["Equipment", "Small Tools"])
+    tab_equipment, tab_small_tools = st.tabs(["Equipment", "Serialized Tools"])
 
     with tab_equipment:
         with st.expander("Tool Trailers & Kits", expanded=False):
