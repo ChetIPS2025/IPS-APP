@@ -1033,12 +1033,7 @@ def create_auth_user(
             update_rows_admin("profiles", {"employee_id": link_eid}, {"id": user_id})
         except Exception:
             pass
-        for col in ("auth_user_id", "profile_id"):
-            try:
-                update_rows_admin("employees", {col: str(user_id)}, {"id": link_eid})
-                break
-            except Exception:
-                continue
+        _link_employee_auth_ids(employee_id=link_eid, auth_id=str(user_id), email=em_norm)
 
     return {
         "id": user_id,
@@ -1048,9 +1043,192 @@ def create_auth_user(
     }
 
 
-def set_auth_user_password_admin(*, user_id: str, password: str) -> None:
-    """Set password for an existing Supabase Auth user (admin API)."""
+def _exception_indicates_user_not_found(exc: Exception) -> bool:
+    msg = f"{type(exc).__name__} {exc}".lower()
+    return "user not found" in msg or "not_found" in msg
+
+
+def get_auth_user_by_id_admin(user_id: str) -> dict[str, Any] | None:
+    """Return Supabase Auth user dict when present, else None."""
     uid = str(user_id or "").strip()
+    if not uid:
+        return None
+    admin = get_admin_client()
+    fn = getattr(admin.auth.admin, "get_user_by_id", None)
+    if fn is not None:
+        try:
+            res = fn(uid)
+            user = getattr(res, "user", None)
+            if user is None and isinstance(res, dict):
+                user = res.get("user") or res
+            if isinstance(user, dict):
+                return user
+            if user is not None:
+                return {
+                    "id": getattr(user, "id", None),
+                    "email": getattr(user, "email", None),
+                }
+        except Exception as exc:
+            if _exception_indicates_user_not_found(exc):
+                return None
+            raise RuntimeError(f"Could not look up auth user {uid!r}: {exc!r}") from exc
+    for page in range(1, 51):
+        batch = list_auth_users_admin(page=page, per_page=200)
+        if not batch:
+            break
+        for row in batch:
+            if str(row.get("id") or "").strip() == uid:
+                return row
+        if len(batch) < 200:
+            break
+    return None
+
+
+def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
+    """Find Supabase Auth user by email (case-insensitive)."""
+    em = str(email or "").strip().lower()
+    if not em:
+        return None
+    for page in range(1, 51):
+        batch = list_auth_users_admin(page=page, per_page=200)
+        if not batch:
+            break
+        for row in batch:
+            if str(row.get("email") or "").strip().lower() == em:
+                return row
+        if len(batch) < 200:
+            break
+    return None
+
+
+def resolve_auth_user_id(
+    *,
+    email: str = "",
+    auth_user_id: str = "",
+    profile_id: str = "",
+    employee_auth_user_id: str = "",
+) -> str:
+    """
+    Return a verified Supabase Auth user id (auth.users.id).
+
+    Never returns employees.id. Resolution order:
+    1. employees.auth_user_id (canonical)
+    2. login email lookup in auth.users
+    3. legacy profiles.id when it still matches auth.users
+    """
+    canonical = str(auth_user_id or employee_auth_user_id or "").strip()
+    if canonical and get_auth_user_by_id_admin(canonical):
+        return canonical
+    em = str(email or "").strip().lower()
+    if em:
+        found = find_auth_user_by_email_admin(em)
+        if found and str(found.get("id") or "").strip():
+            return str(found["id"])
+    legacy_profile = str(profile_id or "").strip()
+    if legacy_profile and get_auth_user_by_id_admin(legacy_profile):
+        return legacy_profile
+    return ""
+
+
+def _delete_profile_by_id_admin(profile_id: str) -> None:
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return
+    try:
+        get_admin_client().table("profiles").delete().eq("id", pid).execute()
+    except Exception as exc:
+        _LOG.warning("Could not delete profile %s: %s", pid, exc)
+
+
+def _remove_orphan_profiles_for_email(
+    email: str,
+    *,
+    keep_auth_id: str = "",
+) -> None:
+    """Delete profile rows that are not backed by a Supabase Auth user."""
+    em = str(email or "").strip().lower()
+    keep = str(keep_auth_id or "").strip()
+    seen: set[str] = set()
+    try:
+        rows = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=20)  # type: ignore[name-defined]
+    except Exception:
+        rows = []
+    for row in rows or []:
+        pid = str(row.get("id") or "").strip()
+        if not pid or pid in seen or pid == keep:
+            continue
+        seen.add(pid)
+        if get_auth_user_by_id_admin(pid):
+            continue
+        _delete_profile_by_id_admin(pid)
+
+
+def _link_employee_auth_ids(*, employee_id: str | None, auth_id: str, email: str) -> None:
+    """Persist auth.users.id on the employee row (canonical: employees.auth_user_id)."""
+    eid_link = str(employee_id or "").strip() or None
+    auth_uid = str(auth_id or "").strip()
+    if not eid_link or not auth_uid:
+        return
+    try:
+        update_rows_admin("employees", {"auth_user_id": auth_uid}, {"id": eid_link})
+    except Exception:
+        try:
+            update_rows_admin("employees", {"profile_id": auth_uid}, {"id": eid_link})
+        except Exception:
+            pass
+    else:
+        try:
+            update_rows_admin("employees", {"profile_id": auth_uid}, {"id": eid_link})
+        except Exception:
+            pass
+    try:
+        emp = fetch_one("employees", {"id": eid_link}) or {}
+        if not str(emp.get("email") or "").strip():
+            update_rows_admin("employees", {"email": str(email or "").strip().lower()}, {"id": eid_link})
+    except Exception:
+        pass
+
+
+def _upsert_profile_for_auth(
+    *,
+    auth_id: str,
+    email: str,
+    full_name: str,
+    role: str,
+    employee_id: str | None,
+    must_reset_password: bool = False,
+) -> None:
+    role_norm = str(role or "employee").strip().lower() or "employee"
+    if role_norm in {"pm", "estimator"}:
+        role_norm = "manager"
+    payload: dict[str, Any] = {
+        "id": auth_id,
+        "email": str(email or "").strip().lower(),
+        "full_name": full_name,
+        "role": role_norm,
+        "is_active": True,
+        "must_reset_password": must_reset_password,
+    }
+    if employee_id:
+        payload["employee_id"] = str(employee_id)
+    existing = fetch_one("profiles", {"id": auth_id})
+    try:
+        if existing:
+            update_rows_admin("profiles", payload, {"id": auth_id})
+        else:
+            get_admin_client().table("profiles").insert(payload).execute()
+    except Exception as exc:
+        raise RuntimeError(f"Could not sync profile for auth user {auth_id!r}: {exc!r}") from exc
+
+
+def set_auth_user_password_admin(
+    *,
+    auth_user_id: str = "",
+    user_id: str = "",
+    password: str = "",
+) -> None:
+    """Set password for an existing Supabase Auth user (auth.users.id — not employees.id)."""
+    uid = str(auth_user_id or user_id or "").strip()
     pw = str(password or "").strip()
     if not uid:
         raise RuntimeError("Auth user id is required.")
@@ -1066,11 +1244,99 @@ def set_auth_user_password_admin(*, user_id: str, password: str) -> None:
         except TypeError:
             fn({"uid": uid, "attributes": {"password": pw}})
     except Exception as exc:
+        if _exception_indicates_user_not_found(exc):
+            raise RuntimeError(
+                "No Supabase login account exists for this user. "
+                "Use Create login to set up access, or contact an administrator."
+            ) from exc
         raise RuntimeError(f"Could not update password for user_id={uid!r}: {exc!r}") from exc
     try:
         update_profile_admin(uid, {"must_reset_password": False})
     except Exception:
         pass
+
+
+def set_login_password_admin(
+    *,
+    email: str,
+    password: str,
+    auth_user_id: str = "",
+    employee_id: str | None = None,
+    profile_id: str = "",
+    employee_auth_user_id: str = "",
+    full_name: str = "",
+    role: str = "employee",
+) -> str:
+    """
+    Create or update app login password for an employee.
+
+    Always resolves auth.users.id from employees.auth_user_id (or email lookup).
+    Never uses employees.id for Supabase Auth. Repairs orphaned profiles and avoids
+    duplicate auth users for one email.
+    """
+    em = str(email or "").strip().lower()
+    if not em or "@" not in em:
+        raise RuntimeError("A valid work email is required.")
+    pw = str(password or "").strip()
+    if len(pw) < 6:
+        raise RuntimeError("Password must be at least 6 characters.")
+
+    auth_id = resolve_auth_user_id(
+        email=em,
+        auth_user_id=auth_user_id or employee_auth_user_id,
+        profile_id=profile_id,
+    )
+
+    if auth_id:
+        set_auth_user_password_admin(auth_user_id=auth_id, password=pw)
+        _upsert_profile_for_auth(
+            auth_id=auth_id,
+            email=em,
+            full_name=full_name,
+            role=role,
+            employee_id=employee_id,
+            must_reset_password=False,
+        )
+        _link_employee_auth_ids(employee_id=employee_id, auth_id=auth_id, email=em)
+        stale_profile_id = str(profile_id or "").strip()
+        if stale_profile_id and stale_profile_id != auth_id:
+            _delete_profile_by_id_admin(stale_profile_id)
+        _remove_orphan_profiles_for_email(em, keep_auth_id=auth_id)
+        return auth_id
+
+    _remove_orphan_profiles_for_email(em)
+    try:
+        created = create_auth_user(
+            email=em,
+            password=pw,
+            role=role,
+            full_name=full_name,
+            employee_id=employee_id,
+        )
+        return str(created.get("id") or "")
+    except Exception as exc:
+        lower = str(exc).lower()
+        if "already exists" not in lower and "duplicate" not in lower and "registered" not in lower:
+            raise
+        found = find_auth_user_by_email_admin(em)
+        if not found or not str(found.get("id") or "").strip():
+            raise RuntimeError(
+                "A login already exists for this email, but it could not be linked. "
+                "Contact an administrator."
+            ) from exc
+        auth_id = str(found["id"])
+        set_auth_user_password_admin(auth_user_id=auth_id, password=pw)
+        _upsert_profile_for_auth(
+            auth_id=auth_id,
+            email=em,
+            full_name=full_name,
+            role=role,
+            employee_id=employee_id,
+            must_reset_password=False,
+        )
+        _link_employee_auth_ids(employee_id=employee_id, auth_id=auth_id, email=em)
+        _remove_orphan_profiles_for_email(em, keep_auth_id=auth_id)
+        return auth_id
 
 
 def invite_auth_user(
@@ -1219,14 +1485,9 @@ def invite_auth_user(
     except Exception as exc:
         raise RuntimeError(f"Invite sent, but creating the profile row failed: {exc!r}") from exc
 
-    # Link employee back to this auth/profile id when possible (columns may not exist yet).
+    # Link employee back to auth.users.id (employees.auth_user_id).
     if matched_emp_id:
-        for col in ("auth_user_id", "profile_id"):
-            try:
-                update_rows_admin("employees", {col: str(user_id)}, {"id": matched_emp_id})
-                break
-            except Exception:
-                continue
+        _link_employee_auth_ids(employee_id=matched_emp_id, auth_id=str(user_id), email=em)
         # If employee email is blank, fill it from the invited email when column exists.
         if employees_has_email:
             try:

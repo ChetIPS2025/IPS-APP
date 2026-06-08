@@ -1,8 +1,19 @@
 """
 User profiles and auth-linked employee records.
 
-Users page rows are primarily ``employees`` records; login access lives on ``profiles``
-linked via ``profiles.employee_id``.
+Identity model (keep these separate):
+
+- **Employee** (``employees``): workforce row — name, phone, role, status, permissions.
+  Primary key is ``employees.id`` (app user id). Never pass this to Supabase Auth APIs.
+
+- **Auth user** (``auth.users``): login identity — email and password.
+  Primary key is ``auth.users.id``. Stored on the employee as ``employees.auth_user_id``.
+
+- **Profile** (``profiles``): app mirror of auth user (``profiles.id`` == ``auth.users.id``),
+  linked to workforce via ``profiles.employee_id``.
+
+Password updates and invites must always use ``employees.auth_user_id`` (or resolve it from
+email), never ``employees.id``.
 """
 
 from __future__ import annotations
@@ -12,7 +23,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 try:
-    from app.db import delete_auth_user_admin, fetch_by_match, fetch_one, update_rows_admin
+    from app.db import delete_auth_user_admin, fetch_by_match, fetch_one, resolve_auth_user_id, update_rows_admin
     from app.services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee
     from app.services.repository import (
         ServiceResult,
@@ -23,7 +34,7 @@ try:
         update_row,
     )
 except ImportError:
-    from db import delete_auth_user_admin, fetch_by_match, fetch_one, update_rows_admin  # type: ignore
+    from db import delete_auth_user_admin, fetch_by_match, fetch_one, resolve_auth_user_id, update_rows_admin  # type: ignore
     from services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee  # type: ignore
     from services.repository import (  # type: ignore
         ServiceResult,
@@ -123,16 +134,25 @@ def get_user_delete_context(user_id: str) -> dict[str, Any]:
     """Summary fields for delete confirmation UI."""
     employee = _employee_row(user_id) or {}
     profile = _find_profile_for_employee(user_id, email=str(employee.get("email") or ""))
+    email = str(employee.get("email") or profile.get("email") or "")
+    profile_id = str(profile.get("id") or "") if profile else ""
+    employee_auth_user_id = str(employee.get("auth_user_id") or "").strip()
+    auth_user_id = resolve_auth_user_id(
+        email=email,
+        auth_user_id=employee_auth_user_id,
+        profile_id=profile_id,
+    )
     return {
         "user_id": user_id,
         "name": str(employee.get("name") or profile.get("full_name") or "—"),
         "role": str(employee.get("role") or profile.get("role") or "—"),
-        "email": str(employee.get("email") or profile.get("email") or "—"),
+        "email": email or "—",
         "employee_linked": bool(employee.get("id")),
-        "has_login": bool(profile and profile.get("id")),
+        "has_login": bool(auth_user_id),
         "last_login": str(employee.get("last_login") or "—"),
         "time_entry_count": _count_time_entries(user_id),
-        "profile_id": str(profile.get("id") or "") if profile else "",
+        "profile_id": profile_id,
+        "auth_user_id": auth_user_id,
     }
 
 
@@ -399,11 +419,19 @@ def hard_delete_user(
         return ServiceResult(ok=False, error=check.reason or "Cannot delete user.")
 
     profile = check.profile
+    employee = check.employee or {}
     auth_deleted = False
     auth_warning: str | None = None
 
-    if profile and profile.get("id"):
-        profile_id = str(profile["id"])
+    resolved_auth_id = ""
+    if profile or employee:
+        resolved_auth_id = resolve_auth_user_id(
+            email=str(employee.get("email") or (profile or {}).get("email") or ""),
+            auth_user_id=str(employee.get("auth_user_id") or ""),
+            profile_id=str((profile or {}).get("id") or ""),
+        )
+    if resolved_auth_id:
+        profile_id = resolved_auth_id
         try:
             delete_auth_user_admin(user_id=profile_id)
             auth_deleted = True

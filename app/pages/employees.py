@@ -56,10 +56,9 @@ try:
     from app.pages._core._session import select_key
     from app.config import settings
     from app.db import (
-        create_auth_user,
         invite_auth_user,
         resend_invite_by_email,
-        set_auth_user_password_admin,
+        set_login_password_admin,
     )
     from app.services.employee_role_service import (
         auth_role_from_permission_label,
@@ -121,10 +120,9 @@ except ImportError:
     from pages._core._session import select_key  # type: ignore
     from config import settings  # type: ignore
     from db import (  # type: ignore
-        create_auth_user,
         invite_auth_user,
         resend_invite_by_email,
-        set_auth_user_password_admin,
+        set_login_password_admin,
     )
     from services.employee_role_service import (  # type: ignore
         auth_role_from_permission_label,
@@ -751,6 +749,24 @@ def _employee_invite_email(emp: dict) -> str:
     return email
 
 
+def _login_panel_error_message(exc: Exception, *, action: str) -> str:
+    """User-facing message for App Login failures (no raw tracebacks)."""
+    text = str(exc or "").strip()
+    lower = text.lower()
+    if "already exists" in lower or "duplicate" in lower:
+        return "A login already exists for this email."
+    if "domain" in lower or "indfustrial" in lower:
+        return text
+    if "at least 6" in lower or "valid work email" in lower or "email is required" in lower:
+        return text
+    if "user not found" in lower or "no supabase login" in lower:
+        return (
+            "No app login account was found for this user. "
+            "Try Create login, or contact an administrator."
+        )
+    return f"Could not {action.lower()}."
+
+
 def _create_employee_login_with_password(emp: dict, password: str) -> str:
     eid = str(emp.get("id") or "").strip()
     email = _employee_invite_email(emp)
@@ -762,20 +778,13 @@ def _create_employee_login_with_password(emp: dict, password: str) -> str:
         raise RuntimeError("Email domain is not allowed for app login.")
 
     ctx = get_user_delete_context(eid)
-    if ctx.get("has_login"):
-        prof_id = str(ctx.get("profile_id") or "").strip()
-        if not prof_id:
-            raise RuntimeError("Login exists but profile id is missing.")
-        set_auth_user_password_admin(user_id=prof_id, password=password)
-        clear_all_data_caches()
-        return email
-
-    create_auth_user(
+    set_login_password_admin(
         email=email,
         password=password,
-        role=_invite_role_from_employee(emp),
-        full_name=str(emp.get("name") or "").strip(),
+        auth_user_id=str(emp.get("auth_user_id") or ctx.get("auth_user_id") or ""),
         employee_id=eid or None,
+        full_name=str(emp.get("name") or "").strip(),
+        role=_invite_role_from_employee(emp),
     )
     clear_all_data_caches()
     return email
@@ -858,9 +867,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 )
                 st.rerun()
             except Exception as exc:
-                st.error(f"Could not {btn_label.lower()}.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+                st.error(_login_panel_error_message(exc, action=btn_label))
 
     if not has_login:
         if st.button(
@@ -873,9 +880,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 st.session_state["users_action_flash"] = ("success", f"Invite sent to {sent_to}.")
                 st.rerun()
             except Exception as exc:
-                st.error("Could not send invite.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+                st.error(_login_panel_error_message(exc, action="Send invite email"))
     else:
         if st.button(
             "Email password reset link",
@@ -887,9 +892,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 st.session_state["users_action_flash"] = ("success", f"Reset link sent to {sent_to}.")
                 st.rerun()
             except Exception as exc:
-                st.error("Could not send reset email.")
-                with st.expander("Technical details"):
-                    st.code(repr(exc), language="text")
+                st.error(_login_panel_error_message(exc, action="Send reset email"))
 
 
 def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
