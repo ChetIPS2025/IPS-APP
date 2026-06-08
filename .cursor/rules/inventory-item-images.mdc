@@ -8,6 +8,8 @@ alwaysApply: false
 
 Use **one resolver** for every inventory item display so QR scan, list, detail, and job materials show the same picture.
 
+Cross-domain tables (assets, small tools, job materials) use the unified facade in **`catalog_images.py`** — see `catalog-item-images.mdc`.
+
 ## Resolver (`app/services/inventory_images.py`)
 
 | Function | Use |

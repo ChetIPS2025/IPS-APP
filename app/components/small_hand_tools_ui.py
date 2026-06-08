@@ -18,6 +18,7 @@ try:
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.pages._core._data import load_assets
     from app.services.asset_kits_service import get_tool_trailers
+    from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
     from app.services.small_hand_tool_service import (
         HAND_TOOL_CATEGORIES,
         HAND_TOOL_CONDITIONS,
@@ -44,6 +45,7 @@ except ImportError:
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from pages._core._data import load_assets  # type: ignore
     from services.asset_kits_service import get_tool_trailers  # type: ignore
+    from services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html  # type: ignore
     from services.small_hand_tool_service import (  # type: ignore
         HAND_TOOL_CATEGORIES,
         HAND_TOOL_CONDITIONS,
@@ -56,8 +58,10 @@ except ImportError:
     )
 
 _TABLE_KEY = "assets_hand_tools_list"
-_COLS = [2.9, 1.05, 0.5, 0.5, 1.05, 0.95, 0.9, 0.8]
+_COLS = [0.22, 0.42, 2.35, 1.0, 0.48, 0.48, 1.0, 0.92, 0.85, 0.78]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("", None),
+    ("IMAGE", None),
     ("TOOL", None),
     ("CATEGORY", "category"),
     ("EXPECTED", None),
@@ -221,7 +225,12 @@ def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
     return apply_column_filters(out, _TABLE_KEY, _FILTER_SPECS)
 
 
-def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> None:
+def _render_table(
+    rows: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+    image_context: CatalogImageContext,
+) -> None:
     if not rows:
         st.info("No small hand tools match your filters.")
         return
@@ -273,39 +282,48 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
 
             with cols[0]:
                 st.markdown(
-                    f'<span class="ips-hand-tools-row-marker small-tools-table-row" aria-hidden="true"></span>'
-                    f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
+                    '<span class="ips-hand-tools-row-marker small-tools-table-row" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
             with cols[1]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell">{html.escape(category)}</div>',
+                    catalog_thumbnail_html(row, kind="small_tool", context=image_context, alt="Small tool image"),
                     unsafe_allow_html=True,
                 )
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty">{qty_exp:g}</div>',
+                    f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[3]:
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell">{html.escape(category)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[4]:
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty">{qty_exp:g}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[5]:
                 short_cls = " ips-assets-qty-short" if qty_short else ""
                 st.markdown(
                     f'<div class="ips-hand-tools-cell ips-hand-tools-qty{short_cls}"><strong>{qty_act:g}</strong></div>',
                     unsafe_allow_html=True,
                 )
-            with cols[4]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-hand-tools-cell">{html.escape(location)}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[5]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-hand-tools-cell">{html.escape(storage)}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[6]:
+            with cols[8]:
                 st.markdown(_hand_tool_status_pill_html(status), unsafe_allow_html=True)
-            with cols[7]:
+            with cols[9]:
                 _render_hand_tool_adjust_action(row)
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -330,6 +348,7 @@ def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
     jobs_by_id = {str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()}
 
     rows = list_hand_tools(assets_by_id=assets_by_id, jobs_by_id=jobs_by_id)
+    image_context = build_catalog_image_context(assets_by_id=assets_by_id)
     filter_options = build_filter_options(rows, _FILTER_SPECS)
     categories = sorted({str(r.get("category") or "") for r in rows if r.get("category")})
     locations = sorted({str(r.get("location_display") or "") for r in rows if r.get("location_display")})
@@ -382,5 +401,5 @@ def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="tool")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_table(page_rows, filter_options=filter_options)
+    _render_table(page_rows, filter_options=filter_options, image_context=image_context)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)

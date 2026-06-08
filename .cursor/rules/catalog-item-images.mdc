@@ -1,0 +1,45 @@
+---
+description: Unified catalog image resolver for assets, small tools, inventory, pricing guide
+globs: app/services/catalog_images.py,app/pages/assets.py,app/components/small_hand_tools_ui.py,app/components/job_materials_ui.py,app/pages/inventory*.py,app/services/inventory_images.py,app/services/asset_images.py,app/services/pricing_guide_images.py
+alwaysApply: false
+---
+
+# Catalog item images (unified resolver)
+
+Use **one resolver** for every catalog row thumbnail so Equipment, Serialized Tools, Small Tools, Inventory, and Pricing Guide stay consistent.
+
+## Entry point (`app/services/catalog_images.py`)
+
+| Function | Use |
+|----------|-----|
+| `get_catalog_image_url(record, kind=...)` | Resolve browser URL or `None` |
+| `catalog_thumbnail_html(record, kind=...)` | HTML `<img>` or placeholder |
+| `render_catalog_thumbnail(record)` | Streamlit thumbnail |
+| `build_catalog_image_context(assets_by_id=...)` | Name/asset lookups for small tools |
+
+Pass explicit `kind` when known: `"asset"`, `"small_tool"`, `"inventory"`, `"pricing_guide"`.
+
+**Do not** read `image_url` / `photo_url` directly in table UI code.
+
+## Domain delegation
+
+| Kind | Resolver |
+|------|----------|
+| `asset` / `equipment` / `serialized` | `get_asset_thumbnail_url` (+ linked catalog inherit) |
+| `small_tool` | source asset → inventory name → pricing name → asset name |
+| `inventory` | `get_inventory_image_url` (item → linked PG) |
+| `pricing_guide` | `get_pricing_guide_image_url` (row → linked inventory/asset) |
+
+Placeholders: inventory → 📦; assets / small tools → —
+
+## Where to use
+
+- Assets Equipment / Serialized Tools tables → `catalog_thumbnail_html(..., kind="asset")`
+- Assets Small Tools tab → `catalog_thumbnail_html(..., kind="small_tool", context=ctx)`
+- Inventory list/scan → existing `inventory_thumbnail_html` (wraps same inventory resolver)
+- Job materials → `catalog_thumbnail_html` for inventory and pricing rows
+
+## Do not
+
+- Duplicate per-table image fallback chains
+- Add new resolvers in page files — extend `catalog_images.py` or domain modules (`inventory_images.py`, etc.)

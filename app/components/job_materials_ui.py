@@ -211,30 +211,31 @@ def _material_row_thumbnail_html(
     pg_by_id: dict[str, dict[str, Any]],
 ) -> str:
     try:
-        from app.services.inventory_images import get_inventory_image_url, inventory_thumbnail_html
-        from app.services.pricing_guide_images import get_pricing_guide_image_url
+        from app.services.catalog_images import catalog_thumbnail_html
     except ImportError:
-        from services.inventory_images import get_inventory_image_url, inventory_thumbnail_html  # type: ignore
-        from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
+        from services.catalog_images import catalog_thumbnail_html  # type: ignore
 
+    thumb_class = "ips-inventory-thumb-img ips-job-mat-thumb"
+    cell_class = "ips-inventory-thumb-cell"
     iid = str(row.get("inventory_item_id") or "").strip()
     if iid and iid in inv_by_id:
-        return inventory_thumbnail_html(inv_by_id[iid], css_class="ips-inventory-thumb-img ips-job-mat-thumb")
+        return catalog_thumbnail_html(
+            inv_by_id[iid],
+            kind="inventory",
+            css_class=thumb_class,
+            cell_class=cell_class,
+            alt="Material image",
+        )
     pid = str(row.get("pricing_guide_id") or "").strip()
     if pid and pid in pg_by_id:
-        pg_url = get_pricing_guide_image_url(pg_by_id[pid])
-        if pg_url:
-            return (
-                '<span class="ips-inventory-thumb-cell">'
-                f'<img class="ips-inventory-thumb-img ips-job-mat-thumb" '
-                f'src="{html.escape(pg_url, quote=True)}" alt="Material image" />'
-                "</span>"
-            )
-    return (
-        '<span class="ips-inventory-thumb-cell">'
-        '<span class="ips-inventory-thumb-placeholder">📦</span>'
-        "</span>"
-    )
+        return catalog_thumbnail_html(
+            pg_by_id[pid],
+            kind="pricing_guide",
+            css_class=thumb_class,
+            cell_class=cell_class,
+            alt="Material image",
+        )
+    return catalog_thumbnail_html({}, kind="inventory", css_class=thumb_class, cell_class=cell_class)
 
 
 def _render_materials_table(

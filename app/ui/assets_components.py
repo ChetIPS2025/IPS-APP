@@ -204,13 +204,15 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {
             display: grid !important;
             grid-template-columns:
-                minmax(420px, 2fr)
-                minmax(150px, 0.9fr)
-                80px
-                80px
-                minmax(150px, 0.9fr)
-                minmax(160px, 1fr)
-                120px
+                28px
+                56px
+                minmax(280px, 2fr)
+                minmax(130px, 0.85fr)
+                72px
+                72px
+                minmax(130px, 0.85fr)
+                minmax(140px, 0.9fr)
+                110px
                 140px !important;
             column-gap: 14px !important;
             align-items: center !important;

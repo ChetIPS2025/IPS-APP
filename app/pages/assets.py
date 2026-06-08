@@ -698,8 +698,12 @@ def _asset_status_pill_html(status: str) -> str:
 
 
 def _asset_image_src(asset: dict) -> str | None:
-    """Resolve a browser-safe thumbnail URL from all known asset image fields."""
-    return get_asset_thumbnail_url(asset)
+    """Resolve a browser-safe thumbnail URL via the unified catalog image resolver."""
+    try:
+        from app.services.catalog_images import get_catalog_image_url
+    except ImportError:
+        from services.catalog_images import get_catalog_image_url  # type: ignore
+    return get_catalog_image_url(asset, kind="asset")
 
 
 def _render_asset_thumbnail(asset: dict) -> None:
