@@ -440,7 +440,7 @@ def _render_horizontal_week_grid(
             row_total = 0.0
             for day_ix, (day_d, col) in enumerate(zip(days, cols[1:8])):
                 day_status = _normalize_timecard_status(grid[day_ix].get("status"))
-                week_status = _normalize_timecard_status(emp.get("status"))
+                week_status = _week_status_from_grid(grid)
                 editable = _day_hours_editable(day_status, week_status)
                 with col:
                     _render_hgrid_day_cell(
@@ -1708,7 +1708,7 @@ def _render_list_row_week_boxes(emp: dict, week_start_d: date) -> None:
     grid = _ensure_weekly_grid(emp, week_start_d)
     grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
     _sync_row_hrs_from_grid(grid, eid=eid, week_sig=week_sig)
-    week_status = _normalize_timecard_status(emp.get("status"))
+    week_status = _week_status_from_grid(grid)
     days = week_dates(week_start_d)
 
     st.markdown(
@@ -2087,9 +2087,53 @@ def _timecard_id_for_row(row: dict, ws: date) -> str:
     return f"{eid}_{week_start_str}"
 
 
+def _week_status_from_grid(grid: list[dict[str, Any]]) -> str:
+    """Aggregate employee/week status from day-level statuses (not stale weekly summary)."""
+    statuses: list[str] = []
+    for day_row in grid:
+        norm = _normalize_timecard_status(day_row.get("status"))
+        if _row_has_hours(day_row) or norm in ("Approved", "Pending", "Rejected"):
+            statuses.append(norm)
+    if not statuses:
+        return "Draft"
+    if any(s == "Rejected" for s in statuses):
+        return "Rejected"
+    if any(s == "Pending" for s in statuses):
+        return "Pending"
+    if all(s == "Approved" for s in statuses):
+        return "Approved"
+    return "Draft"
+
+
+def _resolved_week_status(
+    emp: dict,
+    week_start_d: date,
+    *,
+    grid: list[dict[str, Any]] | None = None,
+) -> str:
+    """Row status for display/actions — always derived from day grid when available."""
+    if grid is not None:
+        return _week_status_from_grid(grid)
+    eid = str(emp.get("id") or emp.get("employee_id") or "").strip()
+    if not eid:
+        return _normalize_timecard_status(emp.get("status"))
+    try:
+        loaded = load_timekeeping_grid(eid, week_start_d)
+        if loaded:
+            return _week_status_from_grid(loaded)
+    except Exception:
+        pass
+    return _week_status_from_grid(_ensure_weekly_grid(emp, week_start_d))
+
+
 def _build_timecard_row(row: dict, ws: date) -> dict:
     st_total, ot_total, dt_total, total = _emp_totals(row)
-    status = _normalize_timecard_status(row.get("status"))
+    emp_stub = {
+        "id": str(row.get("id") or row.get("employee_id") or "").strip(),
+        "employee_id": str(row.get("id") or row.get("employee_id") or "").strip(),
+        "status": row.get("status"),
+    }
+    status = _resolved_week_status(emp_stub, ws)
     return {
         **row,
         "timecard_id": _timecard_id_for_row(row, ws),
@@ -2282,19 +2326,6 @@ def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
             )
 
 
-def _week_status_from_grid(grid: list[dict[str, Any]]) -> str:
-    active = [_normalize_timecard_status(row.get("status")) for row in grid if _row_has_hours(row)]
-    if not active:
-        return "Draft"
-    if all(status == "Approved" for status in active):
-        return "Approved"
-    if any(status == "Rejected" for status in active):
-        return "Rejected"
-    if any(status == "Pending" for status in active):
-        return "Pending"
-    return "Draft"
-
-
 def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     gk = _grid_key(eid)
@@ -2310,13 +2341,13 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
         unsafe_allow_html=True,
     )
     grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
+    week_status = _week_status_from_grid(grid)
 
     edit_cols = _DAY_GRID_EDIT_COLS
     _render_day_grid_header(edit_mode=True)
 
     for i, row in enumerate(grid):
         day_status = _normalize_timecard_status(row.get("status"))
-        week_status = _normalize_timecard_status(emp.get("status"))
         row_editable = _day_hours_editable(day_status, week_status)
         live_row = _day_row_with_widget_values(row, eid=eid, week_sig=week_sig, index=i)
         row_complete = _day_entry_complete(live_row)
@@ -2552,14 +2583,14 @@ def _render_list_allocation_detail(
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
     scope = str(panel_scope or eid or week_sig).strip()
-    week_status = _normalize_timecard_status(emp.get("status"))
     admin_edit = _can_admin_edit_approved_timekeeping()
-    week_locked = week_status == "Approved" and not admin_edit
     job_opts = _assignment_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
     can_submit = _can_submit_timekeeping()
     grid = _ensure_weekly_grid(emp, week_start_d)
     _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+    week_status = _resolved_week_status(emp, week_start_d, grid=grid)
+    week_locked = week_status == "Approved" and not admin_edit
     by_date = _ensure_allocation_state(emp, week_start_d)
 
     render_allocation_panel_intro()
@@ -2739,7 +2770,7 @@ def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
 
 
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
-    week_status = _normalize_timecard_status(emp.get("status"))
+    week_status = _resolved_week_status(emp, week_start_d)
     admin_edit = _can_admin_edit_approved_timekeeping()
     if week_status == "Approved" and not admin_edit:
         _render_weekly_grid_readonly(emp, week_start_d)
@@ -2768,7 +2799,7 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
 
 
 def _render_approval_tab(emp: dict, week_start_d: date) -> None:
-    status = _normalize_timecard_status(emp.get("status"))
+    status = _resolved_week_status(emp, week_start_d)
     approved_at = str(emp.get("approved_at") or "").strip()
     notes = str(emp.get("notes") or "").strip()
     st.markdown(
@@ -2813,7 +2844,7 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
 
 def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
     st_total, ot_total, dt_total, total = _emp_totals(emp)
-    status = _normalize_timecard_status(emp.get("status"))
+    status = _resolved_week_status(emp, week_start_d)
     tab_weekly, tab_daily, tab_approval, tab_notes, tab_activity = st.tabs(
         ["Weekly Timecard", "Daily Entries", "Approval", "Notes", "Activity"]
     )
@@ -2860,7 +2891,7 @@ def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
 
 def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
     st_total, ot_total, dt_total, total = _emp_totals(emp)
-    status = _normalize_timecard_status(emp.get("status"))
+    status = _resolved_week_status(emp, week_start_d)
     render_modal_shell()
     render_modal_header(
         title=str(emp.get("name") or emp.get("employee_name") or "Employee"),
@@ -2957,7 +2988,6 @@ def _render_custom_timekeeping_table(
                 continue
 
             employee_name = str(row.get("employee_name") or "—")
-            status = _normalize_timecard_status(row.get("status"))
             expanded = _expanded_timecard_id() == timecard_id
             emp = _emp_from_timecard_row(row)
             eid = str(emp.get("id") or emp.get("employee_id") or "")
@@ -2966,10 +2996,12 @@ def _render_custom_timekeeping_table(
             st_total = float(row.get("st_total") or 0)
             ot_total = float(row.get("ot_total") or 0)
             total_hours = float(row.get("total_hours") or 0)
+            status = _normalize_timecard_status(row.get("status"))
             if eid:
                 grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
                 _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
                 _apply_active_field_job_to_grid(grid)
+                status = _week_status_from_grid(grid)
 
             with st.container(key=f"tk_card_{timecard_id}"):
                 st.markdown(
@@ -3020,8 +3052,7 @@ def _render_custom_timekeeping_table(
                                 day_row, eid=eid, week_sig=week_sig, index=day_ix
                             )
                             day_status = _normalize_timecard_status(day_row.get("status"))
-                            week_status = _normalize_timecard_status(emp.get("status"))
-                            editable = _day_hours_editable(day_status, week_status)
+                            editable = _day_hours_editable(day_status, status)
                             with col:
                                 _render_list_row_day_cell(
                                     day_d=day_d,
