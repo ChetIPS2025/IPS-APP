@@ -196,16 +196,11 @@ def serialized_tool_view(
 
 def is_serialized_tool_asset(asset: dict[str, Any]) -> bool:
     """True for individually serial-tracked tools (not quantity hand tools)."""
-    if asset_is_kit(asset):
-        return False
-    serial = _clean_serial(asset.get("serial_number"))
-    if asset.get("is_serialized_tool"):
-        return True
-    if asset.get("is_checkout_item") and serial:
-        return True
-    if serial and _clean_text(asset.get("category") or asset.get("asset_type")).casefold() == "tool":
-        return True
-    return False
+    try:
+        from app.services.asset_classification_service import is_serialized_tab_asset
+    except ImportError:
+        from services.asset_classification_service import is_serialized_tab_asset  # type: ignore
+    return is_serialized_tab_asset(asset)
 
 
 def _find_kit_item_for_child(parent_asset_id: str, child_asset_id: str) -> dict[str, Any] | None:

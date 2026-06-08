@@ -578,6 +578,7 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
         "asset_type": str(row.get("asset_type") or row.get("category") or ""),
         "is_serialized_tool": bool(row.get("is_serialized_tool")),
         "is_checkout_item": bool(row.get("is_checkout_item")),
+        "tracking_type": str(row.get("tracking_type") or "").strip() or None,
         "current_container_asset_id": str(row.get("current_container_asset_id") or "").strip() or None,
         "current_holder_employee_id": str(row.get("current_holder_employee_id") or "").strip() or None,
         "last_seen_at": str(row.get("last_seen_at") or "")[:19],
@@ -1325,6 +1326,10 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         payload["is_serialized_tool"] = bool(ui.get("is_serialized_tool"))
     if "is_checkout_item" in ui:
         payload["is_checkout_item"] = bool(ui.get("is_checkout_item"))
+    if "tracking_type" in ui:
+        tt = str(ui.get("tracking_type") or "").strip().casefold()
+        if tt in {"equipment", "serialized", "quantity"}:
+            payload["tracking_type"] = tt
     if "current_container_asset_id" in ui:
         cid = str(ui.get("current_container_asset_id") or "").strip()
         payload["current_container_asset_id"] = cid or None

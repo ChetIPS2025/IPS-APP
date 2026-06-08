@@ -82,6 +82,7 @@ def normalize_hand_tool(row: dict[str, Any]) -> dict[str, Any]:
         "is_active": row.get("is_active") is not False,
         "editable": row.get("row_type") != "kit_item",
         "kit_item_id": _clean_text(row.get("kit_item_id") or (row.get("id") if row.get("row_type") == "kit_item" else "")) or None,
+        "source_asset_id": _clean_text(row.get("source_asset_id")) or None,
     }
 
 
@@ -227,6 +228,9 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
         "is_active": True,
         "updated_at": _now_iso(),
     }
+    source_asset_id = _clean_text(ui.get("source_asset_id"))
+    if source_asset_id:
+        payload["source_asset_id"] = source_asset_id
     if qty <= 0 and _clean_text(ui.get("status") or "Available") == "Available":
         payload["status"] = "Low Stock" if qty == 0 else payload["status"]
 

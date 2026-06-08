@@ -101,7 +101,15 @@ try:
         render_serialized_tools_toolbar,
     )
     from app.components.small_hand_tools_ui import render_hand_tools_tab
+    from app.components.asset_reclassification_ui import (
+        apply_tracking_bucket_change,
+        render_asset_reclassification_panel,
+        render_asset_tracking_bucket_select,
+        render_equipment_bulk_move_toolbar,
+        seed_tracking_form_state,
+    )
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
+    from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
     from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
     from app.utils.field_context import (
         FIELD_EXPANDED_ASSET_KEY,
@@ -204,7 +212,15 @@ except ImportError:
         render_serialized_tools_toolbar,
     )
     from components.small_hand_tools_ui import render_hand_tools_tab  # type: ignore
+    from components.asset_reclassification_ui import (  # type: ignore
+        apply_tracking_bucket_change,
+        render_asset_reclassification_panel,
+        render_asset_tracking_bucket_select,
+        render_equipment_bulk_move_toolbar,
+        seed_tracking_form_state,
+    )
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
+    from services.asset_classification_service import is_equipment_tab_asset, tracking_type_label  # type: ignore
     from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_ASSET_KEY,
@@ -222,6 +238,7 @@ _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
 _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
+SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
@@ -326,8 +343,8 @@ def _asset_rentable_badge_html(row: dict) -> str:
     return '<span class="ips-asset-rentable-badge" title="Available on estimate equipment">Rentable</span>'
 
 
-def _is_small_tool_asset(row: dict) -> bool:
-    """Standalone serialized tools (not kit/trailer containers)."""
+def _is_serialized_tab_asset(row: dict) -> bool:
+    """Assets that belong on the Serialized Tools tab."""
     return is_serialized_tool_asset(row)
 
 
@@ -459,11 +476,11 @@ def _build_serialized_tool_list(all_assets: list[dict]) -> list[dict]:
     assets_by_id = {
         str(a.get("id") or "").strip(): a for a in all_assets if str(a.get("id") or "").strip()
     }
-    tool_asset_ids = {str(a.get("id") or "").strip() for a in all_assets if _is_small_tool_asset(a)}
+    tool_asset_ids = {str(a.get("id") or "").strip() for a in all_assets if _is_serialized_tab_asset(a)}
 
     unified: list[dict] = []
     for asset in all_assets:
-        if _is_small_tool_asset(asset):
+        if _is_serialized_tab_asset(asset):
             unified.append({**asset, "row_type": "asset"})
 
     for item in list_all_kit_items_enriched(assets_by_id):
@@ -717,8 +734,27 @@ def _asset_select_key(asset_id: str) -> str:
     return f"asset_select_{asset_id}"
 
 
+def _get_selected_asset_ids() -> list[str]:
+    raw = st.session_state.get(SELECTED_ASSET_IDS_KEY)
+    if isinstance(raw, (set, list, tuple)):
+        return sorted({str(x).strip() for x in raw if str(x).strip()})
+    legacy = st.session_state.get(SELECTED_ASSET_KEY)
+    return [str(legacy).strip()] if legacy else []
+
+
+def _set_selected_asset_ids(asset_ids: list[str]) -> None:
+    st.session_state[SELECTED_ASSET_IDS_KEY] = {str(aid).strip() for aid in asset_ids if str(aid).strip()}
+
+
+def _sync_asset_checkbox_state(asset_ids: list[str]) -> None:
+    selected = set(_get_selected_asset_ids())
+    for aid in asset_ids:
+        st.session_state[_asset_select_key(aid)] = aid in selected
+
+
 def _clear_asset_selection(asset_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_ASSET_KEY] = None
+    st.session_state[SELECTED_ASSET_IDS_KEY] = set()
     st.session_state[SHOW_ASSET_MODAL_KEY] = False
     ids = list(asset_ids or [])
     for aid in ids:
@@ -730,18 +766,12 @@ def _clear_asset_selection(asset_ids: list[str] | None = None) -> None:
 
 def _on_asset_checkbox_change(asset_id: str, all_asset_ids: list[str]) -> None:
     key = _asset_select_key(asset_id)
+    selected = set(_get_selected_asset_ids())
     if st.session_state.get(key):
-        for aid in all_asset_ids:
-            if aid != asset_id:
-                st.session_state[_asset_select_key(aid)] = False
-        st.session_state[SELECTED_ASSET_KEY] = asset_id
-        st.session_state[SHOW_ASSET_MODAL_KEY] = True
-        cache = st.session_state.get(_ASSETS_CACHE_KEY) or {}
-        asset = cache.get(asset_id) if isinstance(cache, dict) else None
-        _open_assets_detail_modal(asset_id, asset)
-    elif st.session_state.get(SELECTED_ASSET_KEY) == asset_id:
-        st.session_state[SELECTED_ASSET_KEY] = None
-        st.session_state[SHOW_ASSET_MODAL_KEY] = False
+        selected.add(asset_id)
+    else:
+        selected.discard(asset_id)
+    st.session_state[SELECTED_ASSET_IDS_KEY] = selected
 
 
 def _render_asset_expand_panel(asset: dict) -> None:
@@ -790,6 +820,7 @@ def _render_custom_assets_table(
 
     all_asset_ids = [str(a.get("id") or "").strip() for a in filtered if str(a.get("id") or "").strip()]
     st.session_state[_ALL_ASSET_IDS_KEY] = all_asset_ids
+    _sync_asset_checkbox_state(all_asset_ids)
 
     with st.container(key="assets_table_wrap"):
         st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
@@ -850,11 +881,17 @@ def _render_custom_assets_table(
                 _render_asset_thumbnail(asset)
 
             with cols[2]:
-                rentable_badge = _asset_rentable_badge_html(asset)
-                st.markdown(
-                    f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
-                    unsafe_allow_html=True,
-                )
+                title_col, open_col = st.columns([5, 1], gap="small", vertical_alignment="center")
+                with title_col:
+                    rentable_badge = _asset_rentable_badge_html(asset)
+                    st.markdown(
+                        f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with open_col:
+                    if st.button("↗", key=f"ast_open_{aid}", help="Open asset details"):
+                        _open_assets_detail_modal(aid, asset)
+                        st.rerun()
 
             with cols[3]:
                 st.markdown(
@@ -1017,7 +1054,7 @@ def _render_small_tools_table(
 def _render_equipment_list(
     rows: list[dict],
 ) -> None:
-    equipment_rows = [r for r in rows if not _is_small_tool_asset(r)]
+    equipment_rows = [r for r in rows if is_equipment_tab_asset(r)]
     filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
     categories = sorted(
         {_asset_category(r) for r in equipment_rows if _asset_category(r) and _asset_category(r) != "—"}
@@ -1101,6 +1138,16 @@ def _render_equipment_list(
                 st.rerun()
 
     layout_filter_bar(_filters)
+
+    assets_lookup = {
+        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
+    }
+    render_equipment_bulk_move_toolbar(
+        _get_selected_asset_ids(),
+        assets_lookup,
+        on_clear_selection=lambda: _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY)),
+        on_success_cache_clear=clear_assets_cache,
+    )
 
     filtered = _filter_rows(
         equipment_rows,
@@ -1716,6 +1763,7 @@ def _seed_asset_edit_form(asset: dict) -> None:
     st.session_state[f"ast_edit_useful_life_{aid}"] = str(asset.get("useful_life") or "7 years")
     st.session_state[f"ast_edit_annual_depr_{aid}"] = float(asset.get("annual_depreciation") or 0)
     st.session_state[f"ast_edit_pg_{aid}"] = bool(asset.get("include_in_pricing_guide"))
+    seed_tracking_form_state(asset, prefix="ast_edit")
     rk = _asset_rental_session_keys(aid)
     st.session_state[rk["rentable"]] = asset_is_rentable(asset)
     st.session_state[rk["rate"]] = primary_rental_rate_from_asset(asset)
@@ -1769,6 +1817,14 @@ def _render_asset_edit_form(asset: dict) -> None:
     )
     _render_asset_rental_pricing_fields(asset, aid=aid)
 
+    st.markdown("##### Tracking tab")
+    bucket = render_asset_tracking_bucket_select(asset, prefix="ast_edit")
+    try:
+        from app.components.asset_reclassification_ui import render_tracking_bucket_extra_fields
+    except ImportError:
+        from components.asset_reclassification_ui import render_tracking_bucket_extra_fields  # type: ignore
+    render_tracking_bucket_extra_fields(asset, bucket, prefix="ast_edit")
+
     st.markdown("##### Usage")
     u1, u2 = st.columns(2)
     with u1:
@@ -1811,14 +1867,25 @@ def _render_asset_edit_form(asset: dict) -> None:
     if cancelled:
         st.rerun()
     if saved:
-        ok, msg = persist_asset(_asset_edit_payload_from_session(aid), row_id=aid)
-        if ok:
-            clear_assets_cache()
-            set_view_mode(_MOD, rk)
-            st.success(msg or "Asset saved.")
-            st.rerun()
+        payload = _asset_edit_payload_from_session(aid)
+        rc_ok, rc_msg = apply_tracking_bucket_change(
+            asset,
+            prefix="ast_edit",
+            serial_number=str(payload.get("serial_number") or ""),
+            on_success_cache_clear=clear_assets_cache,
+        )
+        if not rc_ok:
+            st.error(rc_msg or "Could not update tracking tab.")
         else:
-            st.error(msg or "Could not save asset.")
+            ok, msg = persist_asset(payload, row_id=aid)
+            if ok:
+                clear_assets_cache()
+                set_view_mode(_MOD, rk)
+                parts = [p for p in (rc_msg, msg or "Asset saved.") if p]
+                st.success(" ".join(parts))
+                st.rerun()
+            else:
+                st.error(msg or "Could not save asset.")
 
 
 def _render_asset_detail_tabs(asset: dict) -> None:
@@ -1854,6 +1921,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                         ("Asset Number", asset_number),
                         ("Asset Name", asset_name),
                         ("Category", str(asset.get("category") or "—")),
+                        ("Assets tab", tracking_type_label(asset)),
                         ("Status", status_badge_html(str(asset.get("status") or ""))),
                         ("Location", str(asset.get("location") or "—")),
                         ("Department", str(asset.get("department") or "—")),
@@ -1906,6 +1974,8 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                 ),
                 unsafe_allow_html=True,
             )
+
+        render_asset_reclassification_panel(asset)
 
         if is_serialized_tool_asset(asset):
             render_serialized_tool_tracking_panel(asset)
@@ -2077,6 +2147,7 @@ def render_asset_detail_dialog(asset: dict) -> None:
         render_modal_meta_grid(
             [
                 ("Category", safe_value(asset.get("category"))),
+                ("Assets tab", tracking_type_label(asset)),
                 ("Location", safe_value(asset.get("location"))),
                 ("Department", safe_value(asset.get("department"))),
                 ("Current Value", fmt_currency(asset.get("value"))),
