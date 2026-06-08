@@ -32,6 +32,8 @@ from app.services.asset_images import (
 
     get_asset_image_url as _get_asset_image_url,
 
+    get_asset_thumbnail_url as _get_asset_thumbnail_url,
+
     upload_asset_image as _upload_asset_image_storage,
 
 )
@@ -118,6 +120,8 @@ __all__ = [
     "get_asset_documents",
 
     "get_asset_image_url",
+
+    "get_asset_thumbnail_url",
 
     "get_asset_inspections",
 
@@ -691,6 +695,11 @@ def update_asset(asset_id: str, data: dict[str, Any]) -> ServiceResult:
 def get_asset_image_url(asset: dict[str, Any], *, expires_in: int = 3600) -> str | None:
 
     return _get_asset_image_url(asset, expires_in=expires_in)
+
+
+def get_asset_thumbnail_url(asset: dict[str, Any], *, expires_in: int = 3600) -> str | None:
+
+    return _get_asset_thumbnail_url(asset, expires_in=expires_in)
 
 
 

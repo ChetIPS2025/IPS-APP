@@ -39,6 +39,21 @@ ITEM_IMAGE_FIELDS: tuple[str, ...] = (
     "image_status",
 )
 
+ITEM_IMAGE_URL_FIELDS: tuple[str, ...] = (
+    "image_url",
+    "photo_url",
+    "thumbnail_url",
+    "approved_photo_url",
+    "primary_photo_url",
+)
+
+ITEM_IMAGE_PATH_FIELDS: tuple[str, ...] = (
+    "image_path",
+    "photo_path",
+)
+
+_INVALID_IMAGE_TOKENS = frozenset({"", "—", "-", "none", "null", "undefined"})
+
 _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 
 try:
@@ -174,18 +189,44 @@ def item_image_storage_path(entity_type: str, record_id: str, filename: str) -> 
     return f"{ITEM_IMAGES_PREFIX}/{folder}/{rid}/{ts}_{safe}"
 
 
+def _clean_image_token(raw: object) -> str:
+    val = str(raw or "").strip()
+    if val.casefold() in _INVALID_IMAGE_TOKENS:
+        return ""
+    return val
+
+
 def has_stored_item_image(record: dict[str, Any] | None) -> bool:
     """True when any image metadata exists, regardless of approval status."""
     if not record:
         return False
-    if str(record.get("image_path") or "").strip():
-        return True
-    url = str(record.get("image_url") or record.get("photo_url") or "").strip()
-    if url.startswith("http"):
-        return True
-    if url:
-        return True
-    return bool(str(record.get("photo_path") or "").strip())
+    for key in ITEM_IMAGE_PATH_FIELDS + ITEM_IMAGE_URL_FIELDS:
+        if _clean_image_token(record.get(key)):
+            return True
+    return False
+
+
+def to_browser_image_src(raw: str | None, *, mime: str = "image/jpeg") -> str | None:
+    """Return a URL suitable for HTML <img src> (http(s), data URL, or None)."""
+    val = _clean_image_token(raw)
+    if not val:
+        return None
+    lower = val.casefold()
+    if lower.startswith("http://") or lower.startswith("https://") or lower.startswith("data:image"):
+        return val
+    path = Path(val)
+    if path.is_file():
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return None
+        if not data:
+            return None
+        import base64
+
+        ctype = mime if "/" in mime else "image/jpeg"
+        return f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
+    return None
 
 
 def record_has_item_image(record: dict[str, Any] | None) -> bool:
@@ -286,33 +327,41 @@ def resolve_stored_item_image_url(record: dict[str, Any], *, expires_in: int = 3
     _ = expires_in
     if not has_stored_item_image(record):
         return None
-    public = str(record.get("image_url") or record.get("photo_url") or "").strip()
-    if public.startswith("http"):
-        return public
+    mime = str(record.get("image_mime_type") or "image/jpeg").strip() or "image/jpeg"
 
-    path = str(record.get("image_path") or "").strip()
-    if path:
+    for key in ITEM_IMAGE_URL_FIELDS:
+        public = _clean_image_token(record.get(key))
+        if public.startswith("http"):
+            return to_browser_image_src(public, mime=mime) or public
+
+    for key in ITEM_IMAGE_PATH_FIELDS:
+        path = _clean_image_token(record.get(key))
+        if not path:
+            continue
         bucket = _bucket_for_image_path(path)
         try:
             signed = _signed_item_image_url_cached(path, bucket or "")
-            return signed or None
+            browser = to_browser_image_src(signed, mime=mime)
+            if browser:
+                return browser
+            if signed and str(signed).startswith("http"):
+                return signed
         except Exception:
-            return None
+            continue
 
-    legacy = str(record.get("photo_path") or "").strip()
-    if legacy:
-        try:
-            signed = _signed_item_image_url_cached(legacy, "")
-            return signed or None
-        except Exception:
-            return None
-
-    if public:
+    for key in ITEM_IMAGE_URL_FIELDS:
+        public = _clean_image_token(record.get(key))
+        if not public or public.startswith("http"):
+            continue
         try:
             signed = _signed_item_image_url_cached(public, "")
-            return signed or None
+            browser = to_browser_image_src(signed, mime=mime)
+            if browser:
+                return browser
+            if signed and str(signed).startswith("http"):
+                return signed
         except Exception:
-            return None
+            continue
     return None
 
 

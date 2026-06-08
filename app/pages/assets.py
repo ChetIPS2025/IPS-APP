@@ -78,6 +78,7 @@ try:
         generate_asset_qr_value,
         rebuild_asset_qr,
         get_asset_image_url,
+        get_asset_thumbnail_url,
         get_asset_inspections,
         get_asset_issues,
         upload_asset_image,
@@ -199,6 +200,7 @@ except ImportError:
         clear_assets_cache,
         generate_asset_qr_value,
         get_asset_image_url,
+        get_asset_thumbnail_url,
         get_asset_inspections,
         get_asset_issues,
         upload_asset_image,
@@ -695,8 +697,13 @@ def _asset_status_pill_html(status: str) -> str:
     return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
 
 
+def _asset_image_src(asset: dict) -> str | None:
+    """Resolve a browser-safe thumbnail URL from all known asset image fields."""
+    return get_asset_thumbnail_url(asset)
+
+
 def _render_asset_thumbnail(asset: dict) -> None:
-    image_url = get_asset_image_url(asset)
+    image_url = _asset_image_src(asset)
     if image_url:
         st.markdown(
             (
@@ -845,9 +852,14 @@ def _render_custom_assets_table(
     with st.container(key="assets_table_wrap"):
         st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _ASSET_HEADER_SPECS):
+        header_cols = st.columns(_ASSET_COLS, gap="xxsmall", vertical_alignment="center")
+        for hidx, (col, (label, field)) in enumerate(zip(header_cols, _ASSET_HEADER_SPECS)):
             with col:
+                if hidx == 0:
+                    st.markdown(
+                        '<span class="ips-assets-table-header-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                 if field:
                     render_table_header_cell(
                         label,
@@ -876,7 +888,7 @@ def _render_custom_assets_table(
             field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_ASSET_KEY) == aid
 
-            cols = st.columns(_ASSET_COLS, gap="small", vertical_alignment="center")
+            cols = st.columns(_ASSET_COLS, gap="xxsmall", vertical_alignment="center")
 
             with cols[0]:
                 if field_mode:
@@ -986,11 +998,16 @@ def _render_small_tools_table(
 
         header_cols = st.columns(
             _SMALL_TOOL_COLS,
-            gap="small",
+            gap="xxsmall",
             vertical_alignment="center",
         )
-        for col, (label, field) in zip(header_cols, _SMALL_TOOL_HEADER_SPECS):
+        for hidx, (col, (label, field)) in enumerate(zip(header_cols, _SMALL_TOOL_HEADER_SPECS)):
             with col:
+                if hidx == 0:
+                    st.markdown(
+                        '<span class="ips-assets-table-header-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                 if field:
                     render_table_header_cell(
                         label,
@@ -1025,7 +1042,7 @@ def _render_small_tools_table(
 
             cols = st.columns(
                 _SMALL_TOOL_COLS,
-                gap="small",
+                gap="xxsmall",
                 vertical_alignment="center",
             )
             image_asset = _small_tool_image_asset(row, assets_by_id)
@@ -1439,7 +1456,7 @@ def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
 
 
 def _asset_image_html(asset: dict) -> str:
-    url = get_asset_image_url(asset)
+    url = _asset_image_src(asset)
     if url:
         safe = html.escape(url, quote=True)
         alt = html.escape(str(asset.get("asset_name") or "Asset image"), quote=True)
@@ -2253,21 +2270,17 @@ def render() -> None:
             '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        col_export, col_quick, col_new = st.columns(3, gap="small")
-        with col_export:
-            st.button("Export", key="ast_export")
-        with col_quick:
-            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
-                open_quick_add_tool_dialog()
-        with col_new:
-            if st.button("+ New Asset", key="ast_new"):
-                st.session_state["ips_ast_form"] = True
+        st.button("Export", key="ast_export")
+        if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
+            open_quick_add_tool_dialog()
+        if st.button("+ New Asset", key="ast_new"):
+            st.session_state["ips_ast_form"] = True
 
     render_page_brand_header(
         "Assets",
         "Track and manage all company assets and equipment.",
         actions=[_assets_header_actions],
-        actions_column_ratio=(1.6, 2.4),
+        actions_column_ratio=(2.85, 1.15),
     )
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):

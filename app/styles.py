@@ -2961,15 +2961,37 @@ def inject_assets_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
+    assets_equipment_grid = (
+        "40px 52px minmax(200px, 2.4fr) minmax(110px, 0.95fr) minmax(110px, 1fr) "
+        "minmax(95px, 0.85fr) minmax(120px, 1fr) minmax(105px, 0.9fr) 44px"
+    )
+    assets_serialized_grid = (
+        "40px 52px minmax(160px, 1.8fr) minmax(100px, 0.9fr) minmax(110px, 1fr) "
+        "minmax(100px, 0.95fr) minmax(110px, 1fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr)"
+    )
+    ast_grid_rows = (
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"], "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"], "
+        ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"], "
+        ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"]"
+    )
+    ast_grid_cols = (
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
+        ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
+        ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"]"
+    )
     st.markdown(
         f"""
-<style id="ips-assets-module-v8">
+<style id="ips-assets-module-v9">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+  width: 100%;
+  max-width: 100%;
 }}
 .ips-assets-value {{
   text-align: right;
@@ -2978,16 +3000,92 @@ def inject_assets_module_css() -> None:
 }}
 {ast_list_wrap} [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }}
-{ast_list_wrap} [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+{ast_grid_rows} {{
+  display: grid !important;
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+  gap: 0 !important;
+  align-items: center !important;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 52px;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  flex-wrap: nowrap !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+  grid-template-columns: {assets_equipment_grid} !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+  grid-template-columns: {assets_serialized_grid} !important;
+}}
+{ast_grid_cols} {{
+  flex: unset !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
   display: flex !important;
   align-items: center !important;
   align-self: stretch !important;
-  min-width: 0 !important;
+  overflow: hidden !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
 }}
-{ast_list_wrap} [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
-  width: 100%;
+{ast_grid_cols}:nth-child(1) {{
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  padding: 0 !important;
   justify-content: center !important;
+  overflow: visible !important;
+}}
+{ast_grid_cols}:nth-child(2) {{
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  padding: 0 6px !important;
+  justify-content: center !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9) {{
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  padding: 0 4px !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}}
+{ast_grid_cols} > [data-testid="stVerticalBlock"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  justify-content: inherit !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+}}
+{ast_grid_cols}:nth-child(1) > [data-testid="stVerticalBlock"] {{
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  justify-content: center !important;
+  align-items: center !important;
 }}
 {ast_list_wrap} [data-testid="stMarkdownContainer"],
 {ast_list_wrap} .stMarkdown,
@@ -2998,20 +3096,10 @@ def inject_assets_module_css() -> None:
 {ast_list_wrap} .stMarkdown p:has(.ips-asset-thumb-cell) {{
   line-height: 0 !important;
 }}
-{ast_list_wrap} [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
-  align-items: center !important;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  min-height: 58px;
-  width: 100% !important;
-  max-width: 100% !important;
-}}
+{ast_list_wrap} [data-testid="stHorizontalBlock"]:has(.ips-assets-table-header-marker),
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 40px;
-  padding: 8px 10px !important;
+  background: #f8fafc !important;
+  min-height: 40px !important;
 }}
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
@@ -3045,17 +3133,25 @@ def inject_assets_module_css() -> None:
   white-space: nowrap !important;
 }}
 .ips-assets-header-row {{
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 8px 10px;
-  font-size: 12px;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 11px;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  min-height: 38px;
+  min-height: 0 !important;
+  width: 100%;
   display: flex;
   align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+.ips-assets-table-header-marker {{
+  display: none !important;
 }}
 .ips-assets-row {{
   background: #ffffff;
@@ -3191,6 +3287,13 @@ def inject_assets_module_css() -> None:
   padding: 4px;
 }}
 {checkbox_css}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+}}
 {ast_list_wrap} .stButton > button {{
   height: 32px !important;
   min-height: 32px !important;

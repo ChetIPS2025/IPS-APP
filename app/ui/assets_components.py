@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v15"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v17"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -68,36 +68,42 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-anchor) > div {
             padding: 0.35rem 0.65rem 0.5rem !important;
         }
-        /* Assets header: Export | Quick Add Tool | New Asset — one right-aligned row */
+        /* Assets header: Export | Quick Add Tool | New Asset — grouped top-right */
+        .ips-assets-page-header-actions {
+            display: none !important;
+        }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions) {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .ips-page-actions-marker {
+            display: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-page-actions-marker):has(.ips-assets-page-header-actions) {
             align-items: flex-end !important;
+            justify-content: flex-start !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] {
-            display: inline-flex !important;
-            justify-content: flex-end !important;
-            width: max-content !important;
-            max-width: 100% !important;
-            margin-left: auto !important;
+        > [data-testid="stVerticalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
             flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
             gap: 0.4rem !important;
+            width: 100% !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            flex: 0 0 auto !important;
+        > [data-testid="stVerticalBlock"] > div {
             width: auto !important;
+            flex: 0 0 auto !important;
             min-width: 0 !important;
             max-width: none !important;
-            padding-left: 0 !important;
-            padding-right: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"] .stButton {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton {
             margin: 0 !important;
+            width: auto !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {
@@ -108,7 +114,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button {
+        [class*="st-key-ast_export"] .stButton > button {
             background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             color: #374151 !important;
@@ -116,7 +122,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) .stButton > button[kind="primary"] {
+        [class*="st-key-ast_quick_add"] .stButton > button[kind="primary"] {
             background: #2563eb !important;
             border: 1px solid #2563eb !important;
             color: #ffffff !important;
@@ -127,13 +133,6 @@ def inject_assets_page_styles() -> None:
             min-width: 2rem !important;
             padding: 0.15rem 0.35rem !important;
             font-weight: 700 !important;
-        }
-        /* Equipment table: wider asset name (department column removed) */
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            min-width: 280px !important;
-            flex: 2.2 1 320px !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)

@@ -26,6 +26,7 @@ __all__ = [
     "clear_asset_image",
     "clear_asset_image_url_cache",
     "get_asset_image_url",
+    "get_asset_thumbnail_url",
     "resize_asset_image_bytes",
     "upload_asset_image",
 ]
@@ -118,6 +119,15 @@ def get_asset_image_url(asset: dict[str, Any], *, expires_in: int = 3600) -> str
 def get_asset_stored_image_url(asset: dict[str, Any], *, expires_in: int = 3600) -> str | None:
     display = asset_display_record(asset)
     return resolve_stored_item_image_url(display, expires_in=expires_in)
+
+
+def get_asset_thumbnail_url(asset: dict[str, Any], *, expires_in: int = 3600) -> str | None:
+    """List/detail thumbnail URL — includes stored photos regardless of review status."""
+    display = asset_display_record(asset)
+    url = resolve_stored_item_image_url(display, expires_in=expires_in)
+    if url:
+        return url
+    return resolve_stored_item_image_url(asset, expires_in=expires_in)
 
 
 def upload_asset_image(
