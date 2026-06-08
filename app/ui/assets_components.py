@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v10"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v11"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -76,17 +76,28 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] {
+            display: inline-flex !important;
             justify-content: flex-end !important;
-            width: 100% !important;
+            width: max-content !important;
+            max-width: 100% !important;
+            margin-left: auto !important;
             flex-wrap: nowrap !important;
-            gap: 0.5rem !important;
+            gap: 0.4rem !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] > [data-testid="column"] {
             flex: 0 0 auto !important;
             width: auto !important;
-            min-width: max-content !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] .stButton {
+            margin: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {

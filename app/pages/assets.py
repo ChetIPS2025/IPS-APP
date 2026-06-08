@@ -2252,7 +2252,7 @@ def render() -> None:
             '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        col_export, col_quick, col_new = st.columns([0.95, 1.55, 1.1], gap="small")
+        col_export, col_quick, col_new = st.columns(3, gap="small")
         with col_export:
             st.button("Export", key="ast_export")
         with col_quick:
