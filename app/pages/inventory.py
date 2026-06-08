@@ -25,6 +25,7 @@ try:
         render_table_pagination_header,
         reset_table_page,
     )
+    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -46,7 +47,7 @@ try:
         set_view_mode,
         status_pill_html,
     )
-    from app.pages._core._data import load_inventory, lookup_options
+    from app.pages._core._data import load_inventory, load_recent_qr_scans, lookup_options
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.inventory_display_helpers import (
@@ -88,6 +89,7 @@ try:
         toggle_field_expanded,
     )
 except ImportError:
+    from components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table  # type: ignore
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
     from components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
@@ -126,7 +128,7 @@ except ImportError:
         set_view_mode,
         status_pill_html,
     )
-    from pages._core._data import load_inventory, lookup_options  # type: ignore
+    from pages._core._data import load_inventory, load_recent_qr_scans, lookup_options  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.inventory_display_helpers import (  # type: ignore
@@ -1003,20 +1005,33 @@ def render() -> None:
                 clear_field_expanded(FIELD_EXPANDED_INVENTORY_KEY)
                 st.rerun()
 
-    layout_filter_bar(_filters)
+    tab_items, tab_qr_history = st.tabs(["Items", "QR Scan History"])
 
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("inv_search") or "").strip(),
-        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
-    )
+    with tab_items:
+        layout_filter_bar(_filters)
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+        filtered = _filter_rows(
+            rows,
+            q=str(st.session_state.get("inv_search") or "").strip(),
+            stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
+        )
 
-    build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_inventory_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+        render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
+        page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+
+        build_modal_cache(filtered, cache_key=_CACHE_KEY)
+        _render_custom_inventory_table(page_rows, filter_options=filter_options)
+        render_table_pagination_footer(len(filtered), _TABLE_KEY)
+
+    with tab_qr_history:
+        inject_qr_scan_history_css()
+        st.caption(
+            "Recent inventory and tool QR scans — who scanned, what opened, and what action was recorded."
+        )
+        render_qr_scan_history_table(
+            load_recent_qr_scans(limit=25),
+            empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
+        )
 
     selected_inventory_id = st.session_state.get(SELECTED_INVENTORY_KEY)
     if selected_inventory_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):

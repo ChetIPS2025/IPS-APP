@@ -92,6 +92,7 @@ try:
         INVENTORY_USE_IN_SHOP_LABEL,
         INVENTORY_USE_ON_JOB_LABEL,
         inventory_action_label,
+        serialized_tool_action_label,
     )
 except ImportError:
     from services.tracking_terminology import (  # type: ignore
@@ -99,6 +100,7 @@ except ImportError:
         INVENTORY_USE_IN_SHOP_LABEL,
         INVENTORY_USE_ON_JOB_LABEL,
         inventory_action_label,
+        serialized_tool_action_label,
     )
 
 try:
@@ -256,6 +258,65 @@ def _scan_audit_fields(*, device_label: str, manual_actor: str) -> dict[str, Any
     if dv:
         out["device_label"] = dv[:200]
     return out
+
+
+def _qr_scan_logging_context() -> dict[str, Any]:
+    ua = request_user_agent()
+    suf = str(st.session_state.get("ips_inv_device_suffix") or "")
+    device = str(st.session_state.get("inv_scan_device_display") or "").strip()
+    if not device:
+        device = format_device_label(device_family_from_user_agent(ua), suf)
+    return {
+        "scanned_by_user_id": _scan_profile_user_id() or _auth_user_id_str(),
+        "scanned_by_name": _scan_profile_name() or _created_by_label(),
+        "employee_id": _profile_employee_id(),
+        "device_label": device,
+    }
+
+
+def _inventory_qr_display_value(item: dict[str, Any], *, fallback: str = "") -> str:
+    try:
+        from app.services.inventory_display_helpers import resolve_inventory_qr_value
+    except ImportError:
+        from services.inventory_display_helpers import resolve_inventory_qr_value  # type: ignore
+    return resolve_inventory_qr_value(item) or fallback
+
+
+def _asset_qr_display_value(asset: dict[str, Any], *, fallback: str = "") -> str:
+    return str(asset.get("qr_code_value") or asset.get("asset_id") or fallback or "").strip()
+
+
+def _log_qr_scan_event(**kwargs: Any) -> None:
+    try:
+        from app.services.qr_scan_event_service import record_qr_scan_event
+    except ImportError:
+        from services.qr_scan_event_service import record_qr_scan_event  # type: ignore
+    ctx = _qr_scan_logging_context()
+    record_qr_scan_event(**{**ctx, **kwargs})
+
+
+def _log_qr_scan_opened_once(
+    *,
+    qr_value: str,
+    item_type: str,
+    item_name: str,
+    inventory_item_id: str | None = None,
+    asset_id: str | None = None,
+    source: str = "qr_scan",
+) -> None:
+    dedupe = f"_ips_qr_evt_open_{item_type}_{inventory_item_id or asset_id or qr_value}"
+    if st.session_state.get(dedupe):
+        return
+    st.session_state[dedupe] = True
+    _log_qr_scan_event(
+        qr_value=qr_value,
+        result="opened",
+        item_type=item_type,
+        item_name=item_name,
+        inventory_item_id=inventory_item_id,
+        asset_id=asset_id,
+        source=source,
+    )
 
 
 def _inv_item_thumb_display(item: dict) -> None:
@@ -567,9 +628,10 @@ def _render_inv_scan_asset_panel(
                 except Exception as exc:
                     st.error(f"Could not check out: {exc}")
                     st.stop()
+                tool_txn_id: str | None = None
                 if txn_ok:
                     try:
-                        insert_row_admin(
+                        txn_ins = insert_row_admin(
                             _TOOL_TXN,
                             {
                                 "tool_id": tid,
@@ -579,8 +641,22 @@ def _render_inv_scan_asset_panel(
                                 "notes": str(notes or "").strip()[:2000],
                             },
                         )
+                        if isinstance(txn_ins, dict):
+                            tool_txn_id = str(txn_ins.get("id") or "") or None
                     except Exception as exc:
                         st.warning(f"Checked out but log failed: {exc}")
+                _log_qr_scan_event(
+                    qr_value=_asset_qr_display_value(tool),
+                    result="success",
+                    item_type="asset",
+                    item_name=name,
+                    asset_id=tid,
+                    action_taken=serialized_tool_action_label("CHECK_OUT"),
+                    job_id=new_jid,
+                    destination_type="job" if new_jid else None,
+                    tool_transaction_id=tool_txn_id,
+                    source="inventory_scan_desktop",
+                )
                 st.session_state.pop("inv_scan_asset", None)
                 st.success("Tool checked out.")
                 st.rerun()
@@ -616,9 +692,10 @@ def _render_inv_scan_asset_panel(
             except Exception as exc:
                 st.error(f"Could not check in: {exc}")
                 st.stop()
+            tool_txn_id: str | None = None
             if txn_ok:
                 try:
-                    insert_row_admin(
+                    txn_ins = insert_row_admin(
                         _TOOL_TXN,
                         {
                             "tool_id": tid,
@@ -628,8 +705,20 @@ def _render_inv_scan_asset_panel(
                             "notes": str(notes or "").strip()[:2000],
                         },
                     )
+                    if isinstance(txn_ins, dict):
+                        tool_txn_id = str(txn_ins.get("id") or "") or None
                 except Exception as exc:
                     st.warning(f"Checked in but log failed: {exc}")
+            _log_qr_scan_event(
+                qr_value=_asset_qr_display_value(tool),
+                result="success",
+                item_type="asset",
+                item_name=name,
+                asset_id=tid,
+                action_taken=serialized_tool_action_label("CHECK_IN"),
+                tool_transaction_id=tool_txn_id,
+                source="inventory_scan_desktop",
+            )
             st.session_state.pop("inv_scan_asset", None)
             st.success("Tool checked in.")
             st.rerun()
@@ -781,6 +870,14 @@ def _render_inventory_scan_inner() -> None:
             st.session_state.pop("_ips_inv_scan_deeplink_code", None)
             st.session_state.pop("pending_scan_code", None)
         elif out_dl == "none":
+            _log_qr_scan_event(
+                qr_value=_dl,
+                result="unknown_item",
+                item_type="unknown",
+                item_name="Unknown item",
+                error_message="No inventory or asset matched deeplink",
+                source="inventory_scan_deeplink",
+            )
             st.error(
                 f"Nothing found for `{html.escape(_dl)}` — try **Inventory** list, **Asset Database**, "
                 "or manual entry below."
@@ -861,6 +958,14 @@ def _render_inventory_scan_inner() -> None:
             st.warning("Enter a scan code.")
         elif outcome == "none":
             shown = norm or str(scan_code or "").strip() or "—"
+            _log_qr_scan_event(
+                qr_value=shown,
+                result="unknown_item",
+                item_type="unknown",
+                item_name="Unknown item",
+                error_message="Manual scan lookup returned no match",
+                source="inventory_scan_lookup",
+            )
             st.error(f"Nothing found: `{html.escape(shown)}`")
             st.session_state.pop("inv_scan_loaded", None)
             st.session_state.pop("inv_scan_asset", None)
@@ -918,6 +1023,13 @@ def _render_inventory_scan_inner() -> None:
         return
 
     if isinstance(asset_loaded, dict) and asset_loaded and not asset_loaded.get("_choices"):
+        _log_qr_scan_opened_once(
+            qr_value=_asset_qr_display_value(asset_loaded),
+            item_type="asset",
+            item_name=str(asset_loaded.get("asset_name") or "Tool"),
+            asset_id=str(asset_loaded.get("id") or "") or None,
+            source="inventory_scan_desktop",
+        )
         _render_inv_scan_asset_panel(
             asset_loaded,
             jobs=jobs,
@@ -952,6 +1064,13 @@ def _render_inventory_scan_inner() -> None:
         return
 
     iid = str(item.get("id") or "")
+    _log_qr_scan_opened_once(
+        qr_value=_inventory_qr_display_value(item, fallback=str(item.get("sku") or "")),
+        item_type="inventory",
+        item_name=str(item.get("item_name") or item.get("name") or "Inventory item"),
+        inventory_item_id=iid or None,
+        source="inventory_scan_desktop",
+    )
     name = str(item.get("item_name") or "—").strip()
     sku = str(item.get("sku") or "").strip() or "—"
     qoh = _qty_on_hand(item)
@@ -1108,6 +1227,22 @@ def _render_inventory_scan_inner() -> None:
         if not result.ok:
             st.error(result.error or "Could not issue inventory to job.")
             st.stop()
+        txn_row = result.data.get("transaction") if isinstance(result.data, dict) else {}
+        txn_id = str((txn_row or {}).get("id") or "").strip() or None
+        _log_qr_scan_event(
+            qr_value=_inventory_qr_display_value(item, fallback=sku),
+            result="success",
+            item_type="inventory",
+            item_name=name,
+            inventory_item_id=iid,
+            action_taken=inventory_action_label("consume_on_job"),
+            job_id=jid,
+            destination_type="job",
+            quantity=qv,
+            unit=str(item.get("unit") or "EA"),
+            inventory_transaction_id=txn_id,
+            source="inventory_scan_desktop",
+        )
         st.session_state.pop("inv_scan_loaded", None)
         st.success("Material consumed on job. Stock and job costing updated.")
         st.rerun()
@@ -1176,6 +1311,19 @@ def _render_inventory_scan_inner() -> None:
         st.error(f"Transaction log failed; changes rolled back. {exc}")
         st.stop()
 
+    _log_qr_scan_event(
+        qr_value=_inventory_qr_display_value(item, fallback=sku),
+        result="success",
+        item_type="inventory",
+        item_name=name,
+        inventory_item_id=iid,
+        action_taken=inventory_action_label(txn_type),
+        job_id=jid,
+        destination_type="shop" if itype == INVENTORY_USE_IN_SHOP_LABEL else ("job" if jid else None),
+        quantity=qv,
+        unit=str(item.get("unit") or "EA"),
+        source="inventory_scan_desktop",
+    )
     st.session_state.pop("inv_scan_loaded", None)
     st.success("Material consumed.")
     st.rerun()
@@ -1386,6 +1534,14 @@ def _render_scan_manual_lookup(*, err: str = "") -> None:
         )
         st.session_state.pop("_ips_scan_legacy_code", None)
         st.rerun()
+    _log_qr_scan_event(
+        qr_value=norm or raw,
+        result="unknown_item",
+        item_type="unknown",
+        item_name="Unknown item",
+        error_message=legacy_err or "Nothing found for that code.",
+        source="mobile_qr_scan_lookup",
+    )
     st.error(legacy_err or "Nothing found for that code.")
 
 
@@ -1555,6 +1711,20 @@ def _submit_mobile_inventory_scan(
         if not ok:
             st.error(err or "Could not record shop use.")
             st.stop()
+        _log_qr_scan_event(
+            qr_value=_inventory_qr_display_value(item, fallback=str(item.get("sku") or "")),
+            result="success",
+            item_type="inventory",
+            item_name=str(item.get("name") or item.get("item_name") or "Inventory item"),
+            inventory_item_id=iid,
+            action_taken=inventory_action_label("SHOP"),
+            destination_type="shop",
+            quantity=qv,
+            unit=unit,
+            scanned_by_name=actor_name,
+            scanned_by_phone=phone_norm or None,
+            source="mobile_qr_scan",
+        )
         st.session_state["inv_scan_success_payload"] = {
             "item": item,
             "action": "shop_use",
@@ -1598,6 +1768,24 @@ def _submit_mobile_inventory_scan(
         st.error(result.error or "Could not record transaction.")
         st.stop()
 
+    txn_row = result.data.get("transaction") if isinstance(result.data, dict) else {}
+    txn_id = str((txn_row or {}).get("id") or "").strip() or None
+    _log_qr_scan_event(
+        qr_value=_inventory_qr_display_value(item, fallback=str(item.get("sku") or "")),
+        result="success",
+        item_type="inventory",
+        item_name=str(item.get("name") or item.get("item_name") or "Inventory item"),
+        inventory_item_id=iid,
+        action_taken=inventory_action_label(action),
+        job_id=job_id,
+        destination_type="job",
+        quantity=qv,
+        unit=unit,
+        scanned_by_name=actor_name,
+        scanned_by_phone=phone_norm or None,
+        inventory_transaction_id=txn_id,
+        source="mobile_qr_scan",
+    )
     st.session_state["inv_scan_success_payload"] = {
         "item": item,
         "action": action,
@@ -1671,8 +1859,31 @@ def render_inventory_scan_page() -> None:
 
     item, err = _load_scan_item()
     if err or not item:
+        qr_attempt = (
+            _first_query_param("sku")
+            or _first_query_param("token")
+            or _first_query_param("item_id")
+            or str(st.session_state.get("_ips_scan_legacy_code") or "")
+        )
+        if qr_attempt and err:
+            _log_qr_scan_event(
+                qr_value=qr_attempt,
+                result="failed" if "missing" in err.casefold() else "unknown_item",
+                item_type="unknown",
+                item_name="Unknown item",
+                error_message=err,
+                source="mobile_qr_scan",
+            )
         _render_scan_manual_lookup(err=err or "Invalid inventory QR code.")
         return
+
+    _log_qr_scan_opened_once(
+        qr_value=_inventory_qr_display_value(item, fallback=str(item.get("sku") or "")),
+        item_type="inventory",
+        item_name=str(item.get("name") or item.get("item_name") or "Inventory item"),
+        inventory_item_id=str(item.get("id") or "") or None,
+        source="mobile_qr_scan",
+    )
 
     if not _scan_can_submit():
         st.error("Your role cannot record inventory use.")

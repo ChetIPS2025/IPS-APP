@@ -1,0 +1,97 @@
+---
+description: Unified activity feed — one normalized record shape for all surfaces
+globs:
+  - app/**/*.py
+  - sql/**/*.sql
+---
+
+# Unified activity feed (target architecture)
+
+One normalized activity model for Dashboard, Job Details Activity, Asset History, Inventory Transactions, and future surfaces.
+
+## Normalized record (`ActivityRecord`)
+
+```python
+@dataclass
+class ActivityRecord:
+    id: str
+    created_at: datetime
+    actor_id: str | None          # profile / employee
+    actor_name: str
+    action_type: str              # stable machine key, e.g. inventory.consume_on_job
+    domain: str                   # inventory | asset | small_tool | job | estimate | timekeeping | document
+    display_text: str             # pre-rendered one-liner for lists
+    # Optional links (at least one when scoped)
+    job_id: str | None = None
+    inventory_item_id: str | None = None
+    asset_id: str | None = None
+    customer_id: str | None = None
+    estimate_id: str | None = None
+    # UI hints (optional — renderer can derive from domain + action_type)
+    icon: str = "📋"
+    icon_bg: str = "#eff6ff"
+    meta: str = ""                # job · actor · relative time
+    source_table: str = ""        # inventory_transactions, tool_transactions, job_activity_log, …
+    source_id: str = ""
+```
+
+Feed renderer input (what `render_activity_feed` expects today):
+
+```python
+{"icon", "icon_bg", "title", "meta"}  # title ← display_text
+```
+
+## Write path — log at mutation time
+
+When recording inventory use, tool checkout, small-tool adjust, doc upload, timesheet approval, etc.:
+
+1. Persist the domain transaction (existing table).
+2. Optionally insert into a unified `activity_events` table **or** rely on adapters that read domain tables.
+
+Prefer **dual-write to `activity_events`** only when a domain table is missing or hard to query across domains. Otherwise start with **read adapters** (current `dashboard_item_activity_service` approach).
+
+## Read path — one query API
+
+```python
+# app/services/activity_feed_service.py (future)
+def list_activity(
+    *,
+    limit: int = 50,
+    job_id: str | None = None,
+    asset_id: str | None = None,
+    inventory_item_id: str | None = None,
+    domains: list[str] | None = None,
+) -> list[ActivityRecord]: ...
+```
+
+Surface-specific filters:
+
+| Surface | Filter |
+|---------|--------|
+| Dashboard Recent Item Activity | `domains=["inventory","asset","small_tool"]`, limit 10 |
+| Job Details Activity | `job_id=…` |
+| Asset History | `asset_id=…` |
+| Inventory Transactions tab | `inventory_item_id=…` (or keep txn table; same labels via `tracking_terminology`) |
+
+## Action types & labels
+
+- Machine keys: `inventory.consume_on_job`, `asset.check_out`, `small_tool.adjust`, `job.document_upload`, `timekeeping.approved`
+- Display labels: `inventory_action_label()`, `serialized_tool_action_label()`, `small_tool_action_label()` — never duplicate strings in pages
+
+## Current state (incremental migration)
+
+| Source | Status |
+|--------|--------|
+| `qr_scan_events` | Dedicated QR open/success/fail log (`qr_scan_event_service`) |
+| `inventory_transactions` | Adapter in `dashboard_item_activity_service` |
+| `tool_transactions` | Adapter in `dashboard_item_activity_service` |
+| `job_activity_log` / `estimate_activity_log` | Separate tables; not in unified feed yet |
+| Small tool moves | No txn log yet — add table or `activity_events` on adjust |
+| `render_activity_feed` | Shared UI renderer |
+| `render_activity_panel` | Detail strip — should consume `ActivityRecord` later |
+
+## Rules
+
+- New activity UIs call `list_activity()` (or scoped adapter), not per-page `_fmt_ts` / local feed builders
+- Extend `activity_feed_service` / adapters — do not add a third feed format
+- Domain mutations that users care about should be queryable as activity within one release of the write

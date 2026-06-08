@@ -158,6 +158,114 @@ def demo_activities() -> list[dict[str, str]]:
     ]
 
 
+def demo_item_activities() -> list[dict[str, str]]:
+    return [
+        {"icon": "📦", "icon_bg": "#f3e8ff", "title": "Used on job · PVC cement (4 EA)", "meta": "J26047 · 2h ago"},
+        {"icon": "🔧", "icon_bg": "#ffedd5", "title": "Checked out · Milwaukee M18 impact", "meta": "J26047 · Alex · 3h ago"},
+        {"icon": "📦", "icon_bg": "#f3e8ff", "title": "Used in shop · Wire nuts (50 EA)", "meta": "Shop · 5h ago"},
+        {"icon": "🔧", "icon_bg": "#dcfce7", "title": "Checked in · Hilti rotary hammer", "meta": "Maria · Yesterday"},
+        {"icon": "🔧", "icon_bg": "#e0f2fe", "title": "Assigned · DeWalt circular saw", "meta": "Trailer 2 · Yesterday"},
+        {"icon": "📦", "icon_bg": "#f3e8ff", "title": "Used on job · THHN wire (200 FT)", "meta": "J26048 · 2d ago"},
+        {"icon": "🔧", "icon_bg": "#dbeafe", "title": "Returned · Fluke multimeter", "meta": "J26047 · 2d ago"},
+        {"icon": "📦", "icon_bg": "#f3e8ff", "title": "Used on job · EMT connectors (12 EA)", "meta": "J26049 · 3d ago"},
+        {"icon": "🔧", "icon_bg": "#ffedd5", "title": "Checked out · Greenlee bender", "meta": "J26048 · Chris · 3d ago"},
+        {"icon": "📦", "icon_bg": "#f3e8ff", "title": "Used in shop · Electrical tape (6 EA)", "meta": "Shop · 4d ago"},
+    ]
+
+
+def load_recent_item_activity(*, limit: int = 10) -> list[dict[str, str]]:
+    try:
+        from app.services.dashboard_item_activity_service import recent_item_activity_feed
+    except ImportError:
+        from services.dashboard_item_activity_service import recent_item_activity_feed  # type: ignore
+    items = recent_item_activity_feed(limit=limit)
+    if items:
+        return items
+    return demo_item_activities()[:limit]
+
+
+def demo_qr_scans() -> list[dict[str, str]]:
+    return [
+        {
+            "scanned_at": "2026-05-30T14:30:00Z",
+            "qr_value": "INV-WIRE-220",
+            "item_name": "THHN wire 12 AWG",
+            "item_type": "Inventory",
+            "result": "Opened",
+            "job_shop": "—",
+            "scanned_by": "Chris Ortiz",
+            "device_source": "Android · mobile_qr_scan",
+            "action_taken": "—",
+        },
+        {
+            "scanned_at": "2026-05-30T14:22:00Z",
+            "qr_value": "INV-AB12CD34",
+            "item_name": "PVC cement 8 oz",
+            "item_type": "Inventory",
+            "result": "Success",
+            "job_shop": "J26047 · Riverside TI",
+            "scanned_by": "Alex Rivera",
+            "device_source": "iPhone · QR scan",
+            "action_taken": "Used on job",
+        },
+        {
+            "scanned_at": "2026-05-30T13:05:00Z",
+            "qr_value": "AST-M18-0042",
+            "item_name": "Milwaukee M18 impact",
+            "item_type": "Asset / Tool",
+            "result": "Success",
+            "job_shop": "J26047 · Riverside TI",
+            "scanned_by": "Maria Chen",
+            "device_source": "QR scan",
+            "action_taken": "Checked out",
+        },
+        {
+            "scanned_at": "2026-05-30T11:48:00Z",
+            "qr_value": "INV-FF009911",
+            "item_name": "Wire nuts (yellow)",
+            "item_type": "Inventory",
+            "result": "Success",
+            "job_shop": "Shop",
+            "scanned_by": "Chris Ortiz",
+            "device_source": "Shop cart A · QR scan",
+            "action_taken": "Used in shop",
+        },
+        {
+            "scanned_at": "2026-05-30T10:15:00Z",
+            "qr_value": "UNKNOWN-QR-9921",
+            "item_name": "Unknown item",
+            "item_type": "Inventory",
+            "result": "Unknown item",
+            "job_shop": "—",
+            "scanned_by": "Field scanner",
+            "device_source": "Android · QR scan",
+            "action_taken": "—",
+        },
+        {
+            "scanned_at": "2026-05-29T16:40:00Z",
+            "qr_value": "AST-HILTI-018",
+            "item_name": "Hilti rotary hammer",
+            "item_type": "Asset / Tool",
+            "result": "Success",
+            "job_shop": "—",
+            "scanned_by": "Maria Chen",
+            "device_source": "QR scan",
+            "action_taken": "Checked in",
+        },
+    ]
+
+
+def load_recent_qr_scans(*, limit: int = 25, inventory_item_id: str | None = None) -> list[dict[str, str]]:
+    try:
+        from app.services.qr_scan_log_service import recent_qr_scans
+    except ImportError:
+        from services.qr_scan_log_service import recent_qr_scans  # type: ignore
+    rows = recent_qr_scans(limit=limit, inventory_item_id=inventory_item_id)
+    if rows:
+        return rows
+    return demo_qr_scans()[:limit]
+
+
 def demo_deadlines() -> list[dict[str, str]]:
     today = date.today()
     return [

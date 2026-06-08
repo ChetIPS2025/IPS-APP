@@ -11,17 +11,20 @@ try:
     from app.auth import current_profile
     from app.components.cards import render_kpi_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
+    from app.components.feeds import render_activity_feed
+    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
     from app.components.headers import render_page_header
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.pages.modules._data import (
-        demo_activities,
         demo_deadlines,
         demo_job_status,
         demo_recent_jobs,
         demo_sales_categories,
         demo_sales_series,
         load_dashboard_kpis,
+        load_recent_item_activity,
+        load_recent_qr_scans,
     )
     from app.styles import inject_global_css
     from app.utils.formatting import fmt_currency, fmt_date
@@ -29,17 +32,20 @@ except ImportError:
     from auth import current_profile  # type: ignore
     from components.cards import render_kpi_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
+    from components.feeds import render_activity_feed  # type: ignore
+    from components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table  # type: ignore
     from components.headers import render_page_header  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from pages.modules._data import (  # type: ignore
-        demo_activities,
         demo_deadlines,
         demo_job_status,
         demo_recent_jobs,
         demo_sales_categories,
         demo_sales_series,
         load_dashboard_kpis,
+        load_recent_item_activity,
+        load_recent_qr_scans,
     )
     from styles import inject_global_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
@@ -118,15 +124,14 @@ def render() -> None:
         render_donut_chart(cats, center_label="Total", center_value=fmt_currency(total), money_legend=True)
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
     with row1_r:
-        st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent Activity</p>', unsafe_allow_html=True)
-        for act in demo_activities():
-            st.markdown(
-                f'<{ot} class="ips-activity-item">'
-                f'<{ot} class="ips-activity-icon" style="background:{act["bg"]}">{act["icon"]}</{ot}>'
-                f"<{ot}><span>{html.escape(act['text'])}</span>"
-                f'<{ot} class="ips-activity-meta">{html.escape(act["time"])}</{ot}></{ot}></{ot}>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent Item Activity</p>',
+            unsafe_allow_html=True,
+        )
+        render_activity_feed(
+            load_recent_item_activity(limit=10),
+            empty_message="No recent item activity.",
+        )
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     row2_l, row2_m, row2_r = st.columns([1.2, 1.2, 1], gap="medium")
@@ -157,6 +162,14 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
+
+    inject_qr_scan_history_css()
+    st.markdown(
+        f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent QR Scans</p>',
+        unsafe_allow_html=True,
+    )
+    render_qr_scan_history_table(load_recent_qr_scans(limit=10), compact=True)
+    st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent Jobs</p>', unsafe_allow_html=True)
 
