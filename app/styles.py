@@ -2648,10 +2648,16 @@ def inject_table_viewport_fit() -> None:
     """Scale wide list tables to fit the main content area; full width when there is room."""
     st.markdown(
         """
-<style id="ips-table-viewport-fit-v1">
+<style id="ips-table-viewport-fit-v2">
 section[data-testid="stMain"] [class*="_table_wrap"] {
   width: 100% !important;
   max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+section[data-testid="stMain"] .st-key-timekeeping_table_wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
   box-sizing: border-box !important;
 }
 section[data-testid="stMain"] .ips-data-table-scroll {
@@ -2671,6 +2677,8 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
 }
 [class*="_table_wrap"].ips-table-fit-scaled [data-testid="stHorizontalBlock"] > [data-testid="column"],
 [class*="_table_wrap"].ips-table-fit-scaled .ips-users-ellipsis,
+[class*="_table_wrap"].ips-table-fit-scaled .ips-timekeeping-employee,
+[class*="_table_wrap"].ips-table-fit-scaled .employee-name,
 [class*="_table_wrap"].ips-table-fit-scaled [class*="-ellipsis"] {
   overflow: visible !important;
   text-overflow: clip !important;
@@ -2709,7 +2717,25 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
     return w.innerWidth || 1200;
   }
 
-  function measureNeeded(scaler) {
+  function isTimekeepingWrap(wrap) {
+    return !!(wrap && wrap.classList && wrap.classList.contains('st-key-timekeeping_table_wrap'));
+  }
+
+  function measureNeeded(scaler, wrap) {
+    if (isTimekeepingWrap(wrap)) {
+      var tkMax = 0;
+      var tkRows = scaler.querySelectorAll(
+        '[data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker), ' +
+          '[data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker)'
+      );
+      for (var t = 0; t < tkRows.length; t++) {
+        var row = tkRows[t];
+        if (row.closest('[class*="st-key-tk_expand_detail_"]')) continue;
+        var rowW = row.scrollWidth || row.offsetWidth;
+        if (rowW > tkMax) tkMax = rowW;
+      }
+      return tkMax;
+    }
     var max = 0;
     var blocks = scaler.querySelectorAll('[data-testid="stHorizontalBlock"]');
     for (var i = 0; i < blocks.length; i++) {
@@ -2720,6 +2746,27 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
     }
     var root = scaler.scrollWidth || scaler.offsetWidth;
     return Math.max(max, root);
+  }
+
+  function resetTkExpandInverse(wrap) {
+    if (!wrap || !wrap.querySelectorAll) return;
+    wrap.querySelectorAll('[class*="st-key-tk_expand_detail_"]').forEach(function (el) {
+      el.style.transform = '';
+      el.style.transformOrigin = '';
+      el.style.width = '';
+      el.style.maxWidth = '';
+    });
+  }
+
+  function applyTkExpandInverse(wrap, scale) {
+    if (!isTimekeepingWrap(wrap) || !scale || scale >= 0.995) return;
+    var inv = 1 / scale;
+    wrap.querySelectorAll('[class*="st-key-tk_expand_detail_"]').forEach(function (el) {
+      el.style.transformOrigin = 'top left';
+      el.style.transform = 'scale(' + inv + ')';
+      el.style.width = 100 * scale + '%';
+      el.style.maxWidth = 100 * scale + '%';
+    });
   }
 
   function getScaler(wrap) {
@@ -2745,16 +2792,16 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
     wrap.style.minHeight = '';
     wrap.classList.remove('ips-table-fit-host', 'ips-table-fit-scaled');
     wrap.dataset.ipsTableFitScale = '1';
+    resetTkExpandInverse(wrap);
   }
 
   function applyOne(wrap) {
     if (!wrap || wrap.closest('.ips-proposal-preview-root, .ips-login-page-marker')) return;
-    if (wrap.closest('.st-key-timekeeping_table_wrap')) return;
     var scaler = getScaler(wrap);
     if (!scaler) return;
     resetWrap(wrap, scaler);
     var available = getAvailable(wrap);
-    var needed = measureNeeded(scaler);
+    var needed = measureNeeded(scaler, wrap);
     if (!available || !needed || needed <= available + 2) return;
     var scale = Math.max(MIN_SCALE, available / needed);
     if (scale >= 0.995) return;
@@ -2765,6 +2812,7 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
     var h = (scaler.offsetHeight || scaler.scrollHeight) * scale;
     wrap.style.minHeight = Math.ceil(h + 6) + 'px';
     wrap.dataset.ipsTableFitScale = String(scale);
+    applyTkExpandInverse(wrap, scale);
   }
 
   function runAll() {
@@ -2801,7 +2849,7 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
 </script>
 """
     try:
-        components.html(html_doc, height=0, key="ips_table_viewport_fit_v1")
+        components.html(html_doc, height=0, key="ips_table_viewport_fit_v2")
     except TypeError:
         components.html(html_doc, height=0)
 
@@ -3436,21 +3484,24 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v87">
+<style id="ips-timekeeping-module-v89">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: visible;
   margin-bottom: 0.5rem;
-  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }}
 .st-key-timekeeping_table_wrap > [data-testid="stVerticalBlock"] {{
-  overflow-x: auto;
+  overflow-x: visible;
   min-width: 0;
-  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  width: 100%;
 }}
 .ips-timekeeping-header-row {{
   background: #f8fafc;
@@ -5848,17 +5899,26 @@ def inject_timekeeping_module_css() -> None:
   white-space: nowrap;
 }}
 .st-key-timekeeping_table_wrap {{
-  overflow-x: auto;
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }}
 .st-key-timekeeping_table_wrap > [data-testid="stVerticalBlock"] {{
-  overflow-x: auto;
+  overflow-x: visible;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}}
+.st-key-timekeeping_table_wrap.ips-table-fit-host {{
+  overflow-x: hidden !important;
 }}
 @media (max-width: 900px) {{
   .st-key-timekeeping_table_wrap,
   .st-key-timekeeping_table_wrap > [data-testid="stVerticalBlock"],
   .timekeeping-list-scroll {{
-    overflow-x: auto;
+    overflow-x: hidden;
+    max-width: 100%;
   }}
   {tk_list_outer_row} {{
     min-width: 1382px !important;
@@ -6448,80 +6508,112 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1.2 !important;
   white-space: nowrap !important;
 }}
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-day-grid-marker),
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-rail-marker) {{
+{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker) {{
   display: flex !important;
   flex-wrap: nowrap !important;
-  align-items: flex-start !important;
-  gap: 14px !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
   width: 100% !important;
   max-width: 100% !important;
-  min-height: 0 !important;
-  height: auto !important;
-  max-height: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  margin: 10px 0 0 !important;
+  padding: 10px 0 2px !important;
+  border-top: 1px solid #e2e8f0 !important;
   overflow: visible !important;
 }}
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-day-grid-marker)
+{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker)
   > [data-testid="column"]:first-child {{
-  flex: 1 1 auto !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
-  overflow: visible !important;
-  height: auto !important;
-  max-height: none !important;
 }}
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-rail-marker)
-  > [data-testid="column"]:last-child,
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-day-grid-marker)
+{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker)
   > [data-testid="column"]:last-child {{
-  flex: 0 0 {tk_alloc_actions_col_min_w} !important;
-  width: {tk_alloc_actions_col_min_w} !important;
-  min-width: {tk_alloc_actions_col_min_w} !important;
-  max-width: {tk_alloc_actions_col_min_w} !important;
-  align-self: flex-end !important;
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}}
-{tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-alloc-day-grid-marker)
-  > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"] {{
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
   display: flex !important;
-  flex-direction: column !important;
-  gap: 8px !important;
-  width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}}
-{tk_alloc_day} [class*="st-key-tk_alloc_day_rail_"],
-{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-day-rail-marker) {{
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
   justify-content: flex-end !important;
-  gap: 8px !important;
-  padding-top: 0 !important;
-  padding-bottom: 2px !important;
-  min-width: {tk_alloc_actions_col_min_w} !important;
+  overflow: visible !important;
 }}
-{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-day-rail-marker) [data-testid="stButton"] > button {{
-  width: 100% !important;
-  min-height: 36px !important;
-  font-size: 0.8rem !important;
-  font-weight: 700 !important;
+.timekeeping-alloc-day-actions-status {{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
   white-space: nowrap !important;
 }}
-{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-day-rail-marker)
-  [data-testid="stButton"] > button[kind="secondary"] {{
-  background: #f8fafc !important;
-  color: #92400e !important;
+.timekeeping-alloc-day-actions-status-label {{
+  font-size: 0.78rem !important;
   font-weight: 700 !important;
-  border: 1px solid #d1d5db !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
 }}
-{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-day-rail-marker) {{
-  padding-top: 1.35rem !important;
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker) {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  > [data-testid="stVerticalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin-left: auto !important;
+  overflow: visible !important;
+}}
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  width: auto !important;
+  min-width: max-content !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}}
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  [data-testid="stButton"] {{
+  width: auto !important;
+  min-width: max-content !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}}
+{tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
+  [data-testid="stButton"] > button {{
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
 }}
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) .timekeeping-alloc-remaining-text {{
   color: #15803d !important;
