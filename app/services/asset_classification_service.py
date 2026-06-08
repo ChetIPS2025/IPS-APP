@@ -38,6 +38,52 @@ def _has_serial(raw: object) -> bool:
     return bool(serial and serial.casefold() not in _PLACEHOLDER_SERIAL)
 
 
+def find_asset_by_serial(serial: str, *, exclude_asset_id: str = "") -> dict[str, Any] | None:
+    """Return another asset that already uses this serial number, if any."""
+    serial_clean = _clean_text(serial)
+    if not _has_serial(serial_clean):
+        return None
+    exclude = _clean_text(exclude_asset_id)
+    serial_cf = serial_clean.casefold()
+    rows, _ = fetch_rows(_ASSETS, limit=10000)
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        rid = _clean_text(row.get("id"))
+        if exclude and rid == exclude:
+            continue
+        other = _clean_text(row.get("serial_number"))
+        if other and other.casefold() == serial_cf:
+            return row
+    return None
+
+
+def validate_serial_numbers_for_bulk(
+    asset_ids: list[str],
+    serial_by_id: dict[str, str],
+    *,
+    assets_by_id: dict[str, dict[str, Any]] | None = None,
+) -> tuple[bool, str]:
+    """Ensure every asset has a unique serial before bulk move to Serialized Tools."""
+    assets = assets_by_id or {}
+    seen: dict[str, str] = {}
+    for aid in asset_ids:
+        asset = assets.get(aid) or {}
+        serial = _clean_text(serial_by_id.get(aid)) or _clean_text(asset.get("serial_number"))
+        if not _has_serial(serial):
+            label = _clean_text(asset.get("asset_name") or asset.get("name")) or aid
+            return False, f"Serial number is required for {label}."
+        serial_cf = serial.casefold()
+        if serial_cf in seen:
+            return False, f"Duplicate serial number in this move: {serial}."
+        seen[serial_cf] = aid
+        existing = find_asset_by_serial(serial, exclude_asset_id=aid)
+        if existing:
+            other_label = _clean_text(existing.get("asset_name") or existing.get("name")) or "another asset"
+            return False, f"Serial number {serial} is already assigned to {other_label}."
+    return True, ""
+
+
 def _normalize_tracking_type(raw: object) -> str:
     tt = _clean_text(raw).casefold().replace(" ", "_").replace("-", "_")
     aliases = {
@@ -206,6 +252,13 @@ def reclassify_asset(
                 ok=False,
                 error="Serialized tools require a serial number. Enter one before reclassifying.",
             )
+        existing = find_asset_by_serial(serial, exclude_asset_id=aid)
+        if existing:
+            other_label = _clean_text(existing.get("asset_name") or existing.get("name")) or "another asset"
+            return ServiceResult(
+                ok=False,
+                error=f"Serial number {serial} is already assigned to {other_label}.",
+            )
         payload.update(
             {
                 "serial_number": serial,
@@ -273,7 +326,12 @@ def reclassify_asset(
     return result
 
 
-def reclassify_assets_bulk(asset_ids: list[str], target: str) -> ServiceResult:
+def reclassify_assets_bulk(
+    asset_ids: list[str],
+    target: str,
+    *,
+    serial_numbers: dict[str, str] | None = None,
+) -> ServiceResult:
     """Move multiple assets to the same tab. Skips kits and invalid rows; reports per-item errors."""
     bucket = _normalize_tracking_type(target)
     if bucket not in TRACKING_TYPES:
@@ -283,12 +341,19 @@ def reclassify_assets_bulk(asset_ids: list[str], target: str) -> ServiceResult:
     if not ids:
         return ServiceResult(ok=False, error="Select at least one asset.")
 
+    serial_map = {_clean_text(k): _clean_text(v) for k, v in (serial_numbers or {}).items() if _clean_text(k)}
+
     moved: list[str] = []
     unchanged: list[str] = []
     skipped: list[dict[str, str]] = []
 
     for aid in ids:
-        result = reclassify_asset(aid, bucket)
+        kwargs: dict[str, Any] = {}
+        if bucket == "serialized":
+            serial = serial_map.get(aid)
+            if serial:
+                kwargs["serial_number"] = serial
+        result = reclassify_asset(aid, bucket, **kwargs)
         if result.ok:
             if result.data and result.data.get("unchanged"):
                 unchanged.append(aid)
@@ -330,10 +395,12 @@ __all__ = [
     "TRACKING_TAB_LABELS",
     "TRACKING_TYPES",
     "asset_belongs_to_tab",
+    "find_asset_by_serial",
     "is_equipment_tab_asset",
     "is_serialized_tab_asset",
     "reclassify_asset",
     "reclassify_assets_bulk",
     "resolve_tracking_type",
     "tracking_type_label",
+    "validate_serial_numbers_for_bulk",
 ]

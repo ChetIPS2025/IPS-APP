@@ -14,6 +14,7 @@ try:
         reclassify_assets_bulk,
         resolve_tracking_type,
         tracking_type_label,
+        validate_serial_numbers_for_bulk,
     )
     from app.services.asset_kits_service import asset_is_kit
     from app.services.small_hand_tool_service import STORAGE_TYPES
@@ -25,12 +26,14 @@ except ImportError:
         reclassify_assets_bulk,
         resolve_tracking_type,
         tracking_type_label,
+        validate_serial_numbers_for_bulk,
     )
     from services.asset_kits_service import asset_is_kit  # type: ignore
     from services.small_hand_tool_service import STORAGE_TYPES  # type: ignore
 
 _BULK_MOVE_TARGET_KEY = "ast_bulk_move_target"
 _BULK_MOVE_CONFIRM_KEY = "ast_bulk_move_confirm"
+_BULK_SERIAL_PREFIX = "ast_bulk_serial_"
 
 _BUCKET_HELP = (
     "**Equipment** — large rentable assets (trailers, generators, pressure washers). "
@@ -52,13 +55,33 @@ def _clear_bulk_move_state() -> None:
     st.session_state[_BULK_MOVE_CONFIRM_KEY] = False
 
 
+def _missing_serial(asset: dict[str, Any]) -> bool:
+    serial = str(asset.get("serial_number") or "").strip()
+    return serial in {"", "—", "-"}
+
+
+def _bulk_serial_key(asset_id: str) -> str:
+    return f"{_BULK_SERIAL_PREFIX}{asset_id}"
+
+
+def _collect_bulk_serials(rows: list[dict[str, Any]]) -> dict[str, str]:
+    return {
+        str(row.get("id") or "").strip(): str(
+            st.session_state.get(_bulk_serial_key(str(row.get("id") or "").strip()), "")
+        ).strip()
+        for row in rows
+        if str(row.get("id") or "").strip()
+    }
+
+
 def _preview_bulk_move(
     selected_ids: list[str],
     assets_by_id: dict[str, dict[str, Any]],
     target: str,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return (ready, blocked) asset rows for a bulk move."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return (ready, needs_serial, blocked) asset rows for a bulk move."""
     ready: list[dict[str, Any]] = []
+    needs_serial: list[dict[str, Any]] = []
     blocked: list[dict[str, Any]] = []
     for aid in selected_ids:
         asset = assets_by_id.get(aid) or {}
@@ -66,18 +89,36 @@ def _preview_bulk_move(
         if asset_is_kit(asset) and target != "equipment":
             blocked.append({"id": aid, "label": label, "reason": "Tool Trailers stay on Equipment."})
             continue
-        if target == "serialized":
-            serial = str(asset.get("serial_number") or "").strip()
-            if serial in {"", "—", "-"}:
-                blocked.append(
-                    {"id": aid, "label": label, "reason": "No serial number — add one before moving."}
-                )
-                continue
         if resolve_tracking_type(asset) == target:
             blocked.append({"id": aid, "label": label, "reason": f"Already on {TRACKING_TAB_LABELS[target]}."})
             continue
+        if target == "serialized" and _missing_serial(asset):
+            needs_serial.append({"id": aid, "label": label, "asset": asset})
+            continue
         ready.append({"id": aid, "label": label, "asset": asset})
-    return ready, blocked
+    return ready, needs_serial, blocked
+
+
+def _bulk_serials_complete(needs_serial: list[dict[str, Any]]) -> bool:
+    for row in needs_serial:
+        serial = str(st.session_state.get(_bulk_serial_key(str(row.get("id") or "")), "")).strip()
+        if serial in {"", "—", "-"}:
+            return False
+    return True
+
+
+def _can_confirm_bulk_move(
+    *,
+    target: str,
+    ready: list[dict[str, Any]],
+    needs_serial: list[dict[str, Any]],
+) -> bool:
+    movable = ready + needs_serial
+    if not movable:
+        return False
+    if target == "serialized" and needs_serial and not _bulk_serials_complete(needs_serial):
+        return False
+    return True
 
 
 def render_equipment_bulk_move_toolbar(
@@ -93,8 +134,13 @@ def render_equipment_bulk_move_toolbar(
 
     if st.session_state.get(_BULK_MOVE_CONFIRM_KEY) and st.session_state.get(_BULK_MOVE_TARGET_KEY):
         target = str(st.session_state.get(_BULK_MOVE_TARGET_KEY) or "")
-        ready, blocked = _preview_bulk_move(ids, assets_by_id, target)
+        ready, needs_serial, blocked = _preview_bulk_move(ids, assets_by_id, target)
         tab_label = TRACKING_TAB_LABELS.get(target, target)
+        can_confirm = _can_confirm_bulk_move(
+            target=target,
+            ready=ready,
+            needs_serial=needs_serial,
+        )
 
         st.markdown(f"#### Confirm move to {tab_label}")
         st.caption(
@@ -107,18 +153,61 @@ def render_equipment_bulk_move_toolbar(
                 st.markdown(f"- {row['label']}")
             if len(ready) > 12:
                 st.caption(f"…and {len(ready) - 12} more.")
-        else:
+
+        if target == "serialized" and needs_serial:
+            st.markdown(f"**{len(needs_serial)}** item(s) need a serial number:")
+            st.caption("Serialized Tools require a unique serial number. Enter one for each item below.")
+            for row in needs_serial:
+                aid = str(row.get("id") or "").strip()
+                st.text_input(
+                    row["label"],
+                    key=_bulk_serial_key(aid),
+                    placeholder="Enter serial number",
+                )
+
+        if not ready and not needs_serial:
             st.warning("No selected items can be moved with this action.")
+        elif target == "serialized" and needs_serial and not _bulk_serials_complete(needs_serial):
+            st.info("Enter a serial number for each item above, then confirm the move.")
 
         if blocked:
-            with st.expander(f"{len(blocked)} skipped", expanded=bool(blocked) and not ready):
+            with st.expander(
+                f"{len(blocked)} skipped",
+                expanded=bool(blocked) and not ready and not needs_serial,
+            ):
                 for row in blocked:
                     st.markdown(f"- {row['label']}: {row['reason']}")
 
         c1, c2, c3 = st.columns([1, 1, 2])
         with c1:
-            if st.button("Confirm move", key="ast_bulk_confirm", type="primary", disabled=not ready):
-                result = reclassify_assets_bulk([r["id"] for r in ready], target)
+            if st.button(
+                "Confirm move",
+                key="ast_bulk_confirm",
+                type="primary",
+                disabled=not can_confirm,
+            ):
+                to_move = ready + needs_serial
+                move_ids = [
+                    str(row.get("id") or "").strip()
+                    for row in to_move
+                    if str(row.get("id") or "").strip()
+                ]
+                serial_map = _collect_bulk_serials(needs_serial) if needs_serial else {}
+                if target == "serialized":
+                    valid, err = validate_serial_numbers_for_bulk(
+                        move_ids,
+                        serial_map,
+                        assets_by_id=assets_by_id,
+                    )
+                    if not valid:
+                        st.error(err)
+                        return
+
+                result = reclassify_assets_bulk(
+                    move_ids,
+                    target,
+                    serial_numbers=serial_map if target == "serialized" else None,
+                )
                 if on_success_cache_clear:
                     on_success_cache_clear()
                 _clear_bulk_move_state()
