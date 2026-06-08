@@ -10,7 +10,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role, is_authenticated
-    from app.pages._core._data import load_employees
+    from app.pages._core._data import load_employees, load_inventory
     from app.services.inventory_service import get_inventory_transactions, list_inventory
     from app.services.job_materials_service import (
         add_manual_job_material,
@@ -27,7 +27,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile, current_role, is_authenticated  # type: ignore
-    from pages._core._data import load_employees  # type: ignore
+    from pages._core._data import load_employees, load_inventory  # type: ignore
     from services.inventory_service import get_inventory_transactions, list_inventory  # type: ignore
     from services.job_materials_service import (  # type: ignore
         add_manual_job_material,
@@ -248,7 +248,7 @@ def _render_materials_table(
         st.caption("No materials recorded for this job yet.")
         return
 
-    inv_by_id = {str(r.get("id") or ""): r for r in list_inventory() if str(r.get("id") or "")}
+    inv_by_id = {str(r.get("id") or ""): r for r in load_inventory() if str(r.get("id") or "")}
     pg_by_id = {str(r.get("id") or ""): r for r in list_pricing_guide_job_options(include_inactive=True) if str(r.get("id") or "")}
 
     head = (

@@ -76,17 +76,22 @@ def infer_catalog_record_kind(record: dict[str, Any]) -> str:
 def build_catalog_image_context(
     *,
     assets_by_id: dict[str, dict[str, Any]] | None = None,
+    inventory_rows: list[dict[str, Any]] | None = None,
 ) -> CatalogImageContext:
     """Build shared name indexes used by small-tool image fallback."""
     inventory_by_name: dict[str, dict[str, Any]] = {}
     pricing_by_name: dict[str, dict[str, Any]] = {}
     try:
-        from app.services.inventory_service import list_inventory
         from app.services.inventory_images import get_inventory_image_url
     except ImportError:
-        from services.inventory_service import list_inventory  # type: ignore
         from services.inventory_images import get_inventory_image_url  # type: ignore
-    for item in list_inventory() or []:
+    if inventory_rows is None:
+        try:
+            from app.pages._core._data import load_inventory
+        except ImportError:
+            from pages._core._data import load_inventory  # type: ignore
+        inventory_rows = load_inventory()
+    for item in inventory_rows or []:
         key = _name_key(item.get("name") or item.get("item_name"))
         if key and key not in inventory_by_name and get_inventory_image_url(item):
             inventory_by_name[key] = item

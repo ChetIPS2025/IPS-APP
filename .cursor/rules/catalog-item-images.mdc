@@ -15,7 +15,7 @@ Use **one resolver** for every catalog row thumbnail so Equipment, Serialized To
 | `get_catalog_image_url(record, kind=...)` | Resolve browser URL or `None` |
 | `catalog_thumbnail_html(record, kind=...)` | HTML `<img>` or placeholder |
 | `render_catalog_thumbnail(record)` | Streamlit thumbnail |
-| `build_catalog_image_context(assets_by_id=...)` | Name/asset lookups for small tools |
+| `build_catalog_image_context(assets_by_id=..., inventory_rows=...)` | Name/asset lookups for small tools — pass `load_inventory()` from the page/component |
 
 Pass explicit `kind` when known: `"asset"`, `"small_tool"`, `"inventory"`, `"pricing_guide"`.
 
@@ -35,7 +35,7 @@ Placeholders: inventory → 📦; assets / small tools → —
 ## Where to use
 
 - Assets Equipment / Serialized Tools tables → `catalog_thumbnail_html(..., kind="asset")`
-- Assets Small Tools tab → `catalog_thumbnail_html(..., kind="small_tool", context=ctx)`
+- Assets Small Tools tab → `inventory_rows=load_inventory()` into `build_catalog_image_context`, then `catalog_thumbnail_html(..., kind="small_tool", context=ctx)`
 - Inventory list/scan → existing `inventory_thumbnail_html` (wraps same inventory resolver)
 - Job materials → `catalog_thumbnail_html` for inventory and pricing rows
 

@@ -1,0 +1,47 @@
+---
+description: Pass demo context through page-level data loaders — never call list_* without demo
+globs:
+  - app/**/*.py
+---
+
+# Demo data context
+
+Low-level `list_*` helpers in `phase2_modules_service.py` require keyword-only `demo=`. Call them only from the page data layer or with demo passed explicitly from the caller.
+
+## Good pattern
+
+Page / component owns context; services receive rows or demo from above:
+
+```python
+# app/pages/_core/_data.py — demo wired once, cached
+rows, used = list_inventory(demo=list(_DEMO_INVENTORY))
+
+def load_inventory() -> list[dict[str, Any]]:
+    rows, used = _cached_inventory_rows()
+    return list(rows)
+```
+
+```python
+# Component — use load_* from page data, pass rows down
+inventory_rows = load_inventory()
+image_context = build_catalog_image_context(
+    assets_by_id=assets_by_id,
+    inventory_rows=inventory_rows,
+)
+```
+
+## Avoid
+
+- `list_inventory()` with no `demo=` — raises `TypeError`
+- Deep services importing `_DEMO_INVENTORY` or calling `get_inventory()` when the page already has `load_inventory()`
+- Components reaching into `phase2_modules_service.list_*` directly
+
+## Layering
+
+| Layer | Responsibility |
+|-------|----------------|
+| `_core/_data.py` | `load_inventory()`, `load_assets()`, … — attach `demo=`, cache, mark demo mode |
+| Components / pages | Call `load_*`; pass row lists into services and UI helpers |
+| Services | Accept preloaded rows; optional fallback to `load_*` only when no caller context |
+
+When adding a new `list_*` consumer, thread data from the page the same way `load_assets()` is already passed into `render_hand_tools_tab(all_assets=…)`.

@@ -16,7 +16,7 @@ try:
     from app.components.table_pagination import paginate_rows, render_table_pagination_footer, render_table_pagination_header, reset_table_page
     from app.components.table_filters import clear_table_filters
     from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.pages._core._data import load_assets
+    from app.pages._core._data import load_assets, load_inventory
     from app.services.asset_kits_service import get_tool_trailers
     from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
     from app.services.small_hand_tool_service import (
@@ -43,7 +43,7 @@ except ImportError:
         reset_table_page,
     )
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from pages._core._data import load_assets  # type: ignore
+    from pages._core._data import load_assets, load_inventory  # type: ignore
     from services.asset_kits_service import get_tool_trailers  # type: ignore
     from services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html  # type: ignore
     from services.small_hand_tool_service import (  # type: ignore
@@ -348,7 +348,10 @@ def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
     jobs_by_id = {str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()}
 
     rows = list_hand_tools(assets_by_id=assets_by_id, jobs_by_id=jobs_by_id)
-    image_context = build_catalog_image_context(assets_by_id=assets_by_id)
+    image_context = build_catalog_image_context(
+        assets_by_id=assets_by_id,
+        inventory_rows=load_inventory(),
+    )
     filter_options = build_filter_options(rows, _FILTER_SPECS)
     categories = sorted({str(r.get("category") or "") for r in rows if r.get("category")})
     locations = sorted({str(r.get("location_display") or "") for r in rows if r.get("location_display")})
