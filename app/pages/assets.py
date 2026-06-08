@@ -108,6 +108,16 @@ try:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
+    from app.components.asset_row_actions_ui import (
+        ASSET_OPEN_ACTIVITY_KEY,
+        render_asset_activity_snippet,
+        render_asset_row_actions,
+    )
+    from app.components.quick_add_tool_ui import (
+        QUICK_ADD_OPEN_KEY,
+        open_quick_add_tool_dialog,
+        show_quick_add_tool_dialog,
+    )
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
     from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
     from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
@@ -219,6 +229,16 @@ except ImportError:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
+    from components.asset_row_actions_ui import (  # type: ignore
+        ASSET_OPEN_ACTIVITY_KEY,
+        render_asset_activity_snippet,
+        render_asset_row_actions,
+    )
+    from components.quick_add_tool_ui import (  # type: ignore
+        QUICK_ADD_OPEN_KEY,
+        open_quick_add_tool_dialog,
+        show_quick_add_tool_dialog,
+    )
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
     from services.asset_classification_service import is_equipment_tab_asset, tracking_type_label  # type: ignore
     from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
@@ -244,7 +264,7 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.9, 3.13, 1.6, 1.7, 1.7, 1.5, 1.8, 1.4]
+_ASSET_COLS = [0.42, 0.85, 2.85, 1.45, 1.55, 1.55, 1.35, 1.65, 1.25, 0.55]
 _SMALL_TOOL_COLS = [0.4, 0.8, 2.0, 1.0, 1.35, 1.15, 1.0, 0.75, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -274,6 +294,7 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("ASSIGNED TO", None),
     ("NEXT SERVICE DUE", None),
+    ("", None),
 ]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
@@ -926,6 +947,17 @@ def _render_custom_assets_table(
                     unsafe_allow_html=True,
                 )
 
+            with cols[9]:
+                if not field_mode:
+                    render_asset_row_actions(
+                        asset,
+                        on_view=_row_action_view,
+                        on_edit=_row_action_edit,
+                        on_change_type=_row_action_change_type,
+                        on_history=_row_action_history,
+                        on_after_change=clear_assets_cache,
+                    )
+
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
                 _render_asset_expand_panel(asset)
@@ -1342,6 +1374,26 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
         cache = dict(cache)
     cache[aid] = asset
     st.session_state[_ASSETS_CACHE_KEY] = cache
+
+
+def _row_action_view(asset: dict) -> None:
+    aid = str(asset.get("id") or "").strip()
+    _open_assets_detail_modal(aid, asset)
+
+
+def _row_action_edit(asset: dict) -> None:
+    _row_action_view(asset)
+    _set_asset_edit_mode(asset)
+
+
+def _row_action_change_type(asset: dict) -> None:
+    _row_action_edit(asset)
+
+
+def _row_action_history(asset: dict) -> None:
+    aid = str(asset.get("id") or "").strip()
+    _open_assets_detail_modal(aid, asset)
+    st.session_state[ASSET_OPEN_ACTIVITY_KEY] = aid
 
 
 def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:
@@ -2046,7 +2098,10 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
     with tab_activity:
-        placeholder_html("Asset activity history will appear here when connected to Supabase.")
+        if str(st.session_state.get(ASSET_OPEN_ACTIVITY_KEY) or "") == aid:
+            st.session_state.pop(ASSET_OPEN_ACTIVITY_KEY, None)
+        render_asset_activity_snippet(asset)
+        st.caption("Checkout, audit, and document events will expand here as integrations are connected.")
 
 
 def _asset_action_callbacks() -> tuple[object, object]:
@@ -2204,15 +2259,23 @@ def render() -> None:
     def _assets_export() -> None:
         st.button("Export", key="ast_export", use_container_width=True)
 
+    def _assets_quick_add() -> None:
+        st.markdown('<span class="ips-assets-quick-add-btn"></span>', unsafe_allow_html=True)
+        if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary", use_container_width=True):
+            open_quick_add_tool_dialog()
+
     def _assets_new() -> None:
-        if st.button("+ New Asset", key="ast_new", type="primary", use_container_width=True):
+        if st.button("+ New Asset", key="ast_new", use_container_width=True):
             st.session_state["ips_ast_form"] = True
 
     render_page_brand_header(
         "Assets",
         "Track and manage all company assets and equipment.",
-        actions=[_assets_export, _assets_new],
+        actions=[_assets_export, _assets_quick_add, _assets_new],
     )
+
+    if st.session_state.get(QUICK_ADD_OPEN_KEY):
+        show_quick_add_tool_dialog(uploaded_by=_current_user_id())
 
     if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))

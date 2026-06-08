@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v7"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v8"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -79,12 +79,24 @@ def inject_assets_page_styles() -> None:
             box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-header-anchor)
-        .ips-assets-new-btn button {
+        .ips-page-actions-marker ~ div .ips-assets-quick-add-btn + div button {
             background: #2563eb !important;
             border: 1px solid #2563eb !important;
             color: #ffffff !important;
             font-weight: 600 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .ips-page-actions-marker ~ div button[kind="secondary"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .ips-page-actions-marker ~ div button:not([kind="primary"]) {
+            font-weight: 600 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        button[data-testid="stBaseButton-popover"] {
+            min-width: 2rem !important;
+            padding: 0.15rem 0.35rem !important;
+            font-weight: 700 !important;
         }
         .ips-assets-header-inner {
             display: flex;

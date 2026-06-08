@@ -283,6 +283,7 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
         "description": _clean_text(data.get("notes") or ""),
         "is_serialized_tool": True,
         "is_checkout_item": True,
+        "tracking_type": "serialized",
         "current_container_asset_id": trailer_id or None,
         "assigned_trailer_id": trailer_id or None,
         "assigned_job_id": data.get("current_job_id") or data.get("assigned_job_id"),
