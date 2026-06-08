@@ -99,26 +99,12 @@ def _preview_bulk_move(
     return ready, needs_serial, blocked
 
 
-def _bulk_serials_complete(needs_serial: list[dict[str, Any]]) -> bool:
-    for row in needs_serial:
-        serial = str(st.session_state.get(_bulk_serial_key(str(row.get("id") or "")), "")).strip()
-        if serial in {"", "—", "-"}:
-            return False
-    return True
-
-
 def _can_confirm_bulk_move(
     *,
-    target: str,
     ready: list[dict[str, Any]],
     needs_serial: list[dict[str, Any]],
 ) -> bool:
-    movable = ready + needs_serial
-    if not movable:
-        return False
-    if target == "serialized" and needs_serial and not _bulk_serials_complete(needs_serial):
-        return False
-    return True
+    return bool(ready or needs_serial)
 
 
 def render_equipment_bulk_move_toolbar(
@@ -136,11 +122,7 @@ def render_equipment_bulk_move_toolbar(
         target = str(st.session_state.get(_BULK_MOVE_TARGET_KEY) or "")
         ready, needs_serial, blocked = _preview_bulk_move(ids, assets_by_id, target)
         tab_label = TRACKING_TAB_LABELS.get(target, target)
-        can_confirm = _can_confirm_bulk_move(
-            target=target,
-            ready=ready,
-            needs_serial=needs_serial,
-        )
+        can_confirm = _can_confirm_bulk_move(ready=ready, needs_serial=needs_serial)
 
         st.markdown(f"#### Confirm move to {tab_label}")
         st.caption(
@@ -155,20 +137,21 @@ def render_equipment_bulk_move_toolbar(
                 st.caption(f"…and {len(ready) - 12} more.")
 
         if target == "serialized" and needs_serial:
-            st.markdown(f"**{len(needs_serial)}** item(s) need a serial number:")
-            st.caption("Serialized Tools require a unique serial number. Enter one for each item below.")
+            st.markdown(f"**{len(needs_serial)}** item(s) without a serial number (optional):")
+            st.caption(
+                "Leave blank to move now and add a serial later from Asset detail. "
+                "Enter a serial here to set it during the move."
+            )
             for row in needs_serial:
                 aid = str(row.get("id") or "").strip()
                 st.text_input(
                     row["label"],
                     key=_bulk_serial_key(aid),
-                    placeholder="Enter serial number",
+                    placeholder="Serial number (optional)",
                 )
 
         if not ready and not needs_serial:
             st.warning("No selected items can be moved with this action.")
-        elif target == "serialized" and needs_serial and not _bulk_serials_complete(needs_serial):
-            st.info("Enter a serial number for each item above, then confirm the move.")
 
         if blocked:
             with st.expander(
@@ -337,7 +320,10 @@ def _render_bucket_extra_fields(asset: dict[str, Any], bucket: str, *, prefix: s
     if bucket == "serialized":
         serial = str(asset.get("serial_number") or "").strip()
         if serial in {"", "—", "-"}:
-            st.warning("Enter a serial number below (or in Asset details) before saving as Serialized Tools.")
+            st.caption(
+                "Serial number is optional. Leave blank to save as Serialized Tools with status "
+                "Needs Serial, or enter a unique serial now."
+            )
     elif bucket == "quantity":
         st.caption(
             "Creates or updates a Small Tools quantity record linked to this asset. "

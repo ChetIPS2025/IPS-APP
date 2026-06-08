@@ -686,6 +686,7 @@ def _asset_status_pill_html(status: str) -> str:
         "Assigned": "ips-asset-status-assigned",
         "Out for Repair": "ips-asset-status-out-for-repair",
         "Maintenance Due": "ips-asset-status-maintenance-due",
+        "Needs Serial": "ips-asset-status-maintenance-due",
         "Retired": "ips-asset-status-retired",
         "Sold": "ips-asset-status-sold",
         "Lost": "ips-asset-status-lost",

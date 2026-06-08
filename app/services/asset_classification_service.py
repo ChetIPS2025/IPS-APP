@@ -16,6 +16,7 @@ except ImportError:
 TrackingType = Literal["equipment", "serialized", "quantity"]
 
 TRACKING_TYPES: tuple[str, ...] = ("equipment", "serialized", "quantity")
+SERIAL_NEEDS_STATUS = "Needs Serial"
 
 TRACKING_TAB_LABELS: dict[str, str] = {
     "equipment": "Equipment",
@@ -64,15 +65,18 @@ def validate_serial_numbers_for_bulk(
     *,
     assets_by_id: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
-    """Ensure every asset has a unique serial before bulk move to Serialized Tools."""
+    """Validate uniqueness for serials entered during bulk move; blank serials are allowed."""
     assets = assets_by_id or {}
     seen: dict[str, str] = {}
     for aid in asset_ids:
         asset = assets.get(aid) or {}
-        serial = _clean_text(serial_by_id.get(aid)) or _clean_text(asset.get("serial_number"))
+        inline = serial_by_id.get(aid)
+        if inline is not None:
+            serial = _clean_text(inline)
+        else:
+            serial = _clean_text(asset.get("serial_number"))
         if not _has_serial(serial):
-            label = _clean_text(asset.get("asset_name") or asset.get("name")) or aid
-            return False, f"Serial number is required for {label}."
+            continue
         serial_cf = serial.casefold()
         if serial_cf in seen:
             return False, f"Duplicate serial number in this move: {serial}."
@@ -201,7 +205,7 @@ def reclassify_asset(
     asset_id: str,
     target: str,
     *,
-    serial_number: str = "",
+    serial_number: str | None = None,
     quantity_on_hand: float = 1.0,
     quantity_expected: float = 1.0,
     storage_type: str = "Warehouse",
@@ -246,27 +250,38 @@ def reclassify_asset(
         _deactivate_hand_tool_for_asset(aid)
 
     elif bucket == "serialized":
-        serial = _clean_text(serial_number) or _clean_text(asset.get("serial_number"))
-        if not _has_serial(serial):
-            return ServiceResult(
-                ok=False,
-                error="Serialized tools require a serial number. Enter one before reclassifying.",
+        if serial_number is not None:
+            serial = _clean_text(serial_number)
+        else:
+            serial = _clean_text(asset.get("serial_number"))
+        if _has_serial(serial):
+            existing = find_asset_by_serial(serial, exclude_asset_id=aid)
+            if existing:
+                other_label = _clean_text(existing.get("asset_name") or existing.get("name")) or "another asset"
+                return ServiceResult(
+                    ok=False,
+                    error=f"Serial number {serial} is already assigned to {other_label}.",
+                )
+            status = _clean_text(asset.get("status")) or "Available"
+            if status == SERIAL_NEEDS_STATUS:
+                status = "Available"
+            payload.update(
+                {
+                    "serial_number": serial,
+                    "is_serialized_tool": True,
+                    "is_checkout_item": True,
+                    "status": status,
+                }
             )
-        existing = find_asset_by_serial(serial, exclude_asset_id=aid)
-        if existing:
-            other_label = _clean_text(existing.get("asset_name") or existing.get("name")) or "another asset"
-            return ServiceResult(
-                ok=False,
-                error=f"Serial number {serial} is already assigned to {other_label}.",
+        else:
+            payload.update(
+                {
+                    "serial_number": "",
+                    "is_serialized_tool": True,
+                    "is_checkout_item": True,
+                    "status": SERIAL_NEEDS_STATUS,
+                }
             )
-        payload.update(
-            {
-                "serial_number": serial,
-                "is_serialized_tool": True,
-                "is_checkout_item": True,
-                "status": _clean_text(asset.get("status")) or "Available",
-            }
-        )
         _deactivate_hand_tool_for_asset(aid)
 
     elif bucket == "quantity":
@@ -349,10 +364,8 @@ def reclassify_assets_bulk(
 
     for aid in ids:
         kwargs: dict[str, Any] = {}
-        if bucket == "serialized":
-            serial = serial_map.get(aid)
-            if serial:
-                kwargs["serial_number"] = serial
+        if bucket == "serialized" and aid in serial_map:
+            kwargs["serial_number"] = serial_map[aid]
         result = reclassify_asset(aid, bucket, **kwargs)
         if result.ok:
             if result.data and result.data.get("unchanged"):
@@ -392,6 +405,7 @@ def reclassify_assets_bulk(
 
 
 __all__ = [
+    "SERIAL_NEEDS_STATUS",
     "TRACKING_TAB_LABELS",
     "TRACKING_TYPES",
     "asset_belongs_to_tab",
