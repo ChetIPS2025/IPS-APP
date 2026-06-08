@@ -20,10 +20,13 @@ _COSTING_TXN_TYPES = frozenset({"issue_to_job", "consume_on_job"})
 
 __all__ = [
     "add_manual_job_material",
+    "add_pricing_guide_job_material",
     "fetch_job_materials",
+    "get_pricing_guide_item",
     "issue_inventory_to_job",
     "job_material_line_total",
     "job_materials_total",
+    "list_pricing_guide_job_options",
     "resolve_inventory_by_scan_code",
 ]
 
@@ -128,6 +131,107 @@ def _inventory_unit_cost(item: dict[str, Any]) -> float:
 
 def _inventory_display_name(item: dict[str, Any]) -> str:
     return str(item.get("name") or item.get("item_name") or "Material").strip() or "Material"
+
+
+def _pricing_guide_unit_cost(row: dict[str, Any]) -> float:
+    try:
+        from app.services.pricing_guide_service import resolve_live_unit_cost
+    except ImportError:
+        from services.pricing_guide_service import resolve_live_unit_cost  # type: ignore
+    cost = resolve_live_unit_cost(row)
+    if cost > 0:
+        return cost
+    return _safe_float(row.get("default_cost"))
+
+
+def _pricing_guide_display_name(row: dict[str, Any]) -> str:
+    desc = str(row.get("description") or row.get("item") or "").strip()
+    if desc:
+        return desc
+    return str(row.get("item_number") or row.get("sku") or row.get("item_code") or "Material").strip() or "Material"
+
+
+def get_pricing_guide_item(item_id: str) -> dict[str, Any] | None:
+    pid = str(item_id or "").strip()
+    if not pid:
+        return None
+    for row in list_pricing_guide_job_options():
+        if str(row.get("id") or "") == pid:
+            return row
+    return None
+
+
+def list_pricing_guide_job_options(*, include_inactive: bool = False) -> list[dict[str, Any]]:
+    """Active Pricing Guide rows suitable for job material costing (no inventory movement)."""
+    try:
+        from app.services.pricing_guide_service import (
+            _MATERIAL_LIKE_TYPES,
+            cached_pricing_guide_rows,
+        )
+    except ImportError:
+        from services.pricing_guide_service import (  # type: ignore
+            _MATERIAL_LIKE_TYPES,
+            cached_pricing_guide_rows,
+        )
+    rows = cached_pricing_guide_rows(include_inactive=include_inactive)
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("is_active") is False:
+            continue
+        item_type = str(row.get("item_type") or "Material").strip()
+        if item_type not in _MATERIAL_LIKE_TYPES:
+            continue
+        if not str(row.get("description") or row.get("item_number") or row.get("sku") or "").strip():
+            continue
+        out.append(row)
+    out.sort(key=lambda r: str(r.get("description") or "").casefold())
+    return out
+
+
+def add_pricing_guide_job_material(
+    *,
+    job_id: str,
+    pricing_guide_item_id: str,
+    quantity: float,
+    notes: str = "",
+    subjob_id: str | None = None,
+    employee_id: str | None = None,
+    used_at: datetime | None = None,
+    usage_source: str = "pricing_guide",
+) -> ServiceResult:
+    """Add a job costing line from Pricing Guide — does not change inventory on-hand."""
+    jid = str(job_id or "").strip()
+    pid = str(pricing_guide_item_id or "").strip()
+    qty = float(quantity or 0)
+
+    if not jid:
+        return ServiceResult(ok=False, error="Job is required.")
+    if not pid:
+        return ServiceResult(ok=False, error="Pricing Guide item is required.")
+    if qty <= 0:
+        return ServiceResult(ok=False, error="Quantity must be greater than zero.")
+
+    pg_row = get_pricing_guide_item(pid)
+    if not pg_row:
+        return ServiceResult(ok=False, error="Pricing Guide item not found.")
+
+    unit_cost = _pricing_guide_unit_cost(pg_row)
+    ts = (used_at or datetime.now(timezone.utc)).isoformat()
+    payload: dict[str, Any] = {
+        "job_id": jid,
+        "pricing_guide_id": pid,
+        "inventory_item_id": None,
+        "item_name": _pricing_guide_display_name(pg_row)[:500],
+        "quantity": qty,
+        "unit_cost": unit_cost,
+        "line_total": round(qty * unit_cost, 2),
+        "notes": str(notes or "")[:2000],
+        "subjob_id": subjob_id,
+        "employee_id": employee_id,
+        "used_at": ts,
+        "usage_source": usage_source,
+    }
+    return _insert_job_material(payload)
 
 
 def _insert_job_material(payload: dict[str, Any]) -> ServiceResult:
