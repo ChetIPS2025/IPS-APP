@@ -3036,7 +3036,9 @@ def inject_assets_module_css() -> None:
   font-weight: 700;
   color: #0f172a;
   line-height: 1.25;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-asset-rentable-badge {{
   display: inline-block;

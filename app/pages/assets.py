@@ -264,7 +264,7 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.85, 2.85, 1.45, 1.55, 1.55, 1.35, 1.65, 1.25, 0.55]
+_ASSET_COLS = [0.42, 0.85, 4.25, 1.45, 1.55, 1.35, 1.65, 1.25, 0.55]
 _SMALL_TOOL_COLS = [0.4, 0.8, 2.0, 1.0, 1.35, 1.15, 1.0, 0.75, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -290,7 +290,6 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("ASSET NAME", None),
     ("CATEGORY", "category"),
     ("LOCATION", "location"),
-    ("DEPARTMENT", "department"),
     ("STATUS", "status"),
     ("ASSIGNED TO", None),
     ("NEXT SERVICE DUE", None),
@@ -299,7 +298,6 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
     ("location", lambda r: _asset_location(r)),
-    ("department", lambda r: _asset_department(r)),
     ("status", lambda r: _normalize_asset_status(r.get("status"))),
 ]
 _ASSET_BAR_FILTER_FIELDS = ["category", "location", "department", "status"]
@@ -871,7 +869,6 @@ def _render_custom_assets_table(
             name = _asset_name(asset)
             category = _asset_category(asset)
             location = _asset_location(asset)
-            department = _asset_department(asset)
             status = _normalize_asset_status(asset.get("status"))
             assigned = _asset_assigned_to(asset)
             next_service = _asset_next_service(asset)
@@ -927,27 +924,21 @@ def _render_custom_assets_table(
                 )
 
             with cols[5]:
-                st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(department)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
                 st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
 
-            with cols[7]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(assigned)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[8]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[9]:
+            with cols[8]:
                 if not field_mode:
                     render_asset_row_actions(
                         asset,

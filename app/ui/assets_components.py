@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v9"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v10"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -116,6 +116,21 @@ def inject_assets_page_styles() -> None:
             min-width: 2rem !important;
             padding: 0.15rem 0.35rem !important;
             font-weight: 700 !important;
+        }
+        /* Equipment table: wider asset name (department column removed) */
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+            min-width: 280px !important;
+            flex: 2.2 1 320px !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        .ips-assets-title {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            word-break: normal !important;
         }
         .ips-assets-header-inner {
             display: flex;
