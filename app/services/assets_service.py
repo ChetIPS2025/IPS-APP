@@ -715,9 +715,19 @@ def upload_asset_image(
 
     uploaded_by: str | None = None,
 
+    existing: dict[str, Any] | None = None,
+
+    force: bool = False,
+
 ) -> ServiceResult:
 
-    result = _upload_asset_image_storage(asset_id, uploaded_file, uploaded_by=uploaded_by)
+    result = _upload_asset_image_storage(
+        asset_id,
+        uploaded_file,
+        uploaded_by=uploaded_by,
+        existing=existing,
+        force=force,
+    )
 
     if result.ok:
 
