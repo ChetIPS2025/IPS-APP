@@ -519,13 +519,16 @@ def persist_item_image(
     filename: str,
     existing: dict[str, Any] | None = None,
     uploaded_by: str | None = None,
-    force: bool = False,
+    replace_existing: bool = False,
+    force: bool | None = None,
     image_status: str = IMAGE_STATUS_APPROVED,
 ) -> ServiceResult:
     rid = str(record_id or "").strip()
     if not rid:
         return ServiceResult(ok=False, error="Missing record id.")
-    if not force and not can_apply_item_image(existing):
+    if force is not None:
+        replace_existing = force
+    if not replace_existing and not can_apply_item_image(existing):
         return ServiceResult(ok=True, data={"skipped": True})
 
     ext = _extension(filename)

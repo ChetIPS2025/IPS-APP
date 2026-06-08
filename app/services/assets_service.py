@@ -717,16 +717,21 @@ def upload_asset_image(
 
     existing: dict[str, Any] | None = None,
 
-    force: bool = False,
+    replace_existing: bool = False,
+
+    force: bool | None = None,
 
 ) -> ServiceResult:
+
+    if force is not None:
+        replace_existing = force
 
     result = _upload_asset_image_storage(
         asset_id,
         uploaded_file,
         uploaded_by=uploaded_by,
         existing=existing,
-        force=force,
+        replace_existing=replace_existing,
     )
 
     if result.ok:

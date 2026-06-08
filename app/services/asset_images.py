@@ -136,40 +136,29 @@ def upload_asset_image(
     *,
     uploaded_by: str | None = None,
     existing: dict[str, Any] | None = None,
-    force: bool = False,
+    replace_existing: bool = False,
+    force: bool | None = None,
 ) -> ServiceResult:
-    aid = str(asset_id or "").strip()
-    if not aid:
-        return ServiceResult(ok=False, error="Missing asset id.")
+    """Streamlit UploadedFile wrapper — delegates to ``upload_asset_media``."""
+    if force is not None:
+        replace_existing = force
     if uploaded_file is None:
         return ServiceResult(ok=False, error="No file provided.")
-    filename = str(getattr(uploaded_file, "name", "") or "asset-image")
-    raw = uploaded_file.getvalue()
-    if not raw:
-        return ServiceResult(ok=False, error="Uploaded file is empty.")
-    result = persist_item_image(
-        table="assets",
-        record_id=aid,
-        entity_type="assets",
-        image_bytes=raw,
-        filename=filename,
-        existing=existing,
+    try:
+        from app.services.upload_media_strategy import PHOTO_ROLE_PRIMARY, upload_asset_media
+    except ImportError:
+        from services.upload_media_strategy import PHOTO_ROLE_PRIMARY, upload_asset_media  # type: ignore
+    return upload_asset_media(
+        asset_id=asset_id,
+        file_bytes=uploaded_file.getvalue(),
+        filename=str(getattr(uploaded_file, "name", "") or "asset-image"),
+        content_type=str(getattr(uploaded_file, "type", "") or ""),
         uploaded_by=uploaded_by,
-        force=force,
+        photo_role=PHOTO_ROLE_PRIMARY,
+        make_primary=True,
+        replace_existing=replace_existing,
+        existing=existing,
     )
-    if result.ok and not (isinstance(result.data, dict) and result.data.get("skipped")):
-        try:
-            from app.services.catalog_image_sync import sync_catalog_images_for_asset
-
-            try:
-                from app.pages._core._data import load_assets
-            except ImportError:
-                from pages._core._data import load_assets  # type: ignore
-            source = next((r for r in load_assets() if str(r.get("id") or "") == aid), None) or existing or {"id": aid}
-            sync_catalog_images_for_asset(source)
-        except Exception:
-            pass
-    return result
 
 
 def clear_asset_image(asset_id: str) -> ServiceResult:

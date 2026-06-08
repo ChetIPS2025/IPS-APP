@@ -17,7 +17,7 @@ When users upload photos or documents that may not render in browsers (HEIC, HEI
 ## 2. Display preview (UI + OCR / vision)
 
 - Always produce a **web-friendly** raster (JPEG or PNG)
-- Store on the entity's `image_path` via `upload_asset_image()` / `persist_item_image()`
+- Store on the entity's `image_path` via `upload_asset_media(make_primary=True)` / `upload_asset_image()` / `persist_item_image()`
 - Use `build_display_preview()` or `vision_inputs_from_upload()` — never send raw HEIC/PDF to vision APIs
 
 | Input | Preview pipeline |
@@ -34,6 +34,7 @@ When users upload photos or documents that may not render in browsers (HEIC, HEI
 
 | Flow | Function |
 |------|----------|
+| Shared asset upload API | `upload_asset_media(asset_id, file_bytes, filename, photo_role, make_primary, replace_existing)` |
 | Quick Add multi-photo save | `attach_asset_photos_bundle()` |
 | Single-photo save (legacy) | `attach_asset_photo_with_preview()` |
 | Analyze + suggestions | `analyze_tool_photos()` + `find_product_image_suggestions()` |

@@ -23,6 +23,10 @@ WEB_PREVIEW_EXTENSIONS: frozenset[str] = frozenset({".jpg", ".jpeg", ".png", ".w
 SOURCE_DOCUMENT_TYPE = "Source photo"
 SOURCE_DOCUMENT_NOTES = "Original upload — preserved for evidence; app preview is a converted copy."
 
+PHOTO_ROLE_SOURCE = "source"
+PHOTO_ROLE_PREVIEW = "preview"
+PHOTO_ROLE_PRIMARY = "primary"
+
 
 class _BytesUpload:
     """Minimal Streamlit UploadedFile stand-in for storage helpers."""
@@ -38,6 +42,106 @@ class _BytesUpload:
 
 def _ext(name: str) -> str:
     return Path(str(name or "")).suffix.lower()
+
+
+def _guess_content_type(filename: str, content_type: str = "") -> str:
+    mime = str(content_type or "").strip()
+    if mime:
+        return mime
+    ext = _ext(filename)
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".heic": "image/heic",
+        ".heif": "image/heif",
+        ".pdf": "application/pdf",
+    }.get(ext, "application/octet-stream")
+
+
+def _sync_asset_primary_image(asset_id: str, existing: dict[str, Any] | None = None) -> None:
+    try:
+        from app.services.catalog_image_sync import sync_catalog_images_for_asset
+    except ImportError:
+        from services.catalog_image_sync import sync_catalog_images_for_asset  # type: ignore
+    try:
+        from app.pages._core._data import load_assets
+    except ImportError:
+        from pages._core._data import load_assets  # type: ignore
+    aid = str(asset_id or "").strip()
+    source = next((r for r in load_assets() if str(r.get("id") or "") == aid), None) or existing or {"id": aid}
+    sync_catalog_images_for_asset(source)
+
+
+def upload_asset_media(
+    *,
+    asset_id: str,
+    file_bytes: bytes,
+    filename: str,
+    content_type: str = "",
+    uploaded_by: str | None = None,
+    photo_role: str = PHOTO_ROLE_PRIMARY,
+    make_primary: bool = True,
+    replace_existing: bool = False,
+    existing: dict[str, Any] | None = None,
+) -> ServiceResult:
+    """
+    Shared asset media upload with a stable signature.
+
+    - ``photo_role='source'`` → exact bytes on ``asset_documents`` (evidence/history)
+    - ``make_primary=True`` → web-friendly raster on ``assets.image_path`` (tables/detail)
+    - ``replace_existing=True`` → overwrite an approved primary image; otherwise skip when approved
+    """
+    aid = str(asset_id or "").strip()
+    name = str(filename or "upload").strip() or "upload"
+    if not aid:
+        return ServiceResult(ok=False, error="Asset id is required.")
+    if not file_bytes:
+        return ServiceResult(ok=False, error="Uploaded file is empty.")
+
+    role = str(photo_role or PHOTO_ROLE_PRIMARY).strip().casefold()
+    mime = _guess_content_type(name, content_type)
+
+    if role == PHOTO_ROLE_SOURCE:
+        return persist_original_asset_upload(
+            aid,
+            _BytesUpload(file_bytes, name, mime=mime),
+            uploaded_by=uploaded_by,
+        )
+
+    if not make_primary:
+        return ServiceResult(ok=False, error="Set make_primary=True to save a list/detail thumbnail.")
+
+    save_bytes, save_name = file_bytes, name
+    if needs_display_conversion(name):
+        try:
+            save_bytes, save_name = build_display_preview(file_bytes, name)
+        except ValueError as exc:
+            return ServiceResult(ok=False, error=str(exc))
+
+    try:
+        from app.services.item_images import persist_item_image
+    except ImportError:
+        from services.item_images import persist_item_image  # type: ignore
+
+    result = persist_item_image(
+        table="assets",
+        record_id=aid,
+        entity_type="assets",
+        image_bytes=save_bytes,
+        filename=save_name,
+        existing=existing,
+        uploaded_by=uploaded_by,
+        replace_existing=replace_existing,
+    )
+    if result.ok and not (isinstance(result.data, dict) and result.data.get("skipped")):
+        try:
+            _sync_asset_primary_image(aid, existing)
+        except Exception:
+            pass
+    return result
 
 
 def needs_display_conversion(filename: str) -> bool:
@@ -120,7 +224,8 @@ def attach_asset_photo_with_preview(
     *,
     uploaded_by: str | None = None,
     save_original: bool = True,
-    force_preview: bool = True,
+    replace_existing: bool = True,
+    force_preview: bool | None = None,
 ) -> ServiceResult:
     """
     Dual-save strategy for tool/asset photos:
@@ -137,9 +242,20 @@ def attach_asset_photo_with_preview(
     if not raw:
         return ServiceResult(ok=False, error="Uploaded file is empty.")
 
+    if force_preview is not None:
+        replace_existing = force_preview
+
     original_result: ServiceResult | None = None
     if save_original:
-        original_result = persist_original_asset_upload(aid, uploaded, uploaded_by=uploaded_by)
+        original_result = upload_asset_media(
+            asset_id=aid,
+            file_bytes=raw,
+            filename=name,
+            content_type=str(getattr(uploaded, "type", "") or ""),
+            uploaded_by=uploaded_by,
+            photo_role=PHOTO_ROLE_SOURCE,
+            make_primary=False,
+        )
         if not original_result.ok:
             return original_result
 
@@ -148,17 +264,15 @@ def attach_asset_photo_with_preview(
     except ValueError as exc:
         return ServiceResult(ok=False, error=str(exc))
 
-    try:
-        from app.services.assets_service import upload_asset_image
-    except ImportError:
-        from services.assets_service import upload_asset_image  # type: ignore
-
-    preview_upload = _BytesUpload(preview_bytes, preview_name, mime="image/jpeg")
-    preview_result = upload_asset_image(
-        aid,
-        preview_upload,
+    preview_result = upload_asset_media(
+        asset_id=aid,
+        file_bytes=preview_bytes,
+        filename=preview_name,
+        content_type="image/jpeg",
         uploaded_by=uploaded_by,
-        force=force_preview,
+        photo_role=PHOTO_ROLE_PRIMARY,
+        make_primary=True,
+        replace_existing=replace_existing,
     )
     if not preview_result.ok:
         return preview_result
@@ -199,16 +313,27 @@ def attach_asset_photos_bundle(
                 f"Source upload {idx} of {total} — original preserved for evidence; "
                 "app preview may be a separate catalog or converted image."
             )
-            result = persist_original_asset_upload(
-                aid,
-                upload,
+            result = upload_asset_media(
+                asset_id=aid,
+                file_bytes=upload.getvalue(),
+                filename=str(getattr(upload, "name", "") or "upload"),
+                content_type=str(getattr(upload, "type", "") or ""),
                 uploaded_by=uploaded_by,
-                notes=note,
+                photo_role=PHOTO_ROLE_SOURCE,
+                make_primary=False,
             )
-            if result.ok:
-                saved_sources += 1
-            else:
+            if not result.ok:
                 source_errors.append(result.error or f"Source upload {idx} failed.")
+                continue
+            # Preserve per-file evidence note on the document row when possible.
+            try:
+                from app.services.repository import update_row
+            except ImportError:
+                from services.repository import update_row  # type: ignore
+            doc = (result.data or {}).get("document") if isinstance(result.data, dict) else None
+            if isinstance(doc, dict) and doc.get("id"):
+                update_row("asset_documents", {"notes": note}, {"id": doc["id"]})
+            saved_sources += 1
 
     preview_bytes = primary_preview_bytes
     preview_name = str(primary_preview_filename or "preview.jpg").strip() or "preview.jpg"
@@ -226,17 +351,15 @@ def attach_asset_photos_bundle(
             return ServiceResult(ok=False, error="; ".join(source_errors[:3]))
         return ServiceResult(ok=False, error="Could not build a display preview.")
 
-    try:
-        from app.services.assets_service import upload_asset_image
-    except ImportError:
-        from services.assets_service import upload_asset_image  # type: ignore
-
-    preview_upload = _BytesUpload(preview_bytes, preview_name, mime="image/jpeg")
-    preview_result = upload_asset_image(
-        aid,
-        preview_upload,
+    preview_result = upload_asset_media(
+        asset_id=aid,
+        file_bytes=preview_bytes,
+        filename=preview_name,
+        content_type="image/jpeg",
         uploaded_by=uploaded_by,
-        force=True,
+        photo_role=PHOTO_ROLE_PRIMARY,
+        make_primary=True,
+        replace_existing=True,
     )
     if not preview_result.ok:
         return preview_result
@@ -252,6 +375,9 @@ def attach_asset_photos_bundle(
 
 
 __all__ = [
+    "PHOTO_ROLE_PRIMARY",
+    "PHOTO_ROLE_PREVIEW",
+    "PHOTO_ROLE_SOURCE",
     "SOURCE_DOCUMENT_NOTES",
     "SOURCE_DOCUMENT_TYPE",
     "WEB_PREVIEW_EXTENSIONS",
@@ -260,5 +386,6 @@ __all__ = [
     "build_display_preview",
     "needs_display_conversion",
     "persist_original_asset_upload",
+    "upload_asset_media",
     "vision_inputs_from_upload",
 ]

@@ -128,7 +128,7 @@ def render_item_photo_manager(
             uploaded_file,
             uploaded_by=uploaded_by,
             existing=record,
-            force=True,
+            replace_existing=True,
         )
         if result.ok:
             if on_change:

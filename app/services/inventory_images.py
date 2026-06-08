@@ -186,8 +186,11 @@ def upload_inventory_image(
     *,
     uploaded_by: str | None = None,
     existing: dict[str, Any] | None = None,
-    force: bool = False,
+    replace_existing: bool = False,
+    force: bool | None = None,
 ) -> ServiceResult:
+    if force is not None:
+        replace_existing = force
     iid = str(item_id or "").strip()
     if not iid:
         return ServiceResult(ok=False, error="Missing inventory item id.")
@@ -205,7 +208,7 @@ def upload_inventory_image(
         filename=filename,
         existing=existing,
         uploaded_by=uploaded_by,
-        force=force,
+        replace_existing=replace_existing,
     )
     if result.ok and not (isinstance(result.data, dict) and result.data.get("skipped")):
         try:
