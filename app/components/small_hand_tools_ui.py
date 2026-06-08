@@ -232,8 +232,13 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
             unsafe_allow_html=True,
         )
         header_cols = st.columns(_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _HEADER_SPECS):
+        for idx, (col, (label, field)) in enumerate(zip(header_cols, _HEADER_SPECS)):
             with col:
+                if idx == 0:
+                    st.markdown(
+                        '<span class="small-tools-table-header" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                 if field:
                     render_table_header_cell(
                         label,
@@ -268,7 +273,7 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
 
             with cols[0]:
                 st.markdown(
-                    f'<span class="ips-hand-tools-row-marker" aria-hidden="true"></span>'
+                    f'<span class="ips-hand-tools-row-marker small-tools-table-row" aria-hidden="true"></span>'
                     f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
                     unsafe_allow_html=True,
                 )
