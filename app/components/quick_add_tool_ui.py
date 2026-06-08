@@ -11,7 +11,9 @@ try:
     from app.services.quick_add_tool_service import (
         TOOL_KIND_LABELS,
         TOOL_KINDS,
+        analyze_tool_photos,
         attach_tool_photo,
+        attach_tool_photos_bundle,
         attach_tool_receipt,
         bulk_import_tools,
         parse_bulk_import_file,
@@ -32,7 +34,9 @@ except ImportError:
     from services.quick_add_tool_service import (  # type: ignore
         TOOL_KIND_LABELS,
         TOOL_KINDS,
+        analyze_tool_photos,
         attach_tool_photo,
+        attach_tool_photos_bundle,
         attach_tool_receipt,
         bulk_import_tools,
         parse_bulk_import_file,
@@ -56,9 +60,26 @@ _METHOD_TABS = ("Manual entry", "Tool photo", "Receipt", "Bulk import")
 TOOL_PHOTO_UPLOAD_TYPES: tuple[str, ...] = ("jpg", "jpeg", "png", "webp", "heic", "heif", "pdf")
 TOOL_PHOTO_UPLOAD_CAPTION = "JPG, JPEG, PNG, WEBP, HEIC, HEIF, PDF"
 TOOL_PHOTO_UPLOAD_HELP = (
-    "Supported: JPG, JPEG, PNG, WEBP, HEIC, HEIF, PDF. "
-    "Your original file is kept in Documents; the app stores a converted preview for thumbnails and Scan photo."
+    "Upload one or more photos or PDFs. All originals are kept as source evidence. "
+    "The default table thumbnail comes from your uploads; catalog product images are optional suggestions."
 )
+
+_QAT_PHOTO_ANALYSIS_KEY = "qat_p_analysis"
+_QAT_PHOTO_UPLOAD_META_KEY = "qat_p_upload_meta"
+_QAT_PHOTO_PRIMARY_CHOICE_KEY = "qat_p_primary_choice"
+_PRIMARY_UPLOAD_CHOICE = "upload"
+
+
+class _CachedUpload:
+    """Streamlit UploadedFile stand-in persisted across reruns."""
+
+    def __init__(self, data: bytes, name: str) -> None:
+        self._data = data
+        self.name = name
+        self.type = ""
+
+    def getvalue(self) -> bytes:
+        return self._data
 
 
 def open_quick_add_tool_dialog() -> None:
@@ -95,11 +116,144 @@ def _render_ai_status() -> None:
 def _apply_scan_to_photo_fields(prefix: str, parsed: dict[str, Any], *, kind: str) -> None:
     if parsed.get("tool_name"):
         st.session_state[f"{prefix}_photo_name"] = parsed["tool_name"]
+    if parsed.get("manufacturer"):
+        st.session_state[f"{prefix}_photo_mfr"] = parsed["manufacturer"]
     if kind == "serialized":
         if parsed.get("serial_number"):
             st.session_state[f"{prefix}_photo_serial"] = parsed["serial_number"]
         if parsed.get("model"):
             st.session_state[f"{prefix}_photo_model"] = parsed["model"]
+
+
+def _photo_upload_tuples(photos: list[Any] | None) -> list[tuple[bytes, str]]:
+    tuples: list[tuple[bytes, str]] = []
+    for photo in photos or []:
+        raw = photo.getvalue()
+        name = str(getattr(photo, "name", "") or "upload")
+        if raw:
+            tuples.append((raw, name))
+    return tuples
+
+
+def _cached_photo_uploads(prefix: str) -> list[_CachedUpload]:
+    meta = st.session_state.get(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}") or []
+    uploads: list[_CachedUpload] = []
+    for row in meta:
+        if not isinstance(row, dict):
+            continue
+        data = row.get("file_bytes") or b""
+        name = str(row.get("file_name") or "upload")
+        if data:
+            uploads.append(_CachedUpload(data, name))
+    return uploads
+
+
+def _primary_choice_options(analysis: dict[str, Any]) -> list[tuple[str, str, bytes | None]]:
+    """Return (choice_id, label, thumbnail_bytes) for primary image picker."""
+    options: list[tuple[str, str, bytes | None]] = [
+        (
+            _PRIMARY_UPLOAD_CHOICE,
+            str(analysis.get("preview_source_label") or "Best uploaded photo"),
+            analysis.get("preview_bytes"),
+        )
+    ]
+    for suggestion in analysis.get("product_suggestions") or []:
+        if not isinstance(suggestion, dict):
+            continue
+        sid = str(suggestion.get("id") or "")
+        if not sid:
+            continue
+        options.append(
+            (
+                sid,
+                str(suggestion.get("source_label") or "Product suggestion"),
+                suggestion.get("preview_bytes"),
+            )
+        )
+    return options
+
+
+def _resolve_primary_from_analysis(analysis: dict[str, Any], choice_id: str) -> tuple[bytes | None, str, str]:
+    if choice_id == _PRIMARY_UPLOAD_CHOICE:
+        return (
+            analysis.get("preview_bytes"),
+            str(analysis.get("preview_filename") or "preview.jpg"),
+            str(analysis.get("preview_source_label") or "Uploaded photo"),
+        )
+    for suggestion in analysis.get("product_suggestions") or []:
+        if not isinstance(suggestion, dict):
+            continue
+        if str(suggestion.get("id") or "") == choice_id:
+            return (
+                suggestion.get("preview_bytes"),
+                str(suggestion.get("preview_filename") or "product-preview.jpg"),
+                str(suggestion.get("source_label") or "Product suggestion"),
+            )
+    return (
+        analysis.get("preview_bytes"),
+        str(analysis.get("preview_filename") or "preview.jpg"),
+        str(analysis.get("preview_source_label") or "Uploaded photo"),
+    )
+
+
+def _render_photo_review(prefix: str, analysis: dict[str, Any]) -> None:
+    extracted = analysis.get("extracted") or {}
+    upload_count = int(analysis.get("upload_count") or 0)
+    choice_key = f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}"
+    options = _primary_choice_options(analysis)
+    if choice_key not in st.session_state:
+        st.session_state[choice_key] = _PRIMARY_UPLOAD_CHOICE
+    current_choice = str(st.session_state.get(choice_key) or _PRIMARY_UPLOAD_CHOICE)
+    if current_choice not in {opt[0] for opt in options}:
+        st.session_state[choice_key] = _PRIMARY_UPLOAD_CHOICE
+        current_choice = _PRIMARY_UPLOAD_CHOICE
+
+    primary_bytes, _, primary_label = _resolve_primary_from_analysis(analysis, current_choice)
+
+    with st.container(border=True):
+        st.markdown("##### Review before save")
+        st.caption(
+            f"**Source files:** {upload_count} upload(s) will be saved to Documents as evidence/history."
+        )
+        if primary_bytes:
+            st.image(primary_bytes, caption=f"**Primary image** (tables & detail) — {primary_label}", width=220)
+        else:
+            st.caption("Primary image will be generated from your uploads on save.")
+
+        suggestions = [opt for opt in options if opt[0] != _PRIMARY_UPLOAD_CHOICE]
+        if suggestions:
+            st.markdown("**Product suggestions** (optional — approve one to replace the default upload preview)")
+            cols = st.columns(min(len(suggestions), 3))
+            for idx, (sid, label, thumb) in enumerate(suggestions):
+                with cols[idx % len(cols)]:
+                    if thumb:
+                        st.image(thumb, width=140)
+                    if st.button(
+                        "Use as primary",
+                        key=f"{prefix}_approve_{sid}",
+                        use_container_width=True,
+                        type="primary" if current_choice == sid else "secondary",
+                    ):
+                        st.session_state[choice_key] = sid
+                        st.rerun()
+                    st.caption(label)
+        else:
+            st.caption("No catalog product images found for this model/name. The upload preview will be used.")
+
+        choice_labels = {opt[0]: opt[1] for opt in options}
+        st.radio(
+            "Primary image source",
+            options=[opt[0] for opt in options],
+            format_func=lambda key: choice_labels.get(key, key),
+            key=choice_key,
+            horizontal=True,
+        )
+
+        conf = float(extracted.get("confidence") or 0)
+        if conf > 0:
+            st.caption(f"AI confidence: {conf:.0%}")
+        if extracted.get("notes"):
+            st.caption(str(extracted["notes"]))
 
 
 def _apply_scan_to_receipt_fields(prefix: str, parsed: dict[str, Any]) -> None:
@@ -196,58 +350,113 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
 
 
 def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
-    photo = st.file_uploader(
-        "Tool photo",
+    photos = st.file_uploader(
+        "Tool photos & documents",
         type=list(TOOL_PHOTO_UPLOAD_TYPES),
+        accept_multiple_files=True,
         key=f"{prefix}_photo",
         help=TOOL_PHOTO_UPLOAD_HELP,
     )
-    st.caption(f"Accepted formats: {TOOL_PHOTO_UPLOAD_CAPTION}")
-    scan_col, search_col = st.columns(2)
+    st.caption(f"Accepted formats: {TOOL_PHOTO_UPLOAD_CAPTION}. Upload multiple files when helpful.")
     cfg = load_tool_ai_config()
+    action_col, clear_col = st.columns(2)
+    with action_col:
+        analyze_clicked = st.button(
+            "Analyze uploads",
+            key=f"{prefix}_analyze",
+            use_container_width=True,
+            type="primary",
+            disabled=not photos or not cfg.vision_ready,
+        )
+    with clear_col:
+        if st.button("Clear analysis", key=f"{prefix}_clear_analysis", use_container_width=True):
+            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}", None)
+            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}", None)
+            st.session_state.pop(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}", None)
+            st.rerun()
+
+    if not photos:
+        st.caption("Upload one or more photos or PDFs to analyze tool details and preview image.")
+    elif not cfg.vision_ready:
+        st.caption("Set TOOL_VISION_API_KEY or OPENAI_API_KEY to enable Analyze uploads.")
+
+    if analyze_clicked and photos:
+        try:
+            with st.spinner("Analyzing uploads and searching for product image suggestions…"):
+                batch = _photo_upload_tuples(photos)
+                result = analyze_tool_photos(batch, kind_hint=kind)
+            if not result.ok:
+                st.error(result.error or "Analysis failed.")
+            else:
+                st.session_state[f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}"] = result.data or {}
+                st.session_state[f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}"] = [
+                    {"file_name": name, "file_bytes": data} for data, name in batch
+                ]
+                st.session_state[f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}"] = _PRIMARY_UPLOAD_CHOICE
+                _apply_scan_to_photo_fields(prefix, (result.data or {}).get("extracted") or {}, kind=kind)
+                n_suggest = len((result.data or {}).get("product_suggestions") or [])
+                hint = f" {n_suggest} product suggestion(s) found." if n_suggest else ""
+                st.success(f"Analysis complete — review fields and choose a primary image.{hint}")
+                st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
+
+    analysis = st.session_state.get(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}")
+    if analysis:
+        _render_photo_review(prefix, analysis)
+
+    scan_col, search_col = st.columns(2)
+    first_photo = (photos or [None])[0]
     with scan_col:
         if st.button(
-            "Scan photo",
+            "Re-scan first file",
             key=f"{prefix}_scan",
             use_container_width=True,
-            disabled=photo is None or not cfg.vision_ready,
+            disabled=first_photo is None or not cfg.vision_ready,
         ):
             try:
-                parsed = extract_tool_from_photo(photo.getvalue(), photo.name, kind_hint=kind)
+                parsed = extract_tool_from_photo(first_photo.getvalue(), first_photo.name, kind_hint=kind)
                 _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
-                conf = float(parsed.get("confidence") or 0)
-                st.success(f"Photo scanned ({conf:.0%} confidence). Review fields below.")
-                if parsed.get("notes"):
-                    st.caption(parsed["notes"])
+                st.success(f"First file scanned ({float(parsed.get('confidence') or 0):.0%} confidence).")
+                st.rerun()
             except Exception as exc:
                 st.error(str(exc))
     with search_col:
         if st.button(
-            "Match from image",
+            "Match first file",
             key=f"{prefix}_img_search",
             use_container_width=True,
-            disabled=photo is None or not cfg.image_search_ready,
+            disabled=first_photo is None or not cfg.image_search_ready,
         ):
             try:
-                parsed = search_tool_by_image(photo.getvalue(), photo.name)
+                parsed = search_tool_by_image(first_photo.getvalue(), first_photo.name)
                 _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
-                st.success("Image match applied. Review fields below.")
+                st.success("Image match applied to fields.")
+                st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-    if photo is None:
-        st.caption("Upload a tool photo to enable Scan photo and Match from image.")
-    elif not cfg.vision_ready:
-        st.caption("Set TOOL_VISION_API_KEY or OPENAI_API_KEY to enable Scan photo.")
 
     name = st.text_input("Tool name *", key=f"{prefix}_photo_name")
     if kind == "serialized":
         serial = st.text_input("Serial number *", key=f"{prefix}_photo_serial")
-        model = st.text_input("Model", key=f"{prefix}_photo_model")
+        c1, c2 = st.columns(2)
+        with c1:
+            model = st.text_input("Model", key=f"{prefix}_photo_model")
+        with c2:
+            if f"{prefix}_photo_mfr" not in st.session_state:
+                st.session_state[f"{prefix}_photo_mfr"] = "Milwaukee"
+            mfr = st.text_input("Manufacturer", key=f"{prefix}_photo_mfr")
     else:
         serial = ""
         model = ""
+        mfr = ""
         st.caption("Photos are stored on Serialized Tool assets. Small Tools and Inventory save without a photo for now.")
+
     if st.button("Save with photo", type="primary", key=f"{prefix}_photo_save", use_container_width=True):
+        uploads = _cached_photo_uploads(prefix) or [p for p in (photos or []) if p is not None]
+        if not uploads:
+            st.error("Upload and analyze at least one photo before saving.")
+            return
         if kind == "serialized":
             if not serial:
                 st.error("Serial number is required for Serialized Tools.")
@@ -258,6 +467,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
                     "tool_name": name,
                     "serial_number": serial,
                     "model": model,
+                    "manufacturer": mfr,
                     "category": "Tool",
                 },
                 trailer_id=trailer_id,
@@ -272,13 +482,41 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         if not result.ok:
             st.error(result.error or "Could not save tool.")
             return
-        photo = st.session_state.get(f"{prefix}_photo")
         tool_id = str((result.data or {}).get("id") or "")
-        if photo is not None and tool_id:
-            photo_result = attach_tool_photo(tool_id, photo, uploaded_by=uploaded_by)
+        if tool_id and kind == "serialized":
+            analysis_data = st.session_state.get(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}") or {}
+            choice_id = str(
+                st.session_state.get(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}") or _PRIMARY_UPLOAD_CHOICE
+            )
+            preview_bytes, preview_filename, _ = _resolve_primary_from_analysis(analysis_data, choice_id)
+            if not preview_bytes:
+                try:
+                    from app.services.tool_preview_image_service import pick_best_upload_preview
+                except ImportError:
+                    from services.tool_preview_image_service import pick_best_upload_preview  # type: ignore
+                try:
+                    batch = [(u.getvalue(), u.name) for u in uploads]
+                    preview = pick_best_upload_preview(batch)
+                    preview_bytes = preview.preview_bytes
+                    preview_filename = preview.preview_filename
+                except Exception:
+                    preview_bytes = None
+            photo_result = attach_tool_photos_bundle(
+                tool_id,
+                uploads,
+                primary_preview_bytes=preview_bytes,
+                primary_preview_filename=preview_filename,
+                uploaded_by=uploaded_by,
+            )
             if not photo_result.ok:
                 st.warning(photo_result.error or "Tool saved; photo upload failed.")
+            elif (photo_result.data or {}).get("source_errors"):
+                for err in (photo_result.data or {}).get("source_errors") or []:
+                    st.warning(str(err))
         st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
+        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_ANALYSIS_KEY}", None)
+        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_UPLOAD_META_KEY}", None)
+        st.session_state.pop(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}", None)
         close_quick_add_tool_dialog()
         try:
             from app.services.assets_service import clear_assets_cache

@@ -125,12 +125,14 @@ def _openai_client(api_key: str):
 def _openai_vision_extract(
     *,
     api_key: str,
-    file_bytes: bytes,
-    file_name: str,
+    originals: list[tuple[bytes, str]],
     instructions: str,
     schema: dict[str, Any],
     schema_name: str,
 ) -> dict[str, Any]:
+    if not originals:
+        raise ValueError("At least one file is required.")
+
     try:
         from app.services.asset_autofill_media import pdf_extracted_text_hints
         from app.services.upload_media_strategy import vision_inputs_from_upload
@@ -138,8 +140,9 @@ def _openai_vision_extract(
         from services.asset_autofill_media import pdf_extracted_text_hints  # type: ignore
         from services.upload_media_strategy import vision_inputs_from_upload  # type: ignore
 
-    originals = [(file_bytes, file_name)]
-    images = vision_inputs_from_upload(file_bytes, file_name)
+    images: list[tuple[bytes, str]] = []
+    for file_bytes, file_name in originals:
+        images.extend(vision_inputs_from_upload(file_bytes, file_name))
     prompt = instructions
     pdf_hint = pdf_extracted_text_hints(originals)
     if pdf_hint:
@@ -276,13 +279,57 @@ Return practical field values for Quick Add Tool.
 """
     parsed = _openai_vision_extract(
         api_key=cfg.vision_api_key,
-        file_bytes=file_bytes,
-        file_name=file_name,
+        originals=[(file_bytes, file_name)],
         instructions=instructions,
         schema=_tool_extraction_schema(),
         schema_name="tool_photo_extraction",
     )
     return _normalize_tool_fields(parsed, default_kind=hint)
+
+
+def extract_tool_from_photos(
+    photos: list[tuple[bytes, str]],
+    *,
+    kind_hint: str = "",
+) -> dict[str, Any]:
+    """Identify a tool from one or more photos/PDFs (combined vision analysis)."""
+    if not photos:
+        raise ValueError("At least one photo is required.")
+    cfg = load_tool_ai_config()
+    if not cfg.vision_ready:
+        raise RuntimeError(
+            "Tool vision is not configured. Set TOOL_VISION_API_KEY (and optionally TOOL_VISION_PROVIDER=openai)."
+        )
+    if cfg.vision_provider != "openai":
+        raise RuntimeError(f"Tool vision provider '{cfg.vision_provider}' is not supported yet. Use openai.")
+
+    hint = kind_hint.strip().casefold()
+    n_files = len(photos)
+    instructions = f"""
+You analyze photos and documents of jobsite tools and consumables for inventory intake.
+The user uploaded {n_files} file(s). Read all images/pages together and return the best single tool record.
+
+Classify into exactly one bucket:
+- **serialized**: individual cordless/power tools with a readable serial number
+- **small**: quantity hand tools without serial numbers
+- **inventory**: consumables (cut-off wheels, drill bits, blades, gloves, fasteners)
+
+Read serial numbers only when clearly visible on a nameplate. Do not invent serials.
+Prefer model/part numbers from nameplates, labels, or packaging over guesses.
+Suggested bucket hint from user: {hint or "none"}.
+
+Return practical field values for Quick Add Tool.
+"""
+    parsed = _openai_vision_extract(
+        api_key=cfg.vision_api_key,
+        originals=list(photos),
+        instructions=instructions,
+        schema=_tool_extraction_schema(),
+        schema_name="tool_photos_extraction",
+    )
+    result = _normalize_tool_fields(parsed, default_kind=hint)
+    result["source_file_count"] = n_files
+    return result
 
 
 def ocr_tool_receipt(file_bytes: bytes, file_name: str) -> dict[str, Any]:
@@ -303,8 +350,7 @@ If multiple line items, use the largest tool line and mention others in notes.
 """
     parsed = _openai_vision_extract(
         api_key=cfg.ocr_api_key,
-        file_bytes=file_bytes,
-        file_name=file_name,
+        originals=[(file_bytes, file_name)],
         instructions=instructions,
         schema=_tool_extraction_schema(),
         schema_name="tool_receipt_ocr",
@@ -332,8 +378,7 @@ This is a visual product match, not a web search.
 """
     parsed = _openai_vision_extract(
         api_key=cfg.image_search_api_key,
-        file_bytes=file_bytes,
-        file_name=file_name,
+        originals=[(file_bytes, file_name)],
         instructions=instructions,
         schema=_tool_extraction_schema(),
         schema_name="tool_image_search",
@@ -346,6 +391,7 @@ This is a visual product match, not a web search.
 __all__ = [
     "ToolAIConfig",
     "extract_tool_from_photo",
+    "extract_tool_from_photos",
     "load_tool_ai_config",
     "ocr_tool_receipt",
     "search_tool_by_image",

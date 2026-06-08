@@ -252,6 +252,75 @@ def attach_tool_photo(asset_id: str, uploaded: Any, *, uploaded_by: str | None =
     return attach_asset_photo_with_preview(asset_id, uploaded, uploaded_by=uploaded_by)
 
 
+def analyze_tool_photos(
+    uploads: list[tuple[bytes, str]],
+    *,
+    kind_hint: str = "",
+) -> ServiceResult:
+    """Extract tool fields, default upload primary, and optional catalog product suggestions."""
+    if not uploads:
+        return ServiceResult(ok=False, error="Upload at least one photo or document.")
+    try:
+        from app.services.tool_intake_ai_service import extract_tool_from_photos
+        from app.services.tool_preview_image_service import (
+            find_product_image_suggestions,
+            pick_best_upload_preview,
+            preview_image_to_dict,
+        )
+    except ImportError:
+        from services.tool_intake_ai_service import extract_tool_from_photos  # type: ignore
+        from services.tool_preview_image_service import (  # type: ignore
+            find_product_image_suggestions,
+            pick_best_upload_preview,
+            preview_image_to_dict,
+        )
+
+    try:
+        extracted = extract_tool_from_photos(uploads, kind_hint=kind_hint)
+        upload_preview = pick_best_upload_preview(uploads)
+        suggestions = find_product_image_suggestions(extracted)
+    except Exception as exc:
+        return ServiceResult(ok=False, error=str(exc))
+
+    return ServiceResult(
+        ok=True,
+        data={
+            "extracted": extracted,
+            "preview_bytes": upload_preview.preview_bytes,
+            "preview_filename": upload_preview.preview_filename,
+            "preview_source": upload_preview.source,
+            "preview_source_label": upload_preview.source_label,
+            "product_suggestions": [preview_image_to_dict(s) for s in suggestions],
+            "upload_count": len(uploads),
+        },
+    )
+
+
+def attach_tool_photos_bundle(
+    asset_id: str,
+    uploads: list[Any],
+    *,
+    primary_preview_bytes: bytes | None = None,
+    primary_preview_filename: str = "preview.jpg",
+    uploaded_by: str | None = None,
+) -> ServiceResult:
+    """Save all source uploads and set the chosen primary preview on the asset."""
+    try:
+        from app.services.upload_media_strategy import attach_asset_photos_bundle
+    except ImportError:
+        from services.upload_media_strategy import attach_asset_photos_bundle  # type: ignore
+    result = attach_asset_photos_bundle(
+        asset_id,
+        uploads,
+        primary_preview_bytes=primary_preview_bytes,
+        primary_preview_filename=primary_preview_filename,
+        uploaded_by=uploaded_by,
+    )
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
 def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
     if not asset or uploaded is None:
         return ServiceResult(ok=False, error="Asset and receipt are required.")
@@ -276,7 +345,9 @@ def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: st
 __all__ = [
     "TOOL_KIND_LABELS",
     "TOOL_KINDS",
+    "analyze_tool_photos",
     "attach_tool_photo",
+    "attach_tool_photos_bundle",
     "attach_tool_receipt",
     "bulk_import_tools",
     "parse_bulk_import_file",

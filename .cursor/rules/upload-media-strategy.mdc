@@ -1,6 +1,6 @@
 ---
 description: Dual-save upload strategy — original evidence + web-friendly preview
-globs: app/services/upload_media_strategy.py,app/services/quick_add_tool_service.py,app/services/tool_intake_ai_service.py,app/services/asset_autofill_media.py,app/components/quick_add_tool_ui.py,app/services/asset_images.py,app/services/item_images.py
+globs: app/services/upload_media_strategy.py,app/services/quick_add_tool_service.py,app/services/tool_preview_image_service.py,app/services/tool_intake_ai_service.py,app/services/asset_autofill_media.py,app/components/quick_add_tool_ui.py,app/services/asset_images.py,app/services/item_images.py
 alwaysApply: false
 ---
 
@@ -26,11 +26,17 @@ When users upload photos or documents that may not render in browsers (HEIC, HEI
 | PDF | Render page(s) to PNG (first page for single preview; multi-page for OCR) |
 | JPG / PNG / WEBP | Normalize to JPEG via `resize_item_image_bytes()` |
 
-## Entry points
+## Quick Add Tool — three image tiers
+
+1. **Source files** — every user upload → `asset_documents` (evidence/history). Never replace or drop.
+2. **Primary image** — default best converted upload → `assets.image_path` (tables & detail).
+3. **Product suggestions** — optional catalog matches (Pricing Guide / assets / inventory). User must approve before a suggestion replaces the upload primary.
 
 | Flow | Function |
 |------|----------|
-| Quick Add Tool photo save | `attach_asset_photo_with_preview()` |
+| Quick Add multi-photo save | `attach_asset_photos_bundle()` |
+| Single-photo save (legacy) | `attach_asset_photo_with_preview()` |
+| Analyze + suggestions | `analyze_tool_photos()` + `find_product_image_suggestions()` |
 | Scan photo / vision OCR | `vision_inputs_from_upload()` |
 | Asset intake autofill | `prepare_asset_autofill_inputs()` (same conversion rules) |
 

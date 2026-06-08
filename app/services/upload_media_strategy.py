@@ -169,11 +169,94 @@ def attach_asset_photo_with_preview(
     return ServiceResult(ok=True, data=data)
 
 
+def attach_asset_photos_bundle(
+    asset_id: str,
+    uploads: list[Any],
+    *,
+    primary_preview_bytes: bytes | None = None,
+    primary_preview_filename: str = "preview.jpg",
+    uploaded_by: str | None = None,
+    save_originals: bool = True,
+) -> ServiceResult:
+    """
+    Save every upload as a source document and set one primary ``image_path`` preview.
+
+    When ``primary_preview_bytes`` is provided (e.g. catalog product image), it becomes
+    the asset thumbnail. Otherwise the best converted upload preview is used.
+    """
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return ServiceResult(ok=False, error="Asset id is required.")
+    if not uploads and not primary_preview_bytes:
+        return ServiceResult(ok=False, error="At least one upload or preview image is required.")
+
+    saved_sources = 0
+    source_errors: list[str] = []
+    if save_originals:
+        total = len(uploads)
+        for idx, upload in enumerate(uploads, start=1):
+            note = (
+                f"Source upload {idx} of {total} — original preserved for evidence; "
+                "app preview may be a separate catalog or converted image."
+            )
+            result = persist_original_asset_upload(
+                aid,
+                upload,
+                uploaded_by=uploaded_by,
+                notes=note,
+            )
+            if result.ok:
+                saved_sources += 1
+            else:
+                source_errors.append(result.error or f"Source upload {idx} failed.")
+
+    preview_bytes = primary_preview_bytes
+    preview_name = str(primary_preview_filename or "preview.jpg").strip() or "preview.jpg"
+    if not preview_bytes and uploads:
+        try:
+            best = uploads[0]
+            raw = best.getvalue()
+            name = str(getattr(best, "name", "") or "upload")
+            preview_bytes, preview_name = build_display_preview(raw, name)
+        except ValueError as exc:
+            return ServiceResult(ok=False, error=str(exc))
+
+    if not preview_bytes:
+        if source_errors:
+            return ServiceResult(ok=False, error="; ".join(source_errors[:3]))
+        return ServiceResult(ok=False, error="Could not build a display preview.")
+
+    try:
+        from app.services.assets_service import upload_asset_image
+    except ImportError:
+        from services.assets_service import upload_asset_image  # type: ignore
+
+    preview_upload = _BytesUpload(preview_bytes, preview_name, mime="image/jpeg")
+    preview_result = upload_asset_image(
+        aid,
+        preview_upload,
+        uploaded_by=uploaded_by,
+        force=True,
+    )
+    if not preview_result.ok:
+        return preview_result
+
+    data: dict[str, Any] = {
+        "preview": preview_result.data,
+        "sources_saved": saved_sources,
+        "source_errors": source_errors,
+    }
+    if source_errors and saved_sources == 0:
+        return ServiceResult(ok=False, error="; ".join(source_errors[:3]), data=data)
+    return ServiceResult(ok=True, data=data)
+
+
 __all__ = [
     "SOURCE_DOCUMENT_NOTES",
     "SOURCE_DOCUMENT_TYPE",
     "WEB_PREVIEW_EXTENSIONS",
     "attach_asset_photo_with_preview",
+    "attach_asset_photos_bundle",
     "build_display_preview",
     "needs_display_conversion",
     "persist_original_asset_upload",
