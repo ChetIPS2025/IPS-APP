@@ -100,6 +100,7 @@ try:
         render_serialized_tool_tracking_panel,
         render_serialized_tools_toolbar,
     )
+    from app.components.small_hand_tools_ui import render_hand_tools_tab
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
     from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
     from app.utils.field_context import (
@@ -202,6 +203,7 @@ except ImportError:
         render_serialized_tool_tracking_panel,
         render_serialized_tools_toolbar,
     )
+    from components.small_hand_tools_ui import render_hand_tools_tab  # type: ignore
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
     from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
     from utils.field_context import (  # type: ignore
@@ -447,7 +449,13 @@ def _small_tool_value(row: dict) -> str:
     return fmt_currency(row.get("value") or row.get("purchase_price") or 0)
 
 
-def _build_small_tool_list(all_assets: list[dict]) -> list[dict]:
+def _kit_item_has_serial(item: dict) -> bool:
+    serial = str(item.get("serial_number") or "").strip()
+    return bool(serial and serial not in {"—", "-", "none", "null"})
+
+
+def _build_serialized_tool_list(all_assets: list[dict]) -> list[dict]:
+    """Milwaukee / serial-numbered tools only — quantity hand tools use the Small Tools tab."""
     assets_by_id = {
         str(a.get("id") or "").strip(): a for a in all_assets if str(a.get("id") or "").strip()
     }
@@ -461,6 +469,8 @@ def _build_small_tool_list(all_assets: list[dict]) -> list[dict]:
     for item in list_all_kit_items_enriched(assets_by_id):
         child_id = str(item.get("child_asset_id") or "").strip()
         if child_id and child_id in tool_asset_ids:
+            continue
+        if not _kit_item_has_serial(item) and not child_id:
             continue
         unified.append(item)
 
@@ -1110,7 +1120,7 @@ def _render_equipment_list(
 
 def _render_small_tools_list(rows: list[dict]) -> None:
     assets_by_id, employees_by_id, jobs_by_id = _small_tool_context_maps(rows)
-    small_tool_rows = _build_small_tool_list(rows)
+    small_tool_rows = _build_serialized_tool_list(rows)
     enriched_rows = [
         {
             **r,
@@ -2190,9 +2200,14 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
-    tab_equipment, tab_small_tools = st.tabs(["Equipment", "Serialized Tools"])
+    tab_equipment, tab_serialized_tools, tab_hand_tools = st.tabs(
+        ["Equipment", "Serialized Tools", "Small Tools"]
+    )
 
     with tab_equipment:
+        st.caption(
+            "Large assets and rentable equipment — tool trailers, generators, pressure washers, dump trailers, and similar fleet items."
+        )
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
                 st.session_state["ast_kit_summary_on"] = True
@@ -2202,8 +2217,14 @@ def render() -> None:
                 st.caption("Load kit accountability metrics on demand to speed up the assets page.")
         _render_equipment_list(rows)
 
-    with tab_small_tools:
+    with tab_serialized_tools:
+        st.caption(
+            "Individual tools tracked by serial number — Milwaukee drills, impacts, grinders, saws, rotary hammers, and similar cordless tools."
+        )
         _render_small_tools_list(rows)
+
+    with tab_hand_tools:
+        render_hand_tools_tab(rows)
 
     selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
     if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):
