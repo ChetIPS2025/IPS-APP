@@ -2196,6 +2196,10 @@ def inject_inventory_module_css() -> None:
 .ips-job-inventory-txn-row {{
   grid-template-columns: 1fr 1.1fr 0.8fr 0.9fr 0.5fr 0.5fr 0.9fr 0.8fr 1fr;
 }}
+.ips-job-materials-head,
+.ips-job-materials-row {{
+  grid-template-columns: 0.9fr 1.2fr 0.5fr 0.7fr 0.7fr 0.9fr 0.9fr 0.7fr 1fr;
+}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -3587,7 +3591,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v89">
+<style id="ips-timekeeping-module-v90">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6849,6 +6853,128 @@ def inject_timekeeping_module_css() -> None:
   border: 1px solid #fca5a5 !important;
   border-radius: 8px !important;
   color: #b91c1c !important;
+}}
+/* Day-level approval states — list row hour boxes */
+.timekeeping-day-status-badge {{
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}}
+{tk_list_day_col}:has(.ips-tk-day-draft-empty) {{
+  background: #f8fafc !important;
+  box-shadow: inset 0 0 0 1px #e2e8f0 !important;
+  border-radius: 6px !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-draft-empty) .timekeeping-day-status-badge {{
+  color: #94a3b8;
+}}
+{tk_list_day_col}:has(.ips-tk-day-draft):not(:has(.ips-tk-day-draft-empty)) {{
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 1px #cbd5e1 !important;
+  border-radius: 6px !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-draft) .timekeeping-day-status-badge {{
+  color: #475569;
+}}
+{tk_list_day_col}:has(.ips-tk-day-pending) {{
+  background: #fffbeb !important;
+  box-shadow: inset 0 0 0 2px #f59e0b !important;
+  border-radius: 6px !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-pending) .timekeeping-day-status-badge {{
+  color: #b45309;
+}}
+{tk_list_day_col}:has(.ips-tk-day-approved) {{
+  background: #ecfdf5 !important;
+  box-shadow: inset 0 0 0 2px #22c55e !important;
+  border-radius: 6px !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-approved) .timekeeping-day-status-badge {{
+  color: #15803d;
+}}
+{tk_list_day_col}:has(.ips-tk-day-rejected) {{
+  background: #fef2f2 !important;
+  box-shadow: inset 0 0 0 2px #ef4444 !important;
+  border-radius: 6px !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-rejected) .timekeeping-day-status-badge {{
+  color: #b91c1c;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-draft)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-pending)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
+  background: #fffbeb !important;
+  border-color: #f59e0b !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-approved)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
+  background: #ecfdf5 !important;
+  border-color: #22c55e !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-rejected)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
+  background: #fef2f2 !important;
+  border-color: #ef4444 !important;
+}}
+.timekeeping-list-hour-ro-draft {{
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}}
+.timekeeping-list-hour-ro-pending {{
+  background: #fffbeb !important;
+  border: 2px solid #f59e0b !important;
+  color: #92400e !important;
+  font-weight: 700 !important;
+}}
+.timekeeping-list-hour-ro-approved {{
+  background: #dcfce7 !important;
+  border: 2px solid #22c55e !important;
+  color: #166534 !important;
+  font-weight: 700 !important;
+}}
+.timekeeping-list-hour-ro-rejected {{
+  background: #fee2e2 !important;
+  border: 2px solid #ef4444 !important;
+  color: #991b1b !important;
+  font-weight: 700 !important;
+}}
+/* Allocation day cards — approval state borders */
+[class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-draft) {{
+  border-color: #cbd5e1 !important;
+}}
+[class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-pending) {{
+  border-color: #f59e0b !important;
+  background: #fffbeb !important;
+}}
+[class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-approved) {{
+  border-color: #22c55e !important;
+  background: #f0fdf4 !important;
+}}
+[class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-rejected) {{
+  border-color: #ef4444 !important;
+  background: #fef2f2 !important;
+}}
+.timekeeping-alloc-approval-pending .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill {{
+  box-shadow: 0 0 0 1px #f59e0b;
+}}
+.timekeeping-alloc-approval-approved .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill {{
+  box-shadow: 0 0 0 1px #22c55e;
+}}
+.timekeeping-alloc-approval-rejected .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill {{
+  box-shadow: 0 0 0 1px #ef4444;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker) {{
   max-width: 100% !important;

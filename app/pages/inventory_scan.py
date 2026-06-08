@@ -1043,6 +1043,39 @@ def _render_inventory_scan_inner() -> None:
     prof_id = _profile_uuid()
     cb = _created_by_label()
     ts = datetime.now(timezone.utc).isoformat()
+
+    if itype == "To Job" and jid:
+        try:
+            from app.services.job_materials_service import issue_inventory_to_job
+        except ImportError:
+            from services.job_materials_service import issue_inventory_to_job  # type: ignore
+        ua_sub = request_user_agent()
+        suf_sub = str(st.session_state.get("ips_inv_device_suffix") or "")
+        auto_device_submit = format_device_label(device_family_from_user_agent(ua_sub), suf_sub)
+        final_device = str(st.session_state.get("inv_scan_device_display") or "").strip() or auto_device_submit
+        persist_device_label_to_browser(final_device)
+        scan_extra = _scan_audit_fields(device_label=final_device, manual_actor=str(manual_actor or ""))
+        result = issue_inventory_to_job(
+            job_id=jid,
+            inventory_item_id=iid,
+            quantity=qv,
+            transaction_type="issue_to_job",
+            notes=note_s,
+            employee_id=emp_id,
+            usage_source="qr_scan",
+            allow_overdraw=allow_neg,
+            scanned_by_user_id=prof_id,
+            scanned_by_name=cb or str(manual_actor or "").strip() or None,
+            scanned_by_employee_id=emp_id,
+            source="inventory_scan_desktop",
+        )
+        if not result.ok:
+            st.error(result.error or "Could not issue inventory to job.")
+            st.stop()
+        st.session_state.pop("inv_scan_loaded", None)
+        st.success("Inventory issued to job and job costing updated.")
+        st.rerun()
+
     new_qoh = qoh - qv
 
     try:
@@ -1056,28 +1089,6 @@ def _render_inventory_scan_inner() -> None:
         st.stop()
 
     jm_row: dict | None = None
-    if itype == "To Job" and jid:
-        line_total = round(qv * unit_cost, 2)
-        try:
-            jm_row = insert_row_admin(
-                _JM,
-                {
-                    "job_id": jid,
-                    "inventory_item_id": iid,
-                    "item_name": name[:500],
-                    "quantity": float(qv),
-                    "unit_cost": float(unit_cost),
-                    "line_total": float(line_total),
-                    "notes": note_s[:2000],
-                },
-            )
-        except Exception as exc:
-            try:
-                update_rows_admin(_INV, {"quantity_on_hand": float(qoh), "updated_at": ts}, {"id": iid})
-            except Exception:
-                pass
-            st.error(f"Job costing line failed; stock restored. {exc}")
-            st.stop()
 
     txn_payload: dict[str, Any] = {
         "inventory_item_id": iid,
@@ -1561,21 +1572,44 @@ def render_inventory_scan_page() -> None:
         st.error("Quantity exceeds quantity on hand.")
         st.stop()
 
-    result = record_inventory_transaction({
-        "inventory_id": iid,
-        "transaction_type": action,
-        "quantity": qv,
-        "job_id": job_id,
-        "unit": unit,
-        "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
-        "scanned_by_employee_id": _profile_employee_id(),
-        "scanned_by_name": actor_name,
-        "scanned_by_phone": phone_norm,
-        "phone_verified": phone_verified,
-        "source": "qr_scan",
-        "notes": notes,
-        "allow_overdraw": allow_over,
-    })
+    if action in {"issue_to_job", "consume_on_job"} and job_id:
+        try:
+            from app.services.job_materials_service import issue_inventory_to_job
+        except ImportError:
+            from services.job_materials_service import issue_inventory_to_job  # type: ignore
+        result = issue_inventory_to_job(
+            job_id=job_id,
+            inventory_item_id=iid,
+            quantity=qv,
+            transaction_type=action,
+            notes=notes,
+            employee_id=_profile_employee_id(),
+            usage_source="qr_scan",
+            allow_overdraw=allow_over,
+            scanned_by_user_id=_scan_profile_user_id() if is_authenticated() else None,
+            scanned_by_name=actor_name,
+            scanned_by_phone=phone_norm,
+            scanned_by_employee_id=_profile_employee_id(),
+            phone_verified=phone_verified,
+            source="qr_scan",
+            unit=unit,
+        )
+    else:
+        result = record_inventory_transaction({
+            "inventory_id": iid,
+            "transaction_type": action,
+            "quantity": qv,
+            "job_id": job_id,
+            "unit": unit,
+            "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
+            "scanned_by_employee_id": _profile_employee_id(),
+            "scanned_by_name": actor_name,
+            "scanned_by_phone": phone_norm,
+            "phone_verified": phone_verified,
+            "source": "qr_scan",
+            "notes": notes,
+            "allow_overdraw": allow_over,
+        })
 
     if not result.ok:
         st.error(result.error or "Could not record transaction.")

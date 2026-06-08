@@ -479,6 +479,7 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
         "employee_id": data.get("scanned_by_employee_id"),
         "profile_id": data.get("scanned_by_user_id"),
         "created_by": str(data.get("scanned_by_name") or "")[:500] or None,
+        "subjob_id": data.get("subjob_id"),
     }
     ins = insert_row(_TXN_TABLE, payload)
     if not ins.ok:

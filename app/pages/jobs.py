@@ -10,6 +10,7 @@ import streamlit as st
 try:
     from app.components.job_actions import render_job_action_buttons
     from app.components.job_ips_forms import render_job_ips_forms_tab
+    from app.components.job_materials_ui import render_job_materials_tab
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -63,6 +64,7 @@ try:
     )
 except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
+    from components.job_materials_ui import render_job_materials_tab  # type: ignore
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
@@ -128,7 +130,7 @@ _JOB_TABS = [
     "Overview",
     "Scope",
     "Estimates",
-    "Inventory",
+    "Materials",
     "Equipment",
     "Schedule",
     "Subjobs",
@@ -139,7 +141,7 @@ _JOB_TABS = [
     "Daily Updates",
     "Notes",
 ]
-_FIELD_JOB_TABS = ["Overview", "Subjobs", "Photos", "Daily Report"]
+_FIELD_JOB_TABS = ["Overview", "Materials", "Subjobs", "Photos", "Daily Report"]
 SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
@@ -1486,7 +1488,7 @@ def _render_field_job_detail_tabs(job: dict) -> None:
         from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
         from services.job_service import job_row_select_label  # type: ignore
 
-    tab_overview, tab_tasks, tab_photos, tab_daily = st.tabs(_FIELD_JOB_TABS)
+    tab_overview, tab_materials, tab_tasks, tab_photos, tab_daily = st.tabs(_FIELD_JOB_TABS)
 
     with tab_overview:
         overview_html = (
@@ -1509,6 +1511,9 @@ def _render_field_job_detail_tabs(job: dict) -> None:
             f"</p>"
         )
         st.markdown(_dialog_card("Scope", scope_html), unsafe_allow_html=True)
+
+    with tab_materials:
+        render_job_materials_tab(job, key_prefix=f"field_job_mat_{jid}")
 
     with tab_tasks:
         inject_tasks_module_css()
@@ -1543,7 +1548,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_overview,
         tab_scope,
         tab_estimates,
-        tab_inventory,
+        tab_materials,
         tab_equipment,
         tab_schedule,
         tab_tasks,
@@ -1636,8 +1641,8 @@ def _render_job_detail_tabs(job: dict) -> None:
                         else:
                             st.caption("Proposal PDF is not available for this estimate yet.")
 
-    with tab_inventory:
-        _render_job_inventory_tab(job)
+    with tab_materials:
+        render_job_materials_tab(job, key_prefix=f"job_mat_{str(job.get('id') or '')}")
 
     with tab_equipment:
         _render_job_equipment_tab(job)

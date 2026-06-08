@@ -72,6 +72,7 @@ class DayAllocationCardContext:
     record_key: str = ""
     week_status: str = ""
     day_status: str = "Draft"
+    can_submit: bool = False
 
 
 def allocation_day_block_class(state: str) -> str:
@@ -84,6 +85,18 @@ def allocation_day_block_class(state: str) -> str:
     if state == "incomplete":
         return " timekeeping-alloc-day-incomplete"
     return ""
+
+
+def allocation_day_approval_class(day_status: str) -> str:
+    """CSS hook for day-level approval state on allocation cards."""
+    mapping = {
+        "Draft": "timekeeping-alloc-approval-draft",
+        "Pending": "timekeeping-alloc-approval-pending",
+        "Approved": "timekeeping-alloc-approval-approved",
+        "Rejected": "timekeeping-alloc-approval-rejected",
+    }
+    key = str(day_status or "Draft").strip()
+    return mapping.get(key, "timekeeping-alloc-approval-draft")
 
 
 def allocation_card_state_class(state: str) -> str:
@@ -234,7 +247,12 @@ def _render_day_actions_bar(
         action_slots.append("save")
     if hours_editable:
         action_slots.append("add")
-    if hours_editable and ctx.daily_total > 0 and day_status in ("Draft", "Rejected"):
+    if (
+        hours_editable
+        and ctx.can_submit
+        and ctx.daily_total > 0
+        and day_status in ("Draft", "Rejected")
+    ):
         action_slots.append("submit")
     if ctx.can_approve and day_status == "Pending" and ctx.daily_total > 0:
         action_slots.extend(["approve", "reject"])
@@ -253,7 +271,10 @@ def _render_day_actions_bar(
             unsafe_allow_html=True,
         )
         if not action_slots and day_status == "Approved":
-            st.caption("This day is approved.")
+            st.caption("This day is approved and locked.")
+            return
+        if not action_slots and day_status == "Pending":
+            st.caption("Pending approval — hours are locked until an administrator approves or rejects.")
             return
         if not action_slots:
             return
@@ -498,6 +519,8 @@ def render_day_allocation_card(
         balance_cls += " timekeeping-alloc-day-unbalanced"
     card_cls = allocation_card_state_class(state)
 
+    day_status_norm = normalize_timecard_status(ctx.day_status)
+    approval_cls = allocation_day_approval_class(day_status_norm)
     scope = allocation_panel_scope_key(ctx.panel_scope)
     with st.container(key=f"tk_alloc_day_{scope}_{ctx.iso}", border=True):
         unbalanced_cls = (
@@ -506,6 +529,7 @@ def render_day_allocation_card(
         st.markdown(
             f'<span class="timekeeping-day-allocation-card-marker timekeeping-alloc-day-state-marker '
             f"timekeeping-alloc-day-state-{html.escape(state)}{unbalanced_cls} "
+            f"{html.escape(approval_cls)} "
             f'timekeeping-allocation-day-card-marker timekeeping-allocation-day-group-marker" '
             f'aria-hidden="true"></span>',
             unsafe_allow_html=True,

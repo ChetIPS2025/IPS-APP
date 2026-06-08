@@ -150,9 +150,14 @@ def can_manage_weekly_timesheets(role: str) -> bool:
     return normalize_role(role) in {"admin", "supervisor", "project manager"}
 
 
-def can_approve_timekeeping(role: str) -> bool:
-    """Approve or reject employee weekly timecards."""
+def can_submit_timekeeping(role: str) -> bool:
+    """Enter hours and submit timecards for approval (supervisors and above)."""
     return can_manage_weekly_timesheets(role)
+
+
+def can_approve_timekeeping(role: str) -> bool:
+    """Approve or reject submitted timecards (administrators only)."""
+    return normalize_role(role) == "admin"
 
 
 def can_admin_edit_approved_timekeeping(role: str) -> bool:

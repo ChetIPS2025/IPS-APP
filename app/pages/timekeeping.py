@@ -155,7 +155,7 @@ def _render_timekeeping_list_spacer_cell() -> None:
     )
 
 
-_STATUS_FILTER_OPTS = ["Draft", "Pending", "Approved", "Rejected"]
+_STATUS_FILTER_OPTS = ["Draft", "Pending Approval", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
     ("week_start", lambda r: fmt_date(r.get("week_start"))),
@@ -510,11 +510,15 @@ def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
 
 
 def _timecard_is_editable(status: str) -> bool:
-    return status in ("Draft", "Pending", "Rejected")
+    if _can_admin_edit_approved_timekeeping():
+        return True
+    return _normalize_timecard_status(status) in ("Draft", "Rejected")
 
 
 def _day_is_editable(status: str) -> bool:
-    return _normalize_timecard_status(status) in ("Draft", "Pending", "Rejected")
+    if _can_admin_edit_approved_timekeeping():
+        return True
+    return _normalize_timecard_status(status) in ("Draft", "Rejected")
 
 
 def _can_admin_edit_approved_timekeeping() -> bool:
@@ -533,9 +537,9 @@ def _day_hours_editable(day_status: str, week_status: str) -> bool:
         return True
     day_norm = _normalize_timecard_status(day_status)
     week_norm = _normalize_timecard_status(week_status)
-    if day_norm == "Approved":
+    if day_norm in ("Approved", "Pending"):
         return False
-    if week_norm == "Approved":
+    if week_norm in ("Approved", "Pending"):
         return False
     return _day_is_editable(day_norm)
 
@@ -651,6 +655,16 @@ def _can_approve_timekeeping() -> bool:
         from auth import current_role  # type: ignore
         from utils.permissions import can_approve_timekeeping  # type: ignore
     return can_approve_timekeeping(current_role())
+
+
+def _can_submit_timekeeping() -> bool:
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import can_submit_timekeeping
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import can_submit_timekeeping  # type: ignore
+    return can_submit_timekeeping(current_role())
 
 
 def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
@@ -1526,13 +1540,18 @@ def _render_list_day_hour_stepper(
     widget_key: str,
     day_label: str,
     alloc_state: str = "",
+    day_status: str = "Draft",
 ) -> float:
     """List view: centered hour input with a compact ▲/▼ button strip."""
     step = _LIST_VIEW_HOUR_STEP
     down_key = f"{widget_key}_dn"
     up_key = f"{widget_key}_up"
     spin_key = f"tk_list_hour_spin_{widget_key}"
-    spin_marker_cls = _top_row_hour_spin_marker_class(alloc_state)
+    norm = _normalize_timecard_status(day_status)
+    if norm == "Draft":
+        spin_marker_cls = _top_row_hour_spin_marker_class(alloc_state) + _day_approval_spin_marker_class(day_status)
+    else:
+        spin_marker_cls = _day_approval_spin_marker_class(day_status)
 
     with st.container(key=spin_key):
         st.markdown(
@@ -1601,6 +1620,7 @@ def _render_list_row_day_cell(
     """List row: centered day label stacked above hour stepper."""
     day_label = day_d.strftime("%a %m/%d").upper()
     widget_key = f"tk_hrs_{emp_id}_{week_sig}_{day_ix}"
+    day_status = _normalize_timecard_status(day_row.get("status"))
     alloc_state = _list_day_allocation_state(
         eid=emp_id,
         week_sig=week_sig,
@@ -1609,9 +1629,15 @@ def _render_list_row_day_cell(
         grid_row=day_row,
         alloc_by_date=alloc_by_date,
     )
-    filled_marker = _top_row_day_marker_classes(alloc_state)
-    grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
     total = _day_hours_total(day_row)
+    has_hours = total > _ALLOC_TOLERANCE
+    filled_marker = _list_day_box_marker_classes(
+        day_status=day_status,
+        alloc_state=alloc_state,
+        has_hours=has_hours,
+    )
+    grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
+    status_badge = _timecard_status_display(day_status)
 
     with st.container(key=f"tk_list_day_{emp_id}_{week_sig}_{day_ix}"):
         st.markdown(
@@ -1622,6 +1648,7 @@ def _render_list_row_day_cell(
         st.markdown(
             f'<div class="timekeeping-day-cell">'
             f'<div class="timekeeping-day-label">{html.escape(day_label)}</div>'
+            f'<div class="timekeeping-day-status-badge">{html.escape(status_badge)}</div>'
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1631,16 +1658,20 @@ def _render_list_row_day_cell(
                 widget_key=widget_key,
                 day_label=day_d.strftime("%a"),
                 alloc_state=alloc_state,
+                day_status=day_status,
             )
             _set_day_job_hours(day_row, hrs)
             return hrs
         ro_cls = "timekeeping-hour-input timekeeping-hour-input-ro"
-        if alloc_state == "complete":
-            ro_cls += " timekeeping-list-hour-ro-complete"
-        elif alloc_state == "overallocated":
-            ro_cls += " timekeeping-list-hour-ro-over"
-        elif alloc_state in {"incomplete", "needs_assignment"}:
-            ro_cls += " timekeeping-list-hour-ro-warn"
+        ro_cls += _day_approval_ro_hour_class(day_status)
+        norm = _normalize_timecard_status(day_status)
+        if norm == "Draft":
+            if alloc_state == "complete":
+                ro_cls += " timekeeping-list-hour-ro-complete"
+            elif alloc_state == "overallocated":
+                ro_cls += " timekeeping-list-hour-ro-over"
+            elif alloc_state in {"incomplete", "needs_assignment"}:
+                ro_cls += " timekeeping-list-hour-ro-warn"
         st.markdown(
             f'<div class="{ro_cls}">'
             f"{html.escape(_fmt_day_hours(total))}</div>",
@@ -1967,26 +1998,87 @@ def _normalize_timecard_status(raw: object) -> str:
         return "Draft"
     if s == "approved":
         return "Approved"
-    if s == "pending":
+    if s in ("pending", "pending approval"):
         return "Pending"
     if s == "rejected":
         return "Rejected"
     return str(raw or "Draft").strip().title() or "Draft"
 
 
+def _timecard_status_display(status: str) -> str:
+    norm = _normalize_timecard_status(status)
+    labels = {
+        "Draft": "Draft",
+        "Pending": "Pending Approval",
+        "Approved": "Approved",
+        "Rejected": "Rejected",
+    }
+    return labels.get(norm, norm)
+
+
 def _timecard_status_pill_html(status: str, *, compact: bool = False) -> str:
+    norm = _normalize_timecard_status(status)
     cls_map = {
         "Draft": "ips-timekeeping-status-draft",
         "Pending": "ips-timekeeping-status-pending",
         "Approved": "ips-timekeeping-status-approved",
         "Rejected": "ips-timekeeping-status-rejected",
     }
-    cls = cls_map.get(status, "ips-timekeeping-status-draft")
+    cls = cls_map.get(norm, "ips-timekeeping-status-draft")
     compact_cls = " ips-timekeeping-status-pill-compact" if compact else ""
     return (
         f'<span class="ips-timekeeping-status-pill {cls}{compact_cls}">'
-        f"{html.escape(status)}</span>"
+        f"{html.escape(_timecard_status_display(norm))}</span>"
     )
+
+
+def _day_approval_marker_class(day_status: str, *, has_hours: bool) -> str:
+    norm = _normalize_timecard_status(day_status)
+    if norm == "Approved":
+        return " ips-tk-day-approved"
+    if norm == "Rejected":
+        return " ips-tk-day-rejected"
+    if norm == "Pending":
+        return " ips-tk-day-pending"
+    if has_hours:
+        return " ips-tk-day-draft"
+    return " ips-tk-day-draft-empty"
+
+
+def _list_day_box_marker_classes(
+    *,
+    day_status: str,
+    alloc_state: str,
+    has_hours: bool,
+) -> str:
+    """Approval status drives day-box color; allocation hints apply only on Draft days."""
+    approval_cls = _day_approval_marker_class(day_status, has_hours=has_hours)
+    norm = _normalize_timecard_status(day_status)
+    if norm in ("Approved", "Rejected", "Pending"):
+        return approval_cls
+    return approval_cls + _top_row_day_marker_classes(alloc_state)
+
+
+def _day_approval_spin_marker_class(day_status: str) -> str:
+    norm = _normalize_timecard_status(day_status)
+    mapping = {
+        "Draft": " timekeeping-list-hour-spin-draft",
+        "Pending": " timekeeping-list-hour-spin-pending",
+        "Approved": " timekeeping-list-hour-spin-approved",
+        "Rejected": " timekeeping-list-hour-spin-rejected",
+    }
+    return mapping.get(norm, "")
+
+
+def _day_approval_ro_hour_class(day_status: str) -> str:
+    norm = _normalize_timecard_status(day_status)
+    mapping = {
+        "Draft": " timekeeping-list-hour-ro-draft",
+        "Pending": " timekeeping-list-hour-ro-pending",
+        "Approved": " timekeeping-list-hour-ro-approved",
+        "Rejected": " timekeeping-list-hour-ro-rejected",
+    }
+    return mapping.get(norm, "")
 
 
 def _timecard_id_for_row(row: dict, ws: date) -> str:
@@ -2210,6 +2302,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     grid = _ensure_weekly_grid(emp, week_start_d)
     job_opts = _assignment_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
+    can_submit = _can_submit_timekeeping()
 
     st.markdown(
         '<span class="ips-time-day-edit-marker timekeeping-detail-grid-marker timekeeping-detail-grid-edit" '
@@ -2305,7 +2398,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
         with c[7]:
             action_taken = False
             if row_editable and _row_has_hours(row):
-                if day_status in ("Draft", "Rejected") and st.button(
+                if can_submit and day_status in ("Draft", "Rejected") and st.button(
                     "Submit",
                     key=f"tk_day_submit_{eid}_{week_sig}_{i}",
                     use_container_width=True,
@@ -2464,6 +2557,7 @@ def _render_list_allocation_detail(
     week_locked = week_status == "Approved" and not admin_edit
     job_opts = _assignment_options_for_timekeeping()
     can_approve = _can_approve_timekeeping()
+    can_submit = _can_submit_timekeeping()
     grid = _ensure_weekly_grid(emp, week_start_d)
     _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
     by_date = _ensure_allocation_state(emp, week_start_d)
@@ -2558,6 +2652,7 @@ def _render_list_allocation_detail(
                     week_locked=week_locked,
                     job_opts=job_opts,
                     can_approve=can_approve,
+                    can_submit=can_submit,
                     emp=emp,
                     week_start_d=week_start_d,
                     by_date=by_date,
@@ -2585,7 +2680,7 @@ def _render_list_allocation_detail(
         '<span class="timekeeping-allocation-actions-footer-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    if week_status in ("Draft", "Rejected") and st.button(
+    if can_submit and week_status in ("Draft", "Rejected") and st.button(
         "Submit all for approval",
         key=f"tk_submit_alloc_{record_key}",
     ):
@@ -2619,7 +2714,7 @@ def _render_list_allocation_detail(
                 if _reject_timekeeping_week(emp, week_start_d, reject_notes):
                     st.rerun()
     elif week_status == "Pending":
-        st.caption("This timecard is pending approval.")
+        st.caption("Pending approval — waiting for an administrator to approve or reject.")
     st.caption(
         "Totals in the row above are the source of truth. Use Submit day / Approve day on each day card, "
         "or approve the full week below. Unallocated time is saved to — No assignment — automatically."
@@ -2661,7 +2756,7 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
             if _save_timekeeping_week(emp, week_start_d):
                 st.rerun()
     with action_right:
-        if week_status in ("Draft", "Rejected", "Pending") and st.button(
+        if _can_submit_timekeeping() and week_status in ("Draft", "Rejected") and st.button(
             "Submit All for Approval",
             key=f"tk_submit_{record_key}",
         ):
@@ -2707,7 +2802,7 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
                 if _reject_timekeeping_week(emp, week_start_d, reject_notes):
                     st.rerun()
     elif status == "Pending":
-        st.caption("Approve each day from the expanded list row (Approve day), or approve the full week below.")
+        st.caption("Submitted for approval. An administrator can approve or reject from the expanded list row or below.")
     elif status == "Draft":
         st.caption("Enter hours on the Daily Entries tab, then submit each day or the full week for approval.")
     elif status == "Rejected":

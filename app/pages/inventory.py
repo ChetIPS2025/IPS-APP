@@ -625,8 +625,75 @@ def _txn_action_label(txn_type: str) -> str:
     return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
 
 
+def _render_inventory_issue_to_job_form(item: dict) -> None:
+    """Issue this inventory item to a job — updates stock and job costing."""
+    iid = str(item.get("id") or "").strip()
+    if not iid:
+        return
+    try:
+        from app.pages._core._data import load_jobs
+        from app.services.job_materials_service import issue_inventory_to_job
+        from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+    except ImportError:
+        from pages._core._data import load_jobs  # type: ignore
+        from services.job_materials_service import issue_inventory_to_job  # type: ignore
+        from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
+
+    jobs = sort_jobs_by_number_then_name([j for j in load_jobs() if j.get("id")])
+    job_labels = [job_row_select_label(j) for j in jobs]
+    job_map = {job_row_select_label(j): str(j.get("id") or "") for j in jobs}
+
+    st.markdown("**Issue to job**")
+    with st.form(f"inv_issue_job_{iid}", clear_on_submit=True):
+        job_pick = st.selectbox("Job", ["— Select job —", *job_labels], key=f"inv_issue_job_pick_{iid}")
+        qty = st.number_input(
+            "Quantity",
+            min_value=0.0,
+            value=1.0,
+            step=0.25,
+            format="%.4f",
+            key=f"inv_issue_job_qty_{iid}",
+        )
+        consume = st.checkbox(
+            "Consume on job",
+            value=True,
+            key=f"inv_issue_job_consume_{iid}",
+            help="Consumables stay on the job. Uncheck to allocate/return later.",
+        )
+        notes = st.text_area("Notes", key=f"inv_issue_job_notes_{iid}", height=60)
+        submit = st.form_submit_button("Issue to job", type="primary", use_container_width=True)
+
+    if not submit:
+        return
+    jid = job_map.get(str(job_pick or "").strip())
+    if not jid:
+        st.error("Select a job.")
+        return
+    qv = float(qty or 0)
+    if qv <= 0:
+        st.error("Quantity must be greater than zero.")
+        return
+    txn_type = "consume_on_job" if consume else "issue_to_job"
+    result = issue_inventory_to_job(
+        job_id=jid,
+        inventory_item_id=iid,
+        quantity=qv,
+        transaction_type=txn_type,
+        notes=notes,
+        usage_source="manual_inventory",
+        source="inventory_detail",
+    )
+    if result.ok:
+        st.success("Item issued to job. Stock and job costing updated.")
+        st.rerun()
+    else:
+        st.error(result.error or "Could not issue to job.")
+
+
 def _render_inventory_transactions_tab(item: dict) -> None:
     iid = str(item.get("id") or "")
+    _render_inventory_issue_to_job_form(item)
+    st.divider()
     txns = get_inventory_transactions(inventory_id=iid, limit=100)
     last_scan = "—"
     if txns:
