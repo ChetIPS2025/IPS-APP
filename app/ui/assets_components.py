@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v17"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v18"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -68,7 +68,7 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-anchor) > div {
             padding: 0.35rem 0.65rem 0.5rem !important;
         }
-        /* Assets header: Export | Quick Add Tool | New Asset — grouped top-right */
+        /* Assets header: Export | Quick Add Tool | New Asset — one compact row */
         .ips-assets-page-header-actions {
             display: none !important;
         }
@@ -77,28 +77,30 @@ def inject_assets_page_styles() -> None:
             display: none !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-page-actions-marker):has(.ips-assets-page-header-actions) {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) {
             align-items: flex-end !important;
             justify-content: flex-start !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        > [data-testid="stVerticalBlock"] {
+        [data-testid="stHorizontalBlock"] {
             display: flex !important;
-            flex-direction: row !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
             justify-content: flex-end !important;
-            gap: 0.4rem !important;
-            width: 100% !important;
+            gap: 0.65rem !important;
+            width: auto !important;
+            max-width: 100% !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        > [data-testid="stVerticalBlock"] > div {
-            width: auto !important;
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
             flex: 0 0 auto !important;
-            min-width: 0 !important;
+            width: auto !important;
+            min-width: max-content !important;
             max-width: none !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton {
@@ -109,12 +111,24 @@ def inject_assets_page_styles() -> None:
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {
             width: auto !important;
             min-width: max-content !important;
+            max-width: none !important;
             white-space: nowrap !important;
             font-weight: 600 !important;
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stButton"] > button p {
+            white-space: nowrap !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [class*="st-key-ast_export"] .stButton > button {
+        [class*="st-key-ast_export"] .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [class*="st-key-ast_new"] .stButton > button {
             background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             color: #374151 !important;
