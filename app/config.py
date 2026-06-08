@@ -103,6 +103,13 @@ def _load_streamlit_secrets() -> None:
         "APP_BASE_URL",
         "APP_ENV",
         "OPENAI_API_KEY",
+        "OPENAI_MODEL",
+        "TOOL_VISION_PROVIDER",
+        "TOOL_VISION_API_KEY",
+        "TOOL_OCR_PROVIDER",
+        "TOOL_OCR_API_KEY",
+        "TOOL_IMAGE_SEARCH_PROVIDER",
+        "TOOL_IMAGE_SEARCH_API_KEY",
         "LOG_LEVEL",
     ):
         try:
@@ -241,6 +248,16 @@ class Settings:
 
     openai_api_key: str = field(default_factory=lambda: _strip_env("OPENAI_API_KEY"))
     openai_model: str = field(default_factory=_openai_model)
+
+    # Quick Add Tool — photo vision, receipt OCR, image search (provider: openai)
+    tool_vision_provider: str = field(default_factory=lambda: _strip_env("TOOL_VISION_PROVIDER", "openai"))
+    tool_vision_api_key: str = field(default_factory=lambda: _strip_env("TOOL_VISION_API_KEY"))
+    tool_ocr_provider: str = field(default_factory=lambda: _strip_env("TOOL_OCR_PROVIDER", "openai"))
+    tool_ocr_api_key: str = field(default_factory=lambda: _strip_env("TOOL_OCR_API_KEY"))
+    tool_image_search_provider: str = field(
+        default_factory=lambda: _strip_env("TOOL_IMAGE_SEARCH_PROVIDER", "openai")
+    )
+    tool_image_search_api_key: str = field(default_factory=lambda: _strip_env("TOOL_IMAGE_SEARCH_API_KEY"))
 
     # Email notifications (provider-agnostic)
     email_provider: str = field(default_factory=lambda: _strip_env("EMAIL_PROVIDER", "resend"))

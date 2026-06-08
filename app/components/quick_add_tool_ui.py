@@ -19,6 +19,13 @@ try:
     )
     from app.services.serialized_tool_service import MILWAUKEE_TOOL_TYPES
     from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, STORAGE_TYPES
+    from app.services.tool_intake_ai_service import (
+        extract_tool_from_photo,
+        load_tool_ai_config,
+        ocr_tool_receipt,
+        search_tool_by_image,
+        tool_ai_status,
+    )
     from app.ui.ips_modal_form import ensure_modal_styles, modal_wide_marker
 except ImportError:
     from services.asset_kits_service import get_tool_trailers  # type: ignore
@@ -33,6 +40,13 @@ except ImportError:
     )
     from services.serialized_tool_service import MILWAUKEE_TOOL_TYPES  # type: ignore
     from services.small_hand_tool_service import HAND_TOOL_CATEGORIES, STORAGE_TYPES  # type: ignore
+    from services.tool_intake_ai_service import (  # type: ignore
+        extract_tool_from_photo,
+        load_tool_ai_config,
+        ocr_tool_receipt,
+        search_tool_by_image,
+        tool_ai_status,
+    )
     from ui.ips_modal_form import ensure_modal_styles, modal_wide_marker  # type: ignore
 
 QUICK_ADD_OPEN_KEY = "ips_quick_add_tool_open"
@@ -58,6 +72,37 @@ def _trailer_options() -> tuple[list[str], dict[str, str]]:
         labels.append(label)
         label_to_id[label] = str(trailer.get("id") or "")
     return labels, label_to_id
+
+
+def _render_ai_status() -> None:
+    status = tool_ai_status()
+    parts: list[str] = []
+    for label, key in (("Vision", "vision"), ("OCR", "ocr"), ("Image search", "image_search")):
+        row = status.get(key) or {}
+        prov = str(row.get("provider") or "—")
+        ready = "ready" if row.get("ready") else "not configured"
+        parts.append(f"{label}: {prov} ({ready})")
+    st.caption("AI providers — " + " · ".join(parts))
+
+
+def _apply_scan_to_photo_fields(prefix: str, parsed: dict[str, Any], *, kind: str) -> None:
+    if parsed.get("tool_name"):
+        st.session_state[f"{prefix}_photo_name"] = parsed["tool_name"]
+    if kind == "serialized":
+        if parsed.get("serial_number"):
+            st.session_state[f"{prefix}_photo_serial"] = parsed["serial_number"]
+        if parsed.get("model"):
+            st.session_state[f"{prefix}_photo_model"] = parsed["model"]
+
+
+def _apply_scan_to_receipt_fields(prefix: str, parsed: dict[str, Any]) -> None:
+    if parsed.get("tool_name"):
+        st.session_state[f"{prefix}_rcpt_name"] = parsed["tool_name"]
+    if parsed.get("serial_number"):
+        st.session_state[f"{prefix}_rcpt_serial"] = parsed["serial_number"]
+    cost = float(parsed.get("unit_cost") or 0)
+    if cost > 0:
+        st.session_state[f"{prefix}_rcpt_cost"] = cost
 
 
 def _render_kind_help(kind: str) -> None:
@@ -144,12 +189,48 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
 
 
 def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
-    st.file_uploader(
+    photo = st.file_uploader(
         "Tool photo",
         type=["jpg", "jpeg", "png", "webp"],
         key=f"{prefix}_photo",
-        help="Photo is attached after the tool record is created (Serialized Tools only).",
+        help="Upload a photo, then Scan photo to autofill fields (requires TOOL_VISION_API_KEY).",
     )
+    scan_col, search_col = st.columns(2)
+    cfg = load_tool_ai_config()
+    with scan_col:
+        if st.button(
+            "Scan photo",
+            key=f"{prefix}_scan",
+            use_container_width=True,
+            disabled=photo is None or not cfg.vision_ready,
+        ):
+            try:
+                parsed = extract_tool_from_photo(photo.getvalue(), photo.name, kind_hint=kind)
+                _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
+                conf = float(parsed.get("confidence") or 0)
+                st.success(f"Photo scanned ({conf:.0%} confidence). Review fields below.")
+                if parsed.get("notes"):
+                    st.caption(parsed["notes"])
+            except Exception as exc:
+                st.error(str(exc))
+    with search_col:
+        if st.button(
+            "Match from image",
+            key=f"{prefix}_img_search",
+            use_container_width=True,
+            disabled=photo is None or not cfg.image_search_ready,
+        ):
+            try:
+                parsed = search_tool_by_image(photo.getvalue(), photo.name)
+                _apply_scan_to_photo_fields(prefix, parsed, kind=kind)
+                st.success("Image match applied. Review fields below.")
+            except Exception as exc:
+                st.error(str(exc))
+    if photo is None:
+        st.caption("Upload a tool photo to enable Scan photo and Match from image.")
+    elif not cfg.vision_ready:
+        st.caption("Set TOOL_VISION_API_KEY or OPENAI_API_KEY to enable Scan photo.")
+
     name = st.text_input("Tool name *", key=f"{prefix}_photo_name")
     if kind == "serialized":
         serial = st.text_input("Serial number *", key=f"{prefix}_photo_serial")
@@ -200,11 +281,29 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
 
 
 def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
-    st.file_uploader(
+    receipt = st.file_uploader(
         "Purchase receipt",
         type=["pdf", "jpg", "jpeg", "png"],
         key=f"{prefix}_receipt",
     )
+    cfg = load_tool_ai_config()
+    if st.button(
+        "Read receipt",
+        key=f"{prefix}_ocr",
+        use_container_width=True,
+        disabled=receipt is None or not cfg.ocr_ready,
+    ):
+        try:
+            parsed = ocr_tool_receipt(receipt.getvalue(), receipt.name)
+            _apply_scan_to_receipt_fields(prefix, parsed)
+            st.success("Receipt read. Review fields below.")
+            if parsed.get("notes"):
+                st.caption(parsed["notes"])
+        except Exception as exc:
+            st.error(str(exc))
+    elif receipt is not None and not cfg.ocr_ready:
+        st.caption("Set TOOL_OCR_API_KEY or OPENAI_API_KEY to enable Read receipt.")
+
     name = st.text_input("Tool / item name *", key=f"{prefix}_rcpt_name")
     if kind == "serialized":
         serial = st.text_input("Serial number *", key=f"{prefix}_rcpt_serial")
@@ -291,6 +390,7 @@ def render_quick_add_tool_dialog(*, uploaded_by: str | None = None) -> None:
     )
     kind = TOOL_KINDS[kind_labels.index(kind_pick)]
     _render_kind_help(kind)
+    _render_ai_status()
 
     trailer_labels, trailer_map = _trailer_options()
     trailer_pick = st.selectbox(
