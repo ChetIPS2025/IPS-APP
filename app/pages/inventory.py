@@ -299,24 +299,11 @@ def _current_user_id() -> str | None:
 
 
 def _render_inventory_thumbnail(item: dict) -> None:
-    image_url = get_inventory_image_url(item)
-    if image_url:
-        st.markdown(
-            (
-                f'<span class="ips-inventory-thumb-cell">'
-                f'<img class="ips-inventory-thumb-img" src="{html.escape(image_url, quote=True)}" '
-                f'alt="Inventory item image" />'
-                f"</span>"
-            ),
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            '<span class="ips-inventory-thumb-cell">'
-            '<span class="ips-inventory-thumb-placeholder">—</span>'
-            "</span>",
-            unsafe_allow_html=True,
-        )
+    try:
+        from app.services.inventory_images import inventory_thumbnail_html
+    except ImportError:
+        from services.inventory_images import inventory_thumbnail_html  # type: ignore
+    st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
 
 
 def _render_inventory_photo_manager(item: dict) -> None:

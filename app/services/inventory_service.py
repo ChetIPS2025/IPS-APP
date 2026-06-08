@@ -392,8 +392,9 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
     Insert inventory_transactions row and update inventory_items quantities.
 
     Expected keys: inventory_id, transaction_type, quantity, job_id (optional),
-    scanned_by_user_id, scanned_by_employee_id, scanned_by_name, scanned_by_phone,
-    phone_verified, source, device_info, notes, unit, allow_overdraw (admin).
+    destination_type (shop | job), scanned_by_user_id, scanned_by_employee_id,
+    scanned_by_name, scanned_by_phone, phone_verified, source, device_info, notes,
+    unit, allow_overdraw (admin).
     """
     iid = str(data.get("inventory_id") or data.get("inventory_item_id") or "").strip()
     txn_type = str(data.get("transaction_type") or "").strip().lower()
@@ -480,6 +481,7 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
         "profile_id": data.get("scanned_by_user_id"),
         "created_by": str(data.get("scanned_by_name") or "")[:500] or None,
         "subjob_id": data.get("subjob_id"),
+        "destination_type": str(data.get("destination_type") or "")[:20] or None,
     }
     ins = insert_row(_TXN_TABLE, payload)
     if not ins.ok:

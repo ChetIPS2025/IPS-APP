@@ -52,6 +52,15 @@ ITEM_IMAGE_PATH_FIELDS: tuple[str, ...] = (
     "photo_path",
 )
 
+# Display resolution order (inventory + linked pricing guide).
+CATALOG_IMAGE_FIELD_PRIORITY: tuple[str, ...] = (
+    "image_url",
+    "photo_url",
+    "thumbnail_url",
+    "image_path",
+    "photo_path",
+)
+
 _INVALID_IMAGE_TOKENS = frozenset({"", "—", "-", "none", "null", "undefined"})
 
 _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
@@ -320,6 +329,53 @@ def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) 
         )
     clear_all_data_caches()
     return ServiceResult(ok=True, data=rows[0])
+
+
+def resolve_image_url_by_field_priority(
+    record: dict[str, Any] | None,
+    field_order: tuple[str, ...] | None = None,
+    *,
+    expires_in: int = 3600,
+) -> str | None:
+    """Resolve a browser image URL using an explicit field fallback order."""
+    _ = expires_in
+    if not record:
+        return None
+    order = field_order or CATALOG_IMAGE_FIELD_PRIORITY
+    mime = str(record.get("image_mime_type") or "image/jpeg").strip() or "image/jpeg"
+    path_keys = frozenset(ITEM_IMAGE_PATH_FIELDS)
+
+    for key in order:
+        val = _clean_image_token(record.get(key))
+        if not val:
+            continue
+        if key in path_keys:
+            bucket = _bucket_for_image_path(val)
+            try:
+                signed = _signed_item_image_url_cached(val, bucket or "")
+                browser = to_browser_image_src(signed, mime=mime)
+                if browser:
+                    return browser
+                if signed and str(signed).startswith("http"):
+                    return signed
+            except Exception:
+                pass
+            browser = to_browser_image_src(val, mime=mime)
+            if browser:
+                return browser
+            continue
+        if val.startswith("http"):
+            return to_browser_image_src(val, mime=mime) or val
+        try:
+            signed = _signed_item_image_url_cached(val, "")
+            browser = to_browser_image_src(signed, mime=mime)
+            if browser:
+                return browser
+            if signed and str(signed).startswith("http"):
+                return signed
+        except Exception:
+            continue
+    return None
 
 
 def resolve_stored_item_image_url(record: dict[str, Any], *, expires_in: int = 3600) -> str | None:

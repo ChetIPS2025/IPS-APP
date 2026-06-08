@@ -212,6 +212,39 @@ def _render_materials_summary(job_id: str, materials: list[dict[str, Any]]) -> N
         st.metric("From inventory", inv_linked)
 
 
+def _material_row_thumbnail_html(
+    row: dict[str, Any],
+    *,
+    inv_by_id: dict[str, dict[str, Any]],
+    pg_by_id: dict[str, dict[str, Any]],
+) -> str:
+    try:
+        from app.services.inventory_images import get_inventory_image_url, inventory_thumbnail_html
+        from app.services.pricing_guide_images import get_pricing_guide_image_url
+    except ImportError:
+        from services.inventory_images import get_inventory_image_url, inventory_thumbnail_html  # type: ignore
+        from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
+
+    iid = str(row.get("inventory_item_id") or "").strip()
+    if iid and iid in inv_by_id:
+        return inventory_thumbnail_html(inv_by_id[iid], css_class="ips-inventory-thumb-img ips-job-mat-thumb")
+    pid = str(row.get("pricing_guide_id") or "").strip()
+    if pid and pid in pg_by_id:
+        pg_url = get_pricing_guide_image_url(pg_by_id[pid])
+        if pg_url:
+            return (
+                '<span class="ips-inventory-thumb-cell">'
+                f'<img class="ips-inventory-thumb-img ips-job-mat-thumb" '
+                f'src="{html.escape(pg_url, quote=True)}" alt="Material image" />'
+                "</span>"
+            )
+    return (
+        '<span class="ips-inventory-thumb-cell">'
+        '<span class="ips-inventory-thumb-placeholder">📦</span>'
+        "</span>"
+    )
+
+
 def _render_materials_table(
     materials: list[dict[str, Any]],
     *,
@@ -222,9 +255,12 @@ def _render_materials_table(
         st.caption("No materials recorded for this job yet.")
         return
 
+    inv_by_id = {str(r.get("id") or ""): r for r in list_inventory() if str(r.get("id") or "")}
+    pg_by_id = {str(r.get("id") or ""): r for r in list_pricing_guide_job_options(include_inactive=True) if str(r.get("id") or "")}
+
     head = (
         '<div class="ips-inventory-txn-head ips-job-materials-head">'
-        "<span>Date</span><span>Material</span><span>Qty</span><span>Unit cost</span>"
+        "<span></span><span>Date</span><span>Material</span><span>Qty</span><span>Unit cost</span>"
         "<span>Total</span><span>Subjob</span><span>Employee</span><span>Source</span><span>Notes</span>"
         "</div>"
     )
@@ -234,8 +270,10 @@ def _render_materials_table(
         sub_id = str(row.get("subjob_id") or "")
         emp_id = str(row.get("employee_id") or "")
         src = _USAGE_SOURCE_LABELS.get(str(row.get("usage_source") or ""), str(row.get("usage_source") or "—"))
+        thumb = _material_row_thumbnail_html(row, inv_by_id=inv_by_id, pg_by_id=pg_by_id)
         rows_html += (
             '<div class="ips-inventory-txn-row ips-job-materials-row">'
+            f"<span>{thumb}</span>"
             f"<span>{html.escape(fmt_date(used))}</span>"
             f'<span>{html.escape(str(row.get("item_name") or "—"))}</span>'
             f'<span>{html.escape(str(row.get("quantity") or ""))}</span>'

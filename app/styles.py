@@ -1951,7 +1951,7 @@ def inject_inventory_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
     st.markdown(
         f"""
-<style id="ips-inventory-module-v4">
+<style id="ips-inventory-module-v5">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2198,7 +2198,13 @@ def inject_inventory_module_css() -> None:
 }}
 .ips-job-materials-head,
 .ips-job-materials-row {{
-  grid-template-columns: 0.9fr 1.2fr 0.5fr 0.7fr 0.7fr 0.9fr 0.9fr 0.7fr 1fr;
+  grid-template-columns: 0.45fr 0.85fr 1.15fr 0.5fr 0.7fr 0.7fr 0.85fr 0.85fr 0.65fr 1fr;
+}}
+.ips-job-mat-thumb {{
+  width: 36px !important;
+  height: 36px !important;
+  object-fit: cover !important;
+  border-radius: 6px !important;
 }}
 </style>
 """,
@@ -2416,7 +2422,7 @@ def inject_inventory_qr_scan_css() -> None:
     """Mobile inventory QR scan page."""
     st.markdown(
         """
-<style id="ips-inventory-qr-scan-v1">
+<style id="ips-inventory-qr-scan-v2">
 .ips-inv-qr-item-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;

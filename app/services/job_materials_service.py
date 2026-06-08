@@ -284,6 +284,7 @@ def issue_inventory_to_job(
         "transaction_type": txn_type,
         "quantity": qty,
         "job_id": jid,
+        "destination_type": "job",
         "unit": unit or str(item.get("unit") or "EA"),
         "notes": notes,
         "allow_overdraw": allow_overdraw,
@@ -320,6 +321,7 @@ def issue_inventory_to_job(
         "inventory_transaction_id": txn_id,
         "used_at": ts,
         "usage_source": usage_source,
+        "destination_type": "job",
     }
     mat_result = _insert_job_material(mat_payload)
     if not mat_result.ok:

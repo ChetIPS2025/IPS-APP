@@ -1,0 +1,39 @@
+---
+description: Single inventory item image resolver — item, linked Pricing Guide, placeholder
+globs: app/pages/inventory*.py,app/pages/inventory_scan.py,app/services/inventory_images.py,app/components/job_materials_ui.py
+alwaysApply: false
+---
+
+# Inventory item images
+
+Use **one resolver** for every inventory item display so QR scan, list, detail, and job materials show the same picture.
+
+## Resolver (`app/services/inventory_images.py`)
+
+| Function | Use |
+|----------|-----|
+| `get_inventory_image_url(item)` | Resolve browser URL (or `None`) |
+| `inventory_thumbnail_html(item)` | HTML `<img>` or 📦 placeholder |
+| `render_inventory_item_thumbnail(item)` | Streamlit thumbnail |
+
+**Do not** read `item["image_url"]` directly in UI code.
+
+## Fallback order
+
+1. **Inventory item** — `image_url`, `photo_url`, `thumbnail_url`, `image_path`, `photo_path`
+2. **Linked Pricing Guide** — same fields via `pricing_guide_id` / `pricing_item_id`
+3. **Placeholder** — 📦 when resolver returns `None`
+
+Field priority is defined in `CATALOG_IMAGE_FIELD_PRIORITY` (`app/services/item_images.py`).
+
+## Where to use
+
+- Inventory list → `inventory_thumbnail_html`
+- Inventory detail / photo manager → `get_inventory_image_url` (via `inventory_display_record` preview)
+- Mobile QR scan / checkout → `render_inventory_item_thumbnail`
+- Job materials (inventory lines) → `inventory_thumbnail_html`
+
+## Upload / approval
+
+- Upload and approval workflow stay separate (`upload_inventory_image`, `image_status`).
+- Display resolver does **not** require `approved` status — inherited Pricing Guide photos must show in scan/list views.

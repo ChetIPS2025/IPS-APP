@@ -1,0 +1,56 @@
+---
+description: Two inventory scan workflows — mobile QR (field) vs full action (office/admin)
+globs: app/pages/inventory_scan.py,app/pages/inventory.py,app/components/job_materials_ui.py
+alwaysApply: false
+---
+
+# Inventory scan workflows
+
+Keep **two separate workflows**. Do not merge them into one form.
+
+## 1. Mobile QR Scan (field speed)
+
+**Entry:** `render_inventory_scan_page()` in `inventory_scan.py`  
+**Route:** `?scan=inventory` / inventory QR deep link (`inventory_scan_route_active`)
+
+**UI — only:**
+- Qty (with − / + steppers)
+- Job / Shop dropdown (`Shop` first, then **all** jobs — any status)
+- Enter
+
+**Defaults (hidden):**
+- Action = `issue_to_job` (job) or Shop Use (`shop`)
+- Persist structured destination on save:
+  - `destination_type` = `shop` or `job`
+  - `job_id` = `null` for Shop, selected job uuid for Job
+- Scanner name/phone from profile or device
+- No notes, no action picker, no admin checkboxes on screen
+
+**Goal:** Fast field issue-to-job after scanning a QR code.
+
+**Images:** Use `render_inventory_item_thumbnail` / `get_inventory_image_url` only — see `inventory-item-images.mdc`.
+
+## 2. Full Inventory Action (office / admin)
+
+**Entry:** `_render_inventory_scan_inner()` — **Scan Inventory** module page  
+**Also:** Inventory module issue flows, job materials UI admin controls
+
+**UI includes:**
+- Action / issue type
+- Notes
+- Person / device / manual actor
+- Phone (where applicable)
+- Allow over on-hand (admin)
+- Check-in / check-out / tool panels
+
+**Goal:** Corrections, admin overrides, and non-QR workflows.
+
+## When changing behavior
+
+| Change | Where |
+|--------|--------|
+| Simpler mobile UX | `render_inventory_scan_page` only |
+| New action types, audit fields, overrides | Full workflow only |
+| Shared services | `inventory_service`, `job_materials_service` |
+
+Never add Action/notes/phone fields back to the mobile QR form unless explicitly requested.

@@ -12,6 +12,7 @@ try:
         ITEM_IMAGE_UPLOAD_TYPES,
         has_stored_item_image,
         normalize_image_status,
+        resolve_image_url_by_field_priority,
         resolve_stored_item_image_url,
     )
     from app.services.repository import ServiceResult
@@ -20,6 +21,7 @@ except ImportError:
         ITEM_IMAGE_UPLOAD_TYPES,
         has_stored_item_image,
         normalize_image_status,
+        resolve_image_url_by_field_priority,
         resolve_stored_item_image_url,
     )
     from services.repository import ServiceResult  # type: ignore
@@ -64,7 +66,14 @@ def render_item_photo_manager(
         return
 
     preview = preview_record if isinstance(preview_record, dict) else record
-    image_url = resolve_stored_item_image_url(preview)
+    image_url = None
+    try:
+        from app.services.inventory_images import get_inventory_image_url
+    except ImportError:
+        from services.inventory_images import get_inventory_image_url  # type: ignore
+    image_url = get_inventory_image_url(preview) or get_inventory_image_url(record)
+    if not image_url:
+        image_url = resolve_image_url_by_field_priority(preview) or resolve_stored_item_image_url(preview)
     status = normalize_image_status(preview.get("image_status"))
     status_label = _STATUS_LABELS.get(status, status.replace("_", " ").title())
 

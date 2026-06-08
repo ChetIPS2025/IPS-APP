@@ -162,11 +162,23 @@ def pricing_guide_has_image(row: dict[str, Any]) -> bool:
 
 
 def get_pricing_guide_image_url(row: dict[str, Any], *, expires_in: int = 3600) -> str | None:
-    if record_has_item_image(row):
-        return resolve_item_image_url(row, expires_in=expires_in)
-    linked = _resolve_linked_catalog_row(row, approved_only=True)
+    try:
+        from app.services.item_images import (
+            CATALOG_IMAGE_FIELD_PRIORITY,
+            resolve_image_url_by_field_priority,
+        )
+    except ImportError:
+        from services.item_images import (  # type: ignore
+            CATALOG_IMAGE_FIELD_PRIORITY,
+            resolve_image_url_by_field_priority,
+        )
+
+    url = resolve_image_url_by_field_priority(row, CATALOG_IMAGE_FIELD_PRIORITY, expires_in=expires_in)
+    if url:
+        return url
+    linked = _resolve_linked_catalog_row(row, approved_only=False)
     if linked:
-        return resolve_item_image_url(linked, expires_in=expires_in)
+        return resolve_image_url_by_field_priority(linked, CATALOG_IMAGE_FIELD_PRIORITY, expires_in=expires_in)
     return None
 
 
