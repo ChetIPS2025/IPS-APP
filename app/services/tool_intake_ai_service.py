@@ -70,6 +70,10 @@ def _guess_mime(file_name: str) -> str:
         return "image/webp"
     if low.endswith(".pdf"):
         return "application/pdf"
+    if low.endswith(".heif"):
+        return "image/heif"
+    if low.endswith(".heic"):
+        return "image/heic"
     return "image/jpeg"
 
 
@@ -127,15 +131,41 @@ def _openai_vision_extract(
     schema: dict[str, Any],
     schema_name: str,
 ) -> dict[str, Any]:
+    try:
+        from app.services.asset_autofill_media import pdf_extracted_text_hints
+        from app.services.upload_media_strategy import vision_inputs_from_upload
+    except ImportError:
+        from services.asset_autofill_media import pdf_extracted_text_hints  # type: ignore
+        from services.upload_media_strategy import vision_inputs_from_upload  # type: ignore
+
+    originals = [(file_bytes, file_name)]
+    images = vision_inputs_from_upload(file_bytes, file_name)
+    prompt = instructions
+    pdf_hint = pdf_extracted_text_hints(originals)
+    if pdf_hint:
+        prompt += (
+            "\n\n## Supplemental text from uploaded PDF(s)\n"
+            "Use together with the rendered page images below.\n\n"
+            + pdf_hint
+        )
+
     client = _openai_client(api_key)
     if not hasattr(client, "responses"):
         raise RuntimeError("OpenAI SDK does not support the Responses API.")
 
     model = (getattr(settings, "openai_model", "") or os.getenv("OPENAI_MODEL", "gpt-5")).strip() or "gpt-5"
-    content: list[dict[str, Any]] = [
-        {"type": "input_text", "text": instructions},
-        {"type": "input_image", "image_url": _to_data_url(file_bytes, file_name), "detail": "high"},
-    ]
+    content: list[dict[str, Any]] = [{"type": "input_text", "text": prompt}]
+    for idx, (img_bytes, img_name) in enumerate(images):
+        if len(images) > 1:
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": f"Image {idx + 1} of {len(images)} (filename hint: {img_name})",
+                }
+            )
+        content.append(
+            {"type": "input_image", "image_url": _to_data_url(img_bytes, img_name), "detail": "high"}
+        )
     response = client.responses.create(
         model=model,
         input=[{"type": "message", "role": "user", "content": content}],

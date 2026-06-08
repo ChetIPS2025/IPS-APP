@@ -53,6 +53,13 @@ QUICK_ADD_OPEN_KEY = "ips_quick_add_tool_open"
 
 _METHOD_TABS = ("Manual entry", "Tool photo", "Receipt", "Bulk import")
 
+TOOL_PHOTO_UPLOAD_TYPES: tuple[str, ...] = ("jpg", "jpeg", "png", "webp", "heic", "heif", "pdf")
+TOOL_PHOTO_UPLOAD_CAPTION = "JPG, JPEG, PNG, WEBP, HEIC, HEIF, PDF"
+TOOL_PHOTO_UPLOAD_HELP = (
+    "Supported: JPG, JPEG, PNG, WEBP, HEIC, HEIF, PDF. "
+    "Your original file is kept in Documents; the app stores a converted preview for thumbnails and Scan photo."
+)
+
 
 def open_quick_add_tool_dialog() -> None:
     st.session_state[QUICK_ADD_OPEN_KEY] = True
@@ -191,10 +198,11 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
 def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
     photo = st.file_uploader(
         "Tool photo",
-        type=["jpg", "jpeg", "png", "webp"],
+        type=list(TOOL_PHOTO_UPLOAD_TYPES),
         key=f"{prefix}_photo",
-        help="Upload a photo, then Scan photo to autofill fields (requires TOOL_VISION_API_KEY).",
+        help=TOOL_PHOTO_UPLOAD_HELP,
     )
+    st.caption(f"Accepted formats: {TOOL_PHOTO_UPLOAD_CAPTION}")
     scan_col, search_col = st.columns(2)
     cfg = load_tool_ai_config()
     with scan_col:

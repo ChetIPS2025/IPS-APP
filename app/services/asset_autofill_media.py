@@ -85,7 +85,7 @@ def prepare_asset_autofill_inputs(uploads: list[tuple[bytes, str]]) -> list[tupl
     Convert uploads to a flat list of (bytes, file_name) suitable for vision API (raster images).
 
     - JPG/JPEG/PNG/WEBP: passed through unchanged.
-    - HEIC: decoded to PNG bytes (requires pillow-heif).
+    - HEIC/HEIF: decoded to PNG bytes (requires pillow-heif).
     - PDF: each page rendered to PNG (PyMuPDF), up to _MAX_PDF_PAGES_PER_FILE pages per file.
 
     Raises ValueError with a user-facing message on empty/unsupported inputs.
@@ -101,13 +101,13 @@ def prepare_asset_autofill_inputs(uploads: list[tuple[bytes, str]]) -> list[tupl
 
         if ext in (".jpg", ".jpeg", ".png", ".webp"):
             normalized.append((raw, name))
-        elif ext == ".heic":
+        elif ext in (".heic", ".heif"):
             normalized.append(_heic_to_png(raw, name))
         elif ext == ".pdf":
             normalized.extend(_pdf_pages_to_pngs(raw, name))
         else:
             raise ValueError(
-                f"Unsupported type for {name!r}. Use PDF, HEIC, JPG, JPEG, PNG, or WEBP."
+                f"Unsupported type for {name!r}. Use PDF, HEIC, HEIF, JPG, JPEG, PNG, or WEBP."
             )
 
     if not normalized:

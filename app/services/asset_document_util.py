@@ -19,6 +19,9 @@ _EXT_TO_MIME: dict[str, str] = {
     "png": "image/png",
     "jpg": "image/jpeg",
     "jpeg": "image/jpeg",
+    "heic": "image/heic",
+    "heif": "image/heif",
+    "webp": "image/webp",
 }
 
 
@@ -62,7 +65,7 @@ def is_pdf_document(filename: str, content_type: str = "") -> bool:
 def is_image_document(filename: str, content_type: str = "") -> bool:
     n = str(filename or "").lower()
     ct = str(content_type or "").lower()
-    if n.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
+    if n.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif")):
         return True
     return ct.startswith("image/")
 

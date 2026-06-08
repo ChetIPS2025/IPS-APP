@@ -1,0 +1,41 @@
+---
+description: Dual-save upload strategy — original evidence + web-friendly preview
+globs: app/services/upload_media_strategy.py,app/services/quick_add_tool_service.py,app/services/tool_intake_ai_service.py,app/services/asset_autofill_media.py,app/components/quick_add_tool_ui.py,app/services/asset_images.py,app/services/item_images.py
+alwaysApply: false
+---
+
+# Upload media strategy
+
+When users upload photos or documents that may not render in browsers (HEIC, HEIF, PDF) or need consistent thumbnails:
+
+## 1. Original upload (evidence / history)
+
+- Save **exact bytes** and **original filename**
+- Store on `asset_documents` (type **Source photo**) via `persist_original_asset_upload()`
+- Never resize, re-encode, or convert the original
+
+## 2. Display preview (UI + OCR / vision)
+
+- Always produce a **web-friendly** raster (JPEG or PNG)
+- Store on the entity's `image_path` via `upload_asset_image()` / `persist_item_image()`
+- Use `build_display_preview()` or `vision_inputs_from_upload()` — never send raw HEIC/PDF to vision APIs
+
+| Input | Preview pipeline |
+|-------|------------------|
+| HEIC / HEIF | Convert to PNG (`asset_autofill_media`) |
+| PDF | Render page(s) to PNG (first page for single preview; multi-page for OCR) |
+| JPG / PNG / WEBP | Normalize to JPEG via `resize_item_image_bytes()` |
+
+## Entry points
+
+| Flow | Function |
+|------|----------|
+| Quick Add Tool photo save | `attach_asset_photo_with_preview()` |
+| Scan photo / vision OCR | `vision_inputs_from_upload()` |
+| Asset intake autofill | `prepare_asset_autofill_inputs()` (same conversion rules) |
+
+## Do not
+
+- Replace originals with converted previews only
+- Use HEIC/PDF bytes directly in `<img>` or Streamlit `st.image` without conversion
+- Duplicate conversion logic in page files — extend `upload_media_strategy.py` or `asset_autofill_media.py`

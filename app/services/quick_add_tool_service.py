@@ -244,13 +244,12 @@ def bulk_import_tools(
 
 
 def attach_tool_photo(asset_id: str, uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
-    if not asset_id or uploaded is None:
-        return ServiceResult(ok=False, error="Asset and photo are required.")
+    """Save original upload for evidence and a converted preview for thumbnails/OCR."""
     try:
-        from app.services.assets_service import upload_asset_image
+        from app.services.upload_media_strategy import attach_asset_photo_with_preview
     except ImportError:
-        from services.assets_service import upload_asset_image  # type: ignore
-    return upload_asset_image(asset_id, uploaded, uploaded_by=uploaded_by)
+        from services.upload_media_strategy import attach_asset_photo_with_preview  # type: ignore
+    return attach_asset_photo_with_preview(asset_id, uploaded, uploaded_by=uploaded_by)
 
 
 def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
