@@ -346,7 +346,9 @@ def render_field_scan_bar(*actions: tuple[str, str]) -> None:
         with col:
             if st.button(label, key=f"field_scan_{slug}", type="primary", use_container_width=True):
                 navigate_to_field_page(slug)
-    st.caption("Scan a QR code for the fastest checkout, check-in, and lookup.")
+    st.caption(
+        "Scan a QR: inventory (use/consume), serialized tools (check out/in), or small tools (count/audit)."
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
 

@@ -49,10 +49,23 @@ INVENTORY_TXN_TYPES = (
     "adjustment",
 )
 
+try:
+    from app.services.tracking_terminology import (
+        INVENTORY_ACTION_LABELS,
+        inventory_action_label,
+    )
+except ImportError:
+    from services.tracking_terminology import (  # type: ignore
+        INVENTORY_ACTION_LABELS,
+        inventory_action_label,
+    )
+
 _JOB_REQUIRED_TYPES = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
 _DECREASE_ON_HAND = frozenset({"check_out", "issue_to_job", "consume_on_job"})
 
+
 __all__ = [
+    "INVENTORY_ACTION_LABELS",
     "INVENTORY_TXN_TYPES",
     "can_manage_inventory_actions",
     "clear_inventory_cache",
@@ -66,6 +79,7 @@ __all__ = [
     "get_inventory_item",
     "get_inventory_item_by_qr",
     "get_inventory_transactions",
+    "inventory_action_label",
     "inventory_has_image",
     "list_inventory",
     "normalize_inventory",

@@ -183,21 +183,21 @@ def _render_hand_tool_adjust_action(row: dict) -> None:
         return
 
     name = str(row.get("tool_name") or "tool")
-    with st.popover("Adjust", type="primary"):
+    with st.popover("Adjust count", type="primary"):
         st.caption(name)
-        delta = st.number_input("Qty change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
-        adj_notes = st.text_input("Notes", key=f"ht_adj_notes_{rid}")
+        delta = st.number_input("Count change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
+        adj_notes = st.text_input("Audit notes", key=f"ht_adj_notes_{rid}")
         ac1, ac2 = st.columns(2)
         with ac1:
-            if st.button("Apply", key=f"ht_adj_go_{rid}", use_container_width=True):
+            if st.button("Apply adjustment", key=f"ht_adj_go_{rid}", use_container_width=True):
                 if delta == 0:
-                    st.warning("Enter a non-zero quantity change.")
+                    st.warning("Enter a non-zero count change.")
                 else:
                     result = adjust_hand_tool_quantity(rid, delta, notes=adj_notes)
                     if result.ok:
-                        st.success("Quantity updated.")
+                        st.success("Count adjusted.")
                         st.rerun()
-                    st.error(result.error or "Update failed.")
+                    st.error(result.error or "Adjustment failed.")
         with ac2:
             if st.button("Remove", key=f"ht_del_{rid}", use_container_width=True):
                 result = delete_hand_tool(rid)
@@ -314,8 +314,8 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
 def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
     """Quantity-based small hand tools — pliers, wrenches, etc."""
     st.caption(
-        "Quantity-counted hand tools (no serial number). Track **expected** vs **actual** quantity "
-        "per Tool Trailer, shop, warehouse, or job."
+        "Small tools are **counted** and **audited** (not checked out). Track expected vs actual quantity "
+        "per Tool Trailer, shop, warehouse, or job — **move**, mark **missing**, or **adjust** counts."
     )
     _ = all_assets
     assets_by_id = {

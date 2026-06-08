@@ -1,0 +1,65 @@
+---
+description: Field vocabulary split — inventory vs serialized tools vs small tools
+globs: app/pages/inventory*.py,app/pages/inventory_scan.py,app/pages/assets.py,app/components/job_materials_ui.py,app/components/small_hand_tools_ui.py,app/components/serialized_tools_ui.py,app/services/inventory_service.py,app/services/tracking_terminology.py,app/services/small_hand_tool_service.py,app/services/serialized_tool_service.py
+alwaysApply: false
+---
+
+# Tracking terminology
+
+Use the correct vocabulary for each domain. Field users should never see checkout language on consumables or “consumed” on serialized tools.
+
+## Inventory (consumables / materials)
+
+**Verbs:** consumed, used, restocked, adjusted
+
+| Situation | Wording |
+|-----------|---------|
+| Job consumption | **Use on Job** / txn label **Used on job** |
+| Shop consumption | **Use in Shop** / txn label **Used in shop** |
+| Stock received back | **Restocked** |
+| Qty correction | **Adjusted** / **Adjust stock** |
+
+- Helpers: `inventory_action_label()`, constants in `tracking_terminology.py`
+- DB types stay as-is (`consume_on_job`, `SHOP`, etc.) — only UI copy changes
+- Never: check out, check in, checkout form (for inventory)
+
+## Assets / serialized tools
+
+**Verbs:** checked out, checked in, assigned, returned
+
+| Situation | Wording |
+|-----------|---------|
+| Employee takes tool | **Check out** / **Checked out** |
+| Tool comes back | **Check in** / **Checked in** |
+| Trailer / job assignment | **Assigned** |
+| Return from holder | **Returned** |
+
+- Helper: `serialized_tool_action_label()`
+- Scan Inventory tool panel and Serialized Tools UI use this set only
+
+## Small tools (quantity-counted)
+
+**Verbs:** counted, moved, audited, missing, adjusted
+
+| Situation | Wording |
+|-----------|---------|
+| Qty update / reconcile | **Counted** / **Adjust count** |
+| Location / trailer change | **Moved** |
+| Trailer kit audit | **Audited** |
+| Status lost | **Missing** |
+| Qty correction | **Adjusted** |
+
+- Helper: `small_tool_action_label()`
+- No checkout/check-in; no “consumed” or “used” for small tools unless marked lost/used in status
+
+## Shared scan page (`inventory_scan.py`)
+
+- **Inventory QR** → consumable use flow (`render_inventory_scan_page`)
+- **Tool QR** on `assets` → checkout / check-in flow only
+- Page caption must mention both domains explicitly when both are supported
+
+## When adding UI
+
+1. Identify domain (inventory row, serialized asset, small_hand_tools row)
+2. Import label helper from `app.services.tracking_terminology`
+3. Do not copy label dicts into page files — extend `tracking_terminology.py` instead

@@ -50,20 +50,12 @@ _USAGE_SOURCE_LABELS = {
     "manual_entry": "Manual entry",
 }
 
-_TXN_ACTION_LABELS = {
-    "check_out": "Check Out",
-    "check_in": "Check In",
-    "issue_to_job": "Issue to Job",
-    "return_from_job": "Return From Job",
-    "consume_on_job": "Consume On Job",
-    "TO_JOB": "Issue to Job",
-    "OUT": "Check Out",
-    "IN": "Check In",
-    "CONSUME": "Consume On Job",
-    "RETURN": "Return From Job",
-    "SHOP": "Shop Use",
-    "ADJUST": "Adjustment",
-}
+def _txn_action_label(txn_type: str) -> str:
+    try:
+        from app.services.inventory_service import inventory_action_label
+    except ImportError:
+        from services.inventory_service import inventory_action_label  # type: ignore
+    return inventory_action_label(txn_type)
 
 
 def _profile_employee_id() -> str | None:
@@ -308,7 +300,7 @@ def _render_scan_activity(job_id: str) -> None:
             f'<span>{html.escape(fmt_date(row.get("created_at")))}</span>'
             f'<span>{html.escape(str(row.get("item_name") or "—"))}</span>'
             f'<span>{html.escape(str(row.get("sku") or "—"))}</span>'
-            f'<span>{html.escape(_TXN_ACTION_LABELS.get(txn_type, txn_type or "—"))}</span>'
+            f'<span>{html.escape(_txn_action_label(txn_type))}</span>'
             f'<span>{html.escape(str(row.get("quantity_display") or ""))}</span>'
             f'<span>{html.escape(str(row.get("unit") or "—"))}</span>'
             f'<span>{html.escape(str(row.get("scanned_by_name") or row.get("created_by") or "—"))}</span>'
@@ -407,11 +399,10 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                         st.error(result.error or "Could not add material.")
 
     with tab_inventory:
-        st.caption("Pull from stock — on-hand quantity updates when **Consume** is checked.")
+        st.caption("Consumable inventory — on-hand quantity decreases when material is consumed on this job.")
         with st.form(f"{key_prefix}_inv_form", clear_on_submit=False):
             item_pick = st.selectbox("Inventory item", inv_labels, key=f"{key_prefix}_inv_pick")
             qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key=f"{key_prefix}_inv_qty")
-            consume = st.checkbox("Consume (do not return to stock)", value=True, key=f"{key_prefix}_inv_consume")
             if allow_over:
                 st.checkbox("Allow quantity over on-hand (admin)", key=f"{key_prefix}_inv_over")
             submit_inv = st.form_submit_button("Add from inventory", type="primary", use_container_width=True)
@@ -426,12 +417,11 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                 if qv <= 0:
                     st.error("Quantity must be greater than zero.")
                 else:
-                    txn_type = "consume_on_job" if consume else "issue_to_job"
                     result = issue_inventory_to_job(
                         job_id=jid,
                         inventory_item_id=iid,
                         quantity=qv,
-                        transaction_type=txn_type,
+                        transaction_type="consume_on_job",
                         notes=common_notes,
                         subjob_id=subjob_id,
                         employee_id=employee_id,
@@ -443,7 +433,7 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                         source="job_materials_inventory",
                     )
                     if result.ok:
-                        st.success("Material added and inventory updated.")
+                        st.success("Material consumed — job costing updated.")
                         st.rerun()
                     else:
                         st.error(result.error or "Could not add material.")
@@ -475,20 +465,14 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                 st.error(result.error or "Could not add material.")
 
     with tab_scan:
-        st.caption("Scan a QR code with your device, or paste SKU / checkout link below.")
+        st.caption("Scan a QR code with your device, or paste SKU / scan link below.")
         with st.form(f"{key_prefix}_scan_form", clear_on_submit=False):
             code = st.text_input(
                 "Item code or QR link",
                 key=f"{key_prefix}_scan_code",
-                placeholder="SKU, INV-…, or checkout URL",
+                placeholder="SKU, INV-…, or scan URL",
             )
             qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key=f"{key_prefix}_scan_qty")
-            consume = st.checkbox(
-                "Consume (do not return to stock)",
-                value=True,
-                key=f"{key_prefix}_scan_consume",
-                help="Checked = consumable used on job. Unchecked = issue/allocate to job.",
-            )
             if allow_over:
                 st.checkbox("Allow quantity over on-hand (admin)", key=f"{key_prefix}_scan_over")
             submit_scan = st.form_submit_button("Add from scan", type="primary", use_container_width=True)
@@ -504,12 +488,11 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                 if qv <= 0:
                     st.error("Quantity must be greater than zero.")
                 else:
-                    txn_type = "consume_on_job" if consume else "issue_to_job"
                     result = issue_inventory_to_job(
                         job_id=jid,
                         inventory_item_id=iid,
                         quantity=qv,
-                        transaction_type=txn_type,
+                        transaction_type="consume_on_job",
                         notes=common_notes,
                         subjob_id=subjob_id,
                         employee_id=employee_id,

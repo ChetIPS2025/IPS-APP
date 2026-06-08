@@ -218,7 +218,7 @@ def render_serialized_tool_tracking_panel(asset: dict[str, Any]) -> None:
 
     status = str(view.get("status") or "")
     if status == "Available" and emp_labels:
-        with st.expander("Check out tool", expanded=False):
+        with st.expander("Check out tool (assign to employee)", expanded=False):
             emp = st.selectbox("Employee", emp_labels, key=f"st_checkout_emp_{aid}")
             job = st.selectbox("Job (optional)", job_labels, key=f"st_checkout_job_{aid}")
             notes = st.text_input("Notes", key=f"st_checkout_notes_{aid}")

@@ -6,6 +6,8 @@ alwaysApply: false
 
 # Inventory scan workflows
 
+See **`tracking-terminology.mdc`** for the vocabulary split (inventory vs serialized tools vs small tools).
+
 Keep **two separate workflows**. Do not merge them into one form.
 
 ## 1. Mobile QR Scan (field speed)
@@ -15,33 +17,32 @@ Keep **two separate workflows**. Do not merge them into one form.
 
 **UI — only:**
 - Qty (with − / + steppers)
-- Job / Shop dropdown (`Shop` first, then **all** jobs — any status)
+- Where used dropdown (`Use in Shop` first, then **all** jobs — any status)
 - Enter
 
 **Defaults (hidden):**
-- Action = `issue_to_job` (job) or Shop Use (`shop`)
-- Persist structured destination on save:
-  - `destination_type` = `shop` or `job`
-  - `job_id` = `null` for Shop, selected job uuid for Job
+- Job selection → `consume_on_job` with `destination_type=job`
+- Shop selection → `shop_use` / SHOP with `destination_type=shop`
+- `job_id` = `null` for Use in Shop, selected job uuid for Use on Job
 - Scanner name/phone from profile or device
 - No notes, no action picker, no admin checkboxes on screen
 
-**Goal:** Fast field issue-to-job after scanning a QR code.
+**Goal:** Fast field consumption after scanning a QR code.
 
 **Images:** Use `render_inventory_item_thumbnail` / `get_inventory_image_url` only — see `inventory-item-images.mdc`.
 
 ## 2. Full Inventory Action (office / admin)
 
 **Entry:** `_render_inventory_scan_inner()` — **Scan Inventory** module page  
-**Also:** Inventory module issue flows, job materials UI admin controls
+**Also:** Inventory module use flows, job materials UI admin controls
 
 **UI includes:**
-- Action / issue type
+- Use type (Use on Job / Use in Shop / Adjust stock)
 - Notes
 - Person / device / manual actor
 - Phone (where applicable)
 - Allow over on-hand (admin)
-- Check-in / check-out / tool panels
+- Serialized tool check-out / check-in panels (assets only — not inventory)
 
 **Goal:** Corrections, admin overrides, and non-QR workflows.
 
@@ -52,5 +53,6 @@ Keep **two separate workflows**. Do not merge them into one form.
 | Simpler mobile UX | `render_inventory_scan_page` only |
 | New action types, audit fields, overrides | Full workflow only |
 | Shared services | `inventory_service`, `job_materials_service` |
+| Label wording | `tracking_terminology.py` |
 
 Never add Action/notes/phone fields back to the mobile QR form unless explicitly requested.

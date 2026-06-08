@@ -30,7 +30,7 @@ Field priority is defined in `CATALOG_IMAGE_FIELD_PRIORITY` (`app/services/item_
 
 - Inventory list → `inventory_thumbnail_html`
 - Inventory detail / photo manager → `get_inventory_image_url` (via `inventory_display_record` preview)
-- Mobile QR scan / checkout → `render_inventory_item_thumbnail`
+- Mobile QR scan / use form → `render_inventory_item_thumbnail`
 - Job materials (inventory lines) → `inventory_thumbnail_html`
 
 ## Upload / approval

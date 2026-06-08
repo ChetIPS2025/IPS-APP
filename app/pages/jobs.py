@@ -1324,19 +1324,11 @@ def _render_job_photos_tab(job: dict) -> None:
 
 
 def _job_inventory_action_label(txn_type: str) -> str:
-    labels = {
-        "check_out": "Check Out",
-        "check_in": "Check In",
-        "issue_to_job": "Issue to Job",
-        "return_from_job": "Return From Job",
-        "consume_on_job": "Consume On Job",
-        "TO_JOB": "Issue to Job",
-        "OUT": "Check Out",
-        "IN": "Check In",
-        "CONSUME": "Consume On Job",
-        "RETURN": "Return From Job",
-    }
-    return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
+    try:
+        from app.services.inventory_service import inventory_action_label
+    except ImportError:
+        from services.inventory_service import inventory_action_label  # type: ignore
+    return inventory_action_label(txn_type)
 
 
 def get_inventory_transactions(job_id=None, limit=200):

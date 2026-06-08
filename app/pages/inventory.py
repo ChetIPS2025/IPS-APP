@@ -573,14 +573,14 @@ def _seed_inventory_edit_form(item: dict) -> None:
 
 
 def _render_inventory_qr_block(item: dict) -> None:
-    """Clickable QR + checkout link for inventory scan form."""
+    """Clickable QR + scan link for the mobile use form."""
     scan_url = generate_inventory_qr_value(item)
     qr_png = inventory_qr_png_bytes(item)
     if qr_png and scan_url:
         b64 = base64.b64encode(qr_png).decode("ascii")
         safe_url = html.escape(scan_url, quote=True)
         st.markdown(
-            f'<a href="{safe_url}" target="_self" title="Open checkout form">'
+            f'<a href="{safe_url}" target="_self" title="Open use form">'
             f'<img src="data:image/png;base64,{b64}" width="140" alt="Inventory QR code" '
             f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
             f"</a>",
@@ -591,29 +591,20 @@ def _render_inventory_qr_block(item: dict) -> None:
     else:
         st.caption(str(item.get("qr_code_value") or "—"))
     if scan_url:
-        st.link_button("Open Checkout Form", scan_url, use_container_width=True)
-        st.caption("Scan with a phone or tap to open the checkout form.")
+        st.link_button("Open Use Form", scan_url, use_container_width=True)
+        st.caption("Scan with a phone or tap to record material use.")
 
 
 def _txn_action_label(txn_type: str) -> str:
-    labels = {
-        "check_out": "Take / Check Out",
-        "check_in": "Return / Check In",
-        "issue_to_job": "Issue to Job",
-        "return_from_job": "Return From Job",
-        "consume_on_job": "Consume On Job",
-        "adjustment": "Adjustment",
-        "TO_JOB": "Issue to Job",
-        "OUT": "Check Out",
-        "IN": "Check In",
-        "SHOP": "Shop Use",
-        "ADJUST": "Adjustment",
-    }
-    return labels.get(str(txn_type or "").strip(), str(txn_type or "—"))
+    try:
+        from app.services.inventory_service import inventory_action_label
+    except ImportError:
+        from services.inventory_service import inventory_action_label  # type: ignore
+    return inventory_action_label(txn_type)
 
 
 def _render_inventory_issue_to_job_form(item: dict) -> None:
-    """Issue this inventory item to a job — updates stock and job costing."""
+    """Record use of this consumable on a job — updates stock and job costing."""
     iid = str(item.get("id") or "").strip()
     if not iid:
         return
@@ -630,7 +621,7 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
     job_labels = [job_row_select_label(j) for j in jobs]
     job_map = {job_row_select_label(j): str(j.get("id") or "") for j in jobs}
 
-    st.markdown("**Issue to job**")
+    st.markdown("**Use on Job**")
     with st.form(f"inv_issue_job_{iid}", clear_on_submit=True):
         job_pick = st.selectbox("Job", ["— Select job —", *job_labels], key=f"inv_issue_job_pick_{iid}")
         qty = st.number_input(
@@ -641,14 +632,8 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
             format="%.4f",
             key=f"inv_issue_job_qty_{iid}",
         )
-        consume = st.checkbox(
-            "Consume on job",
-            value=True,
-            key=f"inv_issue_job_consume_{iid}",
-            help="Consumables stay on the job. Uncheck to allocate/return later.",
-        )
         notes = st.text_area("Notes", key=f"inv_issue_job_notes_{iid}", height=60)
-        submit = st.form_submit_button("Issue to job", type="primary", use_container_width=True)
+        submit = st.form_submit_button("Use on Job", type="primary", use_container_width=True)
 
     if not submit:
         return
@@ -660,21 +645,20 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
     if qv <= 0:
         st.error("Quantity must be greater than zero.")
         return
-    txn_type = "consume_on_job" if consume else "issue_to_job"
     result = issue_inventory_to_job(
         job_id=jid,
         inventory_item_id=iid,
         quantity=qv,
-        transaction_type=txn_type,
+        transaction_type="consume_on_job",
         notes=notes,
         usage_source="manual_inventory",
         source="inventory_detail",
     )
     if result.ok:
-        st.success("Item issued to job. Stock and job costing updated.")
+        st.success("Material consumed on job. Stock and job costing updated.")
         st.rerun()
     else:
-        st.error(result.error or "Could not issue to job.")
+        st.error(result.error or "Could not record material use.")
 
 
 def _render_inventory_transactions_tab(item: dict) -> None:
@@ -686,19 +670,17 @@ def _render_inventory_transactions_tab(item: dict) -> None:
     if txns:
         last_scan = fmt_date(txns[0].get("created_at"))
 
-    c1, c2, c3, c4 = st.columns(4, gap="small")
+    c1, c2, c3 = st.columns(3, gap="small")
     with c1:
         st.metric("On Hand", int(item.get("qty_on_hand") or 0))
     with c2:
-        st.metric("Checked Out", int(float(item.get("quantity_checked_out") or 0)))
-    with c3:
         st.metric("Allocated", int(float(item.get("quantity_allocated") or 0)))
-    with c4:
-        st.metric("Last Scan", last_scan)
+    with c3:
+        st.metric("Last use", last_scan)
 
     scan_url = generate_inventory_qr_value(item)
     if scan_url:
-        st.link_button("Open Checkout Form", scan_url, use_container_width=True)
+        st.link_button("Open Use Form", scan_url, use_container_width=True)
         st.code(scan_url, language=None)
 
     if not txns:
@@ -764,7 +746,6 @@ def _render_inventory_detail_tabs(item: dict) -> None:
         stock_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
-            f"{detail_field_html('Checked Out', int(float(item.get('quantity_checked_out') or 0)))}"
             f"{detail_field_html('Allocated to Jobs', int(float(item.get('quantity_allocated') or 0)))}"
             f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
             f"{detail_field_html('Stock policy', item.get('stock_policy_label') or 'Not stocked')}"

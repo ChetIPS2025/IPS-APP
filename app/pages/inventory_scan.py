@@ -1,5 +1,5 @@
 """
-Mobile-first field scan: inventory_items (issue) + reusable tools on public.assets (checkout).
+Mobile-first field scan: inventory_items (consumable use) + reusable tools on public.assets (checkout).
 
 Schema assumptions (see sql/015, 027, 028):
 - inventory_items: id, item_name, sku, qr_code_value, quantity_on_hand, reorder_point,
@@ -86,8 +86,27 @@ _JM = "job_materials"
 _ASSETS = "assets"
 _TOOL_TXN = "tool_transactions"
 
-_ISSUE_TYPES = ("To Job", "Stock Adjustment", "Shop Use")
-_TXN_MAP = {"To Job": "TO_JOB", "Stock Adjustment": "ADJUST", "Shop Use": "SHOP"}
+try:
+    from app.services.tracking_terminology import (
+        INVENTORY_ADJUST_LABEL,
+        INVENTORY_USE_IN_SHOP_LABEL,
+        INVENTORY_USE_ON_JOB_LABEL,
+        inventory_action_label,
+    )
+except ImportError:
+    from services.tracking_terminology import (  # type: ignore
+        INVENTORY_ADJUST_LABEL,
+        INVENTORY_USE_IN_SHOP_LABEL,
+        INVENTORY_USE_ON_JOB_LABEL,
+        inventory_action_label,
+    )
+
+_ISSUE_TYPES = (INVENTORY_USE_ON_JOB_LABEL, INVENTORY_ADJUST_LABEL, INVENTORY_USE_IN_SHOP_LABEL)
+_TXN_MAP = {
+    INVENTORY_USE_ON_JOB_LABEL: "TO_JOB",
+    INVENTORY_ADJUST_LABEL: "ADJUST",
+    INVENTORY_USE_IN_SHOP_LABEL: "SHOP",
+}
 
 
 def _inject_inv_scan_mobile_css() -> None:
@@ -695,7 +714,7 @@ def render() -> None:
 def _render_inventory_scan_inner() -> None:
     """Full Scan Inventory workflow — action types, notes, device, admin overrides (office)."""
     ensure_narrow_viewport_detected()
-    render_page_header("Scan Inventory", "Issue or receive stock via QR scan.")
+    render_page_header("Scan Inventory", "Consume materials or check out serialized tools via QR scan.")
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
@@ -705,7 +724,7 @@ def _render_inventory_scan_inner() -> None:
     if not can_use:
         st.info(
             "You do not have access to this page. Ask an admin to enable **Scan Inventory** "
-            "(inventory issue + tool checkout)."
+            "(material use + tool checkout)."
         )
         return
 
@@ -793,8 +812,8 @@ def _render_inventory_scan_inner() -> None:
         emps = []
 
     st.caption(
-        "Paste **inventory** QR / SKU or **tool** QR / asset tag, then **Find**. "
-        "Checkout tools are also in **Who Has What**."
+        "Paste **inventory** QR / SKU (consumable use) or **serialized tool** QR / asset tag (check out / check in), "
+        "then **Find**. Checked-out tools are also in **Who Has What**."
     )
 
     with st.form("inv_scan_lookup_form", clear_on_submit=False):
@@ -985,7 +1004,7 @@ def _render_inventory_scan_inner() -> None:
             st.markdown(f"**Unit cost:** {_fmt_money(unit_cost)}")
             st.caption(f"Location: {html.escape(loc)} · Vendor: {html.escape(vendor)}")
 
-    st.subheader("Issue")
+    st.subheader("Record use")
     prof = current_profile()
     has_login_actor = bool(str(prof.get("id") or "").strip() or _auth_user_id_str())
     manual_actor = ""
@@ -1015,11 +1034,11 @@ def _render_inventory_scan_inner() -> None:
             "a stable id is kept in this browser (localStorage) when supported."
         )
         qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key="inv_scan_qty")
-        issue_type = st.selectbox("Issue type", _ISSUE_TYPES, key="inv_scan_issue_type")
+        issue_type = st.selectbox("Use type", _ISSUE_TYPES, key="inv_scan_issue_type")
         job_opts = ["— No job —"] + job_labels
         job_pick = st.selectbox("Job", job_opts, key="inv_scan_job")
         notes = st.text_area("Notes", key="inv_scan_notes", height=88, placeholder="Optional")
-        submit = st.form_submit_button("Issue Inventory", type="primary", use_container_width=True)
+        submit = st.form_submit_button("Record use", type="primary", use_container_width=True)
 
     if not submit:
         return
@@ -1037,13 +1056,13 @@ def _render_inventory_scan_inner() -> None:
         st.error("Quantity cannot exceed quantity on hand.")
         st.stop()
 
-    itype = str(issue_type or "Shop Use")
+    itype = str(issue_type or INVENTORY_USE_IN_SHOP_LABEL)
     txn_type = _TXN_MAP.get(itype, "SHOP")
     raw_job = str(job_pick or "").strip()
     jid: str | None = None
-    if itype == "To Job":
+    if itype == INVENTORY_USE_ON_JOB_LABEL:
         if not raw_job or raw_job.startswith("—"):
-            st.error("Select a job for **To Job** issues.")
+            st.error(f"Select a job for **{INVENTORY_USE_ON_JOB_LABEL}**.")
             st.stop()
         jid = job_label_to_id.get(raw_job)
         if not jid:
@@ -1056,7 +1075,7 @@ def _render_inventory_scan_inner() -> None:
     cb = _created_by_label()
     ts = datetime.now(timezone.utc).isoformat()
 
-    if itype == "To Job" and jid:
+    if itype == INVENTORY_USE_ON_JOB_LABEL and jid:
         try:
             from app.services.job_materials_service import issue_inventory_to_job
         except ImportError:
@@ -1071,7 +1090,7 @@ def _render_inventory_scan_inner() -> None:
             job_id=jid,
             inventory_item_id=iid,
             quantity=qv,
-            transaction_type="issue_to_job",
+            transaction_type="consume_on_job",
             notes=note_s,
             employee_id=emp_id,
             usage_source="qr_scan",
@@ -1085,7 +1104,7 @@ def _render_inventory_scan_inner() -> None:
             st.error(result.error or "Could not issue inventory to job.")
             st.stop()
         st.session_state.pop("inv_scan_loaded", None)
-        st.success("Inventory issued to job and job costing updated.")
+        st.success("Material consumed on job. Stock and job costing updated.")
         st.rerun()
 
     new_qoh = qoh - qv
@@ -1153,7 +1172,7 @@ def _render_inventory_scan_inner() -> None:
         st.stop()
 
     st.session_state.pop("inv_scan_loaded", None)
-    st.success("Inventory issued.")
+    st.success("Material consumed.")
     st.rerun()
 
 
@@ -1169,24 +1188,7 @@ def _fmt_money(v: float) -> str:
 
 _REMEMBERED_PHONE_KEY = "_ips_remembered_scanner_phone"
 _SCAN_SESSION_KEY = "_ips_inventory_scan_page"
-_MOBILE_SCAN_SHOP_LABEL = "Shop"
-
-_ACTION_DB_VALUES = (
-    "check_out",
-    "check_in",
-    "issue_to_job",
-    "return_from_job",
-    "consume_on_job",
-)
-_ACTION_LABELS: dict[str, str] = {
-    "check_out": "Take / Check Out",
-    "check_in": "Return / Check In",
-    "issue_to_job": "Issue to Job",
-    "return_from_job": "Return From Job",
-    "consume_on_job": "Consume On Job",
-    "shop_use": "Shop Use",
-}
-_JOB_REQUIRED_ACTIONS = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
+_MOBILE_SCAN_SHOP_LABEL = INVENTORY_USE_IN_SHOP_LABEL
 
 
 def _parse_inventory_scan_deeplink(raw: str) -> dict[str, str]:
@@ -1222,7 +1224,7 @@ def _apply_inventory_scan_params(
     item_id: str = "",
     legacy_code: str = "",
 ) -> None:
-    """Persist scan identifiers in session for mobile inventory checkout."""
+    """Persist scan identifiers in session for mobile inventory use form."""
     st.session_state[_SCAN_SESSION_KEY] = True
     if sku:
         st.session_state["_ips_scan_inv_sku"] = sku
@@ -1342,12 +1344,12 @@ def _render_scan_manual_lookup(*, err: str = "") -> None:
     if err:
         st.error(err)
     st.markdown("### Find item")
-    st.caption("Enter SKU, scan code, or paste the full checkout link from the inventory detail page.")
+    st.caption("Enter SKU, scan code, or paste the scan link from the inventory detail page.")
     with st.form("inv_mobile_scan_lookup", clear_on_submit=False):
         code = st.text_input(
             "Item code or link",
             key="inv_mobile_scan_lookup_code",
-            placeholder="SKU, INV-…, or checkout URL",
+            placeholder="SKU, INV-…, or scan URL",
         )
         submit = st.form_submit_button("Find item", type="primary", use_container_width=True)
     if not submit:
@@ -1400,7 +1402,7 @@ def _resolve_mobile_scan_destination(
 
 
 def _scan_mobile_job_options() -> tuple[list[str], dict[str, str]]:
-    """All jobs (any status) plus Shop — for the simplified mobile QR scan form."""
+    """All jobs (any status) plus Use in Shop — for the simplified mobile QR scan form."""
     try:
         jobs = sort_jobs_by_number_then_name(fetch_table_admin("jobs", limit=5000))
     except Exception:
@@ -1416,7 +1418,7 @@ def _record_mobile_shop_use(
     qoh: float,
     allow_over: bool,
 ) -> tuple[bool, str]:
-    """Shop issue from mobile QR scan — matches desktop Shop Use (SHOP txn, no job)."""
+    """Use in Shop from mobile QR scan — matches desktop Use in Shop (SHOP txn, no job)."""
 
     iid = str(item.get("id") or "")
     qv = float(qty or 0)
@@ -1444,7 +1446,7 @@ def _record_mobile_shop_use(
         "job_id": None,
         "employee_id": _profile_employee_id(),
         "profile_id": _profile_uuid(),
-        "notes": "Shop use (mobile QR scan)",
+        "notes": f"{INVENTORY_USE_IN_SHOP_LABEL} (mobile QR scan)",
         "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
         "scanned_by_name": actor_name[:500],
         "scanned_by_phone": phone_norm or None,
@@ -1528,13 +1530,13 @@ def _submit_mobile_inventory_scan(
     qoh: float,
     unit: str,
 ) -> None:
-    """Issue scanned inventory to the selected job (mobile QR form)."""
+    """Consume scanned inventory on the selected job or in shop (mobile QR form)."""
     try:
         from app.services.job_materials_service import issue_inventory_to_job
     except ImportError:
         from services.job_materials_service import issue_inventory_to_job  # type: ignore
 
-    action = "issue_to_job"
+    action = "consume_on_job"
     iid = str(item.get("id") or "")
     qv = float(qty or 0)
     if qv <= 0:
@@ -1543,7 +1545,7 @@ def _submit_mobile_inventory_scan(
 
     destination_type, job_id, destination_label = _resolve_mobile_scan_destination(job_pick, job_map)
     if not destination_label:
-        st.error("Select Shop or a job.")
+        st.error(f"Select {INVENTORY_USE_IN_SHOP_LABEL} or a job.")
         st.stop()
 
     actor_name, phone_norm, phone_display, phone_verified = _mobile_scan_actor_defaults()
@@ -1615,10 +1617,10 @@ def _submit_mobile_inventory_scan(
 def _render_scan_success(item: dict[str, Any], payload: dict[str, Any]) -> None:
     dest_type = str(payload.get("destination_type") or "").strip().lower()
     dest_label = str(payload.get("job_label") or "—")
-    st.success("Inventory action recorded.")
+    st.success("Material consumed.")
     st.markdown(
         f"**Item:** {html.escape(str(item.get('name') or item.get('item_name') or '—'))}  \n"
-        f"**Action:** {html.escape(_ACTION_LABELS.get(str(payload.get('action') or ''), payload.get('action', '')))}  \n"
+        f"**Use:** {html.escape(inventory_action_label(str(payload.get('action') or '')))}  \n"
         f"**Quantity:** {float(payload.get('quantity') or 0):g} {html.escape(str(payload.get('unit') or 'EA'))}  \n"
         f"**Destination:** {html.escape(dest_label)}"
         + (f" ({html.escape(dest_type)})" if dest_type else "")
@@ -1629,7 +1631,7 @@ def _render_scan_success(item: dict[str, Any], payload: dict[str, Any]) -> None:
     )
     b1, b2 = st.columns(2, gap="small")
     with b1:
-        if st.button("Submit another action for this item", key="inv_scan_success_again", use_container_width=True):
+        if st.button("Record another use for this item", key="inv_scan_success_again", use_container_width=True):
             st.session_state.pop("inv_scan_success_payload", None)
             st.rerun()
     with b2:
@@ -1659,8 +1661,8 @@ def render_inventory_scan_page() -> None:
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-qr-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 
-    st.markdown("## IPS Inventory Scan")
-    st.caption("Enter quantity and select a job to issue this item.")
+    st.markdown("## Use Inventory")
+    st.caption("Consumable materials — enter quantity and where used (Use on Job or Use in Shop).")
 
     success = st.session_state.get("inv_scan_success_payload")
     if success and isinstance(success, dict):
@@ -1674,7 +1676,7 @@ def render_inventory_scan_page() -> None:
         return
 
     if not _scan_can_submit():
-        st.error("Your role cannot submit inventory actions.")
+        st.error("Your role cannot record inventory use.")
         st.stop()
 
     iid = str(item.get("id") or "")
@@ -1720,7 +1722,7 @@ def render_inventory_scan_page() -> None:
         with qty_plus_col:
             qty_inc = st.form_submit_button("+", use_container_width=True)
 
-        job_pick = st.selectbox("Job / Shop", job_labels, key="inv_scan_job_pick")
+        job_pick = st.selectbox("Where used", job_labels, key="inv_scan_job_pick")
         submit = st.form_submit_button("Enter", type="primary", use_container_width=True)
 
     if qty_dec:

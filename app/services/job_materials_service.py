@@ -88,7 +88,7 @@ def _parse_inventory_scan_deeplink(raw: str) -> dict[str, str]:
 
 
 def resolve_inventory_by_scan_code(code: str) -> ServiceResult:
-    """Resolve inventory item from SKU, QR value, or mobile checkout URL."""
+    """Resolve inventory item from SKU, QR value, or mobile use-form URL."""
     raw = str(code or "").strip()
     if not raw:
         return ServiceResult(ok=False, error="Enter an item code or scan link.")
