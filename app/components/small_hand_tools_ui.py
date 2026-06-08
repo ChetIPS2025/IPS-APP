@@ -56,7 +56,7 @@ except ImportError:
     )
 
 _TABLE_KEY = "assets_hand_tools_list"
-_COLS = [3.0, 1.1, 0.5, 0.5, 1.1, 1.0, 0.95, 0.55]
+_COLS = [2.9, 1.05, 0.5, 0.5, 1.05, 0.95, 0.9, 0.8]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("TOOL", None),
     ("CATEGORY", "category"),
@@ -183,7 +183,7 @@ def _render_hand_tool_adjust_action(row: dict) -> None:
         return
 
     name = str(row.get("tool_name") or "tool")
-    with st.popover("Adjust"):
+    with st.popover("Adjust", type="primary"):
         st.caption(name)
         delta = st.number_input("Qty change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
         adj_notes = st.text_input("Notes", key=f"ht_adj_notes_{rid}")

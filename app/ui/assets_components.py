@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v13"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v14"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -185,7 +185,15 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
             flex: 0 0 auto !important;
             width: auto !important;
-            min-width: 4.5rem !important;
+            min-width: 5.75rem !important;
+            max-width: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child
+        [data-testid="stVerticalBlock"] {
+            width: auto !important;
+            min-width: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_hand_tools_table_wrap .ips-hand-tools-cell,
@@ -209,15 +217,36 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_hand_tools_table_wrap
         [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child
         button[data-testid="stBaseButton-popover"] {
-            min-height: 1.75rem !important;
-            height: 1.75rem !important;
-            padding: 0 0.65rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 1.85rem !important;
+            height: 1.85rem !important;
+            min-width: 4.85rem !important;
+            width: auto !important;
+            max-width: none !important;
+            padding: 0 0.75rem !important;
             font-size: 0.78rem !important;
             font-weight: 600 !important;
-            color: #2563eb !important;
-            background: #ffffff !important;
-            border: 1px solid #dbeafe !important;
+            white-space: nowrap !important;
+            writing-mode: horizontal-tb !important;
+            word-break: keep-all !important;
+            color: #ffffff !important;
+            background: #2563eb !important;
+            border: 1px solid #2563eb !important;
             box-shadow: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child
+        button[data-testid="stBaseButton-popover"] p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child
+        button[data-testid="stBaseButton-popover"] span {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            line-height: 1 !important;
         }
         .ips-assets-header-inner {
             display: flex;
