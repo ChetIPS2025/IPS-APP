@@ -37,6 +37,12 @@ COLORS = {
     "success": "#059669",
     "warning": "#d97706",
     "danger": "#dc2626",
+    "danger_hover": "#b91c1c",
+    "action_open": "#2563eb",
+    "action_open_hover": "#1d4ed8",
+    "action_neutral_bg": "#ffffff",
+    "action_neutral_border": "#e2e8f0",
+    "action_neutral_text": "#374151",
 }
 
 

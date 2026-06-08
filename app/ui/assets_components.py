@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v20"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v21"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -176,7 +176,7 @@ def inject_assets_page_styles() -> None:
             text-overflow: ellipsis !important;
             word-break: normal !important;
         }
-        /* Assets table row Open (↗) — compact blue action button */
+        /* Assets table row Open — compact sizing (colors via inject_row_action_colors_css) */
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton {
@@ -185,9 +185,6 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton > button {
-            background: #2563eb !important;
-            border: 1px solid #2563eb !important;
-            color: #ffffff !important;
             min-width: 2rem !important;
             width: 2rem !important;
             max-width: 2rem !important;
@@ -196,31 +193,7 @@ def inject_assets_page_styles() -> None:
             padding: 0 !important;
             border-radius: 8px !important;
             font-weight: 700 !important;
-            white-space: nowrap !important;
             line-height: 1 !important;
-            box-shadow: none !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
-        [class*="st-key-ast_open_"] .stButton > button:hover,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
-        [class*="st-key-ast_open_"] .stButton > button:focus {
-            background: #1d4ed8 !important;
-            border-color: #1d4ed8 !important;
-            color: #ffffff !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
-        [class*="st-key-ast_open_"] .stButton > button p,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
-        [class*="st-key-ast_open_"] .stButton > button span,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
-        [class*="st-key-ast_open_"] .stButton > button div {
-            color: #ffffff !important;
-            white-space: nowrap !important;
         }
         /* Small Hand Tools tab — CSS grid rows with fixed Actions column */
         section[data-testid="stMain"]:has(.ips-assets-page)

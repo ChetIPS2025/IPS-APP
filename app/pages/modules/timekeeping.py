@@ -499,7 +499,7 @@ def _render_timekeeping_table(rows: list[dict], *, selected_id: str, week_start_
                     '<span class="ips-tk-actions ips-clean-actions" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                if st.button("👁", key=f"tk_view_{eid}", help="View weekly time"):
+                if st.button("↗", key=f"tk_open_{eid}", help="Open weekly time"):
                     st.session_state[_SEL] = eid
                     st.session_state.pop(_COLLAPSED_KEY, None)
                     st.rerun()

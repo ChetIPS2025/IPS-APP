@@ -1186,7 +1186,7 @@ def render_job_row(
     )
     a1, a2 = st.columns(2, gap="small")
     with a1:
-        if st.button("👁", key=f"jrow_view_{jid}", help="View job details"):
+        if st.button("↗", key=f"jrow_open_{jid}", help="Open job details"):
             on_view()
     with a2:
         if st.button(

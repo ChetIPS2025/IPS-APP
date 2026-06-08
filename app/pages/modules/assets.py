@@ -370,7 +370,7 @@ def _render_assets_table(rows: list[dict], *, selected_id: str, can_edit: bool) 
                 )
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
-                    if st.button("👁", key=f"ast_view_{aid}", help="View asset"):
+                    if st.button("↗", key=f"ast_open_{aid}", help="Open asset details"):
                         st.session_state[_SEL] = aid
                         st.session_state[_TAB] = "Overview"
                         st.rerun()

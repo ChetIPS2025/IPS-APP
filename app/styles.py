@@ -10773,6 +10773,11 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
     inject_table_viewport_fit()
     inject_ips_dialog_styles()
     inject_action_colors_css()
+    try:
+        from app.ui.row_action_colors import inject_row_action_colors_css
+    except ImportError:
+        from ui.row_action_colors import inject_row_action_colors_css  # type: ignore
+    inject_row_action_colors_css()
 
 
 def inject_coupling_inspection_css() -> None:

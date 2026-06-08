@@ -1,0 +1,38 @@
+---
+description: Row action button colors for list tables (Open, Edit, Delete, etc.)
+globs: app/pages/**/*.py,app/ui/**/*.py,app/components/**/*_ui.py
+alwaysApply: false
+---
+
+# Row action button colors
+
+Use shared styling from `app/ui/row_action_colors.py` (`inject_row_action_colors_css`, called via `inject_global_css`).
+
+## Color map
+
+| Action | Style | Key suffix examples |
+|--------|--------|---------------------|
+| Open / View | Blue bg, white icon | `_open_`, `_view_` |
+| Edit | White/outline neutral | `_more_edit_`, `_det_edit_`, `estimates_modal_edit_`, `_tool_edit_` |
+| Move / Reclassify | Blue | `_trailer_go_`, `_ctype_`, `_row_move_`, `_reclass_` |
+| Delete | Red (trash icon) | `_del_`, `_delete_` — styled in `inject_action_colors_css` |
+| Cancel | White/outline neutral | `_confirm_cancel_`, `est_cancel_new`, `job_cancel_new` |
+
+## Button keys
+
+Use `row_action_key(prefix, action, record_id)` or `{prefix}_{action}_{id}` so CSS can target `st-key-*` classes.
+
+```python
+# Good — picked up by shared CSS
+st.button("↗", key=f"ast_open_{aid}", help="Open asset details")
+st.button("Edit", key=f"inv_more_edit_{iid}", use_container_width=True)
+
+# Avoid — generic keys won't get semantic colors
+st.button("↗", key=f"btn_{aid}")
+```
+
+## Rules
+
+- Row Open/View: compact `↗` icon on one horizontal row; do not stack.
+- Popover menus (`⋯`): text labels OK; inline row icons follow the color map.
+- Scope page-specific sizing in page CSS; colors stay in `row_action_colors.py`.
