@@ -267,10 +267,18 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
         if not asset_is_kit(trailer):
             return ServiceResult(ok=False, error="Selected container is not a Tool Trailer / kit.")
 
+    asset_tag = _clean_text(data.get("asset_number")) or _clean_text(data.get("asset_id"))
+    if not asset_tag:
+        try:
+            from app.services.asset_service import next_asset_id
+        except ImportError:
+            from services.asset_service import next_asset_id  # type: ignore
+        existing_assets, _ = fetch_rows(_ASSETS, limit=5000, order_by="asset_id")
+        asset_tag = next_asset_id(existing_assets)
+
     payload = {
         "asset_name": name,
-        "asset_id": _clean_text(data.get("asset_number")) or None,
-        "asset_number": _clean_text(data.get("asset_number")) or None,
+        "asset_id": asset_tag,
         "category": _clean_text(data.get("category") or data.get("asset_type") or "Tool"),
         "asset_type": _clean_text(data.get("asset_type") or data.get("category") or "Tool"),
         "manufacturer": _clean_text(data.get("manufacturer") or "Milwaukee"),
