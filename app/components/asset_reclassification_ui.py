@@ -235,12 +235,22 @@ def render_equipment_bulk_move_toolbar(
     st.markdown(f"**{count} selected**")
     b1, b2, b3, _ = st.columns([1.4, 1.6, 1.0, 2.0])
     with b1:
-        if st.button("Move to Small Tools", key="ast_bulk_small_tools", use_container_width=True):
+        if st.button(
+            "Move to Small Tools",
+            key="ast_bulk_small_tools",
+            type="primary",
+            use_container_width=True,
+        ):
             st.session_state[_BULK_MOVE_TARGET_KEY] = "quantity"
             st.session_state[_BULK_MOVE_CONFIRM_KEY] = True
             st.rerun()
     with b2:
-        if st.button("Move to Serialized Tools", key="ast_bulk_serialized", use_container_width=True):
+        if st.button(
+            "Move to Serialized Tools",
+            key="ast_bulk_serialized",
+            type="primary",
+            use_container_width=True,
+        ):
             st.session_state[_BULK_MOVE_TARGET_KEY] = "serialized"
             st.session_state[_BULK_MOVE_CONFIRM_KEY] = True
             st.rerun()
