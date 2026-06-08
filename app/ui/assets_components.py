@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v8"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v9"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -68,28 +68,47 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-anchor) > div {
             padding: 0.35rem 0.65rem 0.5rem !important;
         }
-        /* Header actions: Export secondary, New primary */
+        /* Assets header: Export | Quick Add Tool | New Asset — one right-aligned row */
         section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-header-anchor)
-        .ips-assets-export-btn button {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) {
+            align-items: flex-end !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] {
+            justify-content: flex-end !important;
+            width: 100% !important;
+            flex-wrap: nowrap !important;
+            gap: 0.5rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: max-content !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {
+            width: auto !important;
+            min-width: max-content !important;
+            white-space: nowrap !important;
+            font-weight: 600 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button {
             background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             color: #374151 !important;
-            font-weight: 600 !important;
             box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .ips-page-actions-marker ~ div .ips-assets-quick-add-btn + div button {
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) .stButton > button[kind="primary"] {
             background: #2563eb !important;
             border: 1px solid #2563eb !important;
             color: #ffffff !important;
-            font-weight: 600 !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        .ips-page-actions-marker ~ div button[kind="secondary"],
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        .ips-page-actions-marker ~ div button:not([kind="primary"]) {
-            font-weight: 600 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)

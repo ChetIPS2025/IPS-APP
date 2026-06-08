@@ -42,6 +42,7 @@ def render_page_brand_header(
     subtitle: str | None = None,
     *,
     actions: list[_ActionFn] | None = None,
+    actions_column_ratio: tuple[float, float] | None = None,
     brand_actions: list[_ActionFn] | None = None,
     include_brand_bar: bool = False,
 ) -> None:
@@ -69,7 +70,14 @@ def render_page_brand_header(
     )
 
     if actions:
-        main_col, act_col = st.columns([2.55, 1.45], gap="small", vertical_alignment="top")
+        n = len(actions)
+        if actions_column_ratio:
+            title_w, actions_w = actions_column_ratio
+        elif n >= 3:
+            title_w, actions_w = 1.65, 2.35
+        else:
+            title_w, actions_w = 2.55, 1.45
+        main_col, act_col = st.columns([title_w, actions_w], gap="small", vertical_alignment="top")
         with main_col:
             st.markdown(
                 f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
@@ -80,7 +88,6 @@ def render_page_brand_header(
                 '<span class="ips-page-actions-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            n = len(actions)
             if n == 1:
                 actions[0]()
             elif n == 2:
@@ -89,8 +96,16 @@ def render_page_brand_header(
                     actions[0]()
                 with bc2:
                     actions[1]()
+            elif n == 3:
+                bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
+                with bc1:
+                    actions[0]()
+                with bc2:
+                    actions[1]()
+                with bc3:
+                    actions[2]()
             else:
-                cols = st.columns(min(n, 3), gap="small")
+                cols = st.columns(min(n, 4), gap="small")
                 for i, widget in enumerate(actions):
                     with cols[i % len(cols)]:
                         widget()

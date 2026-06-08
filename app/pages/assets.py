@@ -2256,22 +2256,26 @@ def render() -> None:
     )
     rows = load_assets()
 
-    def _assets_export() -> None:
-        st.button("Export", key="ast_export", use_container_width=True)
-
-    def _assets_quick_add() -> None:
-        st.markdown('<span class="ips-assets-quick-add-btn"></span>', unsafe_allow_html=True)
-        if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary", use_container_width=True):
-            open_quick_add_tool_dialog()
-
-    def _assets_new() -> None:
-        if st.button("+ New Asset", key="ast_new", use_container_width=True):
-            st.session_state["ips_ast_form"] = True
+    def _assets_header_actions() -> None:
+        st.markdown(
+            '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        col_export, col_quick, col_new = st.columns([0.95, 1.55, 1.1], gap="small")
+        with col_export:
+            st.button("Export", key="ast_export")
+        with col_quick:
+            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
+                open_quick_add_tool_dialog()
+        with col_new:
+            if st.button("+ New Asset", key="ast_new"):
+                st.session_state["ips_ast_form"] = True
 
     render_page_brand_header(
         "Assets",
         "Track and manage all company assets and equipment.",
-        actions=[_assets_export, _assets_quick_add, _assets_new],
+        actions=[_assets_header_actions],
+        actions_column_ratio=(1.6, 2.4),
     )
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):
