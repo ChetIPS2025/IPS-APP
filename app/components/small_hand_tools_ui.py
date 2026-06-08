@@ -56,7 +56,7 @@ except ImportError:
     )
 
 _TABLE_KEY = "assets_hand_tools_list"
-_COLS = [2.2, 0.95, 0.55, 0.55, 1.35, 0.95, 0.95, 0.75, 0.75]
+_COLS = [3.0, 1.1, 0.5, 0.5, 1.1, 1.0, 0.95, 0.55]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("TOOL", None),
     ("CATEGORY", "category"),
@@ -64,9 +64,8 @@ _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("ACTUAL", None),
     ("LOCATION", "location"),
     ("STORAGE", "storage_type"),
-    ("JOB", "job"),
     ("STATUS", "status"),
-    ("CONDITION", "condition"),
+    ("ACTIONS", None),
 ]
 _FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: str(r.get("category") or "")),
@@ -159,6 +158,55 @@ def _render_add_hand_tool_form() -> None:
             st.error(result.error or "Could not save hand tool.")
 
 
+def _hand_tool_status_pill_html(status: str) -> str:
+    cls_map = {
+        "Available": "ips-asset-status-available",
+        "In Use": "ips-asset-status-assigned",
+        "Low Stock": "ips-asset-status-maintenance-due",
+        "Missing": "ips-asset-status-lost",
+        "Damaged": "ips-asset-status-out-for-repair",
+        "Out of Service": "ips-asset-status-retired",
+        "Retired": "ips-asset-status-retired",
+    }
+    cls = cls_map.get(status, "ips-asset-status-available")
+    return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _render_hand_tool_adjust_action(row: dict) -> None:
+    rid = str(row.get("id") or "").strip()
+    editable = bool(row.get("editable", True))
+    if not rid or not editable:
+        st.markdown(
+            '<div class="ips-hand-tools-cell ips-assets-muted">—</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    name = str(row.get("tool_name") or "tool")
+    with st.popover("Adjust"):
+        st.caption(name)
+        delta = st.number_input("Qty change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
+        adj_notes = st.text_input("Notes", key=f"ht_adj_notes_{rid}")
+        ac1, ac2 = st.columns(2)
+        with ac1:
+            if st.button("Apply", key=f"ht_adj_go_{rid}", use_container_width=True):
+                if delta == 0:
+                    st.warning("Enter a non-zero quantity change.")
+                else:
+                    result = adjust_hand_tool_quantity(rid, delta, notes=adj_notes)
+                    if result.ok:
+                        st.success("Quantity updated.")
+                        st.rerun()
+                    st.error(result.error or "Update failed.")
+        with ac2:
+            if st.button("Remove", key=f"ht_del_{rid}", use_container_width=True):
+                result = delete_hand_tool(rid)
+                if result.ok:
+                    st.success("Hand tool removed.")
+                    st.rerun()
+                st.error(result.error or "Remove failed.")
+
+
 def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
     out = list(rows)
     if q:
@@ -179,7 +227,10 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
         return
 
     with st.container(key="assets_hand_tools_table_wrap"):
-        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="ips-assets-table-wrap ips-hand-tools-table-wrap">',
+            unsafe_allow_html=True,
+        )
         header_cols = st.columns(_COLS, gap="small", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _HEADER_SPECS):
             with col:
@@ -189,10 +240,13 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
                         table_key=_TABLE_KEY,
                         filter_field=field,
                         filter_options=filter_options.get(field, []),
-                        base_class="ips-assets-header-row ips-assets-cell",
+                        base_class="ips-assets-header-row ips-hand-tools-cell",
                     )
                 else:
-                    render_table_header_cell(label, base_class="ips-assets-header-row ips-assets-cell")
+                    render_table_header_cell(
+                        label,
+                        base_class="ips-assets-header-row ips-hand-tools-cell",
+                    )
 
         for row in rows:
             rid = str(row.get("id") or "")
@@ -204,59 +258,50 @@ def _render_table(rows: list[dict], *, filter_options: dict[str, list[str]]) -> 
             qty_short = qty_act < qty_exp
             location = str(row.get("location_display") or "—")
             storage = str(row.get("storage_type") or "—")
-            job_label = str(row.get("job_label") or "—")
             status = str(row.get("status") or "—")
-            condition = str(row.get("condition") or "—")
             editable = bool(row.get("editable", True))
+            title_attr = (
+                ' title="Trailer kit item — edit in Tool Trailer kit tab"'
+                if not editable
+                else ""
+            )
 
             with cols[0]:
-                st.markdown(f'<div class="ips-assets-title">{html.escape(name)}</div>', unsafe_allow_html=True)
-                if not editable:
-                    st.caption("Trailer kit item — edit in Tool Trailer kit tab")
+                st.markdown(
+                    f'<span class="ips-hand-tools-row-marker" aria-hidden="true"></span>'
+                    f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[1]:
-                st.markdown(f'<div class="ips-assets-cell">{html.escape(category)}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell">{html.escape(category)}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[2]:
-                st.markdown(f'<div class="ips-assets-cell">{qty_exp:g}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty">{qty_exp:g}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[3]:
                 short_cls = " ips-assets-qty-short" if qty_short else ""
                 st.markdown(
-                    f'<div class="ips-assets-cell{short_cls}"><strong>{qty_act:g}</strong></div>',
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty{short_cls}"><strong>{qty_act:g}</strong></div>',
                     unsafe_allow_html=True,
                 )
             with cols[4]:
-                st.markdown(f'<div class="ips-assets-muted ips-assets-cell">{html.escape(location)}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-assets-muted ips-hand-tools-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[5]:
-                st.markdown(f'<div class="ips-assets-cell">{html.escape(storage)}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell">{html.escape(storage)}</div>',
+                    unsafe_allow_html=True,
+                )
             with cols[6]:
-                st.markdown(f'<div class="ips-assets-muted ips-assets-cell">{html.escape(job_label)}</div>', unsafe_allow_html=True)
+                st.markdown(_hand_tool_status_pill_html(status), unsafe_allow_html=True)
             with cols[7]:
-                st.markdown(f'<div class="ips-assets-cell">{html.escape(status)}</div>', unsafe_allow_html=True)
-            with cols[8]:
-                st.markdown(f'<div class="ips-assets-cell">{html.escape(condition)}</div>', unsafe_allow_html=True)
-
-            if editable and rid:
-                with st.expander(f"Adjust · {name}", expanded=False):
-                    ac1, ac2, ac3 = st.columns([1, 1, 1])
-                    with ac1:
-                        delta = st.number_input("Qty change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
-                    with ac2:
-                        adj_notes = st.text_input("Notes", key=f"ht_adj_notes_{rid}")
-                    with ac3:
-                        if st.button("Apply qty", key=f"ht_adj_go_{rid}"):
-                            if delta == 0:
-                                st.warning("Enter a non-zero quantity change.")
-                            else:
-                                result = adjust_hand_tool_quantity(rid, delta, notes=adj_notes)
-                                if result.ok:
-                                    st.success("Quantity updated.")
-                                    st.rerun()
-                                st.error(result.error or "Update failed.")
-                        if st.button("Remove", key=f"ht_del_{rid}"):
-                            result = delete_hand_tool(rid)
-                            if result.ok:
-                                st.success("Hand tool removed.")
-                                st.rerun()
-                            st.error(result.error or "Remove failed.")
+                _render_hand_tool_adjust_action(row)
 
         st.markdown("</div>", unsafe_allow_html=True)
 

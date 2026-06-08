@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v11"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v13"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -130,7 +130,7 @@ def inject_assets_page_styles() -> None:
         }
         /* Equipment table: wider asset name (department column removed) */
         section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        .st-key-assets_table_wrap
         [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
             min-width: 280px !important;
             flex: 2.2 1 320px !important;
@@ -142,6 +142,82 @@ def inject_assets_page_styles() -> None:
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             word-break: normal !important;
+        }
+        /* Small Hand Tools tab — compact single-row table */
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+            flex-wrap: nowrap !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.ips-hand-tools-row-marker) {
+            min-height: 0 !important;
+            padding: 0.15rem 0 !important;
+            margin: 0 !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
+            min-width: 180px !important;
+            flex: 3 1 220px !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+            flex: 0 0 auto !important;
+            width: 2.25rem !important;
+            max-width: 2.75rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {
+            flex: 0 0 auto !important;
+            min-width: 5.25rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 4.5rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap .ips-hand-tools-cell,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap .ips-assets-muted.ips-hand-tools-cell {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            word-break: normal !important;
+            line-height: 1.25 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap .ips-hand-tools-qty {
+            text-align: center !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap .ips-asset-status-pill {
+            white-space: nowrap !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child
+        button[data-testid="stBaseButton-popover"] {
+            min-height: 1.75rem !important;
+            height: 1.75rem !important;
+            padding: 0 0.65rem !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            color: #2563eb !important;
+            background: #ffffff !important;
+            border: 1px solid #dbeafe !important;
+            box-shadow: none !important;
         }
         .ips-assets-header-inner {
             display: flex;
