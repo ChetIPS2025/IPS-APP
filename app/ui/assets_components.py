@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v18"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v19"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -86,33 +86,53 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-wrap: nowrap !important;
-            align-items: center !important;
+            align-items: stretch !important;
             justify-content: flex-end !important;
-            gap: 0.65rem !important;
-            width: auto !important;
+            gap: 0.5rem !important;
+            width: 100% !important;
             max-width: 100% !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            flex: 0 0 auto !important;
+            flex: 1 1 0 !important;
             width: auto !important;
-            min-width: max-content !important;
+            min-width: 0 !important;
             max-width: none !important;
             padding-left: 0 !important;
             padding-right: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
+            flex: 1 0 5.25rem !important;
+            min-width: 5.25rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
+            flex: 1.75 0 11.5rem !important;
+            min-width: 11.5rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+            flex: 1.35 0 8.5rem !important;
+            min-width: 8.5rem !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton {
             margin: 0 !important;
-            width: auto !important;
+            width: 100% !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {
-            width: auto !important;
-            min-width: max-content !important;
-            max-width: none !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
             white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             font-weight: 600 !important;
             padding-left: 0.85rem !important;
             padding-right: 0.85rem !important;
