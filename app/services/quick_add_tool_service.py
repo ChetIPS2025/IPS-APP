@@ -9,12 +9,12 @@ from typing import Any
 
 try:
     from app.services.asset_classification_service import _map_category_to_hand_tool
-    from app.services.repository import ServiceResult, clear_all_data_caches
+    from app.services.repository import ServiceResult, clear_all_data_caches, update_row_admin
     from app.services.serialized_tool_service import create_serialized_tool
     from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool
 except ImportError:
     from services.asset_classification_service import _map_category_to_hand_tool  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches  # type: ignore
+    from services.repository import ServiceResult, clear_all_data_caches, update_row_admin  # type: ignore
     from services.serialized_tool_service import create_serialized_tool  # type: ignore
     from services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool  # type: ignore
 
@@ -25,6 +25,17 @@ TOOL_KIND_LABELS: dict[str, str] = {
     "small": "Small Tools",
     "inventory": "Inventory (consumables)",
 }
+
+_SESSION_EXPIRED_HINT = (
+    "Your session expired. Refresh the page, sign in again, and retry."
+)
+
+
+def _friendly_tool_save_error(err: str) -> str:
+    low = str(err or "").casefold()
+    if "pgrst303" in low or "jwt expired" in low:
+        return _SESSION_EXPIRED_HINT
+    return str(err or "Save failed.")
 
 _IMPORT_ALIASES: dict[str, str] = {
     "tool_name": "tool_name",
@@ -213,13 +224,9 @@ def quick_add_tool(
             }
         )
         if result.ok and result.data:
-            try:
-                from app.services.repository import update_row
-            except ImportError:
-                from services.repository import update_row  # type: ignore
             tool_id = _clean((result.data or {}).get("id"))
             if tool_id:
-                update_row("assets", {"tracking_type": "serialized"}, {"id": tool_id})
+                update_row_admin("assets", {"tracking_type": "serialized"}, {"id": tool_id})
         return result
 
     if bucket == "small":
@@ -293,10 +300,15 @@ def bulk_import_tools(
         if result.ok:
             created += 1
         else:
-            errors.append(f"Row {idx}: {result.error or 'failed'}")
+            errors.append(f"Row {idx}: {_friendly_tool_save_error(result.error or 'failed')}")
 
     if created == 0 and errors:
-        return ServiceResult(ok=False, error="; ".join(errors[:5]), data={"created": 0, "errors": errors})
+        unique_msgs = list(dict.fromkeys(errors))
+        if len(unique_msgs) == 1 and _SESSION_EXPIRED_HINT in unique_msgs[0]:
+            summary = _SESSION_EXPIRED_HINT
+        else:
+            summary = "; ".join(unique_msgs[:5])
+        return ServiceResult(ok=False, error=summary, data={"created": 0, "errors": errors})
 
     clear_all_data_caches()
     return ServiceResult(

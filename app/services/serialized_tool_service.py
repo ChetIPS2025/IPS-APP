@@ -18,7 +18,15 @@ try:
         update_asset_kit_item,
     )
     from app.services.assets_service import ensure_asset_qr_tokens
-    from app.services.repository import ServiceResult, clear_all_data_caches, fetch_rows, insert_row, update_row
+    from app.services.repository import (
+        ServiceResult,
+        clear_all_data_caches,
+        fetch_rows,
+        insert_row,
+        insert_row_admin,
+        update_row,
+        update_row_admin,
+    )
 except ImportError:
     from services.asset_kits_service import (  # type: ignore
         ITEM_STATUSES,
@@ -32,7 +40,15 @@ except ImportError:
         update_asset_kit_item,
     )
     from services.assets_service import ensure_asset_qr_tokens  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches, fetch_rows, insert_row, update_row  # type: ignore
+    from services.repository import (  # type: ignore
+        ServiceResult,
+        clear_all_data_caches,
+        fetch_rows,
+        insert_row,
+        insert_row_admin,
+        update_row,
+        update_row_admin,
+    )
 
 _ASSETS = "assets"
 _TOOL_TXN = "tool_transactions"
@@ -323,7 +339,7 @@ def merge_serialized_tool_fields(asset_id: str, data: dict[str, Any]) -> Service
     if not updates:
         return ServiceResult(ok=True, data={"updated": False, "asset": existing})
 
-    result = update_row(_ASSETS, updates, {"id": aid})
+    result = update_row_admin(_ASSETS, updates, {"id": aid})
     if not result.ok:
         return result
     clear_all_data_caches()
@@ -389,7 +405,8 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
         "last_seen_at": _now_iso(),
     }
     payload = {k: v for k, v in payload.items() if v is not None}
-    result = insert_row(_ASSETS, payload)
+    # Admin insert: Streamlit server-side writes do not reliably carry a fresh user JWT.
+    result = insert_row_admin(_ASSETS, payload)
     if not result.ok:
         err = str(result.error or "")
         if "uq_assets_serialized_serial" in err or (

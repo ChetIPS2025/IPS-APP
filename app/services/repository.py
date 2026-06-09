@@ -148,10 +148,36 @@ def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=False, error=msg)
 
 
+def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
+    """Server-side insert using service role (Streamlit writes when user JWT may be stale)."""
+    payload = filter_payload_to_table(table, payload)
+    try:
+        row = _db().insert_row_admin(table, payload)
+        clear_all_data_caches()
+        return ServiceResult(ok=True, data=row)
+    except Exception as exc:
+        msg = f"Could not save to {table}: {exc}"
+        _LOG.warning(msg)
+        return ServiceResult(ok=False, error=msg)
+
+
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
     payload = filter_payload_to_table(table, payload)
     try:
         rows = _db().update_rows(table, payload, match)
+        clear_all_data_caches()
+        return ServiceResult(ok=True, data=rows[0] if rows else None)
+    except Exception as exc:
+        msg = f"Could not update {table}: {exc}"
+        _LOG.warning(msg)
+        return ServiceResult(ok=False, error=msg)
+
+
+def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
+    """Server-side update using service role (Streamlit writes when user JWT may be stale)."""
+    payload = filter_payload_to_table(table, payload)
+    try:
+        rows = _db().update_rows_admin(table, payload, match)
         clear_all_data_caches()
         return ServiceResult(ok=True, data=rows[0] if rows else None)
     except Exception as exc:
