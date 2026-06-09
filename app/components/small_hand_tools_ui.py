@@ -331,6 +331,9 @@ def _render_table(
 
 def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
     """Quantity-based small hand tools — pliers, wrenches, etc."""
+    import_msg = st.session_state.pop("ht_import_success_message", None)
+    if import_msg:
+        st.success(str(import_msg))
     st.caption(
         "Small tools are **counted** and **audited** (not checked out). Track expected vs actual quantity "
         "per Tool Trailer, shop, warehouse, or job — **move**, mark **missing**, or **adjust** counts."

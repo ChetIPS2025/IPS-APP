@@ -7,10 +7,26 @@ from typing import Any
 
 try:
     from app.services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched
-    from app.services.repository import ServiceResult, clear_all_data_caches, delete_row, fetch_rows, insert_row, update_row
+    from app.services.repository import (
+        ServiceResult,
+        clear_all_data_caches,
+        delete_row,
+        fetch_rows,
+        insert_row,
+        insert_row_admin,
+        update_row,
+    )
 except ImportError:
     from services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches, delete_row, fetch_rows, insert_row, update_row  # type: ignore
+    from services.repository import (  # type: ignore
+        ServiceResult,
+        clear_all_data_caches,
+        delete_row,
+        fetch_rows,
+        insert_row,
+        insert_row_admin,
+        update_row,
+    )
 
 _TABLE = "small_hand_tools"
 
@@ -64,6 +80,8 @@ def normalize_hand_tool(row: dict[str, Any]) -> dict[str, Any]:
         "row_type": str(row.get("row_type") or "hand_tool"),
         "tool_name": _clean_text(row.get("tool_name") or row.get("item_name") or "—"),
         "category": _clean_text(row.get("category") or "Other") or "Other",
+        "model_number": _clean_text(row.get("model_number") or ""),
+        "serial_number": _clean_text(row.get("serial_number") or ""),
         "description": _clean_text(row.get("description") or ""),
         "quantity_on_hand": qty,
         "quantity_expected": exp,
@@ -192,7 +210,8 @@ def list_hand_tools(
     return sorted(out, key=lambda r: (str(r.get("tool_name") or "").casefold(), str(r.get("location_display") or "")))
 
 
-def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+def _hand_tool_payload_from_ui(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    """Build validated DB payload for insert/update; returns error ServiceResult on validation failure."""
     name = _clean_text(ui.get("tool_name"))
     if not name:
         return ServiceResult(ok=False, error="Tool name is required.")
@@ -213,6 +232,8 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
     payload: dict[str, Any] = {
         "tool_name": name,
         "category": _clean_text(ui.get("category") or "Other") or "Other",
+        "model_number": _clean_text(ui.get("model_number") or ""),
+        "serial_number": _clean_text(ui.get("serial_number") or ""),
         "description": _clean_text(ui.get("description") or ""),
         "quantity_on_hand": qty,
         "quantity_expected": max(0.0, _f(ui.get("quantity_expected") or qty)),
@@ -234,6 +255,18 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
     if qty <= 0 and _clean_text(ui.get("status") or "Available") == "Available":
         payload["status"] = "Low Stock" if qty == 0 else payload["status"]
 
+    return ServiceResult(ok=True, data={"payload": payload, "storage": storage, "container_id": container_id})
+
+
+def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    built = _hand_tool_payload_from_ui(ui, row_id=row_id)
+    if not built.ok:
+        return built
+    data = built.data or {}
+    payload = data.get("payload") or {}
+    storage = data.get("storage") or "Warehouse"
+    container_id = data.get("container_id") or ""
+
     if row_id:
         result = update_row(_TABLE, payload, {"id": row_id})
     else:
@@ -243,6 +276,25 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
     if result.ok and storage == "Tool Trailer" and container_id:
         _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id)
     clear_all_data_caches()
+    return result
+
+
+def import_hand_tool_row(ui: dict[str, Any]) -> ServiceResult:
+    """Server-side insert for CSV bulk import (service role; avoids stale user JWT)."""
+    built = _hand_tool_payload_from_ui(ui)
+    if not built.ok:
+        return built
+    data = built.data or {}
+    payload = data.get("payload") or {}
+    storage = data.get("storage") or "Warehouse"
+    container_id = data.get("container_id") or ""
+    payload["created_at"] = _now_iso()
+    result = insert_row_admin(_TABLE, payload)
+    if result.ok and storage == "Tool Trailer" and container_id:
+        row_id = _clean_text((result.data or {}).get("id"))
+        _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id or None)
+    if result.ok:
+        clear_all_data_caches()
     return result
 
 
@@ -344,5 +396,6 @@ __all__ = [
     "delete_hand_tool",
     "list_hand_tools",
     "normalize_hand_tool",
+    "import_hand_tool_row",
     "save_hand_tool",
 ]

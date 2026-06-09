@@ -98,7 +98,7 @@ def render_serialized_tools_toolbar() -> None:
             st.selectbox("Tool type", MILWAUKEE_TOOL_TYPES, key="st_new_type")
         with c2:
             st.text_input("Manufacturer", value="Milwaukee", key="st_new_mfr")
-            st.text_input("Model", key="st_new_model", placeholder="2804-20")
+            st.text_input("Model #", key="st_new_model_number", placeholder="2804-20")
             st.selectbox("Tool Trailer", trailer_labels, key="st_new_trailer")
             st.selectbox("Status", SERIALIZED_TOOL_STATUSES[:4], key="st_new_status")
         st.text_area("Notes", key="st_new_notes", height=60)
@@ -113,7 +113,7 @@ def render_serialized_tools_toolbar() -> None:
                     "asset_type": st.session_state.get("st_new_type"),
                     "category": "Tool",
                     "manufacturer": st.session_state.get("st_new_mfr"),
-                    "model": st.session_state.get("st_new_model"),
+                    "model_number": st.session_state.get("st_new_model_number"),
                     "status": st.session_state.get("st_new_status"),
                     "notes": st.session_state.get("st_new_notes"),
                     "current_container_asset_id": trailer_id,
@@ -129,7 +129,7 @@ def render_serialized_tools_toolbar() -> None:
 
     with st.expander("Import tools (CSV)", expanded=False):
         st.caption(
-            "Columns: asset_name, serial_number, model, asset_type, asset_number, notes. "
+            "Columns: asset_name, model_number, serial_number, asset_type, asset_number, notes. "
             "Optional trailer_asset_number to assign all rows to one trailer."
         )
         uploaded = st.file_uploader("CSV file", type=["csv"], key="st_import_csv")

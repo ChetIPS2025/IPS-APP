@@ -159,7 +159,7 @@ def _existing_asset_summary(existing: dict[str, Any]) -> str:
     asset_no = _clean_text(existing.get("asset_number") or existing.get("asset_id"))
     name = _clean_text(existing.get("asset_name") or existing.get("name") or "Tool")
     serial = _clean_text(existing.get("serial_number"))
-    model = _clean_text(existing.get("model"))
+    model = _clean_text(existing.get("model_number") or existing.get("model"))
     mfr = _clean_text(existing.get("manufacturer"))
     bits = [bit for bit in (asset_no, name) if bit]
     headline = " · ".join(bits) if bits else name
@@ -352,8 +352,8 @@ def _apply_scan_to_photo_fields(prefix: str, parsed: dict[str, Any], *, kind: st
     if kind == "serialized":
         if parsed.get("serial_number"):
             st.session_state[f"{prefix}_photo_serial"] = parsed["serial_number"]
-        if parsed.get("model"):
-            st.session_state[f"{prefix}_photo_model"] = parsed["model"]
+        if parsed.get("model_number") or parsed.get("model"):
+            st.session_state[f"{prefix}_photo_model_number"] = parsed.get("model_number") or parsed.get("model")
 
 
 def _apply_scan_and_lookup(prefix: str, parsed: dict[str, Any], *, kind: str) -> None:
@@ -525,7 +525,7 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
             tool_type = st.selectbox("Tool type", MILWAUKEE_TOOL_TYPES, key=f"{prefix}_tool_type")
         with c2:
             mfr = st.text_input("Manufacturer", value="Milwaukee", key=f"{prefix}_mfr")
-            model = st.text_input("Model", key=f"{prefix}_model")
+            model = st.text_input("Model #", key=f"{prefix}_model_number")
             st.text_input("Notes", key=f"{prefix}_notes")
         payload = {
             "tool_name": name,
@@ -534,7 +534,7 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
             "asset_type": tool_type,
             "category": "Tool",
             "manufacturer": mfr,
-            "model": model,
+            "model_number": model,
             "notes": st.session_state.get(f"{prefix}_notes"),
         }
     elif kind == "small":
@@ -723,7 +723,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         _sync_existing_asset_for_serial(serial)
         c1, c2 = st.columns(2)
         with c1:
-            model = st.text_input("Model", key=f"{prefix}_photo_model")
+            model = st.text_input("Model #", key=f"{prefix}_photo_model_number")
         with c2:
             if f"{prefix}_photo_mfr" not in st.session_state:
                 st.session_state[f"{prefix}_photo_mfr"] = "Milwaukee"
@@ -741,7 +741,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
         photo_payload = {
             "tool_name": name,
             "serial_number": serial,
-            "model": model,
+            "model_number": model,
             "manufacturer": mfr,
             "category": "Tool",
             "trailer_id": trailer_id,
@@ -777,7 +777,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
                 save_payload: dict[str, Any] = {
                     "tool_name": name,
                     "serial_number": "" if needs_serial else serial,
-                    "model": model,
+                    "model_number": model,
                     "manufacturer": mfr,
                     "category": "Tool",
                 }
@@ -942,14 +942,42 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
         _clear_assets_cache_and_rerun()
 
 
+def _bulk_import_preview_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    preview: list[dict[str, str]] = []
+    for row in rows[:25]:
+        preview.append(
+            {
+                "Tool": _clean_text(row.get("tool_name")),
+                "Model #": _clean_text(row.get("model_number")),
+                "Serial": _clean_text(row.get("serial_number")),
+                "Category": _clean_text(row.get("category")),
+                "Type": _clean_text(row.get("tool_kind")),
+                "Trailer #": _clean_text(row.get("trailer_asset_number")),
+            }
+        )
+    return preview
+
+
 def _bulk_form(kind: str, *, prefix: str, trailer_id: str) -> None:
     st.caption(
-        "Upload CSV or XLSX. Columns: tool_name, serial_number (serialized), quantity (small/inventory), "
-        "category, model, manufacturer, tool_type (serialized|small|inventory), trailer_asset_number."
+        "Upload CSV or XLSX. Columns: tool_name, model_number, serial_number (serialized), quantity "
+        "(small/inventory), category, manufacturer, tool_type (serialized|small|inventory), "
+        "trailer_asset_number."
     )
     uploaded = st.file_uploader("Spreadsheet", type=["csv", "xlsx", "xls"], key=f"{prefix}_bulk_file")
-    if uploaded and st.button("Import file", type="primary", key=f"{prefix}_bulk_go", use_container_width=True):
-        rows = parse_bulk_import_file(uploaded.getvalue(), uploaded.name)
+    parsed_rows: list[dict[str, Any]] = []
+    if uploaded:
+        try:
+            parsed_rows = parse_bulk_import_file(uploaded.getvalue(), uploaded.name)
+        except Exception as exc:
+            st.error(f"Could not read file: {exc}")
+        if parsed_rows:
+            st.caption(f"{len(parsed_rows)} row(s) parsed — preview below.")
+            st.dataframe(_bulk_import_preview_rows(parsed_rows), use_container_width=True, hide_index=True)
+        elif uploaded:
+            st.warning("No rows found in file.")
+    if uploaded and parsed_rows and st.button("Import file", type="primary", key=f"{prefix}_bulk_go", use_container_width=True):
+        rows = parsed_rows
         if not rows:
             st.error("No rows found in file.")
             return

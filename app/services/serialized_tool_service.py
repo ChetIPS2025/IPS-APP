@@ -187,7 +187,8 @@ def serialized_tool_view(
         "asset_name": _clean_text(row.get("asset_name") or row.get("name") or "—"),
         "category": _clean_text(row.get("category") or row.get("asset_type") or "Tool"),
         "manufacturer": _clean_text(row.get("manufacturer") or ""),
-        "model": _clean_text(row.get("model") or ""),
+        "model_number": _clean_text(row.get("model_number") or row.get("model") or ""),
+        "model": _clean_text(row.get("model") or row.get("model_number") or ""),
         "serial_number": _clean_serial(row.get("serial_number")),
         "asset_type": _clean_text(row.get("asset_type") or row.get("category") or "Tool"),
         "status": _clean_text(row.get("status") or "Available"),
@@ -320,14 +321,18 @@ def merge_serialized_tool_fields(asset_id: str, data: dict[str, Any]) -> Service
         updates["asset_name"] = incoming_name
     for field, incoming_key in (
         ("manufacturer", "manufacturer"),
-        ("model", "model"),
+        ("model", "model_number"),
         ("asset_type", "asset_type"),
         ("category", "category"),
         ("condition", "condition"),
         ("location", "location"),
     ):
-        if not _clean_text(existing.get(field)) and _clean_text(data.get(incoming_key)):
-            updates[field] = _clean_text(data.get(incoming_key))
+        if field == "model":
+            incoming_val = _clean_text(data.get("model_number") or data.get("model"))
+        else:
+            incoming_val = _clean_text(data.get(incoming_key))
+        if not _clean_text(existing.get(field)) and incoming_val:
+            updates[field] = incoming_val
     incoming_notes = _clean_text(data.get("notes") or data.get("description"))
     if incoming_notes:
         prior = _clean_text(existing.get("notes"))
@@ -389,7 +394,7 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
         "category": _clean_text(data.get("category") or data.get("asset_type") or "Tool"),
         "asset_type": _clean_text(data.get("asset_type") or data.get("category") or "Tool"),
         "manufacturer": _clean_text(data.get("manufacturer") or "Milwaukee"),
-        "model": _clean_text(data.get("model") or ""),
+        "model": _clean_text(data.get("model_number") or data.get("model") or ""),
         "serial_number": serial,
         "status": _clean_text(data.get("status") or "Available"),
         "condition": _clean_text(data.get("condition") or "Good"),

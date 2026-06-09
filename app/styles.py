@@ -3127,17 +3127,18 @@ def inject_assets_module_css() -> None:
   margin: 0 !important;
 }}
 {checkbox_css_small}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) .ips-assets-number {{
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) .ips-assets-title {{
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }}
-.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .ips-assets-muted {{
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) .ips-assets-number,
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(5) .ips-assets-number {{
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+.st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6) .ips-assets-muted {{
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;

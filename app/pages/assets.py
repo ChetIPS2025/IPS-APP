@@ -119,6 +119,12 @@ try:
         open_quick_add_tool_dialog,
         show_quick_add_tool_dialog,
     )
+    from app.components.small_hand_tools_import_ui import (
+        HAND_TOOL_IMPORT_OPEN_KEY,
+        hand_tool_csv_template_bytes,
+        open_hand_tool_import_dialog,
+        show_hand_tool_import_dialog,
+    )
     from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
     from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
     from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
@@ -241,6 +247,12 @@ except ImportError:
         open_quick_add_tool_dialog,
         show_quick_add_tool_dialog,
     )
+    from components.small_hand_tools_import_ui import (  # type: ignore
+        HAND_TOOL_IMPORT_OPEN_KEY,
+        hand_tool_csv_template_bytes,
+        open_hand_tool_import_dialog,
+        show_hand_tool_import_dialog,
+    )
     from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
     from services.asset_classification_service import is_equipment_tab_asset, tracking_type_label  # type: ignore
     from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
@@ -267,22 +279,22 @@ _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _ASSET_COLS = [0.42, 0.85, 4.25, 1.45, 1.55, 1.35, 1.65, 1.25, 0.55]
-_SMALL_TOOL_COLS = [0.4, 0.8, 2.0, 1.0, 1.35, 1.15, 1.0, 0.75, 0.75]
+_SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
     ("TOOL", None),
+    ("MODEL #", "model_number"),
     ("SERIAL", None),
     ("TRAILER", "trailer"),
     ("JOB", "job"),
-    ("CHECKED OUT", "operator"),
     ("STATUS", "status"),
     ("CONDITION", "condition"),
 ]
 _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
+    ("model_number", lambda r: _small_tool_model_number(r)),
     ("trailer", lambda r: _small_tool_trailer_label(r)),
     ("job", lambda r: _small_tool_job_label(r)),
-    ("operator", lambda r: _small_tool_operator_label(r)),
     ("status", lambda r: _small_tool_status(r)),
     ("condition", lambda r: _small_tool_condition_label(r)),
 ]
@@ -397,6 +409,19 @@ def _small_tool_tracking_view(
         employees_by_id=employees_by_id,
         jobs_by_id=jobs_by_id,
     )
+
+
+def _asset_model_number(row: dict) -> str:
+    val = str(row.get("model_number") or row.get("model") or "").strip()
+    return val if val and val != "—" else "—"
+
+
+def _small_tool_model_number(row: dict, *, view: dict | None = None) -> str:
+    v = view or {}
+    val = str(v.get("model_number") or v.get("model") or "").strip()
+    if val and val != "—":
+        return val
+    return _asset_model_number(row)
 
 
 def _small_tool_serial(row: dict, *, view: dict | None = None) -> str:
@@ -535,6 +560,15 @@ def _filter_small_tool_rows(
             r
             for r in out
             if ql in _small_tool_name(r).lower()
+            or ql in _small_tool_model_number(
+                r,
+                view=_small_tool_tracking_view(
+                    r,
+                    assets_by_id=assets_by_id,
+                    employees_by_id=employees_by_id,
+                    jobs_by_id=jobs_by_id,
+                ),
+            ).lower()
             or ql in _small_tool_serial(
                 r,
                 view=_small_tool_tracking_view(
@@ -1037,10 +1071,10 @@ def _render_small_tools_table(
                 employees_by_id=employees_by_id,
                 jobs_by_id=jobs_by_id,
             )
+            model_no = _small_tool_model_number(row, view=view)
             serial = _small_tool_serial(row, view=view)
             trailer = _small_tool_trailer_label(row, view=view)
             job_label = _small_tool_job_label(row, view=view)
-            operator = _small_tool_operator_label(row, view=view)
             status = _small_tool_status(row)
             condition = _small_tool_condition_label(row, view=view)
 
@@ -1067,22 +1101,22 @@ def _render_small_tools_table(
                 )
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(serial)}</div>',
+                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(model_no)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(trailer)}</div>',
+                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(serial)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[5]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(job_label)}</div>',
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(trailer)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(operator)}</div>',
+                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(job_label)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[7]:
@@ -1262,7 +1296,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
             if st.button("Clear", key="ast_st_clear", use_container_width=True):
                 clear_table_filters(
                     _SMALL_TOOLS_TABLE_KEY,
-                    ["trailer", "job", "operator", "status", "condition"],
+                    ["model_number", "trailer", "job", "status", "condition"],
                     extra_keys=["ast_st_search", "ast_st_parent_kit", "ast_st_status"],
                 )
                 st.session_state["ast_st_parent_kit"] = "All Trailers"
@@ -1769,7 +1803,7 @@ def _asset_edit_payload_from_session(aid: str) -> dict[str, Any]:
         "location": st.session_state.get(f"ast_edit_loc_{aid}"),
         "department": st.session_state.get(f"ast_edit_dept_{aid}"),
         "manufacturer": st.session_state.get(f"ast_edit_mfr_{aid}"),
-        "model": st.session_state.get(f"ast_edit_model_{aid}"),
+        "model_number": st.session_state.get(f"ast_edit_model_number_{aid}"),
         "serial_number": st.session_state.get(f"ast_edit_serial_{aid}"),
         "description": desc,
         "operator": st.session_state.get(f"ast_edit_operator_{aid}"),
@@ -1799,7 +1833,9 @@ def _seed_asset_edit_form(asset: dict) -> None:
     st.session_state[f"ast_edit_loc_{aid}"] = str(asset.get("location") or "")
     st.session_state[f"ast_edit_dept_{aid}"] = str(asset.get("department") or "")
     st.session_state[f"ast_edit_mfr_{aid}"] = str(asset.get("manufacturer") or "")
-    st.session_state[f"ast_edit_model_{aid}"] = str(asset.get("model") or "")
+    st.session_state[f"ast_edit_model_number_{aid}"] = str(
+        asset.get("model_number") or asset.get("model") or ""
+    )
     st.session_state[f"ast_edit_serial_{aid}"] = str(asset.get("serial_number") or "")
     st.session_state[f"ast_edit_desc_{aid}"] = str(asset.get("description") or asset.get("notes") or "")
     st.session_state[f"ast_edit_operator_{aid}"] = str(asset.get("operator") or "")
@@ -1871,7 +1907,7 @@ def _render_asset_edit_form(asset: dict) -> None:
         st.text_input("Department", key=f"ast_edit_dept_{aid}")
     with ac2:
         st.text_input("Manufacturer", key=f"ast_edit_mfr_{aid}")
-        st.text_input("Model", key=f"ast_edit_model_{aid}")
+        st.text_input("Model #", key=f"ast_edit_model_number_{aid}")
         st.text_input("Serial Number", key=f"ast_edit_serial_{aid}")
         st.text_area("Description", key=f"ast_edit_desc_{aid}", height=100)
 
@@ -1991,7 +2027,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
                         ("Location", str(asset.get("location") or "—")),
                         ("Department", str(asset.get("department") or "—")),
                         ("Manufacturer", str(asset.get("manufacturer") or "—")),
-                        ("Model", str(asset.get("model") or "—")),
+                        ("Model #", str(asset.get("model_number") or asset.get("model") or "—")),
                         ("Serial Number", str(asset.get("serial_number") or "—")),
                         (
                             "Rentable",
@@ -2274,9 +2310,24 @@ def render() -> None:
             '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        export_col, quick_col, new_col = st.columns([1.0, 1.75, 1.35], gap="small")
+        export_col, template_col, import_col, quick_col, new_col = st.columns(
+            [0.85, 1.15, 1.0, 1.55, 1.25],
+            gap="small",
+        )
         with export_col:
             st.button("Export", key="ast_export", use_container_width=True)
+        with template_col:
+            st.download_button(
+                "CSV Template",
+                data=hand_tool_csv_template_bytes(),
+                file_name="small_hand_tools_import_template.csv",
+                mime="text/csv",
+                key="ast_hand_tool_csv_template",
+                use_container_width=True,
+            )
+        with import_col:
+            if st.button("Import CSV", key="ast_hand_tool_import", use_container_width=True):
+                open_hand_tool_import_dialog()
         with quick_col:
             if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary", use_container_width=True):
                 open_quick_add_tool_dialog()
@@ -2294,6 +2345,9 @@ def render() -> None:
     if st.session_state.get(QUICK_ADD_OPEN_KEY):
         show_quick_add_tool_dialog(uploaded_by=_current_user_id())
 
+    if st.session_state.get(HAND_TOOL_IMPORT_OPEN_KEY):
+        show_hand_tool_import_dialog()
+
     if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
 
@@ -2301,6 +2355,7 @@ def render() -> None:
         with st.expander("New Asset", expanded=True):
             st.text_input("Asset #", key="ast_new_num")
             st.text_input("Asset name", key="ast_new_name")
+            st.text_input("Model #", key="ast_new_model_number")
             st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
             st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
             _render_asset_rental_pricing_fields(new_asset=True)
@@ -2318,6 +2373,7 @@ def render() -> None:
                     {
                         "asset_number": st.session_state.get("ast_new_num"),
                         "asset_name": st.session_state.get("ast_new_name"),
+                        "model_number": st.session_state.get("ast_new_model_number"),
                         "category": st.session_state.get("ast_new_cat"),
                         "status": st.session_state.get("ast_new_status"),
                         **_rental_fields_from_session(_asset_rental_session_keys(new_asset=True)),
