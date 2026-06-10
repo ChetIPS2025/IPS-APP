@@ -23,8 +23,8 @@ def install_share_url() -> str:
 def _install_share_mailto(*, share_url: str) -> str:
     subject = urllib.parse.quote("Install the IPS App")
     body = urllib.parse.quote(
-        "Open this link on your phone to add IPS Operations to your home screen "
-        f"(the IPS app icon is used automatically):\n\n{share_url}"
+        "Open this link to install IPS Operations. The page shows the right steps for "
+        f"iPhone, Android, or computer:\n\n{share_url}"
     )
     return f"mailto:?subject={subject}&body={body}"
 
@@ -37,8 +37,8 @@ def welcome_install_company_update() -> dict[str, Any]:
         "category": "Announcements",
         "title": "Welcome — Install the IPS App on Your Phone",
         "body": (
-            "Open the install link on your phone, then choose **Add to Home Screen** (iPhone Safari) "
-            "or **Install app** (Android Chrome). The IPS app icon is added automatically.\n\n"
+            "Open the install link on any device. iPhone/iPad: Safari → Add to Home Screen. "
+            "Android: Chrome → Install app. Computer: Open the app or install in Chrome/Edge.\n\n"
             f"Install link: {url}"
         ),
         "date": date.today().isoformat(),
@@ -71,7 +71,7 @@ def render_install_share_admin(*, compact: bool = False) -> None:
     if compact:
         st.markdown("**Share IPS App install link**")
         st.caption(
-            "Best flow: send this link → user opens it on their phone → Add to Home Screen."
+            "One link for every device — the install page shows the right steps automatically."
         )
         st.code(share_url, language=None)
         c1, c2 = st.columns(2)
@@ -84,7 +84,7 @@ def render_install_share_admin(*, compact: bool = False) -> None:
     st.markdown("---")
     st.markdown("**Admin: share install link**")
     st.caption(
-        "Send this link so someone can open the install page and add IPS to their home screen."
+        "Send this link so someone can install IPS on iPhone, Android, or computer."
     )
     st.code(share_url, language=None)
     col_a, col_b = st.columns(2)
@@ -123,7 +123,7 @@ def render_install_share_settings() -> None:
     mailto = _install_share_mailto(share_url=share_url)
     st.markdown("**Mobile app install link**")
     st.caption(
-        "Share this link with employees. They open it on their phone and choose Add to Home Screen."
+        "Share this link with employees. The page adapts for iPhone, Android, or computer."
     )
     st.code(share_url, language=None)
     c1, c2 = st.columns(2)
@@ -142,7 +142,7 @@ def render_install_share_login_footer() -> None:
 <div class="ips-login-install-footer">
   <p class="ips-login-install-footer-title">Install on your phone</p>
   <p class="ips-login-install-footer-text">
-    Open the IPS install page, then use <strong>Add to Home Screen</strong> to add the app with the IPS icon.
+    Open the IPS install page for device-specific steps (iPhone, Android, or computer).
   </p>
   <a class="ips-login-install-footer-link" href="{safe_url}">Install IPS App</a>
 </div>

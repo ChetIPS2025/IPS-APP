@@ -8054,6 +8054,47 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
   font-size: 0.8rem;
   color: {TEXT_MUTED};
 }}
+.ips-install-lead,
+.ips-install-steps {{
+  display: none;
+}}
+.ips-install-card[data-device="pending"] .ips-install-lead-desktop,
+.ips-install-card[data-device="pending"] .ips-install-steps-desktop {{
+  display: block;
+}}
+.ips-install-card[data-device="ios"] .ips-install-lead-ios,
+.ips-install-card[data-device="ios"] .ips-install-steps-ios,
+.ips-install-card[data-device="android"] .ips-install-lead-android,
+.ips-install-card[data-device="android"] .ips-install-steps-android,
+.ips-install-card[data-device="desktop"] .ips-install-lead-desktop,
+.ips-install-card[data-device="desktop"] .ips-install-steps-desktop {{
+  display: block;
+}}
+.ips-install-card[data-device="desktop"] .ips-install-btn-download {{
+  display: none;
+}}
+.ips-install-share-note {{
+  margin: 1.1rem 0 0.35rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}}
+.ips-install-share-url {{
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: break-all;
+}}
+.ips-install-share-url a {{
+  color: {PRIMARY};
+  font-weight: 600;
+  text-decoration: none;
+}}
+.ips-install-share-url a:hover {{
+  text-decoration: underline;
+}}
 </style>
 """,
         unsafe_allow_html=True,

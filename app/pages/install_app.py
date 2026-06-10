@@ -86,21 +86,64 @@ def install_route_active() -> bool:
     return bool(st.session_state.get(_INSTALL_SESSION_KEY))
 
 
-def _install_page_html(*, icon_url: str, icon_download_url: str, open_url: str) -> str:
+def _install_device_detect_script() -> str:
+    return """
+<script>
+(function() {
+  function detectInstallDevice() {
+    const ua = navigator.userAgent || "";
+    const isIpad = /iPad/.test(ua)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (/iPhone|iPod/i.test(ua) || isIpad) return "ios";
+    if (/Android/i.test(ua)) return "android";
+    return "desktop";
+  }
+  function applyInstallDevice() {
+    const kind = detectInstallDevice();
+    document.querySelectorAll(".ips-install-card").forEach(function(card) {
+      card.setAttribute("data-device", kind);
+    });
+    document.body.classList.remove(
+      "ips-install-device-ios",
+      "ips-install-device-android",
+      "ips-install-device-desktop"
+    );
+    document.body.classList.add("ips-install-device-" + kind);
+  }
+  applyInstallDevice();
+  document.addEventListener("DOMContentLoaded", applyInstallDevice);
+})();
+</script>
+"""
+
+
+def _install_page_html(
+    *,
+    icon_url: str,
+    icon_download_url: str,
+    open_url: str,
+    share_url: str,
+) -> str:
     app_name = html.escape(str(getattr(settings, "app_name", "IPS Operations") or "IPS Operations"))
     return f"""
-<div class="ips-install-card">
+<div class="ips-install-card" data-device="pending">
   <img class="ips-install-icon" src="{html.escape(icon_url)}" alt="IPS App icon" width="120" height="120" />
   <h1 class="ips-install-title">Install IPS App</h1>
-  <p class="ips-install-lead">
-    Add <strong>{app_name}</strong> to your phone home screen for one-tap access.
+  <p class="ips-install-lead ips-install-lead-ios">
+    Add <strong>{app_name}</strong> to your iPhone or iPad home screen for one-tap access.
+  </p>
+  <p class="ips-install-lead ips-install-lead-android">
+    Add <strong>{app_name}</strong> to your Android home screen from Chrome.
+  </p>
+  <p class="ips-install-lead ips-install-lead-desktop">
+    Open <strong>{app_name}</strong> in your browser, or install it as an app in Chrome or Edge.
   </p>
   <div class="ips-install-actions">
     <a class="ips-install-btn ips-install-btn-primary" href="{html.escape(open_url)}">Open IPS Operations</a>
-    <a class="ips-install-btn ips-install-btn-secondary" href="{html.escape(icon_download_url)}"
-       download="IPS-App-Icon.png">Download App Icon</a>
+    <a class="ips-install-btn ips-install-btn-secondary ips-install-btn-download"
+       href="{html.escape(icon_download_url)}" download="IPS-App-Icon.png">Download App Icon</a>
   </div>
-  <div class="ips-install-steps">
+  <div class="ips-install-steps ips-install-steps-ios">
     <h2 class="ips-install-steps-title">iPhone / iPad (Safari)</h2>
     <ol>
       <li>Open this page in <strong>Safari</strong>.</li>
@@ -110,15 +153,28 @@ def _install_page_html(*, icon_url: str, icon_download_url: str, open_url: str) 
     </ol>
     <p class="ips-install-note">The IPS app icon is applied automatically from this page.</p>
   </div>
-  <div class="ips-install-steps">
+  <div class="ips-install-steps ips-install-steps-android">
     <h2 class="ips-install-steps-title">Android (Chrome)</h2>
     <ol>
       <li>Open this page in <strong>Chrome</strong>.</li>
       <li>Tap the <strong>menu</strong> (three dots).</li>
       <li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
-      <li>Confirm to add the shortcut.</li>
+      <li>Confirm to add the shortcut with the IPS icon.</li>
     </ol>
   </div>
+  <div class="ips-install-steps ips-install-steps-desktop">
+    <h2 class="ips-install-steps-title">Computer (Chrome or Edge)</h2>
+    <ol>
+      <li>Click <strong>Open IPS Operations</strong> above to use the app in your browser.</li>
+      <li><strong>Chrome:</strong> Click the install icon in the address bar, or Menu (⋮) →
+          <strong>Install IPS Operations</strong> / <strong>Install app</strong>.</li>
+      <li><strong>Microsoft Edge:</strong> Open the menu → <strong>Apps</strong> →
+          <strong>Install this site as an app</strong>.</li>
+      <li>Pin the installed app to your taskbar or desktop for quick access.</li>
+    </ol>
+  </div>
+  <p class="ips-install-share-note">Share this install link with anyone:</p>
+  <p class="ips-install-share-url"><a href="{html.escape(share_url)}">{html.escape(share_url)}</a></p>
 </div>
 """
 
@@ -134,9 +190,15 @@ def render_install_page() -> None:
         unsafe_allow_html=True,
     )
 
+    try:
+        from app.pwa import install_page_url
+    except ImportError:
+        from pwa import install_page_url  # type: ignore
+
     icon_url = _absolute_static_url("apple-touch-icon.png")
     icon_download = _absolute_static_url("icon-512.png")
     open_url = _open_app_url()
+    share_url = install_page_url()
 
     _left, center, _right = st.columns([0.35, 1.3, 0.35])
     with center:
@@ -145,7 +207,9 @@ def render_install_page() -> None:
                 icon_url=icon_url,
                 icon_download_url=icon_download,
                 open_url=open_url,
+                share_url=share_url,
             ),
             unsafe_allow_html=True,
         )
+        st.markdown(_install_device_detect_script(), unsafe_allow_html=True)
         render_install_share_admin()

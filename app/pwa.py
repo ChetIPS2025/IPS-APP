@@ -48,16 +48,17 @@ def _start_url() -> str:
 
 
 def install_page_url() -> str:
-    """Public share link for the Install IPS App page (preferred path: ``/install``)."""
+    """Public share link for the Install IPS App page (``?install=1`` on the app root)."""
     try:
         from app.config import settings
     except ImportError:
         from config import settings  # type: ignore
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
     prefix = _streamlit_base_path()
+    path = f"{prefix}/" if prefix else "/"
     if base:
-        return f"{base}{prefix}/install" if prefix else f"{base}/install"
-    return f"{prefix}/install" if prefix else "/install"
+        return f"{base}{path}?install=1"
+    return f"{path}?install=1"
 
 
 def _manifest_id() -> str:
