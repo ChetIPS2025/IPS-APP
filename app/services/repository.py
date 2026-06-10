@@ -20,6 +20,16 @@ class ServiceResult:
 def clear_all_data_caches() -> None:
     """Invalidate Streamlit/db read caches after mutations."""
     try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span("repo.clear_all_data_caches"):
+        _clear_all_data_caches_impl()
+
+
+def _clear_all_data_caches_impl() -> None:
+    try:
         from app.db import clear_streamlit_db_read_cache
 
         clear_streamlit_db_read_cache()
@@ -123,10 +133,16 @@ def fetch_by_id(
 
 def table_column_names(table: str) -> frozenset[str]:
     """Best-effort column set from one sample row (handles legacy schemas)."""
-    rows, err = fetch_rows(table, limit=1)
-    if err or not rows:
-        return frozenset()
-    return frozenset(str(k) for k in rows[0].keys())
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span(f"repo.table_column_names:{table}"):
+        rows, err = fetch_rows(table, limit=1)
+        if err or not rows:
+            return frozenset()
+        return frozenset(str(k) for k in rows[0].keys())
 
 
 def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -137,15 +153,21 @@ def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, An
 
 
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
-    payload = filter_payload_to_table(table, payload)
     try:
-        row = _db().insert_row(table, payload)
-        clear_all_data_caches()
-        return ServiceResult(ok=True, data=row)
-    except Exception as exc:
-        msg = f"Could not save to {table}: {exc}"
-        _LOG.warning(msg)
-        return ServiceResult(ok=False, error=msg)
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span(f"repo.insert_row:{table}"):
+        payload = filter_payload_to_table(table, payload)
+        try:
+            row = _db().insert_row(table, payload)
+            clear_all_data_caches()
+            return ServiceResult(ok=True, data=row)
+        except Exception as exc:
+            msg = f"Could not save to {table}: {exc}"
+            _LOG.warning(msg)
+            return ServiceResult(ok=False, error=msg)
 
 
 def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
@@ -162,15 +184,21 @@ def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
-    payload = filter_payload_to_table(table, payload)
     try:
-        rows = _db().update_rows(table, payload, match)
-        clear_all_data_caches()
-        return ServiceResult(ok=True, data=rows[0] if rows else None)
-    except Exception as exc:
-        msg = f"Could not update {table}: {exc}"
-        _LOG.warning(msg)
-        return ServiceResult(ok=False, error=msg)
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span(f"repo.update_row:{table}"):
+        payload = filter_payload_to_table(table, payload)
+        try:
+            rows = _db().update_rows(table, payload, match)
+            clear_all_data_caches()
+            return ServiceResult(ok=True, data=rows[0] if rows else None)
+        except Exception as exc:
+            msg = f"Could not update {table}: {exc}"
+            _LOG.warning(msg)
+            return ServiceResult(ok=False, error=msg)
 
 
 def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:

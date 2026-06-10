@@ -91,19 +91,25 @@ __all__ = [
 
 
 def clear_inventory_cache() -> None:
-    clear_all_data_caches()
-    clear_inventory_image_url_cache()
     try:
-        from app.pages._core._data import clear_inventory_list_cache
+        from app.perf_debug import perf_span
     except ImportError:
-        from pages._core._data import clear_inventory_list_cache  # type: ignore
-    clear_inventory_list_cache()
-    try:
-        from app.services.pricing_guide_images import clear_catalog_image_maps_cache
+        from perf_debug import perf_span  # type: ignore
 
-        clear_catalog_image_maps_cache()
-    except ImportError:
-        pass
+    with perf_span("inventory.clear_cache"):
+        clear_all_data_caches()
+        clear_inventory_image_url_cache()
+        try:
+            from app.pages._core._data import clear_inventory_list_cache
+        except ImportError:
+            from pages._core._data import clear_inventory_list_cache  # type: ignore
+        clear_inventory_list_cache()
+        try:
+            from app.services.pricing_guide_images import clear_catalog_image_maps_cache
+
+            clear_catalog_image_maps_cache()
+        except ImportError:
+            pass
 
 
 def can_manage_inventory_actions() -> bool:

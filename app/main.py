@@ -191,6 +191,16 @@ def _render_password_reset() -> None:
 
 def main() -> None:
     configure_logging(settings.log_level)
+    try:
+        from app.perf_debug import perf_enabled
+    except ImportError:
+        from perf_debug import perf_enabled  # type: ignore
+    if perf_enabled():
+        import logging
+
+        logging.getLogger("ips.perf").warning(
+            "[perf] IPS_DEBUG_PERFORMANCE is on — save/load timings will be logged."
+        )
 
     _page_icon = page_icon_path()
     st.set_page_config(

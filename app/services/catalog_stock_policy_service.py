@@ -102,6 +102,16 @@ def pricing_guide_lookup_maps() -> tuple[dict[str, dict[str, Any]], dict[str, di
 
 
 def enrich_inventory_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span("inventory.enrich_rows"):
+        return _enrich_inventory_rows_impl(rows)
+
+
+def _enrich_inventory_rows_impl(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_inv, by_pg = pricing_guide_lookup_maps()
     enriched: list[dict[str, Any]] = []
     for row in rows:

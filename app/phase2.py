@@ -133,11 +133,16 @@ def render_module(slug: str | None = None) -> None:
     if fn:
         try:
             try:
+                from app.perf_debug import perf_span
+            except ImportError:
+                from perf_debug import perf_span  # type: ignore
+            try:
                 from app.components.headers import render_main_brand_bar
             except ImportError:
                 from components.headers import render_main_brand_bar  # type: ignore
             render_main_brand_bar()
-            fn()  # type: ignore[operator]
+            with perf_span(f"module.render:{active}"):
+                fn()  # type: ignore[operator]
         except Exception as exc:
             st.error(f"This page encountered an error: {exc}")
             logging.getLogger(__name__).exception("module %s failed", active)

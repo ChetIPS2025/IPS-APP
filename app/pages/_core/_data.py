@@ -625,7 +625,13 @@ def _cached_assets_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
 
 
 def load_inventory() -> list[dict[str, Any]]:
-    rows, used = _cached_inventory_rows()
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span("data.load_inventory"):
+        rows, used = _cached_inventory_rows()
     _mark_if_demo(used)
     return list(rows)
 
