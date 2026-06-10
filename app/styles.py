@@ -8157,6 +8157,16 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
   color: {PRIMARY} !important;
   border: 1px solid #93c5fd;
 }}
+.ips-install-btn-prompt-ready {{
+  background: #eff6ff;
+  border-color: {PRIMARY};
+}}
+.ips-install-btn-hint {{
+  margin: 0.35rem 0 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: {TEXT_MUTED};
+}}
 .ips-install-btn-copy {{
   margin-top: 0.55rem;
   background: #f8fafc;

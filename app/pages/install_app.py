@@ -87,11 +87,16 @@ def install_route_active() -> bool:
 
 
 def _install_page_scripts() -> str:
+    """Height-0 component script — Streamlit does not execute scripts in st.markdown."""
     return """
 <script>
 (function() {
   function appWindow() {
     return window.parent || window;
+  }
+
+  function appDocument() {
+    return appWindow().document;
   }
 
   function detectInstallDevice() {
@@ -104,92 +109,177 @@ def _install_page_scripts() -> str:
   }
 
   function openInstructions() {
-    const details = document.querySelector(".ips-install-help details");
-    if (details) details.open = true;
+    const doc = appDocument();
+    const details = doc.querySelector(".ips-install-help details");
+    if (!details) return;
+    details.open = true;
+    try {
+      details.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) {
+      details.scrollIntoView();
+    }
   }
 
   function setInstallStatus(message) {
-    document.querySelectorAll(".ips-install-status").forEach(function(el) {
+    appDocument().querySelectorAll(".ips-install-status").forEach(function(el) {
       el.textContent = message;
       el.style.display = message ? "block" : "none";
     });
   }
 
-  async function handleInstallClick() {
-    const card = document.querySelector(".ips-install-card");
-    const device = card ? card.getAttribute("data-device") : detectInstallDevice();
+  function currentDevice() {
+    const card = appDocument().querySelector(".ips-install-card");
+    const kind = card ? card.getAttribute("data-device") : "";
+    return kind && kind !== "pending" ? kind : detectInstallDevice();
+  }
+
+  function installPromptAvailable() {
     const w = appWindow();
+    return !!(typeof w.__ipsTriggerInstall === "function" && w.__ipsBipEvent);
+  }
+
+  function instructionStatus(device) {
+    if (device === "ios") {
+      return "On iPhone/iPad: tap Safari Share → Add to Home Screen.";
+    }
+    if (device === "android") {
+      return "Tap Chrome menu (⋮) → Install app.";
+    }
+    return "Use the install icon in your browser address bar, or follow the steps below.";
+  }
+
+  function showInstructionsFallback(device) {
+    openInstructions();
+    setInstallStatus(instructionStatus(device));
+  }
+
+  function syncInstallButtonMode() {
+    const doc = appDocument();
+    const btn = doc.querySelector(".ips-install-btn-install");
+    const hint = doc.querySelector(".ips-install-btn-hint");
+    if (!btn) return;
+
+    const device = currentDevice();
+    const promptReady = device !== "ios" && installPromptAvailable();
+    btn.setAttribute("data-install-mode", promptReady ? "prompt" : "instructions");
+    btn.classList.toggle("ips-install-btn-prompt-ready", promptReady);
+
+    if (!hint) return;
+    if (device === "ios") {
+      hint.textContent = "Shows Safari steps to Add to Home Screen.";
+    } else if (promptReady) {
+      hint.textContent = "Opens your browser install prompt.";
+    } else {
+      hint.textContent = "Shows step-by-step install instructions.";
+    }
+  }
+
+  async function handleInstallClick() {
+    const w = appWindow();
+    const device = currentDevice();
 
     if (device === "ios") {
-      openInstructions();
-      setInstallStatus("Use Safari Share → Add to Home Screen.");
+      showInstructionsFallback(device);
       return;
     }
 
-    if (typeof w.__ipsTriggerInstall === "function") {
-      const ok = await w.__ipsTriggerInstall();
-      if (ok) {
-        setInstallStatus("");
-        return;
+    if (installPromptAvailable()) {
+      setInstallStatus("");
+      try {
+        const ok = await w.__ipsTriggerInstall();
+        if (ok) {
+          syncInstallButtonMode();
+          return;
+        }
+      } catch (err) {
+        console.warn("IPS install prompt failed:", err);
       }
     }
 
-    openInstructions();
-    if (device === "android") {
-      setInstallStatus("Tap Chrome menu → Install app if no prompt appeared.");
-    } else {
-      setInstallStatus("Use the install icon in your browser address bar if needed.");
+    showInstructionsFallback(device);
+  }
+
+  async function handleCopyClick(btn) {
+    const url = btn.getAttribute("data-copy-url") || "";
+    if (!url) return;
+    const original = btn.textContent || "Copy Link";
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = "Copied!";
+      setTimeout(function() { btn.textContent = original; }, 2000);
+    } catch (err) {
+      btn.textContent = "Copy failed";
+      setTimeout(function() { btn.textContent = original; }, 2000);
     }
   }
 
-  function wireInstallButtons() {
-    document.querySelectorAll(".ips-install-btn-install").forEach(function(btn) {
-      if (btn.dataset.ipsInstallWired === "1") return;
-      btn.dataset.ipsInstallWired = "1";
-      btn.addEventListener("click", function(ev) {
-        ev.preventDefault();
-        handleInstallClick();
-      });
-    });
-    document.querySelectorAll(".ips-install-copy-btn").forEach(function(btn) {
-      if (btn.dataset.ipsCopyWired === "1") return;
-      btn.dataset.ipsCopyWired = "1";
-      btn.addEventListener("click", async function(ev) {
-        ev.preventDefault();
-        const url = btn.getAttribute("data-copy-url") || "";
-        if (!url) return;
-        try {
-          await navigator.clipboard.writeText(url);
-          btn.textContent = "Copied!";
-          setTimeout(function() { btn.textContent = "Copy Link"; }, 2000);
-        } catch (err) {
-          btn.textContent = "Copy failed";
-          setTimeout(function() { btn.textContent = "Copy Link"; }, 2000);
-        }
-      });
-    });
+  function onDocumentClick(ev) {
+    const doc = appDocument();
+    const target = ev.target;
+    if (!target || !target.closest) return;
+
+    const installBtn = target.closest(".ips-install-btn-install");
+    if (installBtn && doc.contains(installBtn)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      handleInstallClick();
+      return;
+    }
+
+    const copyBtn = target.closest(".ips-install-copy-btn");
+    if (copyBtn && doc.contains(copyBtn)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      handleCopyClick(copyBtn);
+    }
   }
 
   function applyInstallDevice() {
+    const doc = appDocument();
+    if (!doc.querySelector(".ips-install-page-marker")) return;
+
+    doc.body.classList.add("ips-auth-login", "ips-install-page");
+
     const kind = detectInstallDevice();
-    document.querySelectorAll(".ips-install-card").forEach(function(card) {
+    doc.querySelectorAll(".ips-install-card").forEach(function(card) {
       card.setAttribute("data-device", kind);
     });
-    document.body.classList.remove(
+    doc.body.classList.remove(
       "ips-install-device-ios",
       "ips-install-device-android",
       "ips-install-device-desktop"
     );
-    document.body.classList.add("ips-install-device-" + kind);
-    wireInstallButtons();
+    doc.body.classList.add("ips-install-device-" + kind);
   }
 
-  applyInstallDevice();
-  wireInstallButtons();
-  document.addEventListener("DOMContentLoaded", function() {
+  function wireInstallPage() {
+    const w = appWindow();
+    const doc = appDocument();
+    if (!doc.querySelector(".ips-install-page-marker")) return;
+
     applyInstallDevice();
-    wireInstallButtons();
-  });
+
+    syncInstallButtonMode();
+
+    if (!w.__ipsInstallPageDelegationWired) {
+      w.__ipsInstallPageDelegationWired = true;
+      doc.addEventListener("click", onDocumentClick, true);
+      w.addEventListener("ips-install-ready", syncInstallButtonMode);
+    }
+  }
+
+  function boot(attemptsLeft) {
+    wireInstallPage();
+    const doc = appDocument();
+    if (!doc.querySelector(".ips-install-card") && attemptsLeft > 0) {
+      setTimeout(function() { boot(attemptsLeft - 1); }, 120);
+    } else if (doc.querySelector(".ips-install-card")) {
+      syncInstallButtonMode();
+    }
+  }
+
+  boot(40);
+  appWindow().addEventListener("load", function() { boot(10); });
 })();
 </script>
 """
@@ -204,7 +294,9 @@ def _install_page_html(*, icon_url: str, open_url: str, share_url: str) -> str:
   <div class="ips-install-actions">
     <a class="ips-install-btn ips-install-btn-primary" href="{html.escape(open_url)}">Open IPS App</a>
     <button type="button" class="ips-install-btn ips-install-btn-secondary ips-install-btn-install"
+            data-install-mode="instructions"
             aria-label="Install IPS App on this device">Install on This Device</button>
+    <p class="ips-install-btn-hint">Shows step-by-step install instructions.</p>
   </div>
   <p class="ips-install-status" role="status" aria-live="polite" style="display:none"></p>
   <div class="ips-install-help">
@@ -272,5 +364,5 @@ def render_install_page() -> None:
             ),
             unsafe_allow_html=True,
         )
-        st.markdown(_install_page_scripts(), unsafe_allow_html=True)
+        components.html(_install_page_scripts(), height=0)
         render_install_share_admin()
