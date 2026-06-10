@@ -10122,7 +10122,7 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   color: {TEXT_MUTED};
   line-height: 1.35;
 }}
-.ips-panel-card-compact .ips-qr-scan-table {{
+.ips-panel-card-compact .ips-qr-scan-dash-table {{
   margin-top: 0;
   border: none;
   border-radius: 0;

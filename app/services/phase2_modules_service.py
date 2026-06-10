@@ -331,6 +331,7 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
         "status": str(row.get("status") or "Draft"),
         "start_date": str(row.get("start_date") or "")[:10],
+        "created_at": str(row.get("created_at") or "")[:10],
         "end_date": end,
         "progress": int(row.get("progress") or row.get("percent_complete") or 0),
         "description": notes,

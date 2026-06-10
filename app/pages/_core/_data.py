@@ -298,6 +298,50 @@ def demo_qr_scans() -> list[dict[str, str]]:
             "device_source": "QR scan",
             "action_taken": "Checked in",
         },
+        {
+            "scanned_at": "2026-05-29T14:10:00Z",
+            "qr_value": "INV-CONDUIT-3",
+            "item_name": "EMT conduit 3/4 in",
+            "item_type": "Inventory",
+            "result": "Opened",
+            "job_shop": "—",
+            "scanned_by": "Alex Rivera",
+            "device_source": "Android · QR scan",
+            "action_taken": "—",
+        },
+        {
+            "scanned_at": "2026-05-29T11:22:00Z",
+            "qr_value": "INV-JBOX-8821",
+            "item_name": "4x4 junction box",
+            "item_type": "Inventory",
+            "result": "Success",
+            "job_shop": "J26045 · Oak Park",
+            "scanned_by": "Chris Ortiz",
+            "device_source": "iPhone · mobile_qr_scan",
+            "action_taken": "Used on job",
+        },
+        {
+            "scanned_at": "2026-05-28T17:55:00Z",
+            "qr_value": "AST-DEWALT-991",
+            "item_name": "DeWalt circular saw",
+            "item_type": "Asset / Tool",
+            "result": "Success",
+            "job_shop": "Shop",
+            "scanned_by": "Maria Chen",
+            "device_source": "QR scan",
+            "action_taken": "Checked out",
+        },
+        {
+            "scanned_at": "2026-05-28T09:30:00Z",
+            "qr_value": "INV-LABEL-404",
+            "item_name": "Wire labels (roll)",
+            "item_type": "Inventory",
+            "result": "Opened",
+            "job_shop": "—",
+            "scanned_by": "Field scanner",
+            "device_source": "Shop cart B · QR scan",
+            "action_taken": "—",
+        },
     ]
 
 
@@ -323,6 +367,35 @@ def demo_deadlines() -> list[dict[str, str]]:
 
 def demo_recent_jobs(limit: int = 5) -> list[dict[str, Any]]:
     return load_jobs()[:limit]
+
+
+def _job_awarded_date(job: dict[str, Any]) -> str:
+    for key in ("start_date", "created_at"):
+        val = str(job.get(key) or "").strip()
+        if val:
+            return val[:10]
+    return ""
+
+
+def load_awarded_jobs() -> list[dict[str, Any]]:
+    """All live jobs with status Awarded, sorted by job number."""
+    try:
+        from app.services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name
+    except ImportError:
+        from services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name  # type: ignore
+
+    awarded = [
+        job
+        for job in load_jobs()
+        if not bool(job.get("is_deleted"))
+        and normalize_job_status_for_filter(job.get("status")) == "Awarded"
+    ]
+    rows: list[dict[str, Any]] = []
+    for job in sort_jobs_by_number_then_name(awarded):
+        row = dict(job)
+        row["awarded_date"] = _job_awarded_date(job)
+        rows.append(row)
+    return rows
 
 
 ACTIVE_ESTIMATE_KEY = "ips_active_estimate_id"

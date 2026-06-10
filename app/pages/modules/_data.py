@@ -260,6 +260,14 @@ def demo_recent_jobs(limit: int = 5) -> list[dict[str, Any]]:
     return load_jobs()[:limit]
 
 
+def load_awarded_jobs() -> list[dict[str, Any]]:
+    try:
+        from app.pages._core._data import load_awarded_jobs as _load
+    except ImportError:
+        from pages._core._data import load_awarded_jobs as _load  # type: ignore
+    return _load()
+
+
 ACTIVE_ESTIMATE_KEY = "ips_active_estimate_id"
 
 _DEMO_ESTIMATES: list[dict[str, Any]] = [

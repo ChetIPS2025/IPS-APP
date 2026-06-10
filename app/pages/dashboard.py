@@ -19,7 +19,7 @@ try:
     from app.pages._core._data import (
         demo_deadlines,
         demo_job_status,
-        demo_recent_jobs,
+        load_awarded_jobs,
         demo_sales_categories,
         demo_sales_series,
         load_dashboard_kpis,
@@ -41,7 +41,7 @@ except ImportError:
     from pages._core._data import (  # type: ignore
         demo_deadlines,
         demo_job_status,
-        demo_recent_jobs,
+        load_awarded_jobs,
         demo_sales_categories,
         demo_sales_series,
         load_dashboard_kpis,
@@ -195,23 +195,27 @@ def render() -> None:
         compact=True,
     )
 
-    def _dash_job_cell(field: str, row: dict) -> str:
+    def _dash_awarded_job_cell(field: str, row: dict) -> str:
         if field == "job_number":
             return f'<span class="ips-dash-job-number">{html.escape(str(row.get("job_number") or ""))}</span>'
+        if field == "awarded_date":
+            return html.escape(fmt_date(row.get("awarded_date")) if row.get("awarded_date") else "—")
         return html.escape(str(row.get(field) or "—"))
 
     render_panel_card(
-        "Recent Jobs",
+        "Jobs Awarded",
         data_table_html(
-            demo_recent_jobs(),
+            load_awarded_jobs(),
             [
-                ("job_number", "JOB #"),
-                ("job_name", "PROJECT / DESCRIPTION"),
+                ("job_number", "Job #"),
+                ("job_name", "Project / Description"),
+                ("customer", "Customer"),
+                ("awarded_date", "Awarded Date"),
             ],
-            col_fr=["0.55fr", "1.45fr"],
-            cell_renderer=_dash_job_cell,
+            col_fr=["0.55fr", "1.35fr", "0.95fr", "0.75fr"],
+            cell_renderer=_dash_awarded_job_cell,
             table_class="ips-data-table-wrap ips-data-table-stable ips-dash-list-table",
-            empty_message="No recent jobs.",
+            empty_message="No awarded jobs.",
         ),
         compact=True,
     )
