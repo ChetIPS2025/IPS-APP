@@ -8004,13 +8004,47 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
 .ips-install-actions {{
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  margin-bottom: 1.25rem;
+  gap: 0.85rem;
+  margin-bottom: 1.1rem;
+}}
+.ips-install-action-row {{
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}}
+.ips-install-action-row-advanced {{
+  margin-top: 0.15rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e2e8f0;
+}}
+.ips-install-action-hint {{
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: {TEXT_MUTED};
+  text-align: center;
+}}
+.ips-install-hint-install-ios,
+.ips-install-hint-install-android,
+.ips-install-hint-install-desktop,
+.ips-install-hint-install-ready {{
+  display: none;
+}}
+.ips-install-card[data-device="ios"] .ips-install-hint-install-ios,
+.ips-install-card[data-device="android"] .ips-install-hint-install-android,
+.ips-install-card[data-device="desktop"] .ips-install-hint-install-desktop,
+.ips-install-card[data-device="pending"] .ips-install-hint-install-desktop {{
+  display: block;
+}}
+.ips-install-hint-install-ready {{
+  color: #166534;
+  font-weight: 600;
 }}
 .ips-install-btn {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 44px;
   padding: 0.65rem 1rem;
   border-radius: 10px;
@@ -8018,15 +8052,47 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
   font-weight: 700;
   text-decoration: none !important;
   box-sizing: border-box;
+  cursor: pointer;
+  font-family: inherit;
 }}
 .ips-install-btn-primary {{
   background: {PRIMARY};
   color: #ffffff !important;
+  border: none;
 }}
 .ips-install-btn-secondary {{
-  background: #f8fafc;
-  color: {TEXT} !important;
-  border: 1px solid {BORDER};
+  background: #eff6ff;
+  color: #1d4ed8 !important;
+  border: 1px solid #93c5fd;
+}}
+.ips-install-btn-install.ips-install-btn-ready {{
+  background: {PRIMARY};
+  color: #ffffff !important;
+  border-color: {PRIMARY};
+}}
+.ips-install-btn-tertiary {{
+  background: transparent;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0;
+  min-height: 38px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}}
+.ips-install-status {{
+  margin: 0 0 0.85rem 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: left;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
+}}
+.ips-install-status-warn {{
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
 }}
 .ips-install-steps {{
   text-align: left;
@@ -8069,9 +8135,6 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
 .ips-install-card[data-device="desktop"] .ips-install-lead-desktop,
 .ips-install-card[data-device="desktop"] .ips-install-steps-desktop {{
   display: block;
-}}
-.ips-install-card[data-device="desktop"] .ips-install-btn-download {{
-  display: none;
 }}
 .ips-install-share-note {{
   margin: 1.1rem 0 0.35rem 0;
