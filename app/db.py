@@ -1048,6 +1048,41 @@ def _exception_indicates_user_not_found(exc: Exception) -> bool:
     return "user not found" in msg or "not_found" in msg
 
 
+def _admin_user_attributes(**fields: Any) -> Any:
+    """Build gotrue AdminUserAttributes for auth.admin.update_user_by_id."""
+    try:
+        from gotrue.types import AdminUserAttributes
+    except ImportError:
+        from supabase_auth.types import AdminUserAttributes  # type: ignore
+    return AdminUserAttributes(**{k: v for k, v in fields.items() if v is not None})
+
+
+def _auth_user_email_matches(auth_row: dict[str, Any] | None, email: str) -> bool:
+    em = str(email or "").strip().lower()
+    if not em:
+        return True
+    if not auth_row:
+        return False
+    return str(auth_row.get("email") or "").strip().lower() == em
+
+
+def _auth_admin_user_message(exc: Exception, *, action: str) -> str:
+    """Map Supabase Auth admin errors to safe user-facing text."""
+    msg = f"{type(exc).__name__} {exc}".lower()
+    if _exception_indicates_user_not_found(exc):
+        return (
+            "No app login account exists for this user. "
+            "Use Create login to set up access, or contact an administrator."
+        )
+    if "already exists" in msg or "duplicate" in msg or "registered" in msg:
+        return "A login already exists for this email."
+    if "password" in msg and any(token in msg for token in ("weak", "short", "least", "characters", "strength")):
+        return "Password does not meet requirements. Use at least 6 characters."
+    if any(token in msg for token in ("not authorized", "unauthorized", "service role", "invalid jwt", "jwt")):
+        return "App login could not be updated right now. Contact an administrator."
+    return f"Could not {action}. Try again or contact an administrator."
+
+
 def get_auth_user_by_id_admin(user_id: str) -> dict[str, Any] | None:
     """Return Supabase Auth user dict when present, else None."""
     uid = str(user_id or "").strip()
@@ -1107,26 +1142,37 @@ def resolve_auth_user_id(
     auth_user_id: str = "",
     profile_id: str = "",
     employee_auth_user_id: str = "",
+    employee_id: str = "",
 ) -> str:
     """
-    Return a verified Supabase Auth user id (auth.users.id).
+    Return a verified Supabase Auth user id (``auth.users.id``) for login actions.
 
-    Never returns employees.id. Resolution order:
-    1. employees.auth_user_id (canonical)
-    2. login email lookup in auth.users
-    3. legacy profiles.id when it still matches auth.users
+    Never returns ``employees.id``. Callers must resolve auth identity before
+    password updates, invites, or auth deletes — do not pass the workforce id.
+
+    Resolution order:
+    1. Stored ``auth_user_id`` when it exists in auth.users and email matches
+    2. Login email lookup in auth.users
+    3. Legacy ``profiles.id`` when it still matches auth.users and email
     """
+    workforce_id = str(employee_id or "").strip()
     canonical = str(auth_user_id or employee_auth_user_id or "").strip()
-    if canonical and get_auth_user_by_id_admin(canonical):
-        return canonical
+    if workforce_id and canonical == workforce_id:
+        canonical = ""
     em = str(email or "").strip().lower()
+    if canonical:
+        auth_row = get_auth_user_by_id_admin(canonical)
+        if auth_row and _auth_user_email_matches(auth_row, em):
+            return canonical
     if em:
         found = find_auth_user_by_email_admin(em)
         if found and str(found.get("id") or "").strip():
             return str(found["id"])
     legacy_profile = str(profile_id or "").strip()
-    if legacy_profile and get_auth_user_by_id_admin(legacy_profile):
-        return legacy_profile
+    if legacy_profile:
+        auth_row = get_auth_user_by_id_admin(legacy_profile)
+        if auth_row and _auth_user_email_matches(auth_row, em):
+            return legacy_profile
     return ""
 
 
@@ -1234,22 +1280,28 @@ def set_auth_user_password_admin(
         raise RuntimeError("Auth user id is required.")
     if len(pw) < 6:
         raise RuntimeError("Password must be at least 6 characters.")
+    if not get_auth_user_by_id_admin(uid):
+        raise RuntimeError(
+            "No app login account exists for this user. "
+            "Use Create login to set up access, or contact an administrator."
+        )
+
     admin = get_admin_client()
+    attrs = _admin_user_attributes(password=pw)
     try:
         fn = getattr(admin.auth.admin, "update_user_by_id", None)
         if fn is None:
             raise AttributeError("auth.admin.update_user_by_id is not available in this Supabase client.")
         try:
-            fn(uid, {"password": pw})
+            fn(uid, attrs)
         except TypeError:
-            fn({"uid": uid, "attributes": {"password": pw}})
+            try:
+                fn(uid, {"password": pw})
+            except TypeError:
+                fn({"uid": uid, "attributes": {"password": pw}})
     except Exception as exc:
-        if _exception_indicates_user_not_found(exc):
-            raise RuntimeError(
-                "No Supabase login account exists for this user. "
-                "Use Create login to set up access, or contact an administrator."
-            ) from exc
-        raise RuntimeError(f"Could not update password for user_id={uid!r}: {exc!r}") from exc
+        _LOG.warning("set_auth_user_password_admin failed for auth user %s: %r", uid, exc)
+        raise RuntimeError(_auth_admin_user_message(exc, action="update the password")) from exc
     try:
         update_profile_admin(uid, {"must_reset_password": False})
     except Exception:
@@ -1270,9 +1322,9 @@ def set_login_password_admin(
     """
     Create or update app login password for an employee.
 
-    Always resolves auth.users.id from employees.auth_user_id (or email lookup).
-    Never uses employees.id for Supabase Auth. Repairs orphaned profiles and avoids
-    duplicate auth users for one email.
+    ``employee_id`` is the workforce row (``employees.id``) — used only to link
+    metadata after auth succeeds. Password APIs always use a resolved
+    ``auth.users.id`` from :func:`resolve_auth_user_id`, never ``employees.id``.
     """
     em = str(email or "").strip().lower()
     if not em or "@" not in em:
@@ -1281,13 +1333,21 @@ def set_login_password_admin(
     if len(pw) < 6:
         raise RuntimeError("Password must be at least 6 characters.")
 
+    workforce_id = str(employee_id or "").strip()
     auth_id = resolve_auth_user_id(
         email=em,
         auth_user_id=auth_user_id or employee_auth_user_id,
         profile_id=profile_id,
+        employee_id=workforce_id,
     )
 
     if auth_id:
+        linked = get_auth_user_by_id_admin(auth_id) or {}
+        if not _auth_user_email_matches(linked, em):
+            raise RuntimeError(
+                "No app login account exists for this user. "
+                "Use Create login to set up access, or contact an administrator."
+            )
         set_auth_user_password_admin(auth_user_id=auth_id, password=pw)
         _upsert_profile_for_auth(
             auth_id=auth_id,

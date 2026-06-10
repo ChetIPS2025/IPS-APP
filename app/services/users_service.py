@@ -1,19 +1,21 @@
 """
 User profiles and auth-linked employee records.
 
-Identity model (keep these separate):
+Identity model — keep two IDs separate for every user:
 
-- **Employee** (``employees``): workforce row — name, phone, role, status, permissions.
-  Primary key is ``employees.id`` (app user id). Never pass this to Supabase Auth APIs.
+**App employee / user ID** (``employees.id``)
+    Workforce record: roles, permissions, timekeeping, phone, billing class, status.
+    Use for all in-app business data. Never pass to Supabase Auth admin APIs.
 
-- **Auth user** (``auth.users``): login identity — email and password.
-  Primary key is ``auth.users.id``. Stored on the employee as ``employees.auth_user_id``.
+**Supabase Auth user ID** (``auth.users.id``)
+    Login identity only: email, password, invites, session.
+    Cached on the employee as ``employees.auth_user_id``. Always resolve via
+    :func:`resolve_employee_auth_login` before password or invite actions — do not
+    assume ``employees.id`` or a stale ``auth_user_id`` without verification.
 
-- **Profile** (``profiles``): app mirror of auth user (``profiles.id`` == ``auth.users.id``),
-  linked to workforce via ``profiles.employee_id``.
-
-Password updates and invites must always use ``employees.auth_user_id`` (or resolve it from
-email), never ``employees.id``.
+**Profile** (``profiles``)
+    App mirror of the auth user (``profiles.id`` == ``auth.users.id``), linked to the
+    workforce row via ``profiles.employee_id``.
 """
 
 from __future__ import annotations
@@ -130,29 +132,57 @@ class DeleteUserCheck:
     time_entry_count: int = 0
 
 
+def resolve_employee_auth_login(employee_id: str) -> dict[str, Any]:
+    """
+    Resolve the Supabase Auth login for a workforce user.
+
+    Returns both IDs explicitly so callers never confuse them:
+    ``employee_id`` for app data; ``auth_user_id`` for login/password/invite only.
+    """
+    eid = str(employee_id or "").strip()
+    employee = _employee_row(eid) or {}
+    profile = _find_profile_for_employee(eid, email=str(employee.get("email") or ""))
+    email = str(employee.get("email") or profile.get("email") or "").strip().lower()
+    profile_id = str(profile.get("id") or "") if profile else ""
+    stored_auth_id = str(employee.get("auth_user_id") or "").strip()
+    auth_user_id = resolve_auth_user_id(
+        email=email,
+        auth_user_id=stored_auth_id,
+        profile_id=profile_id,
+        employee_id=eid,
+    )
+    return {
+        "employee_id": eid,
+        "email": email,
+        "auth_user_id": auth_user_id,
+        "profile_id": profile_id,
+        "has_login": bool(auth_user_id),
+        "stored_auth_user_id": stored_auth_id,
+        "auth_link_stale": bool(
+            stored_auth_id and auth_user_id and stored_auth_id != auth_user_id
+        ),
+    }
+
+
 def get_user_delete_context(user_id: str) -> dict[str, Any]:
     """Summary fields for delete confirmation UI."""
     employee = _employee_row(user_id) or {}
     profile = _find_profile_for_employee(user_id, email=str(employee.get("email") or ""))
-    email = str(employee.get("email") or profile.get("email") or "")
-    profile_id = str(profile.get("id") or "") if profile else ""
-    employee_auth_user_id = str(employee.get("auth_user_id") or "").strip()
-    auth_user_id = resolve_auth_user_id(
-        email=email,
-        auth_user_id=employee_auth_user_id,
-        profile_id=profile_id,
-    )
+    login = resolve_employee_auth_login(user_id)
+    email = login.get("email") or str(employee.get("email") or profile.get("email") or "")
     return {
         "user_id": user_id,
+        "employee_id": str(user_id or "").strip(),
         "name": str(employee.get("name") or profile.get("full_name") or "—"),
         "role": str(employee.get("role") or profile.get("role") or "—"),
         "email": email or "—",
         "employee_linked": bool(employee.get("id")),
-        "has_login": bool(auth_user_id),
+        "has_login": bool(login.get("has_login")),
         "last_login": str(employee.get("last_login") or "—"),
         "time_entry_count": _count_time_entries(user_id),
-        "profile_id": profile_id,
-        "auth_user_id": auth_user_id,
+        "profile_id": str(login.get("profile_id") or ""),
+        "auth_user_id": str(login.get("auth_user_id") or ""),
+        "auth_link_stale": bool(login.get("auth_link_stale")),
     }
 
 
@@ -423,13 +453,7 @@ def hard_delete_user(
     auth_deleted = False
     auth_warning: str | None = None
 
-    resolved_auth_id = ""
-    if profile or employee:
-        resolved_auth_id = resolve_auth_user_id(
-            email=str(employee.get("email") or (profile or {}).get("email") or ""),
-            auth_user_id=str(employee.get("auth_user_id") or ""),
-            profile_id=str((profile or {}).get("id") or ""),
-        )
+    resolved_auth_id = str(resolve_employee_auth_login(uid).get("auth_user_id") or "").strip()
     if resolved_auth_id:
         profile_id = resolved_auth_id
         try:
@@ -481,6 +505,7 @@ __all__ = [
     "get_profile_by_user_id",
     "get_user_delete_context",
     "hard_delete_user",
+    "resolve_employee_auth_login",
     "list_profiles",
     "soft_delete_user",
 ]

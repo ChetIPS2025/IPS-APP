@@ -67,7 +67,11 @@ try:
         permission_role_options,
     )
     from app.services.repository import clear_all_data_caches
-    from app.services.users_service import can_manage_user_actions, get_user_delete_context
+    from app.services.users_service import (
+        can_manage_user_actions,
+        get_user_delete_context,
+        resolve_employee_auth_login,
+    )
     from app.styles import inject_users_module_css
     from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
     from app.utils.formatting import fmt_date
@@ -131,7 +135,11 @@ except ImportError:
         permission_role_options,
     )
     from services.repository import clear_all_data_caches  # type: ignore
-    from services.users_service import can_manage_user_actions, get_user_delete_context  # type: ignore
+    from services.users_service import (  # type: ignore
+        can_manage_user_actions,
+        get_user_delete_context,
+        resolve_employee_auth_login,
+    )
     from styles import inject_users_module_css  # type: ignore
     from utils.constants import DEPARTMENTS, SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -752,19 +760,35 @@ def _employee_invite_email(emp: dict) -> str:
 def _login_panel_error_message(exc: Exception, *, action: str) -> str:
     """User-facing message for App Login failures (no raw tracebacks)."""
     text = str(exc or "").strip()
+    if not text:
+        return f"Could not {action.lower()}."
     lower = text.lower()
-    if "already exists" in lower or "duplicate" in lower:
-        return "A login already exists for this email."
-    if "domain" in lower or "indfustrial" in lower:
-        return text
-    if "at least 6" in lower or "valid work email" in lower or "email is required" in lower:
-        return text
-    if "user not found" in lower or "no supabase login" in lower:
-        return (
-            "No app login account was found for this user. "
-            "Try Create login, or contact an administrator."
+    if "user_id=" in lower or "exc)" in lower or "raw_result=" in lower:
+        return f"Could not {action.lower()}. Try again or contact an administrator."
+    if any(
+        phrase in lower
+        for phrase in (
+            "no app login account",
+            "no supabase login",
+            "user not found",
+            "create login",
+            "contact an administrator",
+            "already exists",
+            "password does not meet",
+            "valid work email",
+            "email is required",
+            "email domain",
+            "at least 6",
+            "indfustrial",
         )
-    return f"Could not {action.lower()}."
+    ):
+        return text
+    return f"Could not {action.lower()}. Try again or contact an administrator."
+
+
+def _clear_login_password_field(key: str) -> None:
+    if key in st.session_state:
+        del st.session_state[key]
 
 
 def _create_employee_login_with_password(emp: dict, password: str) -> str:
@@ -777,11 +801,12 @@ def _create_employee_login_with_password(emp: dict, password: str) -> str:
     if not _email_domain_allowed(email):
         raise RuntimeError("Email domain is not allowed for app login.")
 
-    ctx = get_user_delete_context(eid)
+    login = resolve_employee_auth_login(eid)
     set_login_password_admin(
         email=email,
         password=password,
-        auth_user_id=str(emp.get("auth_user_id") or ctx.get("auth_user_id") or ""),
+        auth_user_id=str(login.get("auth_user_id") or ""),
+        profile_id=str(login.get("profile_id") or ""),
         employee_id=eid or None,
         full_name=str(emp.get("name") or "").strip(),
         role=_invite_role_from_employee(emp),
@@ -800,8 +825,8 @@ def _send_employee_invite(emp: dict) -> str:
     if not _email_domain_allowed(email):
         raise RuntimeError("Email domain is not allowed for app login.")
 
-    ctx = get_user_delete_context(eid)
-    if ctx.get("has_login"):
+    login = resolve_employee_auth_login(eid)
+    if login.get("has_login"):
         raise RuntimeError("This user already has a login. Use Resend invite instead.")
 
     invite_auth_user(
@@ -823,16 +848,20 @@ def _resend_employee_invite(emp: dict) -> str:
 
 
 def _render_user_login_panel(emp: dict, rk: str) -> None:
-    """Create or update app login (email + password) from the user detail modal."""
+    """Create or update app login (email + password) from the user detail modal.
+
+    Uses ``employees.id`` for workforce data only. Password actions resolve
+    ``auth.users.id`` via :func:`resolve_employee_auth_login` first.
+    """
     if not can_manage_user_actions():
         return
     eid = str(emp.get("id") or "").strip()
     if not eid or is_demo_id(eid):
         return
 
-    ctx = get_user_delete_context(eid)
+    login = resolve_employee_auth_login(eid)
     email = _employee_invite_email(emp)
-    has_login = bool(ctx.get("has_login"))
+    has_login = bool(login.get("has_login"))
 
     st.markdown(
         '<p class="ips-user-actions-title">App Login</p>',
@@ -843,7 +872,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
         return
 
     if not has_login:
-        st.caption(f"Sign in with email {email} and the password you set below.")
+        st.caption(f"No app login is linked yet for {email}. Set a password below to create one.")
     else:
         st.caption(f"Login active for {email}. Enter a new password to change it.")
     pw_key = f"emp_login_pw_{rk}"
@@ -858,15 +887,18 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
     if st.button(btn_label, type="primary", key=f"emp_set_login_pw_{rk}", use_container_width=True):
         if len(str(pw or "").strip()) < 6:
             st.error("Enter a password of at least 6 characters.")
+            _clear_login_password_field(pw_key)
         else:
             try:
                 _create_employee_login_with_password(emp, str(pw))
+                _clear_login_password_field(pw_key)
                 st.session_state["users_action_flash"] = (
                     "success",
                     f"{'Password updated' if has_login else 'Login created'} for {email}.",
                 )
                 st.rerun()
             except Exception as exc:
+                _clear_login_password_field(pw_key)
                 st.error(_login_panel_error_message(exc, action=btn_label))
 
     if not has_login:
