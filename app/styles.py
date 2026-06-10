@@ -2463,42 +2463,167 @@ def inject_pricing_guide_module_css() -> None:
 
 
 def inject_inventory_qr_scan_css() -> None:
-    """Mobile inventory QR scan page."""
+    """Mobile inventory QR scan / Use Inventory page."""
     st.markdown(
-        """
-<style id="ips-inventory-qr-scan-v2">
-.ips-inv-qr-item-card {
+        f"""
+<script>document.body.classList.add("ips-inv-qr-scan-page");</script>
+<style id="ips-inventory-qr-scan-v3">
+body.ips-inv-qr-scan-page section[data-testid="stSidebar"],
+body.ips-inv-qr-scan-page [data-testid="stSidebarCollapsedControl"] {{
+  display: none !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) .block-container {{
+  max-width: 100% !important;
+  padding: 0.75rem 1rem 2rem !important;
+}}
+.ips-inv-qr-mobile-header {{
+  margin: 0 0 0.65rem 0;
+  text-align: center;
+}}
+.ips-inv-qr-mobile-logo {{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}}
+.ips-inv-qr-mobile-logo .ips-main-header-logo {{
+  height: 52px !important;
+  max-width: min(340px, 92vw) !important;
+  width: auto !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) .ips-page-header {{
+  margin-bottom: 0.85rem !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) .ips-page-title {{
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) .ips-page-subtitle {{
+  font-size: 0.88rem !important;
+  color: #64748b !important;
+  line-height: 1.45 !important;
+}}
+.ips-inv-qr-item-panel {{
+  margin: 0 0 0.85rem 0;
+}}
+.ips-inv-qr-thumb-wrap {{
+  margin: 0 0 0.5rem 0;
+}}
+.ips-inv-qr-thumb-cell {{
+  display: inline-block;
+}}
+.ips-inv-qr-thumb-img,
+.ips-inv-qr-thumb-cell img {{
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  display: block;
+  background: #ffffff;
+}}
+.ips-inv-qr-thumb-cell .ips-inventory-thumb-placeholder {{
+  display: inline-flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}}
+.ips-inv-qr-item-card {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px 14px;
-  margin: 8px 0 12px;
-}
-.ips-inv-qr-item-title {
-  font-size: 1.1rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}}
+.ips-inv-qr-item-title {{
+  font-size: 1rem;
   font-weight: 800;
   color: #0f172a;
-  margin-bottom: 4px;
-}
-.ips-inv-qr-item-meta {
-  font-size: 0.85rem;
+  line-height: 1.35;
+  margin-bottom: 2px;
+}}
+.ips-inv-qr-item-model {{
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}}
+.ips-inv-qr-item-meta {{
+  font-size: 0.82rem;
   color: #64748b;
-}
-div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) label {
-  font-size: 1rem !important;
-}
-div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) input,
-div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) textarea {
-  min-height: 44px !important;
-  font-size: 1rem !important;
+  line-height: 1.45;
+}}
+.ips-inv-qr-item-onhand {{
+  margin-top: 4px;
+  color: #0f172a !important;
+}}
+.ips-inv-qr-field-label {{
+  margin: 0 0 0.35rem 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}}
+.ips-inv-qr-field-label-spaced {{
+  margin-top: 0.65rem !important;
+}}
+.ips-inv-qr-qty-hint {{
+  margin: 0.25rem 0 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-align: center;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stForm"] {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stForm"] label {{
+  display: none !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stNumberInput"] input {{
+  min-height: 52px !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  text-align: center !important;
   background: #ffffff !important;
   border-radius: 10px !important;
-}
-div[data-testid="stVerticalBlock"]:has(span.ips-inv-qr-scan-scope) button[kind="primary"] {
+  border: 1px solid #e2e8f0 !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-baseweb="select"] > div {{
   min-height: 48px !important;
-  font-size: 1rem !important;
+  font-size: 0.95rem !important;
+  background: #f8fafc !important;
+  border-radius: 10px !important;
+  border-color: #e2e8f0 !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stForm"] button {{
+  min-height: 52px !important;
+  border-radius: 10px !important;
   font-weight: 700 !important;
-}
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stForm"] button:not([kind="primary"]) {{
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 1.5rem !important;
+  line-height: 1 !important;
+}}
+body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-scope) [data-testid="stForm"] button[kind="primary"] {{
+  margin-top: 0.75rem !important;
+  min-height: 50px !important;
+  font-size: 1rem !important;
+  background: {PRIMARY} !important;
+  border-color: {PRIMARY} !important;
+  color: #ffffff !important;
+}}
 </style>
 """,
         unsafe_allow_html=True,

@@ -328,6 +328,77 @@ def _inv_item_thumb_display(item: dict) -> None:
     render_inventory_item_thumbnail(item, width=80)
 
 
+def _item_model_line(item: dict[str, Any], sku: str) -> str:
+    for key in ("model", "model_number", "part_number", "manufacturer_part"):
+        val = str(item.get(key) or "").strip()
+        if val:
+            return val
+    return sku if sku and sku != "—" else ""
+
+
+def _render_mobile_use_inventory_header() -> None:
+    """IPS logo, page title, and subtitle for the mobile use-inventory scan page."""
+    try:
+        from app.branding import wording_logo_html
+    except ImportError:
+        from branding import wording_logo_html  # type: ignore
+    try:
+        from app.components.headers import render_page_brand_header
+    except ImportError:
+        from components.headers import render_page_brand_header  # type: ignore
+
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    logo = wording_logo_html(height=56)
+    st.markdown(
+        f'<{ot} class="ips-inv-qr-mobile-header">'
+        f'<{ot} class="ips-inv-qr-mobile-logo">{logo}</{ct}>'
+        f"</{ct}>",
+        unsafe_allow_html=True,
+    )
+    render_page_brand_header(
+        "Use Inventory",
+        "Consumable materials — enter quantity and where used (Use on Job or Use in Shop).",
+    )
+
+
+def _render_mobile_item_summary(item: dict[str, Any], *, qoh: float) -> None:
+    """Item thumbnail and summary card for mobile QR use form."""
+    try:
+        from app.services.inventory_images import inventory_thumbnail_html
+    except ImportError:
+        from services.inventory_images import inventory_thumbnail_html  # type: ignore
+
+    name = str(item.get("name") or item.get("item_name") or "—")
+    sku = str(item.get("sku") or "—")
+    unit = str(item.get("unit") or "EA")
+    location = str(item.get("location") or item.get("storage_location") or "—")
+    status = str(item.get("status") or "In Stock")
+    model_line = _item_model_line(item, sku)
+    thumb = inventory_thumbnail_html(
+        item,
+        css_class="ips-inv-qr-thumb-img",
+        cell_class="ips-inv-qr-thumb-cell",
+    )
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    model_html = (
+        f'<{ot} class="ips-inv-qr-item-model">{html.escape(model_line)}</{ct}>'
+        if model_line
+        else ""
+    )
+    st.markdown(
+        f'<{ot} class="ips-inv-qr-item-panel">'
+        f'<{ot} class="ips-inv-qr-thumb-wrap">{thumb}</{ct}>'
+        f'<{ot} class="ips-inv-qr-item-card">'
+        f'<{ot} class="ips-inv-qr-item-title">{html.escape(name)}</{ct}>'
+        f"{model_html}"
+        f'<{ot} class="ips-inv-qr-item-meta">SKU: {html.escape(sku)} · Unit: {html.escape(unit)}</{ct}>'
+        f'<{ot} class="ips-inv-qr-item-meta">Location: {html.escape(location)} · Status: {html.escape(status)}</{ct}>'
+        f'<{ot} class="ips-inv-qr-item-meta ips-inv-qr-item-onhand"><strong>On hand: {qoh:g}</strong></{ct}>'
+        f"</{ct}></{ct}>",
+        unsafe_allow_html=True,
+    )
+
+
 def _lookup_sku_case_insensitive(raw: str) -> list[dict]:
     raw_l = str(raw or "").strip().lower()
     if not raw_l:
@@ -1649,9 +1720,9 @@ def _scan_can_submit() -> bool:
     return str(current_role() or "viewer").lower() != "viewer"
 
 
-def _mobile_scan_qty_step(delta: float) -> None:
-    cur = float(st.session_state.get("inv_scan_qty") or 1.0)
-    st.session_state["inv_scan_qty"] = max(0.25, cur + delta)
+def _mobile_scan_qty_step(delta: int) -> None:
+    cur = int(float(st.session_state.get("inv_scan_qty") or 1))
+    st.session_state["inv_scan_qty"] = max(1, cur + int(delta))
 
 
 def _mobile_scan_actor_defaults() -> tuple[str, str, str, bool]:
@@ -1847,9 +1918,7 @@ def render_inventory_scan_page() -> None:
     inject_inventory_qr_scan_css()
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-qr-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-    st.markdown("## Use Inventory")
-    st.caption("Consumable materials — enter quantity and where used (Use on Job or Use in Shop).")
+    _render_mobile_use_inventory_header()
 
     success = st.session_state.get("inv_scan_success_payload")
     if success and isinstance(success, dict):
@@ -1889,57 +1958,47 @@ def render_inventory_scan_page() -> None:
         st.error("Your role cannot record inventory use.")
         st.stop()
 
-    iid = str(item.get("id") or "")
-    name = str(item.get("name") or item.get("item_name") or "—")
-    sku = str(item.get("sku") or "—")
     unit = str(item.get("unit") or "EA")
-    location = str(item.get("location") or item.get("storage_location") or "—")
     qoh = _qty_on_hand(item)
-    status = str(item.get("status") or "—")
 
-    col_img, col_info = st.columns([1, 2], gap="small")
-    with col_img:
-        _inv_item_thumb_display(item)
-    with col_info:
-        st.markdown(
-            f'<div class="ips-inv-qr-item-card">'
-            f'<div class="ips-inv-qr-item-title">{html.escape(name)}</div>'
-            f'<div class="ips-inv-qr-item-meta">SKU: {html.escape(sku)} · Unit: {html.escape(unit)}</div>'
-            f'<div class="ips-inv-qr-item-meta">Location: {html.escape(location)} · Status: {html.escape(status)}</div>'
-            f'<div class="ips-inv-qr-item-meta"><strong>On hand: {qoh:g}</strong></div>'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+    _render_mobile_item_summary(item, qoh=qoh)
 
     job_labels, job_map = _scan_mobile_job_options()
     if "inv_scan_qty" not in st.session_state:
-        st.session_state["inv_scan_qty"] = 1.0
+        st.session_state["inv_scan_qty"] = 1
 
     with st.form("inv_mobile_scan_form", clear_on_submit=False):
-        st.markdown("**Qty**")
-        qty_minus_col, qty_col, qty_plus_col = st.columns([1, 2.2, 1], gap="small")
+        st.markdown('<span class="ips-inv-qr-form-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+        st.markdown('<p class="ips-inv-qr-field-label">Qty</p>', unsafe_allow_html=True)
+        qty_minus_col, qty_col, qty_plus_col = st.columns([1, 2.4, 1], gap="small")
         with qty_minus_col:
             qty_dec = st.form_submit_button("−", use_container_width=True)
         with qty_col:
             qty = st.number_input(
                 "Qty",
-                min_value=0.25,
-                step=1.0,
-                format="%.2f",
+                min_value=1,
+                step=1,
+                format="%d",
                 key="inv_scan_qty",
                 label_visibility="collapsed",
             )
         with qty_plus_col:
             qty_inc = st.form_submit_button("+", use_container_width=True)
-
-        job_pick = st.selectbox("Where used", job_labels, key="inv_scan_job_pick")
+        st.markdown('<p class="ips-inv-qr-qty-hint">Whole numbers only.</p>', unsafe_allow_html=True)
+        st.markdown('<p class="ips-inv-qr-field-label ips-inv-qr-field-label-spaced">Where used</p>', unsafe_allow_html=True)
+        job_pick = st.selectbox(
+            "Where used",
+            job_labels,
+            key="inv_scan_job_pick",
+            label_visibility="collapsed",
+        )
         submit = st.form_submit_button("Enter", type="primary", use_container_width=True)
 
     if qty_dec:
-        _mobile_scan_qty_step(-1.0)
+        _mobile_scan_qty_step(-1)
         st.rerun()
     if qty_inc:
-        _mobile_scan_qty_step(1.0)
+        _mobile_scan_qty_step(1)
         st.rerun()
     if not submit:
         return
