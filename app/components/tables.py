@@ -234,6 +234,56 @@ def render_clickable_table(
     return str(st.session_state.get(sel_key) or "").strip() or None
 
 
+def data_table_html(
+    rows: list[dict[str, Any]],
+    columns: list[tuple[str, str]],
+    *,
+    row_id_key: str = "id",
+    selected_id: str | None = None,
+    col_fr: list[str] | None = None,
+    cell_renderer: HtmlCellFn | None = None,
+    plain_cell: PlainCellFn | None = None,
+    table_class: str = "ips-data-table-wrap ips-data-table-stable ips-data-table-nested",
+    empty_message: str = "No records to display.",
+) -> str:
+    """Return a read-only HTML grid table for embedding inside panel cards."""
+    open_tag = "d" + "iv"
+    close_tag = "/" + open_tag
+    if not rows:
+        return f'<p class="ips-panel-empty">{html.escape(empty_message)}</p>'
+
+    n = len(columns)
+    grid = "grid-template-columns: " + " ".join(col_fr or ["1.1fr"] + ["1fr"] * max(n - 1, 0)) + ";"
+    header = "".join(f"<{open_tag}>{html.escape(h)}<{close_tag}>" for _, h in columns)
+    active_id = str(selected_id or "").strip()
+    row_parts: list[str] = []
+    for row in rows:
+        rid = str(row.get(row_id_key) or "")
+        sel = " selected" if rid and rid == active_id else ""
+        parts = []
+        for field, _ in columns:
+            if cell_renderer:
+                parts.append(
+                    f'<{open_tag} class="ips-data-cell">{cell_renderer(field, row)}<{close_tag}>'
+                )
+            else:
+                parts.append(
+                    f'<{open_tag} class="ips-data-cell">'
+                    f"{_cell_content(field, row, plain_cell=plain_cell, html_cell=cell_renderer)}"
+                    f"<{close_tag}>"
+                )
+        row_parts.append(
+            f'<{open_tag} class="ips-clean-row ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>'
+        )
+    return (
+        f'<{open_tag} class="{html.escape(table_class)}">'
+        f'<{open_tag} class="ips-data-table-scroll">'
+        f'<{open_tag} class="ips-data-table-header" style="{grid}">{header}<{close_tag}>'
+        f'{"".join(row_parts)}'
+        f"</{open_tag}></{open_tag}>"
+    )
+
+
 def render_data_table(
     rows: list[dict[str, Any]],
     columns: list[tuple[str, str]],
@@ -269,39 +319,18 @@ def render_data_table(
             col_fr=col_fr,
         )
 
-    n = len(columns)
-    grid = "grid-template-columns: " + " ".join(col_fr or ["1.1fr"] + ["1fr"] * max(n - 1, 0)) + ";"
-    open_tag = "d" + "iv"
-    close_tag = "/" + open_tag
-    header = "".join(
-        f"<{open_tag}>{html.escape(h)}<{close_tag}>" for _, h in columns
-    )
+    active_id = str(st.session_state.get(session_select_key) or selected_id or "")
     st.markdown(
-        f'<{open_tag} class="ips-data-table-wrap ips-data-table-stable ips-data-table-nested">'
-        f'<{open_tag} class="ips-data-table-scroll">'
-        f'<{open_tag} class="ips-data-table-header" style="{grid}">{header}<{close_tag}>',
+        data_table_html(
+            rows,
+            columns,
+            row_id_key=row_id_key,
+            selected_id=active_id or None,
+            col_fr=col_fr,
+            cell_renderer=cell_renderer,
+            plain_cell=plain_cell,
+        ),
         unsafe_allow_html=True,
     )
-    active_id = str(st.session_state.get(session_select_key) or selected_id or "")
-    for row in rows:
-        rid = str(row.get(row_id_key) or "")
-        sel = " selected" if rid and rid == active_id else ""
-        parts = []
-        for field, _ in columns:
-            if cell_renderer:
-                parts.append(
-                    f'<{open_tag} class="ips-data-cell">{cell_renderer(field, row)}<{close_tag}>'
-                )
-            else:
-                parts.append(
-                    f'<{open_tag} class="ips-data-cell">'
-                    f"{html.escape(str(row.get(field) or chr(8212)))}"
-                    f"<{close_tag}>"
-                )
-        st.markdown(
-            f'<{open_tag} class="ips-clean-row ips-data-row{sel}" style="{grid}">{"".join(parts)}<{close_tag}>',
-            unsafe_allow_html=True,
-        )
-    st.markdown(f"<{close_tag}><{close_tag}>", unsafe_allow_html=True)
     sel = st.session_state.get(session_select_key) or selected_id
     return str(sel) if sel else None

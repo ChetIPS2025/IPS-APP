@@ -31,11 +31,11 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "customer": "Acme Construction",
         "estimate_number": "E-10238",
         "supervisor": "Mark Johnson",
-        "status": "Scheduled",
-        "start_date": "2025-06-01",
-        "end_date": "2025-10-30",
+        "status": "Estimate Pending",
+        "start_date": "",
+        "end_date": "",
         "progress": 0,
-        "description": "Replace aging piping and valves in tank farm area.",
+        "description": "Awaiting customer approval on tank farm piping estimate.",
     },
     {
         "id": "demo-j26049",
@@ -62,6 +62,45 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "end_date": "2025-12-01",
         "progress": 22,
         "description": "Interior renovation of office building floors 2–3.",
+    },
+    {
+        "id": "demo-j26070",
+        "job_number": "J26070",
+        "job_name": "Orange Turnaround Extra Work",
+        "customer": "Birla Carbons - USA",
+        "estimate_number": "E-10250",
+        "supervisor": "Leland Daigle",
+        "status": "Awarded",
+        "start_date": "2025-06-01",
+        "end_date": "2025-09-30",
+        "progress": 0,
+        "description": "Additional turnaround scope awarded from estimate.",
+    },
+    {
+        "id": "demo-j26071",
+        "job_number": "J26071",
+        "job_name": "Front Office A/C Drain Line",
+        "customer": "Gulf Coast Industrial",
+        "estimate_number": "E-10251",
+        "supervisor": "Mark Johnson",
+        "status": "Awarded",
+        "start_date": "2025-06-15",
+        "end_date": "2025-07-31",
+        "progress": 0,
+        "description": "A/C drain line replacement — awarded, pending start.",
+    },
+    {
+        "id": "demo-j26045",
+        "job_number": "J26045",
+        "job_name": "Boiler House Valve Replacement",
+        "customer": "Acme Construction",
+        "estimate_number": "E-10220",
+        "supervisor": "Sarah Chen",
+        "status": "Completed",
+        "start_date": "2025-01-10",
+        "end_date": "2025-03-28",
+        "progress": 100,
+        "description": "Completed valve replacement scope.",
     },
 ]
 
@@ -102,24 +141,31 @@ def load_jobs() -> list[dict[str, Any]]:
 
 
 def load_dashboard_kpis() -> dict[str, Any]:
+    try:
+        from app.services.job_service import dashboard_job_metrics
+    except ImportError:
+        from services.job_service import dashboard_job_metrics  # type: ignore
+
     estimates = _fetch_table("estimates", limit=200)
     jobs = load_jobs()
     if estimates or jobs:
         open_est = sum(1 for e in estimates if str(e.get("status", "")).lower() in {"draft", "sent", "pending"})
-        active_jobs = sum(1 for j in jobs if str(j.get("status", "")).lower() in {"active", "in progress"})
         return {
             "total_sales": 245680.50,
             "open_invoices": 125430.25,
-            "active_jobs": active_jobs or len([j for j in jobs if j.get("status")]),
             "open_estimates": open_est or len(estimates),
             "inventory_value": 98765.30,
+            **dashboard_job_metrics(jobs),
         }
     return {
         "total_sales": 245680.50,
         "open_invoices": 125430.25,
-        "active_jobs": 18,
         "open_estimates": 14,
         "inventory_value": 98765.30,
+        "jobs_awarded": 2,
+        "active_jobs": 1,
+        "estimate_pending_jobs": 1,
+        "complete_jobs": 1,
     }
 
 

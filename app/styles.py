@@ -9846,10 +9846,13 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
 /* Module layout */
 .ips-kpi-grid {{
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.55rem;
   margin-top: 12px;
   margin-bottom: 0.5rem;
+}}
+.ips-kpi-grid-jobs {{
+  margin-top: 0.35rem;
 }}
 .ips-dashboard-metrics,
 .ips-metric-grid {{
@@ -9911,6 +9914,57 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.5rem;
   min-height: 9rem;
+}}
+.ips-panel-card-compact {{
+  min-height: 0;
+  height: auto;
+  padding-bottom: 0.55rem;
+}}
+.ips-panel-card-compact .ips-panel-title {{
+  margin-bottom: 0.45rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e2e8f0;
+}}
+.ips-panel-card-compact .ips-qr-scan-table {{
+  margin-top: 0;
+  border: none;
+  border-radius: 0;
+  overflow-x: auto;
+}}
+.ips-panel-card-compact .ips-dash-list-table {{
+  margin-top: 0;
+  border: none;
+  box-shadow: none;
+}}
+.ips-panel-card-compact .ips-dash-list-table .ips-data-table-header,
+.ips-panel-card-compact .ips-dash-list-table .ips-clean-row {{
+  padding: 0.35rem 0;
+  min-height: 0 !important;
+}}
+.ips-panel-card-compact .ips-dash-list-table .ips-data-table-header {{
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #e2e8f0;
+}}
+.ips-panel-card-compact .ips-dash-list-table .ips-clean-row {{
+  font-size: 0.8125rem;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-panel-card-compact .ips-dash-list-table .ips-clean-row:last-child {{
+  border-bottom: none;
+}}
+.ips-dash-job-number {{
+  color: #2563eb;
+  font-weight: 600;
+  white-space: nowrap;
+}}
+.ips-panel-empty {{
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: {TEXT_MUTED};
 }}
 .ips-panel-title {{
   font-size: 0.9rem;

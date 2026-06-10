@@ -9,13 +9,12 @@ import streamlit as st
 
 try:
     from app.auth import current_profile
-    from app.components.cards import render_kpi_card
+    from app.components.cards import render_kpi_card, render_panel_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
     from app.components.feeds import render_activity_feed
-    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
+    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html
     from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
-    from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
+    from app.components.tables import data_table_html
     from app.pages._core._data import (
         demo_deadlines,
         demo_job_status,
@@ -30,13 +29,12 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile  # type: ignore
-    from components.cards import render_kpi_card  # type: ignore
+    from components.cards import render_kpi_card, render_panel_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
     from components.feeds import render_activity_feed  # type: ignore
-    from components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table  # type: ignore
+    from components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html  # type: ignore
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
+    from components.tables import data_table_html  # type: ignore
     from pages._core._data import (  # type: ignore
         demo_deadlines,
         demo_job_status,
@@ -102,15 +100,25 @@ def render() -> None:
     kpis = load_dashboard_kpis()
     ot = "d" + "iv"
     st.markdown(f'<{ot} class="ips-kpi-grid">', unsafe_allow_html=True)
-    k1, k2, k3, k4, k5 = st.columns(5)
-    cards = [
+    k1, k2, k3, k4 = st.columns(4)
+    for col, *args in [
         (k1, "Total Sales", fmt_currency(kpis["total_sales"]), "💵", "#dbeafe", "↑ 12.5% vs previous period", "up"),
         (k2, "Open Invoices", fmt_currency(kpis["open_invoices"]), "🧾", "#dcfce7", "↑ 8.3% vs previous period", "up"),
-        (k3, "Active Jobs", str(kpis["active_jobs"]), "💼", "#ffedd5", "↑ 5 vs previous period", "up"),
-        (k4, "Open Estimates", str(kpis["open_estimates"]), "📋", "#f3e8ff", "↓ 2 vs previous period", "down"),
-        (k5, "Inventory Value", fmt_currency(kpis["inventory_value"]), "📦", "#e0f2fe", "↑ 6.7% vs previous period", "up"),
-    ]
-    for col, *args in cards:
+        (k3, "Open Estimates", str(kpis["open_estimates"]), "📋", "#f3e8ff", "↓ 2 vs previous period", "down"),
+        (k4, "Inventory Value", fmt_currency(kpis["inventory_value"]), "📦", "#e0f2fe", "↑ 6.7% vs previous period", "up"),
+    ]:
+        with col:
+            render_kpi_card(*args)
+    st.markdown(f"</{ot}>", unsafe_allow_html=True)
+
+    st.markdown(f'<{ot} class="ips-kpi-grid ips-kpi-grid-jobs">', unsafe_allow_html=True)
+    j1, j2, j3, j4 = st.columns(4)
+    for col, *args in [
+        (j1, "Jobs Awarded", str(kpis["jobs_awarded"]), "🏆", "#dbeafe", "Won — not yet started", "flat"),
+        (j2, "Active Jobs", str(kpis["active_jobs"]), "💼", "#ffedd5", "In progress now", "flat"),
+        (j3, "Estimate Pending", str(kpis["estimate_pending_jobs"]), "📋", "#f3e8ff", "Awaiting estimate approval", "flat"),
+        (j4, "Complete Jobs", str(kpis["complete_jobs"]), "✅", "#dcfce7", "Finished work", "flat"),
+    ]:
         with col:
             render_kpi_card(*args)
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
@@ -169,47 +177,32 @@ def render() -> None:
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     inject_qr_scan_history_css()
-    st.markdown(
-        f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent QR Scans</p>',
-        unsafe_allow_html=True,
+    render_panel_card(
+        "Recent QR Scans",
+        qr_scan_history_table_html(load_recent_qr_scans(limit=10), compact=True),
+        compact=True,
     )
-    render_qr_scan_history_table(load_recent_qr_scans(limit=10), compact=True)
-    st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
-    st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Recent Jobs</p>', unsafe_allow_html=True)
-
-    def _job_cell(field: str, row: dict) -> str:
-        if field == "status":
-            return status_pill_html(str(row.get("status") or ""))
-        if field == "progress":
-            pct = int(row.get("progress") or 0)
-            return (
-                f'{pct}%<div class="ips-progress-bar">'
-                f'<div class="ips-progress-fill" style="width:{pct}%"></div></div>'
-            )
+    def _dash_job_cell(field: str, row: dict) -> str:
         if field == "job_number":
-            return f'<span style="color:#2563eb;font-weight:600">{html.escape(str(row.get("job_number") or ""))}</span>'
+            return f'<span class="ips-dash-job-number">{html.escape(str(row.get("job_number") or ""))}</span>'
         return html.escape(str(row.get(field) or "—"))
 
-    jobs = demo_recent_jobs()
-    render_data_table(
-        jobs,
-        [
-            ("job_number", "JOB #"),
-            ("job_name", "PROJECT / DESCRIPTION"),
-            ("customer", "CUSTOMER"),
-            ("status", "STATUS"),
-            ("start_date", "START"),
-            ("end_date", "END"),
-            ("progress", "PROGRESS"),
-        ],
-        row_id_key="id",
-        selected_id=None,
-        session_select_key="ips_sel_dashboard_jobs",
-        col_fr=["0.9fr", "1.6fr", "1.1fr", "0.9fr", "0.8fr", "0.8fr", "0.9fr"],
-        cell_renderer=_job_cell,
+    render_panel_card(
+        "Recent Jobs",
+        data_table_html(
+            demo_recent_jobs(),
+            [
+                ("job_number", "JOB #"),
+                ("job_name", "PROJECT / DESCRIPTION"),
+            ],
+            col_fr=["0.55fr", "1.45fr"],
+            cell_renderer=_dash_job_cell,
+            table_class="ips-data-table-wrap ips-data-table-stable ips-dash-list-table",
+            empty_message="No recent jobs.",
+        ),
+        compact=True,
     )
-    st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     render_dashboard_quick_actions(
         [

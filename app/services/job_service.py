@@ -147,6 +147,7 @@ def normalize_job_status_for_filter(raw: object) -> str:
         "planning": "Planning",
         "scheduled": "Scheduled",
         "active": "Active",
+        "in progress": "Active",
         "awarded": "Awarded",
         "on hold": "On Hold",
         "completed": "Completed",
@@ -161,6 +162,39 @@ def normalize_job_status_for_filter(raw: object) -> str:
         return mapping[s]
     label = str(raw or "").strip()
     return label if label else "Draft"
+
+
+_DASHBOARD_JOB_METRIC_BUCKETS: dict[str, str] = {
+    "Awarded": "jobs_awarded",
+    "Active": "active_jobs",
+    "Estimate Pending": "estimate_pending_jobs",
+    "Completed": "complete_jobs",
+    "Closed": "complete_jobs",
+}
+
+
+def dashboard_job_metrics(jobs: list[dict[str, Any]]) -> dict[str, int]:
+    """
+    Dashboard job KPI counts — each bucket is mutually exclusive by normalized status.
+
+    - jobs_awarded: won/accepted, not necessarily started
+    - active_jobs: work in progress
+    - estimate_pending_jobs: waiting on estimate approval
+    - complete_jobs: finished (completed or closed)
+    """
+    out = {
+        "jobs_awarded": 0,
+        "active_jobs": 0,
+        "estimate_pending_jobs": 0,
+        "complete_jobs": 0,
+    }
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        bucket = _DASHBOARD_JOB_METRIC_BUCKETS.get(normalize_job_status_for_filter(job.get("status")))
+        if bucket:
+            out[bucket] += 1
+    return out
 
 
 def is_primary_job_number(job_number: object) -> bool:

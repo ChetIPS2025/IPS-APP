@@ -53,17 +53,16 @@ def _result_badge(result: str) -> str:
     return f'<span class="ips-qr-scan-result {cls}">{html.escape(val)}</span>'
 
 
-def render_qr_scan_history_table(
+def qr_scan_history_table_html(
     rows: list[dict[str, Any]],
     *,
     compact: bool = False,
     empty_message: str = "No QR scans recorded yet.",
-) -> None:
-    """Render QR scan log rows as a styled grid table."""
+) -> str:
+    """Return QR scan log rows as HTML for embedding inside panel cards."""
     specs = _COMPACT_COLS if compact else _FULL_COLS
     if not rows:
-        st.caption(empty_message)
-        return
+        return f'<p class="ips-panel-empty">{html.escape(empty_message)}</p>'
 
     wrap_cls = "ips-qr-scan-table ips-qr-scan-compact" if compact else "ips-qr-scan-table"
     head_cells = "".join(f"<span>{html.escape(label)}</span>" for _, label in specs)
@@ -79,7 +78,23 @@ def render_qr_scan_history_table(
                 cells.append(f"<span>{html.escape(_format_cell(field, row))}</span>")
         body += f'<div class="ips-qr-scan-row">{"".join(cells)}</div>'
 
-    st.markdown(f'<div class="{wrap_cls}">{head}{body}</div>', unsafe_allow_html=True)
+    return f'<div class="{wrap_cls}">{head}{body}</div>'
+
+
+def render_qr_scan_history_table(
+    rows: list[dict[str, Any]],
+    *,
+    compact: bool = False,
+    empty_message: str = "No QR scans recorded yet.",
+) -> None:
+    """Render QR scan log rows as a styled grid table."""
+    if not rows:
+        st.caption(empty_message)
+        return
+    st.markdown(
+        qr_scan_history_table_html(rows, compact=compact, empty_message=empty_message),
+        unsafe_allow_html=True,
+    )
 
 
 def inject_qr_scan_history_css() -> None:

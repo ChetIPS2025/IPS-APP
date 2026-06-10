@@ -7,6 +7,27 @@ import html
 import streamlit as st
 
 
+def render_panel_card(
+    title: str,
+    body_html: str = "",
+    *,
+    compact: bool = False,
+    extra_class: str = "",
+) -> None:
+    """Dashboard panel — title and body in one HTML block so Streamlit keeps content inside the card."""
+    cls = "ips-panel-card ips-panel-card-compact" if compact else "ips-panel-card"
+    if extra_class.strip():
+        cls = f"{cls} {extra_class.strip()}"
+    ot = "d" + "iv"
+    st.markdown(
+        f'<{ot} class="{html.escape(cls)}">'
+        f'<p class="ips-panel-title">{html.escape(title)}</p>'
+        f"{body_html}"
+        f"</{ot}>",
+        unsafe_allow_html=True,
+    )
+
+
 def render_card(title: str = "", body_html: str = "") -> None:
     title_html = (
         f"<h4 style='margin:0 0 0.5rem;font-size:0.95rem;'>{html.escape(title)}</h4>"
