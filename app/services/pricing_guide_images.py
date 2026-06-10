@@ -126,18 +126,12 @@ def _resolve_linked_catalog_row(
         linked = inventory_by_id.get(inv_id)
         if _usable(linked):
             return linked
+        return None
     if item_class == "Asset" and ast_id:
         linked = asset_by_id.get(ast_id)
         if _usable(linked):
             return linked
-    if inv_id:
-        linked = inventory_by_id.get(inv_id)
-        if _usable(linked):
-            return linked
-    if ast_id:
-        linked = asset_by_id.get(ast_id)
-        if _usable(linked):
-            return linked
+        return None
     return None
 
 

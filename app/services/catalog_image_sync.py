@@ -137,22 +137,27 @@ def sync_linked_catalog_images(pricing_row: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=False, error="Missing pricing item id.")
 
     pg_row = _fresh_pricing_row(pid) or pricing_row
+    item_class = str(pg_row.get("item_class") or "").strip()
     inv_id = _linked_inventory_id(pg_row)
     ast_id = _linked_asset_id(pg_row)
-    inv_row = get_inventory_item(inv_id) if inv_id else None
-    ast_row = _load_asset_row(ast_id) if ast_id else None
+    inv_row = get_inventory_item(inv_id) if inv_id and item_class == "Inventory" else None
+    ast_row = _load_asset_row(ast_id) if ast_id and item_class == "Asset" else None
 
-    source = _pick_best_image_source(pg_row, inv_row, ast_row)
-    if not source:
-        return ServiceResult(ok=True, data={"synced": 0})
-
+    candidates: list[dict[str, Any] | None] = [pg_row]
     targets: list[tuple[str, str, dict[str, Any] | None]] = [
         ("pricing_guide_items", pid, pg_row),
     ]
-    if inv_row:
+    if item_class == "Inventory" and inv_row:
+        candidates.append(inv_row)
         targets.append(("inventory_items", str(inv_row.get("id") or ""), inv_row))
-    if ast_row:
+    elif item_class == "Asset" and ast_row:
+        candidates.append(ast_row)
         targets.append(("assets", str(ast_row.get("id") or ""), ast_row))
+
+    source = _pick_best_image_source(*candidates)
+    if not source:
+        return ServiceResult(ok=True, data={"synced": 0})
+
     return _sync_targets(source, targets)
 
 

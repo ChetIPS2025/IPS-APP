@@ -293,13 +293,19 @@ def _sync_catalog_links(
 ) -> None:
     _, _, update_rows_admin = _admin()
     now = datetime.now(timezone.utc).isoformat()
-    pg_patch: dict[str, Any] = {
-        "linked_inventory_id": inventory_id,
-        "linked_asset_id": asset_id,
-        "inventory_item_id": inventory_id,
-        "asset_id": asset_id,
-        "updated_at": now,
-    }
+    pg_patch: dict[str, Any] = {"updated_at": now}
+    if inventory_id:
+        pg_patch["linked_inventory_id"] = inventory_id
+        pg_patch["inventory_item_id"] = inventory_id
+    else:
+        pg_patch["linked_inventory_id"] = None
+        pg_patch["inventory_item_id"] = None
+    if asset_id:
+        pg_patch["linked_asset_id"] = asset_id
+        pg_patch["asset_id"] = asset_id
+    else:
+        pg_patch["linked_asset_id"] = None
+        pg_patch["asset_id"] = None
     try:
         update_rows_admin("pricing_guide_items", pg_patch, {"id": pricing_item_id})
     except Exception as exc:
