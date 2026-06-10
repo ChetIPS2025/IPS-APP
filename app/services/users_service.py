@@ -25,7 +25,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 try:
-    from app.db import delete_auth_user_admin, fetch_by_match, fetch_one, resolve_auth_user_id, update_rows_admin
+    from app.db import (
+        delete_auth_user_admin,
+        fetch_by_match,
+        fetch_by_match_admin,
+        fetch_one,
+        resolve_auth_user_id,
+        set_login_password_admin,
+        update_rows_admin,
+    )
     from app.services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee
     from app.services.repository import (
         ServiceResult,
@@ -36,7 +44,15 @@ try:
         update_row,
     )
 except ImportError:
-    from db import delete_auth_user_admin, fetch_by_match, fetch_one, resolve_auth_user_id, update_rows_admin  # type: ignore
+    from db import (  # type: ignore
+        delete_auth_user_admin,
+        fetch_by_match,
+        fetch_by_match_admin,
+        fetch_one,
+        resolve_auth_user_id,
+        set_login_password_admin,
+        update_rows_admin,
+    )
     from services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee  # type: ignore
     from services.repository import (  # type: ignore
         ServiceResult,
@@ -65,20 +81,31 @@ def _utc_now_iso() -> str:
 
 
 def _find_profile_for_employee(employee_id: str, *, email: str = "") -> dict[str, Any] | None:
+    """Admin-backed lookup so login resolution works under RLS and legacy schemas."""
     eid = str(employee_id or "").strip()
-    if eid:
-        try:
-            rows = fetch_by_match("profiles", {"employee_id": eid}, limit=1) or []
-            if rows:
-                return rows[0]
-        except Exception:
-            pass
     em = str(email or "").strip().lower()
     if em:
         try:
-            row = fetch_one("profiles", {"email": em})
-            if row:
-                return row
+            rows = fetch_by_match_admin("profiles", {"email": em}, limit=2) or []
+            if len(rows) == 1:
+                return rows[0]
+            if rows:
+                for row in rows:
+                    if eid and str(row.get("employee_id") or "").strip() == eid:
+                        return row
+                return rows[0]
+        except Exception:
+            try:
+                row = fetch_one("profiles", {"email": em})
+                if row:
+                    return row
+            except Exception:
+                pass
+    if eid:
+        try:
+            rows = fetch_by_match_admin("profiles", {"employee_id": eid}, limit=1) or []
+            if rows:
+                return rows[0]
         except Exception:
             pass
     return None
@@ -240,6 +267,70 @@ def can_delete_user(user_id: str, current_user: dict[str, Any] | None = None) ->
         has_login=bool(profile and profile.get("id")),
         employee_linked=True,
         time_entry_count=te_count,
+    )
+
+
+def admin_reset_employee_password(
+    employee_id: str,
+    password: str,
+    *,
+    employee: dict[str, Any] | None = None,
+    role: str = "employee",
+    allowed_email_domain: str = "",
+) -> ServiceResult:
+    """
+    Admin sets or resets another user's app login password via Supabase Auth Admin API.
+
+    This is not for the signed-in user changing their own password.
+    """
+    if not can_manage_user_actions():
+        return ServiceResult(ok=False, error="You do not have permission to reset user passwords.")
+
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return ServiceResult(ok=False, error="Employee id is required.")
+
+    emp = employee if employee is not None else (_employee_row(eid) or {})
+    login = resolve_employee_auth_login(eid)
+    email = str(login.get("email") or emp.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return ServiceResult(ok=False, error="Add a valid work email before resetting the password.")
+    if "indfustrial" in email:
+        return ServiceResult(ok=False, error="Check spelling of company domain (found 'indfustrial').")
+
+    allow = str(allowed_email_domain or "").strip().lower()
+    if allow:
+        dom = email.split("@", 1)[1] if "@" in email else ""
+        if dom != allow:
+            return ServiceResult(ok=False, error="Email domain is not allowed for app login.")
+
+    pw = str(password or "").strip()
+    if len(pw) < 6:
+        return ServiceResult(ok=False, error="Password must be at least 6 characters.")
+
+    had_login = bool(login.get("has_login"))
+    try:
+        auth_id = set_login_password_admin(
+            email=email,
+            password=pw,
+            auth_user_id=str(login.get("auth_user_id") or ""),
+            profile_id=str(login.get("profile_id") or ""),
+            employee_id=eid,
+            full_name=str(emp.get("name") or "").strip(),
+            role=role,
+        )
+    except Exception as exc:
+        return ServiceResult(ok=False, error=str(exc).strip() or "Could not reset this user's password.")
+
+    clear_all_data_caches()
+    return ServiceResult(
+        ok=True,
+        data={
+            "email": email,
+            "auth_user_id": auth_id,
+            "created_login": not had_login,
+            "reset_password": had_login,
+        },
     )
 
 
@@ -505,6 +596,7 @@ __all__ = [
     "get_profile_by_user_id",
     "get_user_delete_context",
     "hard_delete_user",
+    "admin_reset_employee_password",
     "resolve_employee_auth_login",
     "list_profiles",
     "soft_delete_user",

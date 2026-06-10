@@ -55,11 +55,7 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.config import settings
-    from app.db import (
-        invite_auth_user,
-        resend_invite_by_email,
-        set_login_password_admin,
-    )
+    from app.db import invite_auth_user, resend_invite_by_email
     from app.services.employee_role_service import (
         auth_role_from_permission_label,
         billing_classification_options,
@@ -68,6 +64,7 @@ try:
     )
     from app.services.repository import clear_all_data_caches
     from app.services.users_service import (
+        admin_reset_employee_password,
         can_manage_user_actions,
         get_user_delete_context,
         resolve_employee_auth_login,
@@ -123,11 +120,7 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from config import settings  # type: ignore
-    from db import (  # type: ignore
-        invite_auth_user,
-        resend_invite_by_email,
-        set_login_password_admin,
-    )
+    from db import invite_auth_user, resend_invite_by_email  # type: ignore
     from services.employee_role_service import (  # type: ignore
         auth_role_from_permission_label,
         billing_classification_options,
@@ -136,6 +129,7 @@ except ImportError:
     )
     from services.repository import clear_all_data_caches  # type: ignore
     from services.users_service import (  # type: ignore
+        admin_reset_employee_password,
         can_manage_user_actions,
         get_user_delete_context,
         resolve_employee_auth_login,
@@ -780,10 +774,34 @@ def _login_panel_error_message(exc: Exception, *, action: str) -> str:
             "email domain",
             "at least 6",
             "indfustrial",
+            "could not sync the app profile",
+            "app login could not be updated",
+            "service role",
+            "admin api key",
+            "reset this user's password",
+            "password reset is not available",
+            "could not reset this user's password",
         )
     ):
         return text
     return f"Could not {action.lower()}. Try again or contact an administrator."
+
+
+def _render_login_panel_admin_details(exc: Exception, *, login: dict | None = None) -> None:
+    """Show technical login-debug details for admins only (never includes passwords)."""
+    if not can_manage_user_actions():
+        return
+    with st.expander("Technical details (admin only)"):
+        if login:
+            st.markdown(
+                "**Resolved IDs**  \n"
+                f"- Workforce employee id: `{login.get('employee_id') or '—'}`  \n"
+                f"- Supabase Auth user id: `{login.get('auth_user_id') or '—'}`  \n"
+                f"- Profile id: `{login.get('profile_id') or '—'}`  \n"
+                f"- Stored auth_user_id: `{login.get('stored_auth_user_id') or '—'}`  \n"
+                f"- Auth link stale: `{login.get('auth_link_stale')}`"
+            )
+        st.code(str(exc))
 
 
 def _clear_login_password_field(key: str) -> None:
@@ -791,28 +809,34 @@ def _clear_login_password_field(key: str) -> None:
         del st.session_state[key]
 
 
-def _create_employee_login_with_password(emp: dict, password: str) -> str:
-    eid = str(emp.get("id") or "").strip()
-    email = _employee_invite_email(emp)
-    if not email or "@" not in email:
-        raise RuntimeError("Add a valid work email before creating a login.")
-    if "indfustrial" in email:
-        raise RuntimeError("Check spelling of company domain (found 'indfustrial').")
-    if not _email_domain_allowed(email):
-        raise RuntimeError("Email domain is not allowed for app login.")
-
-    login = resolve_employee_auth_login(eid)
-    set_login_password_admin(
-        email=email,
-        password=password,
-        auth_user_id=str(login.get("auth_user_id") or ""),
-        profile_id=str(login.get("profile_id") or ""),
-        employee_id=eid or None,
-        full_name=str(emp.get("name") or "").strip(),
-        role=_invite_role_from_employee(emp),
+def _admin_allowed_email_domain() -> str:
+    return (
+        str(
+            getattr(settings, "allowed_email_domain", "")
+            or getattr(settings, "company_email_domain", "")
+            or ""
+        )
+        .strip()
+        .lower()
+        or "industrialplantsolution.com"
     )
-    clear_all_data_caches()
-    return email
+
+
+def _admin_reset_employee_login_password(emp: dict, password: str) -> tuple[str, bool]:
+    """Admin sets/resets another user's app login password (not the signed-in admin's)."""
+    eid = str(emp.get("id") or "").strip()
+    result = admin_reset_employee_password(
+        eid,
+        password,
+        employee=emp,
+        role=_invite_role_from_employee(emp),
+        allowed_email_domain=_admin_allowed_email_domain(),
+    )
+    if not result.ok:
+        raise RuntimeError(result.error or "Could not reset this user's password.")
+    email = str((result.data or {}).get("email") or _employee_invite_email(emp) or "").strip()
+    created = bool((result.data or {}).get("created_login"))
+    return email, created
 
 
 def _send_employee_invite(emp: dict) -> str:
@@ -848,7 +872,7 @@ def _resend_employee_invite(emp: dict) -> str:
 
 
 def _render_user_login_panel(emp: dict, rk: str) -> None:
-    """Create or update app login (email + password) from the user detail modal.
+    """Admin-only: create or reset another user's app login from User Details.
 
     Uses ``employees.id`` for workforce data only. Password actions resolve
     ``auth.users.id`` via :func:`resolve_employee_auth_login` first.
@@ -867,39 +891,43 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
         '<p class="ips-user-actions-title">App Login</p>',
         unsafe_allow_html=True,
     )
+    st.caption("Admin only — set or reset this user's app sign-in password (not your own).")
     if not email or "@" not in email:
         st.caption("Add a work email on this user, then set a password below.")
         return
 
     if not has_login:
-        st.caption(f"No app login is linked yet for {email}. Set a password below to create one.")
+        st.caption(f"No app login exists for {email}. Set a password below to create one.")
     else:
-        st.caption(f"Login active for {email}. Enter a new password to change it.")
+        st.caption(f"This user signs in as {email}. Enter a new password to reset it.")
     pw_key = f"emp_login_pw_{rk}"
     pw = st.text_input(
-        "Password",
+        "New password for this user",
         type="password",
         key=pw_key,
         placeholder="At least 6 characters",
-        help="Share this password with the user. They sign in on the app login screen with their email.",
+        help="Admin action: sets this user's app login password. Share it with them securely.",
     )
-    btn_label = "Update password" if has_login else "Create login"
+    btn_label = "Reset password" if has_login else "Create login"
     if st.button(btn_label, type="primary", key=f"emp_set_login_pw_{rk}", use_container_width=True):
         if len(str(pw or "").strip()) < 6:
             st.error("Enter a password of at least 6 characters.")
             _clear_login_password_field(pw_key)
         else:
             try:
-                _create_employee_login_with_password(emp, str(pw))
+                reset_email, created = _admin_reset_employee_login_password(emp, str(pw))
                 _clear_login_password_field(pw_key)
-                st.session_state["users_action_flash"] = (
-                    "success",
-                    f"{'Password updated' if has_login else 'Login created'} for {email}.",
+                flash_msg = (
+                    f"Login created for {reset_email}."
+                    if created
+                    else f"Password reset for {reset_email}."
                 )
+                st.session_state["users_action_flash"] = ("success", flash_msg)
                 st.rerun()
             except Exception as exc:
                 _clear_login_password_field(pw_key)
                 st.error(_login_panel_error_message(exc, action=btn_label))
+                _render_login_panel_admin_details(exc, login=login)
 
     if not has_login:
         if st.button(
@@ -913,6 +941,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 st.rerun()
             except Exception as exc:
                 st.error(_login_panel_error_message(exc, action="Send invite email"))
+                _render_login_panel_admin_details(exc, login=login)
     else:
         if st.button(
             "Email password reset link",
@@ -925,6 +954,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 st.rerun()
             except Exception as exc:
                 st.error(_login_panel_error_message(exc, action="Send reset email"))
+                _render_login_panel_admin_details(exc, login=login)
 
 
 def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
@@ -1144,7 +1174,7 @@ def render() -> None:
                         if fresh:
                             if len(new_pw) >= 6:
                                 try:
-                                    _create_employee_login_with_password(fresh, new_pw)
+                                    _admin_reset_employee_login_password(fresh, new_pw)
                                     flash_msg = f"User saved. They can sign in as {new_email} with the password you set."
                                 except Exception as exc:
                                     flash_kind = "warning"

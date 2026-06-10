@@ -1079,7 +1079,10 @@ def _auth_admin_user_message(exc: Exception, *, action: str) -> str:
     if "password" in msg and any(token in msg for token in ("weak", "short", "least", "characters", "strength")):
         return "Password does not meet requirements. Use at least 6 characters."
     if any(token in msg for token in ("not authorized", "unauthorized", "service role", "invalid jwt", "jwt")):
-        return "App login could not be updated right now. Contact an administrator."
+        return (
+            "Password reset is not available right now. "
+            "Confirm the Supabase service role key is configured on the server."
+        )
     return f"Could not {action}. Try again or contact an administrator."
 
 
@@ -1136,6 +1139,37 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
     return None
 
 
+def _filter_admin_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop keys that are not present on the live table (legacy schema drift)."""
+    try:
+        rows = fetch_table_admin(table, limit=1)  # type: ignore[name-defined]
+        if rows:
+            cols = frozenset(str(k) for k in rows[0].keys())
+            return {k: v for k, v in payload.items() if k in cols}
+    except Exception as exc:
+        _LOG.debug("Could not infer %s columns for payload filter: %r", table, exc)
+    return payload
+
+
+def _auth_user_id_from_profile_email(email: str) -> str:
+    """Resolve auth.users.id via admin profile row when list_users is unavailable."""
+    em = str(email or "").strip().lower()
+    if not em:
+        return ""
+    try:
+        rows = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=3)  # type: ignore[name-defined]
+    except Exception:
+        rows = []
+    for row in rows or []:
+        pid = str(row.get("id") or "").strip()
+        if not pid:
+            continue
+        auth_row = get_auth_user_by_id_admin(pid)
+        if auth_row and _auth_user_email_matches(auth_row, em):
+            return pid
+    return ""
+
+
 def resolve_auth_user_id(
     *,
     email: str = "",
@@ -1165,6 +1199,9 @@ def resolve_auth_user_id(
         if auth_row and _auth_user_email_matches(auth_row, em):
             return canonical
     if em:
+        profile_auth_id = _auth_user_id_from_profile_email(em)
+        if profile_auth_id:
+            return profile_auth_id
         found = find_auth_user_by_email_admin(em)
         if found and str(found.get("id") or "").strip():
             return str(found["id"])
@@ -1257,14 +1294,22 @@ def _upsert_profile_for_auth(
     }
     if employee_id:
         payload["employee_id"] = str(employee_id)
-    existing = fetch_one("profiles", {"id": auth_id})
+    payload = _filter_admin_table_payload("profiles", payload)
+    existing = None
+    try:
+        rows = fetch_by_match_admin("profiles", {"id": auth_id}, columns="id", limit=1)  # type: ignore[name-defined]
+        existing = rows[0] if rows else None
+    except Exception:
+        existing = fetch_one("profiles", {"id": auth_id})
     try:
         if existing:
             update_rows_admin("profiles", payload, {"id": auth_id})
         else:
             get_admin_client().table("profiles").insert(payload).execute()
     except Exception as exc:
-        raise RuntimeError(f"Could not sync profile for auth user {auth_id!r}: {exc!r}") from exc
+        raise RuntimeError(
+            f"Could not sync the app profile after updating login for {payload.get('email') or 'this user'}."
+        ) from exc
 
 
 def set_auth_user_password_admin(
@@ -1301,7 +1346,7 @@ def set_auth_user_password_admin(
                 fn({"uid": uid, "attributes": {"password": pw}})
     except Exception as exc:
         _LOG.warning("set_auth_user_password_admin failed for auth user %s: %r", uid, exc)
-        raise RuntimeError(_auth_admin_user_message(exc, action="update the password")) from exc
+        raise RuntimeError(_auth_admin_user_message(exc, action="reset this user's password")) from exc
     try:
         update_profile_admin(uid, {"must_reset_password": False})
     except Exception:
@@ -1320,11 +1365,12 @@ def set_login_password_admin(
     role: str = "employee",
 ) -> str:
     """
-    Create or update app login password for an employee.
+    Admin action: create or reset another user's app login password.
 
     ``employee_id`` is the workforce row (``employees.id``) — used only to link
     metadata after auth succeeds. Password APIs always use a resolved
     ``auth.users.id`` from :func:`resolve_auth_user_id`, never ``employees.id``.
+    Requires the Supabase **service role** admin client.
     """
     em = str(email or "").strip().lower()
     if not em or "@" not in em:
@@ -1349,14 +1395,21 @@ def set_login_password_admin(
                 "Use Create login to set up access, or contact an administrator."
             )
         set_auth_user_password_admin(auth_user_id=auth_id, password=pw)
-        _upsert_profile_for_auth(
-            auth_id=auth_id,
-            email=em,
-            full_name=full_name,
-            role=role,
-            employee_id=employee_id,
-            must_reset_password=False,
-        )
+        try:
+            _upsert_profile_for_auth(
+                auth_id=auth_id,
+                email=em,
+                full_name=full_name,
+                role=role,
+                employee_id=employee_id,
+                must_reset_password=False,
+            )
+        except Exception as exc:
+            _LOG.warning(
+                "Profile sync after password update failed for auth user %s: %r",
+                auth_id,
+                exc,
+            )
         _link_employee_auth_ids(employee_id=employee_id, auth_id=auth_id, email=em)
         stale_profile_id = str(profile_id or "").strip()
         if stale_profile_id and stale_profile_id != auth_id:
@@ -1378,22 +1431,30 @@ def set_login_password_admin(
         lower = str(exc).lower()
         if "already exists" not in lower and "duplicate" not in lower and "registered" not in lower:
             raise
-        found = find_auth_user_by_email_admin(em)
-        if not found or not str(found.get("id") or "").strip():
+        auth_id = _auth_user_id_from_profile_email(em) or str(
+            (find_auth_user_by_email_admin(em) or {}).get("id") or ""
+        ).strip()
+        if not auth_id:
             raise RuntimeError(
                 "A login already exists for this email, but it could not be linked. "
                 "Contact an administrator."
             ) from exc
-        auth_id = str(found["id"])
         set_auth_user_password_admin(auth_user_id=auth_id, password=pw)
-        _upsert_profile_for_auth(
-            auth_id=auth_id,
-            email=em,
-            full_name=full_name,
-            role=role,
-            employee_id=employee_id,
-            must_reset_password=False,
-        )
+        try:
+            _upsert_profile_for_auth(
+                auth_id=auth_id,
+                email=em,
+                full_name=full_name,
+                role=role,
+                employee_id=employee_id,
+                must_reset_password=False,
+            )
+        except Exception as upsert_exc:
+            _LOG.warning(
+                "Profile sync after password update failed for auth user %s: %r",
+                auth_id,
+                upsert_exc,
+            )
         _link_employee_auth_ids(employee_id=employee_id, auth_id=auth_id, email=em)
         _remove_orphan_profiles_for_email(em, keep_auth_id=auth_id)
         return auth_id
