@@ -86,6 +86,18 @@ def build_web_manifest() -> dict[str, str | list[dict[str, str]]]:
         "theme_color": _THEME_COLOR,
         "icons": [
             {
+                "src": _static_url("favicon.png"),
+                "sizes": "32x32",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": _static_url("apple-touch-icon.png"),
+                "sizes": "180x180",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
                 "src": _static_url("icon-192.png"),
                 "sizes": "192x192",
                 "type": "image/png",
@@ -121,6 +133,9 @@ def inject_pwa_support() -> None:
         "themeColor": _THEME_COLOR,
         "appName": _APP_NAME,
         "version": APP_VERSION,
+        "faviconPng": _static_url("favicon.png"),
+        "faviconIco": _static_url("favicon.ico"),
+        "appleTouchIcon": _static_url("apple-touch-icon.png"),
     }
 
     components.html(
@@ -159,6 +174,15 @@ def inject_pwa_support() -> None:
   }});
   const manifestUrl = URL.createObjectURL(manifestBlob);
   upsertLink('manifest', manifestUrl);
+  if (cfg.faviconIco) {{
+    upsertLink('icon', cfg.faviconIco, {{ type: 'image/x-icon' }});
+  }}
+  if (cfg.faviconPng) {{
+    upsertLink('icon', cfg.faviconPng, {{ type: 'image/png', sizes: '32x32' }});
+  }}
+  if (cfg.appleTouchIcon) {{
+    upsertLink('apple-touch-icon', cfg.appleTouchIcon, {{ sizes: '180x180' }});
+  }}
   upsertMeta('theme-color', cfg.themeColor);
   upsertMeta('mobile-web-app-capable', 'yes');
   upsertMeta('apple-mobile-web-app-capable', 'yes');

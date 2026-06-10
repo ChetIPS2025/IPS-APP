@@ -23,6 +23,9 @@ def _find_wide_logo() -> Path | None:
 
 def get_header_logo_path() -> Path | None:
     """Compact logo for page header bars (square / icon variants)."""
+    branding_icon = _ASSETS_DIR / "branding" / "ips_app_icon.png"
+    if branding_icon.is_file():
+        return branding_icon
     for name in (
         "ips_logo_header.png",
         "IPS Icon.png",

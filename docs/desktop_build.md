@@ -45,11 +45,11 @@
 
 ## Icon
 
-- EXE and window branding use **`static/ips_app.ico`** (multi-size ICO generated from the IPS PNG assets).
-- Regenerate if needed:
+- EXE and window branding use **`static/ips_app.ico`** (generated from `assets/branding/ips_app_icon_source.jpg`).
+- Regenerate all favicon/PWA/desktop icons:
 
   ```text
-  python -c "from pathlib import Path; from PIL import Image; r=Path('.'); im=Image.open(r/'static'/'icon-512.png').convert('RGBA'); sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]; ims=[im.resize(s, Image.Resampling.LANCZOS) for s in sizes]; ims[0].save(r/'static'/'ips_app.ico', format='ICO', sizes=sizes)"
+  python scripts/generate_app_icons.py
   ```
 
 ## Files involved

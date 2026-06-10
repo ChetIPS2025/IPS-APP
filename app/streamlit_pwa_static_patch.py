@@ -30,19 +30,33 @@ _TORNADO_PATCH_ATTR = "_ips_pwa_tornado_route_patch_installed"
 _tls = threading.local()
 
 _ALLOWED_FILES: Final[frozenset[str]] = frozenset(
-    ("sw.js", "manifest.json", "icon-192.png", "icon-512.png")
+    (
+        "sw.js",
+        "manifest.json",
+        "favicon.png",
+        "favicon.ico",
+        "apple-touch-icon.png",
+        "icon-192.png",
+        "icon-512.png",
+    )
 )
 
 _MEDIA_TYPES: Final[dict[str, str]] = {
     "sw.js": "application/javascript",
     "manifest.json": "application/manifest+json",
+    "favicon.png": "image/png",
+    "favicon.ico": "image/x-icon",
+    "apple-touch-icon.png": "image/png",
     "icon-192.png": "image/png",
     "icon-512.png": "image/png",
 }
 
 _ROUTE_TEMPLATE: Final[str] = "static/{path:path}"
 
-_PWA_STATIC_URL_RE: Final[str] = r"static/(?P<pwa_name>sw\.js|manifest\.json|icon-192\.png|icon-512\.png)"
+_PWA_STATIC_URL_RE: Final[str] = (
+    r"static/(?P<pwa_name>sw\.js|manifest\.json|favicon\.png|favicon\.ico|"
+    r"apple-touch-icon\.png|icon-192\.png|icon-512\.png)"
+)
 
 
 def _service_worker_allowed() -> str:

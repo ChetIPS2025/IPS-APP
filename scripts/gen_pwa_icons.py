@@ -52,27 +52,15 @@ def _make_icon(sz: int, *, maskable: bool = False) -> Image.Image:
 
 
 def main() -> None:
+    """Deprecated: regenerate from the IPS branding source instead."""
     root = Path(__file__).resolve().parents[1]
-    out_dir = root / ".streamlit" / "static" / "icons"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    static_root = root / "static"
-    static_root.mkdir(parents=True, exist_ok=True)
+    generate = root / "scripts" / "generate_app_icons.py"
+    if generate.is_file():
+        import runpy
 
-    sizes = [32, 72, 96, 128, 144, 152, 180, 192, 384, 512]
-    for sz in sizes:
-        _make_icon(sz, maskable=False).save(out_dir / f"icon-{sz}.png")
-    for sz in (192, 512):
-        _make_icon(sz, maskable=True).save(out_dir / f"icon-{sz}-maskable.png")
-
-    # PWA manifest references at repo `static/` (deploy with `/static` route) and `.streamlit/static/` (Streamlit dev)
-    for sz in (192, 512):
-        src = out_dir / f"icon-{sz}.png"
-        if src.is_file():
-            dst_st = static_root / f"icon-{sz}.png"
-            dst_st.write_bytes(src.read_bytes())
-            (root / ".streamlit" / "static" / f"icon-{sz}.png").write_bytes(src.read_bytes())
-
-    print(f"Wrote icons to {out_dir} and {static_root}")
+        runpy.run_path(str(generate), run_name="__main__")
+        return
+    print("Run scripts/generate_app_icons.py to build icons from assets/branding/ips_app_icon_source.jpg")
 
 
 if __name__ == "__main__":

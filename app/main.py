@@ -12,8 +12,10 @@ if _root_str not in sys.path:
 import streamlit as st
 
 try:
+    from app.app_icon import page_icon_path
     from app.config import settings
 except ImportError:
+    from app_icon import page_icon_path  # type: ignore
     from config import settings  # type: ignore
 
 try:
@@ -184,11 +186,19 @@ def _render_password_reset() -> None:
 def main() -> None:
     configure_logging(settings.log_level)
 
+    _page_icon = page_icon_path()
     st.set_page_config(
         page_title=getattr(settings, "app_name", "IPS Operations"),
+        page_icon=_page_icon or "🔧",
         layout="wide",
         initial_sidebar_state="expanded",
     )
+
+    try:
+        from app.pwa import inject_pwa_support
+    except ImportError:
+        from pwa import inject_pwa_support  # type: ignore
+    inject_pwa_support()
 
     init_session()
     bootstrap_auth_at_startup()

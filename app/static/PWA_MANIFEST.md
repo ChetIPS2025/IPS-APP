@@ -17,3 +17,16 @@ python scripts/sync_pwa_manifest.py
 ```
 
 Do not commit real secrets; this folder only holds public PWA assets.
+
+## Regenerating icons
+
+Official IPS app icons are generated from `assets/branding/ips_app_icon_source.jpg`
+(portrait phone screenshots are auto-cropped to the square home-screen icon):
+
+```text
+python scripts/generate_app_icons.py
+python scripts/sync_pwa_manifest.py
+```
+
+Outputs: `app/static/favicon.png`, `favicon.ico`, `apple-touch-icon.png`, `icon-*.png`,
+`.streamlit/static/favicon.png`, and `static/ips_app.ico` (desktop EXE).
