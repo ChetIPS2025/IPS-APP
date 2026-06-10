@@ -368,11 +368,16 @@ def _render_mobile_item_summary(item: dict[str, Any], *, qoh: float) -> None:
     except ImportError:
         from services.inventory_images import inventory_thumbnail_html  # type: ignore
 
+    try:
+        from app.services.catalog_stock_policy_service import derive_inventory_stock_status
+    except ImportError:
+        from services.catalog_stock_policy_service import derive_inventory_stock_status  # type: ignore
+
     name = str(item.get("name") or item.get("item_name") or "—")
     sku = str(item.get("sku") or "—")
     unit = str(item.get("unit") or "EA")
     location = str(item.get("location") or item.get("storage_location") or "—")
-    status = str(item.get("status") or "In Stock")
+    status = derive_inventory_stock_status({**item, "quantity_on_hand": qoh, "qty_on_hand": qoh})
     model_line = _item_model_line(item, sku)
     thumb = inventory_thumbnail_html(
         item,
@@ -1657,9 +1662,17 @@ def _record_mobile_shop_use(
     new_qoh = qoh - qv
     ts = datetime.now(timezone.utc).isoformat()
     try:
+        from app.services.catalog_stock_policy_service import inventory_status_fields_for_qty
+    except ImportError:
+        from services.catalog_stock_policy_service import inventory_status_fields_for_qty  # type: ignore
+    try:
         update_rows_admin(
             _INV,
-            {"quantity_on_hand": float(new_qoh), "updated_at": ts},
+            {
+                "quantity_on_hand": float(new_qoh),
+                "updated_at": ts,
+                **inventory_status_fields_for_qty(item, new_qoh),
+            },
             {"id": iid},
         )
     except Exception as exc:
@@ -1707,7 +1720,15 @@ def _record_mobile_shop_use(
                 break
     if exc is not None:
         try:
-            update_rows_admin(_INV, {"quantity_on_hand": float(qoh), "updated_at": ts}, {"id": iid})
+            update_rows_admin(
+                _INV,
+                {
+                    "quantity_on_hand": float(qoh),
+                    "updated_at": ts,
+                    **inventory_status_fields_for_qty(item, qoh),
+                },
+                {"id": iid},
+            )
         except Exception:
             pass
         return False, f"Could not record transaction: {exc}"

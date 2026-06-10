@@ -495,6 +495,8 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "quantity_checked_out": float(row.get("quantity_checked_out") or 0),
         "quantity_allocated": qty_allocated,
         "quantity_available": float(qty_available or 0),
+        "is_active": row.get("is_active", True),
+        "quantity_on_hand": float(qty or 0),
     }
 
 

@@ -32,8 +32,10 @@ __all__ = [
     "STOCK_POLICIES",
     "STOCK_POLICY_LABELS",
     "apply_pricing_stock_settings_to_inventory",
+    "derive_inventory_stock_status",
     "enrich_inventory_rows",
     "inventory_needs_reorder",
+    "inventory_status_fields_for_qty",
     "normalize_stock_policy",
     "passes_inventory_view_filter",
     "pricing_guide_lookup_maps",
@@ -115,6 +117,7 @@ def enrich_inventory_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         item["default_reorder_point"] = default_rp
         if pg:
             item["pricing_item_code"] = str(pg.get("item_code") or pg.get("sku") or "")
+        item["status"] = derive_inventory_stock_status(item)
         enriched.append(item)
     return enriched
 
@@ -127,6 +130,36 @@ def inventory_needs_reorder(row: dict[str, Any]) -> bool:
     return qty <= rp
 
 
+def _inventory_row_discontinued(row: dict[str, Any]) -> bool:
+    if row.get("is_active") is False:
+        return True
+    status = str(row.get("status") or "").strip().lower().replace("_", " ")
+    return status in {"discontinued", "inactive"}
+
+
+def derive_inventory_stock_status(row: dict[str, Any]) -> str:
+    """Derive display status from on-hand quantity and reorder policy."""
+    if _inventory_row_discontinued(row):
+        return "Discontinued"
+    qty = _inventory_qty(row)
+    if qty <= 0:
+        return "Out of Stock"
+    if inventory_needs_reorder(row):
+        return "Needs Reorder"
+    rp = _reorder_point(row)
+    if rp > 0 and qty <= rp:
+        return "Low Stock"
+    return "In Stock"
+
+
+def inventory_status_fields_for_qty(row: dict[str, Any], new_qty: float) -> dict[str, Any]:
+    """Return inventory_items fields to persist after a quantity change."""
+    patched = dict(row)
+    patched["quantity_on_hand"] = float(new_qty)
+    patched["qty_on_hand"] = float(new_qty)
+    return {"status": derive_inventory_stock_status(patched)}
+
+
 def passes_inventory_view_filter(row: dict[str, Any], *, view: str) -> bool:
     view_s = str(view or "In stock").strip()
     qty = _inventory_qty(row)
@@ -136,7 +169,8 @@ def passes_inventory_view_filter(row: dict[str, Any], *, view: str) -> bool:
         return inventory_needs_reorder(row)
     if view_s == "Zero stock":
         return qty <= 0
-    return qty > 0
+    # In stock — active catalog items remain visible even at zero on-hand.
+    return not _inventory_row_discontinued(row)
 
 
 def apply_pricing_stock_settings_to_inventory(pg_row: dict[str, Any]) -> ServiceResult:

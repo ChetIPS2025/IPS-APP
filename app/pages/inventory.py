@@ -217,6 +217,7 @@ def _normalize_inventory_status(raw: object) -> str:
         "in stock": "In Stock",
         "available": "In Stock",
         "low stock": "Low Stock",
+        "needs reorder": "Needs Reorder",
         "out of stock": "Out of Stock",
         "depleted": "Out of Stock",
         "on order": "On Order",
@@ -284,6 +285,7 @@ def _inventory_status_pill_html(status: str) -> str:
     cls_map = {
         "In Stock": "ips-inventory-status-in-stock",
         "Low Stock": "ips-inventory-status-low-stock",
+        "Needs Reorder": "ips-inventory-status-low-stock",
         "Out of Stock": "ips-inventory-status-out-of-stock",
         "On Order": "ips-inventory-status-on-order",
         "Discontinued": "ips-inventory-status-discontinued",

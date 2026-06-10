@@ -463,11 +463,16 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
         signed_qty = float(data.get("signed_quantity") or data.get("quantity_delta") or 0)
 
     ts = datetime.now(timezone.utc).isoformat()
+    try:
+        from app.services.catalog_stock_policy_service import inventory_status_fields_for_qty
+    except ImportError:
+        from services.catalog_stock_policy_service import inventory_status_fields_for_qty  # type: ignore
     inv_update = {
         "quantity_on_hand": new_qoh,
         "quantity_checked_out": new_out,
         "quantity_allocated": new_alloc,
         "updated_at": ts,
+        **inventory_status_fields_for_qty(item, new_qoh),
     }
     upd = update_row(_INV_TABLE, inv_update, {"id": iid})
     if not upd.ok:
@@ -504,6 +509,7 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
             "quantity_checked_out": prev_out,
             "quantity_allocated": prev_alloc,
             "updated_at": ts,
+            **inventory_status_fields_for_qty(item, prev_qoh),
         }, {"id": iid})
         return ServiceResult(ok=False, error=ins.error or "Could not record transaction.")
 
