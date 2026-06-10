@@ -31,7 +31,7 @@ def inject_users_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v17">
+<style id="ips-users-module-v18">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -146,6 +146,50 @@ def inject_users_module_css() -> None:
 .ips-user-status-pending {{
   background: #fef3c7;
   color: #92400e;
+}}
+.ips-admin-pw-reset-marker {{
+  display: none !important;
+}}
+.ips-admin-pw-reset-title {{
+  color: #1e3a8a !important;
+}}
+.ips-admin-auth-status {{
+  margin: 0.15rem 0 0.55rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #334155;
+}}
+.ips-admin-auth-status-label {{
+  font-weight: 700;
+  color: #475569;
+}}
+.ips-admin-auth-status-value {{
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  margin: 0 0.35rem 0 0.15rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}}
+.ips-admin-auth-status--connected .ips-admin-auth-status-value {{
+  background: #dcfce7;
+  color: #166534;
+}}
+.ips-admin-auth-status--missing .ips-admin-auth-status-value {{
+  background: #fef3c7;
+  color: #92400e;
+}}
+.ips-admin-auth-status--stale .ips-admin-auth-status-value {{
+  background: #fee2e2;
+  color: #991b1b;
+}}
+.ips-admin-auth-status-email {{
+  color: #64748b;
+  font-size: 0.75rem;
 }}
 .ips-users-checkbox-cell-marker {{
   display: none !important;

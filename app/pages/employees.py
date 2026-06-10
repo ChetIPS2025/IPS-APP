@@ -871,6 +871,30 @@ def _resend_employee_invite(emp: dict) -> str:
     return email
 
 
+def _admin_auth_status_label(login: dict) -> tuple[str, str]:
+    """Return auth status value and CSS modifier (connected / missing / stale)."""
+    if login.get("auth_link_stale"):
+        return "Stale", "stale"
+    if login.get("has_login"):
+        return "Connected", "connected"
+    return "Missing", "missing"
+
+
+def _admin_auth_status_html(*, login: dict, email: str) -> str:
+    status, modifier = _admin_auth_status_label(login)
+    email_bit = (
+        f'<span class="ips-admin-auth-status-email">{html.escape(email)}</span>'
+        if email and "@" in email
+        else ""
+    )
+    return (
+        f'<p class="ips-admin-auth-status ips-admin-auth-status--{modifier}">'
+        f'<span class="ips-admin-auth-status-label">Auth Status:</span> '
+        f'<span class="ips-admin-auth-status-value">{html.escape(status)}</span>'
+        f"{email_bit}</p>"
+    )
+
+
 def _render_user_login_panel(emp: dict, rk: str) -> None:
     """Admin-only: create or reset another user's app login from User Details.
 
@@ -887,29 +911,57 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
     email = _employee_invite_email(emp)
     has_login = bool(login.get("has_login"))
 
+    st.markdown('<div class="ips-admin-pw-reset-marker"></div>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="ips-user-actions-title">App Login</p>',
+        '<p class="ips-user-actions-title ips-admin-pw-reset-title">Admin Password Reset</p>',
         unsafe_allow_html=True,
     )
-    st.caption("Admin only — set or reset this user's app sign-in password (not your own).")
+    st.caption("Set a new password for this user's app login.")
+    st.markdown(_admin_auth_status_html(login=login, email=email), unsafe_allow_html=True)
+
     if not email or "@" not in email:
-        st.caption("Add a work email on this user, then set a password below.")
+        st.caption("Add a work email on this user before resetting their login.")
         return
 
-    if not has_login:
-        st.caption(f"No app login exists for {email}. Set a password below to create one.")
-    else:
-        st.caption(f"This user signs in as {email}. Enter a new password to reset it.")
+    status_value, _ = _admin_auth_status_label(login)
+    if status_value == "Missing":
+        st.caption("No app login is linked yet. Reset Password will create one for this email.")
+    elif status_value == "Stale":
+        st.caption("Auth link is stale. Reset Password will refresh the link to the correct login.")
+
     pw_key = f"emp_login_pw_{rk}"
     pw = st.text_input(
         "New password for this user",
         type="password",
         key=pw_key,
         placeholder="At least 6 characters",
-        help="Admin action: sets this user's app login password. Share it with them securely.",
+        help="Admin only: sets this user's app login password. This does not change your own password.",
     )
-    btn_label = "Reset password" if has_login else "Create login"
-    if st.button(btn_label, type="primary", key=f"emp_set_login_pw_{rk}", use_container_width=True):
+
+    reset_col, email_col = st.columns(2)
+    btn_label = "Reset Password"
+    with reset_col:
+        reset_clicked = st.button(
+            btn_label,
+            type="primary",
+            key=f"emp_set_login_pw_{rk}",
+            use_container_width=True,
+        )
+    with email_col:
+        if has_login:
+            email_link_clicked = st.button(
+                "Email Password Reset Link",
+                key=f"emp_resend_invite_{rk}",
+                use_container_width=True,
+            )
+        else:
+            email_link_clicked = st.button(
+                "Send Invite Email",
+                key=f"emp_send_invite_{rk}",
+                use_container_width=True,
+            )
+
+    if reset_clicked:
         if len(str(pw or "").strip()) < 6:
             st.error("Enter a password of at least 6 characters.")
             _clear_login_password_field(pw_key)
@@ -929,32 +981,22 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
                 st.error(_login_panel_error_message(exc, action=btn_label))
                 _render_login_panel_admin_details(exc, login=login)
 
-    if not has_login:
-        if st.button(
-            "Send invite email instead",
-            key=f"emp_send_invite_{rk}",
-            use_container_width=True,
-        ):
-            try:
+    if email_link_clicked:
+        try:
+            if has_login:
+                sent_to = _resend_employee_invite(emp)
+                st.session_state["users_action_flash"] = (
+                    "success",
+                    f"Password reset link sent to {sent_to}.",
+                )
+            else:
                 sent_to = _send_employee_invite(emp)
                 st.session_state["users_action_flash"] = ("success", f"Invite sent to {sent_to}.")
-                st.rerun()
-            except Exception as exc:
-                st.error(_login_panel_error_message(exc, action="Send invite email"))
-                _render_login_panel_admin_details(exc, login=login)
-    else:
-        if st.button(
-            "Email password reset link",
-            key=f"emp_resend_invite_{rk}",
-            use_container_width=True,
-        ):
-            try:
-                sent_to = _resend_employee_invite(emp)
-                st.session_state["users_action_flash"] = ("success", f"Reset link sent to {sent_to}.")
-                st.rerun()
-            except Exception as exc:
-                st.error(_login_panel_error_message(exc, action="Send reset email"))
-                _render_login_panel_admin_details(exc, login=login)
+            st.rerun()
+        except Exception as exc:
+            action = "Email Password Reset Link" if has_login else "Send Invite Email"
+            st.error(_login_panel_error_message(exc, action=action))
+            _render_login_panel_admin_details(exc, login=login)
 
 
 def _user_action_callbacks() -> tuple[Callable[[], None], Callable[[], None]]:
