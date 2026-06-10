@@ -8,9 +8,11 @@ try:
     from app.services.inventory_service import clear_inventory_cache, get_inventory_item
     from app.services.item_images import (
         copy_item_image_metadata,
+        has_owned_stored_item_image,
         has_stored_item_image,
         is_image_approved,
         record_has_item_image,
+        record_has_foreign_image_path,
     )
     from app.services.pricing_guide_service import cached_pricing_guide_rows, clear_pricing_guide_cache
     from app.services.repository import ServiceResult
@@ -18,9 +20,11 @@ except ImportError:
     from services.inventory_service import clear_inventory_cache, get_inventory_item  # type: ignore
     from services.item_images import (  # type: ignore
         copy_item_image_metadata,
+        has_owned_stored_item_image,
         has_stored_item_image,
         is_image_approved,
         record_has_item_image,
+        record_has_foreign_image_path,
     )
     from services.pricing_guide_service import cached_pricing_guide_rows, clear_pricing_guide_cache  # type: ignore
     from services.repository import ServiceResult  # type: ignore
@@ -91,7 +95,7 @@ def _fresh_pricing_row(pricing_item_id: str) -> dict[str, Any] | None:
 
 
 def _pick_best_image_source(*rows: dict[str, Any] | None) -> dict[str, Any] | None:
-    candidates = [row for row in rows if row and has_stored_item_image(row)]
+    candidates = [row for row in rows if row and has_owned_stored_item_image(row)]
     if not candidates:
         return None
     approved = [row for row in candidates if is_image_approved(row)]
@@ -101,6 +105,8 @@ def _pick_best_image_source(*rows: dict[str, Any] | None) -> dict[str, Any] | No
 def _target_needs_image_sync(target: dict[str, Any] | None, source: dict[str, Any]) -> bool:
     if not target:
         return False
+    if record_has_foreign_image_path(target):
+        return True
     if not has_stored_item_image(target):
         return True
     target_path = str(target.get("image_path") or "").strip()

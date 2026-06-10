@@ -205,6 +205,41 @@ def _clean_image_token(raw: object) -> str:
     return val
 
 
+def image_path_owned_by_record(record_id: str, path: str) -> bool:
+    """True when a storage path belongs to the given catalog row id."""
+    rid = str(record_id or "").strip()
+    normalized = str(path or "").strip().replace("\\", "/")
+    if not normalized:
+        return False
+    if not rid:
+        return True
+    if normalized == f"inventory/items/{rid}.jpg":
+        return True
+    if normalized.startswith(f"{ITEM_IMAGES_PREFIX}/"):
+        parts = [part for part in normalized.split("/") if part]
+        # assets/item_images/{entity}/{record_id}/filename
+        if len(parts) >= 4 and parts[0] == "assets" and parts[1] == "item_images":
+            return parts[3] == rid
+        return rid in parts
+    if normalized.startswith(("inventory-images/", "asset-images/")):
+        return True
+    return True
+
+
+def record_has_foreign_image_path(record: dict[str, Any] | None) -> bool:
+    """True when image_path/photo_path points at another row's storage folder."""
+    if not record:
+        return False
+    rid = str(record.get("id") or "").strip()
+    if not rid:
+        return False
+    for key in ITEM_IMAGE_PATH_FIELDS:
+        path = _clean_image_token(record.get(key))
+        if path and not image_path_owned_by_record(rid, path):
+            return True
+    return False
+
+
 def has_stored_item_image(record: dict[str, Any] | None) -> bool:
     """True when any image metadata exists, regardless of approval status."""
     if not record:
@@ -213,6 +248,13 @@ def has_stored_item_image(record: dict[str, Any] | None) -> bool:
         if _clean_image_token(record.get(key)):
             return True
     return False
+
+
+def has_owned_stored_item_image(record: dict[str, Any] | None) -> bool:
+    """Like has_stored_item_image, but ignores metadata copied from another row."""
+    if not record or record_has_foreign_image_path(record):
+        return False
+    return has_stored_item_image(record)
 
 
 def to_browser_image_src(raw: str | None, *, mime: str = "image/jpeg") -> str | None:
@@ -344,12 +386,16 @@ def resolve_image_url_by_field_priority(
     order = field_order or CATALOG_IMAGE_FIELD_PRIORITY
     mime = str(record.get("image_mime_type") or "image/jpeg").strip() or "image/jpeg"
     path_keys = frozenset(ITEM_IMAGE_PATH_FIELDS)
+    rid = str(record.get("id") or "").strip()
+    foreign_path = record_has_foreign_image_path(record)
 
     for key in order:
         val = _clean_image_token(record.get(key))
         if not val:
             continue
         if key in path_keys:
+            if rid and not image_path_owned_by_record(rid, val):
+                continue
             bucket = _bucket_for_image_path(val)
             try:
                 signed = _signed_item_image_url_cached(val, bucket or "")
@@ -363,6 +409,8 @@ def resolve_image_url_by_field_priority(
             browser = to_browser_image_src(val, mime=mime)
             if browser:
                 return browser
+            continue
+        if foreign_path:
             continue
         if val.startswith("http"):
             return to_browser_image_src(val, mime=mime) or val

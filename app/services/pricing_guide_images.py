@@ -10,6 +10,7 @@ from app.services.item_images import (
     can_apply_item_image,
     clear_item_image,
     clear_item_image_url_cache,
+    has_owned_stored_item_image,
     has_stored_item_image,
     persist_item_image,
     record_has_item_image,
@@ -136,14 +137,14 @@ def _resolve_linked_catalog_row(
 
 
 def pricing_guide_image_is_inherited(row: dict[str, Any]) -> bool:
-    if has_stored_item_image(row):
+    if has_owned_stored_item_image(row):
         return False
     return _resolve_linked_catalog_row(row, approved_only=False) is not None
 
 
 def pricing_guide_display_record(row: dict[str, Any]) -> dict[str, Any]:
     """Row shape for preview UI, inheriting photo fields from linked inventory/asset when needed."""
-    if has_stored_item_image(row):
+    if has_owned_stored_item_image(row):
         return row
     linked = _resolve_linked_catalog_row(row, approved_only=False)
     if linked:

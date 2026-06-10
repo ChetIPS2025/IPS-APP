@@ -18,10 +18,12 @@ import html
 import streamlit as st
 
 from app.services.item_images import (
+    CATALOG_IMAGE_FIELD_PRIORITY,
     INVENTORY_IMAGE_BUCKET,
     ITEM_IMAGE_FIELDS,
     clear_item_image,
     clear_item_image_url_cache,
+    has_owned_stored_item_image,
     has_stored_item_image,
     persist_item_image,
     record_has_item_image,
@@ -92,14 +94,24 @@ def _resolve_linked_image_source(item: dict[str, Any], *, approved_only: bool) -
     return None
 
 
+def _resolve_image_from_record(record: dict[str, Any] | None, *, expires_in: int = 3600) -> str | None:
+    if not record:
+        return None
+    return resolve_image_url_by_field_priority(
+        record,
+        CATALOG_IMAGE_FIELD_PRIORITY,
+        expires_in=expires_in,
+    )
+
+
 def inventory_image_is_inherited(item: dict[str, Any]) -> bool:
-    if has_stored_item_image(item):
+    if has_owned_stored_item_image(item):
         return False
     return _resolve_linked_image_source(item, approved_only=False) is not None
 
 
 def inventory_display_record(item: dict[str, Any]) -> dict[str, Any]:
-    if has_stored_item_image(item):
+    if has_owned_stored_item_image(item):
         return item
     linked = _resolve_linked_image_source(item, approved_only=False)
     if linked:
@@ -111,19 +123,9 @@ def inventory_has_image(item: dict[str, Any]) -> bool:
     return get_inventory_image_url(item) is not None
 
 
-_INVENTORY_IMAGE_FIELD_PRIORITY: tuple[str, ...] = (
-    "image_url",
-    "image_path",
-)
-
-
 def get_inventory_image_url(item: dict[str, Any], *, expires_in: int = 3600) -> str | None:
     """Browser URL for every inventory display: item → linked Pricing Guide → None (placeholder in UI)."""
-    url = resolve_image_url_by_field_priority(
-        item,
-        _INVENTORY_IMAGE_FIELD_PRIORITY,
-        expires_in=expires_in,
-    )
+    url = _resolve_image_from_record(item, expires_in=expires_in)
     if url:
         return url
     linked_pg = _linked_pricing_row(item)
