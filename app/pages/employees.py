@@ -1084,6 +1084,11 @@ def render_employee_detail_dialog(emp: dict) -> None:
             ]
         )
         _render_user_login_panel(emp, rk)
+        try:
+            from app.components.install_share import render_install_share_user_details
+        except ImportError:
+            from components.install_share import render_install_share_user_details  # type: ignore
+        render_install_share_user_details()
         _render_user_actions_panel(emp, rk)
 
     if is_edit_mode(MODULE, rk):

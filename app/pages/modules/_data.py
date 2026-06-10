@@ -643,7 +643,11 @@ def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any
         from services.updates_service import list_company_updates  # type: ignore
     rows, used = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
     _mark_if_demo(used)
-    return rows
+    try:
+        from app.components.install_share import with_welcome_install_update
+    except ImportError:
+        from components.install_share import with_welcome_install_update  # type: ignore
+    return with_welcome_install_update(rows)
 
 
 def load_recent_company_updates(*, limit: int = 5) -> list[dict[str, Any]]:

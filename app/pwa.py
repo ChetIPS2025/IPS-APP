@@ -47,6 +47,19 @@ def _start_url() -> str:
     return f"{base}/" if base else "/"
 
 
+def install_page_url() -> str:
+    """Public share link for the Install IPS App page (preferred path: ``/install``)."""
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
+    prefix = _streamlit_base_path()
+    if base:
+        return f"{base}{prefix}/install" if prefix else f"{base}/install"
+    return f"{prefix}/install" if prefix else "/install"
+
+
 def _manifest_id() -> str:
     """Stable PWA manifest id tied to :data:`APP_VERSION` (incl. ``IPS_APP_VERSION`` env)."""
     safe = re.sub(r"[^a-zA-Z0-9._-]", "-", str(APP_VERSION or "0").strip()) or "0"
@@ -286,6 +299,11 @@ def render_install_app_sidebar_block() -> None:
         unsafe_allow_html=True,
     )
     st.sidebar.caption("Add IPS to your home screen for quick access.")
+    st.sidebar.link_button(
+        "Open install page",
+        install_page_url(),
+        use_container_width=True,
+    )
 
     if st.sidebar.button("Install App", key="ips_sidebar_install_app", use_container_width=True):
         st.session_state[_IPS_TRIGGER_INSTALL_KEY] = True

@@ -7953,6 +7953,113 @@ def inject_updates_module_css() -> None:
     )
 
 
+def inject_install_page_css() -> None:
+    """Public Install IPS App page — centered card, mobile-friendly, no sidebar."""
+    st.markdown(
+        f"""
+<script>document.body.classList.add("ips-auth-login", "ips-install-page");</script>
+<style id="ips-install-page-v1">
+body.ips-install-page section[data-testid="stSidebar"],
+body.ips-install-page [data-testid="stSidebarCollapsedControl"] {{
+  display: none !important;
+}}
+body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker) .block-container {{
+  max-width: 100% !important;
+  padding: 1.5rem 1rem 2.5rem !important;
+}}
+body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker) [data-testid="stHorizontalBlock"] {{
+  width: 100% !important;
+  max-width: min(520px, calc(100vw - 1.5rem)) !important;
+  margin: 0 auto !important;
+}}
+.ips-install-card {{
+  background: #ffffff;
+  border: 1px solid {BORDER};
+  border-radius: 16px;
+  box-shadow: 0 10px 36px rgba(15, 23, 42, 0.08);
+  padding: 1.75rem 1.35rem 1.5rem;
+  text-align: center;
+  color: {TEXT};
+}}
+.ips-install-icon {{
+  width: 120px;
+  height: 120px;
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
+  margin: 0 auto 1rem;
+  display: block;
+}}
+.ips-install-title {{
+  margin: 0 0 0.45rem 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: {TEXT};
+}}
+.ips-install-lead {{
+  margin: 0 0 1.15rem 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: {TEXT_MUTED};
+}}
+.ips-install-actions {{
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}}
+.ips-install-btn {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  box-sizing: border-box;
+}}
+.ips-install-btn-primary {{
+  background: {PRIMARY};
+  color: #ffffff !important;
+}}
+.ips-install-btn-secondary {{
+  background: #f8fafc;
+  color: {TEXT} !important;
+  border: 1px solid {BORDER};
+}}
+.ips-install-steps {{
+  text-align: left;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}}
+.ips-install-steps-title {{
+  margin: 0 0 0.45rem 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}}
+.ips-install-steps ol {{
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #334155;
+}}
+.ips-install-note {{
+  margin: 0.55rem 0 0 0;
+  font-size: 0.8rem;
+  color: {TEXT_MUTED};
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_unauthenticated_shell_css() -> None:
     """Login-only layout: centered card, no sidebar navigation."""
     st.markdown(
@@ -8037,6 +8144,40 @@ body.ips-auth-login .st-key-ips_login_card .ips-page-title {{
 body.ips-auth-login .st-key-ips_login_card .ips-page-subtitle {{
   font-size: 0.92rem !important;
   color: {TEXT_MUTED} !important;
+}}
+body.ips-auth-login .ips-login-install-footer {{
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid {BORDER};
+  text-align: center;
+}}
+body.ips-auth-login .ips-login-install-footer-title {{
+  margin: 0 0 0.35rem 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}}
+body.ips-auth-login .ips-login-install-footer-text {{
+  margin: 0 0 0.65rem 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: {TEXT_MUTED};
+}}
+body.ips-auth-login .ips-login-install-footer-link {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid {BORDER};
+  color: {PRIMARY} !important;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none !important;
   margin: 0 !important;
   line-height: 1.45 !important;
 }}

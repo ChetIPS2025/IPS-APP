@@ -165,6 +165,12 @@ def _render_login() -> None:
                         except Exception as exc:
                             show_auth_error(exc)
 
+            try:
+                from app.components.install_share import render_install_share_login_footer
+            except ImportError:
+                from components.install_share import render_install_share_login_footer  # type: ignore
+            render_install_share_login_footer()
+
 
 def _render_password_reset() -> None:
     st.markdown("### Set New Password")
@@ -226,6 +232,24 @@ def main() -> None:
     except ImportError:
         from services.asset_qr import capture_asset_deeplink_from_query  # type: ignore
     capture_asset_deeplink_from_query()
+
+    try:
+        from app.pages.install_app import (
+            capture_install_route_from_query,
+            install_route_active,
+            render_install_page,
+        )
+    except ImportError:
+        from pages.install_app import (  # type: ignore
+            capture_install_route_from_query,
+            install_route_active,
+            render_install_page,
+        )
+    capture_install_route_from_query()
+
+    if install_route_active():
+        render_install_page()
+        st.stop()
 
     if inventory_scan_route_active():
         try:

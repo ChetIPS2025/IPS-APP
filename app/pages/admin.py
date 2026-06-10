@@ -270,6 +270,12 @@ def _render_app_settings(*, key_prefix: str) -> None:
     )
     if st.button("Save settings", key=f"{key_prefix}_save", type="primary"):
         st.success("Settings saved (session preferences — company_settings table in a later phase).")
+    st.markdown("---")
+    try:
+        from app.components.install_share import render_install_share_settings
+    except ImportError:
+        from components.install_share import render_install_share_settings  # type: ignore
+    render_install_share_settings()
 
 
 def render() -> None:
