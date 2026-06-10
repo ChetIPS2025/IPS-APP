@@ -11,6 +11,7 @@ def render_panel_card(
     title: str,
     body_html: str = "",
     *,
+    subtitle: str = "",
     compact: bool = False,
     extra_class: str = "",
 ) -> None:
@@ -19,9 +20,15 @@ def render_panel_card(
     if extra_class.strip():
         cls = f"{cls} {extra_class.strip()}"
     ot = "d" + "iv"
+    subtitle_html = (
+        f'<p class="ips-panel-subtitle">{html.escape(subtitle)}</p>'
+        if str(subtitle or "").strip()
+        else ""
+    )
     st.markdown(
         f'<{ot} class="{html.escape(cls)}">'
         f'<p class="ips-panel-title">{html.escape(title)}</p>'
+        f"{subtitle_html}"
         f"{body_html}"
         f"</{ot}>",
         unsafe_allow_html=True,

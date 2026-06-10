@@ -739,6 +739,22 @@ def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any
     return rows
 
 
+def load_recent_company_updates(*, limit: int = 5) -> list[dict[str, Any]]:
+    """Human company announcements for the Dashboard (not system activity events)."""
+    try:
+        from app.components.company_updates_feed import (
+            dashboard_update_visible,
+            sort_dashboard_updates,
+        )
+    except ImportError:
+        from components.company_updates_feed import (  # type: ignore
+            dashboard_update_visible,
+            sort_dashboard_updates,
+        )
+    visible = [row for row in load_company_updates() if dashboard_update_visible(row)]
+    return sort_dashboard_updates(visible)[: max(1, int(limit))]
+
+
 def demo_update_metrics() -> dict[str, int]:
     updates = load_company_updates()
     return {

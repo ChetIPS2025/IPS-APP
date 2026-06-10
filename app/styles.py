@@ -9921,9 +9921,21 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   padding-bottom: 0.55rem;
 }}
 .ips-panel-card-compact .ips-panel-title {{
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.15rem;
+  padding-bottom: 0;
+  border-bottom: none;
+}}
+.ips-panel-card-compact .ips-panel-subtitle {{
+  margin: 0 0 0.45rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid #e2e8f0;
+}}
+.ips-panel-subtitle {{
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: {TEXT_MUTED};
+  line-height: 1.35;
 }}
 .ips-panel-card-compact .ips-qr-scan-table {{
   margin-top: 0;
@@ -9965,6 +9977,70 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   margin: 0.15rem 0 0;
   font-size: 0.8rem;
   color: {TEXT_MUTED};
+}}
+.ips-dash-updates-feed {{
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}}
+.ips-dash-update-item {{
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-dash-update-item:last-child {{
+  border-bottom: none;
+  padding-bottom: 0;
+}}
+.ips-dash-update-icon {{
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}}
+.ips-dash-update-head {{
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}}
+.ips-dash-update-title {{
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: {TEXT};
+  flex: 1 1 auto;
+}}
+.ips-dash-update-date {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  white-space: nowrap;
+}}
+.ips-dash-update-pinned {{
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.08rem 0.4rem;
+}}
+.ips-dash-update-meta {{
+  font-size: 0.7rem;
+  color: {TEXT_MUTED};
+  margin-top: 0.12rem;
+}}
+.ips-dash-update-body {{
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: #475569;
+  line-height: 1.35;
 }}
 .ips-panel-title {{
   font-size: 0.9rem;

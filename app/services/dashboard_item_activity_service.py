@@ -1,4 +1,9 @@
-"""Recent item activity feed for the dashboard (inventory + serialized tools)."""
+"""
+Recent Activity feed for the Dashboard — automated system events only.
+
+Tracks inventory transactions and serialized tool check-in/out. Do not mix
+with Company Updates (human announcements from ``company_updates``).
+"""
 
 from __future__ import annotations
 
