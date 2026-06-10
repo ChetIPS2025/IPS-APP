@@ -103,28 +103,15 @@ def _install_page_scripts() -> str:
     return "desktop";
   }
 
-  function setInstallStatus(message, warn) {
+  function openInstructions() {
+    const details = document.querySelector(".ips-install-help details");
+    if (details) details.open = true;
+  }
+
+  function setInstallStatus(message) {
     document.querySelectorAll(".ips-install-status").forEach(function(el) {
       el.textContent = message;
       el.style.display = message ? "block" : "none";
-      el.classList.toggle("ips-install-status-warn", !!warn);
-    });
-  }
-
-  function scrollToDeviceSteps(device) {
-    const steps = document.querySelector(".ips-install-steps-" + device);
-    if (steps) {
-      steps.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-
-  function markInstallReady() {
-    document.querySelectorAll(".ips-install-btn-install").forEach(function(btn) {
-      btn.classList.add("ips-install-btn-ready");
-      btn.removeAttribute("aria-disabled");
-    });
-    document.querySelectorAll(".ips-install-hint-install-ready").forEach(function(el) {
-      el.style.display = "block";
     });
   }
 
@@ -134,33 +121,24 @@ def _install_page_scripts() -> str:
     const w = appWindow();
 
     if (device === "ios") {
-      scrollToDeviceSteps("ios");
-      setInstallStatus(
-        "On iPhone/iPad, Safari cannot auto-install. Use Share → Add to Home Screen below.",
-        false
-      );
+      openInstructions();
+      setInstallStatus("Use Safari Share → Add to Home Screen.");
       return;
     }
 
     if (typeof w.__ipsTriggerInstall === "function") {
       const ok = await w.__ipsTriggerInstall();
       if (ok) {
-        setInstallStatus("Follow the browser prompt to install IPS Operations.", false);
+        setInstallStatus("");
         return;
       }
     }
 
-    scrollToDeviceSteps(device);
+    openInstructions();
     if (device === "android") {
-      setInstallStatus(
-        "If no install prompt appeared, use Chrome menu → Install app (steps below).",
-        true
-      );
+      setInstallStatus("Tap Chrome menu → Install app if no prompt appeared.");
     } else {
-      setInstallStatus(
-        "If no install prompt appeared, use the install icon in Chrome/Edge (steps below).",
-        true
-      );
+      setInstallStatus("Use the install icon in your browser address bar if needed.");
     }
   }
 
@@ -171,6 +149,23 @@ def _install_page_scripts() -> str:
       btn.addEventListener("click", function(ev) {
         ev.preventDefault();
         handleInstallClick();
+      });
+    });
+    document.querySelectorAll(".ips-install-copy-btn").forEach(function(btn) {
+      if (btn.dataset.ipsCopyWired === "1") return;
+      btn.dataset.ipsCopyWired = "1";
+      btn.addEventListener("click", async function(ev) {
+        ev.preventDefault();
+        const url = btn.getAttribute("data-copy-url") || "";
+        if (!url) return;
+        try {
+          await navigator.clipboard.writeText(url);
+          btn.textContent = "Copied!";
+          setTimeout(function() { btn.textContent = "Copy Link"; }, 2000);
+        } catch (err) {
+          btn.textContent = "Copy failed";
+          setTimeout(function() { btn.textContent = "Copy Link"; }, 2000);
+        }
       });
     });
   }
@@ -195,107 +190,54 @@ def _install_page_scripts() -> str:
     applyInstallDevice();
     wireInstallButtons();
   });
-
-  const w = appWindow();
-  if (w.__ipsBipEvent) {
-    markInstallReady();
-  }
-  w.addEventListener("ips-install-ready", markInstallReady);
 })();
 </script>
 """
 
 
-def _install_page_html(
-    *,
-    icon_url: str,
-    icon_download_url: str,
-    open_url: str,
-    share_url: str,
-) -> str:
-    app_name = html.escape(str(getattr(settings, "app_name", "IPS Operations") or "IPS Operations"))
+def _install_page_html(*, icon_url: str, open_url: str, share_url: str) -> str:
     return f"""
 <div class="ips-install-card" data-device="pending">
   <img class="ips-install-icon" src="{html.escape(icon_url)}" alt="IPS App icon" width="120" height="120" />
   <h1 class="ips-install-title">Install IPS App</h1>
-  <p class="ips-install-lead ips-install-lead-ios">
-    <strong>Open IPS Operations</strong> to use the web app, or follow the steps below to
-    <strong>Add to Home Screen</strong> on iPhone/iPad.
-  </p>
-  <p class="ips-install-lead ips-install-lead-android">
-    <strong>Open IPS Operations</strong> to use the web app, or tap <strong>Install App</strong>
-    when Chrome offers the install prompt.
-  </p>
-  <p class="ips-install-lead ips-install-lead-desktop">
-    <strong>Open IPS Operations</strong> to use the web app in your browser, or click
-    <strong>Install App</strong> to add it to Chrome or Edge.
-  </p>
+  <p class="ips-install-lead">Open IPS on this device or add it to your home screen.</p>
   <div class="ips-install-actions">
-    <div class="ips-install-action-row">
-      <a class="ips-install-btn ips-install-btn-primary" href="{html.escape(open_url)}">Open IPS Operations</a>
-      <p class="ips-install-action-hint">Opens the web app in your browser.</p>
-    </div>
-    <div class="ips-install-action-row">
-      <button type="button" class="ips-install-btn ips-install-btn-secondary ips-install-btn-install"
-              aria-label="Install IPS Operations app">Install App</button>
-      <p class="ips-install-action-hint ips-install-hint-install-ios">
-        iPhone/iPad cannot auto-install — use Share → Add to Home Screen below.
-      </p>
-      <p class="ips-install-action-hint ips-install-hint-install-android">
-        Installs the app when your browser shows the install prompt.
-      </p>
-      <p class="ips-install-action-hint ips-install-hint-install-desktop">
-        Installs IPS as a desktop app in Chrome or Edge.
-      </p>
-      <p class="ips-install-action-hint ips-install-hint-install-ready">
-        Install is ready — click Install App, then confirm in the browser prompt.
-      </p>
-    </div>
-    <div class="ips-install-action-row ips-install-action-row-advanced">
-      <a class="ips-install-btn ips-install-btn-tertiary ips-install-btn-download"
-         href="{html.escape(icon_download_url)}" download="IPS-App-Icon.png">Download App Icon</a>
-      <p class="ips-install-action-hint ips-install-hint-download">
-        Optional — saves the icon image only. Does not install the app.
-      </p>
-    </div>
+    <a class="ips-install-btn ips-install-btn-primary" href="{html.escape(open_url)}">Open IPS App</a>
+    <button type="button" class="ips-install-btn ips-install-btn-secondary ips-install-btn-install"
+            aria-label="Install IPS App on this device">Install on This Device</button>
   </div>
   <p class="ips-install-status" role="status" aria-live="polite" style="display:none"></p>
-  <div class="ips-install-steps ips-install-steps-ios">
-    <h2 class="ips-install-steps-title">iPhone / iPad (Safari)</h2>
-    <ol>
-      <li>Open this page in <strong>Safari</strong>.</li>
-      <li>Tap <strong>Share</strong> (square with arrow).</li>
-      <li>Tap <strong>Add to Home Screen</strong>.</li>
-      <li>Confirm the name, then tap <strong>Add</strong>.</li>
-    </ol>
-    <p class="ips-install-note">Add to Home Screen installs the app with the IPS icon.
-    Download App Icon only saves an image file.</p>
+  <div class="ips-install-help">
+    <p class="ips-install-help-label">Need help installing?</p>
+    <details class="ips-install-help-details">
+      <summary class="ips-install-help-summary">Show Instructions</summary>
+      <div class="ips-install-steps ips-install-steps-ios">
+        <ol>
+          <li>Open this page in <strong>Safari</strong>.</li>
+          <li>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>
+          <li>Tap <strong>Add</strong>.</li>
+        </ol>
+      </div>
+      <div class="ips-install-steps ips-install-steps-android">
+        <ol>
+          <li>Tap <strong>Install on This Device</strong> above.</li>
+          <li>If needed: Chrome menu (⋮) → <strong>Install app</strong>.</li>
+        </ol>
+      </div>
+      <div class="ips-install-steps ips-install-steps-desktop">
+        <ol>
+          <li>Click <strong>Install on This Device</strong> above.</li>
+          <li>If needed: use the install icon in the Chrome or Edge address bar.</li>
+        </ol>
+      </div>
+    </details>
   </div>
-  <div class="ips-install-steps ips-install-steps-android">
-    <h2 class="ips-install-steps-title">Android (Chrome)</h2>
-    <ol>
-      <li>Tap <strong>Install App</strong> above when the browser offers the install prompt.</li>
-      <li>If no prompt appears, open this page in <strong>Chrome</strong>.</li>
-      <li>Tap the <strong>menu</strong> (three dots) → <strong>Install app</strong> or
-          <strong>Add to Home screen</strong>.</li>
-      <li>Confirm to add the app with the IPS icon.</li>
-    </ol>
-    <p class="ips-install-note">Download App Icon only saves an image file — it does not install the app.</p>
+  <div class="ips-install-share">
+    <p class="ips-install-share-note">Share this link:</p>
+    <p class="ips-install-share-url">{html.escape(share_url)}</p>
+    <button type="button" class="ips-install-btn ips-install-btn-copy ips-install-copy-btn"
+            data-copy-url="{html.escape(share_url)}">Copy Link</button>
   </div>
-  <div class="ips-install-steps ips-install-steps-desktop">
-    <h2 class="ips-install-steps-title">Computer (Chrome or Edge)</h2>
-    <ol>
-      <li>Click <strong>Install App</strong> above when your browser supports it.</li>
-      <li>Or click <strong>Open IPS Operations</strong> to use the app in your browser tab.</li>
-      <li><strong>Chrome:</strong> Click the install icon in the address bar, or Menu (⋮) →
-          <strong>Install IPS Operations</strong> / <strong>Install app</strong>.</li>
-      <li><strong>Microsoft Edge:</strong> Open the menu → <strong>Apps</strong> →
-          <strong>Install this site as an app</strong>.</li>
-    </ol>
-    <p class="ips-install-note">Downloading the icon PNG only saves an image file — it does not install the app.</p>
-  </div>
-  <p class="ips-install-share-note">Share this install link with anyone:</p>
-  <p class="ips-install-share-url"><a href="{html.escape(share_url)}">{html.escape(share_url)}</a></p>
 </div>
 """
 
@@ -317,7 +259,6 @@ def render_install_page() -> None:
         from pwa import install_page_url  # type: ignore
 
     icon_url = _absolute_static_url("apple-touch-icon.png")
-    icon_download = _absolute_static_url("icon-512.png")
     open_url = _open_app_url()
     share_url = install_page_url()
 
@@ -326,7 +267,6 @@ def render_install_page() -> None:
         st.markdown(
             _install_page_html(
                 icon_url=icon_url,
-                icon_download_url=icon_download,
                 open_url=open_url,
                 share_url=share_url,
             ),
