@@ -10416,6 +10416,142 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   color: #475569;
   line-height: 1.35;
 }}
+.st-key-dashboard_company_updates {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 1.1rem 1.25rem 1.2rem;
+  margin: 0 0 1.15rem;
+}}
+.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type {{
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-dash-cu-hero-title {{
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: {TEXT};
+  letter-spacing: -0.01em;
+}}
+.ips-dash-cu-hero-subtitle {{
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: {TEXT_MUTED};
+  line-height: 1.4;
+}}
+.ips-dash-cu-body {{
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}}
+.ips-dash-cu-featured {{
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 58%);
+  border: 1px solid #dbeafe;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  padding: 1.1rem 1.15rem;
+}}
+.ips-dash-cu-featured-icon {{
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}}
+.ips-dash-cu-featured-content {{
+  flex: 1 1 auto;
+  min-width: 0;
+}}
+.ips-dash-cu-featured-head {{
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+}}
+.ips-dash-cu-featured-title {{
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: {TEXT};
+  line-height: 1.25;
+}}
+.ips-dash-cu-featured-badge {{
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}}
+.ips-dash-cu-featured-body {{
+  margin: 0.55rem 0 0;
+  font-size: 0.92rem;
+  color: #334155;
+  line-height: 1.5;
+}}
+.ips-dash-cu-featured-meta {{
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: {TEXT_MUTED};
+}}
+.ips-dash-cu-recent-heading {{
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: {TEXT};
+}}
+.ips-dash-cu-recent-list {{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}}
+.ips-dash-cu-recent-item {{
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  color: #334155;
+}}
+.ips-dash-cu-recent-bullet {{
+  color: #2563eb;
+  font-weight: 700;
+}}
+.ips-dash-cu-recent-name {{
+  font-weight: 600;
+}}
+.ips-dash-cu-empty {{
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: {TEXT_MUTED};
+}}
+@media (max-width: 768px) {{
+  .st-key-dashboard_company_updates {{
+    padding: 0.95rem 0.9rem 1rem;
+  }}
+  .ips-dash-cu-featured {{
+    flex-direction: column;
+    gap: 0.75rem;
+  }}
+  .ips-dash-cu-featured-title {{
+    font-size: 1.05rem;
+  }}
+}}
 .ips-panel-title {{
   font-size: 0.9rem;
   font-weight: 700;

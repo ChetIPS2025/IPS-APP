@@ -11,7 +11,7 @@ try:
     from app.auth import current_profile
     from app.components.cards import render_kpi_card, render_panel_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
-    from app.components.company_updates_feed import company_updates_feed_html
+    from app.components.company_updates_feed import render_dashboard_company_updates_section
     from app.components.feeds import render_activity_feed
     from app.components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html
     from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
@@ -33,7 +33,7 @@ except ImportError:
     from auth import current_profile  # type: ignore
     from components.cards import render_kpi_card, render_panel_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
-    from components.company_updates_feed import company_updates_feed_html  # type: ignore
+    from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
     from components.feeds import render_activity_feed  # type: ignore
     from components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html  # type: ignore
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
@@ -101,6 +101,8 @@ def render() -> None:
         actions=[_dash_period, _dash_customize],
     )
 
+    render_dashboard_company_updates_section(load_recent_company_updates(limit=8))
+
     kpis = load_dashboard_kpis()
     ot = "d" + "iv"
     st.markdown(f'<{ot} class="ips-kpi-grid">', unsafe_allow_html=True)
@@ -141,12 +143,6 @@ def render() -> None:
         render_donut_chart(cats, center_label="Total", center_value=fmt_currency(total), money_legend=True)
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
     with row1_r:
-        render_panel_card(
-            "Company Updates",
-            company_updates_feed_html(load_recent_company_updates(limit=5)),
-            subtitle="Human announcements — safety, policy, schedule, and shop notices",
-            compact=True,
-        )
         st.markdown(
             f'<{ot} class="ips-panel-card">'
             f'<p class="ips-panel-title">Recent Activity</p>'
