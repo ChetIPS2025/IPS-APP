@@ -712,24 +712,12 @@ def audit_trailer_tools(
 
 
 def import_serialized_tools(rows: list[dict[str, Any]], *, trailer_id: str = "") -> ServiceResult:
-    created = 0
-    errors: list[str] = []
-    for idx, row in enumerate(rows, start=1):
-        data = {
-            **row,
-            "current_container_asset_id": _clean_text(row.get("trailer_id") or trailer_id) or None,
-        }
-        result = create_serialized_tool(data)
-        if result.ok:
-            created += 1
-        else:
-            errors.append(f"Row {idx}: {result.error or 'failed'}")
-    if created == 0 and errors:
-        return ServiceResult(ok=False, error="; ".join(errors[:5]))
-    return ServiceResult(
-        ok=True,
-        data={"created": created, "errors": errors},
-    )
+    """Import serialized tools from normalized spreadsheet rows (use parse_bulk_import_file first)."""
+    try:
+        from app.services.quick_add_tool_service import bulk_import_tools
+    except ImportError:
+        from services.quick_add_tool_service import bulk_import_tools  # type: ignore
+    return bulk_import_tools(rows, default_kind="serialized", default_trailer_id=trailer_id)
 
 
 __all__ = [

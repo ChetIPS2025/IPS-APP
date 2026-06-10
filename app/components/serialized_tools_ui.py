@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import csv
-import io
 from typing import Any
 
 import streamlit as st
@@ -11,6 +9,7 @@ import streamlit as st
 try:
     from app.pages._core._data import load_assets, load_employees, load_jobs
     from app.services.asset_kits_service import asset_is_kit, get_tool_trailers
+    from app.services.quick_add_tool_service import bulk_import_tools, parse_bulk_import_file
     from app.services.serialized_tool_service import (
         MILWAUKEE_TOOL_TYPES,
         SERIALIZED_TOOL_STATUSES,
@@ -18,7 +17,6 @@ try:
         checkin_serialized_tool,
         checkout_serialized_tool,
         create_serialized_tool,
-        import_serialized_tools,
         is_serialized_tool_asset,
         mark_serialized_tool_status,
         serialized_tool_view,
@@ -27,6 +25,7 @@ try:
 except ImportError:
     from pages._core._data import load_assets, load_employees, load_jobs  # type: ignore
     from services.asset_kits_service import asset_is_kit, get_tool_trailers  # type: ignore
+    from services.quick_add_tool_service import bulk_import_tools, parse_bulk_import_file  # type: ignore
     from services.serialized_tool_service import (  # type: ignore
         MILWAUKEE_TOOL_TYPES,
         SERIALIZED_TOOL_STATUSES,
@@ -34,7 +33,6 @@ except ImportError:
         checkin_serialized_tool,
         checkout_serialized_tool,
         create_serialized_tool,
-        import_serialized_tools,
         is_serialized_tool_asset,
         mark_serialized_tool_status,
         serialized_tool_view,
@@ -129,25 +127,47 @@ def render_serialized_tools_toolbar() -> None:
 
     with st.expander("Import tools (CSV)", expanded=False):
         st.caption(
-            "Columns: asset_name, model_number, serial_number, asset_type, asset_number, notes. "
-            "Optional trailer_asset_number to assign all rows to one trailer."
+            "Columns: tool_name (or asset_name), model_number, serial_number, asset_type, asset_number, "
+            "notes, trailer (or trailer_asset_number). Header spacing/case is normalized automatically."
         )
-        uploaded = st.file_uploader("CSV file", type=["csv"], key="st_import_csv")
+        uploaded = st.file_uploader("CSV file", type=["csv", "xlsx", "xls"], key="st_import_csv")
         trailer_labels, trailer_map = _trailer_options()
         trailer_pick = st.selectbox(
             "Default Tool Trailer",
             trailer_labels,
             key="st_import_trailer",
         )
-        if uploaded and st.button("Import CSV", key="st_import_go"):
-            text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
-            reader = csv.DictReader(io.StringIO(text))
-            rows = [dict(r) for r in reader]
+        parsed_rows: list[dict[str, Any]] = []
+        if uploaded:
+            try:
+                parsed_rows = parse_bulk_import_file(uploaded.getvalue(), uploaded.name)
+            except Exception as exc:
+                st.error(f"Could not read file: {exc}")
+            if parsed_rows:
+                preview = []
+                for row in parsed_rows[:25]:
+                    preview.append(
+                        {
+                            "Tool": str(row.get("tool_name") or "").strip() or "—",
+                            "Model #": str(row.get("model_number") or "").strip() or "—",
+                            "Serial": str(row.get("serial_number") or "").strip() or "—",
+                            "Trailer #": str(row.get("trailer_asset_number") or "").strip() or "—",
+                        }
+                    )
+                st.caption(f"{len(parsed_rows)} row(s) parsed — preview below.")
+                st.dataframe(preview, use_container_width=True, hide_index=True)
+            elif uploaded:
+                st.warning("No rows found in file.")
+        if uploaded and parsed_rows and st.button("Import CSV", key="st_import_go"):
             trailer_id = trailer_map.get(trailer_pick) if trailer_pick != "— None —" else ""
-            result = import_serialized_tools(rows, trailer_id=trailer_id)
+            result = bulk_import_tools(
+                parsed_rows,
+                default_kind="serialized",
+                default_trailer_id=trailer_id,
+            )
             if result.ok:
                 data = result.data or {}
-                st.success(f"Imported {data.get('created', 0)} tool(s).")
+                st.success(str(data.get("message") or f"Imported {data.get('created', 0)} tool(s)."))
                 errors = data.get("errors") or []
                 for err in errors[:5]:
                     st.warning(str(err))

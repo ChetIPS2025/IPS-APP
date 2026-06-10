@@ -67,6 +67,8 @@ _IMPORT_ALIASES: dict[str, str] = {
     "location": "storage_location",
     "vendor": "vendor",
     "trailer_asset_number": "trailer_asset_number",
+    "trailer": "trailer_asset_number",
+    "tool_trailer": "trailer_asset_number",
 }
 
 
