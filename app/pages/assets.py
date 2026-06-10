@@ -2310,12 +2310,9 @@ def render() -> None:
             '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        export_col, template_col, import_col, quick_col, new_col = st.columns(
-            [0.85, 1.15, 1.0, 1.55, 1.25],
-            gap="small",
-        )
+        export_col, template_col, import_col, quick_col, new_col = st.columns(5, gap="small")
         with export_col:
-            st.button("Export", key="ast_export", use_container_width=True)
+            st.button("Export", key="ast_export")
         with template_col:
             st.download_button(
                 "CSV Template",
@@ -2323,23 +2320,22 @@ def render() -> None:
                 file_name="small_hand_tools_import_template.csv",
                 mime="text/csv",
                 key="ast_hand_tool_csv_template",
-                use_container_width=True,
             )
         with import_col:
-            if st.button("Import CSV", key="ast_hand_tool_import", use_container_width=True):
+            if st.button("Import CSV", key="ast_hand_tool_import"):
                 open_hand_tool_import_dialog()
         with quick_col:
-            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary", use_container_width=True):
+            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
                 open_quick_add_tool_dialog()
         with new_col:
-            if st.button("+ New Asset", key="ast_new", use_container_width=True):
+            if st.button("+ New Asset", key="ast_new"):
                 st.session_state["ips_ast_form"] = True
 
     render_page_brand_header(
         "Assets",
         "Track and manage all company assets and equipment.",
         actions=[_assets_header_actions],
-        actions_column_ratio=(0.55, 0.45),
+        actions_column_ratio=(0.38, 0.62),
     )
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):

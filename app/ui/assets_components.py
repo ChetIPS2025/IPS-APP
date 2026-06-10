@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v21"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v22"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -68,7 +68,7 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-anchor) > div {
             padding: 0.35rem 0.65rem 0.5rem !important;
         }
-        /* Assets header: Export | Quick Add Tool | New Asset — one compact row */
+        /* Assets header: Export | CSV Template | Import CSV | Quick Add | New Asset */
         .ips-assets-page-header-actions {
             display: none !important;
         }
@@ -79,57 +79,46 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) {
             align-items: flex-end !important;
-            justify-content: flex-start !important;
+            justify-content: flex-end !important;
+            min-width: 0 !important;
+            overflow-x: auto !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-wrap: nowrap !important;
-            align-items: stretch !important;
+            align-items: center !important;
             justify-content: flex-end !important;
-            gap: 0.5rem !important;
-            width: 100% !important;
+            gap: 0.45rem !important;
+            width: max-content !important;
             max-width: 100% !important;
+            margin-left: auto !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            flex: 1 1 0 !important;
+            flex: 0 0 auto !important;
             width: auto !important;
-            min-width: 0 !important;
+            min-width: max-content !important;
             max-width: none !important;
             padding-left: 0 !important;
             padding-right: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {
-            flex: 1 0 5.25rem !important;
-            min-width: 5.25rem !important;
-        }
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton,
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
-            flex: 1.75 0 11.5rem !important;
-            min-width: 11.5rem !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions)
-        [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-            flex: 1.35 0 8.5rem !important;
-            min-width: 8.5rem !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] {
             margin: 0 !important;
-            width: 100% !important;
+            width: auto !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button {
-            width: 100% !important;
-            min-width: 0 !important;
-            max-width: 100% !important;
+        [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button {
+            width: auto !important;
+            min-width: max-content !important;
+            max-width: none !important;
             white-space: nowrap !important;
             overflow: visible !important;
             text-overflow: clip !important;
@@ -140,12 +129,24 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button p,
         section[data-testid="stMain"]:has(.ips-assets-page)
-        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stButton"] > button p {
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stButton"] > button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button span {
             white-space: nowrap !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [class*="st-key-ast_export"] .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [class*="st-key-ast_hand_tool_csv_template"] [data-testid="stDownloadButton"] > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="column"]:has(.ips-assets-page-header-actions)
+        [class*="st-key-ast_hand_tool_import"] .stButton > button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [class*="st-key-ast_new"] .stButton > button {
