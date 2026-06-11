@@ -578,14 +578,13 @@ def _next_sort_order(rows: list[dict[str, Any]]) -> int:
     return max(int(r.get("sort_order") or 0) for r in rows) + 1
 
 
-def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+def _material_insert_payload(estimate_id: str, data: dict[str, Any], sort_order: int) -> dict[str, Any]:
     eid = _str(estimate_id)
-    existing, _ = get_estimate_materials(eid)
     qty = _num(data.get("quantity") or data.get("qty"))
     unit_cost = _num(data.get("unit_cost"))
     markup_percent = _num(data.get("markup_percent"))
     calc = calc_material_line(qty, unit_cost, markup_percent)
-    payload = {
+    return {
         "estimate_id": eid,
         "pricing_item_id": data.get("pricing_item_id") or None,
         "inventory_item_id": data.get("inventory_item_id") or None,
@@ -605,12 +604,47 @@ def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResu
         "price_total": calc["price_total"],
         "taxable": _bool(data.get("taxable"), True),
         "notes": _str(data.get("notes")),
-        "sort_order": _next_sort_order(existing),
+        "sort_order": sort_order,
     }
+
+
+def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+    eid = _str(estimate_id)
+    existing, _ = get_estimate_materials(eid)
+    payload = _material_insert_payload(eid, data, _next_sort_order(existing))
     result = insert_row("estimate_line_items", payload)
     if result.ok:
         recalculate_and_save_estimate_totals(eid)
     return result
+
+
+def add_estimate_material_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple material/pricing lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one pricing item with quantity.")
+    existing, _ = get_estimate_materials(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        payload = _material_insert_payload(eid, data, sort_base + i)
+        result = insert_row("estimate_line_items", payload)
+        if not result.ok:
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} pricing items. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save pricing items.")
+    return ServiceResult(ok=True, data={"saved": inserted})
 
 
 def update_estimate_material(line_id: str, data: dict[str, Any]) -> ServiceResult:
@@ -804,26 +838,31 @@ def _delete_line(table: str, line_id: str, *, estimate_id: str = "") -> ServiceR
     return result
 
 
-def add_estimate_equipment(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+def _insert_equipment_line(
+    estimate_id: str,
+    data: dict[str, Any],
+    sort_order: int,
+    *,
+    recalc: bool,
+) -> ServiceResult:
     eid = _str(estimate_id)
-    existing, _ = get_estimate_equipment(eid)
     calc = calc_equipment_line(
         data.get("quantity"),
         data.get("duration"),
         data.get("cost_rate"),
         data.get("markup_percent"),
     )
-    sort_order = _next_sort_order(existing)
     if _equipment_storage_is_line_items():
         result = insert_row(
             "estimate_line_items",
             _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
         )
-        if result.ok:
+        if result.ok and recalc:
             recalculate_and_save_estimate_totals(eid)
         return result
 
     payload = {
+        "estimate_id": eid,
         "asset_id": data.get("asset_id") or None,
         "equipment_name": _str(data.get("equipment_name")),
         "equipment_type": _str(data.get("equipment_type")),
@@ -838,20 +877,57 @@ def add_estimate_equipment(estimate_id: str, data: dict[str, Any]) -> ServiceRes
         "notes": _str(data.get("notes")),
         "sort_order": sort_order,
     }
-    result = _add_line(_EQUIPMENT_TABLE, eid, payload)
+    result = insert_row(_EQUIPMENT_TABLE, payload)
     if result.ok:
+        if recalc:
+            recalculate_and_save_estimate_totals(eid)
         return result
-    if result.error and _is_missing_table_message(result.error):
+    if result.error and _is_missing_table_message(str(result.error)):
         _mark_equipment_uses_line_items()
         retry = insert_row(
             "estimate_line_items",
             _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
         )
         if retry.ok:
-            recalculate_and_save_estimate_totals(eid)
+            if recalc:
+                recalculate_and_save_estimate_totals(eid)
             return retry
         return ServiceResult(ok=False, error=_EQUIPMENT_MISSING_MSG)
     return result
+
+
+def add_estimate_equipment(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+    eid = _str(estimate_id)
+    existing, _ = get_estimate_equipment(eid)
+    return _insert_equipment_line(eid, data, _next_sort_order(existing), recalc=True)
+
+
+def add_estimate_equipment_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple equipment lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one equipment line.")
+    existing, _ = get_estimate_equipment(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        result = _insert_equipment_line(eid, data, sort_base + i, recalc=False)
+        if not result.ok:
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} equipment lines. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save equipment lines.")
+    return ServiceResult(ok=True, data={"saved": inserted})
 
 
 def update_estimate_equipment(line_id: str, data: dict[str, Any]) -> ServiceResult:
@@ -1037,6 +1113,35 @@ def add_estimate_travel(estimate_id: str, data: dict[str, Any]) -> ServiceResult
     existing, _ = get_estimate_travel(estimate_id)
     payload = {**_travel_payload(data), "sort_order": _next_sort_order(existing)}
     return _add_line("estimate_travel", estimate_id, payload)
+
+
+def add_estimate_travel_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple travel lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one travel line with a cost.")
+    existing, _ = get_estimate_travel(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        payload = {**_travel_payload(data), "estimate_id": eid, "sort_order": sort_base + i}
+        result = insert_row("estimate_travel", payload)
+        if not result.ok:
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} travel lines. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save travel lines.")
+    return ServiceResult(ok=True, data={"saved": inserted})
 
 
 def update_estimate_travel(line_id: str, data: dict[str, Any]) -> ServiceResult:
