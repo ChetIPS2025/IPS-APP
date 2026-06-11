@@ -363,7 +363,14 @@ def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) 
     try:
         rows = update_rows_admin(table, filtered, {"id": rid})
     except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+        try:
+            from app.auth import friendly_auth_error_message
+        except ImportError:
+            from auth import friendly_auth_error_message  # type: ignore
+        return ServiceResult(
+            ok=False,
+            error=friendly_auth_error_message(exc, operation=f"save image for {table}"),
+        )
     if not rows:
         return ServiceResult(
             ok=False,
@@ -592,7 +599,14 @@ def persist_item_image(
     try:
         upload_bytes_admin(storage_path, data, mime, bucket=None)
     except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+        try:
+            from app.auth import friendly_auth_error_message
+        except ImportError:
+            from auth import friendly_auth_error_message  # type: ignore
+        return ServiceResult(
+            ok=False,
+            error=friendly_auth_error_message(exc, operation="upload image"),
+        )
 
     status = normalize_image_status(image_status)
     payload: dict[str, Any] = {

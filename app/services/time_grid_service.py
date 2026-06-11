@@ -6,9 +6,19 @@ from datetime import date, timedelta
 from typing import Any
 
 try:
-    from db import get_client
+    from db import delete_rows, get_client, insert_row, run_user_supabase_operation, update_rows
 except ImportError:
-    from app.db import get_client  # type: ignore
+    from app.db import (  # type: ignore
+        delete_rows,
+        get_client,
+        insert_row,
+        run_user_supabase_operation,
+        update_rows,
+    )
+
+
+def _run_time_entries_query(operation: str, fn):
+    return run_user_supabase_operation(operation, fn, friendly_on_failure=False)
 
 
 def monday_of_week(d: date) -> date:
@@ -21,27 +31,34 @@ def week_dates(week_start: date) -> list[date]:
 
 def fetch_time_entries_for_date(work_date: date) -> list[dict[str, Any]]:
     wd = work_date.isoformat()[:10]
-    r = (
-        get_client()
-        .table("time_entries")
-        .select("*")
-        .eq("work_date", wd)
-        .limit(20000)
-        .execute()
-    )
+
+    def _run():
+        return (
+            get_client()
+            .table("time_entries")
+            .select("*")
+            .eq("work_date", wd)
+            .limit(20000)
+            .execute()
+        )
+
+    r = _run_time_entries_query("read time_entries", _run)
     return r.data or []
 
 
 def fetch_time_entries_between(work_start: date, work_end: date) -> list[dict[str, Any]]:
-    r = (
-        get_client()
-        .table("time_entries")
-        .select("*")
-        .gte("work_date", work_start.isoformat())
-        .lte("work_date", work_end.isoformat())
-        .limit(20000)
-        .execute()
-    )
+    def _run():
+        return (
+            get_client()
+            .table("time_entries")
+            .select("*")
+            .gte("work_date", work_start.isoformat())
+            .lte("work_date", work_end.isoformat())
+            .limit(20000)
+            .execute()
+        )
+
+    r = _run_time_entries_query("read time_entries", _run)
     return r.data or []
 
 
@@ -80,23 +97,26 @@ def grid_labor_cost_dollars(hours: float, employee: dict | None) -> float:
 
 
 def fetch_entries_employee_between(employee_id: str, work_start: date, work_end: date) -> list[dict[str, Any]]:
-    r = (
-        get_client()
-        .table("time_entries")
-        .select("*")
-        .eq("employee_id", employee_id)
-        .gte("work_date", work_start.isoformat())
-        .lte("work_date", work_end.isoformat())
-        .limit(10000)
-        .execute()
-    )
+    def _run():
+        return (
+            get_client()
+            .table("time_entries")
+            .select("*")
+            .eq("employee_id", employee_id)
+            .gte("work_date", work_start.isoformat())
+            .lte("work_date", work_end.isoformat())
+            .limit(10000)
+            .execute()
+        )
+
+    r = _run_time_entries_query("read time_entries", _run)
     return r.data or []
 
 
 def delete_time_entries_by_ids(entry_ids: list[str]) -> None:
     for eid in entry_ids:
         if eid:
-            get_client().table("time_entries").delete().eq("id", eid).execute()
+            delete_rows("time_entries", {"id": eid})
 
 
 def delete_employee_work_date(employee_id: str, work_date: date) -> int:
@@ -133,22 +153,21 @@ def upsert_time_entry(
     time_type: str | None = None,
 ) -> None:
     """Insert or update one row: (employee, job, day, ST|OT) or (employee, non_job_code, day, ST|OT)."""
-    try:
-        from db import insert_row, update_rows
-    except ImportError:
-        from app.db import insert_row, update_rows  # type: ignore
-
     tt = _normalize_time_type(time_type)
     wd = work_date.isoformat()[:10]
-    client = get_client()
-    r = (
-        client.table("time_entries")
-        .select("id,job_id,non_job_code,time_type")
-        .eq("employee_id", employee_id)
-        .eq("work_date", wd)
-        .limit(500)
-        .execute()
-    )
+
+    def _lookup():
+        return (
+            get_client()
+            .table("time_entries")
+            .select("id,job_id,non_job_code,time_type")
+            .eq("employee_id", employee_id)
+            .eq("work_date", wd)
+            .limit(500)
+            .execute()
+        )
+
+    r = _run_time_entries_query("read time_entries", _lookup)
     rows = r.data or []
     row0 = None
     if job_id:

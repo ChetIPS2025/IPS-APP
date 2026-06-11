@@ -28,7 +28,19 @@ def table_exists(table_name: str, *, admin: bool = False) -> bool:
 
             client = get_client()
     try:
-        client.table(table_name).select("id").limit(1).execute()
+        if admin:
+            client.table(table_name).select("id").limit(1).execute()
+        else:
+            try:
+                from app.db import run_user_supabase_operation
+            except ImportError:
+                from db import run_user_supabase_operation  # type: ignore
+
+            run_user_supabase_operation(
+                f"read {table_name}",
+                lambda: client.table(table_name).select("id").limit(1).execute(),
+                friendly_on_failure=False,
+            )
         return True
     except Exception as exc:
         _LOG.debug("table_exists(%s): %s", table_name, exc)

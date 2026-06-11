@@ -26,15 +26,13 @@ TOOL_KIND_LABELS: dict[str, str] = {
     "inventory": "Inventory (consumables)",
 }
 
-_SESSION_EXPIRED_HINT = (
-    "Your session expired. Refresh the page, sign in again, and retry."
-)
-
-
 def _friendly_tool_save_error(err: str) -> str:
-    low = str(err or "").casefold()
-    if "pgrst303" in low or "jwt expired" in low:
-        return _SESSION_EXPIRED_HINT
+    try:
+        from app.auth import SESSION_EXPIRED_USER_MESSAGE, is_jwt_expired_error
+    except ImportError:
+        from auth import SESSION_EXPIRED_USER_MESSAGE, is_jwt_expired_error  # type: ignore
+    if is_jwt_expired_error(RuntimeError(str(err or ""))):
+        return SESSION_EXPIRED_USER_MESSAGE
     return str(err or "Save failed.")
 
 _IMPORT_ALIASES: dict[str, str] = {
@@ -308,9 +306,13 @@ def bulk_import_tools(
             errors.append(f"Row {idx}: {_friendly_tool_save_error(result.error or 'failed')}")
 
     if created == 0 and errors:
+        try:
+            from app.auth import SESSION_EXPIRED_USER_MESSAGE
+        except ImportError:
+            from auth import SESSION_EXPIRED_USER_MESSAGE  # type: ignore
         unique_msgs = list(dict.fromkeys(errors))
-        if len(unique_msgs) == 1 and _SESSION_EXPIRED_HINT in unique_msgs[0]:
-            summary = _SESSION_EXPIRED_HINT
+        if len(unique_msgs) == 1 and SESSION_EXPIRED_USER_MESSAGE in unique_msgs[0]:
+            summary = SESSION_EXPIRED_USER_MESSAGE
         else:
             summary = "; ".join(unique_msgs[:5])
         return ServiceResult(ok=False, error=summary, data={"created": 0, "errors": errors})

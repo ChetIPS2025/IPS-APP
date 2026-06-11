@@ -16,8 +16,10 @@ try:
         fetch_list,
         fetch_rows,
         insert_row,
+        insert_row_admin,
         table_column_names,
         update_row,
+        update_row_admin,
     )
 except ImportError:
     from services.repository import (  # type: ignore
@@ -27,8 +29,10 @@ except ImportError:
         fetch_list,
         fetch_rows,
         insert_row,
+        insert_row_admin,
         table_column_names,
         update_row,
+        update_row_admin,
     )
 
 def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
@@ -1350,8 +1354,8 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         payload["current_holder_employee_id"] = eid or None
     payload = {k: v for k, v in payload.items() if v is not None}
     if row_id:
-        return update_row("assets", payload, {"id": row_id})
-    return insert_row("assets", payload)
+        return update_row_admin("assets", payload, {"id": row_id})
+    return insert_row_admin("assets", payload)
 
 
 def _clean_employee_number(raw: object) -> str | None:

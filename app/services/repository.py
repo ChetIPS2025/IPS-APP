@@ -152,6 +152,14 @@ def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, An
     return {k: v for k, v in payload.items() if k in cols}
 
 
+def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
+    try:
+        from app.auth import friendly_auth_error_message
+    except ImportError:
+        from auth import friendly_auth_error_message  # type: ignore
+    return friendly_auth_error_message(exc, operation=f"{action} {table}")
+
+
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
     try:
         from app.perf_debug import perf_span
@@ -165,8 +173,8 @@ def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
             clear_all_data_caches()
             return ServiceResult(ok=True, data=row)
         except Exception as exc:
-            msg = f"Could not save to {table}: {exc}"
-            _LOG.warning(msg)
+            msg = _friendly_repo_error(exc, table=table, action="save to")
+            _LOG.warning("insert_row %s failed: %s", table, exc)
             return ServiceResult(ok=False, error=msg)
 
 
@@ -178,8 +186,8 @@ def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
         clear_all_data_caches()
         return ServiceResult(ok=True, data=row)
     except Exception as exc:
-        msg = f"Could not save to {table}: {exc}"
-        _LOG.warning(msg)
+        msg = _friendly_repo_error(exc, table=table, action="save to")
+        _LOG.warning("insert_row_admin %s failed: %s", table, exc)
         return ServiceResult(ok=False, error=msg)
 
 
@@ -196,8 +204,8 @@ def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> Se
             clear_all_data_caches()
             return ServiceResult(ok=True, data=rows[0] if rows else None)
         except Exception as exc:
-            msg = f"Could not update {table}: {exc}"
-            _LOG.warning(msg)
+            msg = _friendly_repo_error(exc, table=table, action="update")
+            _LOG.warning("update_row %s failed: %s", table, exc)
             return ServiceResult(ok=False, error=msg)
 
 
@@ -209,8 +217,8 @@ def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any])
         clear_all_data_caches()
         return ServiceResult(ok=True, data=rows[0] if rows else None)
     except Exception as exc:
-        msg = f"Could not update {table}: {exc}"
-        _LOG.warning(msg)
+        msg = _friendly_repo_error(exc, table=table, action="update")
+        _LOG.warning("update_row_admin %s failed: %s", table, exc)
         return ServiceResult(ok=False, error=msg)
 
 
@@ -220,8 +228,8 @@ def delete_row(table: str, match: dict[str, Any]) -> ServiceResult:
         clear_all_data_caches()
         return ServiceResult(ok=True, data=rows)
     except Exception as exc:
-        msg = f"Could not delete from {table}: {exc}"
-        _LOG.warning(msg)
+        msg = _friendly_repo_error(exc, table=table, action="delete from")
+        _LOG.warning("delete_row %s failed: %s", table, exc)
         return ServiceResult(ok=False, error=msg)
 
 
@@ -229,4 +237,13 @@ def user_facing_error(result: ServiceResult, *, demo_ok_message: str | None = No
     """Message for st.error; None if ok."""
     if result.ok:
         return None
-    return result.error or "An unexpected error occurred."
+    err = str(result.error or "").strip()
+    if not err:
+        return "An unexpected error occurred."
+    try:
+        from app.auth import is_jwt_expired_error, SESSION_EXPIRED_USER_MESSAGE
+    except ImportError:
+        from auth import is_jwt_expired_error, SESSION_EXPIRED_USER_MESSAGE  # type: ignore
+    if is_jwt_expired_error(RuntimeError(err)):
+        return SESSION_EXPIRED_USER_MESSAGE
+    return err

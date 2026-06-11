@@ -1351,20 +1351,23 @@ def get_inventory_transactions(job_id=None, limit=200):
         pass
 
     try:
-        from app.db import get_client
+        from app.db import get_client, run_user_supabase_operation
     except ImportError:
-        from db import get_client  # type: ignore
+        from db import get_client, run_user_supabase_operation  # type: ignore
 
     try:
-        client = get_client()
-        query = client.table("inventory_transactions").select("*")
-        if job_id:
-            query = query.eq("job_id", str(job_id).strip())
-        result = (
-            query
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
+        jid = str(job_id).strip() if job_id else ""
+
+        def _run():
+            query = get_client().table("inventory_transactions").select("*")
+            if jid:
+                query = query.eq("job_id", jid)
+            return query.order("created_at", desc=True).limit(limit).execute()
+
+        result = run_user_supabase_operation(
+            "read inventory_transactions",
+            _run,
+            friendly_on_failure=False,
         )
         return result.data or []
     except Exception:

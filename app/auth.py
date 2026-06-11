@@ -668,3 +668,75 @@ def update_password(new_password: str) -> None:
         except Exception:
             # If RLS blocks it, user can still proceed; admin can clear later.
             st.session_state["auth_profile"] = {**prof, "must_reset_password": False}
+
+
+SESSION_EXPIRED_USER_MESSAGE = "Session expired, please log in again."
+
+
+def is_jwt_expired_error(exc: BaseException) -> bool:
+    low = str(exc or "").casefold()
+    return (
+        "pgrst303" in low
+        or "jwt expired" in low
+        or "jwt has expired" in low
+        or "token is expired" in low
+    )
+
+
+def friendly_auth_error_message(exc: BaseException, *, operation: str = "save") -> str:
+    if is_jwt_expired_error(exc):
+        return SESSION_EXPIRED_USER_MESSAGE
+    op = str(operation or "save").strip() or "save"
+    return f"Could not complete your {op}. Please try again."
+
+
+def try_refresh_supabase_session() -> bool:
+    """
+    Refresh the Supabase access token using the refresh token.
+
+    Uses in-memory client session first, then browser auth cookies. Queues updated
+    tokens for :func:`persist_auth_cookies_if_pending` without forcing a page reload.
+    """
+    client = _try_get_client()
+    if client is None:
+        return False
+
+    refresh_token = ""
+    toks = _auth_session_tokens(client)
+    if toks:
+        refresh_token = toks[1]
+    if not refresh_token:
+        try:
+            cookies = st.context.cookies
+            refresh_token = urllib.parse.unquote(str(cookies.get(_COOKIE_REFRESH) or "").strip())
+        except Exception:
+            refresh_token = ""
+
+    if not refresh_token:
+        return False
+
+    try:
+        client.auth.refresh_session(refresh_token)
+    except Exception as exc:
+        _log.warning("Supabase session refresh failed: %s", exc)
+        return False
+
+    _sync_auth_session_from_client(client)
+    fresh = _auth_session_tokens(client)
+    if not fresh:
+        return False
+
+    at, rt = fresh
+    remember = False
+    try:
+        remember = str(st.context.cookies.get(_COOKIE_PERSIST) or "").strip() == "1"
+    except Exception:
+        remember = False
+    st.session_state["_ips_auth_persist_pending"] = {
+        "access_token": at,
+        "refresh_token": rt,
+        "remember_device": remember,
+    }
+    if is_authenticated():
+        persist_auth_cookies_if_pending()
+    return True

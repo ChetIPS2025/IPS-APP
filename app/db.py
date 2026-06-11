@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from supabase import Client, create_client
+
+_T = TypeVar("_T")
 
 try:
     from storage3.exceptions import StorageApiError
@@ -322,7 +325,13 @@ def _fetch_table_query(
         if order_by:
             query = query.order(order_by)
         try:
-            resp = query.execute()
+            if use_admin:
+                resp = query.execute()
+            else:
+                resp = _execute_user_scoped(
+                    lambda: query.execute(),
+                    operation=f"read {table_name}",
+                )
             return resp.data or []
         except Exception as exc:
             if table_name != "jobs":
@@ -353,7 +362,13 @@ def _fetch_by_match_query(
         for key, value in match_cur.items():
             query = query.eq(key, value)
         try:
-            resp = query.execute()
+            if use_admin:
+                resp = query.execute()
+            else:
+                resp = _execute_user_scoped(
+                    lambda: query.execute(),
+                    operation=f"read {table_name}",
+                )
             return resp.data or []
         except Exception as exc:
             if table_name != "jobs":
@@ -597,21 +612,95 @@ def fetch_one(
     return rows[0] if rows else None
 
 
+def _user_db_operation_label(table_name: str, action: str) -> str:
+    return f"{action} {table_name}"
+
+
+def run_user_supabase_operation(
+    operation: str,
+    fn: Callable[[], _T],
+    *,
+    friendly_on_failure: bool = True,
+) -> _T:
+    """
+    Run a user-scoped Supabase call (RLS / user JWT).
+
+    When the access token is expired: refresh the session, retry once, then return.
+    If refresh fails, raise :data:`app.auth.SESSION_EXPIRED_USER_MESSAGE` (not raw
+    PostgREST / PGRST303 text). Use this for any direct ``get_client()`` query that
+    does not go through :func:`insert_row`, :func:`update_rows`, or :func:`fetch_table`.
+    """
+    try:
+        from app.auth import (
+            SESSION_EXPIRED_USER_MESSAGE,
+            friendly_auth_error_message,
+            is_jwt_expired_error,
+            try_refresh_supabase_session,
+        )
+    except ImportError:
+        from auth import (  # type: ignore
+            SESSION_EXPIRED_USER_MESSAGE,
+            friendly_auth_error_message,
+            is_jwt_expired_error,
+            try_refresh_supabase_session,
+        )
+
+    op = str(operation or "request").strip() or "request"
+
+    def _session_expired_raise(exc: Exception) -> None:
+        raise RuntimeError(SESSION_EXPIRED_USER_MESSAGE) from exc
+
+    def _friendly_raise(exc: Exception) -> None:
+        raise RuntimeError(friendly_auth_error_message(exc, operation=op)) from exc
+
+    try:
+        return fn()
+    except Exception as exc:
+        if not is_jwt_expired_error(exc):
+            if friendly_on_failure:
+                _friendly_raise(exc)
+            raise
+        if try_refresh_supabase_session():
+            try:
+                return fn()
+            except Exception as retry_exc:
+                if is_jwt_expired_error(retry_exc):
+                    _session_expired_raise(retry_exc)
+                if friendly_on_failure:
+                    _friendly_raise(retry_exc)
+                raise
+        _session_expired_raise(exc)
+
+
+def _execute_user_scoped(fn: Callable[[], _T], *, operation: str) -> _T:
+    """User-scoped ``execute()`` — refresh JWT on expiry; preserve raw errors otherwise."""
+    return run_user_supabase_operation(operation, fn, friendly_on_failure=False)
+
+
+def _run_user_db_operation(table_name: str, action: str, fn: Callable[[], _T]) -> _T:
+    return run_user_supabase_operation(
+        _user_db_operation_label(table_name, action),
+        fn,
+        friendly_on_failure=True,
+    )
+
+
 def insert_row(
     table_name: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    try:
+    def _run() -> dict[str, Any]:
         resp = get_client().table(table_name).insert(payload).execute()
-    except Exception as exc:
-        raise RuntimeError(f"insert into {table_name!r} failed: {exc!r}") from exc
-    rows = resp.data or []
-    if not rows:
-        raise RuntimeError(
-            f"Insert into {table_name!r} returned no rows; check RLS and table permissions. response={resp!r}"
-        )
+        rows = resp.data or []
+        if not rows:
+            raise RuntimeError(
+                f"Insert into {table_name!r} returned no rows; check RLS and table permissions."
+            )
+        return rows[0]
+
+    row = _run_user_db_operation(table_name, "insert into", _run)
     clear_streamlit_db_read_cache()
-    return rows[0]
+    return row
 
 
 def update_rows(
@@ -619,30 +708,32 @@ def update_rows(
     payload: dict[str, Any],
     match: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    query = get_client().table(table_name).update(payload)
-    for key, value in match.items():
-        query = query.eq(key, value)
-    try:
+    def _run() -> list[dict[str, Any]]:
+        query = get_client().table(table_name).update(payload)
+        for key, value in match.items():
+            query = query.eq(key, value)
         resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"update_rows({table_name!r}) failed: {exc!r}") from exc
+        return resp.data or []
+
+    rows = _run_user_db_operation(table_name, "update", _run)
     clear_streamlit_db_read_cache()
-    return resp.data or []
+    return rows
 
 
 def delete_rows(
     table_name: str,
     match: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    query = get_client().table(table_name).delete()
-    for key, value in match.items():
-        query = query.eq(key, value)
-    try:
+    def _run() -> list[dict[str, Any]]:
+        query = get_client().table(table_name).delete()
+        for key, value in match.items():
+            query = query.eq(key, value)
         resp = query.execute()
-    except Exception as exc:
-        raise RuntimeError(f"delete_rows({table_name!r}) failed: {exc!r}") from exc
+        return resp.data or []
+
+    rows = _run_user_db_operation(table_name, "delete from", _run)
     clear_streamlit_db_read_cache()
-    return resp.data or []
+    return rows
 
 
 def insert_row_admin(

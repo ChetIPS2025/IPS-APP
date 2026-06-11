@@ -2464,19 +2464,22 @@ def _delete_time_entries_for_slice(
     wd = work_date.isoformat()[:10]
     want_tt = "OT" if str(time_type or "").strip().upper() in ("OT", "O/T", "O-T") else "ST"
     try:
-        from db import get_client
+        from db import get_client, run_user_supabase_operation
     except ImportError:
-        from app.db import get_client  # type: ignore
+        from app.db import get_client, run_user_supabase_operation  # type: ignore
 
-    r = (
-        get_client()
-        .table("time_entries")
-        .select("id,job_id,non_job_code,time_type")
-        .eq("employee_id", employee_id)
-        .eq("work_date", wd)
-        .limit(500)
-        .execute()
-    )
+    def _run():
+        return (
+            get_client()
+            .table("time_entries")
+            .select("id,job_id,non_job_code,time_type")
+            .eq("employee_id", employee_id)
+            .eq("work_date", wd)
+            .limit(500)
+            .execute()
+        )
+
+    r = run_user_supabase_operation("read time_entries", _run, friendly_on_failure=False)
     for row in r.data or []:
         if _tt_entry_time_type(row) != want_tt:
             continue

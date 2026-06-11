@@ -402,17 +402,24 @@ def fetch_all_reports_since(since: date, *, admin: bool, limit: int = 3000) -> l
             )
             resp = q.execute()
             return list(resp.data or [])
-        from app.db import get_client
+        from app.db import get_client, run_user_supabase_operation
 
-        q = (
-            get_client()
-            .table("supervisor_daily_reports")
-            .select("*")
-            .gte("report_date", s)
-            .order("report_date", desc=True)
-            .limit(limit)
+        def _run():
+            q = (
+                get_client()
+                .table("supervisor_daily_reports")
+                .select("*")
+                .gte("report_date", s)
+                .order("report_date", desc=True)
+                .limit(limit)
+            )
+            return q.execute()
+
+        resp = run_user_supabase_operation(
+            "read supervisor_daily_reports",
+            _run,
+            friendly_on_failure=False,
         )
-        resp = q.execute()
         return list(resp.data or [])
     except Exception as exc:
         _LOG.debug("fetch_all_reports_since: %s", exc)
