@@ -654,9 +654,8 @@ def delete_estimate_material(line_id: str, *, estimate_id: str = "") -> ServiceR
     return result
 
 
-def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+def _labor_insert_payload(estimate_id: str, data: dict[str, Any], sort_order: int) -> dict[str, Any]:
     eid = _str(estimate_id)
-    existing, _ = get_estimate_labor(eid)
     calc = calc_labor_line(
         data.get("st_hours"),
         data.get("ot_hours"),
@@ -666,8 +665,8 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
         0,
         data.get("markup_percent"),
     )
-    role = _str(data.get("role_name") or data.get("labor_type"))
-    payload = {
+    role = _str(data.get("role_name") or data.get("labor_type") or data.get("role"))
+    return {
         "estimate_id": eid,
         "labor_type": _str(data.get("labor_type") or role or "Other"),
         "role_name": role,
@@ -687,14 +686,51 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
         "markup_amount": calc["markup_amount"],
         "price_total": calc["price_total"],
         "notes": _str(data.get("notes")),
-        "sort_order": _next_sort_order(existing),
+        "sort_order": sort_order,
     }
+
+
+def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
+    eid = _str(estimate_id)
+    existing, _ = get_estimate_labor(eid)
+    payload = _labor_insert_payload(eid, data, _next_sort_order(existing))
     result = insert_row(_LABOR_LINES_TABLE, payload)
     if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
         return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     if result.ok:
         recalculate_and_save_estimate_totals(eid)
     return result
+
+
+def add_estimate_labor_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple labor lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one labor line with ST or OT hours.")
+    existing, _ = get_estimate_labor(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        payload = _labor_insert_payload(eid, data, sort_base + i)
+        result = insert_row(_LABOR_LINES_TABLE, payload)
+        if not result.ok:
+            if result.error and _is_missing_table_error(Exception(result.error)):
+                return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} labor lines. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save labor lines.")
+    return ServiceResult(ok=True, data={"saved": inserted})
 
 
 def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:

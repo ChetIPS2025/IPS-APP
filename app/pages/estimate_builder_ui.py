@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 from typing import Any, Callable
+from uuid import uuid4
 
 import streamlit as st
 
@@ -15,6 +16,7 @@ try:
         LABOR_ROLE_TYPES,
         add_estimate_equipment,
         add_estimate_labor,
+        add_estimate_labor_batch,
         add_estimate_material,
         add_estimate_other_cost,
         add_estimate_subcontractor,
@@ -51,6 +53,7 @@ except ImportError:
         LABOR_ROLE_TYPES,
         add_estimate_equipment,
         add_estimate_labor,
+        add_estimate_labor_batch,
         add_estimate_material,
         add_estimate_other_cost,
         add_estimate_subcontractor,
@@ -191,6 +194,67 @@ def _sync_labor_role_state(
         st.session_state[last_key] = role
         return opt
     return lab_map.get(role, {})
+
+
+def _labor_batch_draft_key(key_prefix: str, eid: str) -> str:
+    return f"{key_prefix}_lab_batch_{eid}"
+
+
+def _new_labor_batch_row(
+    *,
+    role_labels: list[str],
+    lab_map: dict[str, dict[str, Any]],
+    default_markup: float,
+) -> dict[str, str]:
+    role = role_labels[0] if role_labels else "Other"
+    return {"rid": uuid4().hex[:8], "role": role}
+
+
+def _seed_labor_batch_row_widgets(
+    k: Callable[[str], str],
+    row: dict[str, str],
+    *,
+    lab_map: dict[str, dict[str, Any]],
+    default_markup: float,
+) -> None:
+    rid = str(row.get("rid") or "")
+    role = str(row.get("role") or "Other")
+    if not rid:
+        return
+    opt = lab_map.get(role, {})
+    if k(f"role_{rid}") not in st.session_state:
+        st.session_state[k(f"role_{rid}")] = role
+    if k(f"str_{rid}") not in st.session_state:
+        st.session_state[k(f"str_{rid}")] = float(opt.get("st_rate") or 0)
+    if k(f"otr_{rid}") not in st.session_state:
+        st.session_state[k(f"otr_{rid}")] = float(opt.get("ot_rate") or 0)
+    if k(f"mk_{rid}") not in st.session_state:
+        st.session_state[k(f"mk_{rid}")] = float(default_markup)
+    if k(f"sth_{rid}") not in st.session_state:
+        st.session_state[k(f"sth_{rid}")] = 0.0
+    if k(f"oth_{rid}") not in st.session_state:
+        st.session_state[k(f"oth_{rid}")] = 0.0
+    st.session_state[k(f"last_role_{rid}")] = role
+
+
+def _sync_labor_batch_row_role(
+    k: Callable[[str], str],
+    row_id: str,
+    role: str,
+    lab_map: dict[str, dict[str, Any]],
+) -> None:
+    last_key = k(f"last_role_{row_id}")
+    if st.session_state.get(last_key) == role:
+        return
+    opt = lab_map.get(role, {})
+    st.session_state[k(f"str_{row_id}")] = float(opt.get("st_rate") or 0)
+    st.session_state[k(f"otr_{row_id}")] = float(opt.get("ot_rate") or 0)
+    st.session_state[last_key] = role
+
+
+def _clear_labor_batch_form(*, form_state_key: str, draft_key: str) -> None:
+    st.session_state.pop(form_state_key, None)
+    st.session_state.pop(draft_key, None)
 
 
 def _sync_asset_pick_state(
@@ -638,63 +702,175 @@ def _render_add_labor_form(
     labor_options = labor_options_as_select()
     lab_map = {label: opt for label, opt in labor_options}
     role_labels = [label for label, _ in labor_options] or list(LABOR_ROLE_TYPES)
+    draft_key = _labor_batch_draft_key(key_prefix, eid)
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = [
+            _new_labor_batch_row(
+                role_labels=role_labels,
+                lab_map=lab_map,
+                default_markup=default_markup,
+            )
+        ]
 
     _compact_form_card("Add Labor")
-    c1, c2 = st.columns(2, gap="small")
-    with c1:
-        role = st.selectbox("Labor role", role_labels, key=k("role"))
-        opt = _sync_labor_role_state(k, role, lab_map)
-        st_h = st.number_input("ST hours", min_value=0.0, value=0.0, key=k("sth"), step=0.5)
-        ot_h = st.number_input("OT hours", min_value=0.0, value=0.0, key=k("oth"), step=0.5)
-        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
+    st.caption("Enter multiple labor lines, then save them together.")
 
-    with c2:
-        override = st.checkbox("Override labor rates", key=k("ovr"))
-        if override:
-            st_r = st.number_input("ST rate", min_value=0.0, value=float(opt.get("st_rate") or 0), key=k("str"))
-            ot_r = st.number_input("OT rate", min_value=0.0, value=float(opt.get("ot_rate") or 0), key=k("otr"))
-        else:
-            st_r = float(opt.get("st_rate") or st.session_state.get(k("str")) or 0)
-            ot_r = float(opt.get("ot_rate") or st.session_state.get(k("otr")) or 0)
-            _display_field("ST Rate", fmt_currency(st_r))
-            _display_field("OT Rate", fmt_currency(ot_r))
+    hdr = st.columns([2.4, 0.85, 0.85, 0.95, 0.8, 0.95, 0.95, 0.55], gap="small")
+    for col, label in zip(
+        hdr,
+        ("Role", "ST Hrs", "OT Hrs", "ST Rate", "Markup %", "Cost", "Price", ""),
+    ):
+        with col:
+            st.markdown(
+                f'<div style="font-size:0.72rem;font-weight:700;color:#64748b;">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
 
-        totals = labor_line_totals(st_h, ot_h, st_r, ot_r, markup)
-        _live_totals_card(
-            [
-                ("Cost Total", fmt_currency(totals["cost_total"])),
-                ("Markup Amount", fmt_currency(totals["markup_amount"])),
-                ("Customer Price", fmt_currency(totals["price_total"])),
-            ]
+    draft_rows: list[dict[str, str]] = list(st.session_state.get(draft_key) or [])
+    remove_rid = ""
+    for row in draft_rows:
+        rid = str(row.get("rid") or "")
+        if not rid:
+            continue
+        _seed_labor_batch_row_widgets(
+            k,
+            row,
+            lab_map=lab_map,
+            default_markup=default_markup,
         )
+        cols = st.columns([2.4, 0.85, 0.85, 0.95, 0.8, 0.95, 0.95, 0.55], gap="small")
+        with cols[0]:
+            role = st.selectbox(
+                "Role",
+                role_labels,
+                key=k(f"role_{rid}"),
+                label_visibility="collapsed",
+            )
+            _sync_labor_batch_row_role(k, rid, role, lab_map)
+        with cols[1]:
+            st_h = st.number_input(
+                "ST hours",
+                min_value=0.0,
+                step=0.5,
+                key=k(f"sth_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[2]:
+            ot_h = st.number_input(
+                "OT hours",
+                min_value=0.0,
+                step=0.5,
+                key=k(f"oth_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[3]:
+            st_r = st.number_input(
+                "ST rate",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=k(f"str_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[4]:
+            markup = st.number_input(
+                "Markup %",
+                min_value=0.0,
+                step=0.5,
+                key=k(f"mk_{rid}"),
+                label_visibility="collapsed",
+            )
+        ot_r = float(st.session_state.get(k(f"otr_{rid}")) or 0)
+        totals = labor_line_totals(st_h, ot_h, st_r, ot_r, markup)
+        with cols[5]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['cost_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[6]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['price_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[7]:
+            if st.button("✕", key=k(f"rm_{rid}"), help="Remove row"):
+                remove_rid = rid
 
-    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
-    if st.button("Save Labor", key=k("save"), type="primary", use_container_width=True):
-        description = st.session_state.get(k("desc")) or role
-        ok, err = _service_ok(
-            add_estimate_labor(
-                eid,
+    if remove_rid:
+        remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
+        st.session_state[draft_key] = remaining or [
+            _new_labor_batch_row(
+                role_labels=role_labels,
+                lab_map=lab_map,
+                default_markup=default_markup,
+            )
+        ]
+        st.rerun()
+
+    add_col, _ = st.columns([1, 3], gap="small")
+    with add_col:
+        if st.button("+ Add Row", key=k("add_row"), use_container_width=True):
+            draft_rows.append(
+                _new_labor_batch_row(
+                    role_labels=role_labels,
+                    lab_map=lab_map,
+                    default_markup=default_markup,
+                )
+            )
+            st.session_state[draft_key] = draft_rows
+            st.rerun()
+
+    save_col, cancel_col, _ = st.columns([1, 1, 2], gap="small")
+    with save_col:
+        save_clicked = st.button(
+            "Save Labor Lines",
+            key=k("save"),
+            type="primary",
+            use_container_width=True,
+        )
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", key=k("cancel"), use_container_width=True)
+
+    if cancel_clicked:
+        _clear_labor_batch_form(form_state_key=fk, draft_key=draft_key)
+        st.rerun()
+
+    if save_clicked:
+        payloads: list[dict[str, Any]] = []
+        for row in draft_rows:
+            rid = str(row.get("rid") or "")
+            if not rid:
+                continue
+            role = str(st.session_state.get(k(f"role_{rid}")) or row.get("role") or "")
+            st_h = float(st.session_state.get(k(f"sth_{rid}")) or 0)
+            ot_h = float(st.session_state.get(k(f"oth_{rid}")) or 0)
+            if st_h <= 0 and ot_h <= 0:
+                continue
+            payloads.append(
                 {
                     "labor_type": role,
                     "role_name": role,
-                    "description": description,
+                    "description": role,
                     "st_hours": st_h,
                     "ot_hours": ot_h,
-                    "st_rate": st_r,
-                    "ot_rate": ot_r,
-                    "markup_percent": markup,
-                    "notes": notes,
-                },
+                    "st_rate": float(st.session_state.get(k(f"str_{rid}")) or 0),
+                    "ot_rate": float(st.session_state.get(k(f"otr_{rid}")) or 0),
+                    "markup_percent": float(st.session_state.get(k(f"mk_{rid}")) or default_markup),
+                }
             )
-        )
-        if ok:
-            st.session_state.pop(fk, None)
-            st.success("Labor line added.")
-            st.rerun()
-        st.error(err)
-    if st.button("Cancel", key=k("cancel"), use_container_width=True):
-        st.session_state.pop(fk, None)
-        st.rerun()
+        if not payloads:
+            st.error("Enter at least one labor line with ST or OT hours.")
+        else:
+            ok, err = _service_ok(add_estimate_labor_batch(eid, payloads))
+            if ok:
+                _clear_labor_batch_form(form_state_key=fk, draft_key=draft_key)
+                count = len(payloads)
+                st.success(f"Saved {count} labor line{'s' if count != 1 else ''}.")
+                st.rerun()
+            st.error(err)
+
     _close_compact_form_card()
 
 
