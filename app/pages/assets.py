@@ -274,6 +274,7 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
+_SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
@@ -2329,7 +2330,7 @@ def render() -> None:
                 open_quick_add_tool_dialog()
         with new_col:
             if st.button("+ New Asset", key="ast_new"):
-                st.session_state["ips_ast_form"] = True
+                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
 
     render_page_brand_header(
         "Assets",
@@ -2347,7 +2348,10 @@ def render() -> None:
     if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
 
-    if st.session_state.get("ips_ast_form"):
+    if _SHOW_NEW_ASSET_FORM_KEY not in st.session_state:
+        st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
+
+    if st.session_state.get(_SHOW_NEW_ASSET_FORM_KEY):
         with st.expander("New Asset", expanded=True):
             st.text_input("Asset #", key="ast_new_num")
             st.text_input("Asset name", key="ast_new_name")
@@ -2360,7 +2364,15 @@ def render() -> None:
                 type=list(ITEM_IMAGE_UPLOAD_TYPES),
                 key="ast_new_image",
             )
-            if st.button("Save asset", key="ast_save_new", type="primary"):
+            save_col, cancel_col = st.columns(2)
+            with save_col:
+                save_clicked = st.button("Save Asset", key="ast_save_new", type="primary")
+            with cancel_col:
+                cancel_clicked = st.button("Cancel", key="ast_cancel_new")
+            if cancel_clicked:
+                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
+                st.rerun()
+            if save_clicked:
                 try:
                     from app.services.assets_service import save_asset
                 except ImportError:
@@ -2391,7 +2403,7 @@ def render() -> None:
                         if not upload_result.ok:
                             st.warning(upload_result.error or "Asset saved, but image upload failed.")
                     clear_assets_cache()
-                    st.session_state.pop("ips_ast_form", None)
+                    st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
                     st.success("Asset saved.")
                     st.rerun()
 
