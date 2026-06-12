@@ -918,13 +918,17 @@ def clear_timekeeping_day_rows(
     work_date: str,
     *,
     keep_day_id: str | None = None,
+    keep_day_ids: set[str] | frozenset[str] | None = None,
 ) -> ServiceResult:
     """Delete extra day rows for one calendar date (e.g. after clearing hours to zero)."""
     eid = str(employee_id or "").strip()
     wd = str(work_date or "")[:10]
     if not eid or not wd:
         return ServiceResult(ok=False, error="Missing employee or work date.")
-    keep = str(keep_day_id or "").strip()
+    keep_all = {str(rid).strip() for rid in (keep_day_ids or set()) if str(rid).strip()}
+    single = str(keep_day_id or "").strip()
+    if single:
+        keep_all.add(single)
     rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
     if err:
         return ServiceResult(ok=False, error=err)
@@ -935,7 +939,7 @@ def clear_timekeeping_day_rows(
         if str(row.get("work_date") or "")[:10] != wd:
             continue
         rid = str(row.get("id") or "").strip()
-        if not rid or rid == keep:
+        if not rid or rid in keep_all:
             continue
         result = delete_row("employee_timekeeping_days", {"id": rid})
         if not result.ok:
@@ -944,6 +948,53 @@ def clear_timekeeping_day_rows(
     if removed:
         clear_all_data_caches()
     return ServiceResult(ok=True, data={"removed": removed})
+
+
+def _find_timekeeping_day_row(
+    employee_id: str,
+    work_date: str,
+    job_id: str | None,
+    *,
+    job_label: str | None = None,
+) -> dict[str, Any] | None:
+    """Find an existing day row for upsert (supports one-row-per-day and per-job schemas)."""
+    eid = str(employee_id or "").strip()
+    wd = str(work_date or "")[:10]
+    if not eid or not wd:
+        return None
+    jid = str(job_id or "").strip() or None
+    label = str(job_label or "").strip()
+    matches: list[dict[str, Any]] = []
+    rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
+    if err:
+        return None
+    for row in rows or []:
+        if str(row.get("employee_id") or "") != eid:
+            continue
+        if str(row.get("work_date") or "")[:10] != wd:
+            continue
+        matches.append(row)
+    if not matches:
+        return None
+    if jid:
+        for row in matches:
+            if str(row.get("job_id") or "").strip() == jid:
+                return row
+    if label:
+        for row in matches:
+            if str(row.get("job_label") or "").strip() == label:
+                return row
+    if len(matches) == 1:
+        return matches[0]
+    for row in matches:
+        hours = (
+            float(row.get("st_hours") or 0)
+            + float(row.get("ot_hours") or 0)
+            + float(row.get("dt_hours") or 0)
+        )
+        if hours > 0:
+            return row
+    return matches[0]
 
 
 def _find_timekeeping_week(employee_id: str, week_start: date) -> dict[str, Any] | None:
@@ -1707,8 +1758,18 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
         "notes": ui.get("notes") or "",
         "status": ui.get("status") or "Draft",
     }
-    if row_id:
-        result = update_row("employee_timekeeping_days", payload, {"id": row_id})
+    rid = str(row_id or "").strip() or None
+    if not rid:
+        existing = _find_timekeeping_day_row(
+            str(ui.get("employee_id") or ""),
+            str(ui.get("work_date") or ""),
+            ui.get("job_id"),
+            job_label=str(ui.get("job_label") or ""),
+        )
+        if existing:
+            rid = str(existing.get("id") or "").strip() or None
+    if rid:
+        result = update_row("employee_timekeeping_days", payload, {"id": rid})
     else:
         result = insert_row("employee_timekeeping_days", payload)
     if result.ok:

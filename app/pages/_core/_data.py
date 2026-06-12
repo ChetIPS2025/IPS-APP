@@ -2110,6 +2110,8 @@ def persist_timekeeping_days(
     employee_id: str,
     week_start: date,
     grid: list[dict[str, Any]],
+    *,
+    only_work_date: str | None = None,
 ) -> tuple[bool, str]:
     """Upsert daily rows after week summary save."""
     if _demo_blocked(employee_id):
@@ -2120,6 +2122,8 @@ def persist_timekeeping_days(
         from services.timekeeping_service import save_timekeeping_day  # type: ignore
     ws = week_start.isoformat()
     errors: list[str] = []
+    target_date = str(only_work_date or "")[:10] or None
+    saved_ids_by_date: dict[str, set[str]] = {}
     try:
         from app.services.jobs_service import resolve_job_id_from_label
     except ImportError:
@@ -2132,6 +2136,8 @@ def persist_timekeeping_days(
         work_date = str(row.get("date") or "")[:10]
         if not work_date:
             continue
+        if target_date and work_date != target_date:
+            continue
         day_total = (
             float(row.get("st") or 0)
             + float(row.get("ot") or 0)
@@ -2140,6 +2146,7 @@ def persist_timekeeping_days(
         day_id = str(row.get("day_id") or "").strip() or None
         if day_total <= 0.001:
             clear_timekeeping_day_rows(employee_id, work_date, keep_day_id=day_id)
+            continue
         job_label = str(row.get("job") or "")
         ui = {
             "employee_id": employee_id,
@@ -2157,8 +2164,16 @@ def persist_timekeeping_days(
         err = _persist_result(res, success="")
         if err[0] is False and err[1]:
             errors.append(err[1])
+            continue
+        saved_id = day_id
+        if res.ok and isinstance(res.data, dict):
+            saved_id = str(res.data.get("id") or day_id or "").strip() or None
+        if saved_id:
+            saved_ids_by_date.setdefault(work_date, set()).add(saved_id)
     if errors:
         return False, errors[0]
+    for wd, keep_ids in saved_ids_by_date.items():
+        clear_timekeeping_day_rows(employee_id, wd, keep_day_ids=keep_ids)
     try:
         from app.services.timekeeping_service import sync_timekeeping_week_from_days
     except ImportError:

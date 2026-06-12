@@ -1205,38 +1205,6 @@ def _allocation_lines_to_persist_grid(
         lines = list(by_date.get(iso) or [])
         grid_row = source_grid[day_ix] if day_ix < len(source_grid) else {}
         if focus and iso != focus:
-            if daily_total <= _ALLOC_TOLERANCE:
-                day_id = str(grid_row.get("day_id") or "").strip()
-                if not day_id:
-                    for line in lines:
-                        lid = str(line.get("line_id") or "").strip()
-                        if lid:
-                            day_id = lid
-                            break
-                persist_rows.append(
-                    {
-                        "day_id": day_id,
-                        "day": day_d.strftime("%A"),
-                        "date": iso,
-                        "job": str(grid_row.get("job") or no_job),
-                        "st": 0.0,
-                        "ot": 0.0,
-                        "dt": 0.0,
-                        "notes": str(grid_row.get("notes") or ""),
-                        "status": str(grid_row.get("status") or "Draft"),
-                    }
-                )
-                by_date[iso] = []
-            else:
-                persist_rows.append(
-                    _grid_only_persist_row(
-                        day_d=day_d,
-                        iso=iso,
-                        grid_row=grid_row,
-                        daily_total=daily_total,
-                        no_job=no_job,
-                    )
-                )
             continue
         if daily_total <= 0:
             day_id = str(grid_row.get("day_id") or "").strip()
@@ -1388,7 +1356,9 @@ def _save_allocation_week(
         if show_message:
             st.info("Enter daily hours in the row above, then assign them here.")
         return False, "Enter daily hours in the row above, then assign them here."
-    ok, msg = persist_timekeeping_days(eid, week_start_d, persist_rows)
+    ok, msg = persist_timekeeping_days(
+        eid, week_start_d, persist_rows, only_work_date=focus
+    )
     if ok:
         _invalidate_weekly_grid(emp, week_start_d)
         st.session_state[_grid_key(eid)] = load_timekeeping_grid(eid, week_start_d)
