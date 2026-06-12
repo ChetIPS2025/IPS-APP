@@ -384,7 +384,20 @@ def _render_assets_table(rows: list[dict], *, selected_id: str, can_edit: bool) 
                         st.session_state[_TAB] = "Overview"
                         st.rerun()
                 with a2:
-                    with st.popover("⋯"):
+                    st.markdown(
+                        '<span class="asset-row-actions-menu" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    with st.popover(
+                        "⋮",
+                        help="Actions",
+                        type="secondary",
+                        key=f"ast_row_menu_{aid}",
+                    ):
+                        st.markdown(
+                            '<span class="asset-row-actions-panel" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
                         if st.button("Maintenance", key=f"ast_more_maint_{aid}", use_container_width=True):
                             st.session_state[_SEL] = aid
                             st.session_state[_TAB] = "Maintenance"

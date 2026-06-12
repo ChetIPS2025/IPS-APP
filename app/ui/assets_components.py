@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v24"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v25"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -164,10 +164,128 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        button[data-testid="stBaseButton-popover"] {
-            min-width: 2rem !important;
-            padding: 0.15rem 0.35rem !important;
+        [data-testid="column"]:has(.asset-row-actions-menu) {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 44px !important;
+            max-width: none !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) [data-testid="stPopover"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) [data-testid="stElementContainer"]:has([data-testid="stPopover"]) {
+            width: auto !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            max-height: 36px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 8px !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+            color: #475569 !important;
+            font-size: 1.05rem !important;
             font-weight: 700 !important;
+            line-height: 1 !important;
+            letter-spacing: 0 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            writing-mode: horizontal-tb !important;
+            word-break: normal !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"] svg,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] svg {
+            display: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"] p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"] span,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] span {
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            font-size: 1.05rem !important;
+            font-weight: 700 !important;
+            color: #475569 !important;
+            white-space: nowrap !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"]:hover,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"]:hover {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+            color: #1e293b !important;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) {
+            padding: 0.45rem !important;
+            min-width: 13rem !important;
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button {
+            justify-content: flex-start !important;
+            text-align: left !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #334155 !important;
+            font-weight: 600 !important;
+            font-size: 0.8125rem !important;
+            min-height: 2rem !important;
+            height: auto !important;
+            padding: 0.35rem 0.55rem !important;
+            border-radius: 6px !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button:hover,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button:hover {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)

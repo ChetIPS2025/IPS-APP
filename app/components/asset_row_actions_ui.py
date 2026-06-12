@@ -48,7 +48,20 @@ def render_asset_row_actions(
     if not aid:
         return
 
-    with st.popover("⋯", help="Row actions"):
+    st.markdown(
+        '<span class="asset-row-actions-menu" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    with st.popover(
+        "⋮",
+        help="Actions",
+        type="secondary",
+        key=f"{key_prefix}_menu_{aid}",
+    ):
+        st.markdown(
+            '<span class="asset-row-actions-panel" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         if on_view and st.button("View", key=f"{key_prefix}_view_{aid}", use_container_width=True):
             on_view(asset)
             st.rerun()
