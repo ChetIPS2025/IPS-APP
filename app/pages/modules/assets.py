@@ -370,12 +370,15 @@ def _render_assets_table(rows: list[dict], *, selected_id: str, can_edit: bool) 
                 )
                 a1, a2 = st.columns(2, gap="small")
                 with a1:
+                    st.markdown(
+                        '<span class="asset-open-button" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     if st.button(
                         "Open",
                         key=f"ast_open_{aid}",
                         type="primary",
                         help="Open asset details",
-                        use_container_width=True,
                     ):
                         st.session_state[_SEL] = aid
                         st.session_state[_TAB] = "Overview"

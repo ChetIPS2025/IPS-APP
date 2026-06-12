@@ -951,7 +951,7 @@ def _render_custom_assets_table(
                 _render_asset_thumbnail(asset)
 
             with cols[2]:
-                title_col, open_col = st.columns([5, 1], gap="small", vertical_alignment="center")
+                title_col, open_col = st.columns([6, 2], gap="small", vertical_alignment="center")
                 with title_col:
                     rentable_badge = _asset_rentable_badge_html(asset)
                     st.markdown(
@@ -959,12 +959,15 @@ def _render_custom_assets_table(
                         unsafe_allow_html=True,
                     )
                 with open_col:
+                    st.markdown(
+                        '<span class="asset-open-button" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     if st.button(
                         "Open",
                         key=f"ast_open_{aid}",
                         type="primary",
                         help="Open asset details",
-                        use_container_width=True,
                     ):
                         _open_assets_detail_modal(aid, asset)
                         st.rerun()
