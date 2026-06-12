@@ -959,7 +959,13 @@ def _render_custom_assets_table(
                         unsafe_allow_html=True,
                     )
                 with open_col:
-                    if st.button("↗", key=f"ast_open_{aid}", help="Open asset details"):
+                    if st.button(
+                        "Open",
+                        key=f"ast_open_{aid}",
+                        type="primary",
+                        help="Open asset details",
+                        use_container_width=True,
+                    ):
                         _open_assets_detail_modal(aid, asset)
                         st.rerun()
 

@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v22"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v23"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -177,7 +177,7 @@ def inject_assets_page_styles() -> None:
             text-overflow: ellipsis !important;
             word-break: normal !important;
         }
-        /* Assets table row Open — compact sizing (colors via inject_row_action_colors_css) */
+        /* Assets table row Open — labeled blue action (colors via inject_row_action_colors_css) */
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton {
@@ -186,15 +186,17 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton > button {
-            min-width: 2rem !important;
-            width: 2rem !important;
-            max-width: 2rem !important;
+            min-width: 3.25rem !important;
+            width: 100% !important;
+            max-width: 100% !important;
             min-height: 2rem !important;
-            height: 2rem !important;
-            padding: 0 !important;
+            height: auto !important;
+            padding: 0.25rem 0.55rem !important;
             border-radius: 8px !important;
+            font-size: 0.75rem !important;
             font-weight: 700 !important;
-            line-height: 1 !important;
+            line-height: 1.2 !important;
+            white-space: nowrap !important;
         }
         /* Small Hand Tools tab — CSS grid rows with fixed Actions column */
         section[data-testid="stMain"]:has(.ips-assets-page)
