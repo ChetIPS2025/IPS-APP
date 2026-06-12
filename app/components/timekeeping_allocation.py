@@ -36,7 +36,7 @@ class AllocationRenderDeps:
     alloc_state_key: Callable[[str], str]
     day_is_editable: Callable[[str], bool]
     day_hours_editable: Callable[[str, str], bool]
-    handle_alloc_line_submit: Callable[[dict, date, str], bool]
+    handle_alloc_line_submit: Callable[[dict, date, str, str, dict[str, Any]], bool]
     handle_alloc_line_approve: Callable[[dict, date, str], bool]
     handle_alloc_line_reject: Callable[[dict, date, str], bool]
     handle_day_submit_for_date: Callable[[dict, date, str], bool]
@@ -350,7 +350,9 @@ def _render_allocation_row_secondary_actions(
                 use_container_width=True,
             )
         ):
-            action_taken = deps.handle_alloc_line_submit(ctx.emp, ctx.week_start_d, line_id)
+            action_taken = deps.handle_alloc_line_submit(
+                ctx.emp, ctx.week_start_d, line_id, ctx.iso, line
+            )
     with btn_cols[1]:
         if len(lines) > 1 and st.button(
             "Remove",

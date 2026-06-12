@@ -669,11 +669,17 @@ def _can_submit_timekeeping() -> bool:
 
 def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
-    if not _save_allocation_week(emp, week_start_d, show_message=False):
-        if not _save_timekeeping_week(emp, week_start_d, show_message=False):
-            st.error("Save hours for this day before submitting.")
-            return False
-    ok, msg = persist_timekeeping_day_submit_for_date(eid, week_start_d, work_date)
+    wd = str(work_date or "")[:10]
+    if not wd:
+        st.error("Missing work date.")
+        return False
+    saved, save_msg = _save_allocation_week(
+        emp, week_start_d, show_message=False, focus_iso=wd
+    )
+    if not saved:
+        st.error(save_msg or "Could not save hours for this day.")
+        return False
+    ok, msg = persist_timekeeping_day_submit_for_date(eid, week_start_d, wd)
     if ok:
         _invalidate_weekly_grid(emp, week_start_d)
         _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
@@ -689,7 +695,7 @@ def _handle_day_approve_for_date(emp: dict, week_start_d: date, work_date: str) 
     if not approver:
         st.error("Your profile is missing an approver id.")
         return False
-    if not _save_allocation_week(emp, week_start_d, show_message=False):
+    if not _save_allocation_week(emp, week_start_d, show_message=False)[0]:
         _save_timekeeping_week(emp, week_start_d, show_message=False)
     ok, msg = persist_timekeeping_day_approve_for_date(
         eid, week_start_d, work_date, approved_by=approver
@@ -1089,6 +1095,67 @@ def _ensure_day_allocation_lines(
     return lines
 
 
+def _bootstrap_week_allocation_lines(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    week_start_d: date,
+    source_grid: list[dict],
+    job_opts: list[str],
+    eid: str,
+    week_sig: str,
+) -> None:
+    """Ensure allocation rows exist for every day that has top-row hours."""
+    for day_ix, day_d in enumerate(week_dates(week_start_d)):
+        iso = day_d.isoformat()
+        grid_row = source_grid[day_ix] if day_ix < len(source_grid) else {}
+        daily_total = _daily_total_from_list_row(
+            eid=eid,
+            week_sig=week_sig,
+            day_ix=day_ix,
+            grid_row=grid_row,
+        )
+        if daily_total > _ALLOC_TOLERANCE:
+            _ensure_day_allocation_lines(
+                by_date,
+                iso=iso,
+                daily_total=daily_total,
+                grid_row=grid_row,
+                job_opts=job_opts,
+                eid=eid,
+                week_sig=week_sig,
+            )
+
+
+def _grid_only_persist_row(
+    *,
+    day_d: date,
+    iso: str,
+    grid_row: dict,
+    daily_total: float,
+    no_job: str,
+) -> dict[str, Any]:
+    """Persist one day from the top-row total when not running full allocation validation."""
+    day_id = str(grid_row.get("day_id") or "").strip()
+    st_h = float(grid_row.get("st") or 0)
+    ot_h = float(grid_row.get("ot") or 0)
+    dt_h = float(grid_row.get("dt") or 0)
+    if daily_total > _ALLOC_TOLERANCE and st_h + ot_h + dt_h <= _ALLOC_TOLERANCE:
+        st_h = daily_total
+        ot_h = 0.0
+        dt_h = 0.0
+    return {
+        "day_id": day_id,
+        "day": day_d.strftime("%A"),
+        "date": iso,
+        "job": str(grid_row.get("job") or no_job),
+        "st": st_h,
+        "ot": ot_h,
+        "dt": dt_h,
+        "notes": str(grid_row.get("notes") or ""),
+        "status": str(grid_row.get("status") or "Draft"),
+    }
+
+
 def _sync_allocation_from_widgets(
     by_date: dict[str, list[dict[str, Any]]],
     *,
@@ -1118,12 +1185,14 @@ def _allocation_lines_to_persist_grid(
     eid: str,
     week_sig: str,
     source_grid: list[dict],
+    focus_iso: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Flatten allocation lines for persist_timekeeping_days; auto-fill unassigned remainder."""
     errors: list[str] = []
     persist_rows: list[dict[str, Any]] = []
     job_opts = _assignment_options_for_timekeeping()
     no_job = job_opts[0] if job_opts else "— No assignment —"
+    focus = str(focus_iso or "")[:10] or None
 
     for day_ix, day_d in enumerate(week_dates(week_start_d)):
         iso = day_d.isoformat()
@@ -1135,6 +1204,40 @@ def _allocation_lines_to_persist_grid(
         )
         lines = list(by_date.get(iso) or [])
         grid_row = source_grid[day_ix] if day_ix < len(source_grid) else {}
+        if focus and iso != focus:
+            if daily_total <= _ALLOC_TOLERANCE:
+                day_id = str(grid_row.get("day_id") or "").strip()
+                if not day_id:
+                    for line in lines:
+                        lid = str(line.get("line_id") or "").strip()
+                        if lid:
+                            day_id = lid
+                            break
+                persist_rows.append(
+                    {
+                        "day_id": day_id,
+                        "day": day_d.strftime("%A"),
+                        "date": iso,
+                        "job": str(grid_row.get("job") or no_job),
+                        "st": 0.0,
+                        "ot": 0.0,
+                        "dt": 0.0,
+                        "notes": str(grid_row.get("notes") or ""),
+                        "status": str(grid_row.get("status") or "Draft"),
+                    }
+                )
+                by_date[iso] = []
+            else:
+                persist_rows.append(
+                    _grid_only_persist_row(
+                        day_d=day_d,
+                        iso=iso,
+                        grid_row=grid_row,
+                        daily_total=daily_total,
+                        no_job=no_job,
+                    )
+                )
+            continue
         if daily_total <= 0:
             day_id = str(grid_row.get("day_id") or "").strip()
             if not day_id:
@@ -1213,28 +1316,78 @@ def _allocation_lines_to_persist_grid(
     return persist_rows, errors
 
 
-def _save_allocation_week(emp: dict, week_start_d: date, *, show_message: bool = True) -> bool:
+def _save_allocation_week(
+    emp: dict,
+    week_start_d: date,
+    *,
+    show_message: bool = True,
+    focus_iso: str | None = None,
+) -> tuple[bool, str]:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
+    focus = str(focus_iso or "")[:10] or None
     by_date = _ensure_allocation_state(emp, week_start_d)
     _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
     grid = _ensure_weekly_grid(emp, week_start_d)
     _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+    job_opts = _assignment_options_for_timekeeping()
+    _bootstrap_week_allocation_lines(
+        by_date,
+        week_start_d=week_start_d,
+        source_grid=grid,
+        job_opts=job_opts,
+        eid=eid,
+        week_sig=week_sig,
+    )
+    st.session_state[_alloc_state_key(eid)] = by_date
+    if focus:
+        day_ix = next(
+            (i for i, day_d in enumerate(week_dates(week_start_d)) if day_d.isoformat() == focus),
+            -1,
+        )
+        if day_ix < 0:
+            return False, "Invalid work date for this week."
+        grid_row = grid[day_ix] if day_ix < len(grid) else {}
+        daily_total = _daily_total_from_list_row(
+            eid=eid,
+            week_sig=week_sig,
+            day_ix=day_ix,
+            grid_row=grid_row,
+        )
+        if daily_total <= _ALLOC_TOLERANCE:
+            return False, "Enter hours for this day before submitting."
+        lines = _live_allocation_lines_for_day(
+            list(by_date.get(focus) or []),
+            eid=eid,
+            week_sig=week_sig,
+            iso=focus,
+        )
+        alloc_state = _get_day_allocation_state(daily_total, lines)
+        state = str(alloc_state.get("state") or "")
+        if state == "overallocated":
+            return (
+                False,
+                f"Allocated {_fmt_day_hours(alloc_state['allocated_total'])} exceeds "
+                f"{_fmt_day_hours(daily_total)} entered in the row above.",
+            )
+        if state == "needs_assignment":
+            return False, "Select a valid assignment and S/T or O/T before submitting."
     persist_rows, errors = _allocation_lines_to_persist_grid(
         by_date,
         week_start_d=week_start_d,
         eid=eid,
         week_sig=week_sig,
         source_grid=grid,
+        focus_iso=focus,
     )
     if errors:
         for err in errors[:3]:
             st.error(err)
-        return False
+        return False, errors[0]
     if not persist_rows:
         if show_message:
             st.info("Enter daily hours in the row above, then assign them here.")
-        return False
+        return False, "Enter daily hours in the row above, then assign them here."
     ok, msg = persist_timekeeping_days(eid, week_start_d, persist_rows)
     if ok:
         _invalidate_weekly_grid(emp, week_start_d)
@@ -1242,18 +1395,77 @@ def _save_allocation_week(emp: dict, week_start_d: date, *, show_message: bool =
         st.session_state[f"{_grid_key(eid)}_week"] = week_sig
         if show_message:
             st.success(msg or "Allocations saved.")
-        return True
+        return True, msg or "Allocations saved."
+    err = msg or "Could not save allocations."
     if show_message:
-        st.warning(msg or "Could not save allocations.")
-    return False
+        st.warning(err)
+    return False, err
 
 
-def _handle_alloc_line_submit(emp: dict, week_start_d: date, day_id: str) -> bool:
+def _resolve_saved_allocation_line_id(
+    employee_id: str,
+    week_start_d: date,
+    work_date: str,
+    line: dict[str, Any],
+) -> str:
+    """Find persisted day-row id for an allocation line after save."""
+    wd = str(work_date or "")[:10]
+    if not wd:
+        return ""
+    job_opts = _assignment_options_for_timekeeping()
+    job = _coerce_assignment_label(str(line.get("job") or ""), job_opts)
+    hrs = _line_allocated_hours(line)
+    if hrs <= _ALLOC_TOLERANCE:
+        return ""
+    hour_type = _normalize_alloc_hour_type(line.get("hour_type"))
+    try:
+        from app.services.timekeeping_service import list_timekeeping_days
+    except ImportError:
+        from services.timekeeping_service import list_timekeeping_days  # type: ignore
+    for row in list_timekeeping_days(employee_id, week_start_d):
+        if str(row.get("work_date") or "")[:10] != wd:
+            continue
+        row_job = _coerce_assignment_label(str(row.get("job_label") or ""), job_opts)
+        if row_job != job:
+            continue
+        st_h = float(row.get("st_hours") or 0)
+        ot_h = float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
+        if hour_type == "OT":
+            if abs(ot_h - hrs) <= 0.02:
+                return str(row.get("id") or "").strip()
+        elif abs(st_h - hrs) <= 0.02 and ot_h <= 0.02:
+            return str(row.get("id") or "").strip()
+    return ""
+
+
+def _handle_alloc_line_submit(
+    emp: dict,
+    week_start_d: date,
+    day_id: str,
+    work_date: str,
+    line: dict[str, Any],
+) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
-    if not day_id:
-        st.error("Save allocations before submitting this day.")
+    wd = str(work_date or "")[:10]
+    if not wd:
+        st.error("Missing work date.")
         return False
-    if not _save_allocation_week(emp, week_start_d, show_message=False):
+    saved, save_msg = _save_allocation_week(
+        emp, week_start_d, show_message=False, focus_iso=wd
+    )
+    if not saved:
+        st.error(save_msg or "Could not save hours for this day.")
+        return False
+    if not day_id:
+        day_id = _resolve_saved_allocation_line_id(eid, week_start_d, wd, line)
+    if not day_id:
+        ok, msg = persist_timekeeping_day_submit_for_date(eid, week_start_d, wd)
+        if ok:
+            _invalidate_weekly_grid(emp, week_start_d)
+            _patch_timecard_cache(emp, week_start_d, {"status": "Pending"})
+            st.success(msg)
+            return True
+        st.error(msg)
         return False
     ok, msg = persist_timekeeping_day_submit(day_id, eid, week_start_d)
     if ok:
@@ -2614,7 +2826,7 @@ def _render_list_allocation_detail(
         handle_day_submit_for_date=_handle_day_submit_for_date,
         handle_day_approve_for_date=_handle_day_approve_for_date,
         handle_day_reject_for_date=_handle_day_reject_for_date,
-        save_allocation_week=lambda: _save_allocation_week(emp, week_start_d),
+        save_allocation_week=lambda: _save_allocation_week(emp, week_start_d)[0],
     )
 
     if admin_edit and week_status == "Approved":
@@ -2715,7 +2927,7 @@ def _render_list_allocation_detail(
         "Submit all for approval",
         key=f"tk_submit_alloc_{record_key}",
     ):
-        if _save_allocation_week(emp, week_start_d, show_message=False) and _submit_timekeeping_week(
+        if _save_allocation_week(emp, week_start_d, show_message=False)[0] and _submit_timekeeping_week(
             emp, week_start_d
         ):
             st.rerun()
