@@ -9,7 +9,7 @@ try:
 except ImportError:
     from ui.theme import COLORS  # type: ignore
 
-IPS_ROW_ACTION_COLORS_KEY = "ips_row_action_colors_v1"
+IPS_ROW_ACTION_COLORS_KEY = "ips_row_action_colors_v2"
 
 ROW_ACTION_COLORS = {
     "open_bg": COLORS.get("action_open", COLORS["primary"]),
@@ -127,6 +127,8 @@ def inject_row_action_colors_css() -> None:
   color: var(--ips-action-open-text) !important;
   box-shadow: none !important;
   white-space: nowrap !important;
+  min-width: 5.5rem !important;
+  width: auto !important;
 }}
 {open_btns}:hover,
 {open_btns}:focus {{

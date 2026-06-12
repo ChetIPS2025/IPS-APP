@@ -184,7 +184,10 @@ _ASSIGNMENT_LEGACY_ALIASES = {
     "admin": "Administrative",
     "— no job —": "— No assignment —",
     "no job": "— No assignment —",
+    "— no assignment —": "— No assignment —",
+    "no assignment": "— No assignment —",
     "— select assignment —": "— No assignment —",
+    "select assignment": "— No assignment —",
 }
 
 
@@ -889,6 +892,37 @@ def _line_allocated_hours(line: dict[str, Any]) -> float:
     return max(0.0, float(line.get("hours") or 0))
 
 
+def _is_placeholder_assignment(label: object) -> bool:
+    """True for empty, — No assignment —, — Select assignment —, and similar placeholders."""
+    job = _normalize_assignment_label(str(label or "")).strip().casefold()
+    if not job:
+        return True
+    if job in {
+        "—",
+        "-",
+        "— no job —",
+        "no job",
+        "— no assignment —",
+        "no assignment",
+        "— select assignment —",
+        "select assignment",
+    }:
+        return True
+    return (
+        "no job" in job
+        or "no assignment" in job
+        or "select assignment" in job
+    )
+
+
+def _valid_allocated_hours_sum(lines: list[dict[str, Any]]) -> float:
+    return sum(
+        _line_allocated_hours(line)
+        for line in lines
+        if _allocation_line_has_valid_assignment(line)
+    )
+
+
 def _allocated_hours_sum(lines: list[dict[str, Any]]) -> float:
     return sum(_line_allocated_hours(line) for line in lines)
 
@@ -907,7 +941,7 @@ def _allocated_st_ot_sum(lines: list[dict[str, Any]]) -> tuple[float, float]:
 
 def _allocation_line_has_valid_assignment(line: dict[str, Any]) -> bool:
     """True when hours are tied to a job, subjob, Shop, Administrative, or Vacation."""
-    return _day_has_job({"job": line.get("job")})
+    return not _is_placeholder_assignment(line.get("job"))
 
 
 def _allocation_line_hour_type_valid(line: dict[str, Any], hours: float) -> bool:
@@ -941,33 +975,42 @@ def _live_allocation_lines_for_day(
 
 
 def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]]) -> dict[str, Any]:
+    line_total = 0.0
     allocated_total = 0.0
     allocated_st = 0.0
     allocated_ot = 0.0
-    has_invalid_assignment = False
+    placeholder_hours = 0.0
 
     for row in allocations or []:
         hours = _line_allocated_hours(row)
         if hours <= _ALLOC_TOLERANCE:
             continue
-        allocated_total += hours
+        line_total += hours
+        if not _allocation_line_has_valid_assignment(row):
+            placeholder_hours += hours
+            continue
         if not _allocation_line_hour_type_valid(row, hours):
-            has_invalid_assignment = True
-        elif _normalize_alloc_hour_type(row.get("hour_type")) == "OT":
+            placeholder_hours += hours
+            continue
+        allocated_total += hours
+        if _normalize_alloc_hour_type(row.get("hour_type")) == "OT":
             allocated_ot += hours
         else:
             allocated_st += hours
-        if not _allocation_line_has_valid_assignment(row):
-            has_invalid_assignment = True
 
     remaining = float(day_total or 0) - allocated_total
+    has_invalid_assignment = placeholder_hours > _ALLOC_TOLERANCE
     if day_total <= _ALLOC_TOLERANCE:
         state = "no_hours"
-    elif allocated_total - day_total > _ALLOC_TOLERANCE:
+    elif line_total - day_total > _ALLOC_TOLERANCE:
         state = "overallocated"
-    elif abs(remaining) <= _ALLOC_TOLERANCE and not has_invalid_assignment:
+    elif (
+        abs(remaining) <= _ALLOC_TOLERANCE
+        and allocated_total > _ALLOC_TOLERANCE
+        and not has_invalid_assignment
+    ):
         state = "complete"
-    elif has_invalid_assignment and allocated_total > _ALLOC_TOLERANCE:
+    elif has_invalid_assignment:
         state = "needs_assignment"
     else:
         state = "incomplete"
@@ -978,7 +1021,9 @@ def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]
         "allocated_st": allocated_st,
         "allocated_ot": allocated_ot,
         "remaining": remaining,
+        "line_total": line_total,
         "has_invalid_assignment": has_invalid_assignment,
+        "placeholder_hours": placeholder_hours,
     }
 
 
@@ -1232,26 +1277,33 @@ def _allocation_lines_to_persist_grid(
         if not lines:
             errors.append(f"{day_d.strftime('%A')}: add at least one assignment row.")
             continue
-        allocated = _allocated_hours_sum(lines)
-        if allocated > daily_total + 0.01:
+        line_total = _allocated_hours_sum(lines)
+        valid_allocated = _valid_allocated_hours_sum(lines)
+        placeholder_hours = sum(
+            _line_allocated_hours(line)
+            for line in lines
+            if not _allocation_line_has_valid_assignment(line)
+        )
+        if placeholder_hours > _ALLOC_TOLERANCE:
             errors.append(
-                f"{day_d.strftime('%A')}: allocated {_fmt_day_hours(allocated)} exceeds "
+                f"{day_d.strftime('%A')}: select a valid assignment — "
+                f"— No assignment — does not count as allocated time."
+            )
+            continue
+        if line_total > daily_total + 0.01:
+            errors.append(
+                f"{day_d.strftime('%A')}: allocated {_fmt_day_hours(line_total)} exceeds "
                 f"{_fmt_day_hours(daily_total)} entered in the row above."
             )
             continue
-        out_lines = [dict(line) for line in lines]
-        remainder = round(daily_total - allocated, 2)
+        remainder = round(daily_total - valid_allocated, 2)
         if remainder > 0.01:
-            out_lines.append(
-                {
-                    "line_id": "",
-                    "job": no_job,
-                    "hour_type": "ST",
-                    "hours": remainder,
-                    "notes": "",
-                    "status": str(out_lines[0].get("status") or "Draft"),
-                }
+            errors.append(
+                f"{day_d.strftime('%A')}: assign the remaining "
+                f"{_fmt_day_hours(remainder)} to a job, subjob, Shop, Administrative, or Vacation."
             )
+            continue
+        out_lines = [dict(line) for line in lines]
         merged: dict[tuple[str, str], dict[str, Any]] = {}
         for line in out_lines:
             hrs = _line_allocated_hours(line)
@@ -1335,11 +1387,17 @@ def _save_allocation_week(
         if state == "overallocated":
             return (
                 False,
-                f"Allocated {_fmt_day_hours(alloc_state['allocated_total'])} exceeds "
+                f"Allocated {_fmt_day_hours(alloc_state.get('line_total') or daily_total)} exceeds "
                 f"{_fmt_day_hours(daily_total)} entered in the row above.",
             )
         if state == "needs_assignment":
-            return False, "Select a valid assignment and S/T or O/T before submitting."
+            return False, "Select a valid assignment for all hours — — No assignment — is not allowed."
+        if state != "complete":
+            remaining = max(0.0, float(alloc_state.get("remaining") or 0))
+            return (
+                False,
+                f"Assign the remaining {_fmt_day_hours(remaining)} before submitting.",
+            )
     persist_rows, errors = _allocation_lines_to_persist_grid(
         by_date,
         week_start_d=week_start_d,
@@ -1563,25 +1621,7 @@ def _day_hours_total(day_row: dict) -> float:
 
 
 def _day_has_job(day_row: dict) -> bool:
-    job = _normalize_assignment_label(str(day_row.get("job") or "")).strip().lower()
-    if not job:
-        return False
-    if job in {
-        "—",
-        "-",
-        "— no job —",
-        "no job",
-        "— no assignment —",
-        "no assignment",
-        "— select assignment —",
-        "select assignment",
-    }:
-        return False
-    return (
-        "no job" not in job
-        and "no assignment" not in job
-        and "select assignment" not in job
-    )
+    return not _is_placeholder_assignment(day_row.get("job"))
 
 
 def _day_entry_complete(day_row: dict) -> bool:
@@ -2786,7 +2826,7 @@ def _render_list_allocation_detail(
         ensure_alloc_type_widget_label=_ensure_alloc_type_widget_label,
         alloc_hour_type_label=_alloc_hour_type_label,
         timecard_status_pill_html=_timecard_status_pill_html,
-        allocated_hours_sum=_allocated_hours_sum,
+        allocated_hours_sum=_valid_allocated_hours_sum,
         alloc_state_key=_alloc_state_key,
         day_is_editable=_day_is_editable,
         day_hours_editable=_day_hours_editable,
@@ -2930,7 +2970,7 @@ def _render_list_allocation_detail(
         st.caption("Pending approval — waiting for an administrator to approve or reject.")
     st.caption(
         "Totals in the row above are the source of truth. Use Submit day / Approve day on each day card, "
-        "or approve the full week below. Unallocated time is saved to — No assignment — automatically."
+        "or approve the full week below. Hours on — No assignment — do not count as allocated — pick a job, subjob, Shop, Administrative, or Vacation before submitting."
     )
 
 

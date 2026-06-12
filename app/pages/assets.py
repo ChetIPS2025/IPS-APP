@@ -279,7 +279,7 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.85, 4.25, 1.45, 1.55, 1.35, 1.65, 1.25, 0.62]
+_ASSET_COLS = [0.42, 0.85, 4.5, 1.45, 1.55, 1.35, 1.65, 1.25, 1.15]
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -951,26 +951,11 @@ def _render_custom_assets_table(
                 _render_asset_thumbnail(asset)
 
             with cols[2]:
-                title_col, open_col = st.columns([6, 2], gap="small", vertical_alignment="center")
-                with title_col:
-                    rentable_badge = _asset_rentable_badge_html(asset)
-                    st.markdown(
-                        f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
-                        unsafe_allow_html=True,
-                    )
-                with open_col:
-                    st.markdown(
-                        '<span class="asset-open-button" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(
-                        "Open",
-                        key=f"ast_open_{aid}",
-                        type="primary",
-                        help="Open asset details",
-                    ):
-                        _open_assets_detail_modal(aid, asset)
-                        st.rerun()
+                rentable_badge = _asset_rentable_badge_html(asset)
+                st.markdown(
+                    f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
+                    unsafe_allow_html=True,
+                )
 
             with cols[3]:
                 st.markdown(
@@ -1001,14 +986,29 @@ def _render_custom_assets_table(
 
             with cols[8]:
                 if not field_mode:
-                    render_asset_row_actions(
-                        asset,
-                        on_view=_row_action_view,
-                        on_edit=_row_action_edit,
-                        on_change_type=_row_action_change_type,
-                        on_history=_row_action_history,
-                        on_after_change=clear_assets_cache,
-                    )
+                    open_col, menu_col = st.columns([1.05, 0.95], gap="small", vertical_alignment="center")
+                    with open_col:
+                        st.markdown(
+                            '<span class="asset-open-button" aria-hidden="true"></span>',
+                            unsafe_allow_html=True,
+                        )
+                        if st.button(
+                            "Open",
+                            key=f"ast_open_{aid}",
+                            type="primary",
+                            help="Open asset details",
+                        ):
+                            _open_assets_detail_modal(aid, asset)
+                            st.rerun()
+                    with menu_col:
+                        render_asset_row_actions(
+                            asset,
+                            on_view=_row_action_view,
+                            on_edit=_row_action_edit,
+                            on_change_type=_row_action_change_type,
+                            on_history=_row_action_history,
+                            on_after_change=clear_assets_cache,
+                        )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)

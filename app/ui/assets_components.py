@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v25"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v26"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -298,14 +298,48 @@ def inject_assets_page_styles() -> None:
         /* Assets table row Open — fixed-width horizontal blue label */
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-row-marker) > [data-testid="column"]:last-child,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
         [data-testid="column"]:has(.asset-open-button),
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
         [data-testid="column"]:has([class*="st-key-ast_open_"]) {
             flex: 0 0 auto !important;
             width: auto !important;
-            min-width: 86px !important;
+            min-width: 92px !important;
             max-width: none !important;
+            overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 0.35rem !important;
+            width: auto !important;
+            min-width: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:last-child [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:last-child
+        [data-testid="stElementContainer"]:has([class*="st-key-ast_open_"]),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-open-button)
+        [data-testid="stElementContainer"]:has([class*="st-key-ast_open_"]) {
+            width: auto !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
             overflow: visible !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
@@ -324,9 +358,9 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton {
-            width: auto !important;
-            min-width: 80px !important;
-            max-width: none !important;
+            width: 88px !important;
+            min-width: 88px !important;
+            max-width: 88px !important;
             overflow: visible !important;
             margin: 0 !important;
         }
@@ -342,21 +376,40 @@ def inject_assets_page_styles() -> None:
             border-radius: 8px !important;
             height: 36px !important;
             min-height: 36px !important;
-            width: 80px !important;
-            min-width: 80px !important;
-            max-width: 80px !important;
-            padding: 0 14px !important;
+            width: 88px !important;
+            min-width: 88px !important;
+            max-width: 88px !important;
+            padding: 0 12px !important;
             font-size: 0.8125rem !important;
             font-weight: 700 !important;
-            line-height: 1 !important;
+            line-height: 1.1 !important;
+            letter-spacing: 0 !important;
             white-space: nowrap !important;
             overflow: visible !important;
             text-overflow: clip !important;
             writing-mode: horizontal-tb !important;
-            word-break: normal !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
             display: inline-flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
             align-items: center !important;
             justify-content: center !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        [class*="st-key-ast_open_"] [data-testid="stButton"] > button > div,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
+        [class*="st-key-ast_open_"] .stButton > button > div {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: auto !important;
+            max-width: none !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
@@ -370,8 +423,15 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         [class*="st-key-ast_open_"] .stButton > button span {
+            display: inline !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.1 !important;
+            font-size: 0.8125rem !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
             white-space: nowrap !important;
-            word-break: normal !important;
+            word-break: keep-all !important;
             overflow-wrap: normal !important;
             writing-mode: horizontal-tb !important;
         }

@@ -252,6 +252,7 @@ def _render_day_actions_bar(
         and ctx.can_submit
         and ctx.daily_total > 0
         and day_status in ("Draft", "Rejected")
+        and str(ctx.alloc_state) == "complete"
     ):
         action_slots.append("submit")
     if ctx.can_approve and day_status == "Pending" and ctx.daily_total > 0:
