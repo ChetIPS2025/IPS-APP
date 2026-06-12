@@ -53,8 +53,8 @@ def render_asset_row_actions(
         unsafe_allow_html=True,
     )
     with st.popover(
-        "⋮",
-        help="Actions",
+        "Actions",
+        help="Row actions",
         type="secondary",
         key=f"{key_prefix}_menu_{aid}",
     ):
