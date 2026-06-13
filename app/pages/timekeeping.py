@@ -1228,6 +1228,50 @@ def _sync_allocation_from_widgets(
                 line["notes"] = st.session_state[notes_key]
 
 
+def _alloc_autosave_status_key(eid: str, iso: str) -> str:
+    return f"tk_alloc_autosave_{eid}_{iso}"
+
+
+def _set_alloc_autosave_status(eid: str, iso: str, status: str) -> None:
+    st.session_state[_alloc_autosave_status_key(eid, iso)] = str(status or "").strip()
+
+
+def _alloc_autosave_status_html(eid: str, iso: str) -> str:
+    status = str(st.session_state.get(_alloc_autosave_status_key(eid, iso)) or "").strip().lower()
+    if status == "saving":
+        return (
+            '<span class="timekeeping-alloc-autosave-status '
+            'timekeeping-alloc-autosave-saving">Saving...</span>'
+        )
+    if status == "saved":
+        return (
+            '<span class="timekeeping-alloc-autosave-status '
+            'timekeeping-alloc-autosave-saved">Saved</span>'
+        )
+    if status == "unsaved":
+        return (
+            '<span class="timekeeping-alloc-autosave-status '
+            'timekeeping-alloc-autosave-unsaved">Unsaved changes</span>'
+        )
+    return ""
+
+
+def _auto_save_allocation_day(emp: dict, week_start_d: date, iso: str) -> None:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    wd = str(iso or "")[:10]
+    if not eid or not wd:
+        return
+    _set_alloc_autosave_status(eid, wd, "saving")
+    ok, _msg = _save_allocation_week(
+        emp,
+        week_start_d,
+        show_message=False,
+        focus_iso=wd,
+        allow_incomplete=True,
+    )
+    _set_alloc_autosave_status(eid, wd, "saved" if ok else "unsaved")
+
+
 def _allocation_lines_to_persist_grid(
     by_date: dict[str, list[dict[str, Any]]],
     *,
@@ -1236,6 +1280,7 @@ def _allocation_lines_to_persist_grid(
     week_sig: str,
     source_grid: list[dict],
     focus_iso: str | None = None,
+    allow_incomplete: bool = False,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Flatten allocation lines for persist_timekeeping_days; auto-fill unassigned remainder."""
     errors: list[str] = []
@@ -1302,7 +1347,7 @@ def _allocation_lines_to_persist_grid(
             )
             continue
         remainder = round(daily_total - valid_allocated, 2)
-        if remainder > 0.01:
+        if remainder > 0.01 and not allow_incomplete:
             errors.append(
                 f"{day_d.strftime('%A')}: assign the remaining "
                 f"{_fmt_day_hours(remainder)} to a job, subjob, Shop, Administrative, or Vacation."
@@ -1347,6 +1392,7 @@ def _save_allocation_week(
     *,
     show_message: bool = True,
     focus_iso: str | None = None,
+    allow_incomplete: bool = False,
 ) -> tuple[bool, str]:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
@@ -1365,7 +1411,7 @@ def _save_allocation_week(
         week_sig=week_sig,
     )
     st.session_state[_alloc_state_key(eid)] = by_date
-    if focus:
+    if focus and not allow_incomplete:
         day_ix = next(
             (i for i, day_d in enumerate(week_dates(week_start_d)) if day_d.isoformat() == focus),
             -1,
@@ -1410,12 +1456,16 @@ def _save_allocation_week(
         week_sig=week_sig,
         source_grid=grid,
         focus_iso=focus,
+        allow_incomplete=allow_incomplete,
     )
     if errors:
-        for err in errors[:3]:
-            st.error(err)
+        if show_message:
+            for err in errors[:3]:
+                st.error(err)
         return False, errors[0]
     if not persist_rows:
+        if allow_incomplete:
+            return True, ""
         if show_message:
             st.info("Enter daily hours in the row above, then assign them here.")
         return False, "Enter daily hours in the row above, then assign them here."
@@ -2844,11 +2894,12 @@ def _render_list_allocation_detail(
         handle_day_submit_for_date=_handle_day_submit_for_date,
         handle_day_approve_for_date=_handle_day_approve_for_date,
         handle_day_reject_for_date=_handle_day_reject_for_date,
-        save_allocation_week=lambda: _save_allocation_week(emp, week_start_d)[0],
+        auto_save_allocation_day=lambda iso: _auto_save_allocation_day(emp, week_start_d, iso),
+        alloc_autosave_status_html=lambda iso: _alloc_autosave_status_html(eid, iso),
     )
 
     if admin_edit and week_status == "Approved":
-        st.warning("Administrator edit mode — you can change approved hours. Save after edits.")
+        st.warning("Administrator edit mode — you can change approved hours. Changes save automatically.")
     elif week_locked:
         st.info("This week is approved and locked.")
 

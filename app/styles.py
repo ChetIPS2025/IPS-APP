@@ -7033,6 +7033,26 @@ def inject_timekeeping_module_css() -> None:
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
 }}
+.timekeeping-alloc-row-autosave {{
+  margin-top: 4px !important;
+  min-height: 1.1rem !important;
+}}
+.timekeeping-alloc-autosave-status {{
+  display: inline-block !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.2 !important;
+}}
+.timekeeping-alloc-autosave-saving {{
+  color: #64748b !important;
+}}
+.timekeeping-alloc-autosave-saved {{
+  color: #15803d !important;
+}}
+.timekeeping-alloc-autosave-unsaved {{
+  color: #b45309 !important;
+}}
 {tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker) {{
   display: flex !important;
   flex-direction: row !important;

@@ -42,7 +42,8 @@ class AllocationRenderDeps:
     handle_day_submit_for_date: Callable[[dict, date, str], bool]
     handle_day_approve_for_date: Callable[[dict, date, str], bool]
     handle_day_reject_for_date: Callable[[dict, date, str], bool]
-    save_allocation_week: Callable[[], bool]
+    auto_save_allocation_day: Callable[[str], None]
+    alloc_autosave_status_html: Callable[[str], str]
 
 
 def allocation_panel_scope_key(scope: str) -> str:
@@ -169,6 +170,8 @@ def _render_allocation_hours_input(
     widget_key: str,
     disabled: bool,
     deps: AllocationRenderDeps,
+    on_change: Callable[..., None] | None = None,
+    on_change_args: tuple[Any, ...] = (),
 ) -> float:
     st.markdown(
         '<span class="timekeeping-allocation-hours-marker" aria-hidden="true"></span>',
@@ -185,17 +188,19 @@ def _render_allocation_hours_input(
             unsafe_allow_html=True,
         )
         return float(value)
-    return float(
-        st.number_input(
-            "Hours",
-            value=float(value),
-            key=widget_key,
-            min_value=0.0,
-            max_value=24.0,
-            step=0.5,
-            format="%.1f",
-        )
-    )
+    hours_kwargs: dict[str, Any] = {
+        "label": "Hours",
+        "value": float(value),
+        "key": widget_key,
+        "min_value": 0.0,
+        "max_value": 24.0,
+        "step": 0.5,
+        "format": "%.1f",
+    }
+    if on_change is not None:
+        hours_kwargs["on_change"] = on_change
+        hours_kwargs["args"] = on_change_args
+    return float(st.number_input(**hours_kwargs))
 
 
 def _append_assignment_line(
@@ -223,6 +228,7 @@ def _append_assignment_line(
     )
     by_date[iso] = day_lines
     st.session_state[deps.alloc_state_key(eid)] = by_date
+    deps.auto_save_allocation_day(iso)
     st.rerun()
 
 
@@ -240,11 +246,8 @@ def _render_day_actions_bar(
     norm = normalize_timecard_status or (lambda raw: str(raw or "Draft"))
     day_status = norm(ctx.day_status)
     hours_editable = deps.day_hours_editable(day_status, ctx.week_status)
-    record_key = str(ctx.record_key or ctx.eid or ctx.panel_scope).strip()
 
     action_slots: list[str] = []
-    if hours_editable and deps.save_allocation_week:
-        action_slots.append("save")
     if hours_editable:
         action_slots.append("add")
     if (
@@ -283,15 +286,7 @@ def _render_day_actions_bar(
         btn_cols = st.columns(len(action_slots), gap="small")
         for col, slot in zip(btn_cols, action_slots):
             with col:
-                if slot == "save":
-                    if st.button(
-                        "Save allocations",
-                        key=f"tk_save_alloc_day_{record_key}_{ctx.iso}",
-                        type="primary",
-                    ):
-                        if deps.save_allocation_week():
-                            st.rerun()
-                elif slot == "add":
+                if slot == "add":
                     if st.button(
                         "+ Add assignment",
                         key=f"tk_alloc_add_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
@@ -363,6 +358,7 @@ def _render_allocation_row_secondary_actions(
         ):
             ctx.by_date[ctx.iso] = [ln for j, ln in enumerate(lines) if j != lix]
             st.session_state[deps.alloc_state_key(ctx.eid)] = ctx.by_date
+            deps.auto_save_allocation_day(ctx.iso)
             action_taken = True
     if action_taken:
         st.rerun()
@@ -403,6 +399,8 @@ def render_allocation_control_row(
         hour_type = deps.normalize_alloc_hour_type(st.session_state[type_key])
     is_primary_row = lix == 0
     line_scope = allocation_panel_scope_key(f"{ctx.panel_scope}_{iso}_{lix}")
+    autosave_cb = deps.auto_save_allocation_day if row_editable else None
+    autosave_args = (iso,)
     with st.container(key=f"tk_alloc_line_{line_scope}"):
         row_cols = st.columns(ALLOC_LINE_COLS, gap="small")
         marker_classes = (
@@ -423,6 +421,8 @@ def render_allocation_control_row(
                     job_opts,
                     index=deps.assignment_option_index(job_opts, live_job),
                     key=job_key,
+                    on_change=autosave_cb,
+                    args=autosave_args,
                 )
             else:
                 st.markdown(
@@ -455,6 +455,8 @@ def render_allocation_control_row(
                     options=hour_type_options,
                     index=type_index,
                     key=type_key,
+                    on_change=autosave_cb,
+                    args=autosave_args,
                 )
                 line["hour_type"] = deps.normalize_alloc_hour_type(picked)
             else:
@@ -475,6 +477,8 @@ def render_allocation_control_row(
                 widget_key=f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}",
                 disabled=not row_editable,
                 deps=deps,
+                on_change=autosave_cb,
+                on_change_args=autosave_args,
             )
         with row_cols[3]:
             if row_editable:
@@ -483,7 +487,16 @@ def render_allocation_control_row(
                     value=str(line.get("notes") or ""),
                     key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
                     placeholder="Add notes (optional)",
+                    on_change=autosave_cb,
+                    args=autosave_args,
                 )
+                if is_primary_row:
+                    status_html = deps.alloc_autosave_status_html(iso)
+                    if status_html:
+                        st.markdown(
+                            f'<div class="timekeeping-alloc-row-autosave">{status_html}</div>',
+                            unsafe_allow_html=True,
+                        )
             else:
                 st.markdown(
                     '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
