@@ -17,6 +17,8 @@ CARD_BG = "#ffffff"
 BORDER = "#e5eaf2"
 PRIMARY = "#2563eb"
 PRIMARY_HOVER = "#1d4ed8"
+BRAND_NAV_BTN = "#4361EE"
+BRAND_NAV_BTN_HOVER = "#3651D4"
 TEXT = "#0f172a"
 TEXT_MUTED = "#64748b"
 SELECTED_BG = "#eff6ff"
@@ -3213,7 +3215,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v13">
+<style id="ips-assets-module-v14">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3240,11 +3242,12 @@ def inject_assets_module_css() -> None:
 }}
 .st-key-assets_table_wrap .ips-assets-name-link,
 .st-key-assets_table_wrap .asset-name-button {{
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
-  min-width: 360px;
-  max-width: 520px;
+  min-width: 0;
+  max-width: 500px;
+  width: 100%;
   overflow: hidden;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"],
@@ -3252,26 +3255,28 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .asset-name-button [data-testid="stButton"],
 .st-key-assets_table_wrap .asset-name-button .stButton {{
   width: 100%;
-  max-width: 100%;
-  min-width: 360px;
+  max-width: 500px;
+  min-width: 0;
   margin: 0;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button,
 .st-key-assets_table_wrap .asset-name-button button {{
-  width: 100%;
-  max-width: 100%;
-  min-width: 360px;
-  padding: 0;
-  min-height: 1.35rem;
-  height: auto;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  color: #2563eb;
-  font-weight: 600;
+  background: {BRAND_NAV_BTN};
+  color: #ffffff;
+  font-weight: 700;
   font-size: 0.8125rem;
-  text-align: left;
-  justify-content: flex-start;
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  width: 100%;
+  max-width: 500px;
+  min-width: 0;
+  box-shadow: none;
+  text-align: center;
+  justify-content: center;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -3279,13 +3284,15 @@ def inject_assets_module_css() -> None:
   text-overflow: ellipsis;
   word-break: normal;
   overflow-wrap: normal;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button:hover,
 .st-key-assets_table_wrap .ips-assets-name-link button:focus,
 .st-key-assets_table_wrap .asset-name-button button:hover,
 .st-key-assets_table_wrap .asset-name-button button:focus {{
-  color: #1d4ed8;
-  background: transparent;
+  background: {BRAND_NAV_BTN_HOVER};
+  color: #ffffff;
   border: none;
   box-shadow: none;
 }}
@@ -3295,13 +3302,15 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .asset-name-button button > div,
 .st-key-assets_table_wrap .asset-name-button button p,
 .st-key-assets_table_wrap .asset-name-button button span {{
-  display: block;
-  width: 100%;
+  display: inline;
+  color: #ffffff;
+  font-weight: 700;
+  width: auto;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: left;
+  text-align: center;
 }}
 .st-key-assets_table_wrap .asset-name-cell,
 .st-key-assets_table_wrap .asset-name-button,
@@ -9876,7 +9885,7 @@ def inject_global_button_css() -> None:
     """Single-line horizontal labels on every Streamlit and custom button app-wide."""
     st.markdown(
         """
-<style id="ips-global-buttons-v1">
+<style id="ips-global-buttons-v2">
 button,
 .stButton > button,
 [data-testid="stButton"] > button,
@@ -9954,6 +9963,63 @@ button[data-testid="stBaseButton-popover"],
   max-width: none !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
+}
+.asset-name-button [data-testid="stButton"] > button,
+.ips-nav-name-button [data-testid="stButton"] > button,
+.ips-assets-link-btn.asset-name-button [data-testid="stButton"] > button,
+.ips-assets-link-btn.ips-nav-name-button [data-testid="stButton"] > button {
+  background: #4361EE !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0 16px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 500px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
+  box-shadow: none !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+}
+.asset-name-button [data-testid="stButton"] > button:hover,
+.asset-name-button [data-testid="stButton"] > button:focus,
+.ips-nav-name-button [data-testid="stButton"] > button:hover,
+.ips-nav-name-button [data-testid="stButton"] > button:focus,
+.ips-assets-link-btn.asset-name-button [data-testid="stButton"] > button:hover,
+.ips-assets-link-btn.ips-nav-name-button [data-testid="stButton"] > button:hover {
+  background: #3651D4 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.asset-name-button [data-testid="stButton"] > button p,
+.asset-name-button [data-testid="stButton"] > button span,
+.asset-name-button [data-testid="stButton"] > button div,
+.ips-nav-name-button [data-testid="stButton"] > button p,
+.ips-nav-name-button [data-testid="stButton"] > button span,
+.ips-nav-name-button [data-testid="stButton"] > button div {
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  display: inline !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  width: auto !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
 }
 </style>
 """,

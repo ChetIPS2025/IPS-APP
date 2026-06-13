@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v31"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v32"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -363,11 +363,12 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_table_wrap .ips-assets-name-link,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button {
-            flex: 1 1 auto !important;
+            flex: 0 1 auto !important;
             display: inline-flex !important;
             align-items: center !important;
-            min-width: 360px !important;
-            max-width: 520px !important;
+            min-width: 0 !important;
+            max-width: 500px !important;
+            width: 100% !important;
             overflow: hidden !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
@@ -379,28 +380,30 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button .stButton {
             width: 100% !important;
-            max-width: 100% !important;
-            min-width: 360px !important;
+            max-width: 500px !important;
+            min-width: 0 !important;
             margin: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-link button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button {
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 360px !important;
-            padding: 0 !important;
-            min-height: 1.35rem !important;
-            height: auto !important;
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            color: #2563eb !important;
-            font-weight: 600 !important;
+            background: #4361EE !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
             font-size: 0.8125rem !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0 16px !important;
+            height: 38px !important;
+            min-height: 38px !important;
+            max-height: 38px !important;
+            width: 100% !important;
+            max-width: 500px !important;
+            min-width: 0 !important;
+            box-shadow: none !important;
+            text-align: center !important;
+            justify-content: center !important;
             display: inline-flex !important;
             align-items: center !important;
             white-space: nowrap !important;
@@ -409,6 +412,8 @@ def inject_assets_page_styles() -> None:
             word-break: normal !important;
             overflow-wrap: normal !important;
             writing-mode: horizontal-tb !important;
+            cursor: pointer !important;
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-cell,
@@ -436,9 +441,13 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-link button:hover,
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link button:focus {
-            color: #1d4ed8 !important;
-            background: transparent !important;
+        .st-key-assets_table_wrap .ips-assets-name-link button:focus,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button:hover,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button:focus {
+            background: #3651D4 !important;
+            color: #FFFFFF !important;
             border: none !important;
             box-shadow: none !important;
         }
@@ -447,16 +456,24 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-link button p,
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link button span {
-            display: block !important;
-            width: 100% !important;
+        .st-key-assets_table_wrap .ips-assets-name-link button span,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button > div,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button span {
+            display: inline !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            width: auto !important;
             max-width: 100% !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             word-break: normal !important;
             overflow-wrap: normal !important;
-            text-align: left !important;
+            text-align: center !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-badges {
@@ -1028,18 +1045,31 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stHorizontalBlock"]:has(.ips-assets-row-marker):not(:has(.ips-assets-row-selected)) {
             border-bottom: 1px solid #f1f5f9;
         }
-        section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-link-btn button {
-            color: #2563eb !important;
-            font-weight: 600 !important;
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-link-btn button,
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-nav-name-button button {
+            background: #4361EE !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
             font-size: 0.8125rem !important;
-            padding: 0 !important;
-            min-height: 1.35rem !important;
-            height: auto !important;
+            padding: 0 16px !important;
+            min-height: 38px !important;
+            height: 38px !important;
+            max-height: 38px !important;
             border: none !important;
-            background: #ffffff !important;
+            border-radius: 8px !important;
             box-shadow: none !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
+            text-align: center !important;
+            justify-content: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            cursor: pointer !important;
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-link-btn button:hover,
+        section[data-testid="stMain"]:has(.ips-assets-page) .ips-nav-name-button button:hover {
+            background: #3651D4 !important;
+            color: #FFFFFF !important;
         }
         .ips-assets-num-qr-cell {
             display: inline-flex;

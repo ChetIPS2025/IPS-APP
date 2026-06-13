@@ -871,9 +871,11 @@ def _render_asset_expand_panel(asset: dict) -> None:
         f"</div>"
     )
     st.markdown(dialog_card_html("Asset at a glance", details_html), unsafe_allow_html=True)
+    st.markdown('<div class="ips-nav-name-button">', unsafe_allow_html=True)
     if st.button("Full asset details", key=f"ast_full_modal_{aid}", use_container_width=True):
         _open_assets_detail_modal(aid, asset)
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_custom_assets_table(
@@ -973,7 +975,7 @@ def _render_custom_assets_table(
                     unsafe_allow_html=True,
                 )
                 if st.button(
-                    f"{name_label} ›",
+                    name_label,
                     key=f"ast_name_{aid}",
                     help="Open asset details",
                 ):
