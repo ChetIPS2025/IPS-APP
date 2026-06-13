@@ -682,6 +682,11 @@ def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -
     if not saved:
         st.error(save_msg or "Could not save hours for this day.")
         return False
+    try:
+        from app.services.repository import clear_all_data_caches
+    except ImportError:
+        from services.repository import clear_all_data_caches  # type: ignore
+    clear_all_data_caches()
     ok, msg = persist_timekeeping_day_submit_for_date(eid, week_start_d, wd)
     if ok:
         _invalidate_weekly_grid(emp, week_start_d)
@@ -1414,6 +1419,9 @@ def _save_allocation_week(
         if show_message:
             st.info("Enter daily hours in the row above, then assign them here.")
         return False, "Enter daily hours in the row above, then assign them here."
+    if focus:
+        for row in persist_rows:
+            row["status"] = "Draft"
     ok, msg = persist_timekeeping_days(
         eid, week_start_d, persist_rows, only_work_date=focus
     )

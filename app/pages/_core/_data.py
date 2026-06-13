@@ -2168,6 +2168,19 @@ def persist_timekeeping_days(
         saved_id = day_id
         if res.ok and isinstance(res.data, dict):
             saved_id = str(res.data.get("id") or day_id or "").strip() or None
+        if not saved_id and res.ok:
+            try:
+                from app.services.timekeeping_service import _find_timekeeping_day_row
+            except ImportError:
+                from services.timekeeping_service import _find_timekeeping_day_row  # type: ignore
+            found = _find_timekeeping_day_row(
+                employee_id,
+                work_date,
+                ui.get("job_id"),
+                job_label=job_label,
+            )
+            if found:
+                saved_id = str(found.get("id") or "").strip() or None
         if saved_id:
             saved_ids_by_date.setdefault(work_date, set()).add(saved_id)
     if errors:

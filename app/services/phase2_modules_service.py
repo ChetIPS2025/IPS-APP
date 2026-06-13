@@ -898,19 +898,62 @@ def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) 
     return [normalize_timekeeping_summary(r, week_start) for r in demo], True
 
 
+def _fetch_employee_timekeeping_day_rows(
+    employee_id: str,
+    *,
+    work_date: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """Load day rows for one employee (optionally one calendar date)."""
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return []
+    match: dict[str, Any] = {"employee_id": eid}
+    wd = str(work_date or "")[:10] if work_date else ""
+    if wd:
+        match["work_date"] = wd
+    try:
+        from app.db import fetch_by_match
+    except ImportError:
+        from db import fetch_by_match  # type: ignore
+    try:
+        return fetch_by_match("employee_timekeeping_days", match, limit=limit) or []
+    except Exception as exc:
+        _LOG.debug("fetch_by_match employee_timekeeping_days failed: %s", exc)
+    rows, err = fetch_rows("employee_timekeeping_days", limit=limit, order_by="work_date")
+    if err:
+        return []
+    out = [r for r in rows or [] if str(r.get("employee_id") or "") == eid]
+    if wd:
+        out = [r for r in out if str(r.get("work_date") or "")[:10] == wd]
+    return out
+
+
+def _work_date_in_week(work_date: str, week_start: date) -> bool:
+    wd = str(work_date or "")[:10]
+    if not wd:
+        return False
+    try:
+        day = date.fromisoformat(wd)
+    except ValueError:
+        return False
+    return week_start <= day <= week_start.fromordinal(week_start.toordinal() + 6)
+
+
+def _day_row_in_week(row: dict[str, Any], week_start: date) -> bool:
+    ws = week_start.isoformat()
+    row_week = str(row.get("week_start") or "")[:10]
+    if row_week:
+        return row_week == ws
+    return _work_date_in_week(str(row.get("work_date") or ""), week_start)
+
+
 def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, Any]]:
     eid = str(employee_id or "").strip()
     if not eid:
         return []
-    ws = week_start.isoformat()
-    rows, err = fetch_rows("employee_timekeeping_days", limit=100, order_by="work_date")
-    if err:
-        return []
-    return [
-        r
-        for r in rows
-        if str(r.get("employee_id") or "") == eid and str(r.get("week_start") or "")[:10] == ws
-    ]
+    rows = _fetch_employee_timekeeping_day_rows(eid)
+    return [r for r in rows if _day_row_in_week(r, week_start)]
 
 
 def clear_timekeeping_day_rows(
@@ -929,15 +972,9 @@ def clear_timekeeping_day_rows(
     single = str(keep_day_id or "").strip()
     if single:
         keep_all.add(single)
-    rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
-    if err:
-        return ServiceResult(ok=False, error=err)
+    rows = _fetch_employee_timekeeping_day_rows(eid, work_date=wd, limit=500)
     removed = 0
     for row in rows or []:
-        if str(row.get("employee_id") or "") != eid:
-            continue
-        if str(row.get("work_date") or "")[:10] != wd:
-            continue
         rid = str(row.get("id") or "").strip()
         if not rid or rid in keep_all:
             continue
@@ -965,15 +1002,18 @@ def _find_timekeeping_day_row(
     jid = str(job_id or "").strip() or None
     label = str(job_label or "").strip()
     matches: list[dict[str, Any]] = []
-    rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
-    if err:
-        return None
-    for row in rows or []:
-        if str(row.get("employee_id") or "") != eid:
-            continue
-        if str(row.get("work_date") or "")[:10] != wd:
-            continue
-        matches.append(row)
+    rows = _fetch_employee_timekeeping_day_rows(eid, work_date=wd, limit=50)
+    matches = list(rows or [])
+    if not matches:
+        rows, err = fetch_rows("employee_timekeeping_days", limit=500, order_by="work_date")
+        if err:
+            return None
+        for row in rows or []:
+            if str(row.get("employee_id") or "") != eid:
+                continue
+            if str(row.get("work_date") or "")[:10] != wd:
+                continue
+            matches.append(row)
     if not matches:
         return None
     if jid:
@@ -1867,11 +1907,11 @@ def _day_rows_for_work_date(
     wd = str(work_date or "")[:10]
     if not wd:
         return []
-    return [
-        row
-        for row in list_timekeeping_days(employee_id, week_start)
-        if str(row.get("work_date") or "")[:10] == wd
-    ]
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return []
+    rows = _fetch_employee_timekeeping_day_rows(eid, work_date=wd, limit=50)
+    return [row for row in rows if _day_row_in_week(row, week_start)]
 
 
 def submit_timekeeping_days_for_work_date(employee_id: str, week_start: date, work_date: str) -> ServiceResult:
