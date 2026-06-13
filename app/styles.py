@@ -3215,11 +3215,12 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v14">
-.ips-assets-table-wrap {{
+<style id="ips-assets-module-v15">
+.ips-assets-table-wrap,
+.ips-assets-table-wrap.asset-table {{
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 0.5rem;
   width: 100%;
@@ -3260,23 +3261,24 @@ def inject_assets_module_css() -> None:
   margin: 0;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button,
+.st-key-assets_table_wrap .asset-name-link button,
 .st-key-assets_table_wrap .asset-name-button button {{
-  background: {BRAND_NAV_BTN};
-  color: #ffffff;
+  background: transparent;
+  color: #0f172a;
   font-weight: 700;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   border: none;
-  border-radius: 8px;
-  padding: 0 16px;
-  height: 38px;
-  min-height: 38px;
-  max-height: 38px;
-  width: 100%;
-  max-width: 500px;
+  border-radius: 0;
+  padding: 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  width: auto;
+  max-width: 100%;
   min-width: 0;
   box-shadow: none;
-  text-align: center;
-  justify-content: center;
+  text-align: left;
+  justify-content: flex-start;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -3285,32 +3287,38 @@ def inject_assets_module_css() -> None:
   word-break: normal;
   overflow-wrap: normal;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: color 0.15s ease;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button:hover,
 .st-key-assets_table_wrap .ips-assets-name-link button:focus,
+.st-key-assets_table_wrap .asset-name-link button:hover,
+.st-key-assets_table_wrap .asset-name-link button:focus,
 .st-key-assets_table_wrap .asset-name-button button:hover,
 .st-key-assets_table_wrap .asset-name-button button:focus {{
-  background: {BRAND_NAV_BTN_HOVER};
-  color: #ffffff;
+  background: transparent;
+  color: #2563eb;
+  text-decoration: underline;
   border: none;
   box-shadow: none;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button > div,
 .st-key-assets_table_wrap .ips-assets-name-link button p,
 .st-key-assets_table_wrap .ips-assets-name-link button span,
+.st-key-assets_table_wrap .asset-name-link button > div,
+.st-key-assets_table_wrap .asset-name-link button p,
+.st-key-assets_table_wrap .asset-name-link button span,
 .st-key-assets_table_wrap .asset-name-button button > div,
 .st-key-assets_table_wrap .asset-name-button button p,
 .st-key-assets_table_wrap .asset-name-button button span {{
   display: inline;
-  color: #ffffff;
+  color: inherit;
   font-weight: 700;
   width: auto;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
+  text-align: left;
 }}
 .st-key-assets_table_wrap .asset-name-cell,
 .st-key-assets_table_wrap .asset-name-button,
@@ -3345,7 +3353,7 @@ def inject_assets_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 52px;
+  min-height: 72px;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -3520,8 +3528,8 @@ def inject_assets_module_css() -> None:
   align-items: center !important;
   justify-content: center !important;
 }}
-.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"],
-.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-button) button[data-testid="stBaseButton-popover"] {{
   display: inline-flex !important;
@@ -3531,7 +3539,7 @@ def inject_assets_module_css() -> None:
   justify-content: center !important;
   min-height: 36px !important;
   height: 36px !important;
-  min-width: 96px !important;
+  min-width: 100px !important;
   width: auto !important;
   max-width: none !important;
   padding: 0 0.85rem !important;
@@ -10020,6 +10028,40 @@ button[data-testid="stBaseButton-popover"],
   width: auto !important;
   word-break: normal !important;
   overflow-wrap: normal !important;
+}
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button,
+.st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button,
+.st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button {
+  background: transparent !important;
+  color: #0f172a !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  justify-content: flex-start !important;
+  max-width: 100% !important;
+  width: auto !important;
+  transition: color 0.15s ease !important;
+}
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button:hover,
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button:focus,
+.st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button:hover,
+.st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button:hover {
+  background: transparent !important;
+  color: #2563eb !important;
+  text-decoration: underline !important;
+}
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button p,
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button span,
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button div,
+.st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button p,
+.st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button span,
+.st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button p,
+.st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button span {
+  color: inherit !important;
+  text-align: left !important;
 }
 </style>
 """,

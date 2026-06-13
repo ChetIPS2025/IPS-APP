@@ -114,6 +114,13 @@ try:
         render_asset_activity_snippet,
         render_asset_row_actions,
     )
+    from app.components.assets_page_layout import (
+        close_assets_filter_bar_shell,
+        inject_assets_page_layout_css,
+        render_assets_equipment_banner,
+        render_assets_filter_bar_shell,
+        render_assets_pagination_footer,
+    )
     from app.components.quick_add_tool_ui import (
         QUICK_ADD_OPEN_KEY,
         open_quick_add_tool_dialog,
@@ -242,6 +249,13 @@ except ImportError:
         render_asset_activity_snippet,
         render_asset_row_actions,
     )
+    from components.assets_page_layout import (  # type: ignore
+        close_assets_filter_bar_shell,
+        inject_assets_page_layout_css,
+        render_assets_equipment_banner,
+        render_assets_filter_bar_shell,
+        render_assets_pagination_footer,
+    )
     from components.quick_add_tool_ui import (  # type: ignore
         QUICK_ADD_OPEN_KEY,
         open_quick_add_tool_dialog,
@@ -346,6 +360,12 @@ def _normalize_asset_status(raw: object) -> str:
         "retired": "Retired",
         "sold": "Sold",
         "lost": "Lost",
+        "checked out": "Checked Out",
+        "checked_out": "Checked Out",
+        "active": "In Service",
+        "overdue": "Overdue",
+        "down": "Down",
+        "out of service": "Out of Service",
     }
     if s in mapping:
         return mapping[s]
@@ -719,19 +739,27 @@ def _asset_serial(row: dict) -> str:
 
 
 def _asset_status_pill_html(status: str) -> str:
-    cls_map = {
-        "Available": "ips-asset-status-available",
-        "In Service": "ips-asset-status-in-service",
-        "Assigned": "ips-asset-status-assigned",
-        "Out for Repair": "ips-asset-status-out-for-repair",
-        "Maintenance Due": "ips-asset-status-maintenance-due",
-        "Needs Serial": "ips-asset-status-maintenance-due",
-        "Retired": "ips-asset-status-retired",
-        "Sold": "ips-asset-status-sold",
-        "Lost": "ips-asset-status-lost",
+    tone_map = {
+        "Available": "green",
+        "In Service": "green",
+        "Active": "green",
+        "Out for Repair": "orange",
+        "Maintenance Due": "orange",
+        "Needs Serial": "orange",
+        "Assigned": "blue",
+        "Checked Out": "blue",
+        "Overdue": "red",
+        "Down": "red",
+        "Out of Service": "red",
+        "Lost": "red",
+        "Retired": "neutral",
+        "Sold": "neutral",
     }
-    cls = cls_map.get(status, "ips-asset-status-available")
-    return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
+    tone = tone_map.get(status, "green")
+    return (
+        f'<span class="ips-asset-status-pill ips-asset-status-{tone}">'
+        f"{html.escape(status)}</span>"
+    )
 
 
 def _asset_image_src(asset: dict) -> str | None:
@@ -893,7 +921,7 @@ def _render_custom_assets_table(
     _sync_asset_checkbox_state(all_asset_ids)
 
     with st.container(key="assets_table_wrap"):
-        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-assets-table-wrap asset-table">', unsafe_allow_html=True)
 
         header_cols = st.columns(_ASSET_COLS, gap="xxsmall", vertical_alignment="center")
         for hidx, (col, (label, field)) in enumerate(zip(header_cols, _ASSET_HEADER_SPECS)):
@@ -971,7 +999,7 @@ def _render_custom_assets_table(
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    '<div class="ips-assets-link-btn ips-assets-name-link asset-name-button">',
+                    '<div class="ips-assets-link-btn ips-assets-name-link asset-name-link asset-name-button">',
                     unsafe_allow_html=True,
                 )
                 if st.button(
@@ -1247,7 +1275,9 @@ def _render_equipment_list(
                 clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
                 st.rerun()
 
+    render_assets_filter_bar_shell()
     layout_filter_bar(_filters)
+    close_assets_filter_bar_shell()
 
     assets_lookup = {
         str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
@@ -1272,7 +1302,7 @@ def _render_equipment_list(
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    render_assets_pagination_footer(len(filtered), _TABLE_KEY, item_label="asset")
 
 
 def _render_small_tools_list(rows: list[dict]) -> None:
@@ -2328,6 +2358,7 @@ def render() -> None:
     apply_pending_asset_deeplink()
     inject_assets_page_styles()
     inject_assets_module_css()
+    inject_assets_page_layout_css()
     if is_field_context():
         inject_field_row_expand_css()
     st.markdown(
@@ -2450,9 +2481,7 @@ def render() -> None:
     )
 
     with tab_equipment:
-        st.caption(
-            "Large assets and rentable equipment — tool trailers, generators, pressure washers, dump trailers, and similar fleet items."
-        )
+        render_assets_equipment_banner()
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
                 st.session_state["ast_kit_summary_on"] = True

@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v32"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v33"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -388,22 +388,22 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_table_wrap .ips-assets-name-link button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button {
-            background: #4361EE !important;
-            color: #FFFFFF !important;
+            background: transparent !important;
+            color: #0f172a !important;
             font-weight: 700 !important;
-            font-size: 0.8125rem !important;
+            font-size: 0.875rem !important;
             border: none !important;
-            border-radius: 8px !important;
-            padding: 0 16px !important;
-            height: 38px !important;
-            min-height: 38px !important;
-            max-height: 38px !important;
-            width: 100% !important;
-            max-width: 500px !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            width: auto !important;
+            max-width: 100% !important;
             min-width: 0 !important;
             box-shadow: none !important;
-            text-align: center !important;
-            justify-content: center !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
             display: inline-flex !important;
             align-items: center !important;
             white-space: nowrap !important;
@@ -413,7 +413,7 @@ def inject_assets_page_styles() -> None:
             overflow-wrap: normal !important;
             writing-mode: horizontal-tb !important;
             cursor: pointer !important;
-            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
+            transition: color 0.15s ease !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-cell,
@@ -435,7 +435,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-actions-button {
-            min-width: 96px !important;
+            min-width: 100px !important;
             white-space: nowrap !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
@@ -446,8 +446,9 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_table_wrap .asset-name-button button:hover,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button:focus {
-            background: #3651D4 !important;
-            color: #FFFFFF !important;
+            background: transparent !important;
+            color: #2563eb !important;
+            text-decoration: underline !important;
             border: none !important;
             box-shadow: none !important;
         }
@@ -464,7 +465,7 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button span {
             display: inline !important;
-            color: #FFFFFF !important;
+            color: inherit !important;
             font-weight: 700 !important;
             width: auto !important;
             max-width: 100% !important;
@@ -473,7 +474,7 @@ def inject_assets_page_styles() -> None:
             text-overflow: ellipsis !important;
             word-break: normal !important;
             overflow-wrap: normal !important;
-            text-align: center !important;
+            text-align: left !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-badges {
