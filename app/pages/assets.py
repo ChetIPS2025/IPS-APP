@@ -276,6 +276,8 @@ SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
+_ASSETS_EQUIPMENT_LAYOUT_KEY = "_ips_assets_equipment_layout_ready"
+_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY = "_ips_assets_equipment_layout_bump"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
@@ -963,10 +965,13 @@ def _render_custom_assets_table(
                 rentable_badge = _asset_rentable_badge_html(asset)
                 name_label = name if name and name != "—" else "View asset"
                 st.markdown(
-                    '<div class="ips-assets-name-cell-wrap">',
+                    '<div class="ips-assets-name-cell-wrap asset-name-cell">',
                     unsafe_allow_html=True,
                 )
-                st.markdown('<div class="ips-assets-link-btn ips-assets-name-link">', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="ips-assets-link-btn ips-assets-name-link asset-name-button">',
+                    unsafe_allow_html=True,
+                )
                 if st.button(
                     f"{name_label} ›",
                     key=f"ast_name_{aid}",
@@ -984,7 +989,7 @@ def _render_custom_assets_table(
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(category)}</div>',
+                    f'<div class="ips-assets-cell asset-category-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -1012,7 +1017,7 @@ def _render_custom_assets_table(
             with cols[8]:
                 if not field_mode:
                     st.markdown(
-                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar" aria-hidden="true"></span>',
+                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar asset-actions-cell" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
                     render_asset_row_actions(
@@ -2454,6 +2459,12 @@ def render() -> None:
             else:
                 st.caption("Load kit accountability metrics on demand to speed up the assets page.")
         _render_equipment_list(rows)
+        if st.session_state.pop(_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY, False):
+            pass
+        elif not st.session_state.get(_ASSETS_EQUIPMENT_LAYOUT_KEY):
+            st.session_state[_ASSETS_EQUIPMENT_LAYOUT_KEY] = True
+            st.session_state[_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY] = True
+            st.rerun()
 
     with tab_serialized_tools:
         st.caption(

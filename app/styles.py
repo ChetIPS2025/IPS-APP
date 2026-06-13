@@ -3192,7 +3192,7 @@ def inject_assets_module_css() -> None:
     checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     assets_equipment_grid = (
-        "40px 80px minmax(420px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
+        "40px 80px minmax(360px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
         "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 120px"
     )
     assets_serialized_grid = (
@@ -3213,7 +3213,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v12">
+<style id="ips-assets-module-v13">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3228,23 +3228,39 @@ def inject_assets_module_css() -> None:
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }}
-.st-key-assets_table_wrap .ips-assets-name-cell-wrap {{
+.st-key-assets_table_wrap .ips-assets-name-cell-wrap,
+.st-key-assets_table_wrap .asset-name-cell {{
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  min-width: 0;
+  min-width: 360px;
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
 }}
-.st-key-assets_table_wrap .ips-assets-name-link {{
+.st-key-assets_table_wrap .ips-assets-name-link,
+.st-key-assets_table_wrap .asset-name-button {{
   flex: 1 1 auto;
-  min-width: 0;
-  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  min-width: 360px;
+  max-width: 520px;
   overflow: hidden;
 }}
-.st-key-assets_table_wrap .ips-assets-name-link button {{
+.st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"],
+.st-key-assets_table_wrap .ips-assets-name-link .stButton,
+.st-key-assets_table_wrap .asset-name-button [data-testid="stButton"],
+.st-key-assets_table_wrap .asset-name-button .stButton {{
   width: 100%;
   max-width: 100%;
+  min-width: 360px;
+  margin: 0;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link button,
+.st-key-assets_table_wrap .asset-name-button button {{
+  width: 100%;
+  max-width: 100%;
+  min-width: 360px;
   padding: 0;
   min-height: 1.35rem;
   height: auto;
@@ -3256,6 +3272,8 @@ def inject_assets_module_css() -> None:
   font-size: 0.8125rem;
   text-align: left;
   justify-content: flex-start;
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3263,7 +3281,9 @@ def inject_assets_module_css() -> None:
   overflow-wrap: normal;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button:hover,
-.st-key-assets_table_wrap .ips-assets-name-link button:focus {{
+.st-key-assets_table_wrap .ips-assets-name-link button:focus,
+.st-key-assets_table_wrap .asset-name-button button:hover,
+.st-key-assets_table_wrap .asset-name-button button:focus {{
   color: #1d4ed8;
   background: transparent;
   border: none;
@@ -3271,7 +3291,10 @@ def inject_assets_module_css() -> None:
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button > div,
 .st-key-assets_table_wrap .ips-assets-name-link button p,
-.st-key-assets_table_wrap .ips-assets-name-link button span {{
+.st-key-assets_table_wrap .ips-assets-name-link button span,
+.st-key-assets_table_wrap .asset-name-button button > div,
+.st-key-assets_table_wrap .asset-name-button button p,
+.st-key-assets_table_wrap .asset-name-button button span {{
   display: block;
   width: 100%;
   max-width: 100%;
@@ -3279,6 +3302,22 @@ def inject_assets_module_css() -> None:
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
+}}
+.st-key-assets_table_wrap .asset-name-cell,
+.st-key-assets_table_wrap .asset-name-button,
+.st-key-assets_table_wrap .asset-category-cell,
+.st-key-assets_table_wrap .asset-actions-cell,
+.st-key-assets_table_wrap .asset-actions-button {{
+  white-space: nowrap;
+}}
+.st-key-assets_table_wrap .asset-category-cell {{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 150px;
+}}
+.st-key-assets_table_wrap .asset-actions-button {{
+  min-width: 96px;
+  white-space: nowrap;
 }}
 .st-key-assets_table_wrap .ips-assets-name-badges {{
   flex: 0 0 auto;
@@ -3345,6 +3384,38 @@ def inject_assets_module_css() -> None:
   max-width: 52px !important;
   padding: 0 6px !important;
   justify-content: center !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  flex: 0 0 80px !important;
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
+  flex: 0 0 auto !important;
+  min-width: 360px !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"] {{
+  min-width: 360px !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
+  flex: 0 0 auto !important;
+  min-width: 150px !important;
+  overflow: hidden !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"] {{
+  min-width: 150px !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
 }}
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
@@ -3441,7 +3512,9 @@ def inject_assets_module_css() -> None:
   justify-content: center !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"],
-.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] {{
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-button) button[data-testid="stBaseButton-popover"] {{
   display: inline-flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -3449,7 +3522,7 @@ def inject_assets_module_css() -> None:
   justify-content: center !important;
   min-height: 36px !important;
   height: 36px !important;
-  min-width: 6.75rem !important;
+  min-width: 96px !important;
   width: auto !important;
   max-width: none !important;
   padding: 0 0.85rem !important;
@@ -3759,6 +3832,13 @@ def inject_assets_module_css() -> None:
 }}
 .ips-asset-doc-name {{
   font-weight: 600;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page)
+[data-testid="stTabs"] [data-baseweb="tab-panel"][hidden],
+section[data-testid="stMain"]:has(.ips-assets-page)
+[data-testid="stTabs"] [role="tabpanel"][hidden] {{
+  content-visibility: hidden !important;
+  contain-intrinsic-size: 0 0 !important;
 }}
 </style>
 """,

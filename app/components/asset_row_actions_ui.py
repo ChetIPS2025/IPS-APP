@@ -49,7 +49,7 @@ def render_asset_row_actions(
         return
 
     st.markdown(
-        '<span class="asset-row-actions-menu" aria-hidden="true"></span>',
+        '<span class="asset-row-actions-menu asset-actions-button" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     with st.popover(

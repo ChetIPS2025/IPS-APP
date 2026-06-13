@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v30"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v31"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -247,7 +247,7 @@ def inject_assets_page_styles() -> None:
             align-items: center !important;
             justify-content: center !important;
             width: auto !important;
-            min-width: 6.75rem !important;
+            min-width: 96px !important;
             max-width: none !important;
             height: 36px !important;
             min-height: 36px !important;
@@ -348,35 +348,48 @@ def inject_assets_page_styles() -> None:
             word-break: normal !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-cell-wrap {
+        .st-key-assets_table_wrap .ips-assets-name-cell-wrap,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-cell {
             display: flex !important;
             align-items: center !important;
             gap: 0.45rem !important;
-            min-width: 0 !important;
+            min-width: 360px !important;
             width: 100% !important;
+            max-width: 100% !important;
             overflow: hidden !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link {
+        .st-key-assets_table_wrap .ips-assets-name-link,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button {
             flex: 1 1 auto !important;
-            min-width: 0 !important;
-            max-width: 100% !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            min-width: 360px !important;
+            max-width: 520px !important;
             overflow: hidden !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"],
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link .stButton {
+        .st-key-assets_table_wrap .ips-assets-name-link .stButton,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button [data-testid="stButton"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button .stButton {
             width: 100% !important;
             max-width: 100% !important;
-            min-width: 0 !important;
+            min-width: 360px !important;
             margin: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link button {
+        .st-key-assets_table_wrap .ips-assets-name-link button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button {
             width: 100% !important;
             max-width: 100% !important;
-            min-width: 0 !important;
+            min-width: 360px !important;
             padding: 0 !important;
             min-height: 1.35rem !important;
             height: auto !important;
@@ -388,12 +401,37 @@ def inject_assets_page_styles() -> None:
             font-size: 0.8125rem !important;
             text-align: left !important;
             justify-content: flex-start !important;
+            display: inline-flex !important;
+            align-items: center !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             word-break: normal !important;
             overflow-wrap: normal !important;
             writing-mode: horizontal-tb !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-cell,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-category-cell,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-actions-cell,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-actions-button {
+            white-space: nowrap !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-category-cell {
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            min-width: 150px !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-actions-button {
+            min-width: 96px !important;
+            white-space: nowrap !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .ips-assets-name-link button:hover,
@@ -591,7 +629,7 @@ def inject_assets_page_styles() -> None:
             grid-template-columns:
                 40px
                 80px
-                minmax(420px, 2fr)
+                minmax(360px, 2fr)
                 minmax(150px, 0.9fr)
                 minmax(150px, 0.9fr)
                 minmax(120px, 0.8fr)
@@ -620,9 +658,26 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"] {
             flex: none !important;
             width: auto !important;
-            min-width: 0 !important;
             max-width: none !important;
             overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:nth-child(3),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header) > [data-testid="column"]:nth-child(3) {
+            min-width: 360px !important;
+            overflow: hidden !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:nth-child(4),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header) > [data-testid="column"]:nth-child(4) {
+            min-width: 150px !important;
+            overflow: hidden !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
@@ -712,7 +767,7 @@ def inject_assets_page_styles() -> None:
             justify-content: center !important;
             min-height: 36px !important;
             height: 36px !important;
-            min-width: 6.75rem !important;
+            min-width: 96px !important;
             width: auto !important;
             max-width: none !important;
             padding: 0 0.85rem !important;
@@ -1404,6 +1459,13 @@ def inject_assets_page_styles() -> None:
         div[data-testid="stVerticalBlock"]:has(.ips-clean-row-wrap)
         .ips-assets-row {
             cursor: pointer;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="stTabs"] [data-baseweb="tab-panel"][hidden],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [data-testid="stTabs"] [role="tabpanel"][hidden] {
+            content-visibility: hidden !important;
+            contain-intrinsic-size: 0 0 !important;
         }
         </style>
         """,
