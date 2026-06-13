@@ -961,10 +961,26 @@ def _render_custom_assets_table(
 
             with cols[2]:
                 rentable_badge = _asset_rentable_badge_html(asset)
+                name_label = name if name and name != "—" else "View asset"
                 st.markdown(
-                    f'<div class="ips-assets-title">{html.escape(name)}{rentable_badge}</div>',
+                    '<div class="ips-assets-name-cell-wrap">',
                     unsafe_allow_html=True,
                 )
+                st.markdown('<div class="ips-assets-link-btn ips-assets-name-link">', unsafe_allow_html=True)
+                if st.button(
+                    f"{name_label} ›",
+                    key=f"ast_name_{aid}",
+                    help="Open asset details",
+                ):
+                    _open_assets_detail_modal(aid, asset)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+                if rentable_badge:
+                    st.markdown(
+                        f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("</div>", unsafe_allow_html=True)
 
             with cols[3]:
                 st.markdown(
@@ -996,17 +1012,9 @@ def _render_custom_assets_table(
             with cols[8]:
                 if not field_mode:
                     st.markdown(
-                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar asset-open-button" aria-hidden="true"></span>',
+                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    if st.button(
-                        "Open",
-                        key=f"ast_open_{aid}",
-                        type="primary",
-                        help="Open asset details",
-                    ):
-                        _open_assets_detail_modal(aid, asset)
-                        st.rerun()
                     render_asset_row_actions(
                         asset,
                         on_view=_row_action_view,

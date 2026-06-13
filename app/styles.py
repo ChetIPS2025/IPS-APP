@@ -3142,7 +3142,7 @@ def inject_assets_module_css() -> None:
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     assets_equipment_grid = (
         "40px 80px minmax(420px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
-        "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 220px"
+        "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 120px"
     )
     assets_serialized_grid = (
         "40px 52px minmax(160px, 1.8fr) minmax(100px, 0.9fr) minmax(110px, 1fr) "
@@ -3162,7 +3162,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v11">
+<style id="ips-assets-module-v12">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3176,6 +3176,61 @@ def inject_assets_module_css() -> None:
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}}
+.st-key-assets_table_wrap .ips-assets-name-cell-wrap {{
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link {{
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link button {{
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  min-height: 1.35rem;
+  height: auto;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #2563eb;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-align: left;
+  justify-content: flex-start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link button:hover,
+.st-key-assets_table_wrap .ips-assets-name-link button:focus {{
+  color: #1d4ed8;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link button > div,
+.st-key-assets_table_wrap .ips-assets-name-link button p,
+.st-key-assets_table_wrap .ips-assets-name-link button span {{
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}}
+.st-key-assets_table_wrap .ips-assets-name-badges {{
+  flex: 0 0 auto;
 }}
 {ast_list_wrap} [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
@@ -3244,10 +3299,10 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell),
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-header-cell) {{
-  flex: 0 0 220px !important;
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  flex: 0 0 120px !important;
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
   padding: 0 8px !important;
   justify-content: flex-end !important;
   overflow: visible !important;
@@ -3259,9 +3314,9 @@ def inject_assets_module_css() -> None:
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
   overflow: visible !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-actions-cell) {{
@@ -3401,9 +3456,9 @@ def inject_assets_module_css() -> None:
   align-items: center !important;
 }}
 {ast_grid_cols}:nth-child(9) > [data-testid="stVerticalBlock"] {{
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
   overflow: visible !important;
   justify-content: flex-end !important;
   align-items: center !important;
