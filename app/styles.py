@@ -3141,8 +3141,8 @@ def inject_assets_module_css() -> None:
     checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     assets_equipment_grid = (
-        "40px 52px minmax(200px, 2.4fr) minmax(110px, 0.95fr) minmax(110px, 1fr) "
-        "minmax(95px, 0.85fr) minmax(120px, 1fr) minmax(105px, 0.9fr) 44px"
+        "40px 80px minmax(420px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
+        "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 220px"
     )
     assets_serialized_grid = (
         "40px 52px minmax(160px, 1.8fr) minmax(100px, 0.9fr) minmax(110px, 1fr) "
@@ -3162,7 +3162,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v9">
+<style id="ips-assets-module-v10">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3201,6 +3201,7 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
   grid-template-columns: {assets_equipment_grid} !important;
+  column-gap: 16px !important;
 }}
 .st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
 .st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
@@ -3240,14 +3241,106 @@ def inject_assets_module_css() -> None:
   justify-content: center !important;
 }}
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9) {{
-  flex: 0 0 44px !important;
-  width: 44px !important;
-  min-width: 44px !important;
-  max-width: 44px !important;
-  padding: 0 4px !important;
-  justify-content: center !important;
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell),
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-header-cell) {{
+  flex: 0 0 220px !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  padding: 0 8px !important;
+  justify-content: flex-end !important;
   overflow: visible !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: visible !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: visible !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button {{
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid #2563eb !important;
+  border-radius: 8px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  padding: 0 12px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  min-width: 6.75rem !important;
+  width: auto !important;
+  max-width: none !important;
+  padding: 0 0.85rem !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] span,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] span,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] div {{
+  display: inline !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
 }}
 {ast_grid_cols} > [data-testid="stVerticalBlock"] {{
   width: 100% !important;

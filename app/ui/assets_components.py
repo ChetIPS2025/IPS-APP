@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v27"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v28"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -164,7 +164,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) {
             flex: 0 0 auto !important;
             width: auto !important;
             min-width: 44px !important;
@@ -175,11 +175,24 @@ def inject_assets_page_styles() -> None:
             justify-content: center !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) [data-testid="stPopover"],
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [data-testid="column"]:has(.asset-row-actions-menu) {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+        }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) [data-testid="stElementContainer"]:has([data-testid="stPopover"]) {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) [data-testid="stPopover"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) [data-testid="stElementContainer"]:has([data-testid="stPopover"]) {
             width: auto !important;
             min-width: 0 !important;
             margin: 0 !important;
@@ -190,7 +203,7 @@ def inject_assets_page_styles() -> None:
         [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) button[data-testid="stBaseButton-popover"] {
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -221,8 +234,47 @@ def inject_assets_page_styles() -> None:
         [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"] svg,
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] svg {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) button[data-testid="stBaseButton-popover"] svg {
             display: none !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: auto !important;
+            min-width: 6.75rem !important;
+            max-width: none !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            max-height: none !important;
+            padding: 0 0.85rem !important;
+            margin: 0 !important;
+            border-radius: 8px !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+            color: #475569 !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+            line-height: 1.1 !important;
+            letter-spacing: 0 !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            writing-mode: horizontal-tb !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] svg {
+            display: inline-block !important;
+            flex-shrink: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
@@ -232,10 +284,10 @@ def inject_assets_page_styles() -> None:
         [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"] span,
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) button[data-testid="stBaseButton-popover"] p,
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] span {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) button[data-testid="stBaseButton-popover"] span {
             margin: 0 !important;
             padding: 0 !important;
             line-height: 1 !important;
@@ -249,7 +301,7 @@ def inject_assets_page_styles() -> None:
         [class*="st-key-ast_row_menu_"] button[data-testid="stBaseButton-popover"]:hover,
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap))
-        [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"]:hover {
+        [data-testid="column"]:has(.asset-row-actions-menu):not(:has(.ips-assets-actions-cell)) button[data-testid="stBaseButton-popover"]:hover {
             background: #f8fafc !important;
             border-color: #cbd5e1 !important;
             color: #1e293b !important;
@@ -451,19 +503,25 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header),
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) {
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.assets-table-header),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.assets-table-row) {
             display: grid !important;
             grid-template-columns:
-                28px
-                56px
-                minmax(180px, 2.2fr)
-                minmax(100px, 0.85fr)
-                minmax(110px, 0.9fr)
-                minmax(95px, 0.8fr)
-                minmax(110px, 0.9fr)
-                minmax(110px, 0.9fr)
-                168px !important;
-            column-gap: 14px !important;
+                40px
+                80px
+                minmax(420px, 2fr)
+                minmax(150px, 0.9fr)
+                minmax(150px, 0.9fr)
+                minmax(120px, 0.8fr)
+                minmax(150px, 0.9fr)
+                minmax(160px, 0.9fr)
+                220px !important;
+            column-gap: 16px !important;
             align-items: center !important;
             width: 100% !important;
             box-sizing: border-box !important;
@@ -494,27 +552,56 @@ def inject_assets_page_styles() -> None:
         [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header) > [data-testid="column"]:last-child {
-            min-width: 168px !important;
+        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header) > [data-testid="column"]:last-child,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-header-cell) {
+            min-width: 220px !important;
+            max-width: 220px !important;
             overflow: visible !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
-        [data-testid="stVerticalBlock"] {
+        [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
             justify-content: flex-end !important;
-            gap: 0.45rem !important;
+            gap: 8px !important;
             width: 100% !important;
-            min-width: 168px !important;
+            min-width: 220px !important;
             overflow: visible !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 8px !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"]
         [data-testid="stElementContainer"] {
             flex: 0 0 auto !important;
             width: auto !important;
@@ -523,15 +610,14 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
-        [data-testid="stPopover"],
+        [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="stPopover"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         [class*="st-key-ast_open_"] [data-testid="stButton"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         [class*="st-key-ast_open_"] .stButton {
             width: auto !important;
             min-width: 0 !important;
@@ -539,23 +625,24 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         button[data-testid="stBaseButton-popover"] {
             display: inline-flex !important;
             flex-direction: row !important;
+            flex-wrap: nowrap !important;
             align-items: center !important;
             justify-content: center !important;
             min-height: 36px !important;
             height: 36px !important;
-            min-width: 5.25rem !important;
+            min-width: 6.75rem !important;
             width: auto !important;
             max-width: none !important;
-            padding: 0 0.75rem !important;
+            padding: 0 0.85rem !important;
             font-size: 0.78rem !important;
             font-weight: 600 !important;
             white-space: nowrap !important;
             writing-mode: horizontal-tb !important;
-            word-break: normal !important;
+            word-break: keep-all !important;
             overflow-wrap: normal !important;
             color: #475569 !important;
             background: #ffffff !important;
@@ -564,15 +651,15 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         button[data-testid="stBaseButton-popover"] p,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         button[data-testid="stBaseButton-popover"] span,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         button[data-testid="stBaseButton-popover"] div {
             display: inline !important;
             white-space: nowrap !important;
@@ -582,7 +669,7 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
-        [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:last-child
+        [data-testid="column"]:has(.ips-assets-actions-cell)
         button[data-testid="stBaseButton-popover"] svg {
             display: inline-block !important;
             flex-shrink: 0 !important;
