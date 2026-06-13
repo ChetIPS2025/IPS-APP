@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v33"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v34"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -389,8 +389,9 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button {
             background: transparent !important;
-            color: #0f172a !important;
-            font-weight: 700 !important;
+            background-color: transparent !important;
+            color: #2563eb !important;
+            font-weight: 600 !important;
             font-size: 0.875rem !important;
             border: none !important;
             border-radius: 0 !important;
@@ -402,6 +403,7 @@ def inject_assets_page_styles() -> None:
             max-width: 100% !important;
             min-width: 0 !important;
             box-shadow: none !important;
+            outline: none !important;
             text-align: left !important;
             justify-content: flex-start !important;
             display: inline-flex !important;
@@ -447,7 +449,8 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button button:focus {
             background: transparent !important;
-            color: #2563eb !important;
+            background-color: transparent !important;
+            color: #1d4ed8 !important;
             text-decoration: underline !important;
             border: none !important;
             box-shadow: none !important;
@@ -466,7 +469,7 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_table_wrap .asset-name-button button span {
             display: inline !important;
             color: inherit !important;
-            font-weight: 700 !important;
+            font-weight: 600 !important;
             width: auto !important;
             max-width: 100% !important;
             white-space: nowrap !important;

@@ -120,6 +120,8 @@ try:
         render_assets_equipment_banner,
         render_assets_filter_bar_shell,
         render_assets_pagination_footer,
+        render_assets_summary_cards,
+        render_assets_table_pagination_header,
     )
     from app.components.quick_add_tool_ui import (
         QUICK_ADD_OPEN_KEY,
@@ -255,6 +257,8 @@ except ImportError:
         render_assets_equipment_banner,
         render_assets_filter_bar_shell,
         render_assets_pagination_footer,
+        render_assets_summary_cards,
+        render_assets_table_pagination_header,
     )
     from components.quick_add_tool_ui import (  # type: ignore
         QUICK_ADD_OPEN_KEY,
@@ -950,10 +954,12 @@ def _render_custom_assets_table(
                         base_class="ips-assets-header-row ips-assets-cell",
                     )
 
-        for asset in filtered:
+        for row_idx, asset in enumerate(filtered):
             aid = str(asset.get("id") or "").strip()
             if not aid:
                 continue
+
+            stripe_cls = "ips-assets-row-odd" if row_idx % 2 == 0 else "ips-assets-row-even"
 
             name = _asset_name(asset)
             category = _asset_category(asset)
@@ -968,7 +974,7 @@ def _render_custom_assets_table(
 
             with cols[0]:
                 st.markdown(
-                    '<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row" aria-hidden="true"></span>',
+                    f'<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row {stripe_cls}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 if field_mode:
@@ -1189,6 +1195,28 @@ def _render_small_tools_table(
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _equipment_summary_counts(rows: list[dict]) -> dict[str, int]:
+    """UI-only counts for equipment summary cards (uses already-loaded rows)."""
+    counts = {
+        "total": len(rows),
+        "available": 0,
+        "checked_out": 0,
+        "out_for_repair": 0,
+        "service_due": 0,
+    }
+    for row in rows:
+        status = _normalize_asset_status(row.get("status"))
+        if status in ("Available", "In Service"):
+            counts["available"] += 1
+        elif status in ("Checked Out", "Assigned"):
+            counts["checked_out"] += 1
+        elif status == "Out for Repair":
+            counts["out_for_repair"] += 1
+        if status == "Maintenance Due":
+            counts["service_due"] += 1
+    return counts
+
+
 def _render_equipment_list(
     rows: list[dict],
 ) -> None:
@@ -1299,7 +1327,15 @@ def _render_equipment_list(
         rentable=str(st.session_state.get("ast_bar_rentable") or "All"),
     )
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
+    summary = _equipment_summary_counts(filtered)
+    render_assets_summary_cards(
+        total=summary["total"],
+        available=summary["available"],
+        checked_out=summary["checked_out"],
+        out_for_repair=summary["out_for_repair"],
+        service_due=summary["service_due"],
+    )
+    render_assets_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_assets_pagination_footer(len(filtered), _TABLE_KEY, item_label="asset")

@@ -25,13 +25,14 @@ _EQUIPMENT_BANNER = (
     "Large assets and rentable equipment — tool trailers, generators, pressure washers, "
     "dump trailers, and similar fleet items."
 )
+_ASSETS_PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 
 
 def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
     st.markdown(
         """
-<style id="ips-assets-page-layout-v1">
+<style id="ips-assets-page-layout-v2">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }
@@ -91,8 +92,93 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
 }
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row),
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) {
-  min-height: 72px !important;
+  min-height: 76px !important;
   border-bottom: 1px solid #e5eaf2 !important;
+  transition: background-color 0.15s ease !important;
+}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-row-odd) {
+  background: #ffffff !important;
+}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-row-even) {
+  background: #f8fafc !important;
+}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover {
+  background: #eef2ff !important;
+}
+.ips-assets-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem 0;
+}
+.ips-assets-stat-card {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  min-height: 72px;
+}
+.ips-assets-stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin: 0 0 0.35rem 0;
+}
+.ips-assets-stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ips-assets-stat-available .ips-assets-stat-value { color: #15803d; }
+.ips-assets-stat-checked-out .ips-assets-stat-value { color: #1d4ed8; }
+.ips-assets-stat-repair .ips-assets-stat-value { color: #c2410c; }
+.ips-assets-stat-service .ips-assets-stat-value { color: #b45309; }
+.ips-assets-page-size-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+}
+section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.ips-assets-page-size-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.35rem !important;
+  margin-bottom: 0.65rem !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.ips-assets-page-size-marker) [data-testid="stSelectbox"] {
+  max-width: 5.5rem;
+}
+section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.ips-assets-page-size-marker) [data-testid="stSelectbox"] > div > div {
+  min-height: 34px !important;
+  border-radius: 8px !important;
+  border: 1px solid #dbe3ef !important;
+  background: #ffffff !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+}
+.ips-assets-show-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+.st-key-assets_table_wrap .ips-asset-thumb-cell,
+.st-key-assets_table_wrap .ips-asset-thumb-img,
+.st-key-assets_table_wrap .ips-asset-thumb-placeholder {
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+}
+.st-key-assets_table_wrap .ips-asset-thumb-img {
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 .ips-assets-equipment-table-row,
 .ips-assets-row-marker {
@@ -108,10 +194,13 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
 }
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button,
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button {
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link [data-testid="stBaseButton-secondary"],
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button [data-testid="stBaseButton-secondary"] {
   background: transparent !important;
-  color: #0f172a !important;
-  font-weight: 700 !important;
+  background-color: transparent !important;
+  color: #2563eb !important;
+  font-weight: 600 !important;
   font-size: 0.875rem !important;
   border: none !important;
   border-radius: 0 !important;
@@ -123,6 +212,7 @@ section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .a
   max-width: 100% !important;
   min-width: 0 !important;
   box-shadow: none !important;
+  outline: none !important;
   text-align: left !important;
   justify-content: flex-start !important;
   display: inline !important;
@@ -136,7 +226,8 @@ section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .a
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button:hover,
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button:hover {
   background: transparent !important;
-  color: #2563eb !important;
+  background-color: transparent !important;
+  color: #1d4ed8 !important;
   text-decoration: underline !important;
   border: none !important;
   box-shadow: none !important;
@@ -146,9 +237,12 @@ section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .a
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button span,
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button > div,
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button p,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button span {
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button span,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button > div,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button p,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button span {
   color: inherit !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   display: inline !important;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -156,46 +250,52 @@ section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .i
   text-align: left !important;
 }
 .asset-name-link {
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: #2563eb;
   cursor: pointer;
   text-decoration: none;
 }
 .asset-name-link:hover {
-  color: #2563eb;
+  color: #1d4ed8;
   text-decoration: underline;
 }
 .ips-asset-status-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 26px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   white-space: nowrap;
   letter-spacing: 0.02em;
+  border: 1px solid transparent;
 }
 .ips-asset-status-green {
-  background: #dcfce7;
-  color: #15803d;
+  background: #bbf7d0;
+  color: #14532d;
+  border-color: #86efac;
 }
 .ips-asset-status-orange {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #fed7aa;
+  color: #7c2d12;
+  border-color: #fdba74;
 }
 .ips-asset-status-blue {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #bfdbfe;
+  color: #1e3a8a;
+  border-color: #93c5fd;
 }
 .ips-asset-status-red {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #fecaca;
+  color: #7f1d1d;
+  border-color: #fca5a5;
 }
 .ips-asset-status-neutral {
-  background: #f1f5f9;
-  color: #475569;
+  background: #e2e8f0;
+  color: #334155;
+  border-color: #cbd5e1;
 }
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"] {
   min-width: 100px !important;
@@ -258,6 +358,68 @@ def render_assets_filter_bar_shell() -> None:
 
 def close_assets_filter_bar_shell() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_assets_summary_cards(
+    *,
+    total: int,
+    available: int,
+    checked_out: int,
+    out_for_repair: int,
+    service_due: int,
+) -> None:
+    """Equipment tab KPI strip above the table."""
+    cards = [
+        ("Total Assets", total, "ips-assets-stat-total"),
+        ("Available", available, "ips-assets-stat-available"),
+        ("Checked Out", checked_out, "ips-assets-stat-checked-out"),
+        ("Out For Repair", out_for_repair, "ips-assets-stat-repair"),
+        ("Service Due", service_due, "ips-assets-stat-service"),
+    ]
+    parts = ['<div class="ips-assets-summary-cards">']
+    for label, value, cls in cards:
+        parts.append(
+            f'<div class="ips-assets-stat-card {cls}">'
+            f'<p class="ips-assets-stat-label">{html.escape(label)}</p>'
+            f'<p class="ips-assets-stat-value">{value:,}</p>'
+            f"</div>"
+        )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def render_assets_table_pagination_header(total: int, table_key: str) -> tuple[int, int, int]:
+    """Show: [page size] selector aligned above the table."""
+    try:
+        from app.components.table_pagination import DEFAULT_CATALOG_PAGE_SIZE
+    except ImportError:
+        from components.table_pagination import DEFAULT_CATALOG_PAGE_SIZE  # type: ignore
+
+    page, page_size, total_pages = pagination_meta(total, table_key)
+    _, size_col = st.columns([4.5, 1])
+    with size_col:
+        st.markdown(
+            '<span class="ips-assets-page-size-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        label_col, sel_col = st.columns([0.38, 0.62], gap="small")
+        with label_col:
+            st.markdown('<span class="ips-assets-show-label">Show:</span>', unsafe_allow_html=True)
+        with sel_col:
+            picked = st.selectbox(
+                "Show",
+                list(_ASSETS_PAGE_SIZE_OPTIONS),
+                index=_ASSETS_PAGE_SIZE_OPTIONS.index(page_size)
+                if page_size in _ASSETS_PAGE_SIZE_OPTIONS
+                else _ASSETS_PAGE_SIZE_OPTIONS.index(DEFAULT_CATALOG_PAGE_SIZE),
+                key=f"{table_key}_pg_size_select",
+                label_visibility="collapsed",
+            )
+        if int(picked) != page_size:
+            st.session_state[page_size_key(table_key)] = int(picked)
+            reset_table_page(table_key)
+            st.rerun()
+    return page, page_size, total_pages
 
 
 def render_assets_pagination_footer(total: int, table_key: str, *, item_label: str = "asset") -> None:

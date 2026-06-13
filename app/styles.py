@@ -3194,7 +3194,7 @@ def inject_assets_module_css() -> None:
     checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     assets_equipment_grid = (
-        "40px 80px minmax(360px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
+        "40px 88px minmax(360px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
         "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 120px"
     )
     assets_serialized_grid = (
@@ -3215,7 +3215,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v15">
+<style id="ips-assets-module-v16">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;
@@ -3263,11 +3263,12 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .ips-assets-name-link button,
 .st-key-assets_table_wrap .asset-name-link button,
 .st-key-assets_table_wrap .asset-name-button button {{
-  background: transparent;
-  color: #0f172a;
-  font-weight: 700;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: {PRIMARY};
+  font-weight: 600;
   font-size: 0.875rem;
-  border: none;
+  border: none !important;
   border-radius: 0;
   padding: 0;
   height: auto;
@@ -3276,7 +3277,8 @@ def inject_assets_module_css() -> None:
   width: auto;
   max-width: 100%;
   min-width: 0;
-  box-shadow: none;
+  box-shadow: none !important;
+  outline: none;
   text-align: left;
   justify-content: flex-start;
   display: inline-flex;
@@ -3295,11 +3297,12 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .asset-name-link button:focus,
 .st-key-assets_table_wrap .asset-name-button button:hover,
 .st-key-assets_table_wrap .asset-name-button button:focus {{
-  background: transparent;
-  color: #2563eb;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: {PRIMARY_HOVER};
   text-decoration: underline;
-  border: none;
-  box-shadow: none;
+  border: none !important;
+  box-shadow: none !important;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button > div,
 .st-key-assets_table_wrap .ips-assets-name-link button p,
@@ -3312,7 +3315,7 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .asset-name-button button span {{
   display: inline;
   color: inherit;
-  font-weight: 700;
+  font-weight: 600;
   width: auto;
   max-width: 100%;
   white-space: nowrap;
@@ -3353,7 +3356,7 @@ def inject_assets_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 72px;
+  min-height: 76px;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -3768,15 +3771,15 @@ def inject_assets_module_css() -> None:
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 60px;
+  height: 60px;
   vertical-align: middle;
   flex-shrink: 0;
 }}
 .ips-asset-thumb-img {{
   display: block;
-  width: 42px !important;
-  height: 42px !important;
+  width: 60px !important;
+  height: 60px !important;
   object-fit: cover;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -3786,8 +3789,8 @@ def inject_assets_module_css() -> None:
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 60px;
+  height: 60px;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
@@ -3820,6 +3823,27 @@ def inject_assets_module_css() -> None:
   border-radius: 9px !important;
   font-size: 14px !important;
   width: auto !important;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link .stButton > button,
+.st-key-assets_table_wrap .asset-name-button .stButton > button,
+.st-key-assets_table_wrap .asset-name-link .stButton > button {{
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: {PRIMARY} !important;
+  font-weight: 600 !important;
+}}
+.st-key-assets_table_wrap .ips-assets-name-link .stButton > button:hover,
+.st-key-assets_table_wrap .asset-name-button .stButton > button:hover,
+.st-key-assets_table_wrap .asset-name-link .stButton > button:hover {{
+  background: transparent !important;
+  color: {PRIMARY_HOVER} !important;
+  text-decoration: underline !important;
 }}
 .ips-asset-doc-upload-zone-marker + [data-testid="stFileUploader"] {{
   border: 2px dashed #cbd5e1;
@@ -10033,7 +10057,9 @@ button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button,
 .st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button {
   background: transparent !important;
-  color: #0f172a !important;
+  background-color: transparent !important;
+  color: #2563eb !important;
+  font-weight: 600 !important;
   border: none !important;
   border-radius: 0 !important;
   padding: 0 !important;
@@ -10043,6 +10069,7 @@ button[data-testid="stBaseButton-popover"],
   justify-content: flex-start !important;
   max-width: 100% !important;
   width: auto !important;
+  box-shadow: none !important;
   transition: color 0.15s ease !important;
 }
 .st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button:hover,
@@ -10050,7 +10077,7 @@ button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"] > button:hover,
 .st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button:hover {
   background: transparent !important;
-  color: #2563eb !important;
+  color: #1d4ed8 !important;
   text-decoration: underline !important;
 }
 .st-key-assets_table_wrap .asset-name-button [data-testid="stButton"] > button p,
@@ -10061,6 +10088,7 @@ button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button p,
 .st-key-assets_table_wrap .asset-name-link [data-testid="stButton"] > button span {
   color: inherit !important;
+  font-weight: 600 !important;
   text-align: left !important;
 }
 </style>
