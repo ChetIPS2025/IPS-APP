@@ -9792,6 +9792,95 @@ div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-catal
     )
 
 
+def inject_global_button_css() -> None:
+    """Single-line horizontal labels on every Streamlit and custom button app-wide."""
+    st.markdown(
+        """
+<style id="ips-global-buttons-v1">
+button,
+.stButton > button,
+[data-testid="stButton"] > button,
+[data-testid="stBaseButton-secondary"],
+[data-testid="stBaseButton-primary"],
+[data-testid="stBaseButton-popover"],
+[data-testid="baseButton-secondary"],
+[data-testid="baseButton-primary"],
+button[data-testid="baseButton-secondary"],
+button[data-testid="baseButton-primary"],
+button[data-testid="stBaseButton-popover"],
+[data-testid="stFormSubmitButton"] > button,
+[data-testid="stPopover"] > button,
+.asset-actions-button,
+.actions-button {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  min-width: fit-content !important;
+  width: auto !important;
+  max-width: none !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.stButton,
+[data-testid="stButton"],
+[data-testid="stPopover"],
+[data-testid="stFormSubmitButton"] {
+  width: auto !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+}
+.stButton > button p,
+.stButton > button span,
+.stButton > button div,
+[data-testid="stButton"] > button p,
+[data-testid="stButton"] > button span,
+[data-testid="stButton"] > button div,
+button[data-testid="stBaseButton-popover"] p,
+button[data-testid="stBaseButton-popover"] span,
+button[data-testid="stBaseButton-popover"] div,
+[data-testid="stPopover"] > button p,
+[data-testid="stPopover"] > button span,
+[data-testid="stFormSubmitButton"] > button p,
+[data-testid="stFormSubmitButton"] > button span,
+.asset-actions-button p,
+.asset-actions-button span,
+.actions-button p,
+.actions-button span {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+  display: inline !important;
+  width: auto !important;
+  max-width: none !important;
+}
+button[data-testid="stBaseButton-popover"],
+[data-testid="stPopover"] > button {
+  min-width: max(4.75rem, fit-content) !important;
+  padding-left: 0.8rem !important;
+  padding-right: 0.8rem !important;
+}
+[data-testid="stNumberInputStepDown"] button,
+[data-testid="stNumberInputStepUp"] button,
+[data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"] button,
+[data-testid="stNumberInput"] [data-testid="stNumberInputStepUp"] button {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
@@ -11704,6 +11793,7 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
     except ImportError:
         from ui.row_action_colors import inject_row_action_colors_css  # type: ignore
     inject_row_action_colors_css()
+    inject_global_button_css()
 
 
 def inject_coupling_inspection_css() -> None:

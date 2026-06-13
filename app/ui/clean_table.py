@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v13"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v14"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -206,22 +206,28 @@ def inject_clean_table_css() -> None:
 }}
 .ips-clean-action-btn,
 .ips-clean-actions button {{
-    width: 38px !important;
+    width: auto !important;
     height: 38px !important;
-    min-width: 38px !important;
-    max-width: 38px !important;
+    min-width: fit-content !important;
+    max-width: none !important;
     min-height: 38px !important;
     max-height: 38px !important;
-    padding: 0 !important;
+    padding: 0 0.75rem !important;
     border-radius: 10px !important;
     background: #ffffff !important;
     border: 1px solid #e5eaf2 !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 0.95rem !important;
-    line-height: 1 !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    writing-mode: horizontal-tb !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.1 !important;
 }}
 .ips-clean-action-btn:hover,
 .ips-clean-actions button:hover {{
@@ -345,7 +351,9 @@ def inject_clean_table_css() -> None:
     position: absolute !important;
     top: 0 !important;
     right: 10px !important;
-    width: 86px !important;
+    width: auto !important;
+    min-width: fit-content !important;
+    max-width: none !important;
     height: 60px !important;
     max-height: 60px !important;
     margin: 0 !important;
@@ -395,23 +403,47 @@ def inject_clean_table_css() -> None:
 {vb_wrap}
     > [data-testid="stElementContainer"]:has({act_markers})
     + [data-testid="stElementContainer"] [data-testid="stPopover"] > button {{
-    width: 38px !important;
+    width: auto !important;
     height: 38px !important;
-    min-width: 38px !important;
-    max-width: 38px !important;
+    min-width: fit-content !important;
+    max-width: none !important;
     min-height: 38px !important;
     max-height: 38px !important;
-    padding: 0 !important;
+    padding: 0 0.75rem !important;
     border-radius: 10px !important;
     background: #ffffff !important;
     border: 1px solid #e5eaf2 !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 0.95rem !important;
-    line-height: 1 !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    writing-mode: horizontal-tb !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.1 !important;
     color: #374151 !important;
+}}
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({act_markers})
+    + [data-testid="stElementContainer"] .stButton > button p,
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({act_markers})
+    + [data-testid="stElementContainer"] [data-testid="stPopover"] > button p,
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({act_markers})
+    + [data-testid="stElementContainer"] .stButton > button span,
+{vb_wrap}
+    > [data-testid="stElementContainer"]:has({act_markers})
+    + [data-testid="stElementContainer"] [data-testid="stPopover"] > button span {{
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    writing-mode: horizontal-tb !important;
+    display: inline !important;
 }}
 {vb_wrap}
     > [data-testid="stElementContainer"]:has({act_markers})
