@@ -17,17 +17,22 @@ def _pct(v: float) -> str:
 
 
 def render_job_cost_summary_cards(summary: dict[str, Any], *, compact: bool = False) -> None:
-    """Top summary strip: Estimate, Actual, Remaining, Profit, Margin %."""
+    """Top summary strip: Contract, Estimate, Actual, Remaining, Profit, Margin %."""
     st.markdown(
         '<span class="ips-job-cost-summary-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    profit = float(summary.get("profit") or 0)
+    remaining = float(summary.get("remaining_budget") or 0)
+    profit_cls = "ips-jc-card-profit" if profit >= 0 else "ips-jc-card-negative"
+    remaining_cls = "ips-jc-card-remaining" if remaining >= 0 else "ips-jc-card-negative"
     cards = [
-        ("Estimate", _money(summary.get("estimated_cost", 0)), "ips-jc-card-estimate"),
+        ("Contract Value", _money(summary.get("contract_value", 0)), "ips-jc-card-contract"),
+        ("Estimated Cost", _money(summary.get("estimated_cost", 0)), "ips-jc-card-estimate"),
         ("Actual Cost", _money(summary.get("actual_cost", 0)), "ips-jc-card-actual"),
-        ("Remaining Budget", _money(summary.get("remaining_budget", 0)), "ips-jc-card-remaining"),
-        ("Profit", _money(summary.get("profit", 0)), "ips-jc-card-profit"),
-        ("Margin %", _pct(summary.get("margin_pct", 0)), "ips-jc-card-margin"),
+        ("Remaining Budget", _money(summary.get("remaining_budget", 0)), remaining_cls),
+        ("Profit", _money(summary.get("profit", 0)), profit_cls),
+        ("Margin %", _pct(summary.get("margin_pct", 0)), "ips-jc-card-margin" if profit >= 0 else "ips-jc-card-negative"),
     ]
     if compact:
         cols = st.columns(len(cards), gap="small")

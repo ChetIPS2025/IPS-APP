@@ -13,6 +13,18 @@ try:
     from app.components.job_materials_ui import render_job_materials_tab
     from app.components.job_costing_tab import render_job_costing_tab
     from app.components.job_cost_summary_cards import render_job_cost_summary_cards
+    from app.components.job_detail_layout import (
+        close_job_detail_footer_shell,
+        gather_job_detail_stats,
+        inject_job_detail_layout_css,
+        render_job_detail_activity_sidebar,
+        render_job_detail_footer_shell,
+        render_job_detail_header,
+        render_job_detail_header_actions,
+        render_job_detail_health_section,
+        render_job_detail_metadata_row,
+        render_job_detail_quick_stats,
+    )
     from app.services.job_cost_transaction_service import (
         build_job_cost_summary,
         sync_all_sources_for_job,
@@ -72,6 +84,18 @@ except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
     from components.job_costing_tab import render_job_costing_tab  # type: ignore
+    from components.job_detail_layout import (  # type: ignore
+        close_job_detail_footer_shell,
+        gather_job_detail_stats,
+        inject_job_detail_layout_css,
+        render_job_detail_activity_sidebar,
+        render_job_detail_footer_shell,
+        render_job_detail_header,
+        render_job_detail_header_actions,
+        render_job_detail_health_section,
+        render_job_detail_metadata_row,
+        render_job_detail_quick_stats,
+    )
     from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
     from services.job_cost_transaction_service import (  # type: ignore
         build_job_cost_summary,
@@ -155,6 +179,96 @@ _JOB_TABS = [
     "Notes",
 ]
 _FIELD_JOB_TABS = ["Overview", "Materials", "Subjobs", "Photos", "Daily Report"]
+
+
+def _job_detail_tab_labels(job: dict) -> list[str]:
+    """Dynamic tab labels with counts where existing data is available."""
+    jid = str(job.get("id") or "").strip()
+    open_subjobs = 0
+    document_count = 0
+    photo_count = 0
+    weekly_ts_count = 0
+    form_count = 0
+
+    if jid:
+        try:
+            from app.services.tasks_service import get_tasks_by_job
+        except ImportError:
+            from services.tasks_service import get_tasks_by_job  # type: ignore
+        try:
+            closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
+            open_subjobs = sum(
+                1
+                for task in get_tasks_by_job(jid, include_closed=True)
+                if str(task.get("status") or "").strip().lower() not in closed
+            )
+        except Exception:
+            open_subjobs = 0
+
+        try:
+            from app.services.job_documents import fetch_job_documents
+        except ImportError:
+            from services.job_documents import fetch_job_documents  # type: ignore
+        try:
+            document_count = len(fetch_job_documents(jid, admin=False, limit=500) or [])
+        except Exception:
+            document_count = 0
+
+        try:
+            from app.services.job_photos import fetch_job_photos
+        except ImportError:
+            from services.job_photos import fetch_job_photos  # type: ignore
+        try:
+            photo_count = len(fetch_job_photos(jid, admin=False, limit=500) or [])
+        except Exception:
+            photo_count = 0
+
+        try:
+            from app.services.weekly_job_timesheet_service import list_timesheets_for_job
+        except ImportError:
+            from services.weekly_job_timesheet_service import list_timesheets_for_job  # type: ignore
+        try:
+            weekly_ts_count = len(list_timesheets_for_job(jid) or [])
+        except Exception:
+            weekly_ts_count = 0
+
+    def _count_label(name: str, count: int) -> str:
+        return f"{name} ({count})" if count > 0 else name
+
+    return [
+        "Overview",
+        _count_label("Subjobs", open_subjobs),
+        "Schedule",
+        _count_label("Weekly Timesheets", weekly_ts_count),
+        "Job Costing",
+        "Materials",
+        "Equipment",
+        _count_label("Documents", document_count),
+        _count_label("Photos", photo_count),
+        "IPS Forms" if form_count <= 0 else _count_label("IPS Forms", form_count),
+        "Scope",
+        "Estimates",
+        "Daily Updates",
+        "Notes",
+    ]
+
+
+def _enrich_job_cost_summary(job: dict, cost_summary: dict) -> dict:
+    """Attach contract value using existing costing helpers (UI enrichment only)."""
+    enriched = dict(cost_summary)
+    try:
+        from app.services.job_cost_transaction_service import _estimate_for_job
+        from app.services.job_costing_service import awarded_or_proposal_amount
+    except ImportError:
+        from services.job_cost_transaction_service import _estimate_for_job  # type: ignore
+        from services.job_costing_service import awarded_or_proposal_amount  # type: ignore
+    try:
+        estimate = _estimate_for_job(job)
+        enriched["contract_value"] = awarded_or_proposal_amount(job, estimate)
+    except Exception:
+        enriched.setdefault("contract_value", float(job.get("awarded_amount") or 0))
+    return enriched
+
 SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
 _ALL_JOB_IDS_KEY = "_ips_jobs_visible_ids"
@@ -1554,35 +1668,54 @@ def _render_job_detail_tabs(job: dict) -> None:
 
     (
         tab_overview,
-        tab_scope,
-        tab_estimates,
+        tab_tasks,
+        tab_schedule,
+        tab_weekly_ts,
+        tab_costing,
         tab_materials,
         tab_equipment,
-        tab_costing,
-        tab_schedule,
-        tab_tasks,
-        tab_ips_forms,
-        tab_weekly_ts,
         tab_documents,
         tab_photos,
+        tab_ips_forms,
+        tab_scope,
+        tab_estimates,
         tab_daily,
         tab_notes,
-    ) = st.tabs(_JOB_TABS)
+    ) = st.tabs(_job_detail_tab_labels(job))
 
     with tab_overview:
-        overview_html = (
+        left_html = (
             f'<div class="ips-detail-grid">'
             f"{_detail_field('Job Number', jn)}"
             f"{_detail_field('Project', jname)}"
             f"{_detail_field('Customer', customer)}"
             f'{_detail_field("Status", status, html_value=_status_pill(status))}'
+            f"</div>"
+        )
+        right_html = (
+            f'<div class="ips-detail-grid">'
             f"{_detail_field('Supervisor', supervisor)}"
             f"{_detail_field('Project Manager', job.get('project_manager'))}"
             f"{_detail_field('Location', _job_location(job))}"
             f"{_detail_field('Estimate #', estimate_no)}"
+            f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
+            f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
             f"</div>"
         )
-        st.markdown(_dialog_card("Overview", overview_html), unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="ips-job-detail-overview-grid">'
+            f'{_dialog_card("Overview", left_html)}'
+            f'{_dialog_card("Schedule & Links", right_html)}'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "Edit Overview",
+            key=f"jobs_overview_edit_{_job_session_key(job)}",
+            type="secondary",
+        ):
+            _set_job_edit_mode(job)
+            st.rerun()
 
     with tab_scope:
         scope_text = _safe_value(job.get("scope") or job.get("description"), "No scope defined.")
@@ -1818,50 +1951,69 @@ def render_job_detail_dialog(job: dict) -> None:
     status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
+    project_manager = _safe_value(job.get("project_manager"))
     estimate_no = _safe_value(job.get("estimate_number"))
     schedule = _schedule_summary(job)
 
+    inject_job_detail_layout_css()
     st.markdown(
-        '<span class="ips-dialog-shell ips-modal-wide" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div class="ips-dialog-header">'
-        f'<div class="ips-dialog-title-row">'
-        f"<div>"
-        f'<h2 class="ips-dialog-title">{html.escape(jn)}</h2>'
-        f'<p class="ips-dialog-subtitle">{html.escape(jname)}</p>'
-        f"</div>"
-        f"<div>{_status_pill(status)}</div>"
-        f"</div>"
-        f"</div>",
+        '<span class="ips-dialog-shell ips-modal-wide ips-job-detail-control-page" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        f'<div class="ips-dialog-meta-grid">'
-        f"{_dialog_meta_card('Customer', customer)}"
-        f"{_dialog_meta_card('Supervisor', supervisor)}"
-        f"{_dialog_meta_card('Estimate #', estimate_no)}"
-        f"{_dialog_meta_card('Schedule', schedule)}"
-        f"</div>",
-        unsafe_allow_html=True,
+    header_cols = st.columns([1, 0.28], gap="small")
+    with header_cols[0]:
+        render_job_detail_header(
+            job_number=jn,
+            job_name=jname,
+            customer=customer,
+        )
+    with header_cols[1]:
+        st.markdown(
+            f'<div class="ips-job-detail-header-actions">{_status_pill(status)}</div>',
+            unsafe_allow_html=True,
+        )
+        if not edit_mode:
+            render_job_detail_header_actions(
+                job,
+                on_edit=_set_job_edit_mode,
+                edit_key=f"jobs_modal_edit_{job_key}",
+            )
+
+    render_job_detail_metadata_row(
+        customer=customer,
+        project_manager=project_manager,
+        supervisor=supervisor,
+        estimate_no=estimate_no,
+        schedule=schedule,
     )
 
     jid = str(job.get("id") or "").strip()
+    cost_summary: dict = {}
+    detail_stats: dict = {}
     if jid and not edit_mode:
         sync_all_sources_for_job(jid)
-        cost_summary = build_job_cost_summary(job)
-        render_job_cost_summary_cards(cost_summary)
+        cost_summary = _enrich_job_cost_summary(job, build_job_cost_summary(job))
+        detail_stats = gather_job_detail_stats(job, cost_summary)
+        render_job_cost_summary_cards(cost_summary, compact=True)
+        render_job_detail_health_section(job, cost_summary, detail_stats)
+        render_job_detail_quick_stats(detail_stats)
 
     if edit_mode:
         _render_job_edit_form(job)
     else:
+        body_left, body_right = st.columns([2.35, 1], gap="medium")
+        with body_left:
+            if is_field_context():
+                _render_field_job_detail_tabs(job)
+            else:
+                _render_job_detail_tabs(job)
+        with body_right:
+            render_job_detail_activity_sidebar(job)
+
+        render_job_detail_footer_shell()
         _render_job_actions_panel(job)
-        if is_field_context():
-            _render_field_job_detail_tabs(job)
-        else:
-            _render_job_detail_tabs(job)
+        close_job_detail_footer_shell()
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
