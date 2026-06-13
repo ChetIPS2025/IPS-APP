@@ -30,10 +30,18 @@ def _money(value: float) -> str:
     return f"${float(value or 0):,.2f}"
 
 
+def _summary_money(value: float, *, has_data: bool) -> str:
+    if not has_data:
+        return "—"
+    if abs(float(value or 0)) < 0.005:
+        return "—"
+    return _money(value)
+
+
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v1">
+<style id="ips-jobs-page-layout-v2">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -77,6 +85,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
   border-radius: 10px;
   padding: 0.75rem 0.9rem;
   min-height: 68px;
+  border-left-width: 4px;
+  border-left-style: solid;
 }
 .ips-jobs-stat-label {
   font-size: 0.68rem;
@@ -94,12 +104,20 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.ips-jobs-stat-active .ips-jobs-stat-value { color: #1d4ed8; }
+.ips-jobs-stat-total { border-left-color: #1e3a8a; }
+.ips-jobs-stat-total .ips-jobs-stat-value { color: #1e3a8a; }
+.ips-jobs-stat-active { border-left-color: #2563eb; }
+.ips-jobs-stat-active .ips-jobs-stat-value { color: #2563eb; }
+.ips-jobs-stat-awarded { border-left-color: #15803d; }
 .ips-jobs-stat-awarded .ips-jobs-stat-value { color: #15803d; }
-.ips-jobs-stat-draft .ips-jobs-stat-value { color: #475569; }
-.ips-jobs-stat-subjobs .ips-jobs-stat-value { color: #7c3aed; }
-.ips-jobs-stat-contract .ips-jobs-stat-value { color: #0f172a; }
-.ips-jobs-stat-actual .ips-jobs-stat-value { color: #b45309; }
+.ips-jobs-stat-draft { border-left-color: #64748b; }
+.ips-jobs-stat-draft .ips-jobs-stat-value { color: #64748b; }
+.ips-jobs-stat-subjobs { border-left-color: #ea580c; }
+.ips-jobs-stat-subjobs .ips-jobs-stat-value { color: #ea580c; }
+.ips-jobs-stat-contract { border-left-color: #15803d; }
+.ips-jobs-stat-contract .ips-jobs-stat-value { color: #15803d; }
+.ips-jobs-stat-actual { border-left-color: #2563eb; }
+.ips-jobs-stat-actual .ips-jobs-stat-value { color: #2563eb; }
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ips-jobs-page-size-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
   align-items: center !important;
   justify-content: flex-end !important;
@@ -124,21 +142,20 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   font-weight: 600 !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
-  min-height: 58px !important;
-  transition: background-color 0.15s ease !important;
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd) {
+  min-height: 62px !important;
+  padding: 8px 12px !important;
   background: #ffffff !important;
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {
-  background: #fafbfc !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  transition: background-color 0.15s ease !important;
+  cursor: pointer;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
-  background: #eef2ff !important;
+  background: #f8fbff !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
   background: #f8fafc !important;
   min-height: 42px !important;
+  cursor: default !important;
 }
 .ips-jobs-table-row,
 .ips-jobs-row-marker {
@@ -152,35 +169,37 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   opacity: 0 !important;
   pointer-events: none !important;
 }
+.ips-jobs-number-text,
+.job-number-link .ips-jobs-number-text {
+  font-weight: 700 !important;
+  color: #2563eb !important;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-block;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-number-text {
+  color: #1d4ed8 !important;
+  text-decoration: underline;
+}
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .job-number-link button,
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-jobs-number-link button {
-  background: transparent !important;
-  background-color: transparent !important;
-  color: #2563eb !important;
-  font-weight: 700 !important;
-  font-size: 0.875rem !important;
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  box-shadow: none !important;
-  outline: none !important;
-  white-space: nowrap !important;
-  cursor: pointer !important;
-}
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .job-number-link button:hover,
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-jobs-number-link button:hover {
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  background: transparent !important;
+  display: none !important;
 }
 .ips-jobs-title {
   font-weight: 700 !important;
+  font-size: 0.9375rem !important;
   color: #0f172a !important;
   word-break: normal !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
+  line-height: 1.35 !important;
+}
+.ips-jobs-cell {
+  color: #334155;
+  font-size: 0.8125rem;
+  line-height: 1.35;
 }
 .ips-jobs-money {
   font-variant-numeric: tabular-nums;
@@ -191,6 +210,10 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
 }
 .ips-jobs-money-negative {
   color: #dc2626;
+}
+.ips-jobs-money-empty {
+  color: #94a3b8;
+  font-weight: 500;
 }
 .ips-jobs-health-badge {
   display: inline-flex;
@@ -253,7 +276,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
   border-color: #fdba74;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 100px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  width: 36px !important;
+  padding: 0 0.35rem !important;
+  font-size: 1.15rem !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
   white-space: nowrap !important;
 }
 .ips-jobs-pagination-footer {
@@ -304,6 +334,8 @@ def render_jobs_summary_cards(
     open_subjobs: int,
     total_contract: float,
     total_actual: float,
+    has_contract_data: bool = False,
+    has_actual_data: bool = False,
 ) -> None:
     cards = [
         ("Total Jobs", f"{total:,}", "ips-jobs-stat-total"),
@@ -311,8 +343,8 @@ def render_jobs_summary_cards(
         ("Awarded Jobs", f"{awarded:,}", "ips-jobs-stat-awarded"),
         ("Draft Jobs", f"{draft:,}", "ips-jobs-stat-draft"),
         ("Open Subjobs", f"{open_subjobs:,}", "ips-jobs-stat-subjobs"),
-        ("Total Contract Value", _money(total_contract), "ips-jobs-stat-contract"),
-        ("Total Actual Cost", _money(total_actual), "ips-jobs-stat-actual"),
+        ("Total Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
+        ("Total Actual Cost", _summary_money(total_actual, has_data=has_actual_data), "ips-jobs-stat-actual"),
     ]
     parts = ['<div class="ips-jobs-summary-cards">']
     for label, value, cls in cards:
@@ -396,6 +428,94 @@ def render_jobs_pagination_footer(total: int, table_key: str, *, item_label: str
                     st.session_state[page_key(table_key)] = min(total_pages, page + 1)
                     st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_jobs_row_click_bridge() -> str | None:
+    """Zero-height bridge: row click opens job detail via marker data-row-id."""
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    st.markdown(
+        '<span class="ips-jobs-row-click-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsJobsRowClick::list";
+  const tblSel = ".st-key-jobs_table_wrap";
+  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row)';
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function isInteractive(target) {
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .job-actions-cell, .job-actions-button, .job-row-actions-menu"
+    ));
+  }
+
+  function tableScope() {
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }
+
+  function bindRows() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsJobsRowBound === "1") return;
+      row.dataset.ipsJobsRowBound = "1";
+      row.addEventListener("click", function (e) {
+        if (isInteractive(e.target)) return;
+        const marker = row.querySelector(".ips-jobs-table-row[data-row-id]");
+        const id = marker && marker.getAttribute("data-row-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsJobsRowClickRegistry) doc.ipsJobsRowClickRegistry = {};
+  doc.ipsJobsRowClickRegistry[hookKey] = { bind: bindRows };
+  bindRows();
+  if (!doc.ipsJobsRowBindObserver) {
+    doc.ipsJobsRowBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsJobsRowClickRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsJobsRowBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_jobs_list_row_click",
+        height=1,
+    )
 
 
 def job_health_badge_html(cost_summary: dict) -> str:

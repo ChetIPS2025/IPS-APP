@@ -16,6 +16,7 @@ try:
         job_health_badge_html,
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
+        render_jobs_row_click_bridge,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
     )
@@ -116,6 +117,7 @@ except ImportError:
         job_health_badge_html,
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
+        render_jobs_row_click_bridge,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
     )
@@ -423,8 +425,17 @@ def _job_status_pill_html(status: str) -> str:
     return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
 
 
-def _money_cell(value: float) -> str:
-    return f"${float(value or 0):,.2f}"
+def _money_cell(value: float, *, available: bool = True) -> str:
+    if not available:
+        return "—"
+    if abs(float(value or 0)) < 0.005:
+        return "—"
+    return f"${float(value):,.2f}"
+
+
+def _money_cell_class(value: float, *, available: bool = True) -> str:
+    display = _money_cell(value, available=available)
+    return " ips-jobs-money-empty" if display == "—" else ""
 
 
 def _pct_cell(value: float) -> str:
@@ -450,15 +461,18 @@ def _job_open_subjobs_count(job: dict) -> int:
         return 0
 
 
-def _job_list_cost_fields(job: dict) -> dict[str, float | dict]:
+def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
     """UI-only costing snapshot from existing job cost services."""
-    defaults: dict[str, float | dict] = {
+    defaults: dict[str, float | dict | bool] = {
         "contract_value": 0.0,
         "actual_cost": 0.0,
         "profit": 0.0,
         "margin_pct": 0.0,
         "raw_summary": {},
+        "has_contract": False,
+        "has_actual": False,
     }
+    summary: dict = {}
     try:
         summary = _enrich_job_cost_summary(job, build_job_cost_summary(job))
         defaults["contract_value"] = float(summary.get("contract_value") or 0)
@@ -471,6 +485,15 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict]:
             defaults["contract_value"] = float(job.get("awarded_amount") or job.get("contract_value") or 0)
         except (TypeError, ValueError):
             defaults["contract_value"] = 0.0
+    try:
+        awarded = float(job.get("awarded_amount") or job.get("contract_value") or 0)
+    except (TypeError, ValueError):
+        awarded = 0.0
+    contract = float(defaults["contract_value"])
+    actual = float(defaults["actual_cost"])
+    txn_count = int(summary.get("transaction_count") or 0) if isinstance(summary, dict) else 0
+    defaults["has_contract"] = contract > 0 or awarded > 0
+    defaults["has_actual"] = actual > 0 or txn_count > 0
     return defaults
 
 
@@ -483,6 +506,8 @@ def _jobs_summary_counts(rows: list[dict]) -> dict[str, float | int]:
         "open_subjobs": 0,
         "total_contract": 0.0,
         "total_actual": 0.0,
+        "has_any_contract": False,
+        "has_any_actual": False,
     }
     for job in rows:
         status = _normalize_job_status(job.get("status"))
@@ -496,6 +521,10 @@ def _jobs_summary_counts(rows: list[dict]) -> dict[str, float | int]:
         costs = _job_list_cost_fields(job)
         counts["total_contract"] = float(counts["total_contract"]) + float(costs["contract_value"])
         counts["total_actual"] = float(counts["total_actual"]) + float(costs["actual_cost"])
+        if costs.get("has_contract"):
+            counts["has_any_contract"] = True
+        if costs.get("has_actual"):
+            counts["has_any_actual"] = True
     return counts
 
 
@@ -636,12 +665,11 @@ def _render_custom_jobs_table(
                         base_class="ips-jobs-header-row ips-jobs-cell",
                     )
 
-        for row_idx, job in enumerate(filtered):
+        for job in filtered:
             jid = str(job.get("id") or "").strip()
             if not jid:
                 continue
 
-            stripe_cls = "ips-jobs-row-odd" if row_idx % 2 == 0 else "ips-jobs-row-even"
             job_no = _job_number(job)
             project = _job_project(job)
             customer = _job_customer(job)
@@ -663,7 +691,7 @@ def _render_custom_jobs_table(
 
             with cols[0]:
                 st.markdown(
-                    f'<span class="ips-jobs-row-marker ips-jobs-table-row {stripe_cls}" aria-hidden="true"></span>',
+                    f'<span class="ips-jobs-row-marker ips-jobs-table-row" data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 if field_mode:
@@ -687,17 +715,11 @@ def _render_custom_jobs_table(
             with cols[1]:
                 num_label = job_no if job_no and job_no != "—" else "View job"
                 st.markdown(
-                    '<div class="ips-jobs-number-link job-number-link">',
+                    f'<div class="ips-jobs-number-link job-number-link">'
+                    f'<span class="ips-jobs-number-text" title="{html.escape(num_label, quote=True)}">'
+                    f"{html.escape(num_label)}</span></div>",
                     unsafe_allow_html=True,
                 )
-                if st.button(
-                    num_label,
-                    key=f"job_num_{jid}",
-                    help="Open job details",
-                ):
-                    _open_jobs_detail_modal(jid, job)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
 
             with cols[2]:
                 st.markdown(
@@ -718,14 +740,18 @@ def _render_custom_jobs_table(
                 st.markdown(status_html, unsafe_allow_html=True)
 
             profit_cls = " ips-jobs-money-negative" if profit_val < 0 else ""
+            has_contract = bool(costs.get("has_contract"))
+            has_actual = bool(costs.get("has_actual"))
             with cols[5]:
+                contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell">{html.escape(_money_cell(contract_val))}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{contract_cls}">{html.escape(_money_cell(contract_val, available=has_contract))}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[6]:
+                actual_cls = _money_cell_class(actual_val, available=has_actual)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell">{html.escape(_money_cell(actual_val))}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{actual_cls}">{html.escape(_money_cell(actual_val, available=has_actual))}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[7]:
@@ -759,6 +785,20 @@ def _render_custom_jobs_table(
                 st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    if not is_field_context():
+        jobs_by_id = {
+            str(j.get("id") or "").strip(): j
+            for j in filtered
+            if str(j.get("id") or "").strip()
+        }
+        picked = render_jobs_row_click_bridge()
+        if picked:
+            open_id = str(picked).strip()
+            open_job = jobs_by_id.get(open_id)
+            if open_job:
+                _open_jobs_detail_modal(open_id, open_job)
+                st.rerun()
 
     return all_job_ids
 
@@ -2313,6 +2353,8 @@ def render() -> None:
         open_subjobs=int(summary["open_subjobs"]),
         total_contract=float(summary["total_contract"]),
         total_actual=float(summary["total_actual"]),
+        has_contract_data=bool(summary.get("has_any_contract")),
+        has_actual_data=bool(summary.get("has_any_actual")),
     )
     render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)

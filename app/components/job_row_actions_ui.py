@@ -60,7 +60,7 @@ def render_job_row_actions(
         unsafe_allow_html=True,
     )
     with st.popover(
-        "Actions",
+        "⋮",
         help="Job actions",
         type="secondary",
         key=f"job_row_menu_{job_key}",
