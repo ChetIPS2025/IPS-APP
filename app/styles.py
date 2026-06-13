@@ -912,11 +912,12 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v14">
-.ips-jobs-table-wrap {{
+<style id="ips-jobs-module-v15">
+.ips-jobs-table-wrap,
+.ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }}
@@ -998,28 +999,28 @@ def inject_jobs_module_css() -> None:
   color: #4338ca;
 }}
 .ips-job-status-active {{
-  background: #dcfce7;
-  color: #166534;
+  background: #bfdbfe;
+  color: #1e3a8a;
 }}
 .ips-job-status-awarded {{
-  background: #dcfce7;
-  color: #166534;
+  background: #bbf7d0;
+  color: #14532d;
 }}
 .ips-job-status-on-hold {{
   background: #fef3c7;
   color: #92400e;
 }}
 .ips-job-status-completed {{
-  background: #dcfce7;
-  color: #166534;
+  background: #166534;
+  color: #ffffff;
 }}
 .ips-job-status-closed {{
-  background: #f1f5f9;
-  color: #475569;
+  background: #14532d;
+  color: #ffffff;
 }}
 .ips-job-status-cancelled {{
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fed7aa;
+  color: #9a3412;
 }}
 .ips-job-status-archived {{
   background: #f1f5f9;
@@ -1074,6 +1075,28 @@ def inject_jobs_module_css() -> None:
   border-radius: 9px !important;
   font-size: 14px !important;
   width: auto !important;
+}}
+.st-key-jobs_table_wrap .job-number-link .stButton > button,
+.st-key-jobs_table_wrap .ips-jobs-number-link .stButton > button {{
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: {PRIMARY} !important;
+  font-weight: 700 !important;
+}}
+.st-key-jobs_table_wrap .job-number-link .stButton > button:hover,
+.st-key-jobs_table_wrap .ips-jobs-number-link .stButton > button:hover {{
+  background: transparent !important;
+  color: {PRIMARY_HOVER} !important;
+  text-decoration: underline !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {{
+  min-width: 100px !important;
+  white-space: nowrap !important;
 }}
 .ips-jc-summary-card {{
   background: #ffffff;

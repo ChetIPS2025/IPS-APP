@@ -9,6 +9,16 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
+    from app.components.job_row_actions_ui import render_job_row_actions
+    from app.components.jobs_page_layout import (
+        close_jobs_filter_bar_shell,
+        inject_jobs_page_layout_css,
+        job_health_badge_html,
+        render_jobs_filter_bar_shell,
+        render_jobs_pagination_footer,
+        render_jobs_summary_cards,
+        render_jobs_table_pagination_header,
+    )
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
     from app.components.job_costing_tab import render_job_costing_tab
@@ -40,8 +50,6 @@ try:
     )
     from app.components.table_pagination import (
         paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
         reset_table_page,
     )
     from app.pages._core._data import (
@@ -101,6 +109,16 @@ except ImportError:
         build_job_cost_summary,
         sync_all_sources_for_job,
     )
+    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
+    from components.jobs_page_layout import (  # type: ignore
+        close_jobs_filter_bar_shell,
+        inject_jobs_page_layout_css,
+        job_health_badge_html,
+        render_jobs_filter_bar_shell,
+        render_jobs_pagination_footer,
+        render_jobs_summary_cards,
+        render_jobs_table_pagination_header,
+    )
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
@@ -113,8 +131,6 @@ except ImportError:
     )
     from components.table_pagination import (  # type: ignore
         paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
         reset_table_page,
     )
     from pages._core._data import (  # type: ignore
@@ -279,16 +295,19 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.35, 0.95, 2.35, 1.85, 1.85, 1.35, 1.25, 1.25]
+_JOB_COLS = [0.32, 0.9, 2.05, 1.35, 1.05, 1.05, 1.05, 0.9, 0.8, 0.95, 1.05]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
-    ("SUPERVISOR", "supervisor"),
     ("STATUS", "status"),
-    ("START DATE", None),
-    ("END DATE", None),
+    ("CONTRACT VALUE", None),
+    ("ACTUAL COST", None),
+    ("PROFIT", None),
+    ("MARGIN %", None),
+    ("OPEN TASKS / SUBJOBS", None),
+    ("ACTIONS", None),
 ]
 _JOBS_DEFAULT_VIEW = "Active Jobs"
 _JOBS_VIEW_OPTIONS = [
@@ -402,6 +421,86 @@ def _job_status_pill_html(status: str) -> str:
     }
     cls = cls_map.get(status, "ips-job-status-draft")
     return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
+
+
+def _money_cell(value: float) -> str:
+    return f"${float(value or 0):,.2f}"
+
+
+def _pct_cell(value: float) -> str:
+    return f"{float(value or 0):,.1f}%"
+
+
+def _job_open_subjobs_count(job: dict) -> int:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return 0
+    try:
+        from app.services.tasks_service import get_tasks_by_job
+    except ImportError:
+        from services.tasks_service import get_tasks_by_job  # type: ignore
+    try:
+        closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
+        return sum(
+            1
+            for task in get_tasks_by_job(jid, include_closed=True)
+            if str(task.get("status") or "").strip().lower() not in closed
+        )
+    except Exception:
+        return 0
+
+
+def _job_list_cost_fields(job: dict) -> dict[str, float | dict]:
+    """UI-only costing snapshot from existing job cost services."""
+    defaults: dict[str, float | dict] = {
+        "contract_value": 0.0,
+        "actual_cost": 0.0,
+        "profit": 0.0,
+        "margin_pct": 0.0,
+        "raw_summary": {},
+    }
+    try:
+        summary = _enrich_job_cost_summary(job, build_job_cost_summary(job))
+        defaults["contract_value"] = float(summary.get("contract_value") or 0)
+        defaults["actual_cost"] = float(summary.get("actual_cost") or 0)
+        defaults["profit"] = float(summary.get("profit") or 0)
+        defaults["margin_pct"] = float(summary.get("margin_pct") or 0)
+        defaults["raw_summary"] = summary
+    except Exception:
+        try:
+            defaults["contract_value"] = float(job.get("awarded_amount") or job.get("contract_value") or 0)
+        except (TypeError, ValueError):
+            defaults["contract_value"] = 0.0
+    return defaults
+
+
+def _jobs_summary_counts(rows: list[dict]) -> dict[str, float | int]:
+    counts: dict[str, float | int] = {
+        "total": len(rows),
+        "active": 0,
+        "awarded": 0,
+        "draft": 0,
+        "open_subjobs": 0,
+        "total_contract": 0.0,
+        "total_actual": 0.0,
+    }
+    for job in rows:
+        status = _normalize_job_status(job.get("status"))
+        if status == "Active":
+            counts["active"] += 1
+        elif status == "Awarded":
+            counts["awarded"] += 1
+        elif status == "Draft":
+            counts["draft"] += 1
+        counts["open_subjobs"] += _job_open_subjobs_count(job)
+        costs = _job_list_cost_fields(job)
+        counts["total_contract"] = float(counts["total_contract"]) + float(costs["contract_value"])
+        counts["total_actual"] = float(counts["total_actual"]) + float(costs["actual_cost"])
+    return counts
+
+
+def _open_job_edit_from_list(job: dict) -> None:
+    _set_job_edit_mode(job)
 
 
 def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
@@ -518,7 +617,7 @@ def _render_custom_jobs_table(
     st.session_state[_ALL_JOB_IDS_KEY] = all_job_ids
 
     with st.container(key="jobs_table_wrap"):
-        st.markdown('<div class="ips-jobs-table-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-jobs-table-wrap jobs-table">', unsafe_allow_html=True)
 
         header_cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _JOB_HEADER_SPECS):
@@ -537,24 +636,36 @@ def _render_custom_jobs_table(
                         base_class="ips-jobs-header-row ips-jobs-cell",
                     )
 
-        for job in filtered:
+        for row_idx, job in enumerate(filtered):
             jid = str(job.get("id") or "").strip()
             if not jid:
                 continue
 
+            stripe_cls = "ips-jobs-row-odd" if row_idx % 2 == 0 else "ips-jobs-row-even"
             job_no = _job_number(job)
             project = _job_project(job)
             customer = _job_customer(job)
-            supervisor = _job_supervisor(job)
             status = _normalize_job_status(job.get("status"))
-            start = fmt_date(job.get("start_date"))
-            end = fmt_date(job.get("end_date"))
+            costs = _job_list_cost_fields(job)
+            contract_val = float(costs["contract_value"])
+            actual_val = float(costs["actual_cost"])
+            profit_val = float(costs["profit"])
+            margin_val = float(costs["margin_pct"])
+            open_subjobs = _job_open_subjobs_count(job)
+            raw_summary = costs.get("raw_summary")
+            health_html = ""
+            if isinstance(raw_summary, dict) and raw_summary:
+                health_html = job_health_badge_html(raw_summary)
             field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
             cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
+                st.markdown(
+                    f'<span class="ips-jobs-row-marker ips-jobs-table-row {stripe_cls}" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 if field_mode:
                     if st.button(
                         "▾" if expanded else "▸",
@@ -574,14 +685,23 @@ def _render_custom_jobs_table(
                     )
 
             with cols[1]:
+                num_label = job_no if job_no and job_no != "—" else "View job"
                 st.markdown(
-                    f'<div class="ips-jobs-number">{html.escape(job_no)}</div>',
+                    '<div class="ips-jobs-number-link job-number-link">',
                     unsafe_allow_html=True,
                 )
+                if st.button(
+                    num_label,
+                    key=f"job_num_{jid}",
+                    help="Open job details",
+                ):
+                    _open_jobs_detail_modal(jid, job)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-jobs-title">{html.escape(project)}</div>',
+                    f'<div class="ips-jobs-title ips-jobs-cell">{html.escape(project)}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -592,24 +712,42 @@ def _render_custom_jobs_table(
                 )
 
             with cols[4]:
+                status_html = _job_status_pill_html(status)
+                if health_html:
+                    status_html = f'{status_html}{health_html}'
+                st.markdown(status_html, unsafe_allow_html=True)
+
+            profit_cls = " ips-jobs-money-negative" if profit_val < 0 else ""
+            with cols[5]:
                 st.markdown(
-                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(supervisor)}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell">{html.escape(_money_cell(contract_val))}</div>',
                     unsafe_allow_html=True,
                 )
-
-            with cols[5]:
-                st.markdown(_job_status_pill_html(status), unsafe_allow_html=True)
-
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(start)}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell">{html.escape(_money_cell(actual_val))}</div>',
                     unsafe_allow_html=True,
                 )
-
             with cols[7]:
                 st.markdown(
-                    f'<div class="ips-jobs-muted ips-jobs-cell">{html.escape(end)}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}">{html.escape(_money_cell(profit_val))}</div>',
                     unsafe_allow_html=True,
+                )
+            with cols[8]:
+                st.markdown(
+                    f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}">{html.escape(_pct_cell(margin_val))}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[9]:
+                st.markdown(
+                    f'<div class="ips-jobs-cell">{open_subjobs:,}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[10]:
+                render_job_row_actions(
+                    job,
+                    on_open=_open_jobs_detail_modal,
+                    on_edit=_open_job_edit_from_list,
                 )
 
             if expanded:
@@ -2040,6 +2178,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     inject_jobs_module_css()
+    inject_jobs_page_layout_css()
     if is_field_context():
         inject_field_row_expand_css()
     all_jobs = load_jobs()
@@ -2155,7 +2294,9 @@ def render() -> None:
                 clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
                 st.rerun()
 
+    render_jobs_filter_bar_shell()
     layout_filter_bar(_filters)
+    close_jobs_filter_bar_shell()
 
     filtered = _filter_jobs(
         all_jobs,
@@ -2163,7 +2304,17 @@ def render() -> None:
         view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
     )
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="job")
+    summary = _jobs_summary_counts(filtered)
+    render_jobs_summary_cards(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        awarded=int(summary["awarded"]),
+        draft=int(summary["draft"]),
+        open_subjobs=int(summary["open_subjobs"]),
+        total_contract=float(summary["total_contract"]),
+        total_actual=float(summary["total_actual"]),
+    )
+    render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     modal_cache = {
@@ -2180,7 +2331,7 @@ def render() -> None:
     st.session_state[CACHE_KEY] = modal_cache
 
     _render_custom_jobs_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_jobs_detail_modal()
