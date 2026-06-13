@@ -118,6 +118,7 @@ try:
         close_assets_filter_bar_shell,
         inject_assets_page_layout_css,
         render_assets_equipment_banner,
+        render_assets_equipment_row_click_bridge,
         render_assets_filter_bar_shell,
         render_assets_pagination_footer,
         render_assets_summary_cards,
@@ -255,6 +256,7 @@ except ImportError:
         close_assets_filter_bar_shell,
         inject_assets_page_layout_css,
         render_assets_equipment_banner,
+        render_assets_equipment_row_click_bridge,
         render_assets_filter_bar_shell,
         render_assets_pagination_footer,
         render_assets_summary_cards,
@@ -954,12 +956,12 @@ def _render_custom_assets_table(
                         base_class="ips-assets-header-row ips-assets-cell",
                     )
 
-        for row_idx, asset in enumerate(filtered):
+        for asset in filtered:
             aid = str(asset.get("id") or "").strip()
             if not aid:
                 continue
 
-            stripe_cls = "ips-assets-row-odd" if row_idx % 2 == 0 else "ips-assets-row-even"
+            stripe_cls = "ips-assets-row-odd"
 
             name = _asset_name(asset)
             category = _asset_category(asset)
@@ -974,7 +976,7 @@ def _render_custom_assets_table(
 
             with cols[0]:
                 st.markdown(
-                    f'<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row {stripe_cls}" aria-hidden="true"></span>',
+                    f'<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row {stripe_cls}" data-row-id="{html.escape(aid, quote=True)}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 if field_mode:
@@ -1005,17 +1007,9 @@ def _render_custom_assets_table(
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    '<div class="ips-assets-link-btn ips-assets-name-link asset-name-link asset-name-button">',
+                    f'<span class="asset-name-link ips-assets-name-text" title="{html.escape(name_label, quote=True)}">{html.escape(name_label)}</span>',
                     unsafe_allow_html=True,
                 )
-                if st.button(
-                    name_label,
-                    key=f"ast_name_{aid}",
-                    help="Open asset details",
-                ):
-                    _open_assets_detail_modal(aid, asset)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
                 if rentable_badge:
                     st.markdown(
                         f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
@@ -1071,6 +1065,16 @@ def _render_custom_assets_table(
                 st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    if not is_field_context():
+        assets_by_id = {str(a.get("id") or "").strip(): a for a in filtered if str(a.get("id") or "").strip()}
+        picked = render_assets_equipment_row_click_bridge()
+        if picked:
+            open_id = str(picked).strip()
+            open_asset = assets_by_id.get(open_id)
+            if open_asset:
+                _open_assets_detail_modal(open_id, open_asset)
+                st.rerun()
 
     return all_asset_ids
 

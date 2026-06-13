@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v34"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v35"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -385,37 +385,33 @@ def inject_assets_page_styles() -> None:
             margin: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link button,
+        .st-key-assets_table_wrap .ips-assets-name-text,
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .asset-name-button button {
-            background: transparent !important;
-            background-color: transparent !important;
+        .st-key-assets_table_wrap .asset-name-link.ips-assets-name-text {
+            font-weight: 700 !important;
             color: #2563eb !important;
-            font-weight: 600 !important;
             font-size: 0.875rem !important;
+            background: transparent !important;
             border: none !important;
-            border-radius: 0 !important;
             padding: 0 !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            width: auto !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
             box-shadow: none !important;
-            outline: none !important;
-            text-align: left !important;
-            justify-content: flex-start !important;
-            display: inline-flex !important;
-            align-items: center !important;
+            cursor: pointer !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            word-break: normal !important;
-            overflow-wrap: normal !important;
-            writing-mode: horizontal-tb !important;
-            cursor: pointer !important;
-            transition: color 0.15s ease !important;
+            display: inline-block !important;
+            max-width: 100% !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover .ips-assets-name-text {
+            color: #1d4ed8 !important;
+            text-decoration: underline !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .ips-assets-name-link button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap .asset-name-button button {
+            display: none !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-cell,

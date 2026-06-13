@@ -3238,7 +3238,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v16">
+<style id="ips-assets-module-v17">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;
@@ -3730,17 +3730,34 @@ def inject_assets_module_css() -> None:
   text-overflow: ellipsis;
 }}
 .ips-asset-rentable-badge {{
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.45rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #0f766e;
-  background: #ccfbf1;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  border: 1px solid #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.35);
   vertical-align: middle;
+  white-space: nowrap;
+}}
+.ips-assets-name-text {{
+  font-weight: 700;
+  color: {PRIMARY};
+  font-size: 0.875rem;
+  line-height: 1.25;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
 }}
 .ips-assets-muted {{
   font-size: 13px;

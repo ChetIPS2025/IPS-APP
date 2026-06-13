@@ -32,7 +32,7 @@ def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
     st.markdown(
         """
-<style id="ips-assets-page-layout-v2">
+<style id="ips-assets-page-layout-v3">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }
@@ -95,15 +95,23 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   min-height: 76px !important;
   border-bottom: 1px solid #e5eaf2 !important;
   transition: background-color 0.15s ease !important;
+  position: relative !important;
+  background: #ffffff !important;
+  cursor: pointer !important;
 }
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-row-even),
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-row-odd) {
   background: #ffffff !important;
 }
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-row-even) {
-  background: #f8fafc !important;
-}
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover {
   background: #eef2ff !important;
+}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has(.asset-actions-cell),
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has(.asset-actions-button),
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has([data-testid="stCheckbox"]),
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has([data-testid="stPopover"]) {
+  position: relative !important;
+  z-index: 4 !important;
 }
 .ips-assets-summary-cards {
   display: grid;
@@ -117,6 +125,8 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   border-radius: 10px;
   padding: 0.85rem 1rem;
   min-height: 72px;
+  border-left-width: 4px;
+  border-left-style: solid;
 }
 .ips-assets-stat-label {
   font-size: 0.72rem;
@@ -133,10 +143,37 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
+.ips-assets-stat-pct {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0.2rem 0 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.ips-assets-stat-total {
+  border-left-color: #1e3a8a;
+}
+.ips-assets-stat-total .ips-assets-stat-value { color: #1e3a8a; }
+.ips-assets-stat-available {
+  border-left-color: #15803d;
+}
 .ips-assets-stat-available .ips-assets-stat-value { color: #15803d; }
-.ips-assets-stat-checked-out .ips-assets-stat-value { color: #1d4ed8; }
-.ips-assets-stat-repair .ips-assets-stat-value { color: #c2410c; }
-.ips-assets-stat-service .ips-assets-stat-value { color: #b45309; }
+.ips-assets-stat-checked-out {
+  border-left-color: #2563eb;
+}
+.ips-assets-stat-checked-out .ips-assets-stat-value { color: #2563eb; }
+.ips-assets-stat-repair {
+  border-left-color: #ea580c;
+}
+.ips-assets-stat-repair .ips-assets-stat-value { color: #ea580c; }
+.ips-assets-stat-service {
+  border-left-color: #dc2626;
+}
+.ips-assets-stat-service .ips-assets-stat-value { color: #dc2626; }
+.ips-assets-stat-available .ips-assets-stat-pct { color: #15803d; }
+.ips-assets-stat-checked-out .ips-assets-stat-pct { color: #2563eb; }
+.ips-assets-stat-repair .ips-assets-stat-pct { color: #ea580c; }
+.ips-assets-stat-service .ips-assets-stat-pct { color: #dc2626; }
 .ips-assets-page-size-wrap {
   display: flex;
   align-items: center;
@@ -192,65 +229,48 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   opacity: 0 !important;
   pointer-events: none !important;
 }
+.ips-asset-rentable-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.45rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  border: 1px solid #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.35);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.ips-assets-name-text,
+.asset-name-link.ips-assets-name-text {
+  font-weight: 700 !important;
+  color: #2563eb !important;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+}
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover .ips-assets-name-text {
+  color: #1d4ed8 !important;
+  text-decoration: underline;
+}
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button,
 section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link [data-testid="stBaseButton-secondary"],
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button [data-testid="stBaseButton-secondary"] {
-  background: transparent !important;
-  background-color: transparent !important;
-  color: #2563eb !important;
-  font-weight: 600 !important;
-  font-size: 0.875rem !important;
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  width: auto !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-shadow: none !important;
-  outline: none !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  display: inline !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  cursor: pointer !important;
-  transition: color 0.15s ease !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button:hover,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button:hover,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button:hover {
-  background: transparent !important;
-  background-color: transparent !important;
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button > div,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button p,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button span,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button > div,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button p,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button span,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button > div,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button p,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button span {
-  color: inherit !important;
-  font-weight: 600 !important;
-  display: inline !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  text-align: left !important;
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button {
+  display: none !important;
 }
 .asset-name-link {
-  font-weight: 600;
+  font-weight: 700;
   color: #2563eb;
   cursor: pointer;
   text-decoration: none;
@@ -333,8 +353,7 @@ button,
 .stButton button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"],
-section[data-testid="stMain"]:has(.ips-assets-page) .asset-actions-button,
-section[data-testid="stMain"]:has(.ips-assets-page) .asset-name-button {
+section[data-testid="stMain"]:has(.ips-assets-page) .asset-actions-button {
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
@@ -360,6 +379,12 @@ def close_assets_filter_bar_shell() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _stat_pct(part: int, whole: int) -> str:
+    if whole <= 0:
+        return "0%"
+    return f"{round(part / whole * 100)}%"
+
+
 def render_assets_summary_cards(
     *,
     total: int,
@@ -370,22 +395,112 @@ def render_assets_summary_cards(
 ) -> None:
     """Equipment tab KPI strip above the table."""
     cards = [
-        ("Total Assets", total, "ips-assets-stat-total"),
-        ("Available", available, "ips-assets-stat-available"),
-        ("Checked Out", checked_out, "ips-assets-stat-checked-out"),
-        ("Out For Repair", out_for_repair, "ips-assets-stat-repair"),
-        ("Service Due", service_due, "ips-assets-stat-service"),
+        ("Total Assets", f"{total:,}", "", "ips-assets-stat-total"),
+        ("Available", f"{available:,}", _stat_pct(available, total), "ips-assets-stat-available"),
+        ("Checked Out", f"{checked_out:,}", _stat_pct(checked_out, total), "ips-assets-stat-checked-out"),
+        ("Out For Repair", f"{out_for_repair:,}", _stat_pct(out_for_repair, total), "ips-assets-stat-repair"),
+        ("Service Due", f"{service_due:,}", _stat_pct(service_due, total), "ips-assets-stat-service"),
     ]
     parts = ['<div class="ips-assets-summary-cards">']
-    for label, value, cls in cards:
+    for label, value, pct, cls in cards:
+        pct_html = f'<p class="ips-assets-stat-pct">{html.escape(pct)}</p>' if pct else ""
         parts.append(
             f'<div class="ips-assets-stat-card {cls}">'
             f'<p class="ips-assets-stat-label">{html.escape(label)}</p>'
-            f'<p class="ips-assets-stat-value">{value:,}</p>'
+            f'<p class="ips-assets-stat-value">{html.escape(value)}</p>'
+            f"{pct_html}"
             f"</div>"
         )
     parts.append("</div>")
     st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def render_assets_equipment_row_click_bridge() -> str | None:
+    """Zero-height bridge: row click opens asset detail via marker data-row-id."""
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    st.markdown(
+        '<span class="ips-assets-row-click-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsAssetsRowClick::equipment";
+  const tblSel = ".st-key-assets_table_wrap";
+  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row)';
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function isInteractive(target) {
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .asset-actions-cell, .asset-actions-button"
+    ));
+  }
+
+  function tableScope() {
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }
+
+  function bindRows() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsAssetsRowBound === "1") return;
+      row.dataset.ipsAssetsRowBound = "1";
+      row.addEventListener("click", function (e) {
+        if (isInteractive(e.target)) return;
+        const marker = row.querySelector(".ips-assets-equipment-table-row[data-row-id]");
+        const id = marker && marker.getAttribute("data-row-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsAssetsRowClickRegistry) doc.ipsAssetsRowClickRegistry = {};
+  doc.ipsAssetsRowClickRegistry[hookKey] = { bind: bindRows };
+  bindRows();
+  if (!doc.ipsAssetsRowBindObserver) {
+    doc.ipsAssetsRowBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsAssetsRowClickRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsAssetsRowBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_assets_equipment_row_click",
+        height=1,
+    )
 
 
 def render_assets_table_pagination_header(total: int, table_key: str) -> tuple[int, int, int]:
