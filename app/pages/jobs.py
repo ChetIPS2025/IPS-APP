@@ -11,6 +11,12 @@ try:
     from app.components.job_actions import render_job_action_buttons
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
+    from app.components.job_costing_tab import render_job_costing_tab
+    from app.components.job_cost_summary_cards import render_job_cost_summary_cards
+    from app.services.job_cost_transaction_service import (
+        build_job_cost_summary,
+        sync_all_sources_for_job,
+    )
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -65,6 +71,12 @@ try:
 except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
+    from components.job_costing_tab import render_job_costing_tab  # type: ignore
+    from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
+    from services.job_cost_transaction_service import (  # type: ignore
+        build_job_cost_summary,
+        sync_all_sources_for_job,
+    )
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
@@ -132,6 +144,7 @@ _JOB_TABS = [
     "Estimates",
     "Materials",
     "Equipment",
+    "Job Costing",
     "Schedule",
     "Subjobs",
     "IPS Forms",
@@ -1545,6 +1558,7 @@ def _render_job_detail_tabs(job: dict) -> None:
         tab_estimates,
         tab_materials,
         tab_equipment,
+        tab_costing,
         tab_schedule,
         tab_tasks,
         tab_ips_forms,
@@ -1641,6 +1655,9 @@ def _render_job_detail_tabs(job: dict) -> None:
 
     with tab_equipment:
         _render_job_equipment_tab(job)
+
+    with tab_costing:
+        render_job_costing_tab(job, key_prefix=f"job_cost_{str(job.get('id') or '')}")
 
     with tab_schedule:
         sched_html = (
@@ -1830,6 +1847,12 @@ def render_job_detail_dialog(job: dict) -> None:
         f"</div>",
         unsafe_allow_html=True,
     )
+
+    jid = str(job.get("id") or "").strip()
+    if jid and not edit_mode:
+        sync_all_sources_for_job(jid)
+        cost_summary = build_job_cost_summary(job)
+        render_job_cost_summary_cards(cost_summary)
 
     if edit_mode:
         _render_job_edit_form(job)

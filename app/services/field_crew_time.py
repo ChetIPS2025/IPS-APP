@@ -181,10 +181,18 @@ def approve_batch_and_sync_time_entries(
         }
         if existing:
             update_rows_admin("time_entries", payload, {"id": str(existing[0]["id"])})
+            entry_id = str(existing[0]["id"])
         else:
             if approved_by:
                 payload["created_by"] = approved_by
-            insert_row_admin("time_entries", payload)
+            inserted = insert_row_admin("time_entries", payload)
+            entry_id = str((inserted or {}).get("id") or "")
+        try:
+            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
+        except ImportError:
+            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        if entry_id:
+            _safe_sync(sync_time_entry, entry_id)
         synced += 1
     _, update_fn, _ = write_fn(admin=admin)
     now = datetime.now(timezone.utc).isoformat()

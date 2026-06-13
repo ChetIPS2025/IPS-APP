@@ -910,7 +910,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v13">
+<style id="ips-jobs-module-v14">
 .ips-jobs-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -1072,6 +1072,57 @@ def inject_jobs_module_css() -> None:
   border-radius: 9px !important;
   font-size: 14px !important;
   width: auto !important;
+}}
+.ips-jc-summary-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-height: 72px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}}
+.ips-jc-summary-compact {{
+  min-height: 58px;
+  padding: 8px 10px;
+}}
+.ips-jc-summary-label {{
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}}
+.ips-jc-summary-value {{
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}}
+.ips-jc-card-profit .ips-jc-summary-value,
+.ips-jc-card-margin .ips-jc-summary-value {{
+  color: #15803d;
+}}
+.ips-jc-card-remaining .ips-jc-summary-value {{
+  color: #0369a1;
+}}
+.ips-jc-metric-row {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 4px;
+}}
+.ips-jc-metric-label {{
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 600;
+}}
+.ips-jc-metric-value {{
+  font-size: 0.92rem;
+  color: #0f172a;
+  font-weight: 700;
 }}
 </style>
 """,

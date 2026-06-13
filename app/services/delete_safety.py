@@ -29,6 +29,7 @@ _COSTING_TABLES: tuple[str, ...] = (
     "job_materials",
     "job_equipment",
     "job_expenses",
+    "job_cost_transactions",
 )
 
 

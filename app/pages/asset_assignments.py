@@ -54,7 +54,7 @@ def render() -> None:
 
         c1, c2 = st.columns(2, gap="small")
         if c1.button("Check Out", use_container_width=True):
-            insert_row_admin(
+            assignment_row = insert_row_admin(
                 "asset_assignments",
                 {
                     "asset_id": selected_asset["id"],
@@ -76,6 +76,25 @@ def render() -> None:
                 },
                 {"id": selected_asset["id"]},
             )
+            job_id = job_options.get(job_name)
+            if job_id and isinstance(assignment_row, dict):
+                try:
+                    from app.services.job_cost_transaction_service import (
+                        _safe_sync,
+                        sync_asset_assignment_to_job,
+                    )
+                except ImportError:
+                    from services.job_cost_transaction_service import (  # type: ignore
+                        _safe_sync,
+                        sync_asset_assignment_to_job,
+                    )
+                _safe_sync(
+                    sync_asset_assignment_to_job,
+                    assignment_id=str(assignment_row.get("id") or ""),
+                    asset=selected_asset,
+                    job_id=str(job_id),
+                    check_out_at=str(assignment_row.get("check_out_at") or ""),
+                )
             st.success("Asset checked out.")
             st.rerun()
 

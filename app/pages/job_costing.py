@@ -88,12 +88,25 @@ def _fetch_table_graceful(
     return [], "unreachable"
 
 
-def _insert_row_resilient(table: str, payload: dict[str, Any]) -> None:
+def _insert_row_resilient(table: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Prefer anon insert (RLS); fall back to service role when configured (same pattern as other pages)."""
     try:
-        insert_row(table, payload)
+        row = insert_row(table, payload)
     except Exception:
-        insert_row_admin(table, payload)
+        row = insert_row_admin(table, payload)
+    try:
+        from app.services.job_cost_transaction_service import _safe_sync, sync_job_equipment, sync_job_material
+    except ImportError:
+        from services.job_cost_transaction_service import (  # type: ignore
+            _safe_sync,
+            sync_job_equipment,
+            sync_job_material,
+        )
+    if table == "job_materials":
+        _safe_sync(sync_job_material, row)
+    elif table == "job_equipment":
+        _safe_sync(sync_job_equipment, row)
+    return row
 
 
 def _estimate_amount_for_job(job: dict, estimate_by_id: dict[Any, dict]) -> float | None:

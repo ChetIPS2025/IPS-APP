@@ -1814,6 +1814,13 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
         result = insert_row("employee_timekeeping_days", payload)
     if result.ok:
         clear_all_data_caches()
+        row = result.data if isinstance(result.data, dict) else None
+        if row:
+            try:
+                from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
+            except ImportError:
+                from services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day  # type: ignore
+            _safe_sync(sync_timekeeping_day, row)
     return result
 
 
@@ -1878,6 +1885,20 @@ def update_timekeeping_day_status(
     result = update_row("employee_timekeeping_days", payload, {"id": rid})
     if result.ok:
         clear_all_data_caches()
+        try:
+            from app.db import fetch_by_match
+        except ImportError:
+            from db import fetch_by_match  # type: ignore
+        try:
+            rows = fetch_by_match("employee_timekeeping_days", {"id": rid}, limit=1) or []
+        except Exception:
+            rows = []
+        if rows:
+            try:
+                from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
+            except ImportError:
+                from services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day  # type: ignore
+            _safe_sync(sync_timekeeping_day, rows[0])
     return result
 
 

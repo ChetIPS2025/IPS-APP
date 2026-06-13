@@ -386,7 +386,13 @@ def render() -> None:
                 "entered_by": current_profile().get("id"),
             }
 
-            insert_row("job_expenses", payload)
+            row = insert_row("job_expenses", payload)
+            try:
+                from app.services.job_cost_transaction_service import _safe_sync, sync_job_expense
+            except ImportError:
+                from services.job_cost_transaction_service import _safe_sync, sync_job_expense  # type: ignore
+            if isinstance(row, dict):
+                _safe_sync(sync_job_expense, row)
             st.success("Expense added.")
             st.rerun()
 
@@ -415,5 +421,11 @@ def render() -> None:
             }
 
             update_rows("job_expenses", payload, {"id": selected_expense["id"]})
+            try:
+                from app.services.job_cost_transaction_service import _safe_sync, sync_job_expense
+            except ImportError:
+                from services.job_cost_transaction_service import _safe_sync, sync_job_expense  # type: ignore
+            merged = {**selected_expense, **payload, "id": selected_expense["id"]}
+            _safe_sync(sync_job_expense, merged)
             st.success("Expense updated.")
             st.rerun()

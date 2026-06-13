@@ -235,7 +235,14 @@ def add_pricing_guide_job_material(
 
 
 def _insert_job_material(payload: dict[str, Any]) -> ServiceResult:
-    return insert_row(_JOB_MATERIALS_TABLE, payload)
+    result = insert_row(_JOB_MATERIALS_TABLE, payload)
+    if result.ok and isinstance(result.data, dict):
+        try:
+            from app.services.job_cost_transaction_service import _safe_sync, sync_job_material
+        except ImportError:
+            from services.job_cost_transaction_service import _safe_sync, sync_job_material  # type: ignore
+        _safe_sync(sync_job_material, result.data)
+    return result
 
 
 def issue_inventory_to_job(

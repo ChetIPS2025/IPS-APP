@@ -88,12 +88,19 @@ def sum_employee_week_hours(entries: list[dict], employee_id: str, week_dates_: 
     return total
 
 
-def grid_labor_cost_dollars(hours: float, employee: dict | None) -> float:
-    """All grid hours billed at employee straight-time rate."""
+def grid_labor_cost_dollars(hours: float, employee: dict | None, *, time_type: str | None = None) -> float:
+    """Grid hours billed at employee burdened rate (respects ST/OT/DT when provided)."""
     if not employee:
         return 0.0
-    hr = float(employee.get("hourly_rate") or 0)
-    return float(hours or 0) * hr
+    try:
+        from app.services.employee_labor import time_entry_burdened_cost
+    except ImportError:
+        from services.employee_labor import time_entry_burdened_cost  # type: ignore
+    _, total = time_entry_burdened_cost(
+        {"hours": hours, "time_type": time_type or "ST"},
+        employee,
+    )
+    return total
 
 
 def fetch_entries_employee_between(employee_id: str, work_start: date, work_end: date) -> list[dict[str, Any]]:
@@ -192,6 +199,12 @@ def upsert_time_entry(
     }
     if row0:
         update_rows("time_entries", payload_update, {"id": row0["id"]})
+        try:
+            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
+        except ImportError:
+            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        merged = {**row0, **payload_update, "id": row0["id"], "employee_id": employee_id, "job_id": job_id, "work_date": wd}
+        _safe_sync(sync_time_entry, merged)
         return
     ins: dict[str, Any] = {
         "employee_id": employee_id,
@@ -208,7 +221,13 @@ def upsert_time_entry(
     else:
         ins["job_id"] = None
         ins["non_job_code"] = (non_job_code or "").strip()
-    insert_row("time_entries", ins)
+    row = insert_row("time_entries", ins)
+    if job_id and row:
+        try:
+            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
+        except ImportError:
+            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        _safe_sync(sync_time_entry, row)
 
 
 def copy_employee_day_to_day(
