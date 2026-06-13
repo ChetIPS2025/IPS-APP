@@ -3162,7 +3162,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v10">
+<style id="ips-assets-module-v11">
 .ips-assets-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3259,10 +3259,19 @@ def inject_assets_module_css() -> None:
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: none !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
   overflow: visible !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-actions-cell) {{
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
@@ -3286,10 +3295,22 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   flex: 0 0 auto !important;
   width: auto !important;
-  min-width: 0 !important;
+  min-width: 88px !important;
   max-width: none !important;
   overflow: visible !important;
   padding: 0 !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.asset-row-actions-menu) {{
+  min-width: 108px !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="stPopover"] {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: visible !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button {{
@@ -3330,13 +3351,33 @@ def inject_assets_module_css() -> None:
   word-break: keep-all !important;
   overflow-wrap: normal !important;
   writing-mode: horizontal-tb !important;
+  line-height: 1.1 !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] > div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button > div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button > div {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] p,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] span,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] div,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] span,
-.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] div {{
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button span,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button span {{
   display: inline !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
@@ -3358,6 +3399,15 @@ def inject_assets_module_css() -> None:
   max-width: 40px !important;
   justify-content: center !important;
   align-items: center !important;
+}}
+{ast_grid_cols}:nth-child(9) > [data-testid="stVerticalBlock"] {{
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  overflow: visible !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 8px !important;
 }}
 {ast_list_wrap} [data-testid="stMarkdownContainer"],
 {ast_list_wrap} .stMarkdown,

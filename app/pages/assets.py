@@ -996,32 +996,25 @@ def _render_custom_assets_table(
             with cols[8]:
                 if not field_mode:
                     st.markdown(
-                        '<span class="ips-assets-actions-cell asset-open-button" aria-hidden="true"></span>',
+                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar asset-open-button" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                    open_col, menu_col = st.columns(
-                        [0.44, 0.56],
-                        gap="small",
-                        vertical_alignment="center",
+                    if st.button(
+                        "Open",
+                        key=f"ast_open_{aid}",
+                        type="primary",
+                        help="Open asset details",
+                    ):
+                        _open_assets_detail_modal(aid, asset)
+                        st.rerun()
+                    render_asset_row_actions(
+                        asset,
+                        on_view=_row_action_view,
+                        on_edit=_row_action_edit,
+                        on_change_type=_row_action_change_type,
+                        on_history=_row_action_history,
+                        on_after_change=clear_assets_cache,
                     )
-                    with open_col:
-                        if st.button(
-                            "Open",
-                            key=f"ast_open_{aid}",
-                            type="primary",
-                            help="Open asset details",
-                        ):
-                            _open_assets_detail_modal(aid, asset)
-                            st.rerun()
-                    with menu_col:
-                        render_asset_row_actions(
-                            asset,
-                            on_view=_row_action_view,
-                            on_edit=_row_action_edit,
-                            on_change_type=_row_action_change_type,
-                            on_history=_row_action_history,
-                            on_after_change=clear_assets_cache,
-                        )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)

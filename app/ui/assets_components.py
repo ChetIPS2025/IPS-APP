@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v28"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v29"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -572,9 +572,21 @@ def inject_assets_page_styles() -> None:
             align-items: center !important;
             justify-content: flex-end !important;
             gap: 8px !important;
-            width: 100% !important;
+            width: 220px !important;
             min-width: 220px !important;
+            max-width: 220px !important;
             overflow: visible !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-actions-cell) {
+            flex: 0 0 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
@@ -595,22 +607,20 @@ def inject_assets_page_styles() -> None:
         [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {
             flex: 0 0 auto !important;
             width: auto !important;
-            min-width: 0 !important;
+            min-width: 88px !important;
             max-width: none !important;
             overflow: visible !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
         [data-testid="column"]:has(.ips-assets-actions-cell) > [data-testid="stVerticalBlock"]
-        [data-testid="stElementContainer"] {
+        > [data-testid="stElementContainer"]:not(:has(.ips-assets-actions-cell)) {
             flex: 0 0 auto !important;
             width: auto !important;
             min-width: 0 !important;
+            max-width: none !important;
             overflow: visible !important;
         }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap
-        [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="stPopover"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
         [data-testid="column"]:has(.ips-assets-actions-cell)
@@ -619,10 +629,34 @@ def inject_assets_page_styles() -> None:
         .st-key-assets_table_wrap
         [data-testid="column"]:has(.ips-assets-actions-cell)
         [class*="st-key-ast_open_"] .stButton {
-            width: auto !important;
-            min-width: 0 !important;
-            max-width: none !important;
+            width: 88px !important;
+            min-width: 88px !important;
+            max-width: 88px !important;
         }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [class*="st-key-ast_open_"] [data-testid="stButton"] > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [class*="st-key-ast_open_"] .stButton > button {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 88px !important;
+            min-width: 88px !important;
+            max-width: 88px !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
+            writing-mode: horizontal-tb !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="stPopover"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
         [data-testid="column"]:has(.ips-assets-actions-cell)
@@ -648,6 +682,30 @@ def inject_assets_page_styles() -> None:
             background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        button[data-testid="stBaseButton-popover"] > div,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [class*="st-key-ast_open_"] [data-testid="stButton"] > button > div,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap
+        [data-testid="column"]:has(.ips-assets-actions-cell)
+        [class*="st-key-ast_open_"] .stButton > button > div {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: auto !important;
+            max-width: none !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            overflow-wrap: normal !important;
+            writing-mode: horizontal-tb !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap
