@@ -978,6 +978,17 @@ def clear_timekeeping_day_rows(
         rid = str(row.get("id") or "").strip()
         if not rid or rid in keep_all:
             continue
+        try:
+            from app.services.job_cost_transaction_service import (
+                SOURCE_TIMEKEEPING_DAY,
+                delete_job_cost_transaction,
+            )
+        except ImportError:
+            from services.job_cost_transaction_service import (  # type: ignore
+                SOURCE_TIMEKEEPING_DAY,
+                delete_job_cost_transaction,
+            )
+        delete_job_cost_transaction(SOURCE_TIMEKEEPING_DAY, rid)
         result = delete_row("employee_timekeeping_days", {"id": rid})
         if not result.ok:
             return result

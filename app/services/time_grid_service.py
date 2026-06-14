@@ -121,8 +121,19 @@ def fetch_entries_employee_between(employee_id: str, work_start: date, work_end:
 
 
 def delete_time_entries_by_ids(entry_ids: list[str]) -> None:
+    try:
+        from app.services.job_cost_transaction_service import (
+            SOURCE_TIME_ENTRY,
+            delete_job_cost_transaction,
+        )
+    except ImportError:
+        from services.job_cost_transaction_service import (  # type: ignore
+            SOURCE_TIME_ENTRY,
+            delete_job_cost_transaction,
+        )
     for eid in entry_ids:
         if eid:
+            delete_job_cost_transaction(SOURCE_TIME_ENTRY, str(eid))
             delete_rows("time_entries", {"id": eid})
 
 

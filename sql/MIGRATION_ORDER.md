@@ -231,6 +231,8 @@ Use this sequence in the Supabase SQL editor (or a migration runner). Files mark
 | 62 | `060_company_updates.sql` | FK → `profiles` |
 | 63 | `061_field_operations_phase1.sql` | FK → `jobs`, `job_tasks`, `employees` |
 | 64 | **`062_phase3_operations_hub.sql`** | Lookups, documents, certifications, timekeeping |
+| 65 | `113_job_cost_transactions.sql` | `job_cost_transactions`, `job_expenses`, employee burden fields |
+| 66 | `114_job_cost_transactions_extend.sql` | Ledger asset/inventory links, description, created_by |
 
 ## Per-file CREATE TABLE index
 

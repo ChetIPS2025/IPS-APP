@@ -208,8 +208,19 @@ def render() -> None:
                     st.rerun()
                 pend = st.session_state.get(IPS_PENDING_DELETE) or {}
                 if actions.get("confirm_delete") and pend.get(TABLE_KEY_PO_EXPENSES) and can_add:
+                    try:
+                        from app.services.job_cost_transaction_service import (
+                            SOURCE_JOB_EXPENSE,
+                            delete_job_cost_transaction,
+                        )
+                    except ImportError:
+                        from services.job_cost_transaction_service import (  # type: ignore
+                            SOURCE_JOB_EXPENSE,
+                            delete_job_cost_transaction,
+                        )
                     for xid in pend[TABLE_KEY_PO_EXPENSES]:
                         try:
+                            delete_job_cost_transaction(SOURCE_JOB_EXPENSE, str(xid))
                             delete_rows_admin("job_expenses", {"id": xid})
                         except Exception as exc:
                             st.error(f"Could not delete {xid}: {exc}")

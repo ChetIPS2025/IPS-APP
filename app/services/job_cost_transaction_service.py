@@ -14,14 +14,21 @@ COST_LABOR = "labor"
 COST_MATERIAL = "material"
 COST_EQUIPMENT = "equipment"
 COST_SUBCONTRACT = "subcontract"
+COST_RENTAL = "rental"
 COST_OTHER = "other"
 
 SOURCE_TIME_ENTRY = "time_entry"
+SOURCE_LABOR_TIME = "labor_time"  # display alias for time_entry
 SOURCE_TIMEKEEPING_DAY = "timekeeping_day"
 SOURCE_JOB_MATERIAL = "job_material"
+SOURCE_INVENTORY_SCAN = "inventory_scan"  # display alias for job_material scans
 SOURCE_JOB_EQUIPMENT = "job_equipment"
 SOURCE_JOB_EXPENSE = "job_expense"
+SOURCE_PURCHASE = "purchase"  # display alias for job_expense
 SOURCE_ASSET_ASSIGNMENT = "asset_assignment"
+SOURCE_EQUIPMENT_ASSIGNMENT = "equipment_assignment"  # display alias
+SOURCE_MANUAL_ADJUSTMENT = "manual_adjustment"
+SOURCE_ESTIMATE = "estimate"
 
 
 def _db():
@@ -135,7 +142,10 @@ def upsert_job_cost_transaction(payload: dict[str, Any]) -> bool:
         "source_type": source_type,
         "source_id": source_id,
         "employee_id": payload.get("employee_id") or None,
-        "item_name": str(payload.get("item_name") or "")[:500],
+        "asset_id": payload.get("asset_id") or None,
+        "inventory_item_id": payload.get("inventory_item_id") or None,
+        "item_name": str(payload.get("item_name") or payload.get("description") or "")[:500],
+        "description": str(payload.get("description") or payload.get("item_name") or "")[:500],
         "quantity": round(_safe_float(payload.get("quantity")), 4),
         "unit_cost": round(_safe_float(payload.get("unit_cost")), 4),
         "total_cost": total,
@@ -143,6 +153,8 @@ def upsert_job_cost_transaction(payload: dict[str, Any]) -> bool:
         "notes": str(payload.get("notes") or "")[:2000],
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    if payload.get("created_by"):
+        body["created_by"] = payload.get("created_by")
     db = _db()
     try:
         existing = db.fetch_by_match(_TABLE, {"source_type": source_type, "source_id": source_id}, limit=1) or []
@@ -283,6 +295,7 @@ def sync_job_material(row: dict[str, Any] | str) -> None:
     usage = str(row.get("usage_source") or "").strip().lower()
     source_label = "Inventory scan" if usage in {"qr_scan", "inventory_scan", "scan"} else "Job material"
     txn_date = str(row.get("used_at") or row.get("created_at") or "")[:10] or date.today().isoformat()
+    item_name = str(row.get("item_name") or row.get("material_name") or "Material")[:500]
     upsert_job_cost_transaction(
         {
             "job_id": job_id,
@@ -291,7 +304,9 @@ def sync_job_material(row: dict[str, Any] | str) -> None:
             "source_type": SOURCE_JOB_MATERIAL,
             "source_id": mid,
             "employee_id": row.get("employee_id"),
-            "item_name": str(row.get("item_name") or row.get("material_name") or "Material")[:500],
+            "inventory_item_id": row.get("inventory_item_id") or row.get("inventory_id"),
+            "item_name": item_name,
+            "description": item_name,
             "quantity": qty,
             "unit_cost": unit,
             "total_cost": total,
@@ -321,6 +336,7 @@ def sync_job_equipment(row: dict[str, Any] | str) -> None:
     qty = _safe_float(row.get("usage_days") or row.get("usage_hours") or row.get("qty") or 1)
     unit = total / qty if qty > 0 else total
     txn_date = str(row.get("created_at") or "")[:10] or date.today().isoformat()
+    equip_name = str(row.get("asset_label") or row.get("equipment_name") or "Equipment")[:500]
     upsert_job_cost_transaction(
         {
             "job_id": job_id,
@@ -328,7 +344,9 @@ def sync_job_equipment(row: dict[str, Any] | str) -> None:
             "cost_category": COST_EQUIPMENT,
             "source_type": SOURCE_JOB_EQUIPMENT,
             "source_id": eid,
-            "item_name": str(row.get("asset_label") or row.get("equipment_name") or "Equipment")[:500],
+            "asset_id": row.get("asset_id"),
+            "item_name": equip_name,
+            "description": equip_name,
             "quantity": qty,
             "unit_cost": unit,
             "total_cost": round(total, 2),
@@ -386,25 +404,33 @@ def sync_asset_assignment_to_job(
         return
     rate, unit, qty = equipment_internal_rate(asset)
     if rate <= 0:
+        delete_job_cost_transaction(SOURCE_ASSET_ASSIGNMENT, aid)
         return
     total = round(rate * qty, 2)
     asset_name = str(asset.get("asset_name") or asset.get("name") or "Equipment")[:500]
     txn_date = str(check_out_at or "")[:10] or date.today().isoformat()
+    cost_cat = _asset_rental_category(asset)
     upsert_job_cost_transaction(
         {
             "job_id": jid,
             "transaction_date": txn_date,
-            "cost_category": COST_EQUIPMENT,
+            "cost_category": cost_cat,
             "source_type": SOURCE_ASSET_ASSIGNMENT,
             "source_id": aid,
+            "asset_id": asset.get("id"),
             "item_name": asset_name,
+            "description": asset_name,
             "quantity": qty,
             "unit_cost": rate,
             "total_cost": total,
             "notes": f"Equipment assignment ({unit})",
         }
     )
+    marker = f"auto:assignment:{aid}"
     try:
+        existing = _db().fetch_by_match("job_equipment", {"job_id": jid, "notes": marker}, limit=1) or []
+        if existing:
+            return
         payload = {
             "job_id": jid,
             "asset_id": asset.get("id"),
@@ -414,19 +440,22 @@ def sync_asset_assignment_to_job(
             "rate_per_day": rate if unit == "day" else 0.0,
             "rate_per_hour": rate if unit == "hour" else 0.0,
             "line_total": total,
-            "notes": f"Basis: {unit.title()} (auto from assignment)",
+            "notes": marker,
         }
         if unit == "week":
             payload["usage_days"] = 7.0
             payload["rate_per_day"] = round(rate / 7.0, 4)
-            payload["notes"] = "Basis: Week (auto from assignment)"
         elif unit == "month":
             payload["usage_days"] = 30.0
             payload["rate_per_day"] = round(rate / 30.0, 4)
-            payload["notes"] = "Basis: Month (auto from assignment)"
         _db().insert_row("job_equipment", payload)
     except Exception as exc:
         _LOG.debug("job_equipment auto-line skipped: %s", exc)
+
+
+def void_asset_assignment_cost(assignment_id: str) -> None:
+    """Remove ledger cost when equipment is checked in or assignment voided."""
+    delete_job_cost_transaction(SOURCE_ASSET_ASSIGNMENT, str(assignment_id or "").strip())
 
 
 def fetch_job_cost_transactions(job_id: str, *, limit: int = 2000) -> list[dict[str, Any]]:
@@ -452,16 +481,44 @@ def _estimate_for_job(job: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
-def _estimated_cost(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
-    aw = _safe_float(job.get("awarded_amount"))
-    if aw > 0:
-        return aw
+def _contract_value(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
+    """Contract / revenue baseline from job award or linked estimate."""
+    try:
+        from app.services.job_costing_service import awarded_or_proposal_amount
+    except ImportError:
+        from services.job_costing_service import awarded_or_proposal_amount  # type: ignore
     est = estimate or _estimate_for_job(job)
-    for key in ("proposal_total", "final_bid", "customer_price"):
+    try:
+        return _safe_float(awarded_or_proposal_amount(job, est))
+    except Exception:
+        return _safe_float(job.get("awarded_amount") or job.get("contract_value"))
+
+
+def _estimated_cost(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
+    """Internal estimated cost from linked estimate (not contract value)."""
+    est = estimate or _estimate_for_job(job)
+    for key in ("total_cost", "subtotal", "internal_cost", "estimated_cost"):
         val = _safe_float(est.get(key))
         if val > 0:
             return val
-    return _safe_float(est.get("final_bid"))
+    return _safe_float(job.get("estimated_cost") or 0)
+
+
+def can_manage_manual_cost_adjustments() -> bool:
+    """Only admin users may add/edit/delete manual cost adjustments."""
+    try:
+        from app.auth import current_role
+    except ImportError:
+        from auth import current_role  # type: ignore
+    return str(current_role() or "").strip().lower() == "admin"
+
+
+def _asset_rental_category(asset: dict[str, Any] | None) -> str:
+    if not asset:
+        return COST_EQUIPMENT
+    if bool(asset.get("is_rentable") or asset.get("rentable")):
+        return COST_RENTAL
+    return COST_EQUIPMENT
 
 
 def _task_progress_pct(job_id: str) -> float:
@@ -483,9 +540,10 @@ def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = 
     """Roll up ledger transactions into dashboard metrics."""
     jid = str(job.get("id") or "").strip()
     estimate = _estimate_for_job(job)
+    contract = _contract_value(job, estimate)
     estimated = _estimated_cost(job, estimate)
     txns = fetch_job_cost_transactions(jid)
-    labor = material = equipment = subcontract = other = 0.0
+    labor = material = equipment = subcontract = rental = other = 0.0
     for t in txns:
         cat = str(t.get("cost_category") or "").strip().lower()
         amt = _safe_float(t.get("total_cost"))
@@ -497,13 +555,15 @@ def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = 
             equipment += amt
         elif cat == COST_SUBCONTRACT:
             subcontract += amt
+        elif cat == COST_RENTAL:
+            rental += amt
         else:
             other += amt
-    actual = round(labor + material + equipment + subcontract + other, 2)
-    remaining = round(max(0.0, estimated - actual), 2)
-    profit = round(estimated - actual, 2)
-    margin_pct = round((profit / estimated * 100.0), 1) if estimated > 0 else 0.0
-    variance = round(estimated - actual, 2)
+    actual = round(labor + material + equipment + subcontract + rental + other, 2)
+    remaining = round(estimated - actual, 2) if estimated > 0 else None
+    profit = round(contract - actual, 2) if contract > 0 else round(estimated - actual, 2)
+    margin_pct = round((profit / contract * 100.0), 1) if contract > 0 else 0.0
+    variance = round(estimated - actual, 2) if estimated > 0 else round(contract - actual, 2)
     pct = progress_pct if progress_pct is not None else _task_progress_pct(jid)
     status = str(job.get("status") or "").strip().lower()
     if status in {"completed", "closed", "complete"} or pct >= 99.0:
@@ -511,19 +571,24 @@ def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = 
     elif pct > 5.0:
         projected = round(actual / (pct / 100.0), 2)
     else:
-        projected = round(max(actual, estimated), 2)
+        projected = round(max(actual, estimated or contract), 2)
     return {
-        "estimated_cost": estimated,
+        "contract_value": round(contract, 2),
+        "estimated_cost": round(estimated, 2),
         "actual_cost": actual,
-        "remaining_budget": remaining,
+        "remaining_budget": remaining if remaining is not None else 0.0,
+        "has_estimated_cost": estimated > 0,
+        "has_contract_value": contract > 0,
         "projected_final_cost": projected,
         "variance": variance,
         "margin_pct": margin_pct,
+        "margin_percent": margin_pct,
         "profit": profit,
         "labor_cost": round(labor, 2),
         "material_cost": round(material, 2),
         "equipment_cost": round(equipment, 2),
         "subcontract_cost": round(subcontract, 2),
+        "rental_cost": round(rental, 2),
         "other_cost": round(other, 2),
         "transaction_count": len(txns),
         "progress_pct": pct,
@@ -549,22 +614,146 @@ def sync_all_sources_for_job(job_id: str) -> None:
             continue
         for row in rows:
             _safe_sync(sync_fn, row)
+    try:
+        assignments = db.fetch_by_match("asset_assignments", {"assigned_job_id": jid}, limit=2000) or []
+    except Exception:
+        assignments = []
+    for row in assignments:
+        if not row.get("check_in_at"):
+            aid = str(row.get("id") or "").strip()
+            asset_id = str(row.get("asset_id") or "").strip()
+            if not aid or not asset_id:
+                continue
+            try:
+                assets = db.fetch_by_match("assets", {"id": asset_id}, limit=1) or []
+            except Exception:
+                continue
+            if assets:
+                _safe_sync(
+                    sync_asset_assignment_to_job,
+                    assignment_id=aid,
+                    asset=assets[0],
+                    job_id=jid,
+                    check_out_at=str(row.get("check_out_at") or ""),
+                )
+
+
+def create_manual_cost_adjustment(
+    *,
+    job_id: str,
+    transaction_date: str,
+    cost_category: str,
+    description: str,
+    quantity: float,
+    unit_cost: float,
+    notes: str = "",
+    created_by: str | None = None,
+) -> bool:
+    """Admin-only manual cost line (source_type=manual_adjustment)."""
+    import uuid
+
+    jid = str(job_id or "").strip()
+    if not jid:
+        return False
+    qty = _safe_float(quantity)
+    unit = _safe_float(unit_cost)
+    total = round(qty * unit, 2) if qty > 0 and unit >= 0 else round(_safe_float(quantity), 2)
+    if total <= 0:
+        return False
+    adj_id = str(uuid.uuid4())
+    return upsert_job_cost_transaction(
+        {
+            "job_id": jid,
+            "transaction_date": str(transaction_date or "")[:10] or date.today().isoformat(),
+            "cost_category": str(cost_category or COST_OTHER).strip(),
+            "source_type": SOURCE_MANUAL_ADJUSTMENT,
+            "source_id": adj_id,
+            "item_name": str(description or "Manual adjustment")[:500],
+            "description": str(description or "Manual adjustment")[:500],
+            "quantity": qty or 1.0,
+            "unit_cost": unit if unit > 0 else total,
+            "total_cost": total,
+            "notes": str(notes or "Manual adjustment")[:2000],
+            "created_by": created_by,
+        }
+    )
+
+
+def update_manual_cost_adjustment(txn_id: str, fields: dict[str, Any]) -> bool:
+    """Update an existing manual adjustment only."""
+    tid = str(txn_id or "").strip()
+    if not tid:
+        return False
+    try:
+        rows = _db().fetch_by_match(_TABLE, {"id": tid}, limit=1) or []
+    except Exception:
+        return False
+    if not rows or str(rows[0].get("source_type") or "") != SOURCE_MANUAL_ADJUSTMENT:
+        return False
+    row = rows[0]
+    qty = _safe_float(fields.get("quantity", row.get("quantity")))
+    unit = _safe_float(fields.get("unit_cost", row.get("unit_cost")))
+    total = round(qty * unit, 2)
+    if total <= 0:
+        try:
+            _db().delete_rows(_TABLE, {"id": tid})
+        except Exception:
+            return False
+        return True
+    desc = str(fields.get("description") or row.get("description") or row.get("item_name") or "")[:500]
+    return upsert_job_cost_transaction(
+        {
+            "job_id": row.get("job_id"),
+            "transaction_date": str(fields.get("transaction_date") or row.get("transaction_date") or "")[:10],
+            "cost_category": str(fields.get("cost_category") or row.get("cost_category") or COST_OTHER),
+            "source_type": SOURCE_MANUAL_ADJUSTMENT,
+            "source_id": str(row.get("source_id") or tid),
+            "item_name": desc,
+            "description": desc,
+            "quantity": qty,
+            "unit_cost": unit,
+            "total_cost": total,
+            "notes": str(fields.get("notes") or row.get("notes") or "")[:2000],
+        }
+    )
+
+
+def delete_manual_cost_adjustment(txn_id: str) -> bool:
+    """Delete a manual adjustment row."""
+    tid = str(txn_id or "").strip()
+    if not tid:
+        return False
+    try:
+        rows = _db().fetch_by_match(_TABLE, {"id": tid}, limit=1) or []
+    except Exception:
+        return False
+    if not rows or str(rows[0].get("source_type") or "") != SOURCE_MANUAL_ADJUSTMENT:
+        return False
+    try:
+        _db().delete_rows(_TABLE, {"id": tid})
+        return True
+    except Exception:
+        return False
 
 
 def transaction_display_source(row: dict[str, Any]) -> str:
-    notes = str(row.get("notes") or "").strip()
-    if notes:
-        return notes
     st = str(row.get("source_type") or "").strip()
     mapping = {
-        SOURCE_TIME_ENTRY: "Time entry",
+        SOURCE_TIME_ENTRY: "Labor time",
         SOURCE_TIMEKEEPING_DAY: "Timekeeping",
         SOURCE_JOB_MATERIAL: "Material",
         SOURCE_JOB_EQUIPMENT: "Equipment",
         SOURCE_JOB_EXPENSE: "Purchase / expense",
         SOURCE_ASSET_ASSIGNMENT: "Equipment assignment",
+        SOURCE_MANUAL_ADJUSTMENT: "Manual adjustment",
+        SOURCE_ESTIMATE: "Estimate",
     }
-    return mapping.get(st, st or "—")
+    if st in mapping:
+        return mapping[st]
+    notes = str(row.get("notes") or "").strip()
+    if notes:
+        return notes
+    return st or "—"
 
 
 def transaction_employee_name(row: dict[str, Any], employees_by_id: dict[str, dict[str, Any]]) -> str:

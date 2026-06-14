@@ -272,19 +272,19 @@ def _job_detail_tab_labels(job: dict) -> list[str]:
 
 
 def _enrich_job_cost_summary(job: dict, cost_summary: dict) -> dict:
-    """Attach contract value using existing costing helpers (UI enrichment only)."""
+    """Ensure contract_value and estimate flags are present (build_job_cost_summary sets most fields)."""
     enriched = dict(cost_summary)
-    try:
-        from app.services.job_cost_transaction_service import _estimate_for_job
-        from app.services.job_costing_service import awarded_or_proposal_amount
-    except ImportError:
-        from services.job_cost_transaction_service import _estimate_for_job  # type: ignore
-        from services.job_costing_service import awarded_or_proposal_amount  # type: ignore
-    try:
-        estimate = _estimate_for_job(job)
-        enriched["contract_value"] = awarded_or_proposal_amount(job, estimate)
-    except Exception:
-        enriched.setdefault("contract_value", float(job.get("awarded_amount") or 0))
+    if "contract_value" not in enriched:
+        try:
+            from app.services.job_cost_transaction_service import _contract_value, _estimate_for_job
+        except ImportError:
+            from services.job_cost_transaction_service import _contract_value, _estimate_for_job  # type: ignore
+        try:
+            estimate = _estimate_for_job(job)
+            enriched["contract_value"] = _contract_value(job, estimate)
+            enriched.setdefault("has_contract_value", float(enriched["contract_value"]) > 0)
+        except Exception:
+            enriched.setdefault("contract_value", float(job.get("awarded_amount") or 0))
     return enriched
 
 SELECTED_JOB_KEY = "selected_job_id"
@@ -492,8 +492,10 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
     contract = float(defaults["contract_value"])
     actual = float(defaults["actual_cost"])
     txn_count = int(summary.get("transaction_count") or 0) if isinstance(summary, dict) else 0
-    defaults["has_contract"] = contract > 0 or awarded > 0
-    defaults["has_actual"] = actual > 0 or txn_count > 0
+    defaults["has_contract"] = bool(summary.get("has_contract_value")) if isinstance(summary, dict) else (contract > 0 or awarded > 0)
+    defaults["has_actual"] = txn_count > 0 or actual > 0
+    defaults["profit"] = float(summary.get("profit") or defaults["profit"]) if isinstance(summary, dict) else defaults["profit"]
+    defaults["margin_pct"] = float(summary.get("margin_pct") or defaults["margin_pct"]) if isinstance(summary, dict) else defaults["margin_pct"]
     return defaults
 
 
@@ -739,9 +741,15 @@ def _render_custom_jobs_table(
                     status_html = f'{status_html}{health_html}'
                 st.markdown(status_html, unsafe_allow_html=True)
 
-            profit_cls = " ips-jobs-money-negative" if profit_val < 0 else ""
+            profit_cls = ""
             has_contract = bool(costs.get("has_contract"))
             has_actual = bool(costs.get("has_actual"))
+            has_profit_data = has_contract or has_actual
+            if has_profit_data:
+                if profit_val > 0:
+                    profit_cls = " ips-jobs-money-positive"
+                elif profit_val < 0:
+                    profit_cls = " ips-jobs-money-negative"
             with cols[5]:
                 contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
@@ -755,13 +763,16 @@ def _render_custom_jobs_table(
                     unsafe_allow_html=True,
                 )
             with cols[7]:
+                profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}">{html.escape(_money_cell(profit_val))}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}{profit_display_cls}">{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[8]:
+                margin_display = _pct_cell(margin_val) if has_contract else "—"
+                margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}">{html.escape(_pct_cell(margin_val))}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{margin_cls}">{html.escape(margin_display)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[9]:

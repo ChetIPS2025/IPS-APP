@@ -211,6 +211,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
 .ips-jobs-money-negative {
   color: #dc2626;
 }
+.ips-jobs-money-positive {
+  color: #15803d;
+}
 .ips-jobs-money-empty {
   color: #94a3b8;
   font-weight: 500;

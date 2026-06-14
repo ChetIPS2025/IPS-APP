@@ -1140,6 +1140,12 @@ def inject_jobs_module_css() -> None:
 .ips-jc-card-margin .ips-jc-summary-value {{
   color: #15803d;
 }}
+.ips-jc-card-negative .ips-jc-summary-value {{
+  color: #dc2626;
+}}
+.ips-jc-card-neutral .ips-jc-summary-value {{
+  color: #94a3b8;
+}}
 .ips-jc-card-remaining .ips-jc-summary-value {{
   color: #0369a1;
 }}

@@ -99,6 +99,19 @@ def render() -> None:
             st.rerun()
 
         if c2.button("Check In", use_container_width=True):
+            try:
+                from app.services.job_cost_transaction_service import void_asset_assignment_cost
+            except ImportError:
+                from services.job_cost_transaction_service import void_asset_assignment_cost  # type: ignore
+            asset_id = str(selected_asset.get("id") or "")
+            for row in sorted(assignments, key=lambda r: str(r.get("check_out_at") or ""), reverse=True):
+                if (
+                    str(row.get("asset_id") or "") == asset_id
+                    and row.get("check_out_at")
+                    and not row.get("check_in_at")
+                ):
+                    void_asset_assignment_cost(str(row.get("id") or ""))
+                    break
             insert_row_admin(
                 "asset_assignments",
                 {
