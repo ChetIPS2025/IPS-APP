@@ -2110,5 +2110,9 @@ def render_job_cost_tab(*, job_id: str, job_row: dict[str, Any]) -> None:
     st.caption("Labor, materials, and equipment are tracked on **Job Costing**.")
     if st.button("Open Job Costing", type="primary", key=f"jcost_open_{job_id}"):
         st.session_state["jc_focus_job_id"] = str(job_id)
-        st.session_state[IPS_NAV_PENDING_KEY] = "Job Costing"
+        try:
+            from app.navigation import queue_pending_nav
+        except ImportError:
+            from navigation import queue_pending_nav  # type: ignore
+        queue_pending_nav("Job Costing")
         st.rerun()

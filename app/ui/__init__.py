@@ -88,7 +88,6 @@ _NAV_JOBS_ROUTES: tuple[str, ...] = (
     "Pricing Guide",
     "Estimate Materials",
     "Customers",
-    "Job Costing",
 )
 # Routable asset-area pages (sidebar: nested under **Assets** expander when shown).
 _NAV_ASSET_ROUTES: tuple[str, ...] = ("Asset Database", "Who Has What", "Tool Trailer Audits")
@@ -106,7 +105,6 @@ _NAV_JOBS_SIDEBAR_PAGES: tuple[str, ...] = (
     "Crew Time",
     "Assign Tasks (PM)",
     "Work & Plan (Supervisor)",
-    "Job Costing",
 )
 _NAV_ESTIMATING_SIDEBAR_PAGES: tuple[str, ...] = ("Estimates", "Pricing Guide")
 
@@ -155,7 +153,6 @@ _ROLE_ALLOWED_PAGES: dict[str, frozenset[str]] = {
             "Estimates",
             "Pricing Guide",
             "Estimate Materials",
-            "Job Costing",
             "Inventory",
             "Scan Inventory",
             "Inventory Usage",
@@ -702,16 +699,6 @@ def _render_sidebar_office(*, role: str) -> None:
                         use_container_width=True,
                     ):
                         _set_sidebar_nav_page("Work & Plan (Supervisor)")
-                if role_can_open_page(role, "Job Costing"):
-                    cur = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "")
-                    active = cur == "Job Costing"
-                    if st.button(
-                        "Job Costing",
-                        key=_nav_btn_key("Job_Costing__jobs_exp"),
-                        type="primary" if active else "secondary",
-                        use_container_width=True,
-                    ):
-                        _set_sidebar_nav_page("Job Costing")
 
     est_visible = any(role_can_open_page(role, p) for p in _NAV_ESTIMATING_SIDEBAR_PAGES)
     if est_visible:

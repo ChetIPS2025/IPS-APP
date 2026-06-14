@@ -262,6 +262,18 @@ def _section_card(*, title: str | None = None):
 
 
 def render() -> None:
+    """Legacy standalone route — open Jobs with Job Details on the Job Costing tab."""
+    try:
+        from app.navigation import redirect_to_jobs_job_costing
+        from app.pages import jobs as jobs_page
+    except ImportError:
+        from navigation import redirect_to_jobs_job_costing  # type: ignore
+        import pages.jobs as jobs_page  # type: ignore
+    redirect_to_jobs_job_costing()
+    jobs_page.render()
+
+
+def _render_standalone_job_costing_page() -> None:
     try:
         from app.pages._core._access import begin_module
     except ImportError:

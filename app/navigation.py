@@ -40,7 +40,6 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "tasks",
         "documents",
         "reports",
-        "job_costing",
         "admin",
         "settings",
         "field_dashboard",
@@ -50,6 +49,12 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "coupling_inspection",
     }
 )
+
+# Session keys aligned with ``app.pages.jobs`` for Job Details deep-links.
+JOBS_DETAIL_FOCUS_TAB_KEY = "jobs_detail_focus_tab"
+_JOBS_MODAL_SESSION_KEY = "ips_jobs_detail_modal_id"
+_JOBS_SELECTED_KEY = "selected_job_id"
+_JOBS_SHOW_MODAL_KEY = "show_job_detail_modal"
 
 # Legacy sidebar / deep-link labels from ``app.ui`` → rebuilt module slugs.
 LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
@@ -91,7 +96,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Settings": "settings",
     "PO / Expenses": "reports",
     "Labor": "reports",
-    "Job Costing": "job_costing",
+    "Job Costing": "jobs",
     "Customers / Jobs": "customers",
     "Work & Plan (Supervisor)": "tasks",
     "Assign Tasks (PM)": "tasks",
@@ -120,7 +125,19 @@ PENDING_NAV_ALIASES: dict[str, str] = {
     "Material Catalog": "Pricing Guide",
     "Materials": "Pricing Guide",
     "PM Matrix Time Entry": "Timekeeping",
+    "Job Costing": "Jobs",
 }
+
+
+def redirect_to_jobs_job_costing(*, job_id: str = "") -> None:
+    """Open Jobs module with Job Details on the Job Costing tab."""
+    jid = str(job_id or st.session_state.pop("jc_focus_job_id", "") or "").strip()
+    set_nav_slug("jobs")
+    if jid:
+        st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+        st.session_state[_JOBS_SELECTED_KEY] = jid
+        st.session_state[_JOBS_SHOW_MODAL_KEY] = True
+        st.session_state[_JOBS_MODAL_SESSION_KEY] = jid
 
 _SCAN_INVENTORY_LABELS = frozenset({"Scan Inventory", "Inventory Scan"})
 _SCAN_ASSET_LABELS = frozenset({"Asset Scanner", "Scan Asset", "Asset Scan"})
@@ -159,6 +176,12 @@ def apply_pending_navigation() -> None:
     if label in {"Users", "Employees", "People", "Employee Toolbox"}:
         set_nav_slug("employees")
         return
+    if label in {"Job Costing", "Jobs"} and str(st.session_state.get("jc_focus_job_id") or "").strip():
+        redirect_to_jobs_job_costing()
+        return
+    if label == "Job Costing":
+        redirect_to_jobs_job_costing()
+        return
 
     set_nav_slug(label)
 
@@ -174,10 +197,14 @@ def normalize_nav_slug(raw: str | None) -> str:
         return "dashboard"
     if s in ACTIVE_MODULE_SLUGS:
         return "employees" if s == "users" else s
+    if s == "job_costing":
+        return "jobs"
     mapped = LEGACY_PAGE_LABEL_TO_SLUG.get(s)
     if mapped:
         return mapped
     slug = s.lower().replace(" ", "_").replace("-", "_")
+    if slug == "job_costing":
+        return "jobs"
     if slug in ACTIVE_MODULE_SLUGS:
         return "employees" if slug == "users" else slug
     return slug
@@ -207,6 +234,7 @@ __all__ = [
     "ACTIVE_MODULE_SLUGS",
     "BUILT_MODULES",
     "IPS_NAV_PENDING_KEY",
+    "JOBS_DETAIL_FOCUS_TAB_KEY",
     "LEGACY_PAGE_LABEL_TO_SLUG",
     "PENDING_NAV_ALIASES",
     "apply_pending_navigation",
@@ -215,6 +243,7 @@ __all__ = [
     "normalize_nav_slug",
     "on_nav_change",
     "queue_pending_nav",
+    "redirect_to_jobs_job_costing",
     "render_module",
     "set_nav_slug",
 ]

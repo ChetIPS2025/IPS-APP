@@ -2189,6 +2189,39 @@ def render_job_detail_dialog(job: dict) -> None:
         _render_job_actions_panel(job)
         close_job_detail_footer_shell()
 
+    _focus_job_costing_tab_if_requested()
+
+
+def _focus_job_costing_tab_if_requested() -> None:
+    """Select the Job Costing tab when opened via Jobs deep-link (no layout change)."""
+    try:
+        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
+    except ImportError:
+        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    focus = str(st.session_state.pop(JOBS_DETAIL_FOCUS_TAB_KEY, "") or "").strip()
+    if focus != "Job Costing":
+        return
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+    _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const dialog = doc.querySelector('[data-testid="stDialog"]');
+  if (!dialog) return;
+  const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
+  if (tabs && tabs[4]) tabs[4].click();
+})();
+</script>
+        """,
+        component_key="ips_jobs_focus_costing_tab",
+        height=1,
+    )
+
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
 def _show_jobs_detail_modal() -> None:
