@@ -272,20 +272,8 @@ def _job_detail_tab_labels(job: dict) -> list[str]:
 
 
 def _enrich_job_cost_summary(job: dict, cost_summary: dict) -> dict:
-    """Ensure contract_value and estimate flags are present (build_job_cost_summary sets most fields)."""
-    enriched = dict(cost_summary)
-    if "contract_value" not in enriched:
-        try:
-            from app.services.job_cost_transaction_service import _contract_value, _estimate_for_job
-        except ImportError:
-            from services.job_cost_transaction_service import _contract_value, _estimate_for_job  # type: ignore
-        try:
-            estimate = _estimate_for_job(job)
-            enriched["contract_value"] = _contract_value(job, estimate)
-            enriched.setdefault("has_contract_value", float(enriched["contract_value"]) > 0)
-        except Exception:
-            enriched.setdefault("contract_value", float(job.get("awarded_amount") or 0))
-    return enriched
+    """Merge rollup fields; contract/estimate come from approved estimate helpers in build_job_cost_summary."""
+    return dict(cost_summary)
 
 SELECTED_JOB_KEY = "selected_job_id"
 SHOW_MODAL_KEY = "show_job_detail_modal"
@@ -472,9 +460,14 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
         "has_contract": False,
         "has_actual": False,
     }
+    jid = str(job.get("id") or "").strip()
     summary: dict = {}
     try:
-        summary = _enrich_job_cost_summary(job, build_job_cost_summary(job))
+        summary = build_job_cost_summary(job)
+        if jid and int(summary.get("transaction_count") or 0) == 0:
+            sync_all_sources_for_job(jid)
+            summary = build_job_cost_summary(job)
+        summary = _enrich_job_cost_summary(job, summary)
         defaults["contract_value"] = float(summary.get("contract_value") or 0)
         defaults["actual_cost"] = float(summary.get("actual_cost") or 0)
         defaults["profit"] = float(summary.get("profit") or 0)
@@ -485,17 +478,9 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
             defaults["contract_value"] = float(job.get("awarded_amount") or job.get("contract_value") or 0)
         except (TypeError, ValueError):
             defaults["contract_value"] = 0.0
-    try:
-        awarded = float(job.get("awarded_amount") or job.get("contract_value") or 0)
-    except (TypeError, ValueError):
-        awarded = 0.0
-    contract = float(defaults["contract_value"])
-    actual = float(defaults["actual_cost"])
     txn_count = int(summary.get("transaction_count") or 0) if isinstance(summary, dict) else 0
-    defaults["has_contract"] = bool(summary.get("has_contract_value")) if isinstance(summary, dict) else (contract > 0 or awarded > 0)
-    defaults["has_actual"] = txn_count > 0 or actual > 0
-    defaults["profit"] = float(summary.get("profit") or defaults["profit"]) if isinstance(summary, dict) else defaults["profit"]
-    defaults["margin_pct"] = float(summary.get("margin_pct") or defaults["margin_pct"]) if isinstance(summary, dict) else defaults["margin_pct"]
+    defaults["has_contract"] = bool(summary.get("has_contract_value")) if isinstance(summary, dict) else False
+    defaults["has_actual"] = txn_count > 0 or float(defaults["actual_cost"]) > 0
     return defaults
 
 
@@ -744,7 +729,7 @@ def _render_custom_jobs_table(
             profit_cls = ""
             has_contract = bool(costs.get("has_contract"))
             has_actual = bool(costs.get("has_actual"))
-            has_profit_data = has_contract or has_actual
+            has_profit_data = has_contract
             if has_profit_data:
                 if profit_val > 0:
                     profit_cls = " ips-jobs-money-positive"

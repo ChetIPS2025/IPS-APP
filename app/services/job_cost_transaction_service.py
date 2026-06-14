@@ -240,6 +240,10 @@ def sync_timekeeping_day(row: dict[str, Any] | str) -> None:
     job_id = str(row.get("job_id") or "").strip()
     if not day_id:
         return
+    status = str(row.get("status") or "").strip()
+    if status != "Approved":
+        delete_job_cost_transaction(SOURCE_TIMEKEEPING_DAY, day_id)
+        return
     if not job_id:
         delete_job_cost_transaction(SOURCE_TIMEKEEPING_DAY, day_id)
         return
@@ -470,38 +474,121 @@ def fetch_job_cost_transactions(job_id: str, *, limit: int = 2000) -> list[dict[
     return rows
 
 
+def _norm_estimate_status(status: Any) -> str:
+    return str(status or "").strip().lower().replace("_", " ")
+
+
+_APPROVED_ESTIMATE_STATUSES = frozenset({"approved", "awarded", "accepted", "po_received"})
+
+
+def _estimate_is_approved(estimate: dict[str, Any] | None) -> bool:
+    if not estimate:
+        return False
+    return _norm_estimate_status(estimate.get("status")) in _APPROVED_ESTIMATE_STATUSES
+
+
 def _estimate_for_job(job: dict[str, Any]) -> dict[str, Any]:
-    eid = job.get("estimate_id")
-    if not eid:
-        return {}
-    try:
-        rows = _db().fetch_by_match("estimates", {"id": eid}, limit=1) or []
-        return rows[0] if rows else {}
-    except Exception:
-        return {}
+    """Return linked estimate row (any status) — prefer ``_approved_estimate_for_job`` for costing."""
+    eid = str(job.get("estimate_id") or "").strip()
+    jid = str(job.get("id") or "").strip()
+    db = _db()
+    if eid:
+        try:
+            rows = db.fetch_by_match("estimates", {"id": eid}, limit=1) or []
+            if rows:
+                return rows[0]
+        except Exception:
+            pass
+    if jid:
+        try:
+            rows = db.fetch_by_match("estimates", {"job_id": jid}, limit=5) or []
+            if rows:
+                return rows[0]
+        except Exception:
+            pass
+    return {}
+
+
+def _approved_estimate_for_job(job: dict[str, Any]) -> dict[str, Any]:
+    """Approved/awarded estimate linked by ``estimate_id`` or ``estimates.job_id``."""
+    eid = str(job.get("estimate_id") or "").strip()
+    jid = str(job.get("id") or "").strip()
+    db = _db()
+    candidates: list[dict[str, Any]] = []
+    if eid:
+        try:
+            rows = db.fetch_by_match("estimates", {"id": eid}, limit=1) or []
+            candidates.extend(rows)
+        except Exception:
+            pass
+    if jid:
+        try:
+            rows = db.fetch_by_match("estimates", {"job_id": jid}, limit=10) or []
+            for row in rows:
+                if row not in candidates:
+                    candidates.append(row)
+        except Exception:
+            pass
+    for est in candidates:
+        if _estimate_is_approved(est):
+            return est
+    return {}
+
+
+def _estimate_selling_price(estimate: dict[str, Any]) -> float:
+    """Customer-facing selling price from an approved estimate."""
+    for key in ("customer_price", "total", "grand_total", "proposal_total", "final_bid"):
+        val = _safe_float(estimate.get(key))
+        if val > 0:
+            return val
+    return 0.0
+
+
+def _estimate_internal_cost(estimate: dict[str, Any]) -> float:
+    """Internal cost basis from an approved estimate."""
+    total = _safe_float(estimate.get("total_cost"))
+    if total > 0:
+        return total
+    subtotal = _safe_float(estimate.get("subtotal"))
+    if subtotal > 0:
+        return subtotal
+    parts = sum(
+        _safe_float(estimate.get(k))
+        for k in (
+            "labor_cost",
+            "labor_total",
+            "material_cost",
+            "material_total",
+            "equipment_cost",
+            "equipment_total",
+            "travel_cost",
+            "subcontractor_cost",
+            "other_cost",
+        )
+    )
+    return round(parts, 2) if parts > 0 else 0.0
 
 
 def _contract_value(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
-    """Contract / revenue baseline from job award or linked estimate."""
-    try:
-        from app.services.job_costing_service import awarded_or_proposal_amount
-    except ImportError:
-        from services.job_costing_service import awarded_or_proposal_amount  # type: ignore
-    est = estimate or _estimate_for_job(job)
-    try:
-        return _safe_float(awarded_or_proposal_amount(job, est))
-    except Exception:
-        return _safe_float(job.get("awarded_amount") or job.get("contract_value"))
+    """Contract value: job award amount, else approved estimate selling price."""
+    awarded = _safe_float(job.get("awarded_amount"))
+    if awarded > 0:
+        return awarded
+    manual = _safe_float(job.get("contract_value"))
+    if manual > 0:
+        return manual
+    est = estimate if estimate is not None else _approved_estimate_for_job(job)
+    if est and _estimate_is_approved(est):
+        return _estimate_selling_price(est)
+    return 0.0
 
 
 def _estimated_cost(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
-    """Internal estimated cost from linked estimate (not contract value)."""
-    est = estimate or _estimate_for_job(job)
-    for key in ("total_cost", "subtotal", "internal_cost", "estimated_cost"):
-        val = _safe_float(est.get(key))
-        if val > 0:
-            return val
-    return _safe_float(job.get("estimated_cost") or 0)
+    """Estimated internal cost from approved linked estimate."""
+    est = estimate if estimate is not None else _approved_estimate_for_job(job)
+    if est and _estimate_is_approved(est):
+        return _estimate_internal_cost(est)
+    return _safe_float(job.get("estimated_cost"))
 
 
 def can_manage_manual_cost_adjustments() -> bool:
@@ -539,7 +626,7 @@ def _task_progress_pct(job_id: str) -> float:
 def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = None) -> dict[str, Any]:
     """Roll up ledger transactions into dashboard metrics."""
     jid = str(job.get("id") or "").strip()
-    estimate = _estimate_for_job(job)
+    estimate = _approved_estimate_for_job(job)
     contract = _contract_value(job, estimate)
     estimated = _estimated_cost(job, estimate)
     txns = fetch_job_cost_transactions(jid)
@@ -561,7 +648,7 @@ def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = 
             other += amt
     actual = round(labor + material + equipment + subcontract + rental + other, 2)
     remaining = round(estimated - actual, 2) if estimated > 0 else None
-    profit = round(contract - actual, 2) if contract > 0 else round(estimated - actual, 2)
+    profit = round(contract - actual, 2) if contract > 0 else 0.0
     margin_pct = round((profit / contract * 100.0), 1) if contract > 0 else 0.0
     variance = round(estimated - actual, 2) if estimated > 0 else round(contract - actual, 2)
     pct = progress_pct if progress_pct is not None else _task_progress_pct(jid)
