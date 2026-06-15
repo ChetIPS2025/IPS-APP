@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v35"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v36"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -104,6 +104,34 @@ def inject_assets_page_styles() -> None:
             max-width: none !important;
             padding-left: 0 !important;
             padding-right: 0 !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap)) {
+            background: #ffffff !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap):not(:has(.ips-hand-tools-table-wrap)) > div {
+            background: #ffffff !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap {
+            background: #ffffff !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap [data-testid="stVerticalBlock"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap [data-testid="stVerticalBlock"] {
+            background: #ffffff !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.assets-table-header),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
+            background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton,

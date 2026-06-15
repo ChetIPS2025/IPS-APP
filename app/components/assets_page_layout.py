@@ -32,7 +32,7 @@ def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
     st.markdown(
         """
-<style id="ips-assets-page-layout-v4">
+<style id="ips-assets-page-layout-v5">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }
@@ -143,6 +143,20 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   border-radius: 12px;
   overflow: hidden;
 }
+.st-key-assets_table_wrap,
+.st-key-assets_table_wrap > [data-testid="stVerticalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"],
+.st-key-assets_small_tools_table_wrap,
+.st-key-assets_small_tools_table_wrap > [data-testid="stVerticalBlock"] {
+  background: #ffffff !important;
+}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"],
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-table-header-marker),
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header),
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
+  background: #ffffff !important;
+}
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row),
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) {
   min-height: 76px !important;
@@ -157,7 +171,7 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   background: #ffffff !important;
 }
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover {
-  background: #eef2ff !important;
+  background: #f8fafc !important;
 }
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has(.asset-actions-cell),
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:has(.asset-actions-button),

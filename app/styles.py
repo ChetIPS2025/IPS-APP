@@ -3694,7 +3694,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v18">
+<style id="ips-assets-module-v19">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;
@@ -3825,6 +3825,7 @@ def inject_assets_module_css() -> None:
   gap: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
+  background: #ffffff !important;
 }}
 {ast_grid_rows} {{
   display: grid !important;
@@ -3841,6 +3842,7 @@ def inject_assets_module_css() -> None:
   max-width: 100% !important;
   box-sizing: border-box !important;
   flex-wrap: nowrap !important;
+  background: #ffffff !important;
 }}
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
 .st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
@@ -4124,11 +4126,11 @@ def inject_assets_module_css() -> None:
 }}
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:has(.ips-assets-table-header-marker),
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc !important;
+  background: #ffffff !important;
   min-height: 40px !important;
 }}
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #eef5ff;
+  background: #f8fafc;
 }}
 {ast_list_wrap} [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
   background: #eaf2ff !important;
@@ -4187,7 +4189,7 @@ def inject_assets_module_css() -> None:
   min-height: 52px;
 }}
 .ips-assets-row:hover {{
-  background: #eef5ff;
+  background: #f8fafc;
 }}
 .ips-assets-cell {{
   color: {TEXT};
