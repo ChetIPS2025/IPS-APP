@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v18">
+<style id="ips-jobs-module-v19">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -1179,16 +1179,36 @@ div[data-testid="stPopover"]:has(.job-row-actions-panel) {{
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
   overflow: hidden !important;
 }}
+body:has(.job-row-actions-panel) div[data-baseweb="popover"],
+div[data-baseweb="popover"]:has(.job-row-actions-panel) {{
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+  overflow: hidden !important;
+}}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) {{
   padding: 0.5rem !important;
   min-width: 280px !important;
   max-width: 340px !important;
   width: 300px !important;
   background: #ffffff !important;
+  background-color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
   box-shadow: none !important;
   color: #0f172a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"],
+div[data-baseweb="popover"]:has(.job-row-actions-panel) [data-testid="stVerticalBlock"],
+div[data-baseweb="popover"]:has(.job-row-actions-panel) [data-testid="stVerticalBlockBorderWrapper"],
+div[data-baseweb="popover"]:has(.job-row-actions-panel) [data-testid="stElementContainer"] {{
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-color: transparent !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stVerticalBlock"] {{
   gap: 0.2rem !important;
@@ -1282,7 +1302,7 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stBut
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button:hover,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button:hover {{
-  background: #f3f6fb !important;
+  background: #f8fafc !important;
   color: #0f172a !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button:focus-visible,
