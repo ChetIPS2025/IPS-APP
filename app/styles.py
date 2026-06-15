@@ -12377,7 +12377,7 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   font-weight: 700 !important;
   letter-spacing: 0.04em !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_spin_row} {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) [class*="st-key-tk_list_hour_spin_"] [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
   border: none !important;
   border-radius: 0 !important;
   background: transparent !important;
@@ -12385,11 +12385,11 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   height: auto !important;
   min-height: 0 !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-draft),
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-draft-empty),
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-pending),
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-approved),
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-rejected) {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-draft),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-draft-empty),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-pending),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-approved),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-rejected) {{
   background: transparent !important;
   box-shadow: none !important;
   border-radius: 0 !important;
