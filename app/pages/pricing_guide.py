@@ -357,15 +357,7 @@ def _pg_status_pill_html(status: str) -> str:
 def _render_pg_thumbnail(row: dict[str, Any]) -> None:
     image_url = get_pricing_guide_image_url(row)
     if image_url:
-        st.markdown(
-            (
-                f'<span class="ips-pg-thumb-cell">'
-                f'<img class="ips-pg-thumb-img" src="{html.escape(image_url, quote=True)}" '
-                f'alt="Pricing item image" />'
-                f"</span>"
-            ),
-            unsafe_allow_html=True,
-        )
+        st.image(image_url, width=42)
     else:
         st.markdown(
             '<span class="ips-pg-thumb-cell">'

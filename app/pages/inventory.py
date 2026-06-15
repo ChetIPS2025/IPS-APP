@@ -305,10 +305,10 @@ def _current_user_id() -> str | None:
 
 def _render_inventory_thumbnail(item: dict) -> None:
     try:
-        from app.services.inventory_images import inventory_thumbnail_html
+        from app.services.inventory_images import render_inventory_item_thumbnail
     except ImportError:
-        from services.inventory_images import inventory_thumbnail_html  # type: ignore
-    st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
+        from services.inventory_images import render_inventory_item_thumbnail  # type: ignore
+    render_inventory_item_thumbnail(item, width=42)
 
 
 def _render_inventory_photo_manager(item: dict) -> None:
