@@ -15,6 +15,12 @@ try:
         build_filter_options,
         render_table_header_cell,
     )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from app.components.timekeeping_allocation import (
         AllocationRenderDeps,
         DayAllocationCardContext,
@@ -72,6 +78,12 @@ except ImportError:
         apply_column_filters,
         build_filter_options,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -3252,11 +3264,12 @@ def _render_custom_timekeeping_table(
             )
         for col, day_d in zip(header_cols[3:10], days):
             with col:
-                label = day_d.strftime("%a %m/%d").upper()
+                day_label = day_d.strftime("%a").upper()
+                day_date = day_d.strftime("%m/%d")
                 st.markdown(
                     f'<div class="ips-timekeeping-header-row ips-timekeeping-cell ips-timekeeping-day-header">'
-                    f'<div class="timekeeping-day-label timekeeping-header-day-label">'
-                    f"{html.escape(label)}</div>"
+                    f'<div class="timekeeping-header-day-label">'
+                    f'{html.escape(day_label)} {html.escape(day_date)}</div>'
                     f'<div class="timekeeping-header-draft-badge">DRAFT</div>'
                     f"</div>",
                     unsafe_allow_html=True,
@@ -3326,7 +3339,7 @@ def _render_custom_timekeeping_table(
                         st.markdown(
                             f'<div class="timekeeping-employee-cell weekly-timesheet-employee '
                             f'weekly-employee-cell timesheet-list-employee-cell">'
-                            f'<div class="timesheet-list-name-input weekly-timesheet-employee-name '
+                            f'<div class="weekly-timesheet-employee-name '
                             f'employee-name ips-timekeeping-employee" '
                             f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
                             f"</div>",
@@ -3465,22 +3478,27 @@ def render() -> None:
         with nav1:
             if st.button("← Previous Week", key="tk_prev_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
+                reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
                 st.rerun()
         with nav2:
             if st.button("📅 Current Week", key="tk_current_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = week_start()
+                reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
                 st.rerun()
         with nav3:
             if st.button("Next Week →", key="tk_next_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
+                reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
                 st.rerun()
         with week_col:
             st.markdown(
+                f'<div class="ips-timekeeping-week-range-wrap">'
                 f'<p class="ips-time-week-range">{html.escape(fmt_date(ws))} – {html.escape(fmt_date(we))}</p>'
-                f'<p class="ips-time-week-sub">Week {ws.isocalendar()[1]}</p>',
+                f'<p class="ips-time-week-sub">Week {ws.isocalendar()[1]}</p>'
+                f"</div>",
                 unsafe_allow_html=True,
             )
 
@@ -3488,12 +3506,16 @@ def render() -> None:
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
 
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="timecard")
+
     st.markdown(
         f'<p class="ips-timekeeping-list-caption">{len(filtered)} timecard(s) · '
         f"Day boxes stay visible on each row. Expand for job/ST/OT detail.</p>",
         unsafe_allow_html=True,
     )
-    _render_custom_timekeeping_table(filtered, filter_options=filter_options, week_start_d=ws)
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    _render_custom_timekeeping_table(page_rows, filter_options=filter_options, week_start_d=ws)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()

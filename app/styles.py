@@ -4456,7 +4456,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v92">
+<style id="ips-timekeeping-module-v93">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -5556,6 +5556,28 @@ def inject_timekeeping_module_css() -> None:
   font-size: 0.75rem;
   font-weight: 600;
 }}
+.ips-timekeeping-week-range-wrap {{
+  width: 100%;
+  text-align: right;
+  padding: 0.15rem 0 0;
+}}
+.st-key-tk_week_nav > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  min-width: 220px !important;
+  flex: 1.5 1 auto !important;
+}}
+.st-key-tk_week_nav .ips-timekeeping-week-range-wrap,
+.st-key-tk_week_nav .ips-time-week-range,
+.st-key-tk_week_nav .ips-time-week-sub {{
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-timekeeping-day-header,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label {{
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}}
 .ips-time-day-head {{
   color: #9ca3af;
   font-size: 0.66rem;
@@ -5745,6 +5767,33 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible;
   text-overflow: clip;
   line-height: 1.2;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .weekly-timesheet-employee-name,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .employee-name.ips-timekeeping-employee {{
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: block !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #2563eb !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .weekly-timesheet-employee-name:hover,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .employee-name.ips-timekeeping-employee:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
 }}
 .timesheet-list-hour-box,
 .timesheet-list-hour-box-ro {{
@@ -12305,11 +12354,32 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   margin: 0 !important;
   font-size: 0.875rem !important;
   line-height: 1.25 !important;
+  text-align: right !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
 }}
 .ips-time-week-sub {{
-  margin: 0 !important;
+  margin: 0.15rem 0 0 !important;
   font-size: 0.75rem !important;
   line-height: 1.2 !important;
+  text-align: right !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
+}}
+.ips-timekeeping-week-range-wrap {{
+  width: 100% !important;
+  text-align: right !important;
+}}
+.st-key-tk_week_nav > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  min-width: 220px !important;
+  flex: 1.5 1 auto !important;
+}}
+.st-key-tk_week_nav .ips-timekeeping-week-range-wrap,
+.st-key-tk_week_nav .ips-time-week-range,
+.st-key-tk_week_nav .ips-time-week-sub {{
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }}
 .st-key-tk_week_nav {{
   margin: 0.35rem 0 0.75rem !important;
@@ -12351,6 +12421,8 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   font-size: 10px !important;
   font-weight: 800 !important;
   color: #334155 !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.02em !important;
 }}
 .timekeeping-header-draft-badge {{
   font-size: 9px;
@@ -12408,9 +12480,26 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker):hover {{
   background: #f8fbff !important;
 }}
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .timesheet-list-name-input {{
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .timesheet-list-name-input,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .weekly-timesheet-employee-name,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .employee-name.ips-timekeeping-employee {{
   font-size: 14px !important;
   font-weight: 700 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  color: #2563eb !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-draft-badge {{
+  display: block !important;
+  visibility: visible !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) .timekeeping-day-status-badge {{
   margin: 0 0 4px 0 !important;
@@ -12444,14 +12533,6 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   min-height: 0 !important;
   font-size: 14px !important;
   font-weight: 600 !important;
-}}
-.ips-time-week-range {{
-  margin: 0 !important;
-  font-size: 0.875rem !important;
-  font-weight: 700 !important;
-  line-height: 1.25 !important;
-  text-align: right !important;
-  color: #0f172a !important;
 }}
 </style>
 """,
