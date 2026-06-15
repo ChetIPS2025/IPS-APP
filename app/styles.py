@@ -4705,7 +4705,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v95">
+<style id="ips-timekeeping-module-v96">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -5823,8 +5823,10 @@ def inject_timekeeping_module_css() -> None:
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-timekeeping-day-header,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-status-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .ips-timekeeping-day-header,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-status-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   display: flex !important;
   visibility: visible !important;
@@ -6295,20 +6297,11 @@ def inject_timekeeping_module_css() -> None:
 }}
 .ips-timekeeping-row-column-header {{
   width: 100% !important;
-  min-height: 40px !important;
+  min-height: 44px !important;
   justify-content: center !important;
 }}
-.timekeeping-header-summary-label {{
-  margin: 0 !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  color: #0f172a !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-  letter-spacing: 0.02em !important;
-  line-height: 1.2 !important;
-}}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-status-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-draft-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   display: block !important;
@@ -12702,24 +12695,40 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   align-items: center !important;
   justify-content: center !important;
   gap: 2px !important;
-  padding: 6px 4px !important;
-  min-height: 40px !important;
+  padding: 8px 4px 6px !important;
+  min-height: 44px !important;
+  text-align: center !important;
 }}
 .timekeeping-header-day-label {{
   margin: 0 !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
-  color: #334155 !important;
+  color: #0f172a !important;
   white-space: nowrap !important;
   letter-spacing: 0.02em !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
 }}
+.timekeeping-header-status-badge,
 .timekeeping-header-draft-badge {{
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #64748b;
-  line-height: 1.1;
+  margin: 0 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+  color: #0f172a !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+}}
+.timekeeping-header-summary-label {{
+  margin: 0 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.2 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .employee-name.ips-timekeeping-employee {{
   color: #2563eb !important;
@@ -12786,17 +12795,21 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   color: #2563eb !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-status-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-draft-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-status-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-draft-badge,
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   display: block !important;
   visibility: visible !important;
 }}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker),
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) {{
   border-bottom: 1px solid #e8edf3 !important;
   padding: 6px 4px 4px !important;
   margin: 0 !important;
+  background: #ffffff !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) .timekeeping-day-status-badge {{
   margin: 0 0 4px 0 !important;
