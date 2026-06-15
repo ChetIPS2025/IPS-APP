@@ -3260,6 +3260,7 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
       var tkMax = 0;
       var tkRows = scaler.querySelectorAll(
         '[data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker), ' +
+          '[data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker), ' +
           '[data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker)'
       );
       for (var t = 0; t < tkRows.length; t++) {
@@ -4400,6 +4401,7 @@ def inject_timekeeping_module_css() -> None:
     )
     tk_list_outer_row = (
         f'.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker){tk_list_detail_excl}, '
+        f'.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker){tk_list_detail_excl}, '
         f'.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker){tk_list_detail_excl}'
     )
     tk_list_spacer_col = (
@@ -4456,7 +4458,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v93">
+<style id="ips-timekeeping-module-v94">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -5573,7 +5575,10 @@ def inject_timekeeping_module_css() -> None:
   opacity: 1 !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-timekeeping-day-header,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .ips-timekeeping-day-header,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -5714,6 +5719,8 @@ def inject_timekeeping_module_css() -> None:
 .timesheet-list-days-marker,
 .timekeeping-list-header-marker,
 .timekeeping-list-row-marker,
+.timekeeping-list-row-header-marker,
+.timekeeping-list-row-header-pad,
 .timekeeping-list-spacer-marker,
 .timekeeping-expand-detail-panel {{
   display: none !important;
@@ -6033,6 +6040,34 @@ def inject_timekeeping_module_css() -> None:
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
   padding: 8px 12px !important;
 }}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) {{
+  padding: 6px 4px 4px !important;
+  margin: 0 !important;
+  border-bottom: 1px solid #e8edf3 !important;
+  background: #ffffff !important;
+}}
+.ips-timekeeping-row-column-header {{
+  width: 100% !important;
+  min-height: 40px !important;
+  justify-content: center !important;
+}}
+.timekeeping-header-summary-label {{
+  margin: 0 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.2 !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-draft-badge,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}}
 {tk_list_day_col} {{
   width: {tk_list_day_w} !important;
   min-width: {tk_list_day_w} !important;
@@ -6203,6 +6238,7 @@ def inject_timekeeping_module_css() -> None:
   box-sizing: border-box !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"] {{
   flex: unset !important;
   overflow: visible !important;
@@ -6218,11 +6254,13 @@ def inject_timekeeping_module_css() -> None:
   overflow: hidden !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"],
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) > [data-testid="column"],
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"] {{
   align-self: center !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:first-child,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:first-child {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:first-child,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) > [data-testid="column"]:first-child {{
   width: 24px !important;
   min-width: 24px !important;
   max-width: 24px !important;
@@ -6233,7 +6271,8 @@ def inject_timekeeping_module_css() -> None:
   justify-content: center !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(2),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(2) {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(2),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) > [data-testid="column"]:nth-child(2) {{
   width: 32px !important;
   min-width: 32px !important;
   max-width: 32px !important;
@@ -6244,7 +6283,8 @@ def inject_timekeeping_module_css() -> None:
   justify-content: center !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(3),
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(3) {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:nth-child(3),
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) > [data-testid="column"]:nth-child(3) {{
   width: 220px !important;
   min-width: 220px !important;
   max-width: 220px !important;
@@ -6917,7 +6957,9 @@ def inject_timekeeping_module_css() -> None:
   line-height: 1.1;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-timekeeping-header-row,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-table-header-filter-text {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .ips-table-header-filter-text,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .ips-timekeeping-header-row,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   white-space: nowrap;
 }}
 .st-key-timekeeping_table_wrap {{
@@ -12497,9 +12539,17 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   color: #2563eb !important;
 }}
 .st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-day-label,
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-draft-badge {{
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) .timekeeping-header-draft-badge,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-day-label,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-draft-badge,
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) .timekeeping-header-summary-label {{
   display: block !important;
   visibility: visible !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-row-header-marker) {{
+  border-bottom: 1px solid #e8edf3 !important;
+  padding: 6px 4px 4px !important;
+  margin: 0 !important;
 }}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) .timekeeping-day-status-badge {{
   margin: 0 0 4px 0 !important;

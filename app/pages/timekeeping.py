@@ -167,6 +167,69 @@ def _render_timekeeping_list_spacer_cell() -> None:
     )
 
 
+def _render_timekeeping_row_column_headers(days: list[date]) -> None:
+    """Repeat MON–SUN + summary labels above each employee row."""
+    header_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
+    with header_cols[0]:
+        st.markdown(
+            '<span class="timekeeping-list-row-header-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+    with header_cols[1]:
+        st.markdown(
+            '<span class="timekeeping-list-row-header-pad" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+    with header_cols[2]:
+        st.markdown(
+            '<div class="ips-timekeeping-row-header-employee" aria-hidden="true">&nbsp;</div>',
+            unsafe_allow_html=True,
+        )
+    for col, day_d in zip(header_cols[3:10], days):
+        with col:
+            day_label = day_d.strftime("%a").upper()
+            day_date = day_d.strftime("%m/%d")
+            st.markdown(
+                f'<div class="ips-timekeeping-header-row ips-timekeeping-cell ips-timekeeping-day-header '
+                f'ips-timekeeping-row-column-header">'
+                f'<div class="timekeeping-header-day-label">'
+                f"{html.escape(day_label)} {html.escape(day_date)}</div>"
+                f'<div class="timekeeping-header-draft-badge">DRAFT</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+    with header_cols[10]:
+        _render_timekeeping_list_spacer_cell()
+    for col, label in zip(header_cols[11:15], _LIST_VIEW_SUMMARY_LABELS):
+        with col:
+            st.markdown(
+                f'<div class="ips-timekeeping-header-row ips-timekeeping-cell ips-timekeeping-row-column-header">'
+                f'<div class="timekeeping-header-summary-label">{html.escape(label.upper())}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+
+def _render_timekeeping_employee_filter_header(
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Single employee filter row at the top of the list."""
+    header_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
+    with header_cols[0]:
+        st.markdown(
+            '<span class="timekeeping-list-header-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+    with header_cols[2]:
+        render_table_header_cell(
+            "EMPLOYEE",
+            table_key=_TABLE_KEY,
+            filter_field="employee_name",
+            filter_options=filter_options.get("employee_name", []),
+            base_class="ips-timekeeping-header-row ips-timekeeping-cell",
+        )
+
+
 _STATUS_FILTER_OPTS = ["Draft", "Pending Approval", "Approved", "Rejected"]
 _TK_COLUMN_FILTER_SPECS: list[tuple[str, Any]] = [
     ("employee_name", None),
@@ -3248,41 +3311,7 @@ def _render_custom_timekeeping_table(
             unsafe_allow_html=True,
         )
 
-        header_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
-        with header_cols[0]:
-            st.markdown(
-                '<span class="timekeeping-list-header-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-        with header_cols[2]:
-            render_table_header_cell(
-                "EMPLOYEE",
-                table_key=_TABLE_KEY,
-                filter_field="employee_name",
-                filter_options=filter_options.get("employee_name", []),
-                base_class="ips-timekeeping-header-row ips-timekeeping-cell",
-            )
-        for col, day_d in zip(header_cols[3:10], days):
-            with col:
-                day_label = day_d.strftime("%a").upper()
-                day_date = day_d.strftime("%m/%d")
-                st.markdown(
-                    f'<div class="ips-timekeeping-header-row ips-timekeeping-cell ips-timekeeping-day-header">'
-                    f'<div class="timekeeping-header-day-label">'
-                    f'{html.escape(day_label)} {html.escape(day_date)}</div>'
-                    f'<div class="timekeeping-header-draft-badge">DRAFT</div>'
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-        with header_cols[10]:
-            _render_timekeeping_list_spacer_cell()
-        summary_header_labels = list(_LIST_VIEW_SUMMARY_LABELS)
-        for col, label in zip(header_cols[11:15], summary_header_labels):
-            with col:
-                render_table_header_cell(
-                    label,
-                    base_class="ips-timekeeping-header-row ips-timekeeping-cell",
-                )
+        _render_timekeeping_employee_filter_header(filter_options)
 
         for row in filtered:
             timecard_id = str(row.get("timecard_id") or "").strip()
@@ -3310,6 +3339,7 @@ def _render_custom_timekeeping_table(
                     '<span class="timesheet-employee-card-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
+                _render_timekeeping_row_column_headers(days)
                 with st.container(key=f"tk_row_{timecard_id}"):
                     row_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
 
