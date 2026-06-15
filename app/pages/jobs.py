@@ -709,7 +709,7 @@ def _render_custom_jobs_table(
 
             with cols[0]:
                 st.markdown(
-                    f'<span class="ips-jobs-row-marker ips-jobs-table-row" data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
+                    f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row" data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 if field_mode:
@@ -722,6 +722,10 @@ def _render_custom_jobs_table(
                         set_field_job_id(jid)
                         st.rerun()
                 else:
+                    st.markdown(
+                        '<span class="job-checkbox-cell ips-jobs-checkbox-cell" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     st.checkbox(
                         "",
                         key=_job_select_key(jid),
@@ -741,17 +745,21 @@ def _render_custom_jobs_table(
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-jobs-title ips-jobs-cell">{html.escape(project)}</div>',
+                    f'<div class="ips-jobs-title ips-jobs-cell job-cell jobs-table-cell">{html.escape(project)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-jobs-cell">{html.escape(customer)}</div>',
+                    f'<div class="ips-jobs-cell job-cell jobs-table-cell">{html.escape(customer)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
+                st.markdown(
+                    '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 status_html = _job_status_pill_html(status)
                 if health_html:
                     status_html = f'{status_html}{health_html}'
@@ -793,7 +801,7 @@ def _render_custom_jobs_table(
                 )
             with cols[9]:
                 st.markdown(
-                    f'<div class="ips-jobs-cell">{open_subjobs:,}</div>',
+                    f'<div class="ips-jobs-cell job-cell jobs-table-cell">{open_subjobs:,}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[10]:

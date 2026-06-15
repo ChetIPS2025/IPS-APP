@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v19">
+<style id="ips-jobs-module-v20">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -1064,6 +1064,96 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
   background: #eaf2ff !important;
 }}
+/* Jobs list rows — vertically center all cell content */
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
+  display: flex !important;
+  align-items: center !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  justify-content: flex-start !important;
+  min-height: 0 !important;
+  height: auto !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stVerticalBlock"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stElementContainer"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] > [data-testid="stVerticalBlock"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] > [data-testid="stElementContainer"] {{
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}}
+.ips-jobs-cell,
+.jobs-table-cell,
+.job-cell {{
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}}
+.ips-jobs-number-link,
+.job-number-link {{
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}}
+.ips-jobs-money {{
+  display: flex !important;
+  align-items: center !important;
+  min-height: 0 !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has([data-testid="stCheckbox"]),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-checkbox-cell) {{
+  justify-content: center !important;
+  align-items: center !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has([data-testid="stCheckbox"]) [data-testid="stCheckbox"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-checkbox-cell) [data-testid="stCheckbox"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has([data-testid="stCheckbox"]) [data-testid="stCheckbox"] label,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-checkbox-cell) [data-testid="stCheckbox"] label {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: 100% !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has(.ips-job-status-pill),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell) {{
+  align-items: center !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has(.ips-job-status-pill) [data-testid="stMarkdown"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has(.ips-job-status-pill) [data-testid="stElementContainer"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell) [data-testid="stMarkdown"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell) [data-testid="stElementContainer"] {{
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.25rem !important;
+  width: 100% !important;
+  min-height: 0 !important;
+}}
 .st-key-jobs_table_wrap [data-testid="stElementContainer"] {{
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
@@ -1102,6 +1192,9 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell),
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) {{
   overflow: visible !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell)
 [data-testid="column"]:has(.job-row-actions-menu) {{
@@ -1111,7 +1204,7 @@ def inject_jobs_module_css() -> None:
   max-width: none !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-end !important;
+  justify-content: center !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"],
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"],
