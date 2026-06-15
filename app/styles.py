@@ -4269,12 +4269,12 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v91">
+<style id="ips-timekeeping-module-v92">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border: none;
+  border-radius: 0;
   overflow-x: hidden;
   overflow-y: visible;
   margin-bottom: 0.5rem;
@@ -4289,12 +4289,12 @@ def inject_timekeeping_module_css() -> None:
   width: 100%;
 }}
 .ips-timekeeping-header-row {{
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  border-bottom: none;
   padding: 4px 6px;
   font-size: 11px;
   font-weight: 800;
-  color: #475569;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   min-height: 28px;
@@ -4334,8 +4334,9 @@ def inject_timekeeping_module_css() -> None:
 .ips-timekeeping-hours {{
   font-size: 13px;
   color: #0f172a;
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }}
 .ips-timekeeping-status-pill {{
   display: inline-flex;
@@ -12196,6 +12197,74 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   max-width: 100% !important;
   width: 100% !important;
   flex: 1 1 100% !important;
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {{
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-radius: 0 !important;
+  padding: 6px 4px 8px !important;
+  margin-bottom: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {{
+  background: #ffffff !important;
+  border: none !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  border-radius: 0 !important;
+  min-height: 58px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 10px 4px !important;
+  margin-bottom: 0 !important;
+  overflow: visible !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker):hover {{
+  background: #f8fbff !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timesheet-list-employee-cell .timesheet-list-name-input {{
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) .timekeeping-day-status-badge {{
+  margin: 0 0 4px 0 !important;
+  color: #94a3b8 !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_spin_row} {{
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-draft),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-draft-empty),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-pending),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-approved),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {tk_list_day_col}:has(.ips-tk-day-rejected) {{
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .timekeeping-hour-input-ro {{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}}
+.ips-time-week-range {{
+  margin: 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-align: right !important;
+  color: #0f172a !important;
 }}
 </style>
 """,

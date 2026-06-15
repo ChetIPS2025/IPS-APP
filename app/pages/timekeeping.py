@@ -1897,7 +1897,7 @@ def _render_list_row_day_cell(
     editable: bool,
     alloc_by_date: dict[str, list[dict[str, Any]]] | None = None,
 ) -> float:
-    """List row: centered hour value (header row carries day labels)."""
+    """List row: day status label stacked above centered hour value."""
     widget_key = f"tk_hrs_{emp_id}_{week_sig}_{day_ix}"
     day_status = _normalize_timecard_status(day_row.get("status"))
     alloc_state = _list_day_allocation_state(
@@ -1916,11 +1916,18 @@ def _render_list_row_day_cell(
         has_hours=has_hours,
     )
     grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
+    status_badge = _timecard_status_display(day_status)
 
     with st.container(key=f"tk_list_day_{emp_id}_{week_sig}_{day_ix}"):
         st.markdown(
             f'<span class="timesheet-list-day-marker day-block-marker timekeeping-day-cell-marker{grid_marker}{filled_marker}" '
             f'aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="timekeeping-day-cell">'
+            f'<div class="timekeeping-day-status-badge">{html.escape(status_badge)}</div>'
+            f"</div>",
             unsafe_allow_html=True,
         )
         if editable:
