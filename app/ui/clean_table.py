@@ -14,7 +14,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v14"
+IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v15"
 
 # Table scope markers (host card / list)
 TABLE_SCOPE_SELECTORS = (
@@ -166,8 +166,8 @@ def inject_clean_table_css() -> None:
 }}
 .ips-clean-row,
 {rows} {{
-    min-height: 60px;
-    padding: 10px 16px;
+    min-height: 56px;
+    padding: 5px 10px;
     background: #ffffff;
     border-bottom: 1px solid #e5eaf2;
     border-left: 4px solid transparent;
@@ -207,11 +207,11 @@ def inject_clean_table_css() -> None:
 .ips-clean-action-btn,
 .ips-clean-actions button {{
     width: auto !important;
-    height: 38px !important;
+    height: 30px !important;
     min-width: fit-content !important;
     max-width: none !important;
-    min-height: 38px !important;
-    max-height: 38px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
     padding: 0 0.75rem !important;
     border-radius: 10px !important;
     background: #ffffff !important;
@@ -256,7 +256,7 @@ def inject_clean_table_css() -> None:
 /* ── Row host: single visible HTML row; overlays do not add gray bars ── */
 {vb_wrap} {{
     position: relative !important;
-    min-height: 60px !important;
+    min-height: 56px !important;
     margin: 0 !important;
     padding: 0 !important;
     gap: 0 !important;
@@ -354,8 +354,8 @@ def inject_clean_table_css() -> None:
     width: auto !important;
     min-width: fit-content !important;
     max-width: none !important;
-    height: 60px !important;
-    max-height: 60px !important;
+    height: 56px !important;
+    max-height: 56px !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
@@ -368,7 +368,7 @@ def inject_clean_table_css() -> None:
 {vb_wrap}
     > [data-testid="stElementContainer"]:has({act_markers})
     + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {{
-    height: 60px !important;
+    height: 56px !important;
     align-items: center !important;
     justify-content: flex-end !important;
     gap: 8px !important;

@@ -228,7 +228,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   border-bottom: 1px solid #e5e7eb;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 46px;
+  min-height: 56px;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -238,7 +238,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
   cursor: pointer;
-  min-height: 46px;
+  min-height: 56px;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"],
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
@@ -331,7 +331,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 46px;
+  min-height: 36px !important;
   padding: 0 !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
@@ -460,7 +460,8 @@ def inject_documents_module_css() -> None:
 }}
 .ips-documents-page .ips-data-table-html .ips-data-row {{
   display: grid !important;
-  min-height: 2.75rem;
+  min-height: 56px;
+  padding: 5px 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2379,15 +2380,18 @@ def inject_estimates_module_css() -> None:
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 8px 10px;
+  padding: 5px 10px;
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
 }}
 .ips-est-li-td {{
   font-size: 12px;
   color: #0f172a;
-  padding: 8px 10px;
+  padding: 5px 10px;
   border-bottom: 1px solid #eef2f7;
+  vertical-align: middle;
+  min-height: 56px;
 }}
 .ips-estimate-builder-actions {{
   margin: 6px 0 12px;
@@ -2650,12 +2654,12 @@ def inject_inventory_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 6px 10px !important;
   margin: 0 !important;
-  min-height: 62px;
+  min-height: 56px;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 40px;
-  padding: 8px 10px !important;
+  min-height: 36px;
+  padding: 5px 10px !important;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
@@ -2951,12 +2955,12 @@ def inject_pricing_guide_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 6px 10px !important;
   margin: 0 !important;
-  min-height: 62px;
+  min-height: 56px;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 40px;
-  padding: 8px 10px !important;
+  min-height: 36px;
+  padding: 5px 10px !important;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
@@ -3831,7 +3835,7 @@ def inject_assets_module_css() -> None:
   border-bottom: 1px solid #e2e8f0;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 76px;
+  min-height: 60px;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -4289,15 +4293,15 @@ def inject_assets_module_css() -> None:
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
+  width: 44px;
+  height: 44px;
   vertical-align: middle;
   flex-shrink: 0;
 }}
 .ips-asset-thumb-img {{
   display: block;
-  width: 60px !important;
-  height: 60px !important;
+  width: 44px !important;
+  height: 44px !important;
   object-fit: cover;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -4307,8 +4311,8 @@ def inject_assets_module_css() -> None:
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
+  width: 44px;
+  height: 44px;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
@@ -4785,7 +4789,7 @@ def inject_timekeeping_module_css() -> None:
     tk_list_spin_input_w = "74px"
     tk_list_spin_btn_w = "26px"
     tk_list_spin_h = "38px"
-    tk_list_row_h = "88px"
+    tk_list_row_h = "68px"
     tk_list_summary_row = (
         f'{tk_card} [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]'
         f':has(.timesheet-list-row-marker){tk_list_detail_excl}'
@@ -4857,7 +4861,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v97">
+<style id="ips-timekeeping-module-v98">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -6247,12 +6251,12 @@ def inject_timekeeping_module_css() -> None:
 }}
 {tk_list_data_row},
 {tk_list_summary_row} {{
-  height: {tk_list_row_h} !important;
   min-height: {tk_list_row_h} !important;
-  max-height: {tk_list_row_h} !important;
-  overflow: hidden !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
   align-items: center !important;
-  padding: 6px 12px !important;
+  padding: 6px 10px !important;
   box-sizing: border-box !important;
   flex: 0 0 auto !important;
 }}
@@ -7252,10 +7256,10 @@ def inject_timekeeping_module_css() -> None:
   border: 1px solid #e5e7eb !important;
   border-radius: 10px !important;
   margin-bottom: 0 !important;
-  height: {tk_list_row_h} !important;
   min-height: {tk_list_row_h} !important;
-  max-height: {tk_list_row_h} !important;
-  overflow: hidden !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
   align-items: center !important;
   box-sizing: border-box !important;
   flex: 0 0 auto !important;
@@ -10904,6 +10908,290 @@ button[data-testid="stBaseButton-popover"],
     )
 
 
+def inject_compact_table_rows_css() -> None:
+    """Global compact row height and vertical centering for all list/data tables."""
+    st.markdown(
+        f"""
+<style id="ips-compact-table-rows-v1">
+/* ── Streamlit column-based list tables ── */
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"],
+[class*="_table_wrap"] [data-testid="stVerticalBlock"]:first-child {{
+  gap: 0 !important;
+}}
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}}
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
+  min-height: 36px !important;
+  height: auto !important;
+  padding: 5px 10px !important;
+  background: #f8fafc !important;
+}}
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+  min-height: 56px !important;
+  height: auto !important;
+  padding: 5px 10px !important;
+}}
+@media (min-width: 768px) and (max-width: 1024px) {{
+  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
+  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
+  .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
+  .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }}
+}}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-height: 0 !important;
+  height: auto !important;
+}}
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
+[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stElementContainer"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}}
+[class*="_table_wrap"] [data-testid="stElementContainer"],
+.st-key-users_table_wrap [data-testid="stElementContainer"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}}
+[class*="_table_wrap"] [data-testid="stCheckbox"],
+.st-key-users_table_wrap [data-testid="stCheckbox"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}}
+[class*="_table_wrap"] [data-testid="stCheckbox"] label,
+.st-key-users_table_wrap [data-testid="stCheckbox"] label {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+[class*="_table_wrap"] [data-testid="stImage"],
+[class*="_table_wrap"] [data-testid="stImage"] img {{
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+[class*="_table_wrap"] .stButton > button,
+[class*="_table_wrap"] button[data-testid="stBaseButton-secondary"],
+[class*="_table_wrap"] button[data-testid="stBaseButton-primary"],
+[class*="_table_wrap"] button[data-testid="stBaseButton-popover"] {{
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}}
+[class*="_table_wrap"] [class*="-cell"],
+[class*="_table_wrap"] .ips-data-cell,
+[class*="_table_wrap"] .jobs-table-cell,
+[class*="_table_wrap"] .job-cell {{
+  display: flex !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}}
+[class*="_table_wrap"] [class*="status-cell"],
+[class*="_table_wrap"] [class*="actions-cell"],
+[class*="_table_wrap"] [class*="checkbox-cell"],
+[class*="_table_wrap"] [class*="thumb-cell"],
+[class*="_table_wrap"] [class*="image-cell"],
+[class*="_table_wrap"] [class*="-actcol"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+
+/* ── HTML grid / stable data tables ── */
+table tbody tr {{
+  min-height: 56px;
+}}
+table td,
+table th {{
+  vertical-align: middle !important;
+}}
+.ips-data-table-stable .ips-data-table-header,
+.ips-data-table-stable .ips-data-row,
+.ips-data-table-header,
+.ips-data-row {{
+  align-items: center !important;
+  min-height: 56px;
+  padding: 5px 10px !important;
+}}
+.ips-data-table-stable .ips-data-table-header,
+.ips-data-table-header {{
+  min-height: 36px !important;
+  padding: 5px 10px !important;
+}}
+.ips-data-cell,
+.ips-clean-cell {{
+  display: flex !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}}
+.ips-clean-row,
+.ips-table-row,
+.ips-users-row,
+.ips-customers-row,
+.ips-estimates-row,
+.ips-inventory-row,
+.ips-assets-row,
+.ips-timekeeping-row,
+.ips-updates-row,
+.ips-certifications-row,
+.ips-contacts-row,
+.ips-locations-row,
+.ips-pg-row,
+.ips-tasks-row,
+.ips-est-list-row,
+.usr-row {{
+  min-height: 56px;
+  display: grid;
+  align-items: center;
+}}
+.ips-table-header-row,
+.ips-users-header-row,
+.ips-jobs-header-row,
+.ips-customers-header-row,
+.ips-estimates-header-row,
+.ips-inventory-header-row,
+.ips-assets-header-row,
+.ips-timekeeping-header-row,
+.ips-updates-header-row,
+.ips-certifications-header-row,
+.ips-contacts-header-row,
+.ips-locations-header-row,
+.ips-pg-header-row,
+.ips-tasks-header-row {{
+  min-height: 36px !important;
+  padding: 5px 10px !important;
+}}
+.ips-table-row,
+.ips-users-row,
+.ips-customers-row,
+.ips-estimates-row,
+.ips-inventory-row,
+.ips-assets-row,
+.ips-timekeeping-row,
+.ips-updates-row,
+.ips-certifications-row,
+.ips-contacts-row,
+.ips-locations-row,
+.ips-pg-row,
+.ips-tasks-row {{
+  min-height: 56px !important;
+  padding: 5px 10px !important;
+}}
+.ips-documents-page .ips-data-table-html .ips-data-row {{
+  min-height: 56px !important;
+  padding: 5px 10px !important;
+}}
+@media (min-width: 768px) and (max-width: 1024px) {{
+  .ips-data-table-stable .ips-data-row,
+  .ips-data-row,
+  .ips-table-row,
+  .ips-users-row,
+  .ips-customers-row,
+  .ips-estimates-row,
+  .ips-inventory-row,
+  .ips-assets-row,
+  .ips-timekeeping-row,
+  .ips-updates-row,
+  .ips-certifications-row,
+  .ips-contacts-row,
+  .ips-locations-row,
+  .ips-pg-row,
+  .ips-tasks-row {{
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }}
+}}
+
+/* Hidden row markers must not inflate row height */
+[class*="_table_wrap"] .ips-jobs-table-row,
+[class*="_table_wrap"] .ips-jobs-row-marker,
+[class*="_table_wrap"] .job-row,
+[class*="_table_wrap"] .jobs-table-row,
+[class*="_table_wrap"] .ips-assets-equipment-table-row,
+[class*="_table_wrap"] .ips-assets-row-marker,
+[class*="_table_wrap"] .ips-users-checkbox-cell-marker,
+[class*="_table_wrap"] .timesheet-list-row-marker,
+[class*="_table_wrap"] .weekly-timesheet-row-marker,
+[class*="_table_wrap"] .timekeeping-list-header-marker,
+[class*="_table_wrap"] .timekeeping-list-row-header-marker {{
+  min-height: 0 !important;
+  max-height: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+  background: transparent !important;
+}}
+
+/* Weekly timesheet horizontal grids */
+.st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+.st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker) {{
+  min-height: 56px !important;
+  height: auto !important;
+  align-items: center !important;
+  padding: 5px 10px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {{
+  min-height: 58px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 6px 4px !important;
+  align-items: center !important;
+}}
+@media (min-width: 768px) and (max-width: 1024px) {{
+  .st-key-tk_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+  .st-key-tk_page_hgrid_wrap [data-testid="stHorizontalBlock"]:has(.weekly-timesheet-row-marker),
+  .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) {{
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }}
+}}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
@@ -11330,7 +11618,7 @@ section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stSelect
   display: grid !important;
   align-items: center;
   column-gap: 12px;
-  padding: 0.45rem 0.75rem;
+  padding: 5px 10px;
   font-size: 0.8125rem;
   width: 100%;
   min-width: 48rem;
@@ -11341,8 +11629,9 @@ section[data-testid="stMain"]:has(.ips-filter-bar-marker) [data-testid="stSelect
   display: grid;
   align-items: center;
   column-gap: 12px;
-  padding: 0.45rem 0.75rem;
+  padding: 5px 10px;
   font-size: 0.8125rem;
+  min-height: 56px;
 }}
 .ips-data-table-header {{
   background: #fafbfc;
@@ -12704,8 +12993,8 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-locations-header-row,
 .ips-pg-header-row,
 .ips-tasks-header-row {{
-  padding: 7px 10px !important;
-  min-height: 38px !important;
+  padding: 5px 10px !important;
+  min-height: 36px !important;
 }}
 .ips-table-row,
 .ips-users-row,
@@ -12720,18 +13009,8 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-locations-row,
 .ips-pg-row,
 .ips-tasks-row {{
-  padding: 6px 10px !important;
-  min-height: 50px !important;
-}}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
-  min-height: 56px !important;
   padding: 5px 10px !important;
-}}
-@media (min-width: 768px) and (max-width: 1024px) {{
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
-    min-height: 58px !important;
-    padding: 6px 10px !important;
-  }}
+  min-height: 56px !important;
 }}
 .ips-card-title,
 .ips-panel-title {{
@@ -13028,6 +13307,7 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
     except ImportError:
         from ui.clean_table import inject_clean_table_css  # type: ignore
     inject_clean_table_css()
+    inject_compact_table_rows_css()
     inject_table_header_filter_css()
     inject_table_viewport_fit()
     inject_ips_dialog_styles()

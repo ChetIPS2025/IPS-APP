@@ -216,8 +216,8 @@ def inject_estimates_list_css() -> None:
             grid-template-columns: 1fr 2fr 1.3fr 1fr 1fr 0.9fr 0.85fr 1fr 0.75fr;
             align-items: center;
             gap: 0 8px;
-            min-height: 60px;
-            padding: 10px 14px;
+            min-height: 56px;
+            padding: 5px 10px;
             background: #ffffff;
             border-bottom: 1px solid #e5eaf2;
             border-left: 4px solid transparent;
@@ -324,7 +324,7 @@ def inject_estimates_list_css() -> None:
         [data-testid="stElementContainer"]:has(.ips-est-list-row-select-btn)
         + [data-testid="stElementContainer"]:has(.stButton) .stButton > button {
             width: 100% !important; height: 100% !important;
-            min-height: 60px !important;
+            min-height: 56px !important;
             margin: 0 !important; padding: 0 !important;
             opacity: 0 !important;
             border: none !important; background: transparent !important;
