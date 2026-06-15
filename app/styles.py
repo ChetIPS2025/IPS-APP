@@ -4269,7 +4269,7 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v90">
+<style id="ips-timekeeping-module-v91">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -4322,7 +4322,7 @@ def inject_timekeeping_module_css() -> None:
 .ips-timekeeping-employee {{
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: #2563eb;
   line-height: 1.25;
   word-break: break-word;
 }}
@@ -12122,6 +12122,80 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
   margin: 0 !important;
   font-size: 0.75rem !important;
   line-height: 1.2 !important;
+}}
+.st-key-tk_week_nav {{
+  margin: 0.35rem 0 0.75rem !important;
+}}
+.st-key-tk_week_nav [data-testid="stHorizontalBlock"] {{
+  align-items: center !important;
+}}
+.st-key-tk_week_nav [data-testid="stButton"] > button {{
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 0.8125rem !important;
+  min-height: 2.25rem !important;
+  box-shadow: none !important;
+}}
+.st-key-tk_week_nav [data-testid="stButton"] > button:hover {{
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #1d4ed8 !important;
+}}
+.ips-timekeeping-list-caption {{
+  margin: 0 0 0.65rem !important;
+  color: #64748b !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.35 !important;
+}}
+.ips-timekeeping-day-header {{
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 6px 4px !important;
+  min-height: 40px !important;
+}}
+.timekeeping-header-day-label {{
+  margin: 0 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #334155 !important;
+}}
+.timekeeping-header-draft-badge {{
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.1;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] .employee-name.ips-timekeeping-employee {{
+  color: #2563eb !important;
+}}
+.timekeeping-status-text {{
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  text-align: center !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="column"]:has(.timekeeping-spinner-buttons-marker) {{
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  flex: 0 0 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"] [data-testid="column"]:has(.timekeeping-hour-input-marker) {{
+  min-width: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  flex: 1 1 100% !important;
 }}
 </style>
 """,
