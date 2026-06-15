@@ -32,31 +32,84 @@ def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
     st.markdown(
         """
-<style id="ips-assets-page-layout-v3">
+<style id="ips-assets-page-layout-v4">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }
 section[data-testid="stMain"]:has(.ips-assets-page) .block-container {
   background: #ffffff !important;
 }
-section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="stTabs"] {
+/* Main category tabs — Equipment, Serialized Tools, Small Tools */
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
 }
-section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="stTabs"] [data-baseweb="tab-list"] {
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab-list"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tablist"] {
   background: #ffffff !important;
   border: 1px solid #dbe3ef !important;
+  border-bottom: none !important;
   border-radius: 12px 12px 0 0 !important;
   padding: 0.15rem 0.5rem 0 !important;
   margin-bottom: 0 !important;
+  gap: 0 !important;
+  box-shadow: none !important;
+  overflow-x: auto !important;
+  scrollbar-width: thin;
 }
-section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="stTabContent"] {
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] button[data-baseweb="tab"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tab"] {
+  background: #ffffff !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  padding: 0.65rem 1rem 0.55rem !important;
+  margin: 0 !important;
+  min-height: 2.75rem !important;
+  white-space: nowrap !important;
+  transition: color 0.15s ease, border-color 0.15s ease !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] button[data-baseweb="tab"]:hover:not([aria-selected="true"]),
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab"]:hover:not([aria-selected="true"]),
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tab"]:hover:not([aria-selected="true"]) {
+  color: #2563eb !important;
+  background: #ffffff !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  border: none !important;
+  border-bottom: 2px solid #2563eb !important;
+  background: #ffffff !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] button[data-baseweb="tab"] p,
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] button[data-baseweb="tab"] span,
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab"] p,
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tab"] p {
+  color: inherit !important;
+  font-weight: inherit !important;
+  font-size: inherit !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabContent"],
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [data-baseweb="tab-panel"]:not([hidden]),
+section[data-testid="stMain"]:has(.ips-assets-main-tabs-anchor) [data-testid="stTabs"] [role="tabpanel"]:not([hidden]) {
   background: #ffffff !important;
   border: 1px solid #dbe3ef !important;
   border-top: none !important;
   border-radius: 0 0 12px 12px !important;
   padding: 1rem 1.1rem !important;
+  margin-top: 0 !important;
+  box-shadow: none !important;
 }
 .ips-assets-equipment-banner {
   background: #f8fafc;

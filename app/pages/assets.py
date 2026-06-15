@@ -2516,6 +2516,10 @@ def render() -> None:
         if isinstance(cached, dict) and deeplink_sel in cached:
             _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
 
+    st.markdown(
+        '<span class="ips-assets-main-tabs-anchor" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     tab_equipment, tab_serialized_tools, tab_hand_tools = st.tabs(
         ["Equipment", "Serialized Tools", "Small Tools"]
     )
