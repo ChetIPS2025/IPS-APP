@@ -53,8 +53,6 @@ ACTION_MENU_STATUS_OPTIONS: tuple[str, ...] = (
     "Draft",
     "Pending Review",
     "Approved",
-    "Awarded",
-    "Active",
     "In Progress",
     "On Hold",
     "Completed",
@@ -87,13 +85,13 @@ def backend_to_action_display_status(status: object) -> str:
     mapping = {
         "Draft": "Draft",
         "Pending": "Pending Review",
-        "Awarded": "Awarded",
-        "Active": "Active",
+        "Awarded": "Approved",
+        "Active": "In Progress",
         "On Hold": "On Hold",
         "Completed": "Completed",
         "Cancelled": "Cancelled",
         "Planning": "Approved",
-        "Scheduled": "Active",
+        "Scheduled": "In Progress",
         "Closed": "Completed",
         "Estimate Pending": "Pending Review",
     }
@@ -186,6 +184,11 @@ def render_job_status_change_select(
         current = normalize_job_status(job.get("status"))
     index = options.index(current) if current in options else 0
 
+    if action_menu:
+        st.markdown(
+            '<span class="job-row-actions-status-select" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
     st.selectbox(
         label,
         options,

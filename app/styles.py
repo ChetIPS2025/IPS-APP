@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v17">
+<style id="ips-jobs-module-v18">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -1115,7 +1115,10 @@ def inject_jobs_module_css() -> None:
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"],
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"],
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-popover"] {{
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-popover"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-primary"] {{
   display: inline-flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -1128,11 +1131,11 @@ def inject_jobs_module_css() -> None:
   max-width: none !important;
   padding: 0 0.85rem !important;
   border-radius: 8px !important;
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
-  color: #475569 !important;
-  font-size: 0.78rem !important;
+  background: {PRIMARY} !important;
+  border: 1px solid {PRIMARY} !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
+  color: #ffffff !important;
+  font-size: 0.8125rem !important;
   font-weight: 600 !important;
   line-height: 1.1 !important;
   white-space: nowrap !important;
@@ -1140,7 +1143,9 @@ def inject_jobs_module_css() -> None:
   overflow-wrap: normal !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] > div,
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] > div {{
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] > div,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"] > div,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"] > div {{
   display: inline-flex !important;
   flex-direction: row !important;
   align-items: center !important;
@@ -1150,16 +1155,22 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] p,
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] span,
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] span {{
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] span,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"] p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"] span,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"] p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"] span {{
   display: inline !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
+  color: #ffffff !important;
 }}
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"]:hover {{
-  background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  color: #1e293b !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"]:hover,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"]:hover {{
+  background: {PRIMARY_HOVER} !important;
+  border-color: {PRIMARY_HOVER} !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
 }}
 div[data-testid="stPopover"]:has(.job-row-actions-panel) {{
   background: #ffffff !important;
@@ -1203,31 +1214,47 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-se
   position: relative !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-section-title::before {{
-  content: "⇄" !important;
+  content: "" !important;
   position: absolute !important;
   left: 0.35rem !important;
-  top: 0.1rem !important;
-  width: 1rem !important;
-  text-align: center !important;
-  color: #64748b !important;
-  font-size: 0.85rem !important;
-  font-weight: 700 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 16l-4-4 4-4'/%3E%3Cpath d='M3 12h14'/%3E%3Cpath d='M17 8l4 4-4 4'/%3E%3Cpath d='M21 12H7'/%3E%3C/svg%3E") !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] {{
   margin: 0 !important;
-  padding: 0 0.15rem 0.15rem !important;
+  padding: 0 0.15rem 0.35rem !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] label {{
   font-size: 0.75rem !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   color: #64748b !important;
-  margin-bottom: 0.25rem !important;
+  margin-bottom: 0.35rem !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
   min-height: 42px !important;
   border-color: #dbe3ef !important;
   border-radius: 8px !important;
   background: #ffffff !important;
+  box-shadow: none !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] [data-baseweb="select"] span {{
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-status-select {{
+  display: none !important;
+}}
+ul[role="listbox"] > li[aria-selected="true"] {{
+  background: #eff6ff !important;
+  color: #1e40af !important;
+}}
+ul[role="listbox"] > li[aria-selected="true"] svg {{
+  color: {PRIMARY} !important;
+  fill: {PRIMARY} !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] {{
@@ -1264,26 +1291,28 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stBut
   outline-offset: 1px !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-view) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
-  content: "👁" !important;
+  content: "" !important;
   position: absolute !important;
   left: 0.75rem !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
-  font-size: 0.95rem !important;
-  line-height: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E") !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-edit) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
-  content: "✎" !important;
+  content: "" !important;
   position: absolute !important;
   left: 0.75rem !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
-  font-size: 0.95rem !important;
-  line-height: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E") !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
-  color: #15803d !important;
+  color: #0f172a !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
   content: "✓" !important;
@@ -1291,13 +1320,19 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stEle
   left: 0.75rem !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
-  font-size: 1rem !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #22c55e !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
-  color: #16a34a !important;
+  line-height: 18px !important;
+  text-align: center !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
-  color: #c2410c !important;
+  color: #0f172a !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
   content: "✕" !important;
@@ -1305,22 +1340,29 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stEle
   left: 0.75rem !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
-  font-size: 0.95rem !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #f97316 !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
   font-weight: 800 !important;
-  color: #ea580c !important;
+  line-height: 18px !important;
+  text-align: center !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
-  color: #dc2626 !important;
+  color: #0f172a !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
-  content: "🗑" !important;
+  content: "" !important;
   position: absolute !important;
   left: 0.75rem !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
-  font-size: 0.95rem !important;
-  line-height: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23dc2626' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 6 5 6 21 6'/%3E%3Cpath d='M19 6l-1 14H6L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M9 6V4h6v2'/%3E%3C/svg%3E") !important;
 }}
 @media (max-width: 900px) {{
   div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) {{

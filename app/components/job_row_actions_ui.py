@@ -84,7 +84,7 @@ def render_job_row_actions(
     with st.popover(
         "Actions",
         help="Row actions",
-        type="secondary",
+        type="primary",
         key=f"job_row_menu_{job_key}",
     ):
         st.markdown(
@@ -148,8 +148,6 @@ def render_job_row_actions(
                 st.session_state[_confirm_state_key(jid, "cancel")] = True
                 on_open(jid, job)
                 st.rerun()
-
-            _actions_divider()
 
             if _action_button(
                 marker="delete",
