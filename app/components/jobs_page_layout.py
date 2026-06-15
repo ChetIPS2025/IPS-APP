@@ -279,15 +279,7 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
   border-color: #fdba74;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 36px !important;
-  max-width: 36px !important;
-  width: 36px !important;
-  padding: 0 0.35rem !important;
-  font-size: 1.15rem !important;
-  line-height: 1 !important;
-  font-weight: 700 !important;
-  color: #475569 !important;
-  white-space: nowrap !important;
+  min-width: 100px !important;
 }
 .ips-jobs-pagination-footer {
   margin-top: 0.85rem;

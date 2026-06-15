@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v16">
+<style id="ips-jobs-module-v17">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -1099,16 +1099,90 @@ def inject_jobs_module_css() -> None:
   color: {PRIMARY_HOVER} !important;
   text-decoration: underline !important;
 }}
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {{
-  min-width: 36px !important;
-  max-width: 36px !important;
-  width: 36px !important;
-  padding: 0 0.35rem !important;
-  font-size: 1.15rem !important;
-  line-height: 1 !important;
-  font-weight: 700 !important;
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) {{
+  overflow: visible !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell)
+[data-testid="column"]:has(.job-row-actions-menu) {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-popover"] {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  min-width: 100px !important;
+  width: auto !important;
+  max-width: none !important;
+  padding: 0 0.85rem !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
   color: #475569 !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
   white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] > div,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] > div {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] span,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] span {{
+  display: inline !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"]:hover {{
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) {{
+  padding: 0.45rem !important;
+  min-width: 13rem !important;
+  border-radius: 10px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button {{
+  justify-content: flex-start !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  min-height: 2rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button:hover,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button:hover {{
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
 }}
 .ips-jc-summary-card {{
   background: #ffffff;

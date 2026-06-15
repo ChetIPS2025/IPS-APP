@@ -56,12 +56,12 @@ def render_job_row_actions(
     status = _normalize_status(job)
 
     st.markdown(
-        '<span class="job-row-actions-menu job-actions-button job-actions-cell" aria-hidden="true"></span>',
+        '<span class="job-row-actions-menu job-actions-button" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     with st.popover(
-        "⋮",
-        help="Job actions",
+        "Actions",
+        help="Row actions",
         type="secondary",
         key=f"job_row_menu_{job_key}",
     ):

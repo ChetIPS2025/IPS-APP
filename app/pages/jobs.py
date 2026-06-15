@@ -809,6 +809,10 @@ def _render_custom_jobs_table(
                     unsafe_allow_html=True,
                 )
             with cols[10]:
+                st.markdown(
+                    '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 render_job_row_actions(
                     job,
                     on_open=_open_jobs_detail_modal,
