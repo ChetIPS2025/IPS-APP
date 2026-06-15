@@ -3538,7 +3538,7 @@ def inject_assets_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v17">
+<style id="ips-assets-module-v18">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;
@@ -3857,7 +3857,10 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"],
 .st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"],
-.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-button) button[data-testid="stBaseButton-popover"] {{
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-button) button[data-testid="stBaseButton-popover"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-primary"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-primary"],
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-button) button[data-testid="stBaseButton-primary"] {{
   display: inline-flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -3869,13 +3872,32 @@ def inject_assets_module_css() -> None:
   width: auto !important;
   max-width: none !important;
   padding: 0 0.85rem !important;
+  border-radius: 8px !important;
+  background: {PRIMARY} !important;
+  border: 1px solid {PRIMARY} !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
+  color: #ffffff !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
   writing-mode: horizontal-tb !important;
-  line-height: 1.1 !important;
+}}
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-popover"]:hover,
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"]:hover,
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) button[data-testid="stBaseButton-primary"]:hover,
+.st-key-assets_table_wrap [data-testid="column"]:has(.asset-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-primary"]:hover {{
+  background: {PRIMARY_HOVER} !important;
+  border-color: {PRIMARY_HOVER} !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] > div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-primary"] > div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] > div,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-primary"] > div,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button > div,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] .stButton > button > div {{
   display: inline-flex !important;
@@ -3892,9 +3914,13 @@ def inject_assets_module_css() -> None:
 }}
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] p,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] span,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-primary"] p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-primary"] span,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) button[data-testid="stBaseButton-popover"] div,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] p,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] span,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-primary"] p,
+.st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-primary"] span,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [data-testid="column"]:has(.asset-row-actions-menu) button[data-testid="stBaseButton-popover"] div,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button p,
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell) [class*="st-key-ast_open_"] [data-testid="stButton"] > button span,
@@ -4213,6 +4239,207 @@ def inject_assets_module_css() -> None:
 }}
 .ips-asset-doc-name {{
   font-weight: 600;
+}}
+div[data-testid="stPopover"]:has(.asset-row-actions-panel) {{
+  background: #ffffff !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+  overflow: hidden !important;
+}}
+body:has(.asset-row-actions-panel) div[data-baseweb="popover"],
+div[data-baseweb="popover"]:has(.asset-row-actions-panel) {{
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+  overflow: hidden !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) {{
+  padding: 0.5rem !important;
+  min-width: 280px !important;
+  max-width: 340px !important;
+  width: 300px !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"],
+div[data-baseweb="popover"]:has(.asset-row-actions-panel) [data-testid="stVerticalBlock"],
+div[data-baseweb="popover"]:has(.asset-row-actions-panel) [data-testid="stVerticalBlockBorderWrapper"],
+div[data-baseweb="popover"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"] {{
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-color: transparent !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stVerticalBlock"] {{
+  gap: 0.2rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .asset-row-actions-divider {{
+  border: none !important;
+  border-top: 1px solid #e8edf3 !important;
+  margin: 0.45rem 0 !important;
+  height: 0 !important;
+  opacity: 1 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .asset-row-actions-section {{
+  margin: 0.15rem 0 0.25rem 0 !important;
+  padding: 0 0.15rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .asset-row-actions-section-title {{
+  margin: 0 !important;
+  padding: 0.15rem 0.35rem 0.1rem 1.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.25 !important;
+  position: relative !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .asset-row-actions-section-title::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.35rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'/%3E%3Cpath d='M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stSelectbox"] {{
+  margin: 0 !important;
+  padding: 0 0.15rem 0.35rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stSelectbox"] label {{
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  margin-bottom: 0.35rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+  min-height: 42px !important;
+  border-color: #dbe3ef !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stSelectbox"] [data-baseweb="select"] span {{
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .asset-row-actions-trailer-select {{
+  display: none !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton,
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button,
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button {{
+  justify-content: flex-start !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 0.75rem 0 2.15rem !important;
+  border-radius: 8px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  position: relative !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button:hover,
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button:hover {{
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button:focus-visible,
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button:focus-visible {{
+  outline: 2px solid #2563eb !important;
+  outline-offset: 1px !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-view) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-edit) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-change-type) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 16l-4-4 4-4'/%3E%3Cpath d='M3 12h14'/%3E%3Cpath d='M17 8l4 4-4 4'/%3E%3Cpath d='M21 12H7'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-assign) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'/%3E%3Cpath d='M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-history) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E") !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
+  color: #dc2626 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stElementContainer"]:has(.asset-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23dc2626' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 6 5 6 21 6'/%3E%3Cpath d='M19 6l-1 14H6L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M9 6V4h6v2'/%3E%3C/svg%3E") !important;
+}}
+@media (max-width: 900px) {{
+  div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) {{
+    min-width: 280px !important;
+    max-width: min(340px, calc(100vw - 1.5rem)) !important;
+    width: min(300px, calc(100vw - 1.5rem)) !important;
+  }}
 }}
 section[data-testid="stMain"]:has(.ips-assets-page)
 [data-testid="stTabs"] [data-baseweb="tab-panel"][hidden],

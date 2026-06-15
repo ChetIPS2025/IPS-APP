@@ -308,38 +308,6 @@ def inject_assets_page_styles() -> None:
             box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) {
-            padding: 0.45rem !important;
-            min-width: 13rem !important;
-            border-radius: 10px !important;
-            border: 1px solid #e2e8f0 !important;
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button {
-            justify-content: flex-start !important;
-            text-align: left !important;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            color: #334155 !important;
-            font-weight: 600 !important;
-            font-size: 0.8125rem !important;
-            min-height: 2rem !important;
-            height: auto !important;
-            padding: 0.35rem 0.55rem !important;
-            border-radius: 6px !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) .stButton > button:hover,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        div[data-testid="stPopoverBody"]:has(.asset-row-actions-panel) [data-testid="stButton"] > button:hover {
-            background: #f1f5f9 !important;
-            color: #0f172a !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-table-wrap)
         .ips-assets-title {
             white-space: nowrap !important;
