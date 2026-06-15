@@ -604,7 +604,7 @@ def _apply_standard_proposal_branding(doc: Document) -> None:
     logo_path = _resolve_standard_company_logo_path()
     if not logo_path:
         return
-    width = Inches(2.15)  # Large centered letterhead logo; keep in sync with HTML preview ``.ips-ph-logo-img``.
+    width = Inches(7.5)  # Full content width (8.5in page − 0.5in margins); sync with HTML ``.ips-ph-logo-img``.
     replaced = _replace_company_logo_placeholders_in_document(doc, logo_path, width)
     if replaced == 0:
         try:

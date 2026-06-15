@@ -214,6 +214,7 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
     if resp_body:
         resp_section = (
             '<div class="ips-ph-section-spacer" aria-hidden="true"></div>'
+            '<div class="ips-ph-resp-heading">Exclusions</div>'
             f'<div class="ips-ph-resp-body">{resp_body}</div>'
         )
 

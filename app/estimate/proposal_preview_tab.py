@@ -1,14 +1,17 @@
-"""Single-path proposal tab preview: one HTML builder + markdown renderer (no PDF raster, no expander)."""
+"""Single-path proposal tab preview: canonical Word-aligned HTML (same as Estimate Builder Proposal tab)."""
 from __future__ import annotations
 
-import html
 from typing import Any
 
 import streamlit as st
 
 from app.estimate.persistence import upload_generated_export
-from app.estimate.proposal_document_layout import _logo_data_uri, build_proposal_view_model
-from app.estimate.proposal_exports import PROPOSAL_PDF_UNAVAILABLE_SHORT
+from app.estimate.proposal_document_layout import (
+    ProposalViewModel,
+    build_proposal_view_model,
+    render_proposal_preview_page_html,
+)
+from app.estimate.proposal_exports import PROPOSAL_PDF_UNAVAILABLE_SHORT, _inject_proposal_preview_styles
 
 
 def build_proposal_tab_estimate_data(
@@ -44,6 +47,7 @@ def build_proposal_tab_estimate_data(
         "date": vm.date_display,
         "footer_phone": vm.prepared_by_phone,
         "quote_file_slug": slug,
+        "_vm": vm,
         "_docx_bytes": docx_bytes,
         "_pdf_bytes": pdf_bytes,
         "_word_error": word_error,
@@ -52,90 +56,21 @@ def build_proposal_tab_estimate_data(
     }
 
 
-def build_proposal_html(estimate_data: dict[str, Any]) -> str:
-    """
-    One HTML document card for the on-screen preview (inline styles; centered logo when assets ship it).
-    """
-    title = html.escape(str(estimate_data.get("estimate_description") or "Project"))
-    qn = html.escape(str(estimate_data.get("quote_number") or ""))
-    cust = html.escape(str(estimate_data.get("customer") or ""))
-    contact = html.escape(str(estimate_data.get("contact") or "—"))
-    amt = html.escape(str(estimate_data.get("proposal_total") or "$0.00"))
-    scope = (estimate_data.get("scope_of_work") or "").strip()
-    scope_esc = html.escape(scope, quote=False).replace("\n", "<br/>") if scope else "—"
-    resp = (estimate_data.get("customer_responsibilities") or "").strip()
-    resp_esc = html.escape(resp, quote=False).replace("\n", "<br/>") if resp else ""
-    prep = html.escape(str(estimate_data.get("prepared_by") or ""))
-    dt = html.escape(str(estimate_data.get("date") or ""))
-    phone = html.escape(str(estimate_data.get("footer_phone") or "(337) 577-3944"))
-
-    resp_block = ""
-    if resp_esc and resp_esc != "—":
-        resp_block = f"""
-        <div style="margin-top:18px;">
-            <div style="font-weight:800;border-bottom:1px solid #999;padding-bottom:4px;margin-bottom:8px;">Responsibilities</div>
-            <div style="line-height:1.45;">{resp_esc}</div>
-        </div>"""
-
-    logo_uri = _logo_data_uri()
-    logo_row = ""
-    if logo_uri:
-        logo_row = f"""
-    <div style="text-align:center;margin:0 auto 18px auto;padding:0 8px;">
-        <img src="{logo_uri}" alt="Industrial Plant Solutions" style="max-width:520px;width:100%;height:auto;display:inline-block;margin:0 auto;" />
-    </div>"""
-
-    return f"""
-<div style="max-width:850px;margin:16px auto;background:#ffffff;color:#000000;padding:40px 44px;border:1px solid #d0d0d0;box-shadow:0 2px 10px rgba(0,0,0,0.12);font-family:Arial,Calibri,sans-serif;line-height:1.45;">
-    {logo_row}
-    <div style="background:#0b5f9e;color:#ffffff;text-align:center;padding:14px 20px;margin-bottom:22px;">
-        <div style="color:#ffffff;font-weight:800;font-size:22px;margin-bottom:8px;">{title} – Quote</div>
-        <div style="color:#ffffff;font-weight:800;font-size:18px;">Quote #: {qn}</div>
-    </div>
-    <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:12px;flex-wrap:wrap;">
-        <div><span style="font-weight:700;">Customer:</span> {cust}</div>
-        <div><span style="font-weight:700;">Quote Amt:</span> {amt}</div>
-    </div>
-    <div style="margin-bottom:12px;"><span style="font-weight:700;">Contact:</span> {contact}</div>
-    <div style="margin-top:18px;line-height:1.45;">
-        Industrial Plant <span style="text-decoration:underline;text-underline-offset:2px;">Solutions</span>, LLC (IPS) proposes to perform the following scope of work:
-    </div>
-    <div style="margin-top:18px;">
-        <div style="font-weight:800;border-bottom:1px solid #999;padding-bottom:4px;margin-bottom:8px;">Scope</div>
-        <div style="line-height:1.45;">{scope_esc}</div>
-    </div>
-    {resp_block}
-    <div style="margin-top:28px;">
-        <p style="margin:6px 0;"><span style="font-weight:700;">Prepared By:</span> {prep}</p>
-        <p style="margin:6px 0;"><span style="font-weight:700;">Date:</span> {dt}</p>
-        <p style="margin:12px 0 0 0;">If you have any questions regarding this Quote, please contact {prep} at {phone}.</p>
-    </div>
-</div>
-""".strip()
-
-
 def render_proposal_document_preview(estimate_data: dict[str, Any]) -> None:
     """
-    Render the on-screen proposal preview using the same field values as the Word export.
-    This is the only preview renderer for the Proposal tab.
+    Render the on-screen proposal preview using the same layout as Word/PDF export.
 
-    Uses ``st.html`` so scope text cannot break Markdown (e.g. backticks would otherwise show
-    the footer as a raw code block under ``st.markdown``).
+    Uses ``st.markdown`` with injected CSS so scope text cannot break Markdown parsing.
     """
-    h = build_proposal_html(estimate_data)
-    raw = (h or "").strip()
-    if not raw:
+    vm = estimate_data.get("_vm")
+    if not isinstance(vm, ProposalViewModel):
+        vm = None
+    _inject_proposal_preview_styles()
+    page_html = render_proposal_preview_page_html(vm)
+    if not page_html.strip():
         st.info("No preview content for this estimate.")
         return
-    try:
-        st.html(raw, width=880)
-    except TypeError:
-        try:
-            st.html(raw)
-        except Exception:
-            st.markdown(raw, unsafe_allow_html=True)
-    except Exception:
-        st.markdown(raw, unsafe_allow_html=True)
+    st.markdown(page_html, unsafe_allow_html=True)
 
 
 def render_proposal_export_actions(estimate_data: dict[str, Any]) -> None:
@@ -211,16 +146,5 @@ def render_proposal_export_actions(estimate_data: dict[str, Any]) -> None:
 
 
 def render_proposal_tab(estimate_data: dict[str, Any]) -> None:
-    """Proposal tab: on-screen preview only. Exports live under **Review / Save**."""
-    if "proposal_preview_open" not in st.session_state:
-        st.session_state["proposal_preview_open"] = False
-
-    if st.button("Show preview", key="proposal_preview_btn", use_container_width=True):
-        st.session_state["proposal_preview_open"] = True
-        st.rerun()
-
-    if st.session_state["proposal_preview_open"]:
-        if st.button("Hide preview", key="proposal_hide_preview_btn", use_container_width=True):
-            st.session_state["proposal_preview_open"] = False
-            st.rerun()
-        render_proposal_document_preview(estimate_data)
+    """Proposal tab: always show the Word-aligned quote preview. Exports live under **Review / Save**."""
+    render_proposal_document_preview(estimate_data)

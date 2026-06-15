@@ -106,9 +106,9 @@ from app.estimate.proposal_exports import (
     build_proposal_view_bundle,
     _proposal_export_kwargs,
 )
+from app.estimate.proposal_document_layout import render_proposal_preview_page_html
 from app.estimate.proposal_preview_tab import (
     build_proposal_tab_estimate_data,
-    build_proposal_html,
     render_proposal_export_actions,
     render_proposal_tab,
 )
@@ -513,7 +513,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                 loaded_estimate_id=None,
                 is_locked=True,
             )
-            page_h = build_proposal_html(pdata)
+            page_h = render_proposal_preview_page_html(pdata.get("_vm"))
             if page_h.strip():
                 est["proposal_preview_html"] = page_h
         except Exception:

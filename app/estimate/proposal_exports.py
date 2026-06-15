@@ -79,7 +79,7 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v10"):
+    if st.session_state.get("_ips_proposal_preview_css_injected_v11"):
         return
     st.markdown(
         """
@@ -134,16 +134,16 @@ def _inject_proposal_preview_styles() -> None:
         }
         .ips-proposal-page .ips-ph-logo-wrap {
             text-align: center;
+            width: 100%;
             margin: 0 0 0.28in 0;
         }
         .ips-proposal-page .ips-ph-logo-img {
-            width: 88%;
-            max-width: 4.65in;
-            max-height: 1.55in;
+            width: 100%;
+            max-width: 100%;
             height: auto;
             object-fit: contain;
             display: block;
-            margin: 0 auto;
+            margin: 0;
         }
         .ips-proposal-page .ips-ph-logo-missing {
             min-height: 0.35in;
@@ -399,7 +399,7 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v10"] = True
+    st.session_state["_ips_proposal_preview_css_injected_v11"] = True
 
 
 def _render_proposal_preview_html(
