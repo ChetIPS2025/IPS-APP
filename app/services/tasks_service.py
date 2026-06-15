@@ -26,6 +26,7 @@ from app.services.task_display_helpers import (
 
 __all__ = [
     "clear_tasks_cache",
+    "count_open_subjobs_by_job_id",
     "delete_job_subjob",
     "delete_task",
     "get_closed_tasks",
@@ -37,6 +38,10 @@ __all__ = [
     "save_task",
     "update_task",
 ]
+
+_CLOSED_SUBJOB_STATUSES = frozenset(
+    {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
+)
 
 
 def get_tasks() -> list[dict[str, Any]]:
@@ -94,6 +99,19 @@ def get_tasks_by_job(job_id: str, *, include_closed: bool = False) -> list[dict[
         if include_closed or normalize_task_status(task.get("status")) == "Open":
             out.append(task)
     return out
+
+
+def count_open_subjobs_by_job_id() -> dict[str, int]:
+    """Single pass over all tasks — open subjob count keyed by job id."""
+    counts: dict[str, int] = {}
+    for task in get_tasks():
+        jid = _resolve_task_job_id(task)
+        if not jid:
+            continue
+        if str(task.get("status") or "").strip().lower() in _CLOSED_SUBJOB_STATUSES:
+            continue
+        counts[jid] = counts.get(jid, 0) + 1
+    return counts
 
 
 def clear_tasks_cache() -> None:

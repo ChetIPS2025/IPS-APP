@@ -430,10 +430,23 @@ def _pct_cell(value: float) -> str:
     return f"{float(value or 0):,.1f}%"
 
 
-def _job_open_subjobs_count(job: dict) -> int:
+def _load_open_subjob_counts() -> dict[str, int]:
+    try:
+        from app.services.tasks_service import count_open_subjobs_by_job_id
+    except ImportError:
+        from services.tasks_service import count_open_subjobs_by_job_id  # type: ignore
+    try:
+        return count_open_subjobs_by_job_id()
+    except Exception:
+        return {}
+
+
+def _job_open_subjobs_count(job: dict, *, subjob_counts: dict[str, int] | None = None) -> int:
     jid = str(job.get("id") or "").strip()
     if not jid:
         return 0
+    if subjob_counts is not None:
+        return int(subjob_counts.get(jid, 0))
     try:
         from app.services.tasks_service import get_tasks_by_job
     except ImportError:
@@ -449,8 +462,8 @@ def _job_open_subjobs_count(job: dict) -> int:
         return 0
 
 
-def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
-    """UI-only costing snapshot from existing job cost services."""
+def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> dict[str, float | dict | bool]:
+    """Costing snapshot for list/detail; ledger backfill only when ``sync_if_empty``."""
     defaults: dict[str, float | dict | bool] = {
         "contract_value": 0.0,
         "actual_cost": 0.0,
@@ -464,7 +477,7 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
     summary: dict = {}
     try:
         summary = build_job_cost_summary(job)
-        if jid and int(summary.get("transaction_count") or 0) == 0:
+        if sync_if_empty and jid and int(summary.get("transaction_count") or 0) == 0:
             sync_all_sources_for_job(jid)
             summary = build_job_cost_summary(job)
         summary = _enrich_job_cost_summary(job, summary)
@@ -484,7 +497,32 @@ def _job_list_cost_fields(job: dict) -> dict[str, float | dict | bool]:
     return defaults
 
 
-def _jobs_summary_counts(rows: list[dict]) -> dict[str, float | int]:
+def _build_jobs_list_cost_cache(jobs: list[dict]) -> dict[str, dict[str, float | dict | bool]]:
+    cache: dict[str, dict[str, float | dict | bool]] = {}
+    for job in jobs:
+        jid = str(job.get("id") or "").strip()
+        if not jid or jid in cache:
+            continue
+        cache[jid] = _compute_job_list_cost_fields(job, sync_if_empty=False)
+    return cache
+
+
+def _job_list_cost_fields(
+    job: dict,
+    *,
+    cost_cache: dict[str, dict[str, float | dict | bool]] | None = None,
+) -> dict[str, float | dict | bool]:
+    jid = str(job.get("id") or "").strip()
+    if cost_cache is not None and jid and jid in cost_cache:
+        return cost_cache[jid]
+    return _compute_job_list_cost_fields(job, sync_if_empty=False)
+
+
+def _jobs_summary_counts(
+    rows: list[dict],
+    cost_cache: dict[str, dict[str, float | dict | bool]],
+    subjob_counts: dict[str, int],
+) -> dict[str, float | int]:
     counts: dict[str, float | int] = {
         "total": len(rows),
         "active": 0,
@@ -504,8 +542,11 @@ def _jobs_summary_counts(rows: list[dict]) -> dict[str, float | int]:
             counts["awarded"] += 1
         elif status == "Draft":
             counts["draft"] += 1
-        counts["open_subjobs"] += _job_open_subjobs_count(job)
-        costs = _job_list_cost_fields(job)
+        jid = str(job.get("id") or "").strip()
+        counts["open_subjobs"] += _job_open_subjobs_count(job, subjob_counts=subjob_counts)
+        costs = cost_cache.get(jid) if jid else None
+        if not isinstance(costs, dict):
+            continue
         counts["total_contract"] = float(counts["total_contract"]) + float(costs["contract_value"])
         counts["total_actual"] = float(counts["total_actual"]) + float(costs["actual_cost"])
         if costs.get("has_contract"):
@@ -623,6 +664,8 @@ def _render_custom_jobs_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
+    cost_cache: dict[str, dict[str, float | dict | bool]],
+    subjob_counts: dict[str, int],
 ) -> list[str]:
     if not filtered:
         st.info("No jobs match your filters.")
@@ -661,12 +704,12 @@ def _render_custom_jobs_table(
             project = _job_project(job)
             customer = _job_customer(job)
             status = _normalize_job_status(job.get("status"))
-            costs = _job_list_cost_fields(job)
+            costs = _job_list_cost_fields(job, cost_cache=cost_cache)
             contract_val = float(costs["contract_value"])
             actual_val = float(costs["actual_cost"])
             profit_val = float(costs["profit"])
             margin_val = float(costs["margin_pct"])
-            open_subjobs = _job_open_subjobs_count(job)
+            open_subjobs = _job_open_subjobs_count(job, subjob_counts=subjob_counts)
             raw_summary = costs.get("raw_summary")
             health_html = ""
             if isinstance(raw_summary, dict) and raw_summary:
@@ -2373,7 +2416,9 @@ def render() -> None:
         view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
     )
 
-    summary = _jobs_summary_counts(filtered)
+    subjob_counts = _load_open_subjob_counts()
+    cost_cache = _build_jobs_list_cost_cache(filtered)
+    summary = _jobs_summary_counts(filtered, cost_cache, subjob_counts)
     render_jobs_summary_cards(
         total=int(summary["total"]),
         active=int(summary["active"]),
@@ -2401,7 +2446,12 @@ def render() -> None:
                 break
     st.session_state[CACHE_KEY] = modal_cache
 
-    _render_custom_jobs_table(page_rows, filter_options=filter_options)
+    _render_custom_jobs_table(
+        page_rows,
+        filter_options=filter_options,
+        cost_cache=cost_cache,
+        subjob_counts=subjob_counts,
+    )
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
