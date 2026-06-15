@@ -41,7 +41,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v3">
+<style id="ips-jobs-page-layout-v4">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -146,12 +146,18 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
   display: flex !important;
   align-items: center !important;
-  min-height: 62px !important;
-  padding: 8px 12px !important;
+  min-height: 56px !important;
+  padding: 5px 10px !important;
   background: #ffffff !important;
   border-bottom: 1px solid #e8edf4 !important;
   transition: background-color 0.15s ease !important;
   cursor: pointer;
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] {
   display: flex !important;
@@ -173,7 +179,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   display: flex !important;
   align-items: center !important;
   background: #f8fafc !important;
-  min-height: 42px !important;
+  min-height: 36px !important;
+  padding: 5px 10px !important;
   cursor: default !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
@@ -181,6 +188,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 }
 .ips-jobs-table-row,
 .ips-jobs-row-marker,
+.job-row,
+.jobs-table-row,
 .job-checkbox-cell,
 .ips-jobs-checkbox-cell,
 .job-status-cell,
@@ -188,6 +197,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   display: block !important;
   width: 0 !important;
   height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
   overflow: hidden !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -233,16 +244,15 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
   width: 100% !important;
   cursor: pointer !important;
 }
-.ips-jobs-title,
 .ips-jobs-title-text,
 .job-project-text {
   font-weight: 700 !important;
   color: #2563eb !important;
-  font-size: 0.9375rem !important;
+  font-size: 0.875rem !important;
   word-break: normal !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
-  line-height: 1.35 !important;
+  line-height: 1.3 !important;
   cursor: pointer !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-title-text,
@@ -290,7 +300,10 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   line-height: 1.35;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 100px !important;
+  min-width: 96px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 0.75rem !important;
 }
 .ips-jobs-money-negative {
   color: #dc2626;
@@ -305,13 +318,13 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
 .ips-jobs-health-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.625rem;
   font-weight: 700;
   white-space: nowrap;
-  margin-top: 0.2rem;
+  margin-top: 0;
 }
 .ips-jobs-health-healthy {
   background: #dcfce7;
@@ -330,11 +343,12 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   color: #64748b;
 }
 .ips-job-status-pill {
-  min-height: 28px;
-  padding: 0 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  min-height: 22px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 0.6875rem;
   border: 1px solid transparent;
+  line-height: 1;
 }
 .ips-job-status-draft {
   background: #e2e8f0;
@@ -382,7 +396,10 @@ section[data-testid="stMain"]:has(.ips-job-status-badge-editor-marker) [data-tes
   box-shadow: none !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 100px !important;
+  min-width: 96px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 0.75rem !important;
 }
 .ips-jobs-pagination-footer {
   margin-top: 0.85rem;

@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v21">
+<style id="ips-jobs-module-v22">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -924,13 +924,13 @@ def inject_jobs_module_css() -> None:
 .ips-jobs-header-row {{
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
-  padding: 8px 10px;
+  padding: 5px 10px;
   font-size: 12px;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  min-height: 38px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   white-space: nowrap;
@@ -941,8 +941,8 @@ def inject_jobs_module_css() -> None:
 .ips-jobs-row {{
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px;
-  min-height: 52px;
+  padding: 4px 10px;
+  min-height: 44px;
 }}
 .ips-jobs-row:hover {{
   background: #f8fbff;
@@ -964,9 +964,9 @@ def inject_jobs_module_css() -> None:
   white-space: nowrap;
 }}
 .ips-jobs-title {{
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
   word-break: normal;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -984,8 +984,8 @@ def inject_jobs_module_css() -> None:
 .job-project-text {{
   font-weight: 700 !important;
   color: {PRIMARY} !important;
-  font-size: 0.9375rem;
-  line-height: 1.35;
+  font-size: 0.875rem;
+  line-height: 1.3;
   cursor: pointer;
   word-break: normal !important;
   overflow-wrap: anywhere !important;
@@ -1001,16 +1001,31 @@ def inject_jobs_module_css() -> None:
   color: #64748b;
   word-break: break-word;
 }}
+.st-key-jobs_table_wrap .ips-jobs-table-row,
+.st-key-jobs_table_wrap .ips-jobs-row-marker,
+.st-key-jobs_table_wrap .job-row,
+.st-key-jobs_table_wrap .jobs-table-row {{
+  min-height: 0 !important;
+  max-height: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+  background: transparent !important;
+}}
 .ips-job-status-pill {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  padding: 0 12px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
+  line-height: 1;
 }}
 .ips-job-status-draft {{
   background: #f1f5f9;
@@ -1067,19 +1082,19 @@ def inject_jobs_module_css() -> None:
   gap: 0.35rem !important;
   align-items: center !important;
   border-bottom: 1px solid #e8edf4;
-  padding: 8px 12px !important;
   margin: 0 !important;
-  min-height: 62px;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
-  min-height: 40px;
+  min-height: 36px !important;
   height: auto !important;
-  padding: 8px 12px !important;
+  padding: 5px 10px !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
   background: #ffffff !important;
   cursor: pointer;
+  min-height: 56px !important;
+  padding: 5px 10px !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {{
   background: #f8fbff !important;
@@ -1096,6 +1111,22 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
   display: flex !important;
   align-items: center !important;
+}}
+@media (min-width: 768px) and (max-width: 1024px) {{
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }}
+}}
+@media (max-width: 767px) {{
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
+    min-height: 56px !important;
+    padding: 6px 10px !important;
+  }}
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"],
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
@@ -1188,15 +1219,17 @@ def inject_jobs_module_css() -> None:
   margin: 0 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stCheckbox"] label {{
-  min-height: 24px !important;
+  min-height: 0 !important;
+  height: auto !important;
   margin: 0 !important;
+  padding: 0 !important;
 }}
 .st-key-jobs_table_wrap .stButton > button {{
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 0 12px !important;
-  border-radius: 9px !important;
-  font-size: 14px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
   width: auto !important;
 }}
 .st-key-jobs_table_wrap .job-number-link .stButton,
@@ -1243,12 +1276,12 @@ def inject_jobs_module_css() -> None:
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 36px !important;
-  height: 36px !important;
-  min-width: 100px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  min-width: 96px !important;
   width: auto !important;
   max-width: none !important;
-  padding: 0 0.85rem !important;
+  padding: 0 0.75rem !important;
   border-radius: 8px !important;
   background: {PRIMARY} !important;
   border: 1px solid {PRIMARY} !important;
@@ -1256,7 +1289,7 @@ def inject_jobs_module_css() -> None:
   color: #ffffff !important;
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
-  line-height: 1.1 !important;
+  line-height: 1 !important;
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
@@ -12676,7 +12709,6 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 }}
 .ips-table-row,
 .ips-users-row,
-.ips-jobs-row,
 .ips-customers-row,
 .ips-estimates-row,
 .ips-inventory-row,
@@ -12690,6 +12722,16 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-tasks-row {{
   padding: 6px 10px !important;
   min-height: 50px !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
+  min-height: 56px !important;
+  padding: 5px 10px !important;
+}}
+@media (min-width: 768px) and (max-width: 1024px) {{
+  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
+    min-height: 58px !important;
+    padding: 6px 10px !important;
+  }}
 }}
 .ips-card-title,
 .ips-panel-title {{
