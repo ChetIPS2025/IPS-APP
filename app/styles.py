@@ -912,7 +912,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v20">
+<style id="ips-jobs-module-v21">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -966,9 +966,35 @@ def inject_jobs_module_css() -> None:
 .ips-jobs-title {{
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #0f172a;
   line-height: 1.35;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}}
+.ips-jobs-title-link,
+.job-project-link {{
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  cursor: pointer !important;
+}}
+.ips-jobs-title-text,
+.job-project-text {{
+  font-weight: 700 !important;
+  color: {PRIMARY} !important;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  cursor: pointer;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-title-text,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .job-project-text {{
+  color: {PRIMARY_HOVER} !important;
+  text-decoration: underline !important;
 }}
 .ips-jobs-muted {{
   font-size: 13px;

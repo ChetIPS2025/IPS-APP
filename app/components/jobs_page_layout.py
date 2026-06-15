@@ -224,14 +224,31 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .job-n
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-jobs-number-link button {
   display: none !important;
 }
-.ips-jobs-title {
+.ips-jobs-title-link,
+.job-project-link {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  cursor: pointer !important;
+}
+.ips-jobs-title,
+.ips-jobs-title-text,
+.job-project-text {
   font-weight: 700 !important;
+  color: #2563eb !important;
   font-size: 0.9375rem !important;
-  color: #0f172a !important;
   word-break: normal !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
   line-height: 1.35 !important;
+  cursor: pointer !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-title-text,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .job-project-text {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
 }
 .ips-jobs-cell,
 .jobs-table-cell,

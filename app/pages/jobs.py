@@ -745,7 +745,10 @@ def _render_custom_jobs_table(
 
             with cols[2]:
                 st.markdown(
-                    f'<div class="ips-jobs-title ips-jobs-cell job-cell jobs-table-cell">{html.escape(project)}</div>',
+                    f'<div class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell">'
+                    f'<span class="ips-jobs-title ips-jobs-title-text job-project-text" '
+                    f'title="{html.escape(project, quote=True)}">'
+                    f"{html.escape(project)}</span></div>",
                     unsafe_allow_html=True,
                 )
 
