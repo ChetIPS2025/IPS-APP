@@ -8,8 +8,10 @@ from typing import Any
 import streamlit as st
 
 try:
+    from app.components.job_status_ui import render_job_status_change_select
     from app.services.jobs_service import can_manage_job_actions
 except ImportError:
+    from components.job_status_ui import render_job_status_change_select  # type: ignore
     from services.jobs_service import can_manage_job_actions  # type: ignore
 
 
@@ -45,6 +47,7 @@ def render_job_row_actions(
     *,
     on_open: Callable[[str, dict[str, Any]], None],
     on_edit: Callable[[dict[str, Any]], None] | None = None,
+    on_status_updated: Callable[[str, str], None] | None = None,
 ) -> None:
     """Popover: View Details, Edit, and existing lifecycle actions."""
     jid = str(job.get("id") or "").strip()
@@ -77,6 +80,13 @@ def render_job_row_actions(
             on_open(jid, job)
             st.rerun()
         if not archived and can_manage:
+            st.markdown("**Change Status**")
+            render_job_status_change_select(
+                job,
+                key_prefix=f"job_row_{job_key}",
+                on_updated=on_status_updated,
+            )
+            st.divider()
             if status not in {"Completed", "Closed"} and st.button(
                 "Job Complete",
                 key=f"job_row_complete_{job_key}",

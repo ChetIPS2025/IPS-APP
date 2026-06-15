@@ -115,7 +115,7 @@ def render() -> None:
     for col, *args in [
         (j1, "Jobs Awarded", str(kpis["jobs_awarded"]), "🏆", "#dbeafe", "Won — not yet started", "flat"),
         (j2, "Active Jobs", str(kpis["active_jobs"]), "💼", "#ffedd5", "In progress now", "flat"),
-        (j3, "Estimate Pending", str(kpis["estimate_pending_jobs"]), "📋", "#f3e8ff", "Awaiting estimate approval", "flat"),
+        (j3, "Pending Jobs", str(kpis.get("pending_jobs", 0)), "⏳", "#f3e8ff", "Draft or awaiting start", "flat"),
         (j4, "Complete Jobs", str(kpis["complete_jobs"]), "✅", "#dcfce7", "Finished work", "flat"),
     ]:
         with col:

@@ -166,6 +166,9 @@ def load_dashboard_kpis() -> dict[str, Any]:
         "inventory_value": 98765.30,
         "jobs_awarded": 2,
         "active_jobs": 1,
+        "pending_jobs": 0,
+        "draft_jobs": 0,
+        "on_hold_jobs": 0,
         "estimate_pending_jobs": 1,
         "complete_jobs": 1,
     }
@@ -184,11 +187,17 @@ def demo_sales_categories() -> dict[str, float]:
 
 
 def demo_job_status() -> dict[str, int]:
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
     jobs = load_jobs()
     counts: dict[str, int] = {}
     for j in jobs:
-        st = str(j.get("status") or "Draft")
-        counts[st] = counts.get(st, 0) + 1
+        if bool(j.get("is_deleted")):
+            continue
+        st_label = normalize_job_status(j.get("status"))
+        counts[st_label] = counts.get(st_label, 0) + 1
     if not counts:
         return {"Not Started": 4, "In Progress": 9, "On Hold": 2, "Completed": 3}
     return counts

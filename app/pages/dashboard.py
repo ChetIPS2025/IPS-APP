@@ -120,10 +120,10 @@ def render() -> None:
     st.markdown(f'<{ot} class="ips-kpi-grid ips-kpi-grid-jobs">', unsafe_allow_html=True)
     j1, j2, j3, j4 = st.columns(4)
     for col, *args in [
-        (j1, "Jobs Awarded", str(kpis["jobs_awarded"]), "🏆", "#dbeafe", "Won — not yet started", "flat"),
-        (j2, "Active Jobs", str(kpis["active_jobs"]), "💼", "#ffedd5", "In progress now", "flat"),
-        (j3, "Estimate Pending", str(kpis["estimate_pending_jobs"]), "📋", "#f3e8ff", "Awaiting estimate approval", "flat"),
-        (j4, "Complete Jobs", str(kpis["complete_jobs"]), "✅", "#dcfce7", "Finished work", "flat"),
+        (j1, "Jobs Awarded", str(kpis.get("jobs_awarded", 0)), "🏆", "#dbeafe", "Won — not yet started", "flat"),
+        (j2, "Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5", "In progress now", "flat"),
+        (j3, "Pending Jobs", str(kpis.get("pending_jobs", 0)), "⏳", "#f3e8ff", "Draft or awaiting start", "flat"),
+        (j4, "Complete Jobs", str(kpis.get("complete_jobs", 0)), "✅", "#dcfce7", "Finished work", "flat"),
     ]:
         with col:
             render_kpi_card(*args)

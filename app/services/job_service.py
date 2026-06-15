@@ -140,33 +140,19 @@ def sort_jobs_by_name(jobs: list[dict]) -> list[dict]:
 
 def normalize_job_status_for_filter(raw: object) -> str:
     """Canonical job status labels (aligned with Jobs page filters)."""
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "Draft",
-        "draft": "Draft",
-        "planning": "Planning",
-        "scheduled": "Scheduled",
-        "active": "Active",
-        "in progress": "Active",
-        "awarded": "Awarded",
-        "on hold": "On Hold",
-        "completed": "Completed",
-        "closed": "Closed",
-        "cancelled": "Cancelled",
-        "canceled": "Cancelled",
-        "archived": "Archived",
-        "deleted": "Deleted",
-        "estimate pending": "Estimate Pending",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "Draft"
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+    return normalize_job_status(raw)
 
 
 _DASHBOARD_JOB_METRIC_BUCKETS: dict[str, str] = {
+    "Draft": "draft_jobs",
+    "Pending": "pending_jobs",
     "Awarded": "jobs_awarded",
     "Active": "active_jobs",
+    "On Hold": "on_hold_jobs",
     "Estimate Pending": "estimate_pending_jobs",
     "Completed": "complete_jobs",
     "Closed": "complete_jobs",
@@ -179,17 +165,24 @@ def dashboard_job_metrics(jobs: list[dict[str, Any]]) -> dict[str, int]:
 
     - jobs_awarded: won/accepted, not necessarily started
     - active_jobs: work in progress
+    - pending_jobs: manual pending (not yet active)
+    - draft_jobs: draft / not yet submitted
     - estimate_pending_jobs: waiting on estimate approval
     - complete_jobs: finished (completed or closed)
     """
     out = {
         "jobs_awarded": 0,
         "active_jobs": 0,
+        "pending_jobs": 0,
+        "draft_jobs": 0,
+        "on_hold_jobs": 0,
         "estimate_pending_jobs": 0,
         "complete_jobs": 0,
     }
     for job in jobs:
         if not isinstance(job, dict):
+            continue
+        if bool(job.get("is_deleted")):
             continue
         bucket = _DASHBOARD_JOB_METRIC_BUCKETS.get(normalize_job_status_for_filter(job.get("status")))
         if bucket:

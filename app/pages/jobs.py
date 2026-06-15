@@ -10,6 +10,7 @@ import streamlit as st
 try:
     from app.components.job_actions import render_job_action_buttons
     from app.components.job_row_actions_ui import render_job_row_actions
+    from app.components.job_status_ui import job_status_pill_html, render_job_status_badge_editor
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -111,6 +112,7 @@ except ImportError:
         sync_all_sources_for_job,
     )
     from components.job_row_actions_ui import render_job_row_actions  # type: ignore
+    from components.job_status_ui import job_status_pill_html, render_job_status_badge_editor  # type: ignore
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -311,27 +313,11 @@ _JOB_BAR_FILTER_FIELDS = ["customer", "supervisor", "status"]
 
 
 def _normalize_job_status(raw: object) -> str:
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "Draft",
-        "draft": "Draft",
-        "planning": "Planning",
-        "scheduled": "Scheduled",
-        "active": "Active",
-        "awarded": "Awarded",
-        "on hold": "On Hold",
-        "completed": "Completed",
-        "closed": "Closed",
-        "cancelled": "Cancelled",
-        "canceled": "Cancelled",
-        "archived": "Archived",
-        "deleted": "Deleted",
-        "estimate pending": "Estimate Pending",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "Draft"
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+    return normalize_job_status(raw)
 
 
 def _job_number(job: dict) -> str:
@@ -395,22 +381,7 @@ _JOB_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
 
 
 def _job_status_pill_html(status: str) -> str:
-    cls_map = {
-        "Draft": "ips-job-status-draft",
-        "Planning": "ips-job-status-planning",
-        "Scheduled": "ips-job-status-scheduled",
-        "Active": "ips-job-status-active",
-        "Awarded": "ips-job-status-awarded",
-        "On Hold": "ips-job-status-on-hold",
-        "Completed": "ips-job-status-completed",
-        "Closed": "ips-job-status-closed",
-        "Cancelled": "ips-job-status-cancelled",
-        "Deleted": "ips-job-status-deleted",
-        "Archived": "ips-job-status-archived",
-        "Estimate Pending": "ips-job-status-estimate-pending",
-    }
-    cls = cls_map.get(status, "ips-job-status-draft")
-    return f'<span class="ips-job-status-pill {cls}">{html.escape(status)}</span>'
+    return job_status_pill_html(status)
 
 
 def _money_cell(value: float, *, available: bool = True) -> str:
@@ -527,6 +498,7 @@ def _jobs_summary_counts(
         "total": len(rows),
         "active": 0,
         "awarded": 0,
+        "pending": 0,
         "draft": 0,
         "open_subjobs": 0,
         "total_contract": 0.0,
@@ -540,6 +512,8 @@ def _jobs_summary_counts(
             counts["active"] += 1
         elif status == "Awarded":
             counts["awarded"] += 1
+        elif status == "Pending":
+            counts["pending"] += 1
         elif status == "Draft":
             counts["draft"] += 1
         jid = str(job.get("id") or "").strip()
@@ -556,8 +530,22 @@ def _jobs_summary_counts(
     return counts
 
 
+def _patch_job_cache_status(job_id: str, new_status: str) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    cache = st.session_state.get(CACHE_KEY)
+    if isinstance(cache, dict) and jid in cache and isinstance(cache[jid], dict):
+        cache[jid] = {**cache[jid], "status": new_status}
+        st.session_state[CACHE_KEY] = cache
+
+
 def _open_job_edit_from_list(job: dict) -> None:
     _set_job_edit_mode(job)
+
+
+def _on_job_status_updated(job_id: str, new_status: str) -> None:
+    _patch_job_cache_status(job_id, new_status)
 
 
 def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
@@ -817,6 +805,7 @@ def _render_custom_jobs_table(
                     job,
                     on_open=_open_jobs_detail_modal,
                     on_edit=_open_job_edit_from_list,
+                    on_status_updated=_on_job_status_updated,
                 )
 
             if expanded:
@@ -2075,7 +2064,14 @@ def _render_job_edit_form(job: dict) -> None:
     )
 
     cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
-    status_opts = lookup_options("job_statuses")
+    try:
+        from app.services.jobs_service import MANUAL_JOB_STATUSES, normalize_job_status
+    except ImportError:
+        from services.jobs_service import MANUAL_JOB_STATUSES, normalize_job_status  # type: ignore
+    cur_status = normalize_job_status(job.get("status"))
+    status_opts = list(MANUAL_JOB_STATUSES)
+    if cur_status not in status_opts:
+        status_opts = [cur_status, *status_opts]
     sup_opts = _supervisor_options(job)
 
     ec1, ec2 = st.columns(2, gap="medium")
@@ -2190,10 +2186,17 @@ def render_job_detail_dialog(job: dict) -> None:
             customer=customer,
         )
     with header_cols[1]:
-        st.markdown(
-            f'<div class="ips-job-detail-header-actions">{_status_pill(status)}</div>',
-            unsafe_allow_html=True,
-        )
+        if not edit_mode:
+            render_job_status_badge_editor(
+                job,
+                key_prefix="jobs_modal",
+                on_updated=_on_job_status_updated,
+            )
+        else:
+            st.markdown(
+                f'<div class="ips-job-detail-header-actions">{_status_pill(status)}</div>',
+                unsafe_allow_html=True,
+            )
         if not edit_mode:
             render_job_detail_header_actions(
                 job,
@@ -2352,7 +2355,11 @@ def render() -> None:
                     prev_customer_key="job_new_cust_prev",
                     prev_location_key="job_new_loc_prev",
                 )
-                st.selectbox("Status", lookup_options("job_statuses"), key="job_new_status")
+                try:
+                    from app.services.jobs_service import MANUAL_JOB_STATUSES
+                except ImportError:
+                    from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
+                st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
             st.text_area("Description", key="job_new_desc")
             sb1, sb2 = st.columns(2)
             with sb1:
@@ -2427,6 +2434,7 @@ def render() -> None:
         total=int(summary["total"]),
         active=int(summary["active"]),
         awarded=int(summary["awarded"]),
+        pending=int(summary["pending"]),
         draft=int(summary["draft"]),
         open_subjobs=int(summary["open_subjobs"]),
         total_contract=float(summary["total_contract"]),

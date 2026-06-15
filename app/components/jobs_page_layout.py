@@ -110,6 +110,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 .ips-jobs-stat-active .ips-jobs-stat-value { color: #2563eb; }
 .ips-jobs-stat-awarded { border-left-color: #15803d; }
 .ips-jobs-stat-awarded .ips-jobs-stat-value { color: #15803d; }
+.ips-jobs-stat-pending { border-left-color: #d97706; }
+.ips-jobs-stat-pending .ips-jobs-stat-value { color: #d97706; }
 .ips-jobs-stat-draft { border-left-color: #64748b; }
 .ips-jobs-stat-draft .ips-jobs-stat-value { color: #64748b; }
 .ips-jobs-stat-subjobs { border-left-color: #ea580c; }
@@ -267,6 +269,17 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
   color: #14532d;
   border-color: #86efac;
 }
+.ips-job-status-pending,
+.ips-job-status-estimate-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.ips-job-status-on-hold {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
 .ips-job-status-completed,
 .ips-job-status-closed {
   background: #166534;
@@ -277,6 +290,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-j
   background: #fed7aa;
   color: #9a3412;
   border-color: #fdba74;
+}
+section[data-testid="stMain"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button {
+  min-height: 28px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
   min-width: 100px !important;
@@ -325,6 +346,7 @@ def render_jobs_summary_cards(
     total: int,
     active: int,
     awarded: int,
+    pending: int,
     draft: int,
     open_subjobs: int,
     total_contract: float,
@@ -336,6 +358,7 @@ def render_jobs_summary_cards(
         ("Total Jobs", f"{total:,}", "ips-jobs-stat-total"),
         ("Active Jobs", f"{active:,}", "ips-jobs-stat-active"),
         ("Awarded Jobs", f"{awarded:,}", "ips-jobs-stat-awarded"),
+        ("Pending Jobs", f"{pending:,}", "ips-jobs-stat-pending"),
         ("Draft Jobs", f"{draft:,}", "ips-jobs-stat-draft"),
         ("Open Subjobs", f"{open_subjobs:,}", "ips-jobs-stat-subjobs"),
         ("Total Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
