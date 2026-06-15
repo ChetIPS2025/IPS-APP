@@ -42,6 +42,25 @@ def _normalize_status(job: dict[str, Any]) -> str:
     return mapping.get(raw, str(job.get("status") or "Draft").strip() or "Draft")
 
 
+def _actions_divider() -> None:
+    st.markdown('<hr class="job-row-actions-divider" aria-hidden="true">', unsafe_allow_html=True)
+
+
+def _action_button(
+    *,
+    marker: str,
+    label: str,
+    key: str,
+    tone: str = "default",
+) -> bool:
+    st.markdown(
+        f'<span class="job-row-action-marker job-row-action-{marker} '
+        f'job-row-action-tone-{tone}" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return st.button(label, key=key, use_container_width=True)
+
+
 def render_job_row_actions(
     job: dict[str, Any],
     *,
@@ -49,7 +68,7 @@ def render_job_row_actions(
     on_edit: Callable[[dict[str, Any]], None] | None = None,
     on_status_updated: Callable[[str, str], None] | None = None,
 ) -> None:
-    """Popover: View Details, Edit, and existing lifecycle actions."""
+    """Popover: View Details, Edit, status change, and lifecycle actions."""
     jid = str(job.get("id") or "").strip()
     if not jid:
         return
@@ -72,38 +91,72 @@ def render_job_row_actions(
             '<span class="job-row-actions-panel" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if st.button("View Details", key=f"job_row_view_{job_key}", use_container_width=True):
+
+        if _action_button(
+            marker="view",
+            label="View Details",
+            key=f"job_row_view_{job_key}",
+        ):
             on_open(jid, job)
             st.rerun()
-        if on_edit is not None and st.button("Edit Job", key=f"job_row_edit_{job_key}", use_container_width=True):
+
+        if on_edit is not None and _action_button(
+            marker="edit",
+            label="Edit Job",
+            key=f"job_row_edit_{job_key}",
+        ):
             on_edit(job)
             on_open(jid, job)
             st.rerun()
+
         if not archived and can_manage:
-            st.markdown("**Change Status**")
+            _actions_divider()
+
+            st.markdown(
+                '<div class="job-row-actions-section">'
+                '<span class="job-row-action-marker job-row-action-status" aria-hidden="true"></span>'
+                '<p class="job-row-actions-section-title">Change Status</p>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
             render_job_status_change_select(
                 job,
                 key_prefix=f"job_row_{job_key}",
                 on_updated=on_status_updated,
+                action_menu=True,
+                label="Select new status",
             )
-            st.divider()
-            if status not in {"Completed", "Closed"} and st.button(
-                "Job Complete",
+
+            _actions_divider()
+
+            if status not in {"Completed", "Closed"} and _action_button(
+                marker="complete",
+                label="Job Complete",
                 key=f"job_row_complete_{job_key}",
-                use_container_width=True,
+                tone="success",
             ):
                 st.session_state[_confirm_state_key(jid, "complete")] = True
                 on_open(jid, job)
                 st.rerun()
-            if status != "Cancelled" and st.button(
-                "Cancel Job",
+
+            if status != "Cancelled" and _action_button(
+                marker="cancel",
+                label="Cancel Job",
                 key=f"job_row_cancel_{job_key}",
-                use_container_width=True,
+                tone="warning",
             ):
                 st.session_state[_confirm_state_key(jid, "cancel")] = True
                 on_open(jid, job)
                 st.rerun()
-            if st.button("Delete Job", key=f"job_row_delete_{job_key}", use_container_width=True):
+
+            _actions_divider()
+
+            if _action_button(
+                marker="delete",
+                label="Delete Job",
+                key=f"job_row_delete_{job_key}",
+                tone="danger",
+            ):
                 st.session_state[_confirm_state_key(jid, "delete")] = True
                 on_open(jid, job)
                 st.rerun()

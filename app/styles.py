@@ -1161,12 +1161,78 @@ def inject_jobs_module_css() -> None:
   color: #1e293b !important;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
 }}
+div[data-testid="stPopover"]:has(.job-row-actions-panel) {{
+  background: #ffffff !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+  overflow: hidden !important;
+}}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) {{
-  padding: 0.45rem !important;
-  min-width: 13rem !important;
-  border-radius: 10px !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+  padding: 0.5rem !important;
+  min-width: 280px !important;
+  max-width: 340px !important;
+  width: 300px !important;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stVerticalBlock"] {{
+  gap: 0.2rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-divider {{
+  border: none !important;
+  border-top: 1px solid #e8edf3 !important;
+  margin: 0.45rem 0 !important;
+  height: 0 !important;
+  opacity: 1 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-section {{
+  margin: 0.15rem 0 0.25rem 0 !important;
+  padding: 0 0.15rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-section-title {{
+  margin: 0 !important;
+  padding: 0.15rem 0.35rem 0.1rem 1.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.25 !important;
+  position: relative !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .job-row-actions-section-title::before {{
+  content: "⇄" !important;
+  position: absolute !important;
+  left: 0.35rem !important;
+  top: 0.1rem !important;
+  width: 1rem !important;
+  text-align: center !important;
+  color: #64748b !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] {{
+  margin: 0 !important;
+  padding: 0 0.15rem 0.15rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] label {{
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  margin-bottom: 0.25rem !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+  min-height: 42px !important;
+  border-color: #dbe3ef !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] {{
+  margin: 0 !important;
+  padding: 0 !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button {{
@@ -1175,14 +1241,93 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stBut
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: #334155 !important;
+  color: #0f172a !important;
   font-weight: 600 !important;
-  min-height: 2rem !important;
+  font-size: 0.875rem !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 0.75rem 0 2.15rem !important;
+  border-radius: 8px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  position: relative !important;
 }}
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button:hover,
 div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button:hover {{
-  background: #f1f5f9 !important;
+  background: #f3f6fb !important;
   color: #0f172a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) .stButton > button:focus-visible,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stButton"] > button:focus-visible {{
+  outline: 2px solid #2563eb !important;
+  outline-offset: 1px !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-view) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "👁" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-edit) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "✎" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
+  color: #15803d !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-complete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "✓" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  color: #16a34a !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
+  color: #c2410c !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-cancel) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "✕" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 0.95rem !important;
+  font-weight: 800 !important;
+  color: #ea580c !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button:hover {{
+  color: #dc2626 !important;
+}}
+div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stElementContainer"]:has(.job-row-action-delete) + [data-testid="stElementContainer"] [data-testid="stButton"] > button::before {{
+  content: "🗑" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+}}
+@media (max-width: 900px) {{
+  div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) {{
+    min-width: 280px !important;
+    max-width: min(340px, calc(100vw - 1.5rem)) !important;
+    width: min(300px, calc(100vw - 1.5rem)) !important;
+  }}
 }}
 .ips-jc-summary-card {{
   background: #ffffff;
