@@ -127,6 +127,23 @@ def estimate_visible_in_rejected_view(row: dict[str, Any]) -> bool:
     return _norm_status(row.get("status")) in ESTIMATE_STATUSES_TERMINAL_NEGATIVE
 
 
+def estimate_visible_in_draft_view(row: dict[str, Any]) -> bool:
+    return _norm_status(row.get("status")) == "draft"
+
+
+def estimate_visible_in_sent_view(row: dict[str, Any]) -> bool:
+    return _norm_status(row.get("status")) in {"sent", "submitted"}
+
+
+def estimate_visible_in_archived_view(row: dict[str, Any]) -> bool:
+    return row.get("archived_from_estimates") is True
+
+
+def can_revise_approved_estimates(role: str | None) -> bool:
+    """Same roles that may approve estimates may revise approved pricing/details."""
+    return can_approve_estimates(role)
+
+
 def can_approve_estimates(role: str | None) -> bool:
     r = str(role or "").strip().lower()
     return r in {"admin", "supervisor", "manager", "project manager", "pm", "estimator"}
@@ -563,16 +580,22 @@ def approve_estimate_and_job(
     if not jid:
         return ApproveEstimateResult(ok=False, message="Linked job is missing an id.", error_code="no_job")
 
-    job_update = filter_payload_to_table(
-        "jobs",
-        {
-            "status": JOB_STATUS_AFTER_ESTIMATE_APPROVAL,
-            "estimate_id": eid,
-            "approved_at": now,
-            "approved_by": actor,
-            "updated_at": now,
-        },
-    )
+    try:
+        from app.services.estimate_revision_service import _estimate_customer_price
+    except ImportError:
+        from services.estimate_revision_service import _estimate_customer_price  # type: ignore
+    approved_price = _estimate_customer_price(row)
+    job_fields: dict[str, Any] = {
+        "status": JOB_STATUS_AFTER_ESTIMATE_APPROVAL,
+        "estimate_id": eid,
+        "approved_at": now,
+        "approved_by": actor,
+        "updated_at": now,
+    }
+    if approved_price > 0:
+        job_fields["awarded_amount"] = round(approved_price, 2)
+
+    job_update = filter_payload_to_table("jobs", job_fields)
     try:
         update_rows_admin("jobs", job_update, {"id": jid})
     except Exception as exc:

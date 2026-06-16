@@ -52,21 +52,36 @@ try:
         persist_estimate,
     )
     from app.components.estimate_actions import render_estimate_action_buttons
+    from app.components.estimates_page_layout import (
+        close_estimates_filter_bar_shell,
+        inject_estimates_page_layout_css,
+        render_estimates_filter_bar_shell,
+        render_estimates_summary_cards,
+    )
     from app.components.headers import render_page_brand_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
     )
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimates_service import (
         approve_estimate_and_job,
+        begin_approved_estimate_revision,
+        cancel_approved_estimate_revision,
+        complete_approved_estimate_revision,
         can_approve_estimates,
+        can_revise_approved_estimates,
         estimate_status_approvable,
         estimate_visible_in_active_view,
         estimate_visible_in_approved_view,
+        estimate_visible_in_archived_view,
+        estimate_visible_in_draft_view,
         estimate_visible_in_rejected_view,
+        estimate_visible_in_sent_view,
     )
     from app.auth import current_role
     from app.components.quote_job_number_autofill import (
@@ -121,21 +136,36 @@ except ImportError:
         persist_estimate,
     )
     from components.estimate_actions import render_estimate_action_buttons  # type: ignore
+    from components.estimates_page_layout import (  # type: ignore
+        close_estimates_filter_bar_shell,
+        inject_estimates_page_layout_css,
+        render_estimates_filter_bar_shell,
+        render_estimates_summary_cards,
+    )
     from components.headers import render_page_brand_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
         render_table_header_cell,
     )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.estimates_service import (  # type: ignore
         approve_estimate_and_job,
+        begin_approved_estimate_revision,
+        cancel_approved_estimate_revision,
+        complete_approved_estimate_revision,
         can_approve_estimates,
+        can_revise_approved_estimates,
         estimate_status_approvable,
         estimate_visible_in_active_view,
         estimate_visible_in_approved_view,
+        estimate_visible_in_archived_view,
+        estimate_visible_in_draft_view,
         estimate_visible_in_rejected_view,
+        estimate_visible_in_sent_view,
     )
     from auth import current_role  # type: ignore
     from components.quote_job_number_autofill import (  # type: ignore
@@ -184,6 +214,11 @@ _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
 _PENDING_APPROVE_KEY = "est_pending_approve_id"
 _NEW_ESTIMATE_DIALOG_KEY = "ips_est_new_dialog_open"
 _BUILD_MODE_PREFIX = "est_build_mode_"
+_REVISE_MODE_PREFIX = "est_revise_mode_"
+_REVISE_SNAPSHOT_PREFIX = "est_revise_snapshot_"
+_REVISE_BEGIN_CONFIRM_PREFIX = "est_revise_begin_confirm_"
+_REVISE_COMPLETE_CONFIRM_PREFIX = "est_revise_complete_confirm_"
+_REVISE_CANCEL_CONFIRM_PREFIX = "est_revise_cancel_confirm_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
@@ -350,6 +385,14 @@ def _estimate_customer_price(row: dict) -> str:
     return fmt_currency(live) if live > 0 else fmt_currency(0)
 
 
+def _estimate_customer_price_amount(row: dict) -> float:
+    stored = _estimate_stored_customer_price(row)
+    if stored > 0:
+        return stored
+    live = _estimate_live_customer_price_amount(row)
+    return live if live > 0 else 0.0
+
+
 def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
     """Persist Cost Builder totals when list/modal row is out of date."""
     eid = str(estimate_id or "").strip()
@@ -445,7 +488,51 @@ def _build_mode_key(est: dict) -> str:
     return f"{_BUILD_MODE_PREFIX}{rk}"
 
 
+def _revise_mode_key(est: dict) -> str:
+    rk = record_session_key(est, "id", "estimate_number")
+    return f"{_REVISE_MODE_PREFIX}{rk}"
+
+
+def _revise_snapshot_session_key(eid: str) -> str:
+    return f"{_REVISE_SNAPSHOT_PREFIX}{eid}"
+
+
+def _is_in_revise_mode(est: dict) -> bool:
+    return bool(st.session_state.get(_revise_mode_key(est)))
+
+
+def _approved_estimate_editing_locked(est: dict) -> bool:
+    return estimate_visible_in_approved_view(est) and not _is_in_revise_mode(est)
+
+
+def _get_revise_baseline(est: dict) -> dict | None:
+    eid = str(est.get("id") or "").strip()
+    snap = st.session_state.get(_revise_snapshot_session_key(eid))
+    return snap if isinstance(snap, dict) else None
+
+
+def _enter_revise_mode(est: dict, snapshot: dict) -> None:
+    eid = str(est.get("id") or "").strip()
+    st.session_state[_revise_mode_key(est)] = True
+    st.session_state[_revise_snapshot_session_key(eid)] = snapshot
+    rk = record_session_key(est, "id", "estimate_number")
+    set_view_mode(_MOD, rk)
+
+
+def _exit_revise_mode(est: dict) -> None:
+    eid = str(est.get("id") or "").strip()
+    st.session_state.pop(_revise_mode_key(est), None)
+    st.session_state.pop(_revise_snapshot_session_key(eid), None)
+    for suffix in ("begin_note", "complete_note", "update_job"):
+        st.session_state.pop(f"est_revise_{suffix}_{eid}", None)
+    st.session_state.pop(_REVISE_BEGIN_CONFIRM_PREFIX + eid, None)
+    st.session_state.pop(_REVISE_COMPLETE_CONFIRM_PREFIX + eid, None)
+    st.session_state.pop(_REVISE_CANCEL_CONFIRM_PREFIX + eid, None)
+
+
 def _set_estimate_build_mode(est: dict) -> None:
+    if _approved_estimate_editing_locked(est):
+        return
     st.session_state[_build_mode_key(est)] = True
     rk = record_session_key(est, "id", "estimate_number")
     set_view_mode(_MOD, rk)
@@ -499,6 +586,17 @@ _ESTIMATE_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("customer", _estimate_customer),
     ("status", lambda r: _normalize_estimate_status(r.get("status"))),
 ]
+_ESTIMATES_DEFAULT_VIEW = "Active Estimates"
+_ESTIMATES_VIEW_OPTIONS = [
+    "Active Estimates",
+    "All Estimates",
+    "Draft Estimates",
+    "Sent Estimates",
+    "Approved Estimates",
+    "Rejected / Lost Estimates",
+    "Archived Estimates",
+]
+_ESTIMATE_BAR_FILTER_FIELDS = ["customer", "status"]
 
 
 def _estimate_select_key(estimate_id: str) -> str:
@@ -756,14 +854,50 @@ def _customer_contact_select(
 
 
 def _apply_estimate_view_filter(rows: list[dict], view_filter: str) -> list[dict]:
-    vf = str(view_filter or "Active Estimates").strip()
+    vf = str(view_filter or _ESTIMATES_DEFAULT_VIEW).strip()
+    if vf in {"Approved / Converted", "Approved Estimates"}:
+        return [r for r in rows if estimate_visible_in_approved_view(r)]
+    if vf in {"Rejected", "Rejected / Lost Estimates"}:
+        return [r for r in rows if estimate_visible_in_rejected_view(r)]
     if vf == "All Estimates":
         return rows
-    if vf == "Approved / Converted":
-        return [r for r in rows if estimate_visible_in_approved_view(r)]
-    if vf == "Rejected":
-        return [r for r in rows if estimate_visible_in_rejected_view(r)]
+    if vf == "Draft Estimates":
+        return [r for r in rows if estimate_visible_in_draft_view(r)]
+    if vf == "Sent Estimates":
+        return [r for r in rows if estimate_visible_in_sent_view(r)]
+    if vf == "Archived Estimates":
+        return [r for r in rows if estimate_visible_in_archived_view(r)]
     return [r for r in rows if estimate_visible_in_active_view(r)]
+
+
+def _can_revise_approved_estimate() -> bool:
+    return can_revise_approved_estimates(current_role())
+
+
+def _estimates_summary_counts(rows: list[dict]) -> dict[str, float | int | bool]:
+    counts: dict[str, float | int | bool] = {
+        "total": len(rows),
+        "active": 0,
+        "draft": 0,
+        "sent": 0,
+        "approved": 0,
+        "total_customer_value": 0.0,
+        "has_any_value": False,
+    }
+    for row in rows:
+        if estimate_visible_in_active_view(row):
+            counts["active"] += 1
+        if estimate_visible_in_draft_view(row):
+            counts["draft"] += 1
+        if estimate_visible_in_sent_view(row):
+            counts["sent"] += 1
+        if estimate_visible_in_approved_view(row):
+            counts["approved"] += 1
+        amount = _estimate_customer_price_amount(row)
+        if amount > 0:
+            counts["has_any_value"] = True
+            counts["total_customer_value"] = float(counts["total_customer_value"]) + amount
+    return counts
 
 
 def _can_show_approve_job(est: dict) -> bool:
@@ -914,6 +1048,8 @@ def _set_estimate_view_mode(est: dict) -> None:
 
 
 def _set_estimate_edit_mode(est: dict) -> None:
+    if _approved_estimate_editing_locked(est):
+        return
     rk = record_session_key(est, "id", "estimate_number")
     set_edit_mode(_MOD, rk)
     _seed_estimate_edit_form(est)
@@ -955,7 +1091,7 @@ def _render_estimate_edit_form(est: dict) -> None:
             prev_location_key=f"est_edit_loc_prev_{eid}",
             initial_contact_id=str(est.get("customer_contact_id") or ""),
         )
-        st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}")
+        st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}", disabled=_is_in_revise_mode(est))
         st.date_input("Estimate date", key=f"est_edit_est_date_{eid}")
         st.date_input("Expiration date", key=f"est_edit_exp_date_{eid}")
     with ec2:
@@ -989,6 +1125,9 @@ def _render_estimate_edit_form(est: dict) -> None:
         job_opts = _job_select_options(cust_name)
         job_idx = int(st.session_state.get(f"est_edit_job_{eid}") or 0)
         job_id = job_opts[job_idx][1] if job_opts else ""
+        status_val = st.session_state.get(f"est_edit_status_{eid}")
+        if _is_in_revise_mode(est):
+            status_val = est.get("status") or "Approved"
         ok, msg = persist_estimate(
             {
                 "estimate_number": st.session_state.get(f"est_edit_num_{eid}"),
@@ -998,7 +1137,7 @@ def _render_estimate_edit_form(est: dict) -> None:
                 "customer_location_id": location_id or None,
                 "customer_contact_id": contact_id or None,
                 "job_id": job_id or None,
-                "status": st.session_state.get(f"est_edit_status_{eid}"),
+                "status": status_val,
                 "estimate_date": str(st.session_state.get(f"est_edit_est_date_{eid}")),
                 "expiration_date": str(st.session_state.get(f"est_edit_exp_date_{eid}")),
                 "notes": st.session_state.get(f"est_edit_notes_{eid}"),
@@ -1026,6 +1165,8 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
     if st.session_state.get(_build_mode_key(est)):
         st.info("Build mode — add lines and review totals in Cost Builder.")
+
+    editing_locked = _approved_estimate_editing_locked(est)
 
     (
         tab_overview,
@@ -1075,7 +1216,9 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         st.caption("Open the **Scope of Work** tab to view or edit the full project scope.")
 
     with tab_scope:
-        if eid and not is_demo_id(eid):
+        if editing_locked:
+            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to edit scope.")
+        elif eid and not is_demo_id(eid):
             render_scope_of_work_tab(
                 est,
                 persist_fn=_persist_scope_of_work,
@@ -1085,22 +1228,27 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             placeholder_html("Save this estimate to edit scope of work.")
 
     with tab_cost_builder:
-        if eid and not is_demo_id(eid):
+        if editing_locked:
+            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to adjust pricing lines.")
+        elif eid and not is_demo_id(eid):
             _sync_estimate_rollups_if_stale(eid)
             fresh = get_estimate(eid)
             if fresh:
                 est = fresh
-        render_cost_builder_tab(
-            est,
-            pricing_guide_options=pg_opts,
-            inventory_options=inv_opts,
-            asset_options=asset_opts,
-            vendor_options=vendor_opts,
-            on_saved=lambda: _on_estimate_cost_builder_saved(eid),
-        )
+            render_cost_builder_tab(
+                est,
+                pricing_guide_options=pg_opts,
+                inventory_options=inv_opts,
+                asset_options=asset_opts,
+                vendor_options=vendor_opts,
+                on_saved=lambda: _on_estimate_cost_builder_saved(eid),
+            )
 
     with tab_markups:
-        render_markups_tab(est)
+        if editing_locked:
+            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to change markups.")
+        else:
+            render_markups_tab(est)
 
     with tab_summary:
         render_summary_tab(est)
@@ -1124,6 +1272,162 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         placeholder_html("Estimate activity history will appear here when connected to Supabase.")
 
 
+def _render_estimate_revision_panel(est: dict) -> None:
+    """Explicit approved-estimate revision workflow (protects linked job contract until applied)."""
+    eid = str(est.get("id") or "").strip()
+    if not eid or is_demo_id(eid) or not estimate_visible_in_approved_view(est):
+        return
+    if not _can_revise_approved_estimate():
+        st.caption("This estimate is approved. Contact an administrator or estimator if changes are needed.")
+        return
+
+    baseline = _get_revise_baseline(est)
+    in_revise = _is_in_revise_mode(est)
+    rev_no = int(est.get("revision_number") or 1)
+
+    if in_revise and baseline:
+        approved_price = _safe_float_revision(baseline.get("approved_customer_price"))
+        current_price = _estimate_customer_price_amount(est)
+        job_awarded = _safe_float_revision((baseline.get("job") or {}).get("awarded_amount"))
+        st.markdown(
+            f'<div class="ips-est-revision-banner">'
+            f"<strong>Revision in progress</strong> — approved Rev {rev_no} values are protected. "
+            f"Approved customer price: <strong>{html.escape(fmt_currency(approved_price))}</strong>"
+            f"{f' · Linked job contract: <strong>{html.escape(fmt_currency(job_awarded))}</strong>' if job_awarded > 0 else ''}"
+            f"{f' · Current working total: <strong>{html.escape(fmt_currency(current_price))}</strong>' if abs(current_price - approved_price) > 0.01 else ''}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.session_state.get(_REVISE_COMPLETE_CONFIRM_PREFIX + eid):
+            st.markdown("**Complete this revision?**")
+            st.caption(
+                "Saving records a new revision snapshot. The linked job contract stays unchanged unless you opt in below."
+            )
+            st.text_area(
+                "Completion note",
+                key=f"est_revise_complete_note_{eid}",
+                placeholder="What changed and why…",
+                height=70,
+            )
+            st.checkbox(
+                "Update linked job contract value to the new customer price",
+                key=f"est_revise_update_job_{eid}",
+            )
+            c1, c2 = st.columns(2, gap="small")
+            with c1:
+                if st.button("Confirm Complete Revision", key=f"est_revise_complete_ok_{eid}", type="primary", use_container_width=True):
+                    note = str(st.session_state.get(f"est_revise_complete_note_{eid}") or "").strip()
+                    update_job = bool(st.session_state.get(f"est_revise_update_job_{eid}"))
+                    result = complete_approved_estimate_revision(
+                        eid,
+                        note=note,
+                        update_job_contract=update_job,
+                    )
+                    if result.ok:
+                        try:
+                            from app.services.phase2_modules_service import clear_all_data_caches
+                        except ImportError:
+                            from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                        clear_all_data_caches()
+                        _refresh_estimate_modal_cache(eid)
+                        _exit_revise_mode(est)
+                        msg = "Revision completed."
+                        if result.error:
+                            msg = f"{msg} {result.error}"
+                        st.success(msg)
+                        st.rerun()
+                    st.error(result.error or "Could not complete revision.")
+            with c2:
+                if st.button("Back", key=f"est_revise_complete_back_{eid}", use_container_width=True):
+                    st.session_state.pop(_REVISE_COMPLETE_CONFIRM_PREFIX + eid, None)
+                    st.rerun()
+            return
+
+        if st.session_state.get(_REVISE_CANCEL_CONFIRM_PREFIX + eid):
+            st.warning(
+                "Cancel revision? Approved estimate totals on this record will be restored. "
+                "Cost Builder line edits are not automatically reverted."
+            )
+            c1, c2 = st.columns(2, gap="small")
+            with c1:
+                if st.button("Confirm Cancel Revision", key=f"est_revise_cancel_ok_{eid}", use_container_width=True):
+                    result = cancel_approved_estimate_revision(eid, baseline_snapshot=baseline)
+                    if result.ok:
+                        try:
+                            from app.services.phase2_modules_service import clear_all_data_caches
+                        except ImportError:
+                            from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+                        clear_all_data_caches()
+                        _refresh_estimate_modal_cache(eid)
+                        _exit_revise_mode(est)
+                        st.info("Revision cancelled. Linked job contract was not changed.")
+                        st.rerun()
+                    st.error(result.error or "Could not cancel revision.")
+            with c2:
+                if st.button("Keep revising", key=f"est_revise_cancel_back_{eid}", use_container_width=True):
+                    st.session_state.pop(_REVISE_CANCEL_CONFIRM_PREFIX + eid, None)
+                    st.rerun()
+            return
+
+        c1, c2 = st.columns(2, gap="small")
+        with c1:
+            if st.button("Complete Revision", key=f"est_revise_complete_open_{eid}", type="primary", use_container_width=True):
+                st.session_state[_REVISE_COMPLETE_CONFIRM_PREFIX + eid] = True
+                st.rerun()
+        with c2:
+            if st.button("Cancel Revision", key=f"est_revise_cancel_open_{eid}", use_container_width=True):
+                st.session_state[_REVISE_CANCEL_CONFIRM_PREFIX + eid] = True
+                st.rerun()
+        return
+
+    st.caption(
+        "This estimate is approved and locked. Start an explicit revision to adjust pricing or details. "
+        "The linked job contract value stays pinned until you complete the revision and choose to update it."
+    )
+
+    if st.session_state.get(_REVISE_BEGIN_CONFIRM_PREFIX + eid):
+        st.markdown("**Start revising this approved estimate?**")
+        st.caption(
+            "A snapshot of the approved estimate and linked job contract will be saved before any edits."
+        )
+        st.text_area(
+            "Revision reason",
+            key=f"est_revise_begin_note_{eid}",
+            placeholder="Describe why this approved estimate needs to change…",
+            height=70,
+        )
+        c1, c2 = st.columns(2, gap="small")
+        with c1:
+            if st.button("Start Revision", key=f"est_revise_begin_ok_{eid}", type="primary", use_container_width=True):
+                note = str(st.session_state.get(f"est_revise_begin_note_{eid}") or "").strip()
+                result = begin_approved_estimate_revision(eid, note=note)
+                if result.ok and isinstance(result.data, dict):
+                    snapshot = result.data.get("snapshot")
+                    if isinstance(snapshot, dict):
+                        _enter_revise_mode(est, snapshot)
+                        st.session_state.pop(_REVISE_BEGIN_CONFIRM_PREFIX + eid, None)
+                        st.success("Revision started. You can now edit this estimate.")
+                        st.rerun()
+                st.error(result.error or "Could not start revision.")
+        with c2:
+            if st.button("Back", key=f"est_revise_begin_back_{eid}", use_container_width=True):
+                st.session_state.pop(_REVISE_BEGIN_CONFIRM_PREFIX + eid, None)
+                st.rerun()
+        return
+
+    if st.button("Revise Approved Estimate", key=f"est_revise_open_{eid}", type="primary", use_container_width=False):
+        st.session_state[_REVISE_BEGIN_CONFIRM_PREFIX + eid] = True
+        st.rerun()
+
+
+def _safe_float_revision(value: object) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _render_estimate_actions_panel(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     if is_edit_mode(_MOD, rk):
@@ -1135,6 +1439,7 @@ def _render_estimate_actions_panel(est: dict) -> None:
     def _after_action() -> None:
         _clear_estimates_detail_modal()
 
+    _render_estimate_revision_panel(est)
     render_estimate_action_buttons(est, on_approve=_after_action, on_delete=_after_action)
 
 
@@ -1156,15 +1461,20 @@ def render_estimate_detail_dialog(est: dict) -> None:
     render_modal_shell()
     render_modal_header(title=en, subtitle=project, status=status)
 
-    btn1, btn2 = st.columns(2, gap="small")
-    with btn1:
-        if st.button("Edit", key=f"estimates_modal_edit_{rk}", use_container_width=True):
-            _set_estimate_edit_mode(est)
-            st.rerun()
-    with btn2:
-        if st.button("Build Estimate", key=f"estimates_modal_build_{rk}", use_container_width=True):
-            _set_estimate_build_mode(est)
-            st.rerun()
+    editing_locked = _approved_estimate_editing_locked(est)
+    if editing_locked:
+        st.caption("Approved estimate — locked until you start a revision.")
+    else:
+        btn1, btn2 = st.columns(2, gap="small")
+        with btn1:
+            if st.button("Edit", key=f"estimates_modal_edit_{rk}", use_container_width=True):
+                _set_estimate_edit_mode(est)
+                st.rerun()
+        with btn2:
+            label = "Build Estimate" if not _is_in_revise_mode(est) else "Open Cost Builder"
+            if st.button(label, key=f"estimates_modal_build_{rk}", use_container_width=True):
+                _set_estimate_build_mode(est)
+                st.rerun()
 
     render_modal_meta_grid(
         [
@@ -1308,6 +1618,7 @@ def render() -> None:
     if not begin_module("estimates"):
         return
     inject_estimates_module_css()
+    inject_estimates_page_layout_css()
     st.markdown('<div class="ips-estimates-page"></div>', unsafe_allow_html=True)
     rows = load_estimates()
     filter_options = build_filter_options(rows, _ESTIMATE_COLUMN_FILTER_SPECS)
@@ -1330,11 +1641,53 @@ def render() -> None:
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()
 
+    def _filters() -> None:
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search estimate #, project, customer, status…",
+                key="estimates_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "View",
+                _ESTIMATES_VIEW_OPTIONS,
+                key="estimates_view",
+                label_visibility="collapsed",
+            )
+        with c3:
+            if st.button("Clear", key="estimates_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _ESTIMATE_BAR_FILTER_FIELDS,
+                    extra_keys=["estimates_search", "estimates_view"],
+                )
+                st.session_state["estimates_view"] = _ESTIMATES_DEFAULT_VIEW
+                _clear_estimate_selection(st.session_state.get(_ALL_ESTIMATE_IDS_KEY))
+                st.rerun()
+
+    render_estimates_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_estimates_filter_bar_shell()
+
     filtered = _filter_rows(
         rows,
-        q="",
+        q=str(st.session_state.get("estimates_search") or "").strip(),
         date_range=None,
-        view_filter="Active Estimates",
+        view_filter=str(st.session_state.get("estimates_view") or _ESTIMATES_DEFAULT_VIEW),
+    )
+
+    summary = _estimates_summary_counts(filtered)
+    render_estimates_summary_cards(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        draft=int(summary["draft"]),
+        sent=int(summary["sent"]),
+        approved=int(summary["approved"]),
+        total_customer_value=float(summary["total_customer_value"]),
+        has_value_data=bool(summary.get("has_any_value")),
     )
 
     rows_by_id = {str(r.get("id") or ""): r for r in rows if str(r.get("id") or "").strip()}
@@ -1348,8 +1701,6 @@ def render() -> None:
             mime="text/csv",
             key="est_export_download",
         )
-
-    st.caption(f"{len(filtered)} estimate(s)")
 
     build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
     _render_custom_estimates_table(filtered, filter_options=filter_options)
