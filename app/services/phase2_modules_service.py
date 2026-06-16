@@ -191,6 +191,20 @@ def _estimate_json_markup_patch(
     return {"estimate_json": ej}
 
 
+def _estimate_json_expiration_patch(
+    manual_override: bool,
+    cols: frozenset[str],
+    *,
+    row_id: str | None,
+    existing_row: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if cols and "estimate_json" not in cols:
+        return {}
+    ej = _load_estimate_json_for_patch(row_id=row_id, existing_row=existing_row)
+    ej["expiration_manual_override"] = bool(manual_override)
+    return {"estimate_json": ej}
+
+
 def _estimate_row_title(row: dict[str, Any], *keys: str) -> str:
     for key in keys:
         val = str(row.get(key) or "").strip()
@@ -549,6 +563,16 @@ def normalize_estimate(
         customer = "—"
     display_project = estimate_project_title(row)
     global_mk = _global_markup_from_row(row)
+    try:
+        from app.services.estimate_expiration_service import (
+            effective_expiration_iso,
+            expiration_is_manual_override,
+        )
+    except ImportError:
+        from services.estimate_expiration_service import (  # type: ignore
+            effective_expiration_iso,
+            expiration_is_manual_override,
+        )
     return {
         "id": eid or num,
         "estimate_number": num,
@@ -559,7 +583,8 @@ def normalize_estimate(
         "customer_contact_id": str(row.get("customer_contact_id") or ""),
         "job_id": str(row.get("job_id") or ""),
         "estimate_date": str(row.get("estimate_date") or row.get("created_at") or "")[:10],
-        "expiration_date": str(row.get("expiration_date") or row.get("valid_through") or "")[:10],
+        "expiration_date": effective_expiration_iso(row),
+        "expiration_manual_override": expiration_is_manual_override(row),
         "total": customer_price,
         "customer_price": customer_price,
         "total_cost": total_cost,
@@ -1365,6 +1390,27 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     else:
         cust_resp = str(ui.get("customer_responsibilities") or "").strip()
 
+    try:
+        from app.services.estimate_expiration_service import resolve_expiration_for_save
+    except ImportError:
+        from services.estimate_expiration_service import resolve_expiration_for_save  # type: ignore
+
+    manual_override = ui.get("expiration_manual_override")
+    if manual_override is None and existing:
+        try:
+            from app.services.estimate_expiration_service import expiration_is_manual_override
+        except ImportError:
+            from services.estimate_expiration_service import expiration_is_manual_override  # type: ignore
+        manual_flag = expiration_is_manual_override(existing)
+    else:
+        manual_flag = bool(manual_override)
+
+    resolved_expiration, resolved_manual = resolve_expiration_for_save(
+        estimate_date=ui.get("estimate_date"),
+        expiration_date=ui.get("expiration_date"),
+        manual_override=manual_flag,
+    )
+
     payload = {
         "quote_number": quote_number or None,
         "customer_name": ui.get("customer"),
@@ -1374,7 +1420,7 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "job_id": ui.get("job_id") or None,
         "status": ui.get("status") or "Draft",
         "estimate_date": ui.get("estimate_date") or None,
-        "expiration_date": ui.get("expiration_date") or None,
+        "expiration_date": resolved_expiration,
         "prepared_by_name": ui.get("created_by") or ui.get("prepared_by_name"),
         "description": desc_text or None,
         "scope_of_work": scope_text or None,
@@ -1424,6 +1470,14 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
                 existing_row=existing or None,
             )
         )
+    payload.update(
+        _estimate_json_expiration_patch(
+            resolved_manual,
+            cols,
+            row_id=row_id,
+            existing_row=existing or None,
+        )
+    )
     payload = {k: v for k, v in payload.items() if v is not None}
     if cols and "customer_name" not in cols:
         payload.pop("customer_name", None)

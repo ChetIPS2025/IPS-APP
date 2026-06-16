@@ -20,7 +20,12 @@ def _text(val: Any, default: str = "") -> str:
 
 def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict[str, Any]:
     """Map Phase 2B estimate fields onto the legacy proposal export shape."""
-    out = dict(estimate)
+    try:
+        from app.services.estimate_expiration_service import with_effective_expiration
+    except ImportError:
+        from services.estimate_expiration_service import with_effective_expiration  # type: ignore
+
+    out = with_effective_expiration(dict(estimate))
     out["quote_number"] = _text(out.get("quote_number") or out.get("estimate_number"))
     out["prepared_by_name"] = _text(out.get("prepared_by_name") or out.get("created_by") or out.get("prepared_by"))
     out["scope_of_work"] = _text(out.get("scope_of_work") or out.get("description"))
@@ -43,7 +48,8 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
                 columns=(
                     "id,quote_number,scope_of_work,customer_responsibilities,estimate_description,"
                     "prepared_by_id,prepared_by_name,customer_id,customer_contact_id,contact_name,job_id,"
-                    "proposal_total,final_bid,total,customer_price,grand_total"
+                    "proposal_total,final_bid,total,customer_price,grand_total,estimate_date,expiration_date,"
+                    "created_at,estimate_json"
                 ),
             )
         except Exception:
@@ -65,11 +71,16 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
                 "total",
                 "customer_price",
                 "grand_total",
+                "estimate_date",
+                "expiration_date",
+                "created_at",
+                "estimate_json",
             ):
                 if row.get(key) not in (None, ""):
                     out[key] = row[key]
             if not out.get("contact_name"):
                 out["contact_name"] = _proposal_contact_name_for_export(out)
+            out = with_effective_expiration(out)
 
     return out
 

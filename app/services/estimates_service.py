@@ -84,6 +84,14 @@ from app.services.estimate_revision_service import (
     complete_approved_estimate_revision,
     pin_linked_job_contract_from_estimate,
 )
+from app.services.estimate_expiration_service import (
+    effective_expiration_date,
+    effective_expiration_iso,
+    estimate_date_for_expiration,
+    format_effective_expiration,
+    format_estimate_date,
+    with_effective_expiration,
+)
 from app.services.proposal_pdf_service import (
     build_customer_quote_bundle,
     generate_estimate_proposal_pdf,
@@ -157,7 +165,13 @@ __all__ = [
     "build_estimate_revision_snapshot",
     "cancel_approved_estimate_revision",
     "complete_approved_estimate_revision",
+    "effective_expiration_date",
+    "effective_expiration_iso",
+    "estimate_date_for_expiration",
+    "format_effective_expiration",
+    "format_estimate_date",
     "pin_linked_job_contract_from_estimate",
+    "with_effective_expiration",
     "save_estimate",
     "save_estimate_line_item",
     "update_estimate_equipment",

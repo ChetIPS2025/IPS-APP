@@ -100,6 +100,8 @@ class ProposalViewModel:
     prepared_by: str
     prepared_by_phone: str
     date_display: str
+    estimate_date_display: str
+    expiration_display: str
 
 
 def build_proposal_view_model(
@@ -139,6 +141,20 @@ def build_proposal_view_model(
     phone = _s(prepared_by_phone)
     if not phone:
         phone = _DEFAULT_QUOTE_FOOTER_PHONE
+    try:
+        from app.services.estimate_expiration_service import (
+            effective_expiration_date,
+            estimate_date_for_expiration,
+            format_proposal_long_date,
+        )
+    except ImportError:
+        from services.estimate_expiration_service import (  # type: ignore
+            effective_expiration_date,
+            estimate_date_for_expiration,
+            format_proposal_long_date,
+        )
+    est_d = estimate_date_for_expiration(est)
+    exp_d = effective_expiration_date(est)
     return ProposalViewModel(
         job_title_token=job_title_token,
         quote_number=_s(est.get("quote_number")),
@@ -150,6 +166,8 @@ def build_proposal_view_model(
         prepared_by=_s(prepared),
         prepared_by_phone=phone,
         date_display=datetime.now().strftime("%B %d, %Y"),
+        estimate_date_display=format_proposal_long_date(est_d),
+        expiration_display=format_proposal_long_date(exp_d),
     )
 
 
@@ -166,6 +184,9 @@ def proposal_placeholder_map_from_view_model(vm: ProposalViewModel) -> dict[str,
         "DATE": vm.date_display,
         "PREPARED_BY": vm.prepared_by,
         "PREPARED_BY_PHONE": vm.prepared_by_phone,
+        "ESTIMATE_DATE": vm.estimate_date_display,
+        "VALID_THROUGH": vm.expiration_display,
+        "EXPIRATION_DATE": vm.expiration_display,
     }
 
 
@@ -199,6 +220,8 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
     resp_body = _esc_body(vm.customer_responsibilities)
     prep = html.escape(vm.prepared_by)
     dt = html.escape(vm.date_display)
+    est_dt = html.escape(vm.estimate_date_display) if vm.estimate_date_display else "\u2014"
+    exp_dt = html.escape(vm.expiration_display) if vm.expiration_display else "\u2014"
     phone = html.escape(vm.prepared_by_phone)
     footer_contact = html.escape(vm.prepared_by)
     footer_phone = html.escape(vm.prepared_by_phone or _DEFAULT_QUOTE_FOOTER_PHONE)
@@ -237,6 +260,8 @@ def render_proposal_preview_page_html(vm: ProposalViewModel | None) -> str:
 </div>
 <div class="ips-ph-close-block">
 <div class="ips-ph-prep-line"><span class="ips-ph-meta-k">Prepared By:</span> {prep}</div>
+<div class="ips-ph-est-date-line"><span class="ips-ph-meta-k">Estimate Date:</span> {est_dt}</div>
+<div class="ips-ph-exp-date-line"><span class="ips-ph-meta-k">Valid Through:</span> {exp_dt}</div>
 <div class="ips-ph-date-line"><span class="ips-ph-meta-k">Date:</span> {dt}</div>
 </div>
 <div class="ips-ph-footer-rule" aria-hidden="true"></div>

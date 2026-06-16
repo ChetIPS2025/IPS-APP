@@ -91,6 +91,13 @@ try:
     )
     from app.styles import inject_estimates_module_css
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.services.estimate_expiration_service import (
+        default_expiration_date,
+        effective_expiration_date,
+        ensure_estimate_expiration_persisted,
+        format_effective_expiration,
+        format_estimate_date,
+    )
 except ImportError:
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -175,6 +182,13 @@ except ImportError:
     )
     from styles import inject_estimates_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from services.estimate_expiration_service import (  # type: ignore
+        default_expiration_date,
+        effective_expiration_date,
+        ensure_estimate_expiration_persisted,
+        format_effective_expiration,
+        format_estimate_date,
+    )
 
 _SEL = select_key("estimates")
 _MOD = "estimates"
@@ -1024,6 +1038,52 @@ def _refresh_estimate_modal_cache(estimate_id: str) -> None:
         st.session_state[_ESTIMATES_CACHE_KEY] = cache
 
 
+def _estimate_expiration_display(est: dict) -> str:
+    return format_effective_expiration(est)
+
+
+def _mark_edit_expiration_manual(eid: str) -> None:
+    st.session_state[f"est_edit_exp_manual_{eid}"] = True
+
+
+def _mark_new_expiration_manual() -> None:
+    st.session_state["est_new_exp_manual"] = True
+
+
+def _sync_edit_expiration_from_estimate_date(eid: str) -> None:
+    est_key = f"est_edit_est_date_{eid}"
+    exp_key = f"est_edit_exp_date_{eid}"
+    manual_key = f"est_edit_exp_manual_{eid}"
+    prev_key = f"est_edit_est_date_prev_{eid}"
+    est_d = st.session_state.get(est_key)
+    if not isinstance(est_d, date):
+        est_d = _as_date(est_d)
+    prev = st.session_state.get(prev_key)
+    if isinstance(prev, str):
+        prev = _as_date(prev)
+    if est_d and est_d != prev and not st.session_state.get(manual_key):
+        default_exp = default_expiration_date(est_d)
+        if default_exp:
+            st.session_state[exp_key] = default_exp
+    if est_d:
+        st.session_state[prev_key] = est_d
+
+
+def _sync_new_expiration_from_estimate_date() -> None:
+    est_d = st.session_state.get("est_new_est_date")
+    if not isinstance(est_d, date):
+        est_d = _as_date(est_d)
+    prev = st.session_state.get("est_new_est_date_prev")
+    if isinstance(prev, str):
+        prev = _as_date(prev)
+    if est_d and est_d != prev and not st.session_state.get("est_new_exp_manual"):
+        default_exp = default_expiration_date(est_d)
+        if default_exp:
+            st.session_state["est_new_exp_date"] = default_exp
+    if est_d:
+        st.session_state["est_new_est_date_prev"] = est_d
+
+
 def _seed_estimate_edit_form(est: dict) -> None:
     eid = str(est.get("id") or "")
     st.session_state[f"est_edit_num_{eid}"] = str(est.get("estimate_number") or "")
@@ -1033,8 +1093,12 @@ def _seed_estimate_edit_form(est: dict) -> None:
     st.session_state[f"est_edit_status_{eid}"] = str(est.get("status") or "Draft")
     st.session_state[f"est_edit_notes_{eid}"] = str(est.get("notes") or "")
     st.session_state.pop(f"est_sow_seeded_{eid}", None)
-    st.session_state[f"est_edit_est_date_{eid}"] = _as_date(est.get("estimate_date")) or date.today()
-    st.session_state[f"est_edit_exp_date_{eid}"] = _as_date(est.get("expiration_date")) or (date.today() + timedelta(days=30))
+    est_d = _as_date(est.get("estimate_date")) or date.today()
+    exp_d = effective_expiration_date(est) or default_expiration_date(est_d) or (date.today() + timedelta(days=30))
+    st.session_state[f"est_edit_est_date_{eid}"] = est_d
+    st.session_state[f"est_edit_exp_date_{eid}"] = exp_d
+    st.session_state[f"est_edit_exp_manual_{eid}"] = bool(est.get("expiration_manual_override"))
+    st.session_state[f"est_edit_est_date_prev_{eid}"] = est_d
     st.session_state.pop(f"est_edit_contact_{eid}", None)
     st.session_state.pop(f"est_edit_location_{eid}", None)
     st.session_state.pop(f"est_edit_job_{eid}", None)
@@ -1067,6 +1131,8 @@ def _render_estimate_edit_form(est: dict) -> None:
         st.caption("Demo records cannot be edited until saved to Supabase.")
         return
 
+    _sync_edit_expiration_from_estimate_date(eid)
+
     ec1, ec2 = st.columns(2)
     with ec1:
         st.text_input("Estimate #", key=f"est_edit_num_{eid}")
@@ -1093,7 +1159,24 @@ def _render_estimate_edit_form(est: dict) -> None:
         )
         st.selectbox("Status", lookup_options("estimate_statuses"), key=f"est_edit_status_{eid}", disabled=_is_in_revise_mode(est))
         st.date_input("Estimate date", key=f"est_edit_est_date_{eid}")
-        st.date_input("Expiration date", key=f"est_edit_exp_date_{eid}")
+        st.date_input(
+            "Expiration date",
+            key=f"est_edit_exp_date_{eid}",
+            on_change=_mark_edit_expiration_manual,
+            args=(eid,),
+        )
+        if st.session_state.get(f"est_edit_exp_manual_{eid}"):
+            if st.button("Reset expiration to estimate date + 30 days", key=f"est_edit_exp_reset_{eid}"):
+                st.session_state[f"est_edit_exp_manual_{eid}"] = False
+                est_d = st.session_state.get(f"est_edit_est_date_{eid}")
+                if not isinstance(est_d, date):
+                    est_d = _as_date(est_d)
+                default_exp = default_expiration_date(est_d) if est_d else None
+                if default_exp:
+                    st.session_state[f"est_edit_exp_date_{eid}"] = default_exp
+                st.rerun()
+        else:
+            st.caption("Expiration follows estimate date + 30 days until you change it.")
     with ec2:
         job_opts = _job_select_options(cust_name)
         job_labels = [label for label, _ in job_opts]
@@ -1140,6 +1223,7 @@ def _render_estimate_edit_form(est: dict) -> None:
                 "status": status_val,
                 "estimate_date": str(st.session_state.get(f"est_edit_est_date_{eid}")),
                 "expiration_date": str(st.session_state.get(f"est_edit_exp_date_{eid}")),
+                "expiration_manual_override": bool(st.session_state.get(f"est_edit_exp_manual_{eid}")),
                 "notes": st.session_state.get(f"est_edit_notes_{eid}"),
             },
             row_id=eid,
@@ -1188,8 +1272,8 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             f"{detail_field_html('Customer', customer)}"
             f"{detail_field_html('Contact', _contact_label_for_estimate(est))}"
             f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
-            f"{detail_field_html('Estimate date', fmt_date(est.get('estimate_date')))}"
-            f"{detail_field_html('Expiration', fmt_date(est.get('expiration_date')))}"
+            f"{detail_field_html('Estimate date', format_estimate_date(est))}"
+            f"{detail_field_html('Expiration', _estimate_expiration_display(est))}"
             f"{detail_field_html('Linked Job', est.get('job_number'))}"
             f"</div>"
         )
@@ -1446,6 +1530,8 @@ def _render_estimate_actions_panel(est: dict) -> None:
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
+    if eid and not is_demo_id(eid):
+        ensure_estimate_expiration_persisted(eid)
     if eid and not is_demo_id(eid) and _estimate_rollups_are_stale(est):
         _sync_estimate_rollups_if_stale(eid)
     fresh = get_estimate(eid) if eid else None
@@ -1514,12 +1600,36 @@ def _show_new_estimate_dialog() -> None:
     clear_new_estimate_number_state()
     if "est_new_est_date" not in st.session_state:
         st.session_state["est_new_est_date"] = date.today()
+    if "est_new_exp_manual" not in st.session_state:
+        st.session_state["est_new_exp_manual"] = False
+    if "est_new_exp_date" not in st.session_state:
+        st.session_state["est_new_exp_date"] = default_expiration_date(st.session_state["est_new_est_date"])
+    if "est_new_est_date_prev" not in st.session_state:
+        st.session_state["est_new_est_date_prev"] = st.session_state["est_new_est_date"]
+
+    _sync_new_expiration_from_estimate_date()
 
     customers = customer_filter_options()
     nc1, nc2 = st.columns(2)
     with nc2:
-        st.date_input("Estimate date", value=date.today(), key="est_new_est_date")
-        st.date_input("Expiration date", value=date.today() + timedelta(days=30), key="est_new_exp_date")
+        st.date_input("Estimate date", key="est_new_est_date")
+        st.date_input(
+            "Expiration date",
+            key="est_new_exp_date",
+            on_change=_mark_new_expiration_manual,
+        )
+        if st.session_state.get("est_new_exp_manual"):
+            if st.button("Reset expiration to estimate date + 30 days", key="est_new_exp_reset"):
+                st.session_state["est_new_exp_manual"] = False
+                est_d = st.session_state.get("est_new_est_date")
+                if not isinstance(est_d, date):
+                    est_d = _as_date(est_d)
+                default_exp = default_expiration_date(est_d) if est_d else None
+                if default_exp:
+                    st.session_state["est_new_exp_date"] = default_exp
+                st.rerun()
+        else:
+            st.caption("Expiration follows estimate date + 30 days until you change it.")
         st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
         st.caption("A linked job in **Estimate Pending** status is created automatically when you save.")
     with nc1:
@@ -1569,6 +1679,7 @@ def _show_new_estimate_dialog() -> None:
                     "status": st.session_state.get("est_new_status") or "Draft",
                     "estimate_date": str(st.session_state.get("est_new_est_date")),
                     "expiration_date": str(st.session_state.get("est_new_exp_date")),
+                    "expiration_manual_override": bool(st.session_state.get("est_new_exp_manual")),
                     "scope_of_work": st.session_state.get("est_new_sow"),
                     "notes": st.session_state.get("est_new_notes"),
                 }

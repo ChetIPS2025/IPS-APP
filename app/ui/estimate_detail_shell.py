@@ -224,16 +224,21 @@ def _fmt_date_short(v: Any) -> str:
         return s[:10] if len(s) >= 10 else s
 
 
-def _valid_through_html(base_date: Any) -> str:
-    if not base_date:
+def _valid_through_html(expiration_date: Any) -> str:
+    """Render valid-through date (already resolved; not estimate date + 30)."""
+    if not expiration_date:
         return "—"
     try:
-        s = str(base_date).strip()
-        if "T" in s:
-            d0 = datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+        if isinstance(expiration_date, date):
+            valid = expiration_date
+        elif isinstance(expiration_date, datetime):
+            valid = expiration_date.date()
         else:
-            d0 = date.fromisoformat(s[:10])
-        valid = d0 + timedelta(days=30)
+            s = str(expiration_date).strip()
+            if "T" in s:
+                valid = datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+            else:
+                valid = date.fromisoformat(s[:10])
         days = (valid - date.today()).days
         vt = valid.strftime("%b %d, %Y")
         if days > 0:
@@ -244,7 +249,7 @@ def _valid_through_html(base_date: Any) -> str:
             extra = f' <span style="color:#dc2626;font-weight:600;">({abs(days)} days ago)</span>'
         return html.escape(vt) + extra
     except Exception:
-        return html.escape(_fmt_date_short(base_date))
+        return html.escape(_fmt_date_short(expiration_date))
 
 
 def render_breadcrumb(*, quote_label: str, tab_label: str) -> None:

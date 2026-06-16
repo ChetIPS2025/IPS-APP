@@ -38,6 +38,9 @@ _DOCX_CANONICAL_TOKENS: tuple[str, ...] = (
     "PREPARED_BY",
     "DATE",
     "PREPARED_BY_PHONE",
+    "ESTIMATE_DATE",
+    "VALID_THROUGH",
+    "EXPIRATION_DATE",
 )
 
 ESTIMATE_PROPOSAL_TEMPLATE_FILENAME = "estimate_template_autofill_logo_updated.docx"
@@ -424,6 +427,9 @@ def proposal_values_preview_html(vals: dict[str, str]) -> str:
         ("CUSTOMER_RESPONSIBILITIES", "Customer responsibilities"),
         ("PREPARED_BY", "Prepared by"),
         ("DATE", "Date"),
+        ("ESTIMATE_DATE", "Estimate date"),
+        ("VALID_THROUGH", "Valid through"),
+        ("EXPIRATION_DATE", "Expiration date"),
         ("PREPARED_BY_PHONE", "Phone"),
     )
     trs: list[str] = []
@@ -629,6 +635,9 @@ def _normalize_placeholder_tokens(text: str) -> str:
         (r"\{\{\s*Prepared\s*By\s*Phone\s*\}\}", "{{PREPARED_BY_PHONE}}"),
         (r"\{\{\s*Prepared\s*By\s*Phone\s*Number\s*\}\}", "{{PREPARED_BY_PHONE}}"),
         (r"\{\{\s*Date\s*\}\}", "{{DATE}}"),
+        (r"\{\{\s*Estimate\s*Date\s*\}\}", "{{ESTIMATE_DATE}}"),
+        (r"\{\{\s*Valid\s*Through\s*\}\}", "{{VALID_THROUGH}}"),
+        (r"\{\{\s*Expiration\s*Date\s*\}\}", "{{EXPIRATION_DATE}}"),
         (r"\{\{\s*Company\s+Logo\s*\}\}", "{{COMPANY_LOGO}}"),
     ]
     for pat, repl in explicit:

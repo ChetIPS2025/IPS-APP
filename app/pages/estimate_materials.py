@@ -96,6 +96,22 @@ _MODAL_KEY = "ips_mat_detail_modal_id"
 _CACHE_KEY = "_ips_mat_modal_by_id"
 
 
+def _estimate_materials_date(est: dict) -> str:
+    try:
+        from app.services.estimate_expiration_service import format_estimate_date
+    except ImportError:
+        from services.estimate_expiration_service import format_estimate_date  # type: ignore
+    return format_estimate_date(est)
+
+
+def _estimate_materials_expiration(est: dict) -> str:
+    try:
+        from app.services.estimate_expiration_service import format_effective_expiration
+    except ImportError:
+        from services.estimate_expiration_service import format_effective_expiration  # type: ignore
+    return format_effective_expiration(est)
+
+
 def _render_summary_card(est: dict) -> None:
     ot = "d" + "iv"
     st.markdown(f'<{ot} class="ips-summary-card">', unsafe_allow_html=True)
@@ -103,8 +119,8 @@ def _render_summary_card(est: dict) -> None:
     fields = [
         ("Client", str(est.get("customer") or "—")),
         ("Job", f"{est.get('job_number') or '—'} — {est.get('project_name') or ''}"),
-        ("Estimate Date", str(est.get("estimate_date") or "—")[:10]),
-        ("Valid Through", str(est.get("expiration_date") or "—")[:10]),
+        ("Estimate Date", _estimate_materials_date(est)),
+        ("Valid Through", _estimate_materials_expiration(est)),
         ("Prepared By", str(est.get("created_by") or "—")),
         ("Estimated Total", fmt_currency(est.get("total"))),
     ]
