@@ -9,6 +9,7 @@ from uuid import uuid4
 import streamlit as st
 
 try:
+    from app.auth import current_role
     from app.components.record_modal import detail_field_html, dialog_card_html, safe_value
     from app.pages._core._crud import is_demo_id
     from app.services.estimate_costing_service import (
@@ -33,7 +34,9 @@ try:
         delete_estimate_travel,
         get_estimate_bundle,
         recalculate_and_save_estimate_totals,
+        update_estimate_labor,
     )
+    from app.services.labor_rates_service import save_default_rates_from_lines
     from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
     from app.services.proposal_pdf_service import build_customer_quote_bundle
     from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
@@ -49,6 +52,7 @@ try:
     from app.utils.estimate_calculations import margin_warning_class
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
+    from auth import current_role  # type: ignore
     from components.record_modal import detail_field_html, dialog_card_html, safe_value  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.estimate_costing_service import (  # type: ignore
@@ -73,7 +77,9 @@ except ImportError:
         delete_estimate_travel,
         get_estimate_bundle,
         recalculate_and_save_estimate_totals,
+        update_estimate_labor,
     )
+    from services.labor_rates_service import save_default_rates_from_lines  # type: ignore
     from utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total, margin_warning_class  # type: ignore
     from services.estimate_builder_helpers import (  # type: ignore
         equipment_line_totals,
@@ -258,6 +264,25 @@ def _sync_labor_batch_row_role(
     st.session_state[k(f"str_{row_id}")] = float(opt.get("st_rate") or 0)
     st.session_state[k(f"otr_{row_id}")] = float(opt.get("ot_rate") or 0)
     st.session_state[last_key] = role
+
+
+def _labor_rates_differ_from_default(
+    role: str,
+    st_rate: float,
+    ot_rate: float,
+    lab_map: dict[str, dict[str, Any]],
+) -> bool:
+    opt = lab_map.get(role, {})
+    return (
+        abs(float(st_rate or 0) - float(opt.get("st_rate") or 0)) > 0.009
+        or abs(float(ot_rate or 0) - float(opt.get("ot_rate") or 0)) > 0.009
+    )
+
+
+def _labor_line_rate_text(row: dict[str, Any]) -> str:
+    st_r = float(row.get("st_rate") or 0)
+    ot_r = float(row.get("ot_rate") or 0)
+    return f"{fmt_currency(st_r)} / {fmt_currency(ot_r)}"
 
 
 def _clear_batch_form(*, form_state_key: str, draft_key: str) -> None:
@@ -833,12 +858,14 @@ def _render_add_labor_form(
         ]
 
     _compact_form_card("Add Labor")
-    st.caption("Enter multiple labor lines, then save them together.")
+    st.caption(
+        "Rates pre-fill from Pricing Guide → Labor Rates. Change ST/OT on a row to override for this estimate only."
+    )
 
-    hdr = st.columns([2.4, 0.85, 0.85, 0.95, 0.8, 0.95, 0.95, 0.55], gap="small")
+    hdr = st.columns([2.2, 0.75, 0.75, 0.85, 0.85, 0.7, 0.85, 0.85, 0.45], gap="small")
     for col, label in zip(
         hdr,
-        ("Role", "ST Hrs", "OT Hrs", "ST Rate", "Markup %", "Cost", "Price", ""),
+        ("Role", "ST Hrs", "OT Hrs", "ST Rate", "OT Rate", "Markup %", "Cost", "Price", ""),
     ):
         with col:
             st.markdown(
@@ -858,7 +885,7 @@ def _render_add_labor_form(
             lab_map=lab_map,
             default_markup=default_markup,
         )
-        cols = st.columns([2.4, 0.85, 0.85, 0.95, 0.8, 0.95, 0.95, 0.55], gap="small")
+        cols = st.columns([2.2, 0.75, 0.75, 0.85, 0.85, 0.7, 0.85, 0.85, 0.45], gap="small")
         with cols[0]:
             role = st.selectbox(
                 "Role",
@@ -893,6 +920,15 @@ def _render_add_labor_form(
                 label_visibility="collapsed",
             )
         with cols[4]:
+            ot_r = st.number_input(
+                "OT rate",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=k(f"otr_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[5]:
             markup = st.number_input(
                 "Markup %",
                 min_value=0.0,
@@ -900,21 +936,20 @@ def _render_add_labor_form(
                 key=k(f"mk_{rid}"),
                 label_visibility="collapsed",
             )
-        ot_r = float(st.session_state.get(k(f"otr_{rid}")) or 0)
         totals = labor_line_totals(st_h, ot_h, st_r, ot_r, markup)
-        with cols[5]:
+        with cols[6]:
             st.markdown(
                 f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
                 f"{html.escape(fmt_currency(totals['cost_total']))}</div>",
                 unsafe_allow_html=True,
             )
-        with cols[6]:
+        with cols[7]:
             st.markdown(
                 f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
                 f"{html.escape(fmt_currency(totals['price_total']))}</div>",
                 unsafe_allow_html=True,
             )
-        with cols[7]:
+        with cols[8]:
             if st.button("✕", key=k(f"rm_{rid}"), help="Remove row"):
                 remove_rid = rid
 
@@ -942,6 +977,14 @@ def _render_add_labor_form(
             st.session_state[draft_key] = draft_rows
             st.rerun()
 
+    save_as_default = False
+    if current_role() == "admin":
+        save_as_default = st.checkbox(
+            "Save modified rates as defaults for future estimates",
+            value=False,
+            key=k("save_defaults"),
+            help="Updates Pricing Guide labor rates. Does not change labor lines already saved on other estimates.",
+        )
     save_col, cancel_col, _ = st.columns([1, 1, 2], gap="small")
     with save_col:
         save_clicked = st.button(
@@ -985,9 +1028,24 @@ def _render_add_labor_form(
         else:
             ok, err = _service_ok(add_estimate_labor_batch(eid, payloads))
             if ok:
+                default_lines: list[dict[str, Any]] = []
+                if save_as_default:
+                    for row in payloads:
+                        role = str(row.get("role_name") or "")
+                        st_r = float(row.get("st_rate") or 0)
+                        ot_r = float(row.get("ot_rate") or 0)
+                        if _labor_rates_differ_from_default(role, st_r, ot_r, lab_map):
+                            default_lines.append(row)
+                    if default_lines:
+                        def_ok, def_err = _service_ok(save_default_rates_from_lines(default_lines))
+                        if not def_ok:
+                            st.warning(f"Labor lines saved, but defaults were not updated: {def_err}")
                 _clear_batch_form(form_state_key=fk, draft_key=draft_key)
                 count = len(payloads)
-                st.success(f"Saved {count} labor line{'s' if count != 1 else ''}.")
+                msg = f"Saved {count} labor line{'s' if count != 1 else ''}."
+                if save_as_default and default_lines:
+                    msg += f" Updated {len(default_lines)} default rate(s)."
+                st.success(msg)
                 st.rerun()
             st.error(err)
 
@@ -1617,19 +1675,7 @@ def _render_cost_builder_line_sections(est: dict[str, Any]) -> None:
     )
 
     st.markdown("#### Labor")
-    _render_deletable_lines(
-        eid,
-        ["Role", "ST/OT", "Cost", "Price"],
-        bundle["labor"],
-        row_cells=lambda r: [
-            html.escape(str(r.get("role_name") or "—")),
-            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}"),
-            html.escape(fmt_currency(r.get("cost_total"))),
-            html.escape(fmt_currency(r.get("price_total"))),
-        ],
-        delete_fn=delete_estimate_labor,
-        key_prefix="ecb_lab",
-    )
+    _render_labor_lines(eid, bundle["labor"], key_prefix="ecb_lab")
 
     st.markdown("#### Equipment")
     _render_deletable_lines(
@@ -1811,6 +1857,128 @@ def _render_deletable_lines(
                 st.error(err)
 
 
+def _render_labor_edit_form(
+    eid: str,
+    row: dict[str, Any],
+    *,
+    key_prefix: str,
+) -> None:
+    rid = str(row.get("id") or "")
+    pk = f"{key_prefix}_edit_{rid}"
+    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+    with c1:
+        st_hours = st.number_input(
+            "ST Hrs",
+            min_value=0.0,
+            step=0.5,
+            value=float(row.get("st_hours") or 0),
+            key=f"{pk}_sth",
+        )
+    with c2:
+        ot_hours = st.number_input(
+            "OT Hrs",
+            min_value=0.0,
+            step=0.5,
+            value=float(row.get("ot_hours") or 0),
+            key=f"{pk}_oth",
+        )
+    with c3:
+        st_rate = st.number_input(
+            "ST Rate",
+            min_value=0.0,
+            step=1.0,
+            format="%.2f",
+            value=float(row.get("st_rate") or 0),
+            key=f"{pk}_str",
+        )
+    with c4:
+        ot_rate = st.number_input(
+            "OT Rate",
+            min_value=0.0,
+            step=1.0,
+            format="%.2f",
+            value=float(row.get("ot_rate") or 0),
+            key=f"{pk}_otr",
+        )
+    with c5:
+        markup = st.number_input(
+            "Markup %",
+            min_value=0.0,
+            step=0.5,
+            value=float(row.get("markup_percent") or 0),
+            key=f"{pk}_mk",
+        )
+    s1, s2 = st.columns(2, gap="small")
+    with s1:
+        if st.button("Save line", key=f"{pk}_save", type="primary", use_container_width=True):
+            ok, err = _service_ok(
+                update_estimate_labor(
+                    rid,
+                    {
+                        "estimate_id": eid,
+                        "labor_type": row.get("labor_type") or row.get("role_name"),
+                        "role_name": row.get("role_name"),
+                        "description": row.get("description") or row.get("role_name"),
+                        "st_hours": st_hours,
+                        "ot_hours": ot_hours,
+                        "st_rate": st_rate,
+                        "ot_rate": ot_rate,
+                        "markup_percent": markup,
+                        "notes": row.get("notes") or "",
+                    },
+                )
+            )
+            if ok:
+                st.session_state.pop(f"{key_prefix}_edit_id", None)
+                st.rerun()
+            st.error(err)
+    with s2:
+        if st.button("Cancel", key=f"{pk}_cancel", use_container_width=True):
+            st.session_state.pop(f"{key_prefix}_edit_id", None)
+            st.rerun()
+
+
+def _render_labor_lines(
+    eid: str,
+    rows: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+) -> None:
+    if not rows:
+        st.caption("No lines yet.")
+        return
+    edit_id = str(st.session_state.get(f"{key_prefix}_edit_id") or "")
+    headers = ["Role", "ST/OT Hrs", "ST/OT Rate", "Cost", "Price"]
+    for row in rows:
+        rid = str(row.get("id") or "")
+        if edit_id == rid:
+            st.markdown(f"**Edit — {html.escape(str(row.get('role_name') or 'Labor'))}**")
+            _render_labor_edit_form(eid, row, key_prefix=key_prefix)
+            continue
+        cells = [
+            html.escape(str(row.get("role_name") or "—")),
+            html.escape(f"{row.get('st_hours', 0)}/{row.get('ot_hours', 0)}"),
+            html.escape(_labor_line_rate_text(row)),
+            html.escape(fmt_currency(row.get("cost_total"))),
+            html.escape(fmt_currency(row.get("price_total"))),
+        ]
+        c0, c_act = st.columns([8, 1.2], gap="small")
+        with c0:
+            _line_table(headers, [cells])
+        with c_act:
+            b1, b2 = st.columns(2, gap="small")
+            with b1:
+                if st.button("✎", key=f"{key_prefix}_edit_{rid}", help="Edit line"):
+                    st.session_state[f"{key_prefix}_edit_id"] = rid
+                    st.rerun()
+            with b2:
+                if st.button("✕", key=f"{key_prefix}_del_{rid}", help="Delete line"):
+                    ok, err = _service_ok(delete_estimate_labor(rid, estimate_id=eid))
+                    if ok:
+                        st.rerun()
+                    st.error(err)
+
+
 def render_materials_tab(
     est: dict[str, Any],
     *,
@@ -1852,19 +2020,7 @@ def render_materials_tab(
 def render_labor_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
     bundle = get_estimate_bundle(eid)
-    _render_deletable_lines(
-        eid,
-        ["Role", "ST/OT", "Cost", "Price"],
-        bundle["labor"],
-        row_cells=lambda r: [
-            html.escape(str(r.get("role_name") or "—")),
-            html.escape(f"{r.get('st_hours',0)}/{r.get('ot_hours',0)}"),
-            html.escape(fmt_currency(r.get("cost_total"))),
-            html.escape(fmt_currency(r.get("price_total"))),
-        ],
-        delete_fn=delete_estimate_labor,
-        key_prefix="lab_tab",
-    )
+    _render_labor_lines(eid, bundle["labor"], key_prefix="lab_tab")
     if st.button("+ Add Labor", key=f"lab_tab_add_{eid}"):
         st.session_state[f"lab_tab_form_{eid}"] = True
         st.rerun()

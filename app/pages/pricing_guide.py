@@ -44,6 +44,7 @@ try:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
+    from app.components.labor_rates_panel import render_labor_rates_panel
     from app.components.tabs import render_tabs
     from app.db import fetch_table, fetch_table_admin
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
@@ -120,6 +121,7 @@ except ImportError:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
+    from components.labor_rates_panel import render_labor_rates_panel  # type: ignore
     from components.tabs import render_tabs  # type: ignore
     from db import fetch_table, fetch_table_admin  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
@@ -1066,18 +1068,28 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    rows = _load_rows()
-    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
-
     def _pg_new() -> None:
         if st.button("+ New Pricing Item", key="pg_add", type="primary", use_container_width=True):
             st.session_state["pg_add_form"] = True
 
     render_page_brand_header(
         "Pricing Guide",
-        "Master estimating catalog: inventory materials, asset rentals, labor, travel, and estimate-only items.",
+        "Master estimating catalog: materials, asset rentals, default labor rates, travel, and estimate-only items.",
         actions=[_pg_new],
     )
+
+    main_tab = render_tabs(
+        ["Catalog", "Labor Rates"],
+        session_key="pg_main_tab",
+        default="Catalog",
+    )
+
+    if main_tab == "Labor Rates":
+        render_labor_rates_panel(key_prefix="pg_labor", show_header=False)
+        return
+
+    rows = _load_rows()
+    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 
     _render_summary_cards(rows)
 
