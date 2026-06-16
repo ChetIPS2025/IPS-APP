@@ -33,7 +33,8 @@ def render_job_cost_summary_cards(summary: dict[str, Any], *, compact: bool = Fa
     remaining_raw = summary.get("remaining_budget")
     remaining = float(remaining_raw or 0) if remaining_raw is not None else 0.0
     profit_cls = "ips-jc-card-negative" if profit < 0 else "ips-jc-card-profit"
-    remaining_cls = "ips-jc-card-remaining" if (has_estimated and remaining >= 0) else "ips-jc-card-negative"
+    remaining_available = has_contract or has_estimated
+    remaining_cls = "ips-jc-card-remaining" if (remaining_available and remaining >= 0) else "ips-jc-card-negative"
     margin_available = has_contract
     cards = [
         ("Contract Value", _money(summary.get("contract_value", 0), available=has_contract), "ips-jc-card-contract"),
@@ -41,8 +42,8 @@ def render_job_cost_summary_cards(summary: dict[str, Any], *, compact: bool = Fa
         ("Actual Cost", _money(summary.get("actual_cost", 0), available=has_actual), "ips-jc-card-actual"),
         (
             "Remaining Budget",
-            _money(remaining, available=has_estimated),
-            remaining_cls if has_estimated else "ips-jc-card-neutral",
+            _money(remaining, available=remaining_available),
+            remaining_cls if remaining_available else "ips-jc-card-neutral",
         ),
         (
             "Profit",

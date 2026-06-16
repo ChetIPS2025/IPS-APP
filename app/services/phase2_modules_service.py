@@ -331,7 +331,14 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "customer_contact_id": contact_id,
         "location": location_text,
         "location_name": location_text,
-        "estimate_number": str(row.get("estimate_number") or row.get("quote_number") or "—"),
+        "estimate_id": str(row.get("estimate_id") or "").strip(),
+        "source_estimate_number": str(row.get("source_estimate_number") or "").strip(),
+        "estimate_number": str(
+            row.get("estimate_number")
+            or row.get("source_estimate_number")
+            or row.get("quote_number")
+            or "—"
+        ),
         "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
         "status": str(row.get("status") or "Draft"),
         "start_date": str(row.get("start_date") or "")[:10],
@@ -356,6 +363,25 @@ def normalize_estimate(
     eid = str(row.get("id") or "").strip()
     num = str(row.get("quote_number") or row.get("estimate_number") or eid[:8] or "—")
     total_cost = _money_field(row, "total_cost", "subtotal", "material_sell_basis")
+    if total_cost <= 0:
+        total_cost = round(
+            sum(
+                _money_field(row, k)
+                for k in (
+                    "labor_cost",
+                    "labor_total",
+                    "material_cost",
+                    "material_total",
+                    "equipment_cost",
+                    "equipment_total",
+                    "travel_cost",
+                    "travel_total",
+                    "subcontractor_cost",
+                    "other_cost",
+                )
+            ),
+            2,
+        )
     customer_price = _money_field(row, "customer_price")
     if customer_price <= 0:
         customer_price = _money_field(
@@ -365,6 +391,24 @@ def normalize_estimate(
             "proposal_total",
             "final_bid",
         )
+    if customer_price <= 0:
+        customer_price = round(
+            sum(
+                _money_field(row, k)
+                for k in (
+                    "labor_total",
+                    "material_sell_basis",
+                    "material_total",
+                    "equipment_total",
+                    "travel_price",
+                    "travel_total",
+                    "other_cost",
+                )
+            ),
+            2,
+        )
+    if customer_price <= 0 and total_cost > 0:
+        customer_price = total_cost
     customer = str(row.get("customer_name") or row.get("customer") or "").strip()
     if not customer:
         cid = str(row.get("customer_id") or "").strip()

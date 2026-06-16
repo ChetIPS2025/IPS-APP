@@ -535,17 +535,40 @@ def _approved_estimate_for_job(job: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _estimate_selling_price(estimate: dict[str, Any]) -> float:
-    """Customer-facing selling price from an approved estimate."""
-    for key in ("customer_price", "total", "grand_total", "proposal_total", "final_bid"):
-        val = _safe_float(estimate.get(key))
-        if val > 0:
-            return val
-    return 0.0
+def _rollup_from_estimate_lines(estimate_id: str) -> tuple[float, float]:
+    """Sum costing line tables into (internal_cost, customer_price)."""
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return 0.0, 0.0
+    db = _db()
+    cost_total = 0.0
+    price_total = 0.0
+    line_specs = (
+        ("estimate_labor_lines", "cost_total", "price_total", "total"),
+        ("estimate_equipment", "cost_total", "price_total", None),
+        ("estimate_travel", "cost_total", "price_total", None),
+        ("estimate_line_items", "cost_total", "price_total", "total_cost"),
+        ("estimate_other_costs", "cost_total", "price_total", None),
+        ("estimate_subcontractors", "cost_total", "price_total", None),
+    )
+    for table, cost_col, price_col, alt_cost_col in line_specs:
+        try:
+            rows = db.fetch_by_match(table, {"estimate_id": eid}, limit=1000) or []
+        except Exception:
+            continue
+        for row in rows:
+            cost = _safe_float(row.get(cost_col))
+            if cost <= 0 and alt_cost_col:
+                cost = _safe_float(row.get(alt_cost_col))
+            price = _safe_float(row.get(price_col))
+            if price <= 0:
+                price = cost
+            cost_total += cost
+            price_total += price
+    return round(cost_total, 2), round(price_total, 2)
 
 
-def _estimate_internal_cost(estimate: dict[str, Any]) -> float:
-    """Internal cost basis from an approved estimate."""
+def _legacy_estimate_cost_rollup(estimate: dict[str, Any]) -> float:
     total = _safe_float(estimate.get("total_cost"))
     if total > 0:
         return total
@@ -559,14 +582,78 @@ def _estimate_internal_cost(estimate: dict[str, Any]) -> float:
             "labor_total",
             "material_cost",
             "material_total",
+            "material_sell_basis",
             "equipment_cost",
             "equipment_total",
             "travel_cost",
+            "travel_total",
             "subcontractor_cost",
             "other_cost",
         )
     )
     return round(parts, 2) if parts > 0 else 0.0
+
+
+def _legacy_estimate_selling_rollup(estimate: dict[str, Any]) -> float:
+    parts = sum(
+        _safe_float(estimate.get(k))
+        for k in (
+            "labor_total",
+            "material_sell_basis",
+            "material_total",
+            "equipment_total",
+            "travel_price",
+            "travel_total",
+            "other_cost",
+        )
+    )
+    return round(parts, 2) if parts > 0 else 0.0
+
+
+def _live_estimate_totals(estimate: dict[str, Any]) -> dict[str, float]:
+    eid = str(estimate.get("id") or "").strip()
+    if not eid:
+        return {}
+    try:
+        from app.services.estimate_costing_service import calculate_estimate_totals
+    except ImportError:
+        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    try:
+        return calculate_estimate_totals(eid)
+    except Exception:
+        return {}
+
+
+def _estimate_selling_price(estimate: dict[str, Any]) -> float:
+    """Customer-facing selling price from an approved estimate."""
+    for key in ("customer_price", "total", "grand_total", "proposal_total", "final_bid"):
+        val = _safe_float(estimate.get(key))
+        if val > 0:
+            return val
+    live = _live_estimate_totals(estimate)
+    customer_price = _safe_float(live.get("customer_price"))
+    if customer_price > 0:
+        return customer_price
+    _, line_price = _rollup_from_estimate_lines(str(estimate.get("id") or ""))
+    if line_price > 0:
+        return line_price
+    header_price = _legacy_estimate_selling_rollup(estimate)
+    if header_price > 0:
+        return header_price
+    return _legacy_estimate_cost_rollup(estimate)
+
+
+def _estimate_internal_cost(estimate: dict[str, Any]) -> float:
+    """Internal cost basis from an approved estimate."""
+    total = _legacy_estimate_cost_rollup(estimate)
+    if total > 0:
+        return total
+    live = _live_estimate_totals(estimate)
+    live_cost = _safe_float(live.get("total_cost"))
+    if live_cost > 0:
+        return live_cost
+    line_cost, _ = _rollup_from_estimate_lines(str(estimate.get("id") or ""))
+    return line_cost
 
 
 def _contract_value(job: dict[str, Any], estimate: dict[str, Any] | None = None) -> float:
@@ -647,9 +734,18 @@ def build_job_cost_summary(job: dict[str, Any], *, progress_pct: float | None = 
         else:
             other += amt
     actual = round(labor + material + equipment + subcontract + rental + other, 2)
-    remaining = round(estimated - actual, 2) if estimated > 0 else None
-    profit = round(contract - actual, 2) if contract > 0 else 0.0
-    margin_pct = round((profit / contract * 100.0), 1) if contract > 0 else 0.0
+    if contract > 0:
+        remaining = round(contract - actual, 2)
+    elif estimated > 0:
+        remaining = round(estimated - actual, 2)
+    else:
+        remaining = None
+    if contract > 0:
+        profit = round(contract - actual, 2) if actual > 0 else round(contract - estimated, 2)
+        margin_pct = round((profit / contract * 100.0), 1) if contract > 0 else 0.0
+    else:
+        profit = 0.0
+        margin_pct = 0.0
     variance = round(estimated - actual, 2) if estimated > 0 else round(contract - actual, 2)
     pct = progress_pct if progress_pct is not None else _task_progress_pct(jid)
     status = str(job.get("status") or "").strip().lower()

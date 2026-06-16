@@ -344,6 +344,25 @@ def _job_customer(job: dict) -> str:
     return "—"
 
 
+def _resolve_job_estimate_number(job: dict) -> str:
+    for key in ("estimate_number", "source_estimate_number", "quote_number"):
+        val = str(job.get(key) or "").strip()
+        if val and val != "—":
+            return val
+    jid = str(job.get("id") or "").strip()
+    eid = str(job.get("estimate_id") or "").strip()
+    for est in load_estimates():
+        if eid and str(est.get("id") or "") == eid:
+            num = str(est.get("estimate_number") or est.get("quote_number") or "").strip()
+            if num:
+                return num
+        if jid and str(est.get("job_id") or "") == jid:
+            num = str(est.get("estimate_number") or est.get("quote_number") or "").strip()
+            if num:
+                return num
+    return "—"
+
+
 def _job_supervisor(job: dict) -> str:
     for key in ("supervisor_name", "supervisor"):
         val = str(job.get(key) or "").strip()
@@ -1885,7 +1904,7 @@ def _render_job_detail_tabs(job: dict) -> None:
     status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
-    estimate_no = _safe_value(job.get("estimate_number"))
+    estimate_no = _safe_value(_resolve_job_estimate_number(job))
 
     (
         tab_overview,
@@ -2180,7 +2199,7 @@ def render_job_detail_dialog(job: dict) -> None:
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
     project_manager = _safe_value(job.get("project_manager"))
-    estimate_no = _safe_value(job.get("estimate_number"))
+    estimate_no = _safe_value(_resolve_job_estimate_number(job))
     schedule = _schedule_summary(job)
 
     inject_job_detail_layout_css()
