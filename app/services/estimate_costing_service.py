@@ -1047,6 +1047,53 @@ def add_estimate_subcontractor(estimate_id: str, data: dict[str, Any]) -> Servic
     )
 
 
+def _subcontractor_insert_payload(estimate_id: str, data: dict[str, Any], sort_order: int) -> dict[str, Any]:
+    calc = calc_simple_line(data.get("cost_total"), data.get("markup_percent"))
+    return {
+        "estimate_id": _str(estimate_id),
+        "vendor_id": data.get("vendor_id") or None,
+        "subcontractor_name": _str(data.get("subcontractor_name")),
+        "description": _str(data.get("description")),
+        "cost_total": calc["cost_total"],
+        "markup_percent": _num(data.get("markup_percent")),
+        "markup_amount": calc["markup_amount"],
+        "price_total": calc["price_total"],
+        "notes": _str(data.get("notes")),
+        "sort_order": sort_order,
+    }
+
+
+def add_estimate_subcontractor_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple subcontractor lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one subcontractor line with a cost.")
+    existing, _ = get_estimate_subcontractors(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        payload = _subcontractor_insert_payload(eid, data, sort_base + i)
+        result = insert_row(_SUBCONTRACTORS_TABLE, payload)
+        if not result.ok:
+            if result.error and _is_missing_table_message(result.error):
+                return ServiceResult(ok=False, error=_SUBCONTRACTORS_MISSING_MSG)
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} subcontractor lines. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save subcontractor lines.")
+    return ServiceResult(ok=True, data={"saved": inserted})
+
+
 def update_estimate_subcontractor(line_id: str, data: dict[str, Any]) -> ServiceResult:
     calc = calc_simple_line(data.get("cost_total"), data.get("markup_percent"))
     payload = {
@@ -1086,6 +1133,53 @@ def add_estimate_other_cost(estimate_id: str, data: dict[str, Any]) -> ServiceRe
         payload,
         missing_table_msg=_OTHER_COSTS_MISSING_MSG,
     )
+
+
+def _other_cost_insert_payload(estimate_id: str, data: dict[str, Any], sort_order: int) -> dict[str, Any]:
+    calc = calc_simple_line(data.get("cost_total"), data.get("markup_percent"))
+    return {
+        "estimate_id": _str(estimate_id),
+        "description": _str(data.get("description")),
+        "category": _str(data.get("category")),
+        "cost_total": calc["cost_total"],
+        "markup_percent": _num(data.get("markup_percent")),
+        "markup_amount": calc["markup_amount"],
+        "price_total": calc["price_total"],
+        "taxable": _bool(data.get("taxable"), False),
+        "notes": _str(data.get("notes")),
+        "sort_order": sort_order,
+    }
+
+
+def add_estimate_other_cost_batch(estimate_id: str, lines: list[dict[str, Any]]) -> ServiceResult:
+    """Insert multiple other cost lines, then recalculate estimate totals once."""
+    eid = _str(estimate_id)
+    if not lines:
+        return ServiceResult(ok=False, error="Add at least one other cost line with a cost.")
+    existing, _ = get_estimate_other_costs(eid)
+    sort_base = _next_sort_order(existing)
+    inserted = 0
+    last_err = ""
+    for i, data in enumerate(lines):
+        payload = _other_cost_insert_payload(eid, data, sort_base + i)
+        result = insert_row(_OTHER_COSTS_TABLE, payload)
+        if not result.ok:
+            if result.error and _is_missing_table_message(result.error):
+                return ServiceResult(ok=False, error=_OTHER_COSTS_MISSING_MSG)
+            last_err = str(result.error or "Save failed.")
+            break
+        inserted += 1
+    if inserted:
+        recalculate_and_save_estimate_totals(eid)
+    if inserted < len(lines):
+        if inserted:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {inserted} of {len(lines)} other cost lines. {last_err}",
+                data={"saved": inserted},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save other cost lines.")
+    return ServiceResult(ok=True, data={"saved": inserted})
 
 
 def update_estimate_other_cost(line_id: str, data: dict[str, Any]) -> ServiceResult:

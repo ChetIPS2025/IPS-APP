@@ -22,7 +22,9 @@ try:
         add_estimate_material,
         add_estimate_material_batch,
         add_estimate_other_cost,
+        add_estimate_other_cost_batch,
         add_estimate_subcontractor,
+        add_estimate_subcontractor_batch,
         add_estimate_travel,
         add_estimate_travel_batch,
         calculate_estimate_totals,
@@ -69,7 +71,9 @@ except ImportError:
         add_estimate_material,
         add_estimate_material_batch,
         add_estimate_other_cost,
+        add_estimate_other_cost_batch,
         add_estimate_subcontractor,
+        add_estimate_subcontractor_batch,
         add_estimate_travel,
         add_estimate_travel_batch,
         calculate_estimate_totals,
@@ -295,6 +299,38 @@ def _labor_line_rate_text(row: dict[str, Any]) -> str:
 
 def _clear_batch_form(*, form_state_key: str, draft_key: str) -> None:
     st.session_state.pop(form_state_key, None)
+    st.session_state.pop(draft_key, None)
+
+
+_DEFAULT_BATCH_ROW_COUNT = 5
+
+_BATCH_ENTRY_CAPTION = (
+    f"{_DEFAULT_BATCH_ROW_COUNT} blank rows ready — fill what you need, then save once. "
+    "Use + Add Row only if you need more."
+)
+
+
+def _new_blank_batch_row(**extra: str) -> dict[str, str]:
+    return {"rid": uuid4().hex[:8], **extra}
+
+
+def _initial_batch_draft_rows(count: int = _DEFAULT_BATCH_ROW_COUNT, **extra: str) -> list[dict[str, str]]:
+    return [_new_blank_batch_row(**extra) for _ in range(count)]
+
+
+def _single_batch_fallback_row(**extra: str) -> list[dict[str, str]]:
+    return [_new_blank_batch_row(**extra)]
+
+
+def _batch_draft_key_for_section(section: str, key_prefix: str, eid: str) -> str:
+    if section == "lab":
+        return _labor_batch_draft_key(key_prefix, eid)
+    return _batch_draft_key(section, key_prefix, eid)
+
+
+def _open_batch_add_form(*, form_state_key: str, draft_key: str) -> None:
+    """Open a staged-entry form with a fresh set of default blank rows."""
+    st.session_state[form_state_key] = True
     st.session_state.pop(draft_key, None)
 
 
@@ -571,6 +607,10 @@ def render_cost_builder_tab(
         totals = calculate_estimate_totals(eid)
     render_cost_summary_cards(est, totals)
 
+    st.caption(
+        "Staged entry: open a section for 5 blank rows, fill what you need, and save once."
+    )
+
     st.markdown('<div class="ips-estimate-builder-actions">', unsafe_allow_html=True)
     qa1, qa2, qa3, qa4, qa5, qa6 = st.columns(6, gap="small")
     with qa1:
@@ -599,17 +639,35 @@ def render_cost_builder_tab(
     st.markdown("</div>", unsafe_allow_html=True)
 
     if add_mat:
-        st.session_state[f"ecb_form_mat_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_mat_{eid}",
+            draft_key=_batch_draft_key("mat", "ecb_mat", eid),
+        )
     if add_lab:
-        st.session_state[f"ecb_form_lab_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_lab_{eid}",
+            draft_key=_batch_draft_key_for_section("lab", "ecb_lab", eid),
+        )
     if add_eq:
-        st.session_state[f"ecb_form_eq_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_eq_{eid}",
+            draft_key=_batch_draft_key("eq", "ecb_eq", eid),
+        )
     if add_trv:
-        st.session_state[f"ecb_form_trv_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_trv_{eid}",
+            draft_key=_batch_draft_key("trv", "ecb_trv", eid),
+        )
     if add_sub:
-        st.session_state[f"ecb_form_sub_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_sub_{eid}",
+            draft_key=_batch_draft_key("sub", "ecb_sub", eid),
+        )
     if add_other:
-        st.session_state[f"ecb_form_other_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"ecb_form_other_{eid}",
+            draft_key=_batch_draft_key("oth", "ecb_oth", eid),
+        )
 
     if st.session_state.get(f"ecb_form_mat_{eid}"):
         _render_add_material_form(
@@ -686,10 +744,10 @@ def _render_add_material_form(
     pick_labels = [*pg_labels, _CUSTOM_MATERIAL_LABEL] if pg_labels else [_CUSTOM_MATERIAL_LABEL]
     draft_key = _batch_draft_key("mat", key_prefix, eid)
     if draft_key not in st.session_state:
-        st.session_state[draft_key] = [{"rid": uuid4().hex[:8], "pick": pick_labels[0]}]
+        st.session_state[draft_key] = _initial_batch_draft_rows(pick=pick_labels[0])
 
     _compact_form_card("Add Pricing Items")
-    st.caption("Add multiple pricing guide or custom material lines, then save together.")
+    st.caption(_BATCH_ENTRY_CAPTION)
     if not pg_labels:
         st.info("No pricing guide items yet — use custom rows or add items under Pricing Guide.")
 
@@ -775,7 +833,7 @@ def _render_add_material_form(
 
     if remove_rid:
         remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
-        st.session_state[draft_key] = remaining or [{"rid": uuid4().hex[:8], "pick": pick_labels[0]}]
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row(pick=pick_labels[0])
         st.rerun()
 
     add_col, _ = st.columns([1, 3], gap="small")
@@ -863,11 +921,13 @@ def _render_add_labor_form(
                 lab_map=lab_map,
                 default_markup=default_markup,
             )
+            for _ in range(_DEFAULT_BATCH_ROW_COUNT)
         ]
 
     _compact_form_card("Add Labor")
     st.caption(
-        "Rates pre-fill from Pricing Guide → Labor Rates. Change ST/OT on a row to override for this estimate only."
+        f"{_BATCH_ENTRY_CAPTION} Rates pre-fill from Pricing Guide → Labor Rates; "
+        "change ST/OT on a row to override for this estimate only."
     )
 
     hdr = st.columns([2.2, 0.75, 0.75, 0.85, 0.85, 0.7, 0.85, 0.85, 0.45], gap="small")
@@ -1097,10 +1157,10 @@ def _render_add_equipment_form(
     labels = [label for label, _ in asset_options]
     draft_key = _batch_draft_key("eq", key_prefix, eid)
     if draft_key not in st.session_state:
-        st.session_state[draft_key] = [{"rid": uuid4().hex[:8], "pick": labels[0] if labels else ""}]
+        st.session_state[draft_key] = _initial_batch_draft_rows(pick=labels[0] if labels else "")
 
     _compact_form_card("Add Equipment")
-    st.caption("Add multiple equipment lines, then save together.")
+    st.caption(_BATCH_ENTRY_CAPTION)
     if not asset_options:
         st.info("No rentable assets available. Mark assets as Rentable on the Assets page.")
 
@@ -1214,7 +1274,7 @@ def _render_add_equipment_form(
 
     if remove_rid:
         remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
-        st.session_state[draft_key] = remaining or [{"rid": uuid4().hex[:8], "pick": labels[0] if labels else ""}]
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row(pick=labels[0] if labels else "")
         st.rerun()
 
     add_col, _ = st.columns([1, 3], gap="small")
@@ -1284,48 +1344,146 @@ def _render_add_subcontractor_form(
     fk = form_state_key or f"ecb_form_sub_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     default_markup = float(est.get("default_subcontractor_markup_pct") or 0)
+    draft_key = _batch_draft_key("sub", key_prefix, eid)
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = _initial_batch_draft_rows()
 
-    _compact_form_card("Add Subcontractor")
-    c1, c2 = st.columns(2, gap="small")
-    with c1:
-        if vendor_options:
-            vendor = st.selectbox("Vendor", vendor_options, key=k("vendor"))
-        else:
-            vendor = st.text_input("Subcontractor", key=k("vendor"))
-        description = st.text_input("Scope / description", key=k("desc"))
-        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
-        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-    with c2:
+    _compact_form_card("Add Subcontractors")
+    st.caption(_BATCH_ENTRY_CAPTION)
+
+    hdr = st.columns([2.0, 2.2, 0.95, 0.75, 0.9, 0.9, 0.55], gap="small")
+    for col, label in zip(hdr, ("Subcontractor", "Scope", "Cost", "Markup %", "Cost", "Price", "")):
+        with col:
+            st.markdown(
+                f'<div style="font-size:0.72rem;font-weight:700;color:#64748b;">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+
+    draft_rows: list[dict[str, str]] = list(st.session_state.get(draft_key) or [])
+    remove_rid = ""
+    for row in draft_rows:
+        rid = str(row.get("rid") or "")
+        if not rid:
+            continue
+        if k(f"mk_{rid}") not in st.session_state:
+            st.session_state[k(f"mk_{rid}")] = default_markup
+        if k(f"cost_{rid}") not in st.session_state:
+            st.session_state[k(f"cost_{rid}")] = 0.0
+        cols = st.columns([2.0, 2.2, 0.95, 0.75, 0.9, 0.9, 0.55], gap="small")
+        with cols[0]:
+            if vendor_options:
+                st.selectbox(
+                    "Subcontractor",
+                    vendor_options,
+                    key=k(f"vendor_{rid}"),
+                    label_visibility="collapsed",
+                )
+            else:
+                st.text_input(
+                    "Subcontractor",
+                    key=k(f"vendor_{rid}"),
+                    label_visibility="collapsed",
+                    placeholder="Subcontractor name",
+                )
+        with cols[1]:
+            st.text_input(
+                "Scope",
+                key=k(f"desc_{rid}"),
+                label_visibility="collapsed",
+                placeholder="Scope / description",
+            )
+        with cols[2]:
+            cost = st.number_input(
+                "Cost",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=k(f"cost_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[3]:
+            markup = st.number_input(
+                "Markup %",
+                min_value=0.0,
+                step=0.5,
+                key=k(f"mk_{rid}"),
+                label_visibility="collapsed",
+            )
         totals = simple_line_totals(cost, markup)
-        _live_totals_card(
-            [
-                ("Cost Total", fmt_currency(totals["cost_total"])),
-                ("Markup Amount", fmt_currency(totals["markup_amount"])),
-                ("Customer Price", fmt_currency(totals["price_total"])),
-            ]
+        with cols[4]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['cost_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[5]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['price_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[6]:
+            if st.button("✕", key=k(f"rm_{rid}"), help="Remove row"):
+                remove_rid = rid
+
+    if remove_rid:
+        remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row()
+        st.rerun()
+
+    add_col, _ = st.columns([1, 3], gap="small")
+    with add_col:
+        if st.button("+ Add Row", key=k("add_row"), use_container_width=True):
+            draft_rows.append(_new_blank_batch_row())
+            st.session_state[draft_key] = draft_rows
+            st.rerun()
+
+    save_col, cancel_col, _ = st.columns([1, 1, 2], gap="small")
+    with save_col:
+        save_clicked = st.button(
+            "Save Subcontractors",
+            key=k("save"),
+            type="primary",
+            use_container_width=True,
         )
-    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
-    if st.button("Save Subcontractor", key=k("save"), type="primary", use_container_width=True):
-        ok, err = _service_ok(
-            add_estimate_subcontractor(
-                eid,
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", key=k("cancel"), use_container_width=True)
+
+    if cancel_clicked:
+        _clear_batch_form(form_state_key=fk, draft_key=draft_key)
+        st.rerun()
+
+    if save_clicked:
+        payloads: list[dict[str, Any]] = []
+        for row in draft_rows:
+            rid = str(row.get("rid") or "")
+            if not rid:
+                continue
+            cost = float(st.session_state.get(k(f"cost_{rid}")) or 0)
+            if cost <= 0:
+                continue
+            vendor = str(st.session_state.get(k(f"vendor_{rid}")) or "").strip()
+            if not vendor:
+                continue
+            payloads.append(
                 {
                     "subcontractor_name": vendor,
-                    "description": description,
+                    "description": str(st.session_state.get(k(f"desc_{rid}")) or ""),
                     "cost_total": cost,
-                    "markup_percent": markup,
-                    "notes": notes,
-                },
+                    "markup_percent": float(st.session_state.get(k(f"mk_{rid}")) or default_markup),
+                }
             )
-        )
-        if ok:
-            st.session_state.pop(fk, None)
-            st.success("Subcontractor line added.")
-            st.rerun()
-        st.error(err)
-    if st.button("Cancel", key=k("cancel"), use_container_width=True):
-        st.session_state.pop(fk, None)
-        st.rerun()
+        if not payloads:
+            st.error("Enter at least one subcontractor line with a name and cost.")
+        else:
+            ok, err = _service_ok(add_estimate_subcontractor_batch(eid, payloads))
+            if ok:
+                _clear_batch_form(form_state_key=fk, draft_key=draft_key)
+                count = len(payloads)
+                st.success(f"Saved {count} subcontractor line{'s' if count != 1 else ''}.")
+                st.rerun()
+            st.error(err)
+
     _close_compact_form_card()
 
 
@@ -1339,48 +1497,135 @@ def _render_add_other_form(
     fk = form_state_key or f"ecb_form_other_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     default_markup = float(est.get("default_other_markup_pct") or 0)
+    draft_key = _batch_draft_key("oth", key_prefix, eid)
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = _initial_batch_draft_rows()
 
-    _compact_form_card("Add Other Cost")
-    c1, c2 = st.columns(2, gap="small")
-    with c1:
-        description = st.text_input("Description", key=k("desc"))
-        cost = st.number_input("Cost", min_value=0.0, value=0.0, key=k("cost"))
-        markup = st.number_input("Markup %", value=default_markup, key=k("mk"))
-        taxable = st.checkbox("Taxable", value=False, key=k("tax"))
-    with c2:
+    _compact_form_card("Add Other Costs")
+    st.caption(_BATCH_ENTRY_CAPTION)
+
+    hdr = st.columns([2.4, 0.95, 0.75, 0.65, 0.9, 0.9, 0.55], gap="small")
+    for col, label in zip(hdr, ("Description", "Cost", "Markup %", "Tax", "Cost", "Price", "")):
+        with col:
+            st.markdown(
+                f'<div style="font-size:0.72rem;font-weight:700;color:#64748b;">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+
+    draft_rows: list[dict[str, str]] = list(st.session_state.get(draft_key) or [])
+    remove_rid = ""
+    for row in draft_rows:
+        rid = str(row.get("rid") or "")
+        if not rid:
+            continue
+        if k(f"mk_{rid}") not in st.session_state:
+            st.session_state[k(f"mk_{rid}")] = default_markup
+        if k(f"cost_{rid}") not in st.session_state:
+            st.session_state[k(f"cost_{rid}")] = 0.0
+        if k(f"tax_{rid}") not in st.session_state:
+            st.session_state[k(f"tax_{rid}")] = False
+        cols = st.columns([2.4, 0.95, 0.75, 0.65, 0.9, 0.9, 0.55], gap="small")
+        with cols[0]:
+            st.text_input(
+                "Description",
+                key=k(f"desc_{rid}"),
+                label_visibility="collapsed",
+                placeholder="Description",
+            )
+        with cols[1]:
+            cost = st.number_input(
+                "Cost",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=k(f"cost_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[2]:
+            markup = st.number_input(
+                "Markup %",
+                min_value=0.0,
+                step=0.5,
+                key=k(f"mk_{rid}"),
+                label_visibility="collapsed",
+            )
+        with cols[3]:
+            st.checkbox("Tax", key=k(f"tax_{rid}"), label_visibility="collapsed")
         totals = simple_line_totals(cost, markup)
-        _live_totals_card(
-            [
-                ("Cost Total", fmt_currency(totals["cost_total"])),
-                ("Markup Amount", fmt_currency(totals["markup_amount"])),
-                ("Customer Price", fmt_currency(totals["price_total"])),
-            ]
+        with cols[4]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['cost_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[5]:
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(totals['price_total']))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[6]:
+            if st.button("✕", key=k(f"rm_{rid}"), help="Remove row"):
+                remove_rid = rid
+
+    if remove_rid:
+        remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row()
+        st.rerun()
+
+    add_col, _ = st.columns([1, 3], gap="small")
+    with add_col:
+        if st.button("+ Add Row", key=k("add_row"), use_container_width=True):
+            draft_rows.append(_new_blank_batch_row())
+            st.session_state[draft_key] = draft_rows
+            st.rerun()
+
+    save_col, cancel_col, _ = st.columns([1, 1, 2], gap="small")
+    with save_col:
+        save_clicked = st.button(
+            "Save Other Costs",
+            key=k("save"),
+            type="primary",
+            use_container_width=True,
         )
-    with st.expander("Advanced details", expanded=False):
-        st.text_input("Category", key=k("cat"))
-    notes = st.text_area("Notes", key=k("notes"), height=56, placeholder="Notes (optional)")
-    if st.button("Save Other Cost", key=k("save"), type="primary", use_container_width=True):
-        ok, err = _service_ok(
-            add_estimate_other_cost(
-                eid,
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", key=k("cancel"), use_container_width=True)
+
+    if cancel_clicked:
+        _clear_batch_form(form_state_key=fk, draft_key=draft_key)
+        st.rerun()
+
+    if save_clicked:
+        payloads: list[dict[str, Any]] = []
+        for row in draft_rows:
+            rid = str(row.get("rid") or "")
+            if not rid:
+                continue
+            cost = float(st.session_state.get(k(f"cost_{rid}")) or 0)
+            if cost <= 0:
+                continue
+            description = str(st.session_state.get(k(f"desc_{rid}")) or "").strip()
+            if not description:
+                continue
+            payloads.append(
                 {
                     "description": description,
-                    "category": st.session_state.get(k("cat")),
                     "cost_total": cost,
-                    "markup_percent": markup,
-                    "taxable": taxable,
-                    "notes": notes,
-                },
+                    "markup_percent": float(st.session_state.get(k(f"mk_{rid}")) or default_markup),
+                    "taxable": bool(st.session_state.get(k(f"tax_{rid}"))),
+                }
             )
-        )
-        if ok:
-            st.session_state.pop(fk, None)
-            st.success("Other cost added.")
-            st.rerun()
-        st.error(err)
-    if st.button("Cancel", key=k("cancel"), use_container_width=True):
-        st.session_state.pop(fk, None)
-        st.rerun()
+        if not payloads:
+            st.error("Enter at least one other cost line with a description and cost.")
+        else:
+            ok, err = _service_ok(add_estimate_other_cost_batch(eid, payloads))
+            if ok:
+                _clear_batch_form(form_state_key=fk, draft_key=draft_key)
+                count = len(payloads)
+                st.success(f"Saved {count} other cost line{'s' if count != 1 else ''}.")
+                st.rerun()
+            st.error(err)
+
     _close_compact_form_card()
 
 
@@ -1496,12 +1741,12 @@ def _render_add_travel_form(
     defaults = travel_defaults()
     draft_key = _batch_draft_key("trv", key_prefix, eid)
     if draft_key not in st.session_state:
-        st.session_state[draft_key] = [{"rid": uuid4().hex[:8]}]
+        st.session_state[draft_key] = _initial_batch_draft_rows()
 
     _compact_form_card("Add Travel Costs")
     st.caption(
-        "Qty = miles, days, nights, hours, or flat cost. Rate = per-unit rate where applicable. "
-        "× = trips or people."
+        f"{_BATCH_ENTRY_CAPTION} Qty = miles, days, nights, hours, or flat cost. "
+        "Rate = per-unit rate where applicable. × = trips or people."
     )
 
     hdr = st.columns([1.5, 0.75, 0.85, 0.65, 0.7, 0.85, 0.85, 0.55], gap="small")
@@ -1603,7 +1848,7 @@ def _render_add_travel_form(
 
     if remove_rid:
         remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
-        st.session_state[draft_key] = remaining or [{"rid": uuid4().hex[:8]}]
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row()
         st.rerun()
 
     add_col, _ = st.columns([1, 3], gap="small")
@@ -1798,7 +2043,10 @@ def render_travel_tab(est: dict[str, Any]) -> None:
             )
 
     if st.button("+ Add Travel Cost", key=f"trv_tab_add_{eid}"):
-        st.session_state[f"trv_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"trv_tab_form_{eid}",
+            draft_key=_batch_draft_key("trv", "trv_tab", eid),
+        )
         st.rerun()
 
     if not travel_lines:
@@ -2012,7 +2260,10 @@ def render_materials_tab(
         key_prefix="mat_tab",
     )
     if st.button("+ Add Pricing Item", key=f"mat_tab_add_{eid}"):
-        st.session_state[f"mat_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"mat_tab_form_{eid}",
+            draft_key=_batch_draft_key("mat", "mat_tab", eid),
+        )
         st.rerun()
     if st.session_state.get(f"mat_tab_form_{eid}"):
         _render_add_material_form(
@@ -2030,7 +2281,10 @@ def render_labor_tab(est: dict[str, Any]) -> None:
     bundle = get_estimate_bundle(eid)
     _render_labor_lines(eid, bundle["labor"], key_prefix="lab_tab")
     if st.button("+ Add Labor", key=f"lab_tab_add_{eid}"):
-        st.session_state[f"lab_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"lab_tab_form_{eid}",
+            draft_key=_batch_draft_key_for_section("lab", "lab_tab", eid),
+        )
         st.rerun()
     if st.session_state.get(f"lab_tab_form_{eid}"):
         _render_add_labor_form(
@@ -2058,7 +2312,10 @@ def render_equipment_tab(est: dict[str, Any], *, asset_options: list[tuple[str, 
         key_prefix="eq_tab",
     )
     if st.button("+ Add Equipment", key=f"eq_tab_add_{eid}"):
-        st.session_state[f"eq_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"eq_tab_form_{eid}",
+            draft_key=_batch_draft_key("eq", "eq_tab", eid),
+        )
         st.rerun()
     if st.session_state.get(f"eq_tab_form_{eid}"):
         _render_add_equipment_form(
@@ -2087,7 +2344,10 @@ def render_subcontractors_tab(est: dict[str, Any], *, vendor_options: list[str] 
         key_prefix="sub_tab",
     )
     if st.button("+ Add Subcontractor", key=f"sub_tab_add_{eid}"):
-        st.session_state[f"sub_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"sub_tab_form_{eid}",
+            draft_key=_batch_draft_key("sub", "sub_tab", eid),
+        )
         st.rerun()
     if st.session_state.get(f"sub_tab_form_{eid}"):
         _render_add_subcontractor_form(
@@ -2116,7 +2376,10 @@ def render_other_costs_tab(est: dict[str, Any]) -> None:
         key_prefix="oth_tab",
     )
     if st.button("+ Add Other Cost", key=f"oth_tab_add_{eid}"):
-        st.session_state[f"oth_tab_form_{eid}"] = True
+        _open_batch_add_form(
+            form_state_key=f"oth_tab_form_{eid}",
+            draft_key=_batch_draft_key("oth", "oth_tab", eid),
+        )
         st.rerun()
     if st.session_state.get(f"oth_tab_form_{eid}"):
         _render_add_other_form(
